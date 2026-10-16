@@ -17,16 +17,15 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import {
     getPositionForCell,
-    getRangeAttackSideCenter,
     isCellWithinGrid,
     isRangeAttackSideObservable,
     RANGE_ATTACK_CELL_SIDES,
-    type RangeAttackCellSide,
+    resolveRangeAttackAimEdge,
 } from "../../grid/grid_math";
 import { footprintCellsForAnchor } from "../../simulation/footprint";
-import { VINE_STRIDE_COST_MULTIPLIER } from "../../spells/vines";
+import { maxCellsForStepBudget } from "../../spells/vines";
 import type { Unit } from "../../units/unit";
-import { getDistance, type XY } from "../../utils/math";
+import type { XY } from "../../utils/math";
 import { AIActionType, canUnitLandAt, findTarget, type IAIAction } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { decisionFireWalls } from "../decision_fight_state";
@@ -327,7 +326,16 @@ export class StrategyV0_1 implements IAIStrategy {
             const through = unit.hasAbilityActive("Through Shot");
             for (const cell of target.getCells()) {
                 for (const side of RANGE_ATTACK_CELL_SIDES) {
-                    if (!isRangeAttackSideObservable(matrix, cell, side, unit.getTeam(), through)) {
+                    if (
+                        !isRangeAttackSideObservable(
+                            matrix,
+                            cell,
+                            side,
+                            unit.getTeam(),
+                            through,
+                            unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw"),
+                        )
+                    ) {
                         continue;
                     }
                     const aimedShot: Extract<GameAction, { type: "range_attack" }> = {
@@ -373,60 +381,25 @@ export class StrategyV0_1 implements IAIStrategy {
         const from = unit.getPosition();
         const through = unit.hasAbilityActive("Through Shot");
         const isAOE = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
-        const closestCell = (cells: XY[]): XY | undefined => {
-            let best: XY | undefined;
-            let bestDistance = Number.MAX_VALUE;
-            for (const cell of cells) {
-                const distance = getDistance(
-                    from,
-                    getPositionForCell(
-                        cell,
-                        gridSettings.getMinX(),
-                        gridSettings.getStep(),
-                        gridSettings.getHalfStep(),
-                    ),
-                );
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    best = cell;
-                }
-            }
-            return best;
-        };
-        const closestSide = (cell: XY, sides: readonly RangeAttackCellSide[]): RangeAttackCellSide => {
-            let best = sides[0];
-            let bestDistance = Number.MAX_VALUE;
-            for (const side of sides) {
-                const distance = getDistance(from, getRangeAttackSideCenter(gridSettings, cell, side, from));
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    best = side;
-                }
-            }
-            return best;
-        };
-
-        const targetCells = target.getCells();
-        const aimCell =
-            (action.aimCell &&
-                targetCells.find((cell) => cell.x === action.aimCell?.x && cell.y === action.aimCell?.y)) ??
-            closestCell(targetCells);
-        if (!aimCell) {
-            return false;
-        }
-        const observableSides = RANGE_ATTACK_CELL_SIDES.filter((side) =>
-            isRangeAttackSideObservable(matrix, aimCell, side, unit.getTeam(), through),
+        // Resolve the aim with the same shared resolver ActionEngine.rangeAttack uses: the requested edge while
+        // it is still observable, else the observable edge nearest the shooter across EVERY target cell. The
+        // old mirror took the nearest cell first and then its nearest side, so an aimless shot could be
+        // validated on a clear edge while the engine fired at a different edge straight into a mountain.
+        const edge = resolveRangeAttackAimEdge(
+            matrix,
+            gridSettings,
+            target.getCells(),
+            from,
+            unit.getTeam(),
+            through,
+            action.aimCell,
+            action.aimSide,
+            isAOE,
         );
-        const to = !observableSides.length
-            ? target.getPosition()
-            : getRangeAttackSideCenter(
-                  gridSettings,
-                  aimCell,
-                  action.aimSide !== undefined && observableSides.includes(action.aimSide as RangeAttackCellSide)
-                      ? (action.aimSide as RangeAttackCellSide)
-                      : closestSide(aimCell, observableSides),
-                  from,
-              );
+        if (!edge) {
+            return false; // no visible edge: the engine refuses the shot outright
+        }
+        const to = edge.position;
         const evaluation = attackHandler.evaluateRangeAttack(
             context.unitsHolder.getAllUnits(),
             unit,
@@ -547,9 +520,11 @@ export class StrategyV0_1 implements IAIStrategy {
             route.route[0]?.x === base.x && route.route[0]?.y === base.y ? route.route.slice(1) : route.route;
         const vines =
             context.fightProperties?.getVines() ?? FightStateManager.getInstance().getFightProperties().getVines();
-        const cheapestCellCost =
-            unit.hasAbilityActive("In Its Own World") && vines.size() > 0 ? VINE_STRIDE_COST_MULTIPLIER : 1;
-        const maxTravelledCells = Math.max(1, Math.ceil(unit.getSteps() / cheapestCellCost));
+        const maxTravelledCells = maxCellsForStepBudget(
+            unit.getSteps(),
+            unit.hasAbilityActive("In Its Own World") && vines.size() > 0,
+            context.grid.getSettings().getGridSize(),
+        );
         if (
             !travelled.length ||
             travelled.length > maxTravelledCells ||

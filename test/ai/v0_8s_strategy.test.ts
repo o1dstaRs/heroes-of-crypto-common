@@ -23,7 +23,11 @@ import {
 } from "../../src/ai";
 import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { StrategyV0_8S } from "../../src/ai/versions/v0_8s";
-import { selectV08STargetPressureCandidate, V08S_URGENT_FINISH_START_LAP } from "../../src/ai/versions/v0_8s_finish";
+import {
+    selectV08STargetPressureCandidate,
+    V08_TARGET_PRESSURE_START_LAP,
+    V08S_URGENT_FINISH_START_LAP,
+} from "../../src/ai/versions/v0_8s_finish";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -227,7 +231,16 @@ describe("v0.8 search measurement alias", () => {
         // Two isolated runs reproduced it.
         // Re-pinned 2026-08-29 with the same Warding Mane Blessing change as the v0.7 control above.
         // Two isolated runs reproduced it.
-        expect(digest("v0.8")).toBe("df27e9e232957eadeedcc54bdec2be538fcc79dc5d124573a394c646bfc77ae5");
+        // Re-pinned 2026-09-12 for the Through Shot LINE policy: v0.8 now takes the shot that pierces the most
+        // valuable set of enemies, including a free line aimed at a world point (test/ai/through_shot_free_aim).
+        // The seeded rosters field Tsar Cannons, so the v0.8 trace diverges at its first such shot; the v0.7
+        // digest above is untouched (the frozen versions only gain the line behind V06_THROUGH_SHOT). Two
+        // isolated runs reproduced this digest byte-identically.
+        // Re-pinned 2026-09-25: only melee may follow a move in the same turn. v0.8's ranged positioning no
+        // longer steps a shooter forward and then fires (the engine now rejects that shot), so its trace moves;
+        // the v0.7 control above is untouched (v0.7 never planned move-then-shoot). Two isolated runs reproduced
+        // this digest, both with zero rejected actions.
+        expect(digest("v0.8")).toBe("d93b20d6acf01564891ff53d17a78ab394df99f04054583fc4d2617d3b2f3dff");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {
@@ -316,6 +329,95 @@ describe("v0.8 search measurement alias", () => {
         expect(selectV08STargetPressureCandidate(dulling.actor, dulling.context.unitsHolder, [dullingDelivery])).toBe(
             dullingDelivery,
         );
+    });
+
+    it("does not defer a knight who will not answer", () => {
+        const dulling = schedulerFixture();
+        const plainTank = dulling.placeTarget(
+            createTestUnit({ team: RIGHT, name: "Plain tank", maxHp: 100, amountAlive: 1, attack: 10 }),
+            { x: 5, y: 6 },
+        );
+        const dullingTank = dulling.placeTarget(
+            createTestUnit({
+                team: RIGHT,
+                name: "Dulling tank",
+                maxHp: 100,
+                amountAlive: 1,
+                attack: 10,
+                abilities: ["Dulling Defense"],
+            }),
+            { x: 7, y: 5 },
+        );
+        const dullingDelivery = candidate(dulling.actor, dullingTank, { damage: 20 });
+        const plainDelivery = candidate(dulling.actor, plainTank, { damage: 20 });
+        const fightProperties = dulling.context.fightProperties;
+
+        expect(
+            selectV08STargetPressureCandidate(
+                dulling.actor,
+                dulling.context.unitsHolder,
+                [dullingDelivery, plainDelivery],
+                V08_TARGET_PRESSURE_START_LAP,
+                fightProperties,
+            ),
+        ).toBe(plainDelivery);
+
+        fightProperties!.addRepliedAttack(dullingTank.getId());
+        expect(
+            selectV08STargetPressureCandidate(
+                dulling.actor,
+                dulling.context.unitsHolder,
+                [dullingDelivery, plainDelivery],
+                V08_TARGET_PRESSURE_START_LAP,
+                fightProperties,
+            ),
+        ).toBe(dullingDelivery);
+    });
+
+    it("treats the knight's own swing as a reason to attack the unit he can still dull", () => {
+        const { context, placeTarget } = schedulerFixture();
+        const knight = createTestUnit({
+            team: LEFT,
+            name: "Knight",
+            attack: 10,
+            abilities: ["Dulling Defense"],
+        });
+        const ordinary = createTestUnit({ team: LEFT, name: "Ordinary", attack: 10 });
+        const spent = placeTarget(
+            createTestUnit({ team: RIGHT, name: "Spent", maxHp: 100, amountAlive: 1, attack: 1 }),
+            { x: 5, y: 6 },
+        );
+        const cuttable = placeTarget(
+            createTestUnit({ team: RIGHT, name: "Cuttable", maxHp: 100, amountAlive: 1, attack: 12 }),
+            { x: 7, y: 5 },
+        );
+        const bulky = placeTarget(
+            createTestUnit({ team: RIGHT, name: "Bulky", maxHp: 200, amountAlive: 1, attack: 1 }),
+            { x: 8, y: 8 },
+        );
+        const spentDelivery = candidate(knight, spent, { damage: 20 });
+        const cuttableDelivery = candidate(knight, cuttable, { damage: 20 });
+        const bulkyDelivery = candidate(knight, bulky, { damage: 20 });
+        const shot = candidate(knight, cuttable, { kind: "shot", damage: 20 });
+        const biggerShot = candidate(knight, cuttable, { kind: "shot", damage: 40 });
+        const kill = candidate(knight, spent, { damage: 20, kill: 1 });
+
+        expect(selectV08STargetPressureCandidate(knight, context.unitsHolder, [spentDelivery, cuttableDelivery])).toBe(
+            cuttableDelivery,
+        );
+        expect(
+            selectV08STargetPressureCandidate(ordinary, context.unitsHolder, [spentDelivery, cuttableDelivery]),
+        ).toBe(spentDelivery);
+        expect(selectV08STargetPressureCandidate(knight, context.unitsHolder, [cuttableDelivery, bulkyDelivery])).toBe(
+            bulkyDelivery,
+        );
+        expect(selectV08STargetPressureCandidate(knight, context.unitsHolder, [shot, cuttableDelivery])).toBe(
+            cuttableDelivery,
+        );
+        expect(selectV08STargetPressureCandidate(knight, context.unitsHolder, [cuttableDelivery, biggerShot])).toBe(
+            biggerShot,
+        );
+        expect(selectV08STargetPressureCandidate(knight, context.unitsHolder, [cuttableDelivery, kill])).toBe(kill);
     });
 
     it("preserves the exact same-target incumbent unless an alternative creates an immediate kill", () => {

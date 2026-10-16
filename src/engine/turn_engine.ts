@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { detonateLastFuseChain, explodeLastFuse, type IPyreExplosion } from "../abilities/last_fuse_ability";
 import { getSpellConfig } from "../configuration/config_provider";
 import {
     MAX_HOLE_LAYERS,
@@ -367,6 +368,49 @@ export class TurnEngine {
 
         return events;
     }
+    private detonateDeletedUnit(unit: Unit, events: GameEvent[]): void {
+        const explosion = explodeLastFuse(unit, this.unitsHolder, this.sceneLog);
+        if (!explosion) {
+            return;
+        }
+        this.emitPyreExplosion(events, explosion);
+        detonateLastFuseChain(
+            explosion.unitIdsDied,
+            this.unitsHolder,
+            this.sceneLog,
+            (unitId) => {
+                events.push({ type: "unit_destroyed", unitId, reason: "dead_cleanup" });
+            },
+            (chain) => {
+                this.emitPyreExplosion(events, chain);
+            },
+            (resurrected) => {
+                if (this.headlessEvents) {
+                    return;
+                }
+                this.sceneLog.updateLog(`${resurrected.getName()} is resurrecting!`);
+                events.push({
+                    type: "unit_resurrected",
+                    unitId: resurrected.getId(),
+                    team: resurrected.getTeam(),
+                    amount: resurrected.getAmountAlive(),
+                    hp: resurrected.getHp(),
+                    position: { ...resurrected.getPosition() },
+                });
+            },
+        );
+    }
+    private emitPyreExplosion(events: GameEvent[], explosion: IPyreExplosion | undefined): void {
+        if (!explosion || this.headlessEvents) {
+            return;
+        }
+        events.push({
+            type: "pyre_exploded",
+            unitId: explosion.unitId,
+            position: explosion.position,
+            hits: explosion.hits,
+        });
+    }
     private handleSystemMoveResult(result: ISystemMoveResult): GameEvent[] {
         const events: GameEvent[] = [];
 
@@ -379,10 +423,17 @@ export class TurnEngine {
         for (const [unitId, position] of result.unitIdToNewPosition.entries()) {
             events.push({ type: "unit_moved_by_system", unitId, position, reason: "narrowing" });
         }
+        if (result.dispelledSmokeCells?.length && !this.headlessEvents) {
+            events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+        }
 
         for (const unitId of result.unitIdsDestroyed) {
+            const crushed = this.unitsHolder.getAllUnits().get(unitId);
             if (this.unitsHolder.deleteUnitById(unitId)) {
                 events.push({ type: "unit_destroyed", unitId, reason: "narrowing" });
+                if (crushed?.isDead()) {
+                    this.detonateDeletedUnit(crushed, events);
+                }
             }
         }
 
@@ -426,6 +477,7 @@ export class TurnEngine {
                 // no-questions crush the narrowing branch above applies.
                 if (unit.isDead() && this.unitsHolder.deleteUnitById(unitId, true)) {
                     events.push({ type: "unit_destroyed", unitId, reason: "dead_cleanup" });
+                    this.detonateDeletedUnit(unit, events);
                 }
             }
         }
@@ -441,12 +493,16 @@ export class TurnEngine {
         }
 
         for (const unit of units) {
+            if (unit.isDead() || !this.unitsHolder.getAllUnits().has(unit.getId())) {
+                continue;
+            }
             const amountAliveBefore = unit.getAmountAlive();
             const damage = unit.applyArmageddonDamage(wave, this.sceneLog);
             const unitsDied = Math.max(0, amountAliveBefore - unit.getAmountAlive());
             events.push({ type: "armageddon_applied", unitId: unit.getId(), wave, damage, unitsDied });
             if (unit.isDead() && this.unitsHolder.deleteUnitById(unit.getId(), wave === 1)) {
                 events.push({ type: "unit_destroyed", unitId: unit.getId(), reason: "armageddon" });
+                this.detonateDeletedUnit(unit, events);
             }
         }
 
@@ -487,12 +543,34 @@ export class TurnEngine {
 
         return events;
     }
+    /**
+     * The team's living stacks that haven't acted this lap — what the turn clock shares the budget among. Both
+     * teams' stored stack counts are refreshed on the way, so losses and summons reach every reader of them.
+     */
+    private stacksToAct(team: TeamType): number {
+        for (const side of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT] as TeamType[]) {
+            this.fightProperties.setTeamUnitsAlive(
+                side,
+                this.unitsHolder.getAllAllies(side).filter((ally) => !ally.isDead()).length,
+            );
+        }
+        return this.unitsHolder
+            .getAllAllies(team)
+            .filter((ally) => !ally.isDead() && !this.fightProperties.hasAlreadyMadeTurn(ally.getId())).length;
+    }
     private activateNextUnit(unit: Unit): GameEvent[] {
         const events: GameEvent[] = [];
+        // completeTurn clears the flag when a turn ends; clearing it again as a turn starts means no path that ends a
+        // turn without it (a stack killed mid-move and raised later) can leave a unit barred from shooting or casting.
+        unit.setMovedThisTurn(false);
         if (unit.isOnHourglass()) {
             unit.setOnHourglass(false);
         }
-        this.fightProperties.startTurn(unit.getTeam(), this.runtime.clock.nowMillis());
+        this.fightProperties.startTurn(
+            unit.getTeam(),
+            this.runtime.clock.nowMillis(),
+            this.stacksToAct(unit.getTeam()),
+        );
         unit.refreshPreTurnState(this.sceneLog);
 
         // Poison ticks at the very start of the unit's turn, before it acts (even if it is about to skip).
@@ -511,6 +589,7 @@ export class TurnEngine {
             }
             if (unit.isDead() && this.unitsHolder.deleteUnitById(unit.getId())) {
                 events.push({ type: "unit_destroyed", unitId: unit.getId(), reason: "poison" });
+                this.detonateDeletedUnit(unit, events);
                 return events;
             }
         }

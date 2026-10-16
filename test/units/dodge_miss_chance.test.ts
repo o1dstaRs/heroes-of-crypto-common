@@ -58,3 +58,67 @@ describe("Dodge miss chance (Scavenger)", () => {
         expect(attacker().calculateMissChance(orc, 0)).toBe(0);
     });
 });
+
+/*
+ * Small Specie dodges LEVEL-4 attackers only — the 2x2 giants. The old "not small" gate also caught the
+ * 2x1/1x2 rectangles, letting a Small Specie holder dodge bodies the ability was never meant to blur past.
+ * Owner call (1 Oct): level 4 is the gate, and every level 4 is a 2x2, so the two readings coincide.
+ */
+describe("Small Specie dodges level 4 (2x2) attackers only", () => {
+    const holder = () =>
+        createTestUnit({
+            team: PBTypes.TeamVals.RIGHT,
+            attackType: PBTypes.AttackVals.MELEE,
+            name: "Halfling",
+            abilities: ["Small Specie"],
+            stackPower: 5,
+        });
+
+    test("a level 4 attacker can be dodged (50% at full stack, no luck)", () => {
+        createCombatTestContext();
+        const giant = createTestUnit({
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.MELEE,
+            name: "Giant",
+            level: PBTypes.UnitLevelVals.FOURTH,
+            size: PBTypes.UnitSizeVals.LARGE,
+        });
+        expect(giant.calculateMissChance(holder(), 0)).toBe(50);
+    });
+
+    test("a small level 1 attacker is never dodged", () => {
+        createCombatTestContext();
+        const imp = createTestUnit({
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.MELEE,
+            name: "Imp",
+        });
+        expect(imp.calculateMissChance(holder(), 0)).toBe(0);
+    });
+
+    test("a 2x1 rectangle attacker is NOT dodged — large-ish is not a level 4 giant", () => {
+        createCombatTestContext();
+        const serpent = createTestUnit({
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.MELEE,
+            name: "Serpent",
+            footprintWidth: 2,
+            footprintHeight: 1,
+        });
+        // Not small, so the OLD gate dodged it; the level gate must not.
+        expect(serpent.isSmallSize()).toBe(false);
+        expect(serpent.calculateMissChance(holder(), 0)).toBe(0);
+    });
+
+    test("a mid-level 2x2 attacker is not dodged either — the gate is the level, not the footprint", () => {
+        createCombatTestContext();
+        const ogre = createTestUnit({
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.MELEE,
+            name: "Ogre",
+            level: PBTypes.UnitLevelVals.THIRD,
+            size: PBTypes.UnitSizeVals.LARGE,
+        });
+        expect(ogre.calculateMissChance(holder(), 0)).toBe(0);
+    });
+});

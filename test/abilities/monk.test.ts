@@ -41,7 +41,7 @@ beforeEach(() => FightStateManager.getInstance().reset());
 afterEach(() => setDeterministicRandomSource(undefined));
 
 /**
- * Pin the exact value each getRandomInt(0, 100) call returns, in order. getRandomInt combines one 21-bit
+ * Pin the raw integer used by each getRandomInt call, in order. getRandomInt combines one 21-bit
  * and one 32-bit source draw, so an exact raw integer keeps the percentage boundary explicit (same trick
  * as the Predatory Assimilation tests). A single-candidate pick consumes no draw at all — getRandomInt
  * returns min when the span is 1.
@@ -146,7 +146,7 @@ describe("Borrowed Grace", () => {
         expect(borrowedGraceChance(makeMonk(5), 0)).toBe(70);
     });
 
-    it("takes a cast buff off the target and wears it with the laps it had left", () => {
+    it("copies a cast buff and leaves it on the target with the laps it had left", () => {
         const monk = makeMonk(5);
         const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.RIGHT });
         castBuff(target, "Life", "Blessing");
@@ -156,7 +156,7 @@ describe("Borrowed Grace", () => {
         const stolen = processBorrowedGraceAbility(monk, target, new SceneLogMock());
 
         expect(stolen?.buffName).toBe("Blessing");
-        expect(target.getBuff("Blessing")).toBeUndefined();
+        expect(target.getBuff("Blessing")?.getLaps()).toBe(laps);
         expect(monk.getBuff("Blessing")?.getLaps()).toBe(laps);
     });
 
@@ -165,7 +165,7 @@ describe("Borrowed Grace", () => {
         const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.RIGHT });
         castBuff(target, "Life", "Blessing");
 
-        setRolls(20); // the boundary itself misses
+        setRolls(2_000); // the 20% boundary itself misses
         expect(processBorrowedGraceAbility(monk, target, new SceneLogMock())).toBeUndefined();
         expect(target.getBuff("Blessing")).toBeDefined();
     });
@@ -386,8 +386,8 @@ describe("Absolving Arrow", () => {
         expect(enemy.isDead()).toBe(false);
         // Absolving Arrow cleansed the ally the arrow crossed...
         expect(ally.hasEffectActive("Stun")).toBe(false);
-        // ...and Borrowed Grace moved the target's blessing onto the Monk.
-        expect(enemy.getBuff("Blessing")).toBeUndefined();
+        // ...and Borrowed Grace copied the target's blessing onto the Monk.
+        expect(enemy.getBuff("Blessing")).toBeDefined();
         expect(monk.getBuff("Blessing")).toBeDefined();
     });
 

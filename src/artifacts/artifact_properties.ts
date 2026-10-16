@@ -29,8 +29,8 @@ export enum ArtifactTier {
 export enum Tier1Artifact {
     NO_ARTIFACT = 0,
     VETERAN_HELM = 1, // +4% defense (all)
-    AMULET_OF_RESOLVE = 2, // +25% status resist
-    KEEN_BLADE = 3, // +1 attack (flat)
+    AMULET_OF_RESOLVE = 2, // +25% status and mind resist
+    KEEN_BLADE = 3, // +1 ranged attack / +0.7 melee attack (flat)
     IRON_PLATE = 4, // +1 defense (flat)
     SWIFT_BOOTS = 5, // +1 movement to melee units
     WINGED_BOOTS = 6, // +1 movement and +1 armor to flying units
@@ -38,32 +38,48 @@ export enum Tier1Artifact {
     WOUNDING_CHARM = 8, // grants the Deep Wounds Level 1 card to all allies
     CURSED_WARD = 9, // +5 luck / -5 morale
     HUNTERS_LONGBOW = 10, // ranged units: +1 flat atk per archer in the army (scales with archer count), no downside
-    HELM_OF_FOCUS = 11, // +25% mind resist
+    BARREL_BARRICADE = 11, // two deployable single-hit barrels
     BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 20% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
     MAGES_RING = 13, // +10% magic damage (army-wide); Tier-1 half of the arcane pair
+    // Was Tier 2 id 10. That id stays addressable for saved games; new drafts pick this one.
+    TOME_OF_AMPLIFICATION = 14, // +35% power to non-healing castable buffs allied units apply to allies
+    // Was Tier 2 id 11. That id stays addressable for saved games; new drafts pick this one.
+    RIME_CHARM = 15, // 30% plus the attacking unit's current luck to slow a target for 3 laps
 }
 
 export enum Tier2Artifact {
     NO_ARTIFACT = 0,
-    WARLORDS_EDGE = 1, // +15% attack (all)
+    WARLORDS_EDGE = 1, // +16% ranged attack / +12% melee attack
     TITAN_PLATE = 2, // +15% defense (all)
     HOLY_CROSS = 3, // +50% heal & resurrection; cast Troll ability without consuming it
     CLOVER_OF_FORTUNE = 4, // +10 luck
     CROWN_OF_COMMAND = 5, // +1 movement, +8 morale, and +1 armor (all)
     GIANTS_MAUL = 6, // +50% non-magical (physical) AOE damage, resisted by status resistance
     PENDANT_OF_VITALITY = 7, // +25% HP (all) / -20% attack
-    FARSIGHT_QUIVER = 8, // all allied archers shoot at full arrow (no range falloff)
-    BERSERKERS_BOND = 9, // +3 attack / -2 defense (flat)
-    TOME_OF_AMPLIFICATION = 10, // +50% power to non-healing castable buffs allied units apply to allies
-    RIME_CHARM = 11, // 30% chance to apply a 3-turn slow on any attack
+    FARSIGHT_QUIVER = 8, // allied archers ignore range falloff (always 1/1); a shot through smoke is still 1/2
+    BERSERKERS_BOND = 9, // +3 attack / -1 defense (flat)
+    // Retired from the live Tier-2 pool (2026-10-14). New drafts pick Tier1Artifact.TOME_OF_AMPLIFICATION.
+    // This id still applies the same buff, so a saved game or replay that drafted it does not lose it.
+    TOME_OF_AMPLIFICATION = 10,
+    // Retired from the live Tier-2 pool (2026-10-14). New drafts pick Tier1Artifact.RIME_CHARM.
+    // This id still applies the same buff, so a saved game or replay that drafted it does not lose it.
+    RIME_CHARM = 11, // 30% plus the attacking unit's current luck to slow a target for 3 laps
     LAVA_STRIDERS = 12, // all units may move over lava
+    QUIVER_OF_ECHOES = 15, // One extra ranged attack, 40% + current luck chance
+    GRAVECHAIN = 16,
+    AEGIS_OF_THE_ARCANE = 14, // extra magic-defense roll (army-wide), combined, not added
     ARCHMAGES_RING = 13, // +20% magic damage (army-wide); Tier-2 half of the arcane pair
+    LAST_FUSE = 17, // death blast: 20% of actual killing damage, at least 20 per stack power
 }
 
 // Keep retired artifacts addressable for saved games, replays, and balance history, but exclude them from every
 // live selection pool. New ranked drafts and the sandbox both build their choices from the lists below.
 export const DISABLED_TIER1_ARTIFACT_IDS: ReadonlySet<Tier1Artifact> = new Set([Tier1Artifact.BROKEN_AEGIS]);
-export const DISABLED_TIER2_ARTIFACT_IDS: ReadonlySet<Tier2Artifact> = new Set([Tier2Artifact.HOLY_CROSS]);
+export const DISABLED_TIER2_ARTIFACT_IDS: ReadonlySet<Tier2Artifact> = new Set([
+    Tier2Artifact.HOLY_CROSS,
+    Tier2Artifact.TOME_OF_AMPLIFICATION,
+    Tier2Artifact.RIME_CHARM,
+]);
 
 export type ArtifactType =
     { tier: ArtifactTier.TIER_1; value: Tier1Artifact } | { tier: ArtifactTier.TIER_2; value: Tier2Artifact };
@@ -82,9 +98,11 @@ export const ToTier1Artifact: { [key: string]: Tier1Artifact } = {
     "8": Tier1Artifact.WOUNDING_CHARM,
     "9": Tier1Artifact.CURSED_WARD,
     "10": Tier1Artifact.HUNTERS_LONGBOW,
-    "11": Tier1Artifact.HELM_OF_FOCUS,
+    "11": Tier1Artifact.BARREL_BARRICADE,
     "12": Tier1Artifact.BROKEN_AEGIS,
     "13": Tier1Artifact.MAGES_RING,
+    "14": Tier1Artifact.TOME_OF_AMPLIFICATION,
+    "15": Tier1Artifact.RIME_CHARM,
 };
 
 export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
@@ -103,17 +121,23 @@ export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
     "11": Tier2Artifact.RIME_CHARM,
     "12": Tier2Artifact.LAVA_STRIDERS,
     "13": Tier2Artifact.ARCHMAGES_RING,
+    "14": Tier2Artifact.AEGIS_OF_THE_ARCANE,
+    "15": Tier2Artifact.QUIVER_OF_ECHOES,
+    "16": Tier2Artifact.GRAVECHAIN,
+    "17": Tier2Artifact.LAST_FUSE,
 };
 
 // Effect magnitudes. Centralised here so balance tuning happens in one place.
 export const ARTIFACT_POWER = {
     VETERAN_HELM_PERCENT: 4,
     WARLORDS_EDGE_PERCENT: 12,
+    WARLORDS_EDGE_RANGED_PERCENT: 16,
     TITAN_PLATE_PERCENT: 12,
     KEEN_BLADE_FLAT: 0.7,
+    KEEN_BLADE_RANGED_FLAT: 1,
     IRON_PLATE_FLAT: 1,
     BERSERKERS_BOND_ATTACK: 3,
-    BERSERKERS_BOND_DEFENSE_PENALTY: 2,
+    BERSERKERS_BOND_DEFENSE_PENALTY: 1,
     PENDANT_HP_PERCENT: 25,
     PENDANT_ATTACK_PENALTY_PERCENT: 12.5,
     CURSED_WARD_LUCK: 3,
@@ -129,17 +153,16 @@ export const ARTIFACT_POWER = {
     // Per-archer scaling: each ranged unit in the army grants every ranged unit this much bonus attack and
     // defense penalty. N archers => +N attack and -7.5N% defense on each ranged unit.
     LONGBOW_ATTACK_FLAT_PER_ARCHER: 1,
-    HELM_OF_FOCUS_RESIST_PERCENT: 35,
+    BARREL_BARRICADE_COUNT: 2,
     AMULET_OF_RESOLVE_RESIST_PERCENT: 25,
     AEGIS_AREA_REDUCTION_PERCENT: 0,
     GIANTS_MAUL_AOE_PERCENT: 40,
-    RIME_PROC_PERCENT: 60,
+    // Base chance only. The attacking unit's current luck is added when the attack rolls, then clamped
+    // to 0–100. The unit's buff hover shows that sum, not this base and not the words "plus luck".
+    RIME_PROC_PERCENT: 30,
     RIME_SLOW_LAPS: 3,
     HOLY_CROSS_HEAL_RES_PERCENT: 50,
-    // Farsight Quiver extends an archer's BASIC shot range by this % (additive off base shot_distance; it
-    // pushes the range-falloff threshold out rather than removing falloff, and does NOT compound with Sniper Augment).
-    FARSIGHT_QUIVER_RANGE_PERCENT: 50,
-    TOME_BUFF_POWER_PERCENT: 50,
+    TOME_BUFF_POWER_PERCENT: 35,
     DUAL_STRIKE_SECOND_ATTACK_PERCENT: 50,
     // Base amplification of the "Deep Wounds Level 1" card the charm grants army-wide. Mirrors that
     // ability's power in configuration/abilities.json — the displayed figure only, since the applied
@@ -151,6 +174,16 @@ export const ARTIFACT_POWER = {
     // as a plain "+N%". Tier 2 is deliberately double Tier 1, matching the Warlord's Edge / Keen Blade gap.
     MAGES_RING_MAGIC_PERCENT: 10,
     ARCHMAGES_RING_MAGIC_PERCENT: 20,
+    // An independent magic-defense roll for every unit, combined with the defense it already has by
+    // 1 − Π(1 − p) — the same formula as Magic Shield. Not points added onto that defense.
+    AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE: 18,
+    QUIVER_OF_ECHOES_CHANCE: 40,
+    GRAVECHAIN_CHANCE: 50,
+    GRAVECHAIN_SLOW_LAPS: 3,
+    GRAVECHAIN_CONNECTIONS: 3,
+    GRAVECHAIN_STEPS_PENALTY: 1,
+    LAST_FUSE_PERCENT: 20,
+    LAST_FUSE_MIN_DAMAGE_PER_POWER: 20,
 } as const;
 
 export interface ArtifactProperties {
@@ -213,14 +246,14 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "amulet_of_resolve",
         "Amulet of Resolve",
         "Amulet of Resolve",
-        "Increases the army's status resistance by {}%.",
+        "Grants your army +{}% status and mind resistance.",
     ),
     [Tier1Artifact.KEEN_BLADE]: t1(
         Tier1Artifact.KEEN_BLADE,
         "keen_blade",
         "Keen Blade",
         "Keen Blade",
-        "Increases the army's base attack (both ranged and melee) by {}.",
+        "Increases ranged units' base attack by {} and melee units' base attack by [].",
     ),
     [Tier1Artifact.IRON_PLATE]: t1(
         Tier1Artifact.IRON_PLATE,
@@ -271,12 +304,12 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "Hunters Longbow",
         "Ranged units gain +{} attack for each ranged unit in the army.",
     ),
-    [Tier1Artifact.HELM_OF_FOCUS]: t1(
-        Tier1Artifact.HELM_OF_FOCUS,
-        "helm_of_focus",
-        "Helm of Focus",
-        "Helm of Focus",
-        "Increases the army's mind resistance by {}%.",
+    [Tier1Artifact.BARREL_BARRICADE]: t1(
+        Tier1Artifact.BARREL_BARRICADE,
+        "barrel_barricade",
+        "Barrel Barricade",
+        "",
+        "Grants {} barrels to place anywhere in your deployment zone. Each blocks movement and shots until destroyed by one hit.",
     ),
     [Tier1Artifact.BROKEN_AEGIS]: t1(
         Tier1Artifact.BROKEN_AEGIS,
@@ -292,6 +325,28 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "Mages Ring",
         "Increases all magic damage the army deals by {}%.",
     ),
+    // The portrait already ships as the Tier-2 cutout. Keep that file; a Tier-1 filename was never drawn.
+    [Tier1Artifact.TOME_OF_AMPLIFICATION]: {
+        ...t1(
+            Tier1Artifact.TOME_OF_AMPLIFICATION,
+            "tome_of_amplification",
+            "Tome of Amplification",
+            "Tome of Amplification",
+            "Increases the power of non-healing castable buffs allied units apply to allies by {}%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.",
+        ),
+        imageKey: "artifact_t2_tome_of_amplification_256",
+    },
+    // The portrait already ships as the Tier-2 cutout. Keep that file; a Tier-1 filename was never drawn.
+    [Tier1Artifact.RIME_CHARM]: {
+        ...t1(
+            Tier1Artifact.RIME_CHARM,
+            "rime_charm",
+            "Rime Charm",
+            "Rime Charm",
+            "{}% chance, plus the attacking unit's current luck, for any attack to slow the target for [] laps.",
+        ),
+        imageKey: "artifact_t2_rime_charm_256",
+    },
 };
 
 export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
@@ -301,7 +356,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "warlords_edge",
         "Warlord's Edge",
         "Warlords Edge",
-        "Grants the whole army an additional {}% attack.",
+        "Grants your army +{}% ranged attack and +[]% melee attack.",
     ),
     [Tier2Artifact.TITAN_PLATE]: t2(
         Tier2Artifact.TITAN_PLATE,
@@ -350,7 +405,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "farsight_quiver",
         "Farsight Quiver",
         "Farsight Quiver",
-        "Extends all allied archers' basic shot range by an additional {}%.",
+        "Allied archers ignore the range penalty and always deal full damage (1/1). A shot through Smoke is still halved (1/2).",
     ),
     [Tier2Artifact.BERSERKERS_BOND]: t2(
         Tier2Artifact.BERSERKERS_BOND,
@@ -371,14 +426,35 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "rime_charm",
         "Rime Charm",
         "Rime Charm",
-        "{}% chance for any attack to slow the target for [] laps.",
+        "{}% chance, plus the attacking unit's current luck, for any attack to slow the target for [] laps.",
     ),
     [Tier2Artifact.LAVA_STRIDERS]: t2(
         Tier2Artifact.LAVA_STRIDERS,
         "lava_striders",
         "Lava Striders",
         "Lava Striders",
-        "All army units may move over and stand in lava; while on central lava they gain Made of Fire (+10% to all stats and abilities).",
+        "All army units can cross and stand in lava. Moving through or flying over lava grants Made of Fire (+10% to stats and ability power) for 2 laps, even when landing on dry ground.",
+    ),
+    [Tier2Artifact.QUIVER_OF_ECHOES]: t2(
+        Tier2Artifact.QUIVER_OF_ECHOES,
+        "quiver_of_echoes",
+        "Quiver of Echoes",
+        "Quiver of Echoes",
+        "Ranged units have a {}% chance to make one extra attack.",
+    ),
+    [Tier2Artifact.GRAVECHAIN]: t2(
+        Tier2Artifact.GRAVECHAIN,
+        "gravechain",
+        "Gravechain",
+        "Gravechain",
+        "Cursed: attacks have a {}% chance per enemy to inflict Gravebound on the target and connected enemies up to <> links away, reducing movement by 25% for [] laps. Failed rolls do not stop the chain. Every unit in your army loses {} movement step.",
+    ),
+    [Tier2Artifact.AEGIS_OF_THE_ARCANE]: t2(
+        Tier2Artifact.AEGIS_OF_THE_ARCANE,
+        "aegis_of_the_arcane",
+        "Aegis of the Arcane",
+        "Aegis of the Arcane",
+        "Grants the whole army an extra {}% magic defense roll, combined with each unit's own defense instead of added to it.",
     ),
     [Tier2Artifact.ARCHMAGES_RING]: t2(
         Tier2Artifact.ARCHMAGES_RING,
@@ -386,6 +462,13 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "Archmage's Ring",
         "Archmages Ring",
         "Increases all magic damage the army deals by {}%.",
+    ),
+    [Tier2Artifact.LAST_FUSE]: t2(
+        Tier2Artifact.LAST_FUSE,
+        "last_fuse",
+        "Last Fuse",
+        "Last Fuse",
+        "When an allied stack is destroyed, it explodes. Adjacent enemies take {}% of the killing blow's actual damage, with a minimum of [] damage per stack power.",
     ),
 };
 
@@ -400,7 +483,7 @@ const AP = ARTIFACT_POWER;
 const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] } = {
     veteran_helm: [AP.VETERAN_HELM_PERCENT],
     amulet_of_resolve: [AP.AMULET_OF_RESOLVE_RESIST_PERCENT],
-    keen_blade: [AP.KEEN_BLADE_FLAT],
+    keen_blade: [AP.KEEN_BLADE_RANGED_FLAT, AP.KEEN_BLADE_FLAT],
     iron_plate: [AP.IRON_PLATE_FLAT],
     swift_boots: [AP.SWIFT_BOOTS_STEPS],
     winged_boots: [AP.WINGED_BOOTS_STEPS, AP.WINGED_BOOTS_ARMOR],
@@ -408,11 +491,10 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     wounding_charm: [AP.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT],
     cursed_ward: [AP.CURSED_WARD_LUCK, AP.CURSED_WARD_MORALE_PENALTY],
     hunters_longbow: [AP.LONGBOW_ATTACK_FLAT_PER_ARCHER],
-    helm_of_focus: [AP.HELM_OF_FOCUS_RESIST_PERCENT],
+    barrel_barricade: [AP.BARREL_BARRICADE_COUNT],
     broken_aegis: [AP.AEGIS_AREA_REDUCTION_PERCENT],
-    warlords_edge: [AP.WARLORDS_EDGE_PERCENT],
+    warlords_edge: [AP.WARLORDS_EDGE_RANGED_PERCENT, AP.WARLORDS_EDGE_PERCENT],
     titan_plate: [AP.TITAN_PLATE_PERCENT],
-    farsight_quiver: [AP.FARSIGHT_QUIVER_RANGE_PERCENT],
     holy_cross: [AP.HOLY_CROSS_HEAL_RES_PERCENT],
     clover_of_fortune: [AP.CLOVER_LUCK],
     crown_of_command: [AP.CROWN_STEPS, AP.CROWN_MORALE, AP.CROWN_ARMOR],
@@ -423,6 +505,10 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     rime_charm: [AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS],
     mages_ring: [AP.MAGES_RING_MAGIC_PERCENT],
     archmages_ring: [AP.ARCHMAGES_RING_MAGIC_PERCENT],
+    aegis_of_the_arcane: [AP.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE],
+    quiver_of_echoes: [AP.QUIVER_OF_ECHOES_CHANCE],
+    gravechain: [AP.GRAVECHAIN_CHANCE, AP.GRAVECHAIN_CONNECTIONS, AP.GRAVECHAIN_SLOW_LAPS, AP.GRAVECHAIN_STEPS_PENALTY],
+    last_fuse: [AP.LAST_FUSE_PERCENT, AP.LAST_FUSE_MIN_DAMAGE_PER_POWER],
 };
 
 // Human-readable effect text with the real numbers substituted in (the raw `description` keeps `{}`/`[]`

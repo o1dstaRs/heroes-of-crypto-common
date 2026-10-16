@@ -10,7 +10,17 @@
  */
 
 import type { IAIStrategy } from "./ai_strategy";
+import { withAreaThrow } from "./versions/area_throw_router";
 import { scoreCreature } from "./setup/creature_score";
+import {
+    tier1ArtifactFitScore,
+    tier1ArtifactFitScoreV2,
+    tier1ArtifactFitScoreV3,
+    tier1ArtifactFitScoreV4,
+    withArtifactFitSetupPolicy,
+} from "./setup/artifact_fit";
+import { pickCoherentDraftBundle } from "./setup/draft_coherence";
+import { TIER1_ARTIFACT_WINRATE } from "./setup/setup_strategy";
 import {
     SETUP_POLICY_V0_RESOLVED,
     type ISetupAugmentChoice,
@@ -46,6 +56,7 @@ export interface IRankedAISetupPolicy extends IResolvedSetupPolicy {
         ownCreatureIds: readonly number[],
         knownOpponentCreatureIds: readonly number[],
         tier1ArtifactId?: number,
+        tier2ArtifactId?: number,
     ): number;
     pickArtifactT2(
         offered: readonly number[],
@@ -124,6 +135,97 @@ export const RANKED_SETUP_POLICY_V0: Readonly<IRankedAISetupPolicy> = Object.fre
     bestSynergyForFaction: (faction: number): number => SETUP_POLICY_V0.bestSynergyForFaction(faction),
 });
 
+export const RANKED_SETUP_POLICY_ARTIFACT_FIT_V1: Readonly<IRankedAISetupPolicy> = Object.freeze({
+    ...RANKED_SETUP_POLICY_V0,
+    ...withArtifactFitSetupPolicy(SETUP_POLICY_V0_RESOLVED),
+    version: "setup-v0+artifact-fit-v1",
+    pickBundle: (bundles: readonly (readonly [number, number, number])[]): number =>
+        pickCoherentDraftBundle(bundles, scoreCreature, (id, ownIds) =>
+            tier1ArtifactFitScore(id, ownIds, TIER1_ARTIFACT_WINRATE[id] ?? 50),
+        ),
+});
+
+export const RANKED_SETUP_POLICY_ARTIFACT_FIT_V2: Readonly<IRankedAISetupPolicy> = Object.freeze({
+    ...RANKED_SETUP_POLICY_V0,
+    ...withArtifactFitSetupPolicy(SETUP_POLICY_V0_RESOLVED, 2),
+    version: "setup-v0+artifact-fit-v2",
+    pickCreature: (
+        level: number,
+        available: readonly number[],
+        ownIds: readonly number[],
+        enemyIds: readonly number[],
+        tier1?: number,
+        tier2?: number,
+    ): number => SETUP_POLICY_V0.pickCreature(level, available, ownIds, enemyIds, tier1, tier2),
+    pickBundle: (bundles: readonly (readonly [number, number, number])[]): number =>
+        pickCoherentDraftBundle(bundles, scoreCreature, (id, ownIds) =>
+            tier1ArtifactFitScoreV2(id, ownIds, TIER1_ARTIFACT_WINRATE[id] ?? 50),
+        ),
+});
+
+export const RANKED_SETUP_POLICY_ARTIFACT_FIT_V3: Readonly<IRankedAISetupPolicy> = Object.freeze({
+    ...RANKED_SETUP_POLICY_ARTIFACT_FIT_V2,
+    ...withArtifactFitSetupPolicy(SETUP_POLICY_V0_RESOLVED, 3),
+    version: "setup-v0+artifact-fit-v3",
+    pickCreature: (
+        level: number,
+        available: readonly number[],
+        ownIds: readonly number[],
+        enemyIds: readonly number[],
+        tier1?: number,
+        tier2?: number,
+    ): number => SETUP_POLICY_V0.pickCreature(level, available, ownIds, enemyIds, tier1, tier2, 3),
+    pickBundle: (bundles: readonly (readonly [number, number, number])[]): number =>
+        pickCoherentDraftBundle(
+            bundles,
+            scoreCreature,
+            (id, ownIds) => tier1ArtifactFitScoreV3(id, ownIds, TIER1_ARTIFACT_WINRATE[id] ?? 50),
+            { artifactFitVersion: 3 },
+        ),
+});
+
+export const RANKED_SETUP_POLICY_ARTIFACT_FIT_V4: Readonly<IRankedAISetupPolicy> = Object.freeze({
+    ...RANKED_SETUP_POLICY_ARTIFACT_FIT_V3,
+    ...withArtifactFitSetupPolicy(SETUP_POLICY_V0_RESOLVED, 4),
+    version: "setup-v0+artifact-fit-v4",
+    pickCreature: (
+        level: number,
+        available: readonly number[],
+        ownIds: readonly number[],
+        enemyIds: readonly number[],
+        tier1?: number,
+        tier2?: number,
+    ): number => SETUP_POLICY_V0.pickCreature(level, available, ownIds, enemyIds, tier1, tier2, 4),
+    pickBundle: (bundles: readonly (readonly [number, number, number])[]): number =>
+        pickCoherentDraftBundle(
+            bundles,
+            scoreCreature,
+            (id, ownIds) => tier1ArtifactFitScoreV4(id, ownIds, TIER1_ARTIFACT_WINRATE[id] ?? 50),
+            { artifactFitVersion: 4 },
+        ),
+});
+
+export const RANKED_SETUP_POLICY_ARTIFACT_FIT_V5: Readonly<IRankedAISetupPolicy> = Object.freeze({
+    ...RANKED_SETUP_POLICY_ARTIFACT_FIT_V4,
+    ...withArtifactFitSetupPolicy(SETUP_POLICY_V0_RESOLVED, 5),
+    version: "setup-v0+artifact-fit-v5",
+    pickCreature: (
+        level: number,
+        available: readonly number[],
+        ownIds: readonly number[],
+        enemyIds: readonly number[],
+        tier1?: number,
+        tier2?: number,
+    ): number => SETUP_POLICY_V0.pickCreature(level, available, ownIds, enemyIds, tier1, tier2, 5),
+    pickBundle: (bundles: readonly (readonly [number, number, number])[]): number =>
+        pickCoherentDraftBundle(
+            bundles,
+            scoreCreature,
+            (id, ownIds) => tier1ArtifactFitScoreV4(id, ownIds, TIER1_ARTIFACT_WINRATE[id] ?? 50),
+            { artifactFitVersion: 5 },
+        ),
+});
+
 type StrategyFactory = () => IAIStrategy;
 
 const checkedFactory =
@@ -133,15 +235,15 @@ const checkedFactory =
         if (strategy.version !== version) {
             throw new Error(`AI strategy factory for "${version}" created "${strategy.version}"`);
         }
-        return strategy;
+        return withAreaThrow(strategy);
     };
 
 const rankedProfile = (version: string, factory: StrategyFactory): Readonly<IRankedAIProfile> => {
     const createStrategy = checkedFactory(version, factory);
     return Object.freeze({
         version,
-        setupPolicyVersion: RANKED_SETUP_POLICY_V0.version,
-        setupPolicy: RANKED_SETUP_POLICY_V0,
+        setupPolicyVersion: RANKED_SETUP_POLICY_ARTIFACT_FIT_V5.version,
+        setupPolicy: RANKED_SETUP_POLICY_ARTIFACT_FIT_V5,
         createStrategy,
     });
 };

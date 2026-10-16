@@ -11,15 +11,16 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { ArtifactTier, Tier2Artifact } from "../../src/artifacts/artifact_properties";
+import { ArtifactTier, Tier1Artifact } from "../../src/artifacts/artifact_properties";
 import { getSpellConfig } from "../../src/configuration/config_provider";
-import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_KILL } from "../../src/constants";
+import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_KILL, NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCell } from "../../src/grid/grid_math";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { AttackTarget } from "../../src/handlers/attack_handler";
 import { Spell } from "../../src/spells/spell";
+import { fireforgedSwordDamage } from "../../src/spells/spell_damage";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import {
     createCombatTestContext,
@@ -103,6 +104,60 @@ describe("AttackHandler", () => {
             });
             sniper.setPosition(origin.x, origin.y);
             expect(attackHandler.getRangeAttackDivisor(sniper, center({ x: 15, y: 15 }))).toBe(1);
+        });
+
+        it("keeps a Farsight Quiver shot at full damage except through smoke", () => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const attacker = createTestUnit({
+                team: PBTypes.TeamVals.RIGHT,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                shotDistance: 2,
+            });
+            const target = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
+            const aim = target.getPosition();
+
+            expect(attackHandler.getRangeAttackDivisor(attacker, aim)).toBe(8);
+            expect(
+                attackHandler.evaluateRangeAttack(
+                    unitsHolder.getAllUnits(),
+                    attacker,
+                    attacker.getPosition(),
+                    aim,
+                    false,
+                    false,
+                    false,
+                    [{ x: 4, y: 1 }],
+                ).rangeAttackDivisors,
+            ).toEqual([8]);
+
+            const buff = new Spell({
+                spellProperties: getSpellConfig("System", "Farsight Quiver", NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            });
+            buff.setPower(0);
+            attacker.applyBuff(buff);
+
+            expect(attackHandler.getRangeAttackDivisor(attacker, aim)).toBe(1);
+            expect(attacker.getRangeShotDistance()).toBe(2);
+            expect(
+                attackHandler.evaluateRangeAttack(unitsHolder.getAllUnits(), attacker, attacker.getPosition(), aim)
+                    .rangeAttackDivisors,
+            ).toEqual([1]);
+            expect(
+                attackHandler.evaluateRangeAttack(
+                    unitsHolder.getAllUnits(),
+                    attacker,
+                    attacker.getPosition(),
+                    aim,
+                    false,
+                    false,
+                    false,
+                    [{ x: 4, y: 1 }],
+                ).rangeAttackDivisors,
+            ).toEqual([2]);
         });
 
         it("measures a large attacker's square from its footprint, not from its center", () => {
@@ -323,6 +378,158 @@ describe("AttackHandler", () => {
             expect(caster.hasDebuffActive("Helping Hand")).toBe(true);
         });
 
+        it("a Fireforged Sword is a stable 20% of the damage that landed, not the caster's HP", () => {
+            setDeterministicRandomSource(() => 0);
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+            // Wandering Mage: 6 HP. That number used to leak into the buff tooltip as "6%".
+            const caster = createTestUnit({
+                name: "Wandering Mage",
+                team: PBTypes.TeamVals.RIGHT,
+                spells: ["Chaos:Fireforged Sword"],
+                maxHp: 6,
+                armor: 8,
+            });
+            const ally = createTestUnit({
+                name: "Swordsman",
+                team: PBTypes.TeamVals.RIGHT,
+                attackType: PBTypes.AttackVals.MELEE,
+                damageMin: 40,
+                damageMax: 40,
+                maxHp: 200,
+                amountAlive: 3,
+            });
+            const enemy = createTestUnit({
+                name: "Target",
+                team: PBTypes.TeamVals.LEFT,
+                armor: 0,
+                magicResist: 0,
+                maxHp: 500,
+                amountAlive: 5,
+                damageMin: 0,
+                damageMax: 0,
+            });
+
+            placeUnit(grid, unitsHolder, caster, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, ally, { x: 2, y: 1 });
+            placeUnit(grid, unitsHolder, enemy, { x: 3, y: 1 });
+
+            const cast = attackHandler.handleMagicAttack(
+                grid.getMatrix(),
+                unitsHolder,
+                caster.getSpells()[0],
+                caster,
+                ally,
+            );
+
+            expect(cast.completed).toBe(true);
+            expect(ally.getBuff("Fireforged Sword")?.getPower()).toBe(20);
+            expect(ally.getBuff("Fireforged Sword")?.getFirstSpellProperty()).toBeUndefined();
+            const shown = ally.getUnitProperties().applied_buffs_descriptions[0]?.split(";")[0] ?? "";
+            expect(shown).toContain("for 20%");
+            expect(shown).not.toContain("for 6%");
+            expect(shown).not.toContain("{}");
+
+            const damage = createVisibleDamage(enemy);
+            const attack = attackHandler.handleMeleeAttack(unitsHolder, moveHandler, damage, undefined, ally, enemy, {
+                x: 2,
+                y: 1,
+            });
+
+            expect(attack.completed).toBe(true);
+            expect(damage.amount).toBeGreaterThan(0);
+            // damage.amount is the swing that landed. The fire is exactly 20% of that number.
+            const burns = (damage.secondary ?? []).filter((entry) => entry.source === "fireforged_sword");
+            expect(burns).toHaveLength(1);
+            expect(burns[0]?.unitId).toBe(enemy.getId());
+            expect(burns[0]?.amount).toBe(
+                fireforgedSwordDamage({
+                    damageDealt: damage.amount,
+                    swordPercentage: 20,
+                    targetMagicResist: 0,
+                    targetIsFireElement: false,
+                    targetIsWaterElement: false,
+                }),
+            );
+            setDeterministicRandomSource(undefined);
+        });
+
+        it("Tome of Amplification raises a Fireforged Sword from 20% to 27% of the hit", () => {
+            setDeterministicRandomSource(() => 0);
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+            const caster = createTestUnit({
+                name: "Wandering Mage",
+                team: PBTypes.TeamVals.RIGHT,
+                spells: ["Chaos:Fireforged Sword"],
+                maxHp: 6,
+            });
+            const ally = createTestUnit({
+                name: "Swordsman",
+                team: PBTypes.TeamVals.RIGHT,
+                attackType: PBTypes.AttackVals.MELEE,
+                damageMin: 40,
+                damageMax: 40,
+                maxHp: 200,
+                amountAlive: 3,
+            });
+            const enemy = createTestUnit({
+                name: "Target",
+                team: PBTypes.TeamVals.LEFT,
+                armor: 0,
+                magicResist: 0,
+                maxHp: 500,
+                amountAlive: 5,
+                damageMin: 0,
+                damageMax: 0,
+            });
+
+            placeUnit(grid, unitsHolder, caster, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, ally, { x: 2, y: 1 });
+            placeUnit(grid, unitsHolder, enemy, { x: 3, y: 1 });
+            const fightProperties = FightStateManager.getInstance().getFightProperties();
+            fightProperties.setArtifactPerTeam(
+                PBTypes.TeamVals.RIGHT,
+                ArtifactTier.TIER_1,
+                Tier1Artifact.TOME_OF_AMPLIFICATION,
+            );
+            unitsHolder.applyArtifacts(fightProperties);
+            // Empower is a magic-damage bonus. It must not move the blade on top of the tome.
+            ally.applyBuff(new Spell({ spellProperties: getSpellConfig("Chaos", "Empower"), amount: 1 }));
+
+            const sourceSpell = caster.getSpells()[0];
+            const cast = attackHandler.handleMagicAttack(grid.getMatrix(), unitsHolder, sourceSpell, caster, ally);
+
+            expect(cast.completed).toBe(true);
+            expect(sourceSpell.getPower()).toBe(20);
+            expect(ally.getBuff("Fireforged Sword")?.getPower()).toBe(27);
+            const swordIndex = ally.getUnitProperties().applied_buffs.indexOf("Fireforged Sword");
+            const shown = ally.getUnitProperties().applied_buffs_descriptions[swordIndex]?.split(";")[0] ?? "";
+            expect(shown).toContain("for 27%");
+            expect(ally.getMagicDamageBonusPercentage()).toBeGreaterThan(0);
+
+            const damage = createVisibleDamage(enemy);
+            const attack = attackHandler.handleMeleeAttack(unitsHolder, moveHandler, damage, undefined, ally, enemy, {
+                x: 2,
+                y: 1,
+            });
+
+            expect(attack.completed).toBe(true);
+            expect(damage.amount).toBeGreaterThan(0);
+            const burns = (damage.secondary ?? []).filter((entry) => entry.source === "fireforged_sword");
+            expect(burns).toHaveLength(1);
+            expect(burns[0]?.amount).toBe(
+                fireforgedSwordDamage({
+                    damageDealt: damage.amount,
+                    swordPercentage: 27,
+                    targetMagicResist: 0,
+                    targetIsFireElement: false,
+                    targetIsWaterElement: false,
+                }),
+            );
+            setDeterministicRandomSource(undefined);
+        });
+
         it("amplifies a Healer's Spiritual Armor cast without mutating the source spell", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const caster = createTestUnit({
@@ -341,8 +548,8 @@ describe("AttackHandler", () => {
             placeUnit(grid, unitsHolder, target, { x: 2, y: 1 });
             fightProperties.setArtifactPerTeam(
                 PBTypes.TeamVals.RIGHT,
-                ArtifactTier.TIER_2,
-                Tier2Artifact.TOME_OF_AMPLIFICATION,
+                ArtifactTier.TIER_1,
+                Tier1Artifact.TOME_OF_AMPLIFICATION,
             );
             unitsHolder.applyArtifacts(fightProperties);
 
@@ -351,10 +558,10 @@ describe("AttackHandler", () => {
 
             expect(result.completed).toBe(true);
             expect(sourceSpell.getPower()).toBe(30);
-            expect(target.getBuff("Spiritual Armor")?.getPower()).toBe(45);
-            expect(target.getUnitProperties().applied_buffs_powers).toContain(45);
+            expect(target.getBuff("Spiritual Armor")?.getPower()).toBe(40.5);
+            expect(target.getUnitProperties().applied_buffs_powers).toContain(40.5);
             target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-            expect(target.getArmor()).toBeCloseTo(29);
+            expect(target.getArmor()).toBeCloseTo(28.1);
         });
 
         it("amplifies Helping Hand's allied benefit but not its caster debuff", () => {
@@ -380,8 +587,8 @@ describe("AttackHandler", () => {
             placeUnit(grid, unitsHolder, target, { x: 2, y: 1 });
             fightProperties.setArtifactPerTeam(
                 PBTypes.TeamVals.RIGHT,
-                ArtifactTier.TIER_2,
-                Tier2Artifact.TOME_OF_AMPLIFICATION,
+                ArtifactTier.TIER_1,
+                Tier1Artifact.TOME_OF_AMPLIFICATION,
             );
             unitsHolder.applyArtifacts(fightProperties);
 
@@ -390,12 +597,13 @@ describe("AttackHandler", () => {
 
             expect(result.completed).toBe(true);
             expect(sourceSpell.getPower()).toBe(30);
-            expect(target.getBuff("Helping Hand")?.getPower()).toBe(45);
+            expect(target.getBuff("Helping Hand")?.getPower()).toBe(40.5);
             expect(caster.getDebuff("Helping Hand")?.getPower()).toBe(30);
-            expect(target.getUnitProperties().applied_buffs_powers).toContain(45);
+            expect(target.getUnitProperties().applied_buffs_powers).toContain(40.5);
             target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
             caster.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-            expect(target.getMaxHp()).toBe(55);
+            expect(target.getMaxHp()).toBe(51);
+            // 40.5% of the Satyr's 20 armor is 8.1, and Helping Hand ceils that gift before adding it to the target's 10.
             expect(target.getBaseArmor()).toBe(19);
             expect(caster.getMaxHp()).toBe(70);
             expect(caster.getBaseArmor()).toBe(14);
@@ -1161,6 +1369,462 @@ describe("AttackHandler", () => {
             expect(grid.getOccupantUnitId(second)).toBe("");
             expect(grid.getScatteredMountainsStanding()).toEqual([survivor]);
             expect(attacker.getRangeShots()).toBe(2);
+        });
+
+        // Skewer Strike (Pikeman) and Fire Breath (Black Dragon) strike the cell BEHIND a one-cell target, so
+        // the cemetery barrel standing directly behind the struck one goes down with it — straight or diagonal
+        // along the strike line. Cells sit off the classic 2x2 mountain footprint so the scattered layout is
+        // the only obstacle in play.
+        describe("piercing melee passives through scattered tombstones", () => {
+            const strikeBarrels = (opts: {
+                layout: { x: number; y: number }[];
+                target: { x: number; y: number };
+                standCell: { x: number; y: number };
+                abilities?: string[];
+                size?: PBTypes.UnitSizeVals;
+            }) => {
+                const ctx = setupMountainFight();
+                ctx.grid.setScatteredMountains(opts.layout);
+                const attacker = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: opts.abilities,
+                    size: opts.size,
+                });
+                placeUnit(ctx.grid, ctx.unitsHolder, attacker, opts.standCell);
+                // Stationary strike: attackFrom is the unit's own anchor, so no movement paths are needed.
+                const result = ctx.attackHandler.handleObstacleAttack(
+                    positionForCell(opts.target),
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    attacker,
+                    opts.standCell,
+                    undefined,
+                );
+                return { ...ctx, attacker, result };
+            };
+
+            it("Skewer Strike knocks out the barrel directly behind the struck one", () => {
+                const behind = { x: 4, y: 3 };
+                const survivor = { x: 10, y: 3 };
+                const { grid, result } = strikeBarrels({
+                    layout: [{ x: 3, y: 3 }, behind, survivor],
+                    target: { x: 3, y: 3 },
+                    standCell: { x: 2, y: 3 },
+                    abilities: ["Skewer Strike"],
+                });
+                expect(result.completed).toBe(true);
+                expect(grid.getScatteredMountainsStanding()).toEqual([survivor]);
+                expect(grid.getOccupantUnitId(behind)).toBe("");
+            });
+
+            it("a diagonal strike pierces diagonally and spares the orthogonal neighbour", () => {
+                const diagonal = { x: 4, y: 4 };
+                const orthogonal = { x: 4, y: 3 };
+                const { grid, result } = strikeBarrels({
+                    layout: [{ x: 3, y: 3 }, orthogonal, diagonal],
+                    target: { x: 3, y: 3 },
+                    standCell: { x: 2, y: 2 },
+                    abilities: ["Skewer Strike"],
+                });
+                expect(result.completed).toBe(true);
+                expect(grid.getScatteredMountainsStanding()).toEqual([orthogonal]);
+            });
+
+            it("Fire Breath from a 2x2 body aims the pierce from its cell closest to the barrel", () => {
+                const behind = { x: 4, y: 3 };
+                // Anchor (2,3) = body cells (2,3) (1,3) (2,2) (1,2); (2,3) is the one touching the barrel.
+                const { grid, result } = strikeBarrels({
+                    layout: [{ x: 3, y: 3 }, behind],
+                    target: { x: 3, y: 3 },
+                    standCell: { x: 2, y: 3 },
+                    abilities: ["Fire Breath"],
+                    size: PBTypes.UnitSizeVals.LARGE,
+                });
+                expect(result.completed).toBe(true);
+                expect(grid.getScatteredMountainsStanding()).toEqual([]);
+            });
+
+            it("does not jump a gap: an empty cell behind the barrel ends the sweep", () => {
+                const farther = { x: 5, y: 3 };
+                const { grid, result } = strikeBarrels({
+                    layout: [{ x: 3, y: 3 }, farther],
+                    target: { x: 3, y: 3 },
+                    standCell: { x: 2, y: 3 },
+                    abilities: ["Skewer Strike"],
+                });
+                expect(result.completed).toBe(true);
+                expect(grid.getScatteredMountainsStanding()).toEqual([farther]);
+            });
+
+            it("a plain melee strike still breaks only the barrel it hits", () => {
+                const behind = { x: 4, y: 3 };
+                const { grid, result } = strikeBarrels({
+                    layout: [{ x: 3, y: 3 }, behind],
+                    target: { x: 3, y: 3 },
+                    standCell: { x: 2, y: 3 },
+                });
+                expect(result.completed).toBe(true);
+                expect(grid.getScatteredMountainsStanding()).toEqual([behind]);
+            });
+
+            it("a Skewer Strike aimed at a barrel runs on into the enemy standing behind it", () => {
+                const ctx = setupMountainFight();
+                const aimed = { x: 3, y: 3 };
+                ctx.grid.setScatteredMountains([aimed]);
+                const pikeman = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Skewer Strike"],
+                    attack: 50,
+                    damageMin: 100,
+                    damageMax: 100,
+                });
+                const behind = createTestUnit({ name: "Behind", team: PBTypes.TeamVals.LEFT, maxHp: 10 });
+                placeUnit(ctx.grid, ctx.unitsHolder, pikeman, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, behind, { x: 4, y: 3 });
+                const damage = createVisibleDamage(pikeman);
+
+                const result = ctx.attackHandler.handleObstacleAttack(
+                    positionForCell(aimed),
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    pikeman,
+                    { x: 2, y: 3 },
+                    undefined,
+                    damage,
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([]);
+                expect(behind.isDead()).toBe(true);
+                expect(result.unitIdsDied).toEqual([behind.getId()]);
+                expect(damage.secondary).toContainEqual(
+                    expect.objectContaining({ source: "skewer_strike", unitId: behind.getId(), unitsDied: 1 }),
+                );
+            });
+
+            // A barrel strike with a unit standing right behind the barrel (attacker (2,3), barrel (3,3), unit (4,3)).
+            const strikeBarrelWithUnitBehind = (
+                abilities: string[],
+                behindOptions: Parameters<typeof createTestUnit>[0],
+            ) => {
+                const ctx = setupMountainFight();
+                ctx.grid.setScatteredMountains([{ x: 3, y: 3 }]);
+                const attacker = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities,
+                    attack: 50,
+                    damageMin: 100,
+                    damageMax: 100,
+                });
+                const behind = createTestUnit({ name: "Behind", maxHp: 10, ...behindOptions });
+                placeUnit(ctx.grid, ctx.unitsHolder, attacker, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, behind, { x: 4, y: 3 });
+                const damage = createVisibleDamage(attacker);
+                const result = ctx.attackHandler.handleObstacleAttack(
+                    positionForCell({ x: 3, y: 3 }),
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    attacker,
+                    { x: 2, y: 3 },
+                    undefined,
+                    damage,
+                );
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([]);
+                return { behind, damage, result };
+            };
+
+            it("the barrel strike's skewer spares an ally behind the barrel", () => {
+                const { behind, damage, result } = strikeBarrelWithUnitBehind(["Skewer Strike"], {
+                    team: PBTypes.TeamVals.RIGHT,
+                });
+                expect(behind.getCumulativeHp()).toBe(behind.getMaxHp());
+                expect(result.unitIdsDied).toEqual([]);
+                expect(damage.secondary ?? []).toEqual([]);
+            });
+
+            it("a Fire Breath aimed at a barrel burns whoever stands behind it, ally or enemy", () => {
+                for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
+                    const { behind, damage, result } = strikeBarrelWithUnitBehind(["Fire Breath"], { team });
+                    expect(behind.isDead()).toBe(true);
+                    expect(result.unitIdsDied).toEqual([behind.getId()]);
+                    expect(damage.secondary).toContainEqual(
+                        expect.objectContaining({ source: "fire_breath", unitId: behind.getId() }),
+                    );
+                }
+            });
+
+            it("a Fire Breath aimed at a barrel leaves a fire-immune unit behind it untouched", () => {
+                const { behind, damage, result } = strikeBarrelWithUnitBehind(["Fire Breath"], {
+                    team: PBTypes.TeamVals.LEFT,
+                    abilities: ["Fire Element"],
+                });
+                expect(behind.getCumulativeHp()).toBe(behind.getMaxHp());
+                expect(result.unitIdsDied).toEqual([]);
+                expect(damage.secondary ?? []).toEqual([]);
+            });
+
+            it("a unit strike's Fire Breath burns every barrel in its band behind a 2x2 target", () => {
+                const ctx = setupMountainFight();
+                // Dragon anchor (3,4) = body x 2..3, y 3..4; target anchor (5,4) = body x 4..5, y 3..4. The breath's
+                // band is the target's own 2x2 depth straight behind it: x 6..7, y 3..4.
+                const inBand = [
+                    { x: 6, y: 4 },
+                    { x: 7, y: 3 },
+                ];
+                const pastBand = { x: 8, y: 4 };
+                ctx.grid.setScatteredMountains([pastBand, ...inBand]);
+                const dragon = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Fire Breath"],
+                    size: PBTypes.UnitSizeVals.LARGE,
+                });
+                const target = createTestUnit({
+                    name: "Target",
+                    team: PBTypes.TeamVals.LEFT,
+                    maxHp: 1000,
+                    size: PBTypes.UnitSizeVals.LARGE,
+                });
+                placeUnit(ctx.grid, ctx.unitsHolder, dragon, { x: 3, y: 4 });
+                placeUnit(ctx.grid, ctx.unitsHolder, target, { x: 5, y: 4 });
+
+                const result = ctx.attackHandler.handleMeleeAttack(
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    createVisibleDamage(target),
+                    undefined,
+                    dragon,
+                    target,
+                    { x: 3, y: 4 },
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([pastBand]);
+                expect(result.piercedObstacles).toHaveLength(2);
+                expect(result.piercedObstacles).toEqual(
+                    expect.arrayContaining(inBand.map((cell) => ({ cell, source: "fire_breath" }))),
+                );
+            });
+
+            it("a unit strike's Skewer Strike breaks the barrel behind its small target", () => {
+                const ctx = setupMountainFight();
+                const behind = { x: 4, y: 3 };
+                const aside = { x: 4, y: 4 };
+                ctx.grid.setScatteredMountains([aside, behind]);
+                const pikeman = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Skewer Strike"],
+                });
+                const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, maxHp: 1000 });
+                placeUnit(ctx.grid, ctx.unitsHolder, pikeman, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, target, { x: 3, y: 3 });
+
+                const result = ctx.attackHandler.handleMeleeAttack(
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    createVisibleDamage(target),
+                    undefined,
+                    pikeman,
+                    target,
+                    { x: 2, y: 3 },
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([aside]);
+                expect(result.piercedObstacles).toEqual([{ cell: behind, source: "skewer_strike" }]);
+            });
+
+            it("a Skewer Strike into a large target breaks no barrel behind it", () => {
+                const ctx = setupMountainFight();
+                const behindBody = [
+                    { x: 5, y: 3 },
+                    { x: 5, y: 4 },
+                ];
+                ctx.grid.setScatteredMountains(behindBody);
+                const pikeman = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Skewer Strike"],
+                });
+                const target = createTestUnit({
+                    name: "Target",
+                    team: PBTypes.TeamVals.LEFT,
+                    maxHp: 1000,
+                    size: PBTypes.UnitSizeVals.LARGE,
+                });
+                placeUnit(ctx.grid, ctx.unitsHolder, pikeman, { x: 2, y: 3 });
+                // Anchor (4,4) = body (4,4) (3,4) (4,3) (3,3), touching the Pikeman at (3,3).
+                placeUnit(ctx.grid, ctx.unitsHolder, target, { x: 4, y: 4 });
+
+                const result = ctx.attackHandler.handleMeleeAttack(
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    createVisibleDamage(target),
+                    undefined,
+                    pikeman,
+                    target,
+                    { x: 2, y: 3 },
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual(behindBody);
+                expect(result.piercedObstacles).toEqual([]);
+            });
+
+            it("leaves the classic 2x2 mountains to their own hit counters", () => {
+                const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
+                const attacker = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Skewer Strike"],
+                });
+                placeUnit(grid, unitsHolder, attacker, { x: 4, y: 7 });
+                const result = attackHandler.handleObstacleAttack(
+                    positionForCell({ x: 5, y: 7 }),
+                    unitsHolder,
+                    moveHandler,
+                    attacker,
+                    { x: 4, y: 7 },
+                    undefined,
+                );
+                expect(result.completed).toBe(true);
+                expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN - 1);
+                expect(fightProperties.getObstacleHitsLeftRight()).toBe(HITS_PER_MOUNTAIN);
+            });
+        });
+
+        // Hydra's Lightning Spin is one radial impact: every barrel AND every enemy around her body is hit, whether
+        // the blow that set it off was aimed at a barrel or at a unit.
+        describe("Lightning Spin through scattered tombstones", () => {
+            it("a 2x2 spinner aiming at one barrel breaks every barrel around her body, and nothing further out", () => {
+                const ctx = setupMountainFight();
+                // Anchor (3,4) = body (3,4) (2,4) (3,3) (2,3); the ring is x 1..4, y 2..5 minus the body.
+                const aimed = { x: 4, y: 4 };
+                const corner = { x: 1, y: 2 };
+                const above = { x: 2, y: 5 };
+                const outside = { x: 5, y: 4 };
+                ctx.grid.setScatteredMountains([outside, above, aimed, corner]);
+                const hydra = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Lightning Spin"],
+                    size: PBTypes.UnitSizeVals.LARGE,
+                });
+                placeUnit(ctx.grid, ctx.unitsHolder, hydra, { x: 3, y: 4 });
+
+                const result = ctx.attackHandler.handleObstacleAttack(
+                    positionForCell(aimed),
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    hydra,
+                    { x: 3, y: 4 },
+                    undefined,
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([outside]);
+                // The aimed stone fell to the blow itself; the spin reports only the ones it swept, in ring order.
+                expect(result.spunObstacleCells).toEqual([corner, above]);
+            });
+
+            it("a barrel strike spins into the enemies around the attacker as well", () => {
+                const ctx = setupMountainFight();
+                const aimed = { x: 3, y: 3 };
+                ctx.grid.setScatteredMountains([aimed]);
+                const hydra = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Lightning Spin"],
+                    attack: 50,
+                    damageMin: 100,
+                    damageMax: 100,
+                });
+                const adjacent = createTestUnit({ name: "Adjacent", team: PBTypes.TeamVals.LEFT, maxHp: 10 });
+                const distant = createTestUnit({ name: "Distant", team: PBTypes.TeamVals.LEFT, maxHp: 10 });
+                placeUnit(ctx.grid, ctx.unitsHolder, hydra, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, adjacent, { x: 2, y: 4 });
+                placeUnit(ctx.grid, ctx.unitsHolder, distant, { x: 12, y: 3 });
+                const damage = createVisibleDamage(hydra);
+
+                const result = ctx.attackHandler.handleObstacleAttack(
+                    positionForCell(aimed),
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    hydra,
+                    { x: 2, y: 3 },
+                    undefined,
+                    damage,
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([]);
+                expect(adjacent.isDead()).toBe(true);
+                expect(result.unitIdsDied).toEqual([adjacent.getId()]);
+                expect(damage.secondary).toContainEqual(
+                    expect.objectContaining({ source: "lightning_spin", unitId: adjacent.getId() }),
+                );
+                expect(distant.getCumulativeHp()).toBe(distant.getMaxHp());
+            });
+
+            it("a unit strike breaks the barrels around the attacker in the same spin", () => {
+                const ctx = setupMountainFight();
+                const beside = { x: 2, y: 4 };
+                const diagonal = { x: 1, y: 2 };
+                const outside = { x: 5, y: 3 };
+                ctx.grid.setScatteredMountains([beside, outside, diagonal]);
+                const hydra = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Lightning Spin"],
+                });
+                const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, maxHp: 1000 });
+                placeUnit(ctx.grid, ctx.unitsHolder, hydra, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, target, { x: 3, y: 3 });
+
+                const result = ctx.attackHandler.handleMeleeAttack(
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    createVisibleDamage(target),
+                    undefined,
+                    hydra,
+                    target,
+                    { x: 2, y: 3 },
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([outside]);
+                expect(result.spunObstacleCells).toHaveLength(2);
+                expect(result.spunObstacleCells).toEqual(expect.arrayContaining([beside, diagonal]));
+            });
+
+            it("a plain unit strike leaves the barrels beside the attacker standing", () => {
+                const ctx = setupMountainFight();
+                const beside = { x: 2, y: 4 };
+                ctx.grid.setScatteredMountains([beside]);
+                const attacker = createTestUnit({ team: PBTypes.TeamVals.RIGHT, attackType: PBTypes.AttackVals.MELEE });
+                const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, maxHp: 1000 });
+                placeUnit(ctx.grid, ctx.unitsHolder, attacker, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, target, { x: 3, y: 3 });
+
+                const result = ctx.attackHandler.handleMeleeAttack(
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    createVisibleDamage(target),
+                    undefined,
+                    attacker,
+                    target,
+                    { x: 2, y: 3 },
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([beside]);
+                expect(result.spunObstacleCells).toEqual([]);
+            });
         });
 
         it("small melee unit strikes the left mountain from an outer (non-corridor) cell", () => {

@@ -354,6 +354,22 @@ export function targetedSpellRequiresLineOfSight(spellName: string): boolean {
  * Shared target-specific reachability gate. Returning true for non-thrown spells lets callers apply this after
  * the generic canCastSpell check without growing another spell-name branch at every decision surface.
  */
+/**
+ * Thrown spells that behave like an ARCHER'S SHOT rather than a refused throw: they arc over the caster's
+ * own troops, land on the centre of a visible edge of their target, and are INTERCEPTED by a screening
+ * enemy instead of being refused by it (owner 2026-08-09 for Fire Strike; Fireball was added 2026-09-20 as
+ * "basically like fire arrow, but with AOE around the target").
+ *
+ * Deliberately NOT every thrown offensive spell. Ring of Fire resolves on the aimed target through its own
+ * cast path, so letting a blocked one through would fire it THROUGH the blocker, and Vine Throw snares one
+ * named enemy — snaring a different creature instead would be a different spell.
+ */
+const INTERCEPTED_THROWN_SPELLS: ReadonlySet<string> = new Set(["Fire Strike", "Fireball"]);
+
+export function isInterceptedThrownSpell(spellName: string): boolean {
+    return INTERCEPTED_THROWN_SPELLS.has(spellName);
+}
+
 export function isTargetedSpellLineOfSightClear(
     spellName: string,
     grid: ISpellSightGrid,
@@ -373,11 +389,11 @@ export function isTargetedSpellLineOfSightClear(
     // — the same rule ranged shots obey). Checked before the line walk because it is a property of the
     // TARGET, independent of which lane the throw takes.
     //
-    // Fire Strike ONLY. Vine Throw snares one named enemy and Ring of Fire resolves on the aimed target
-    // through their own cast paths; neither is a shot at an edge, and gating them here would silently
-    // delete legal casts the engine still performs.
+    // The intercepted throws ONLY (Fire Strike, Fireball). Vine Throw snares one named enemy and Ring of
+    // Fire resolves on the aimed target through their own cast paths; neither is a shot at an edge, and
+    // gating them here would silently delete legal casts the engine still performs.
     if (
-        spellName === "Fire Strike" &&
+        isInterceptedThrownSpell(spellName) &&
         !hasObservableThrownSpellEdge(grid, isWithinGrid, targetCells ?? [to], isTransparentUnit)
     ) {
         return false;
@@ -386,13 +402,10 @@ export function isTargetedSpellLineOfSightClear(
     if (!blocker) {
         return true;
     }
-    // Fire Strike alone is no longer refused by a body in the way (owner 2026-08-09): like an archer's
-    // shot it is INTERCEPTED, and the engine burns whoever stepped into the line, so only terrain still
-    // refuses it. Deliberately NOT every thrown offensive spell: Ring of Fire has its own cast path that
-    // still resolves on the aimed target, so letting a blocked one through would fire it THROUGH the
-    // blocker. Vine Throw likewise keeps refusing — it snares one named enemy, and snaring a different
-    // creature instead would be a different spell.
-    if (spellName === "Fire Strike") {
+    // An intercepted throw is not refused by a body in the way: like an archer's shot it burns whoever
+    // stepped into the line, so only terrain still refuses it. See INTERCEPTED_THROWN_SPELLS for why this
+    // is not every thrown spell.
+    if (isInterceptedThrownSpell(spellName)) {
         return blocker.occupantId !== "B" && blocker.occupantId !== "H";
     }
 
@@ -425,19 +438,22 @@ export function firstTargetedSpellSightBlocker(
     );
 }
 
+/** The cell-targeted spells whose block is an odd-sided 3x3, centred on the aimed cell. */
+const CELL_TARGETED_3X3_SPELLS: ReadonlySet<string> = new Set(["Meteor Shower", "Smoke"]);
+
 /**
  * The block of cells a CELL-targeted spell covers when aimed at `origin`.
  *
- * Meteor Shower's 3x3 is CENTRED on the aimed cell — an odd-sided footprint pivots about the cursor, the way
- * the Fire Wall's 3-cell line does. Everything else here is 2x2 (Meteorite, Smoke, Craft) and hangs off the
- * aimed cell as its bottom-left corner, because an even-sided block has no centre cell to anchor on.
+ * Meteor Shower's and Smoke's 3x3 are CENTRED on the aimed cell — an odd-sided footprint pivots about the
+ * cursor, the way the Fire Wall's line does. Everything else here is 2x2 (Meteorite, Craft) and hangs off
+ * the aimed cell as its bottom-left corner, because an even-sided block has no centre cell to anchor on.
  *
- * The ONE place either footprint is derived: meteoriteCast / meteorShowerCast read their block out of this,
- * and so does the client's aim outline and every damage label drawn inside it. A preview whose footprint
- * differs from the cast's is worse than no preview at all.
+ * The ONE place any of these footprints is derived: meteoriteCast / meteorShowerCast / smokeCast read their
+ * block out of this, and so does the client's aim outline and every damage label drawn inside it. A preview
+ * whose footprint differs from the cast's is worse than no preview at all.
  */
 export function cellTargetedSpellBlockCells(spellName: string, origin: XY): XY[] {
-    const spread = spellName === "Meteor Shower" ? [-1, 0, 1] : [0, 1];
+    const spread = CELL_TARGETED_3X3_SPELLS.has(spellName) ? [-1, 0, 1] : [0, 1];
     return spread.flatMap((dx) => spread.map((dy) => ({ x: origin.x + dx, y: origin.y + dy })));
 }
 
@@ -511,10 +527,10 @@ export function thrownSpellReachesAimedTarget(
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return true;
     }
-    // Same Fire-Strike-only visible-edge gate the engine applies, so the AI never scores a throw the cast
-    // would refuse. Scoped identically — see isTargetedSpellLineOfSightClear.
+    // The same visible-edge gate the engine applies to an intercepted throw, so the AI never scores one the
+    // cast would refuse. Scoped identically — see isTargetedSpellLineOfSightClear.
     if (
-        spellName === "Fire Strike" &&
+        isInterceptedThrownSpell(spellName) &&
         !hasObservableThrownSpellEdge(grid, isWithinGrid, targetCells ?? [to], isTransparentUnit)
     ) {
         return false;
@@ -611,6 +627,11 @@ export function summonFootprintOf(spell: Spell): { width: number; height: number
  * the client's own cast path each used to spell this rule out separately, and three copies of a targeting
  * rule is three chances to promise a cast the engine then refuses.
  */
+/** What the player should read when a summon's real body has no free cells next to the caster. */
+export function noSpaceToSummonMessage(casterName: string, summonName: string, width: number, height: number): string {
+    return `No space next to ${casterName}. ${summonName} needs ${width}×${height} free cells.`;
+}
+
 export function resolveSummonAnchor(
     spell: Spell,
     gridMatrix: number[][],
@@ -649,12 +670,46 @@ export function firstSummonableAnchor(
  */
 export const spellToTextureName = (spellName: string): string => `${spellName.toLowerCase().replace(/ /g, "_")}_256`;
 
-/** Shared charge/stack gate used by the engine and AI before target-specific spell legality. */
+/**
+ * Shared caster gate used by the engine and AI before target-specific spell legality: a Broken unit can't cast
+ * (G4), and the spell needs laps, charges and enough stack power. The engine's cast validation calls this, so the
+ * AI never proposes a cast the engine refuses.
+ */
 export function isSpellUsableByCaster(casterUnit: Unit, spell: Spell): boolean {
     return (
+        !casterUnit.hasEffectActive("Break") &&
         spell.getLapsTotal() > 0 &&
         spell.isRemaining() &&
         spell.getMinimalCasterStackPower() <= casterUnit.getStackPower()
+    );
+}
+
+/**
+ * How much farther than its own movement a caster may reach with a position swap (Castling). Owner call
+ * 2026-10-02: the swap range is the unit's movement distance PLUS this many cells. Every place that
+ * computes swap targets pathfinds with `getSteps() + CASTLING_RANGE_BONUS_CELLS` — common's
+ * getEnemiesCellsWithinMovementRange (the engine's cast validation and the AI's candidates) and the
+ * client's two arming paths (Sandbox, LocalModelOpponent) — so the wire, the hover highlight and the
+ * server's re-validation all agree on one number.
+ */
+export const CASTLING_RANGE_BONUS_CELLS = 1;
+
+/**
+ * Whether a position swap (Castling) may exchange these two bodies: only when their footprints are the
+ * SAME shape — identical width AND identical height.
+ *
+ * The swap is a straight exchange of anchors, so identical footprints are what make it well defined: each
+ * body lands exactly on the cells the other vacated, with no overlap to resolve and no cell left stranded.
+ * Any mismatch breaks that. Two cells apiece is not enough — a 2x1 dropped onto a 1x2's anchor would claim
+ * a cell the 1x2 never held — so this compares the two sides, not their areas.
+ *
+ * It is deliberately NOT "both must be 1x1": a 2x2 Arachna Queen that stole Castling through Predatory
+ * Assimilation swaps with a 2x2, and a 2x1 mount with a 2x1.
+ */
+export function hasSwappableFootprint(casterUnit: Unit, targetUnit: Unit): boolean {
+    return (
+        casterUnit.getFootprintWidth() === targetUnit.getFootprintWidth() &&
+        casterUnit.getFootprintHeight() === targetUnit.getFootprintHeight()
     );
 }
 
@@ -696,6 +751,7 @@ export function canCastSpell(
             targetUnit &&
             targetUnit.getTeam() === casterUnit.getTeam() &&
             targetUnit.getAmountDied() > 0 &&
+            targetUnit.canBeResurrected() &&
             (spell.isSelfCastAllowed() || (!spell.isSelfCastAllowed() && !isSelfCast))
         );
     }
@@ -752,41 +808,31 @@ export function canCastSpell(
             targetIsEarthElement: targetUnit.hasAbilityActive("Earth Element"),
         }) <= 0;
 
+    /**
+     * Whether the target is free of this spell and of everything it conflicts with.
+     *
+     * Read through hasStatusBuffApplied / hasStatusApplied, never the buff/debuff OBJECTS alone: a ranked
+     * client leaves those arrays empty and mirrors only the authoritative display lists, so an object-only
+     * check greyed nothing out there — a Riot aimed at a Mass Riot stack, or a second Sadness, was offered,
+     * sent, and refused by the server as spell_not_available. The server keeps both views in lockstep (an
+     * expired buff leaves the list with its object), so it answers exactly as before.
+     */
     const notAlreadyApplied = (): boolean => {
-        const willConclictWith = spell.getConflictsWith();
         if (!targetUnit) {
             return false;
         }
 
-        if (spell.isBuff()) {
-            // Blacksmith's runes (Armor Rune / Weapon Rune) STACK: re-casting on a unit that already carries the
-            // rune adds +1, so they must stay targetable (green) instead of being rejected as "already applied".
-            // A declared conflict with a DIFFERENT buff still blocks.
-            const stacks = spell.getName() === "Armor Rune" || spell.getName() === "Weapon Rune";
-            const existingBuff = targetUnit.getBuff(spell.getName());
-
-            if (!stacks && existingBuff && existingBuff.getLaps() > 0) {
-                return false;
-            }
-            for (const b of targetUnit.getBuffs()) {
-                const blocksBySameName = !stacks && b.getName() === spell.getName();
-                if ((blocksBySameName || willConclictWith.includes(b.getName())) && b.getLaps()) {
-                    return false;
-                }
-            }
-        } else {
-            const existingDebuff = targetUnit.getDebuff(spell.getName());
-            if (existingDebuff && existingDebuff.getLaps() > 0) {
-                return false;
-            }
-            for (const d of targetUnit.getDebuffs()) {
-                if ((d.getName() === spell.getName() || willConclictWith.includes(d.getName())) && d.getLaps()) {
-                    return false;
-                }
-            }
+        const carries = (name: string): boolean =>
+            spell.isBuff() ? targetUnit.hasStatusBuffApplied(name) : targetUnit.hasStatusApplied(name);
+        // Blacksmith's runes (Armor Rune / Weapon Rune) STACK: re-casting on a unit that already carries the
+        // rune adds +1, so they must stay targetable (green) instead of being rejected as "already applied".
+        // A declared conflict with a DIFFERENT buff still blocks.
+        const stacks = spell.isBuff() && (spell.getName() === "Armor Rune" || spell.getName() === "Weapon Rune");
+        if (!stacks && carries(spell.getName())) {
+            return false;
         }
 
-        return true;
+        return !spell.getConflictsWith().some(carries);
     };
 
     if (spell.getSpellTargetType() === SpellTargetType.ANY_ALLY) {
@@ -806,9 +852,8 @@ export function canCastSpell(
     if (
         spell.getSpellTargetType() === SpellTargetType.ANY_ENEMY ||
         (spell.getSpellTargetType() === SpellTargetType.ENEMY_WITHIN_MOVEMENT_RANGE &&
-            casterUnit.isSmallSize() &&
             targetUnit &&
-            targetUnit.isSmallSize() &&
+            hasSwappableFootprint(casterUnit, targetUnit) &&
             oneOfTheEnemiesHasTargetCell())
     ) {
         const forcedUnitId = casterUnit.getTarget();
@@ -952,16 +997,19 @@ export const getMagicMirrorPower = (targetUnit: Unit): number => {
 };
 
 /**
- * The Magic Dragon's passive "Magic Mirror" ability, as a CHANCE in 0..100 (0 when the unit has no such
+ * The Magic Dragon's passive rebound figure, as a percentage in 0..100 (0 when the unit has no such
  * ability, or while it is Broken).
  *
- * The ability's base power plus the holder's own LUCK, the same way the poison auras combine theirs — a
- * lucky dragon rebounds more often, an unlucky one less. Clamped to 0..100 at the end, so the sum can never
- * push the chance past certain or below impossible.
+ * The ability's base power plus the holder's own LUCK, the same way the poison auras combine theirs —
+ * lucky dragons rebound more, unlucky ones less. Clamped to 0..100 at the end, so the sum can never
+ * push the share past certain or below impossible.
+ *
+ * The figure is an AMOUNT, not a chance — mdef in reverse: the caster ALWAYS takes this percentage of
+ * the magic damage that landed, exactly the way magic resistance always cuts it. The only roll left to
+ * it is the debuff copy (isMirrored), which stays all-or-nothing because half a Stun is not a thing.
  *
  * Deliberately separate from getMagicMirrorPower: the BUFF and passive ability have independent configured
- * values. For the passive, this same advertised percentage is both the proc chance and the share of landed
- * damage returned by getMagicMirrorAbilityShare.
+ * values. For the passive, this figure is the share of landed damage returned by getMagicMirrorAbilityShare.
  */
 export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
     if (!targetUnit.hasAbilityActive("Magic Reflection")) {
@@ -982,17 +1030,20 @@ export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
  * The SHARE of a rebounded spell's damage the passive ability sends back, as a percentage.
  *
  * A mirror returns what it reflects, not more: the caster takes this share of the damage the spell actually
- * landed, never the whole hit. It is the same figure the ability card advertises (base power moved by the
- * holder's luck), so the number the player reads is the number that comes back — a mirror that says 75 and
- * returns 100 is the kind of surprise that makes a stat sheet worthless.
+ * landed, never the whole hit — DETERMINISTICALLY, like magic resistance, never as a roll. It is the same
+ * figure the ability card advertises (base power moved by the holder's luck), so the number the player reads
+ * is the number that comes back — a mirror that says 75 and sometimes returns 0 is the kind of surprise that
+ * makes a stat sheet worthless.
  *
  * Effects are a separate question and stay all-or-nothing (see isMirrored): half a Stun is not a thing.
  */
 export const getMagicMirrorAbilityShare = (targetUnit: Unit): number => getMagicMirrorAbilityChance(targetUnit);
 
 /**
- * Whether the Magic Reflection passive rebounds an incoming spell. The Magic Mirror spell buffs return
- * damage deterministically instead and are resolved by {@link rollMagicMirrorDamageShare}.
+ * Whether the Magic Reflection passive sends an incoming spell's DEBUFF copy back. Damage itself is never
+ * rolled — both the buff and the passive return their share deterministically through
+ * {@link mirroredDamageShare}; this boolean is kept for the effect-side question only (see isMirrored,
+ * which answers it for either mirror source).
  */
 export const reboundsSpell = (targetUnit: Unit): boolean => {
     const chance = getMagicMirrorAbilityChance(targetUnit);
@@ -1003,20 +1054,13 @@ export const reboundsSpell = (targetUnit: Unit): boolean => {
 /**
  * Resolve the percentage of landed magical damage this holder returns to the caster for one incoming spell.
  *
- * Magic Mirror and Mass Magic Mirror always return their configured share. Magic Reflection remains a proc:
- * when it succeeds with a stronger share than the active spell buff, that stronger share wins for this hit.
- * This preserves the existing non-stacking mirror rule and never consumes randomness when the passive could
- * not improve the guaranteed result.
+ * An AMOUNT, not a roll — mdef in reverse: Magic Mirror and Mass Magic Mirror always return their
+ * configured share, the Magic Dragon's passive always returns its stack-scaled one, and when both are
+ * present the STRONGER share wins for the hit. This preserves the non-stacking mirror rule and draws no
+ * randomness at all; the only mirrored thing that still rolls is the debuff copy (isMirrored).
  */
-export const rollMagicMirrorDamageShare = (targetUnit: Unit): number => {
-    const guaranteedShare = getMagicMirrorPower(targetUnit);
-    const passiveShare = getMagicMirrorAbilityShare(targetUnit);
-    if (passiveShare <= guaranteedShare) {
-        return guaranteedShare;
-    }
-
-    return getRandomInt(0, 100) < passiveShare ? passiveShare : guaranteedShare;
-};
+export const mirroredDamageShare = (targetUnit: Unit): number =>
+    Math.max(getMagicMirrorPower(targetUnit), getMagicMirrorAbilityShare(targetUnit));
 
 export const isMirrored = (targetUnit: Unit): boolean => {
     // Either source can send a debuff back: the buff at its own power, the passive ability at its chance.

@@ -11,7 +11,12 @@
 
 import { buildV08A13SearchEnvironment, V08_A13_PRODUCTION_VERSION } from "../ai/versions/v0_8_a13_profile";
 import type { ILookaheadDeps } from "./lookahead";
-import { SearchDriver, type ISearchMatchInfo, type SearchPassiveProductiveProbeObserver } from "./search_driver";
+import {
+    SearchDriver,
+    withSearchEnvironment,
+    type ISearchMatchInfo,
+    type SearchPassiveProductiveProbeObserver,
+} from "./search_driver";
 
 export const V08_A13_SEARCH_OVERRIDE_ENV = "V08_A13_SEARCH" as const;
 
@@ -57,8 +62,11 @@ export function createV08A13SearchDriver(
     match: ISearchMatchInfo,
     passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver,
 ): SearchDriver {
-    return withScopedAIEnvironment(
-        buildV08A13SearchEnvironment(),
-        () => new SearchDriver(deps, match, undefined, passiveProductiveProbeObserver),
+    const environment = buildV08A13SearchEnvironment();
+    return withSearchEnvironment(environment, () =>
+        withScopedAIEnvironment(
+            environment,
+            () => new SearchDriver(deps, match, undefined, passiveProductiveProbeObserver),
+        ),
     );
 }

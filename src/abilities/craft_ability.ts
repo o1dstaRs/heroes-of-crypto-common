@@ -53,6 +53,11 @@ export function processCraftAbility(caster: Unit, allies: Unit[], sceneLog: ISce
 
         if (roll < stunChance) {
             const stun = effectFactory.makeEffect("Stun");
+            // The Blacksmith caught in its own backfire is the unit whose turn it is: without the extra lap the
+            // Stun ran out at the end of this very turn and it never missed one.
+            if (stun && ally.getId() === caster.getId()) {
+                stun.extend();
+            }
             if (stun && ally.applyEffect(stun)) {
                 sceneLog.updateLog(`${ally.getName()}'s craft backfired — stunned`);
             }

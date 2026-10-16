@@ -36,6 +36,7 @@ import { RANKED_DRAFT_VARIETY_POLICY_ID } from "../../src/ai/setup/draft_variety
 import {
     DRAFT_ANCHOR_W,
     DRAFT_FEATURE_DIM,
+    DRAFT_FEATURE_NAMES,
     applyCreatureRoleFitMultiplier,
     creatureRoleFitMultiplier,
     isRangedDamageCreature,
@@ -89,10 +90,14 @@ describe("draft ship genome", () => {
             draftSpellRangedPolicy: RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
         });
 
-        for (const creatureId of [magicDragon, battleMage, arbalester]) {
+        // The Wandering Mage joined the offensive casters when it gained Fireball (owner 2026-09-20). That
+        // reclassification is the POINT of the rule under test, not a regression in it: a stack that throws
+        // damage across the board is a ranged-damage asset however it throws it. Nightmare and Satyr stay
+        // out — their books buff and control, they deal none.
+        for (const creatureId of [magicDragon, battleMage, arbalester, wanderingMage]) {
             expect(isRangedDamageCreature(creatureId)).toBe(true);
         }
-        for (const creatureId of [nightmare, satyr, wanderingMage]) {
+        for (const creatureId of [nightmare, satyr]) {
             expect(isRangedDamageCreature(creatureId)).toBe(false);
         }
         for (const creatureId of [magicDragon, battleMage, nightmare]) {
@@ -104,6 +109,8 @@ describe("draft ship genome", () => {
         expect(rankedSpellRangedCoPlayAffinity(magicDragon, [satyr])).toBeGreaterThan(0);
         expect(rankedSpellRangedCoPlayAffinity(nightmare, [magicDragon])).toBeGreaterThan(0);
         expect(rankedSpellRangedCoPlayAffinity(satyr, [magicDragon])).toBeGreaterThan(0);
+        // Two offensive casters are not a co-play pairing — the bonus is for a caster ALONGSIDE a magic
+        // amplifier, and the Wandering Mage is neither an amplifier nor made one by carrying Fireball.
         expect(rankedSpellRangedCoPlayAffinity(magicDragon, [wanderingMage])).toBe(0);
         expect(rankedSpellRangedCoPlayAffinity(magicDragon, [PBTypes.CreatureVals.PEASANT])).toBe(0);
         expect(projectDraftGenomeForShipping(candidate).draftSpellRangedPolicy).toBe(
@@ -180,16 +187,23 @@ describe("draft ship genome", () => {
         expect(genome.weights).toEqual(frozenWeights);
     });
 
-    it("makes role fit a monotone boost for both positive and negative learned scores", () => {
+    it("makes role fit a monotone boost for both positive and negative genome scores", () => {
         expect(applyCreatureRoleFitMultiplier(30, 3)).toBe(90);
         expect(applyCreatureRoleFitMultiplier(-30, 3)).toBe(-10);
         expect(applyCreatureRoleFitMultiplier(-30, 1)).toBe(-30);
 
-        const negativeGenome = parseDraftGenome(LEAGUE_ROUND3_DRAFT_SPEC);
+        // Isolate signed role-fit ordering from changes to the roster's mobility and initiative stats.
+        const negativeWeights = new Array(DRAFT_FEATURE_DIM).fill(0);
+        negativeWeights[DRAFT_FEATURE_NAMES.indexOf("level")] = -30;
+        negativeWeights[DRAFT_FEATURE_NAMES.indexOf("exp")] = 1;
+        const negativeGenome = createLeagueGenome("negative-role-fit", embedIntrinsicDraftWeights(negativeWeights));
         const wanderingMage = PBTypes.CreatureVals.WANDERING_MAGE;
         const squire = PBTypes.CreatureVals.SQUIRE;
         const offer = [wanderingMage, squire];
         expect(offer.every((creatureId) => draftGenomeCreatureScore(negativeGenome, creatureId) < 0)).toBe(true);
+        expect(draftGenomeCreatureScore(negativeGenome, squire)).toBeGreaterThan(
+            draftGenomeCreatureScore(negativeGenome, wanderingMage),
+        );
         expect(pickDraftGenomeCreature(negativeGenome, offer, [], [])).toBe(squire);
         expect(pickDraftGenomeCreature(negativeGenome, offer, [], [PBTypes.CreatureVals.ARBALESTER])).toBe(
             wanderingMage,

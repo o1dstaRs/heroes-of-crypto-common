@@ -130,6 +130,7 @@ export interface ISetupPolicy {
         ownCreatureIds: readonly number[],
         knownOpponentCreatureIds: readonly number[],
         tier1ArtifactId?: number,
+        tier2ArtifactId?: number,
     ): number;
     /** Best Tier-2 artifact id from the offered set. */
     pickArtifactT2(offered: readonly number[]): number;
@@ -166,11 +167,41 @@ export const TIER1_ARTIFACT_WINRATE: Record<number, number> = {
     [Tier1Artifact.VETERAN_HELM]: 49.3,
     [Tier1Artifact.DUAL_STRIKE_CHARM]: 47.2,
     [Tier1Artifact.SWIFT_BOOTS]: 46.6,
-    [Tier1Artifact.HELM_OF_FOCUS]: 46.1,
+    // Retained Helm prior, not a measured barrel win rate. A19 artifact-swap calibration at d2181a2
+    // (seeds 2026101411/2026101415; 1176/336 games including self-controls, seven cohorts, three maps)
+    // measured 45.47% [43.20, 47.73] and 43.27% [38.26, 48.28]. Replacing this with 45.47 did not
+    // establish a held-out Brier improvement (95% CI crosses zero); later balance changes need a rerun.
+    [Tier1Artifact.BARREL_BARRICADE]: 46.1,
+    // Not remeasured after the item became +25% status resistance and +25% mind resistance.
     [Tier1Artifact.AMULET_OF_RESOLVE]: 45.4,
     [Tier1Artifact.HUNTERS_LONGBOW]: 45.0,
     [Tier1Artifact.WINGED_BOOTS]: 44.5,
     [Tier1Artifact.BROKEN_AEGIS]: 42.8,
+    // Moved with the pick from Tier 2 on 2026-10-14, when the bonus went from 50% to 40%. This is the
+    // 2026-07-15 Tier-2 measurement under the old augment-amplifying mechanic. It was already stale after
+    // the castable-buffs-only change and has not been remeasured as a Tier-1 artifact or at 40%.
+    [Tier1Artifact.TOME_OF_AMPLIFICATION]: 68.8,
+    // Moved from Tier 2 on 2026-10-14, when the proc went from a flat 60% to 30% plus the attacking
+    // unit's current luck. 46.3 is the 2026-07-15 Tier-2 measurement at 60%. It has not been remeasured.
+    [Tier1Artifact.RIME_CHARM]: 46.3,
+};
+
+/**
+ * Tier-1 win rates corrected for the ranked draft's CURRENT composition (2026-09-24). The shipped table was
+ * measured in 2026-07, when ranked armies held ~0.2 natively ranged creatures; the draft now fields ~2.9, and two
+ * entries were measured again under that distribution with the artifact forced on one seat (2000 games per arm,
+ * a control that read exactly 50.00%, evidence in docs/evidence/a19_live_program_20260921):
+ *   CURSED_WARD      79.8 -> 46.3  — the table's top entry, so the bundle pick took it whenever it was offered,
+ *                                    yet forcing it measured 46.32% [42.00, 50.70] against the policy's own mix.
+ *   HUNTERS_LONGBOW  45.0 -> 53.5  — it grants ranged units +1 flat attack PER ARCHER, so its value rose with the
+ *                                    archer count the draft tripled; forcing it measured 53.47% [49.09, 57.80].
+ * Every other entry, and the deliberate absence of MAGES_RING (measured 47.25%, i.e. the 50 fallback is fair), is
+ * unchanged. Research-only: nothing resolves this table unless a draft genome opts in.
+ */
+export const TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED: Record<number, number> = {
+    ...TIER1_ARTIFACT_WINRATE,
+    [Tier1Artifact.CURSED_WARD]: 46.3,
+    [Tier1Artifact.HUNTERS_LONGBOW]: 53.5,
 };
 
 /**
@@ -178,15 +209,23 @@ export const TIER1_ARTIFACT_WINRATE: Record<number, number> = {
  * See measure_artifacts.ts --tier=2. REFRESHED 2026-07-15 — see the TIER1_ARTIFACT_WINRATE docstring above
  * for the full provenance (same bugfix, same bake). Historical headline rerank: Tome of Amplification
  * #9(41.7%)->#1(68.8%) under its former augment-amplifying mechanic; Farsight Quiver
- * #4(62.5%)->#5(47.1%). Tome's row is stale after the 2026-07-18 castable-buffs-only change and remains
- * here only until the Tier-2 table is remeasured and re-gated.
+ * #4(62.5%)->#5(47.1%). Tome left the live Tier-2 pool on 2026-10-14 (new drafts pick Tier 1 id 14, and
+ * the same stale 68.8 moved with it). This row stays so a frozen policy or a saved offer of id 10 still
+ * ranks the artifact it was measured as. It was already stale after the 2026-07-18 castable-buffs-only
+ * change and has not been remeasured.
  */
 export const TIER2_ARTIFACT_WINRATE: Record<number, number> = {
+    // Unmeasured artifact: neutral prior until cohort evidence is available.
+    [Tier2Artifact.GRAVECHAIN]: 50,
+    // Provisional neutral prior for the new artifact; not a measured win rate.
+    [Tier2Artifact.LAST_FUSE]: 50,
     [Tier2Artifact.TOME_OF_AMPLIFICATION]: 68.8,
     [Tier2Artifact.TITAN_PLATE]: 63.9,
     [Tier2Artifact.WARLORDS_EDGE]: 63.7,
     [Tier2Artifact.CLOVER_OF_FORTUNE]: 62.2,
     [Tier2Artifact.FARSIGHT_QUIVER]: 47.1,
+    // Left the live pool on 2026-10-14 (new drafts pick Tier 1 id 15). This 46.3 stays for a saved offer
+    // of id 11. It was measured at a flat 60%, not at 30% plus luck.
     [Tier2Artifact.RIME_CHARM]: 46.3,
     [Tier2Artifact.HOLY_CROSS]: 46.1,
     [Tier2Artifact.LAVA_STRIDERS]: 45.4,

@@ -183,7 +183,10 @@ describe("IL dataset v3", () => {
             // the schema hash covers the per-action field whitelist, so widening it moves this hash and only
             // this hash — af/cf/vf/wf are feature-vector orders and are untouched.
             // af3ae888...41531 -> 8dfa8af2...28241.
-            schema: "8dfa8af25b132fbf2e81bca275f22a48f76e3b0e94e729e38fbcac729e028241",
+            // Re-pinned 2026-09-12 when range_attack gained `targetPosition` (a free Through Shot line aimed at a
+            // world point, targetId ""): without it a recorded free shot could not be replayed to the same ray.
+            // Same whitelist-only change: only this hash moves. 8dfa8af2...28241 -> 5fd24a77...215af.
+            schema: "5fd24a773d7b8760cfc6585a3e73a24173a8f4681d3ee6b6dc0647f89b8215af",
         });
     });
 

@@ -23,6 +23,7 @@ import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_pat
 import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { otherTeam } from "./v0_1";
 import { enemyFieldsSplashAoe, layoutRevealPlacement, opponentCreatureIdsForPlacement } from "./v0_7_placement_reveal";
+import { assertNoLegacySeatEnv, seatEnvName } from "../seat_env";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
 
 export type V08BacklineProtectorKind = "abomination" | "angel" | "arachna_queen";
@@ -38,6 +39,44 @@ export interface IV08BacklineWardIntent {
     readonly protector: Unit;
     readonly protectorIntent: IV08BacklineProtectorIntent;
 }
+
+/**
+ * Abomination has no protector intent by default: native v0.8 and the a19 search play it as an ordinary melee
+ * unit. Releasing it passed two preregistered paired A/Bs on live-drafted side boards (+4.20pp and +5.35pp for its
+ * army, docs/evidence/draft_unit_strength_20260913) and shipped on 2026-09-14. `V08_ABOMINATION_GUARD_<LEFT|RIGHT>=1`
+ * restores the old guard duty for that seat, for rollback and for measuring the two contracts against each other.
+ * Placement still screens wards with it either way.
+ */
+export const V08_ABOMINATION_GUARD_ENV = "V08_ABOMINATION_GUARD";
+
+/**
+ * Research seam, off by default: `V08_PROTECTOR_RELEASE_<LEFT|RIGHT>` is a comma list of protector kinds
+ * (`abomination`, `angel`, `arachna_queen`) that get no protector intent for that seat. It generalizes the
+ * Abomination release to the other protector roles so each can be measured on the same drafted matchups.
+ */
+export const V08_PROTECTOR_RELEASE_ENV = "V08_PROTECTOR_RELEASE";
+
+const PROTECTOR_KINDS: readonly V08BacklineProtectorKind[] = ["abomination", "angel", "arachna_queen"];
+
+const protectorReleasedForTeam = (kind: V08BacklineProtectorKind, team: number): boolean => {
+    assertNoLegacySeatEnv(V08_PROTECTOR_RELEASE_ENV);
+    const raw = process.env[seatEnvName(V08_PROTECTOR_RELEASE_ENV, team)];
+    if (!raw) return false;
+    const released = raw
+        .split(",")
+        .map((token) => token.trim())
+        .filter(Boolean);
+    const unknown = released.filter((token) => !PROTECTOR_KINDS.includes(token as V08BacklineProtectorKind));
+    if (unknown.length) {
+        throw new Error(`${V08_PROTECTOR_RELEASE_ENV} lists unknown protector kinds: ${unknown.join(", ")}`);
+    }
+    return released.includes(kind);
+};
+
+const abominationReleasedForTeam = (team: number): boolean => {
+    assertNoLegacySeatEnv(V08_ABOMINATION_GUARD_ENV);
+    return process.env[seatEnvName(V08_ABOMINATION_GUARD_ENV, team)] !== "1";
+};
 
 export const v08BacklineProtectorKind = (unit: Unit): V08BacklineProtectorKind | undefined => {
     if (unit.getName() === "Abomination") return "abomination";
@@ -105,6 +144,8 @@ export function buildV08BacklineProtectorIntent(
 ): IV08BacklineProtectorIntent | undefined {
     const kind = v08BacklineProtectorKind(unit);
     if (!kind || (kind === "arachna_queen" && unit.isSummoned())) return undefined;
+    if (kind === "abomination" && abominationReleasedForTeam(unit.getTeam())) return undefined;
+    if (protectorReleasedForTeam(kind, unit.getTeam())) return undefined;
     const wards = sortedWards(unit, context);
     if (!wards.length) return undefined;
     if (kind === "angel" && (wards.length < 2 || !liveEnemyShooters(unit, context).length)) return undefined;

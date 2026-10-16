@@ -37,7 +37,7 @@ export function processTerrifyingGazeAbility(
         return;
     }
 
-    // As with Aggr, MIND resistance (e.g. Helm of Focus) lowers the odds the fright lands.
+    // As with Aggr, MIND resistance (e.g. Amulet of Resolve) lowers the odds the fright lands.
     const mindResistCoeff =
         terrifyingGazeAbility.getType() === AbilityType.MIND ? 1 - targetUnit.getMindResist() / 100 : 1;
 

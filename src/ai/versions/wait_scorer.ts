@@ -20,6 +20,7 @@ import type { Unit } from "../../units/unit";
 import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
 import type { UnitsHolder } from "../../units/units_holder";
 import type { IDecisionContext } from "../ai_strategy";
+import { assertNoLegacySeatEnv, seatEnvName } from "../seat_env";
 
 /**
  * Q2 Gate-2 — the ANCHORED WAIT-SCORER: the shippable distillation of the Gate-1 act-vs-wait lap-rollout
@@ -538,13 +539,14 @@ export function v07BakedWaitWeights(): IWaitWeights | null {
 
 /**
  * Per-TEAM wait-weight override (battery/refit seam, mirrors the SearchDriver's per-team V2 leaf):
- * `V07_WAIT_WEIGHTS_LOWER` / `V07_WAIT_WEIGHTS_UPPER`. Returns undefined when the seat has no
+ * `V07_WAIT_WEIGHTS_<LEFT|RIGHT>` (built by seat_env.seatEnvName). Returns undefined when the seat has no
  * override (caller falls through to the shared resolution), null for an explicit all-zero vector
  * (scorer disabled for that seat), or the parsed weights. Read per call — the battery flips these
  * between games in the same worker process.
  */
 export function v07WaitWeightsForTeam(team: TeamType): IWaitWeights | null | undefined {
-    const raw = process.env[team === PBTypes.TeamVals.LEFT ? "V07_WAIT_WEIGHTS_LOWER" : "V07_WAIT_WEIGHTS_UPPER"];
+    assertNoLegacySeatEnv("V07_WAIT_WEIGHTS");
+    const raw = process.env[seatEnvName("V07_WAIT_WEIGHTS", team)];
     if (raw === undefined) {
         return undefined;
     }
@@ -840,7 +842,7 @@ export function consumeWaitReplacement(unitId: string): GameAction[] | undefined
  * 41-dim basis, fit on the B2 oracle's counterfactual-labeled scorer-wait points, that vetoes a
  * scorer wait when its cancel score clears the fitted threshold. Scoped EXACTLY to scorer-created
  * waits (the fit's support); the strategic-rule's own waits are untouched. JSON {b, w[41], t} via
- * `V08_WAIT_CANCEL`, with per-team `V08_WAIT_CANCEL_LOWER`/`_UPPER` taking precedence so the A/B
+ * `V08_WAIT_CANCEL`, with per-team `V08_WAIT_CANCEL_<LEFT|RIGHT>` taking precedence so the A/B
  * battery can arm one seat (the process-global-env lesson from the router ladder).
  */
 export interface IWaitCancelWeights extends IWaitWeights {
@@ -870,7 +872,8 @@ export function parseWaitCancelWeights(raw: string | undefined): IWaitCancelWeig
 }
 
 function waitCancelWeightsForTeam(team: TeamType): IWaitCancelWeights | null {
-    const perTeam = process.env[team === PBTypes.TeamVals.LEFT ? "V08_WAIT_CANCEL_LOWER" : "V08_WAIT_CANCEL_UPPER"];
+    assertNoLegacySeatEnv("V08_WAIT_CANCEL");
+    const perTeam = process.env[seatEnvName("V08_WAIT_CANCEL", team)];
     return parseWaitCancelWeights(perTeam) ?? parseWaitCancelWeights(process.env.V08_WAIT_CANCEL);
 }
 

@@ -159,7 +159,7 @@ export const abilityToTextureName = (abilityName: string): string =>
 /**
  * Buffs and debuffs that are NOT a cast blessing or a landed curse: army equipment (artifacts, augments)
  * and the engine's own per-lap markers. They live in the same applied_buffs/applied_debuffs lists as real
- * spells, so anything that moves or lifts an entry (Borrowed Grace, Absolving Arrow) has to skip them —
+ * spells, so anything that copies or lifts an entry (Borrowed Grace, Absolving Arrow) has to skip them —
  * an artifact is worn, not cast, and a marker is rewritten by the next stat recompute anyway.
  *
  * Aura-applied entries are NOT listed here: they are recognised by their Number.MAX_SAFE_INTEGER laps
@@ -190,6 +190,7 @@ const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
     "Arcane Ward Blessing",
     "Warding Mane Blessing",
     "Arrows Wingshield Blessing",
+    "Rallying Volley Blessing",
     "Water Shield",
 ]);
 
@@ -219,33 +220,46 @@ function addToTargetList(
     return targetList;
 }
 
-function getTargetList(
-    startingPos: XY[],
-    cellsDiff: XY,
-    target: Unit,
-    attacker: Unit,
-    grid: Grid,
-    unitsHolder: UnitsHolder,
-    onlyOppositeTeam: boolean,
-): Unit[] {
-    let targetList: Unit[] = [];
-    const signX = Math.sign(cellsDiff.x);
-    const signY = Math.sign(cellsDiff.y);
-    const bX = Math.floor(Math.abs(cellsDiff.x));
-    const bY = Math.floor(Math.abs(cellsDiff.y));
-    for (const startingCell of startingPos) {
-        targetList = addToTargetList(
-            startingCell.x + bX * signX,
-            startingCell.y + bY * signY,
-            targetList,
-            target,
-            attacker,
-            grid,
-            unitsHolder,
-            onlyOppositeTeam,
-        );
+/**
+ * The one cell a piercing melee sweep carries on to past a SINGLE-CELL target — the step `nextStandingTargets`
+ * takes past a small unit, expressed for a bare cell so the obstacle path can run Skewer Strike / Fire Breath
+ * on through a cemetery barrel to the barrel standing behind it.
+ *
+ * Same geometry as the unit sweep: a large attacker aims from the cell of its body closest to the target (a
+ * 2x2 keeps the hand-written order the search tie-breaks on, see nextStandingTargets), and the sweep steps
+ * exactly one cell further along the attacker→target line — straight or diagonal. A target the attacker is
+ * not in contact with yields nothing: a pierce only ever runs on from a contact strike.
+ */
+export function pierceCellBehind(attackerUnit: Unit, attackFromCell: XY, targetCell: XY): XY | undefined {
+    let attackerCell = attackFromCell;
+    if (!attackerUnit.isSmallSize()) {
+        const width = attackerUnit.getFootprintWidth();
+        const height = attackerUnit.getFootprintHeight();
+        const attackerCells =
+            width === 2 && height === 2
+                ? [
+                      attackFromCell,
+                      { x: attackFromCell.x - 1, y: attackFromCell.y },
+                      { x: attackFromCell.x, y: attackFromCell.y - 1 },
+                      { x: attackFromCell.x - 1, y: attackFromCell.y - 1 },
+                  ]
+                : getFootprintCellsForAnchor(attackFromCell, width, height);
+        attackerCell = attackerCells[0];
+        let minDistance = getDistance(attackerCell, targetCell);
+        for (const cell of attackerCells) {
+            const distance = getDistance(cell, targetCell);
+            if (distance < minDistance) {
+                attackerCell = cell;
+                minDistance = distance;
+            }
+        }
     }
-    return targetList;
+    const dx = targetCell.x - attackerCell.x;
+    const dy = targetCell.y - attackerCell.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
+        return undefined;
+    }
+    return { x: targetCell.x + dx, y: targetCell.y + dy };
 }
 
 export function nextStandingTargets(
@@ -258,12 +272,39 @@ export function nextStandingTargets(
     onlyOppositeTeam = false,
 ): Unit[] {
     let targetList: Unit[] = [];
+    for (const cell of pierceSweepCells(attackerUnit, targetUnit, attackFromCell, pierceLargeUnits)) {
+        targetList = addToTargetList(
+            cell.x,
+            cell.y,
+            targetList,
+            targetUnit,
+            attackerUnit,
+            grid,
+            unitsHolder,
+            onlyOppositeTeam,
+        );
+    }
+    return targetList;
+}
+
+/**
+ * The cells a piercing melee sweep (Fire Breath, Skewer Strike) runs on into behind `targetUnit`, in the order the
+ * sweep visits them. nextStandingTargets reads the units off exactly these cells and the cemetery-barrel rules read
+ * the barrels off them, so the wave can never hit a unit in a cell whose barrel it spared. Empty when the sweep does
+ * not pierce this target (a large body with `pierceLargeUnits` off). Cells may lie off the board.
+ */
+export function pierceSweepCells(
+    attackerUnit: Unit,
+    targetUnit: Unit,
+    attackFromCell?: XY,
+    pierceLargeUnits = true,
+): XY[] {
     let targetBaseCell = targetUnit.getBaseCell();
 
     const attackFromBaseCell = attackFromCell ? attackFromCell : attackerUnit.getBaseCell();
 
     if (!attackFromBaseCell || !targetBaseCell) {
-        return targetList;
+        return [];
     }
 
     let attackerBaseCell = attackFromBaseCell;
@@ -357,23 +398,16 @@ export function nextStandingTargets(
         }
     }
 
-    if (targetBaseCell && attackerBaseCell) {
-        const cellsDiff = {
-            x: targetBaseCell.x - attackerBaseCell.x + xCoefficient,
-            y: targetBaseCell.y - attackerBaseCell.y + yCoefficient,
-        };
-        if (targetUnit.isSmallSize() || pierceLargeUnits) {
-            targetList = getTargetList(
-                targetUnit.getCells(),
-                cellsDiff,
-                targetUnit,
-                attackerUnit,
-                grid,
-                unitsHolder,
-                onlyOppositeTeam,
-            );
-        }
+    if (!targetBaseCell || !attackerBaseCell || (!targetUnit.isSmallSize() && !pierceLargeUnits)) {
+        return [];
     }
-
-    return targetList;
+    const cellsDiff = {
+        x: targetBaseCell.x - attackerBaseCell.x + xCoefficient,
+        y: targetBaseCell.y - attackerBaseCell.y + yCoefficient,
+    };
+    const signX = Math.sign(cellsDiff.x);
+    const signY = Math.sign(cellsDiff.y);
+    const bX = Math.floor(Math.abs(cellsDiff.x));
+    const bY = Math.floor(Math.abs(cellsDiff.y));
+    return targetUnit.getCells().map((cell) => ({ x: cell.x + bX * signX, y: cell.y + bY * signY }));
 }

@@ -9,7 +9,9 @@
  * -----------------------------------------------------------------------------
  */
 
-import { Tier1Artifact } from "../../artifacts/artifact_properties";
+import { Tier1Artifact, Tier2Artifact } from "../../artifacts/artifact_properties";
+import type { ArtifactFitVersion } from "./artifact_fit";
+import { lastFuseDraftContact, lastFuseIncomingMeleeShare } from "./last_fuse_fit";
 import {
     backlineProtectionBeneficiaryCount,
     creatureInfo,
@@ -28,6 +30,8 @@ import {
     pickRankedDraftVarietyCreature,
     type RankedDraftVarietyPolicyId,
 } from "./draft_variety";
+import { rankedDraftStrengthScore, type RankedDraftStrengthPolicyId } from "./draft_strength_prior";
+import type { RankedDraftSynergyVariants } from "./draft_synergy_variants";
 
 export type DraftBundle = readonly [number, number, number];
 
@@ -36,6 +40,10 @@ export interface IDraftCoherenceContext {
     ownCreatureIds: readonly number[];
     /** The acting seat's selected Tier-1 artifact, when the bundle phase has already resolved. */
     tier1ArtifactId?: number;
+    /** Own Tier-2 choice, only after the simultaneous artifact phase has finished. */
+    tier2ArtifactId?: number;
+    /** Omitted retains the historical coherence head used by research and explicit v1/v2 policies. */
+    artifactFitVersion?: ArtifactFitVersion;
     /** Only public enemy picks. Required when an interaction-prior candidate uses counter evidence. */
     knownOpponentCreatureIds?: readonly number[];
     /** Candidate-only evidence overlay; omitted preserves the existing coherence policy exactly. */
@@ -44,6 +52,12 @@ export interface IDraftCoherenceContext {
     draftVarietyPolicy?: RankedDraftVarietyPolicyId;
     /** Candidate-only offensive-spell co-play selector; omitted preserves the existing coherence policy exactly. */
     draftSpellRangedPolicy?: RankedSpellRangedDraftPolicyId;
+    /** Candidate-only battle-fitted unit strength; omitted preserves the existing coherence policy exactly. */
+    draftStrengthPolicy?: RankedDraftStrengthPolicyId;
+    /** The map, only once the live pick phase has revealed it (right before the level-3 picks). */
+    revealedGridType?: number;
+    /** The game's synergy variants (public from the first draft screen); read only by `-sv` strength policies. */
+    synergyVariants?: RankedDraftSynergyVariants;
 }
 
 /** Keep replay-derived build fit influential without making it lexicographically stronger than the genome. */
@@ -84,6 +98,8 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
     if (!info) return 0;
 
     let affinity = 0;
+    const ringBeneficiary =
+        (context.artifactFitVersion ?? 1) >= 3 ? info.dealsMagicDamage : info.rangedSpellDamage || info.magicAttack;
     if (context.tier1ArtifactId === Tier1Artifact.HUNTERS_LONGBOW && info.ranged) {
         affinity += 1.2;
     } else if (context.tier1ArtifactId === Tier1Artifact.WINGED_BOOTS && info.canFly) {
@@ -92,6 +108,51 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
         affinity += 0.45;
         if (hasMultiHitMeleePressure(creatureId)) affinity += 0.75;
         if (hasMobilePressure(creatureId)) affinity += 0.15;
+    } else if (context.tier1ArtifactId === Tier1Artifact.BARREL_BARRICADE && info.ranged) {
+        // Two one-hit barrels are a screen. They pay off for units that shoot from behind them.
+        affinity += 0.55;
+    } else if (context.tier1ArtifactId === Tier1Artifact.AMULET_OF_RESOLVE && info.abilities.includes("Mechanism")) {
+        // Mechanism takes extra status and extra physical area damage. The amulet offsets both.
+        affinity += 0.8;
+    } else if (context.tier1ArtifactId === Tier1Artifact.MAGES_RING && ringBeneficiary) {
+        affinity += 0.8;
+    } else if (context.tier1ArtifactId === Tier1Artifact.TOME_OF_AMPLIFICATION && info.castsAmplifiableBuff) {
+        affinity += 0.8;
+    } else if (context.tier1ArtifactId === Tier1Artifact.RIME_CHARM && (info.melee || info.ranged)) {
+        affinity += 0.3;
+        if (hasMultiHitMeleePressure(creatureId)) affinity += 0.3;
+    }
+
+    // The last level-4 pick follows Tier 2. Complete the selected plan without overriding the trained
+    // strength head or inventing future artifacts during earlier picks.
+    switch (context.tier2ArtifactId) {
+        case Tier2Artifact.QUIVER_OF_ECHOES:
+            if (info.ranged && info.shots > 1) affinity += 0.6;
+            break;
+        case Tier2Artifact.ARCHMAGES_RING:
+            if ((context.artifactFitVersion ?? 1) >= 3 ? info.dealsMagicDamage : ringBeneficiary || info.magicalSplash)
+                affinity += 0.5;
+            break;
+        case Tier2Artifact.GRAVECHAIN:
+            if (info.ranged) affinity += 0.3;
+            else if (info.melee && (info.movementSteps ?? 4) <= 3) affinity -= 0.4;
+            else if (info.melee && (info.movementSteps ?? 4) >= 6) affinity += 0.15;
+            break;
+        case Tier2Artifact.LAST_FUSE:
+            if ((context.artifactFitVersion ?? 1) >= 5) {
+                const enemies = [...new Set(context.knownOpponentCreatureIds ?? [])].flatMap((id) => {
+                    const enemy = creatureInfo(id);
+                    return enemy ? [enemy] : [];
+                });
+                affinity += 0.35 * lastFuseDraftContact(info, lastFuseIncomingMeleeShare(enemies));
+                break;
+            }
+            if (info.melee) {
+                affinity += 0.35;
+                if (info.footprintWidth * info.footprintHeight > 1) affinity += 0.15;
+                if (info.abilities.includes("Resurrection")) affinity -= 0.25;
+            }
+            break;
     }
 
     const ownInfos = context.ownCreatureIds.flatMap((id) => {
@@ -165,7 +226,9 @@ export function pickCoherentDraftCreature(
             draftCreatureCoherenceAffinity(creatureId, context) +
             (isRankedDraftInteractionPrior(context.draftInteractionPrior)
                 ? rankedDraftInteractionAffinity(creatureId, context) * INTERACTION_TO_COHERENCE_SCALE
-                : 0),
+                : 0) +
+            // Divided back out of the overlay weight so the final score moves by exactly weight x lift.
+            rankedDraftStrengthScore(creatureId, context.draftStrengthPolicy, context) / DRAFT_COHERENCE_WEIGHT,
     );
     const scores = applyDraftCoherenceOverlay(baseScores, affinities);
     if (isRankedDraftVarietyPolicy(context.draftVarietyPolicy)) {
@@ -177,13 +240,18 @@ export function pickCoherentDraftCreature(
 /** Build-plan fit available at bundle time, before later creature offers have resolved. */
 export function draftBundleCoherenceAffinity(
     [level1, level2, artifactId]: DraftBundle,
-    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy"> = {},
+    options: Pick<
+        IDraftCoherenceContext,
+        "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants" | "artifactFitVersion"
+    > = {},
 ): number {
     const creatures = [level1, level2] as const;
     const planSeed =
         artifactId === Tier1Artifact.HUNTERS_LONGBOW ||
         artifactId === Tier1Artifact.WINGED_BOOTS ||
-        artifactId === Tier1Artifact.WOUNDING_CHARM
+        artifactId === Tier1Artifact.WOUNDING_CHARM ||
+        artifactId === Tier1Artifact.BARREL_BARRICADE ||
+        artifactId === Tier1Artifact.AMULET_OF_RESOLVE
             ? 0.12
             : 0;
     const creatureFit = creatures.reduce(
@@ -202,13 +270,30 @@ export function draftBundleCoherenceAffinity(
 export function pickCoherentDraftBundle(
     bundles: readonly DraftBundle[],
     creatureScore: (creatureId: number) => number,
-    artifactScore: (artifactId: number) => number,
-    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy"> = {},
+    artifactScore: (artifactId: number, ownCreatureIds: readonly number[]) => number,
+    options: Pick<
+        IDraftCoherenceContext,
+        "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants" | "artifactFitVersion"
+    > = {},
 ): number {
     if (!bundles.length) return 0;
     const baseScores = bundles.map(
-        ([level1, level2, artifactId]) => creatureScore(level1) + creatureScore(level2) + artifactScore(artifactId),
+        ([level1, level2, artifactId]) =>
+            creatureScore(level1) + creatureScore(level2) + artifactScore(artifactId, [level1, level2]),
     );
-    const affinities = bundles.map((bundle) => draftBundleCoherenceAffinity(bundle, options));
+    const affinities = bundles.map(
+        (bundle) =>
+            draftBundleCoherenceAffinity(bundle, options) +
+            // A bundle drafts both creatures, so both count in full; the second joins the first's roster.
+            (rankedDraftStrengthScore(bundle[0], options.draftStrengthPolicy, {
+                ownCreatureIds: [],
+                synergyVariants: options.synergyVariants,
+            }) +
+                rankedDraftStrengthScore(bundle[1], options.draftStrengthPolicy, {
+                    ownCreatureIds: [bundle[0]],
+                    synergyVariants: options.synergyVariants,
+                })) /
+                DRAFT_COHERENCE_WEIGHT,
+    );
     return bestScoreIndex(applyDraftCoherenceOverlay(baseScores, affinities));
 }

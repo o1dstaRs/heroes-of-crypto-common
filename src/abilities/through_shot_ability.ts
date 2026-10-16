@@ -18,7 +18,7 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
-import type { IAnimationData, ISecondaryDamage } from "../scene/animations";
+import type { IAnimationData, ISecondaryDamage, IVisibleDamage } from "../scene/animations";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 
@@ -26,10 +26,12 @@ import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
+import { processGravechainAbility } from "./gravechain_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
 import { processFreezeAbility } from "./freeze_ability";
 import { processPoisonAuraAbility } from "./poison_aura_ability";
+import { processBorrowedGraceAbility } from "./borrowed_grace_ability";
 
 export interface IThroughShotResult {
     landed: boolean;
@@ -54,6 +56,8 @@ export function processThroughShotAbility(
     decreaseNumberOfShots = true,
     secondaryDamage?: ISecondaryDamage[],
     damageMultiplier = 1,
+    visibleDamage?: IVisibleDamage,
+    hitIndex = 0,
 ): IThroughShotResult {
     const animationData: IAnimationData[] = [];
     const unitIdsDied: string[] = [];
@@ -244,7 +248,21 @@ export function processThroughShotAbility(
         }
     }
 
+    const gravechainTargets = new Set<string>();
     for (const unit of unitsDamaged) {
+        if (!absorbedUnitIds.has(unit.getId())) {
+            processGravechainAbility(
+                attackerUnit,
+                unit,
+                grid,
+                unitsHolder,
+                sceneLog,
+                currentActiveUnit,
+                gravechainTargets,
+                visibleDamage,
+                hitIndex,
+            );
+        }
         if (unit.isDead()) {
             if (!unitIdsDied.includes(unit.getId())) {
                 sceneLog.updateLog(`${unit.getName()} died`);
@@ -257,8 +275,9 @@ export function processThroughShotAbility(
         } else if (!absorbedUnitIds.has(unit.getId())) {
             processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
             processFreezeAbility(attackerUnit, unit, attackerUnit, sceneLog);
-            processRimeCharmAbility(attackerUnit, unit, sceneLog);
+            processRimeCharmAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
             processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
+            processBorrowedGraceAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
         }
     }
 

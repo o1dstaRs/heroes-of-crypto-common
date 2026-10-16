@@ -176,48 +176,6 @@ function cowardlyMeleeFixture(): {
     return { combat, actor, target, context: contextWithRoutes(combat, [unsafe, safe]), unsafe, safe };
 }
 
-function moveShotFixture(): {
-    combat: CombatTestContext;
-    shooter: Unit;
-    target: Unit;
-    context: IDecisionContext;
-    lethal: IReadonlyWeightedRoute;
-    safe: IReadonlyWeightedRoute;
-} {
-    const combat = createCombatTestContext();
-    const shooter = createTestUnit({
-        team: LEFT,
-        name: "Fragile archer",
-        attackType: RANGE,
-        initiative: 4,
-        rangeShots: 5,
-        shotDistance: 3,
-        amountAlive: 1,
-        maxHp: 10,
-        damageMin: 10,
-        damageMax: 10,
-    });
-    const target = createTestUnit({ team: RIGHT, name: "Distant target", amountAlive: 20, maxHp: 20 });
-    shooter.applyDamage(9, 0, new SceneLogMock());
-    placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 7 });
-    placeUnit(combat.grid, combat.unitsHolder, target, { x: 10, y: 7 });
-    shooter.refreshPossibleAttackTypes(true);
-    const lethal = route({ x: 5, y: 7 }, [
-        { x: 2, y: 7 },
-        { x: 3, y: 7 },
-        { x: 4, y: 7 },
-        { x: 5, y: 7 },
-    ]);
-    const safe = route({ x: 5, y: 8 }, [
-        { x: 2, y: 7 },
-        { x: 3, y: 8 },
-        { x: 4, y: 8 },
-        { x: 5, y: 8 },
-    ]);
-    FightStateManager.getInstance().getFightProperties().getFireWalls().add({ x: 3, y: 7 }, 3, 25);
-    return { combat, shooter, target, context: contextWithRoutes(combat, [lethal, safe]), lethal, safe };
-}
-
 describe("AI post-move actor availability", () => {
     it("filters lethal move-melee before maxMeleePairs, backfills safe melee, and keeps the lethal standalone move", () => {
         const fixture = meleeFixture();
@@ -286,49 +244,6 @@ describe("AI post-move actor availability", () => {
         expect(fixture.combat.unitsHolder.getAllUnits().has(fixture.actor.getId())).toBe(true);
         expect(fixture.actor.hasSpellRemaining("Resurrection")).toBe(false);
         expect(engine.apply(resurrecting!.actions[1]).completed).toBe(true);
-    });
-
-    it("filters lethal move-shots before the cap, backfills a safe shot, and refuses unsafe incumbent enrichment", () => {
-        const fixture = moveShotFixture();
-        const generated = enumerateCandidates(fixture.shooter, fixture.context, endTurn(fixture.shooter), {
-            maxMoveShotComposites: 1,
-        });
-        const moveShots = generated.candidates.filter(
-            (candidate) =>
-                candidate.actions.some((action) => action.type === "move_unit") &&
-                candidate.actions.some((action) => action.type === "range_attack"),
-        );
-        expect(moveShots).toHaveLength(1);
-        expect(moveOf(moveShots[0])?.targetCells?.[0]).toEqual(fixture.safe.cell);
-
-        const stationaryShot = generated.candidates.find(
-            (candidate) =>
-                candidate.kind === "shot" &&
-                !candidate.actions.some((action) => action.type === "move_unit") &&
-                candidate.actions.some((action) => action.type === "range_attack"),
-        );
-        expect(stationaryShot).toBeDefined();
-        const unsafeIncumbent: GameAction[] = [
-            {
-                type: "move_unit",
-                unitId: fixture.shooter.getId(),
-                path: fixture.lethal.route.map((cell) => ({ ...cell })),
-                targetCells: [{ ...fixture.lethal.cell }],
-                hasLavaCell: false,
-                hasWaterCell: false,
-            },
-            ...stationaryShot!.actions,
-        ];
-        const anchor = enumerateCandidates(fixture.shooter, fixture.context, unsafeIncumbent, {
-            maxMoveShotComposites: 0,
-            enrichIncumbentMetadata: true,
-        }).candidates[0];
-        expect(anchor.actions).toBe(unsafeIncumbent);
-        expect(anchor.targetId).toBeUndefined();
-        expect(anchor.features.expectedDamage).toBe(0);
-
-        const engine = activateEngine(fixture.combat, fixture.shooter, fixture.context);
-        expect(moveShots[0].actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
     });
 
     it("repairs only explicit actor-owned move→attack suffixes, not standalone moves or path-bearing melee", () => {
@@ -407,7 +322,7 @@ describe("AI post-move actor availability", () => {
         expect(actions.some((action) => action.type === "melee_attack")).toBe(true);
     });
 
-    it("v0.8 keeps a legal stationary shot instead of emitting a lethal protected move-shot", () => {
+    it("v0.8 keeps its stationary shot and never moves and then shoots, lethal wall or not", () => {
         const decide = (withLethalWall: boolean): GameAction[] => {
             const combat = createCombatTestContext();
             const shooter = createTestUnit({
@@ -449,7 +364,7 @@ describe("AI post-move actor availability", () => {
             return new StrategyV0_8().decideTurn(shooter, context);
         };
 
-        expect(decide(false).map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
+        expect(decide(false).map((action) => action.type)).toEqual(["range_attack"]);
         expect(decide(true).map((action) => action.type)).toEqual(["range_attack"]);
     });
 });

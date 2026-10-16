@@ -48,6 +48,8 @@ export function registerV08Level4CoverageRegression(game: Level4RegressionGame):
             if ((V08_LEVEL4_V07_REGRESSION_GAMES as readonly number[]).includes(game)) {
                 expect(result.rejectedOpponent).toBe(0);
             }
-        }, 30_000);
+            // Game 219 took 37s in the 12-wide release suite against a 30s budget. The search stays on
+            // deterministic work; only the wall clock has to absorb that contention.
+        }, 90_000);
     });
 }

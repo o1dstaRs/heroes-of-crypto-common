@@ -68,10 +68,13 @@ const RANGE = PBTypes.AttackVals.RANGE;
 // a parallel simulation campaign saturates the host; the match count and exact action-log checks stay intact.
 //
 // 10_000 was BELOW the package-wide 30s default (test/setup_timeout.ts), so this test opted itself out of
-// the very protection that default exists for: on GitHub's shared runners the three matches take 12–16s and
+// the very protection that default exists for: on GitHub's shared runners the three matches took 12–16s and
 // it timed out on nearly every push. Matches the "genuinely long simulations set their own higher explicit
-// timeout" convention instead — ~4x the slowest observed CI cost, with the assertions untouched.
-const FULL_MATCH_REGRESSION_TIMEOUT_MS = 60_000;
+// timeout" convention instead, with the assertions untouched. Raised from 60_000 on 2026-09-25: the deep a19
+// budget and then the legal-rules fix (common f6573e0 — a shooter that moved can no longer fire, so this seed's
+// v0.8 match runs 8 laps and 155 actions instead of 7 and 104) took the three matches to 71–74s on the shared
+// runners (~12s on a workstation); 180_000 is ~2.5x that.
+const FULL_MATCH_REGRESSION_TIMEOUT_MS = 180_000;
 
 function setupMountainDecision(
     enemyCell: { x: number; y: number },

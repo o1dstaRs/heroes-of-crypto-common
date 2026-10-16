@@ -26,7 +26,7 @@ import {
     Tier1Artifact,
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
-import { DOUBLE_SHOT_ABILITY_NAMES } from "../abilities/double_shot_names";
+import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES } from "../abilities/double_shot_names";
 import { getSpellConfig, POISON_ON_HIT_AURA_EFFECT_NAMES } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effects/effect_properties";
@@ -49,6 +49,56 @@ import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { UnitProperties } from "./unit_properties";
 
 type AuraRefreshFingerprintValue = boolean | number | string | undefined;
+
+/** Reused detail scratch for auraRefreshFingerprintStillMatches; the refresh is never re-entered. */
+const AURA_REFRESH_FINGERPRINT_SEGMENT: AuraRefreshFingerprintValue[] = [];
+/** Values in a unit's fixed fingerprint header, after its segment-length slot. */
+const AURA_REFRESH_FINGERPRINT_HEADER_LENGTH = 15;
+
+const ANGELIC_HOST_BLESSING_BIT = 1;
+const ARCANE_WARD_BLESSING_BIT = 2;
+const WARDING_MANE_BLESSING_BIT = 4;
+const ARROWS_WINGSHIELD_BLESSING_BIT = 8;
+const RALLYING_VOLLEY_BLESSING_BIT = 16;
+
+/** The board-wide blessings as seen at the start of one stack-power refresh. */
+interface IBlessingCensus {
+    angelicHost: Map<TeamType, number>;
+    arcaneWard: Map<TeamType, number>;
+    wardingMane: Map<TeamType, number>;
+    arrowsWingshield: Map<TeamType, number>;
+    rallyingVolley: Map<TeamType, number>;
+    /** Per unit, in allUnits order: the blessing bits it carries as a buff object or a display entry. */
+    carriers: number[];
+    /** Every blessing bit carried by any unit. */
+    carried: number;
+}
+
+function blessingBit(name: string): number {
+    switch (name) {
+        case "Angelic Host Blessing":
+            return ANGELIC_HOST_BLESSING_BIT;
+        case "Arcane Ward Blessing":
+            return ARCANE_WARD_BLESSING_BIT;
+        case "Warding Mane Blessing":
+            return WARDING_MANE_BLESSING_BIT;
+        case "Arrows Wingshield Blessing":
+            return ARROWS_WINGSHIELD_BLESSING_BIT;
+        case "Rallying Volley Blessing":
+            return RALLYING_VOLLEY_BLESSING_BIT;
+        default:
+            return 0;
+    }
+}
+
+function hasPositivePower(powerPerTeam: ReadonlyMap<TeamType, number>): boolean {
+    for (const power of powerPerTeam.values()) {
+        if (power > 0) {
+            return true;
+        }
+    }
+    return false;
+}
 
 export class UnitsHolder {
     private readonly grid: Grid;
@@ -464,7 +514,11 @@ export class UnitsHolder {
             const tier2 = fightProperties.getArtifactTier2(team);
             const isRange = unit.getAttackType() === PBTypes.AttackVals.RANGE;
             const isFlyer = unit.canFly();
-            const isMelee = unit.getAttackType() === PBTypes.AttackVals.MELEE && !isFlyer;
+            // Swift Boots' "melee units": plain melee and melee-magic walkers (Troll, Battle Mage, Ogre Mage, Behemoth).
+            const isMelee =
+                (unit.getAttackType() === PBTypes.AttackVals.MELEE ||
+                    unit.getAttackType() === PBTypes.AttackVals.MELEE_MAGIC) &&
+                !isFlyer;
 
             const applyArtifactBuff = (buffName: string, primary: number, secondary?: number): void => {
                 const buff = new Spell({
@@ -524,6 +578,7 @@ export class UnitsHolder {
                 debuffDesc: string,
                 primary: number,
                 secondary?: number,
+                penaltyPower?: number,
             ): void => {
                 const buff = new Spell({
                     spellProperties: getSpellConfig("System", buffName, NUMBER_OF_LAPS_TOTAL),
@@ -538,11 +593,11 @@ export class UnitsHolder {
                     amount: 1,
                 });
                 debuff.setDesc([
-                    debuffDesc.replace(/\{\}/g, (secondary ?? primary).toString()),
+                    debuffDesc.replace(/\{\}/g, (penaltyPower ?? secondary ?? primary).toString()),
                     "Lasts till the end of the fight.",
                 ]);
                 debuff.setPower(0);
-                unit.applyDebuff(debuff, secondary);
+                unit.applyDebuff(debuff, penaltyPower ?? secondary);
             };
 
             // ---- Tier 1 stat artifacts ----
@@ -551,7 +606,7 @@ export class UnitsHolder {
                     applyArtifactBuff("Veteran Helm", AP.VETERAN_HELM_PERCENT);
                     break;
                 case Tier1Artifact.KEEN_BLADE:
-                    applyArtifactBuff("Keen Blade", AP.KEEN_BLADE_FLAT);
+                    applyArtifactBuff("Keen Blade", isRange ? AP.KEEN_BLADE_RANGED_FLAT : AP.KEEN_BLADE_FLAT);
                     break;
                 case Tier1Artifact.IRON_PLATE:
                     applyArtifactBuff("Iron Plate", AP.IRON_PLATE_FLAT);
@@ -588,9 +643,6 @@ export class UnitsHolder {
                         }
                     }
                     break;
-                case Tier1Artifact.HELM_OF_FOCUS:
-                    applyArtifactBuff("Helm of Focus", AP.HELM_OF_FOCUS_RESIST_PERCENT);
-                    break;
                 case Tier1Artifact.AMULET_OF_RESOLVE:
                     applyArtifactBuff("Amulet of Resolve", AP.AMULET_OF_RESOLVE_RESIST_PERCENT);
                     break;
@@ -600,7 +652,7 @@ export class UnitsHolder {
                     // marker buff to units with Double Punch (melee) or one of the ranged second-shot
                     // abilities — Double Shot and Gargantuan's full-power Double Throw alike.
                     if (
-                        unit.hasAbilityActive("Double Punch") ||
+                        DOUBLE_PUNCH_ABILITY_NAMES.some((abilityName) => unit.hasAbilityActive(abilityName)) ||
                         DOUBLE_SHOT_ABILITY_NAMES.some((abilityName) => unit.hasAbilityActive(abilityName))
                     ) {
                         applyArtifactBuff("Dual Strike Charm", AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT);
@@ -635,6 +687,12 @@ export class UnitsHolder {
                     // casts, the AI's estimates and the sidebar card all pick the ring up from one place.
                     applyArtifactBuff("Mages Ring", AP.MAGES_RING_MAGIC_PERCENT);
                     break;
+                case Tier1Artifact.TOME_OF_AMPLIFICATION:
+                    applyArtifactBuff("Tome of Amplification", AP.TOME_BUFF_POWER_PERCENT);
+                    break;
+                case Tier1Artifact.RIME_CHARM:
+                    applyArtifactBuff("Rime Charm", AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS);
+                    break;
                 default:
                     break;
             }
@@ -642,7 +700,7 @@ export class UnitsHolder {
             // ---- Tier 2 stat artifacts ----
             switch (tier2) {
                 case Tier2Artifact.WARLORDS_EDGE:
-                    applyArtifactBuff("Warlords Edge", AP.WARLORDS_EDGE_PERCENT);
+                    applyArtifactBuff("Warlords Edge", AP.WARLORDS_EDGE_RANGED_PERCENT, AP.WARLORDS_EDGE_PERCENT);
                     break;
                 case Tier2Artifact.TITAN_PLATE:
                     applyArtifactBuff("Titan Plate", AP.TITAN_PLATE_PERCENT);
@@ -679,12 +737,21 @@ export class UnitsHolder {
                     applyArtifactBuff("Giants Maul", AP.GIANTS_MAUL_AOE_PERCENT);
                     break;
                 case Tier2Artifact.FARSIGHT_QUIVER:
-                    applyArtifactBuff("Farsight Quiver", AP.FARSIGHT_QUIVER_RANGE_PERCENT);
+                    // Use native shooting or its ability grant, not the selected attack or stale stats:
+                    // artifacts refresh before stats after gaining/losing a stolen Endless Quiver.
+                    if (isRange || unit.hasAbilityActive("Endless Quiver")) {
+                        // Marker only. Range falloff skips its bands; smoke still doubles.
+                        applyArtifactBuff("Farsight Quiver", 0);
+                    }
                     break;
                 case Tier2Artifact.TOME_OF_AMPLIFICATION:
+                    // Retired id. A saved game that drafted the tome as Tier 2 still receives the buff,
+                    // at the current power, not the 50% it was drafted under.
                     applyArtifactBuff("Tome of Amplification", AP.TOME_BUFF_POWER_PERCENT);
                     break;
                 case Tier2Artifact.RIME_CHARM:
+                    // Retired id. A saved game that drafted the charm as Tier 2 still receives the buff,
+                    // at the current 30% plus the attacker's luck, not the flat 60% it was drafted under.
                     applyArtifactBuff("Rime Charm", AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS);
                     break;
                 case Tier2Artifact.LAVA_STRIDERS:
@@ -697,9 +764,28 @@ export class UnitsHolder {
                     // BUFF, applied by applyLavaWaterModifier when a move route actually touches lava.
                     applyArtifactBuff("Lava Striders", 0);
                     break;
+                case Tier2Artifact.QUIVER_OF_ECHOES:
+                    if (isRange) applyArtifactBuff("Quiver of Echoes", AP.QUIVER_OF_ECHOES_CHANCE);
+                    break;
+                case Tier2Artifact.GRAVECHAIN:
+                    applyDualArtifact(
+                        "Gravechain",
+                        `Artifact. Attacks have a {}% chance per enemy to inflict Gravebound, chaining through connected enemies up to ${AP.GRAVECHAIN_CONNECTIONS} links away: −25% movement for ${AP.GRAVECHAIN_SLOW_LAPS} laps. Failed rolls do not stop the chain.`,
+                        "Cursed: −{} movement step for every unit in the army.",
+                        AP.GRAVECHAIN_CHANCE,
+                        AP.GRAVECHAIN_SLOW_LAPS,
+                        AP.GRAVECHAIN_STEPS_PENALTY,
+                    );
+                    break;
+                case Tier2Artifact.AEGIS_OF_THE_ARCANE:
+                    applyArtifactBuff("Aegis of the Arcane", AP.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE);
+                    break;
                 case Tier2Artifact.ARCHMAGES_RING:
                     // See Mage's Ring above — read by Unit.getMagicDamageBonusPercentage(), not by a stat hook.
                     applyArtifactBuff("Archmages Ring", AP.ARCHMAGES_RING_MAGIC_PERCENT);
+                    break;
+                case Tier2Artifact.LAST_FUSE:
+                    applyArtifactBuff("Last Fuse", AP.LAST_FUSE_PERCENT, AP.LAST_FUSE_MIN_DAMAGE_PER_POWER);
                     break;
                 default:
                     break;
@@ -860,34 +946,8 @@ export class UnitsHolder {
     }
     public allEnemiesAroundUnit(attacker: IUnitAIRepr, isAttack: boolean, attackFromCell?: XY): Unit[] {
         const enemyList: Unit[] = [];
-        const firstCheckCell = isAttack ? attackFromCell : attacker.getBaseCell();
 
-        if (!firstCheckCell) {
-            return enemyList;
-        }
-
-        let checkCells: XY[];
-
-        if (attacker.isSmallSize()) {
-            // use either target move position on current
-            // depending on the action type (attack vs response)
-            checkCells = getCellsAroundCell(this.gridSettings, firstCheckCell);
-        } else {
-            // firstCheckCell is the footprint's ANCHOR (its top-right cell), so the body covers
-            // [x-W+1..x] x [y-H+1..y] and the cells that touch it run one further out in each direction:
-            // [x-W..x+1] x [y-H..y+1]. For a 2x2 that is verbatim the -2..1 box this has always walked,
-            // in the same order; for a 1x2 it is the 3x4 box, where the old constants would have missed
-            // a whole rank of neighbours on the long side.
-            const { width, height } = this.footprintSidesOf(attacker);
-            checkCells = [];
-            for (let i = -width; i <= 1; i++) {
-                for (let j = -height; j <= 1; j++) {
-                    checkCells.push({ x: firstCheckCell.x + i, y: firstCheckCell.y + j });
-                }
-            }
-        }
-
-        for (const c of checkCells) {
+        for (const c of this.cellsAroundUnit(attacker, isAttack, attackFromCell)) {
             const checkUnitId = this.grid.getOccupantUnitId(c);
             if (checkUnitId) {
                 const addUnit = this.getAllUnits().get(checkUnitId);
@@ -905,6 +965,39 @@ export class UnitsHolder {
         return enemyList;
     }
     /**
+     * The ring a radial melee strike sweeps (Lightning Spin): every cell touching the unit's body — at the
+     * attack-from anchor for an attack, where it stands for a response. Enemies (allEnemiesAroundUnit) and
+     * cemetery barrels (lightningSpinObstacleCells) are both read off this one ring, so the spin can never
+     * disagree with itself about what "around" means. Cells may fall outside the grid at a board edge.
+     */
+    public cellsAroundUnit(attacker: IUnitAIRepr, isAttack: boolean, attackFromCell?: XY): XY[] {
+        const firstCheckCell = isAttack ? attackFromCell : attacker.getBaseCell();
+
+        if (!firstCheckCell) {
+            return [];
+        }
+
+        if (attacker.isSmallSize()) {
+            // use either target move position on current
+            // depending on the action type (attack vs response)
+            return getCellsAroundCell(this.gridSettings, firstCheckCell);
+        }
+
+        // firstCheckCell is the footprint's ANCHOR (its top-right cell), so the body covers
+        // [x-W+1..x] x [y-H+1..y] and the cells that touch it run one further out in each direction:
+        // [x-W..x+1] x [y-H..y+1]. For a 2x2 that is verbatim the -2..1 box this has always walked,
+        // in the same order; for a 1x2 it is the 3x4 box, where the old constants would have missed
+        // a whole rank of neighbours on the long side.
+        const { width, height } = this.footprintSidesOf(attacker);
+        const checkCells: XY[] = [];
+        for (let i = -width; i <= 1; i++) {
+            for (let j = -height; j <= 1; j++) {
+                checkCells.push({ x: firstCheckCell.x + i, y: firstCheckCell.y + j });
+            }
+        }
+        return checkCells;
+    }
+    /**
      * The footprint of an AI-facing unit view, in cells.
      *
      * IUnitAIRepr gained its footprint accessors along with rectangular bodies. The narrower stand-ins
@@ -919,25 +1012,88 @@ export class UnitsHolder {
             height: typeof unit.getFootprintHeight === "function" ? unit.getFootprintHeight() : size,
         };
     }
-    private refreshAngelicHostForAllUnits(): void {
-        const powerPerTeam: Map<TeamType, number> = new Map();
+    /**
+     * One pass over the army for all board-wide blessings: each team's strongest living source and which
+     * units already carry each blessing. Everything it reads — death, board position, abilities, Break, luck,
+     * stack power — is untouched by the blessing buffs the refreshes delete and re-apply, so reading it once
+     * equals re-reading it before each refresh. Each refresh used to walk the army twice and probe every unit
+     * with deleteBuff, although most boards carry one blessing at most and most units carry none.
+     */
+    private captureBlessingCensus(): IBlessingCensus {
+        const census: IBlessingCensus = {
+            angelicHost: new Map(),
+            arcaneWard: new Map(),
+            wardingMane: new Map(),
+            arrowsWingshield: new Map(),
+            rallyingVolley: new Map(),
+            carriers: [],
+            carried: 0,
+        };
 
         for (const unit of this.getAllUnitsIterator()) {
+            let carried = 0;
+            for (const buff of unit.getBuffs()) {
+                carried |= blessingBit(buff.getName());
+            }
+            for (const name of unit.getUnitProperties().applied_buffs) {
+                carried |= blessingBit(name);
+            }
+            census.carriers.push(carried);
+            census.carried |= carried;
+
             if (unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
                 continue;
             }
 
+            const team = unit.getTeam();
             const angelicHostAbility = unit.getAbility("Angelic Host Blessing");
             if (angelicHostAbility) {
-                powerPerTeam.set(
-                    unit.getTeam(),
-                    Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, angelicHostAbility.getPower()),
+                census.angelicHost.set(
+                    team,
+                    Math.max(census.angelicHost.get(team) ?? 0, angelicHostAbility.getPower()),
+                );
+            }
+            if (unit.getAbility("Arcane Ward Blessing")) {
+                census.arcaneWard.set(
+                    team,
+                    Math.max(census.arcaneWard.get(team) ?? 0, unit.calculateArcaneWardBlessingPower()),
+                );
+            }
+            if (unit.getAbility("Warding Mane Blessing")) {
+                census.wardingMane.set(
+                    team,
+                    Math.max(census.wardingMane.get(team) ?? 0, unit.calculateWardingManeBlessingPower()),
+                );
+            }
+            if (unit.getAbility("Arrows Wingshield Blessing")) {
+                census.arrowsWingshield.set(
+                    team,
+                    Math.max(census.arrowsWingshield.get(team) ?? 0, unit.calculateArrowsWingshieldBlessingPower()),
+                );
+            }
+            const rallyingVolleyAbility = unit.getAbility("Rallying Volley Blessing");
+            if (rallyingVolleyAbility) {
+                census.rallyingVolley.set(
+                    team,
+                    Math.max(census.rallyingVolley.get(team) ?? 0, rallyingVolleyAbility.getPower()),
                 );
             }
         }
 
+        return census;
+    }
+    private refreshAngelicHostForAllUnits(census: IBlessingCensus = this.captureBlessingCensus()): void {
+        const powerPerTeam = census.angelicHost;
+        // No source and no carrier: every deleteBuff below would be a no-op and every unit would skip the apply.
+        if (!(census.carried & ANGELIC_HOST_BLESSING_BIT) && !hasPositivePower(powerPerTeam)) {
+            return;
+        }
+
+        let index = 0;
         for (const unit of this.getAllUnitsIterator()) {
-            unit.deleteBuff("Angelic Host Blessing");
+            if (census.carriers[index++] & ANGELIC_HOST_BLESSING_BIT) {
+                unit.deleteBuff("Angelic Host Blessing");
+            }
 
             const power = powerPerTeam.get(unit.getTeam()) ?? 0;
             if (
@@ -958,90 +1114,36 @@ export class UnitsHolder {
             unit.applyBuff(buff, power);
         }
     }
-    private refreshArcaneWardBlessingForAllUnits(): void {
-        const powerPerTeam: Map<TeamType, number> = new Map();
-
-        for (const unit of this.getAllUnitsIterator()) {
-            if (
-                unit.isDead() ||
-                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
-                !unit.getAbility("Arcane Ward Blessing")
-            ) {
-                continue;
-            }
-
-            const power = unit.calculateArcaneWardBlessingPower();
-            powerPerTeam.set(unit.getTeam(), Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, power));
-        }
-
-        for (const unit of this.getAllUnitsIterator()) {
-            unit.deleteBuff("Arcane Ward Blessing");
-
-            const power = powerPerTeam.get(unit.getTeam()) ?? 0;
-            if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
-                continue;
-            }
-
-            const buff = new Spell({
-                spellProperties: getSpellConfig("System", "Arcane Ward Blessing", NUMBER_OF_LAPS_TOTAL),
-                amount: 1,
-            });
-            buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
-            buff.setPower(power);
-            unit.applyBuff(buff, power);
-        }
+    private refreshArcaneWardBlessingForAllUnits(census: IBlessingCensus = this.captureBlessingCensus()): void {
+        this.reapplyTeamBlessing(census, census.arcaneWard, ARCANE_WARD_BLESSING_BIT, "Arcane Ward Blessing");
     }
-    private refreshWardingManeBlessingForAllUnits(): void {
-        const powerPerTeam: Map<TeamType, number> = new Map();
-
-        for (const unit of this.getAllUnitsIterator()) {
-            if (
-                unit.isDead() ||
-                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
-                !unit.getAbility("Warding Mane Blessing")
-            ) {
-                continue;
-            }
-
-            const power = unit.calculateWardingManeBlessingPower();
-            powerPerTeam.set(unit.getTeam(), Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, power));
-        }
-
-        for (const unit of this.getAllUnitsIterator()) {
-            unit.deleteBuff("Warding Mane Blessing");
-
-            const power = powerPerTeam.get(unit.getTeam()) ?? 0;
-            if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
-                continue;
-            }
-
-            const buff = new Spell({
-                spellProperties: getSpellConfig("System", "Warding Mane Blessing", NUMBER_OF_LAPS_TOTAL),
-                amount: 1,
-            });
-            buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
-            buff.setPower(power);
-            unit.applyBuff(buff, power);
-        }
+    private refreshWardingManeBlessingForAllUnits(census: IBlessingCensus = this.captureBlessingCensus()): void {
+        this.reapplyTeamBlessing(census, census.wardingMane, WARDING_MANE_BLESSING_BIT, "Warding Mane Blessing");
     }
-    private refreshArrowsWingshieldBlessingForAllUnits(): void {
-        const powerPerTeam: Map<TeamType, number> = new Map();
-
-        for (const unit of this.getAllUnitsIterator()) {
-            if (
-                unit.isDead() ||
-                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
-                !unit.getAbility("Arrows Wingshield Blessing")
-            ) {
-                continue;
-            }
-
-            const power = unit.calculateArrowsWingshieldBlessingPower();
-            powerPerTeam.set(unit.getTeam(), Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, power));
+    private refreshArrowsWingshieldBlessingForAllUnits(census: IBlessingCensus = this.captureBlessingCensus()): void {
+        this.reapplyTeamBlessing(
+            census,
+            census.arrowsWingshield,
+            ARROWS_WINGSHIELD_BLESSING_BIT,
+            "Arrows Wingshield Blessing",
+        );
+    }
+    /** Strip `blessingName` from its carriers, then grant every living on-board unit its team's strongest power. */
+    private reapplyTeamBlessing(
+        census: IBlessingCensus,
+        powerPerTeam: ReadonlyMap<TeamType, number>,
+        bit: number,
+        blessingName: string,
+    ): void {
+        if (!(census.carried & bit) && !hasPositivePower(powerPerTeam)) {
+            return;
         }
 
+        let index = 0;
         for (const unit of this.getAllUnitsIterator()) {
-            unit.deleteBuff("Arrows Wingshield Blessing");
+            if (census.carriers[index++] & bit) {
+                unit.deleteBuff(blessingName);
+            }
 
             const power = powerPerTeam.get(unit.getTeam()) ?? 0;
             if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
@@ -1049,7 +1151,7 @@ export class UnitsHolder {
             }
 
             const buff = new Spell({
-                spellProperties: getSpellConfig("System", "Arrows Wingshield Blessing", NUMBER_OF_LAPS_TOTAL),
+                spellProperties: getSpellConfig("System", blessingName, NUMBER_OF_LAPS_TOTAL),
                 amount: 1,
             });
             buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
@@ -1078,39 +1180,77 @@ export class UnitsHolder {
         // buff-style auras were silently inactive in ranked; pairing them here matches the sandbox,
         // whose refreshUnits() has always run both. cleanAuraEffects() makes this idempotent.
         this.refreshAuraEffectsIfNeeded();
-        this.refreshAngelicHostForAllUnits();
-        this.refreshArcaneWardBlessingForAllUnits();
-        this.refreshWardingManeBlessingForAllUnits();
-        this.refreshArrowsWingshieldBlessingForAllUnits();
+        const blessingCensus = this.captureBlessingCensus();
+        this.refreshAngelicHostForAllUnits(blessingCensus);
+        this.refreshArcaneWardBlessingForAllUnits(blessingCensus);
+        this.refreshWardingManeBlessingForAllUnits(blessingCensus);
+        this.refreshArrowsWingshieldBlessingForAllUnits(blessingCensus);
+        this.reapplyTeamBlessing(
+            blessingCensus,
+            blessingCensus.rallyingVolley,
+            RALLYING_VOLLEY_BLESSING_BIT,
+            "Rallying Volley Blessing",
+        );
         this.refreshWaterShieldForAllUnits();
+        // This loop runs after EVERY engine action, so a19 rollouts walk it millions of times. The fight
+        // scalars are the same for every unit, and the per-team modifiers are the same for every unit on a
+        // side — resolving the singleton and those seven lookups per UNIT (eleven chained calls) was pure
+        // repetition. Hoist the fight-wide values and memoize the per-team block for the two sides.
+        // Nothing inside the loop writes these: adjustBaseStats / increaseAttackMod / setSynergies and the
+        // Disguise buff swap all mutate the UNIT, never FightProperties. The decision fingerprint pins it.
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        const fightStarted = fightProperties.hasFightStarted();
+        const currentLap = fightProperties.getCurrentLap();
+        const stepsMoraleMultiplier = fightProperties.getStepsMoraleMultiplier();
+        const teamModifiers = new Map<
+            TeamType,
+            {
+                abilityPower: number;
+                movementSteps: number;
+                flyArmor: number;
+                morale: number;
+                luck: number;
+                auraRange: number;
+                synergies: ReturnType<FightProperties["getSynergiesPerTeam"]>;
+            }
+        >();
+        const modifiersForTeam = (team: TeamType) => {
+            let modifiers = teamModifiers.get(team);
+            if (!modifiers) {
+                modifiers = {
+                    abilityPower: fightProperties.getAdditionalAbilityPowerPerTeam(team),
+                    movementSteps: fightProperties.getAdditionalMovementStepsPerTeam(team),
+                    flyArmor: fightProperties.getAdditionalFlyArmorPerTeam(team),
+                    morale: fightProperties.getAdditionalMoralePerTeam(team),
+                    luck: fightProperties.getAdditionalLuckPerTeam(team),
+                    auraRange: fightProperties.getAdditionalAuraRangePerTeam(team),
+                    synergies: fightProperties.getSynergiesPerTeam(team),
+                };
+                teamModifiers.set(team, modifiers);
+            }
+            return modifiers;
+        };
         for (const u of this.getAllUnitsIterator()) {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
                 continue;
             }
+            const modifiers = modifiersForTeam(u.getTeam());
             u.adjustBaseStats(
-                FightStateManager.getInstance().getFightProperties().hasFightStarted(),
-                FightStateManager.getInstance().getFightProperties().getCurrentLap(),
-                FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(u.getTeam()),
-                FightStateManager.getInstance().getFightProperties().getAdditionalMovementStepsPerTeam(u.getTeam()),
-                FightStateManager.getInstance().getFightProperties().getAdditionalFlyArmorPerTeam(u.getTeam()),
-                FightStateManager.getInstance().getFightProperties().getAdditionalMoralePerTeam(u.getTeam()),
-                FightStateManager.getInstance().getFightProperties().getAdditionalLuckPerTeam(u.getTeam()),
-                FightStateManager.getInstance().getFightProperties().getStepsMoraleMultiplier(),
+                fightStarted,
+                currentLap,
+                modifiers.abilityPower,
+                modifiers.movementSteps,
+                modifiers.flyArmor,
+                modifiers.morale,
+                modifiers.luck,
+                stepsMoraleMultiplier,
             );
             u.increaseAttackMod(this.getUnitAuraAttackMod(u));
-            u.setSynergies(FightStateManager.getInstance().getFightProperties().getSynergiesPerTeam(u.getTeam()));
+            u.setSynergies(modifiers.synergies);
 
             const disguiseAura = u.getAppliedAuraEffect("Disguise Aura");
             if (disguiseAura) {
-                if (
-                    this.getNumberOfEnemiesWithinRange(
-                        u,
-                        disguiseAura.getRange() +
-                            FightStateManager.getInstance()
-                                .getFightProperties()
-                                .getAdditionalAuraRangePerTeam(u.getTeam()),
-                    )
-                ) {
+                if (this.getNumberOfEnemiesWithinRange(u, disguiseAura.getRange() + modifiers.auraRange)) {
                     u.deleteBuff("Hidden");
                     if (!u.hasDebuffActive("Visible")) {
                         u.applyDebuff(
@@ -1134,63 +1274,74 @@ export class UnitsHolder {
             }
         }
     }
-    public getNumberOfEnemiesWithinRange(unit: Unit, range: number): number {
-        const enemyIdsSpotted: string[] = [];
-        const enemyIds: string[] = [];
+    /**
+     * Distinct enemy stacks standing anywhere in the union of the aura balls around `cells`.
+     *
+     * The same count as walking EffectHelper.getAuraCells per body cell — the oracle this used to call on
+     * every stack-power refresh, rebuilding the ball cell by cell with linear `includes` scans. The shared
+     * key view is that oracle's exact cell list (identical per cell AND in order, checked for every cell
+     * and range on the 16x16 board), and a count of distinct ids does not care which order the cells are
+     * visited in. Any cell the view cannot pack (off-board, non-integer, a custom board) keeps the oracle.
+     */
+    private countEnemiesWithinRange(unit: Unit, cells: readonly XY[], range: number): number {
+        const enemyIds = new Set<string>();
         for (const e of this.getAllEnemyUnits(unit.getTeam())) {
-            enemyIds.push(e.getId());
+            enemyIds.add(e.getId());
         }
 
-        for (const c of unit.getCells()) {
-            const auraCells = EffectHelper.getAuraCells(this.gridSettings, c, range);
-            for (const ac of auraCells) {
-                const occupantId = this.grid.getOccupantUnitId(ac);
-                if (!occupantId) {
-                    continue;
+        const spotted = new Set<string>();
+        const packable = this.gridSettings.getGridSize() === 16 && Number.isSafeInteger(range) && range >= 0;
+        const probe: XY = { x: 0, y: 0 };
+        for (const c of cells) {
+            if (
+                packable &&
+                Number.isSafeInteger(c.x) &&
+                Number.isSafeInteger(c.y) &&
+                c.x >= 0 &&
+                c.y >= 0 &&
+                c.x < 16 &&
+                c.y < 16
+            ) {
+                const keys = EffectHelper.getAuraCellKeyBuffer(this.gridSettings, c, range);
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
+                    probe.x = key >>> 4;
+                    probe.y = key & 0xf;
+                    const occupantId = this.grid.getOccupantUnitId(probe);
+                    if (occupantId && enemyIds.has(occupantId)) {
+                        spotted.add(occupantId);
+                    }
                 }
+                continue;
+            }
 
-                if (enemyIds.includes(occupantId) && !enemyIdsSpotted.includes(occupantId)) {
-                    enemyIdsSpotted.push(occupantId);
+            for (const ac of EffectHelper.getAuraCells(this.gridSettings, c, range)) {
+                const occupantId = this.grid.getOccupantUnitId(ac);
+                if (occupantId && enemyIds.has(occupantId)) {
+                    spotted.add(occupantId);
                 }
             }
         }
 
-        return enemyIdsSpotted.length;
+        return spotted.size;
+    }
+    public getNumberOfEnemiesWithinRange(unit: Unit, range: number): number {
+        return this.countEnemiesWithinRange(unit, unit.getCells(), range);
     }
     public getUnitAuraAttackMod(unit: Unit, cells?: XY[]): number {
         let auraAttackMod = 0;
         const warAngerAuraEffect = unit.getAuraEffect("War Anger");
-        if (warAngerAuraEffect) {
-            const enemyIdsSpotted: string[] = [];
-            const enemyIds: string[] = [];
-            for (const e of this.getAllEnemyUnits(unit.getTeam())) {
-                enemyIds.push(e.getId());
-            }
-
+        // Break switches War Anger off like every aura the unit projects (getAuraEffects is empty then).
+        if (warAngerAuraEffect && !unit.hasEffectActive("Break")) {
             const unitCells = cells?.length ? cells : unit.getCells();
+            const enemiesSpotted = this.countEnemiesWithinRange(
+                unit,
+                unitCells,
+                warAngerAuraEffect.getRange() +
+                    FightStateManager.getInstance().getFightProperties().getAdditionalAuraRangePerTeam(unit.getTeam()),
+            );
 
-            for (const c of unitCells) {
-                const auraCells = EffectHelper.getAuraCells(
-                    this.gridSettings,
-                    c,
-                    warAngerAuraEffect.getRange() +
-                        FightStateManager.getInstance()
-                            .getFightProperties()
-                            .getAdditionalAuraRangePerTeam(unit.getTeam()),
-                );
-                for (const ac of auraCells) {
-                    const occupantId = this.grid.getOccupantUnitId(ac);
-                    if (!occupantId) {
-                        continue;
-                    }
-
-                    if (enemyIds.includes(occupantId) && !enemyIdsSpotted.includes(occupantId)) {
-                        enemyIdsSpotted.push(occupantId);
-                    }
-                }
-            }
-
-            return unit.getBaseAttack() * ((warAngerAuraEffect.getPower() * enemyIdsSpotted.length) / 100);
+            return unit.getBaseAttack() * ((warAngerAuraEffect.getPower() * enemiesSpotted) / 100);
         }
 
         return auraAttackMod;
@@ -1253,114 +1404,195 @@ export class UnitsHolder {
         );
         return true;
     }
+    /**
+     * Appends one unit's segment of the aura-refresh fingerprint — its length, a fixed header of
+     * AURA_REFRESH_FINGERPRINT_HEADER_LENGTH values, then the detail — and returns false when the unit's aura
+     * state is malformed. The length slot is derived from the content, so two segments are equal exactly when
+     * their values are.
+     */
+    private appendUnitAuraRefreshFingerprint(
+        fingerprint: AuraRefreshFingerprintValue[],
+        unit: Unit,
+        fightProperties: FightProperties,
+    ): boolean {
+        const lengthIndex = fingerprint.length;
+        fingerprint.push(0);
+        // The body's cells and anchor are a pure function of the position and the footprint dimensions
+        // (grid_math), so those four scalars carry exactly the same information as listing every cell —
+        // without allocating the cell list for every unit on every stack-power refresh.
+        const position = unit.getPosition();
+        const auraEffects = unit.getAuraEffects();
+        const madeOfFire = unit.getBuff("Made of Fire");
+
+        fingerprint.push(
+            "unit",
+            unit.getId(),
+            unit.getTeam(),
+            position.x,
+            position.y,
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
+            unit.getAttackType(),
+            unit.canFly(),
+            unit.getLuck(),
+            unit.hasEffectActive("Break"),
+            unit.hasAuraEffect("Disguise"),
+            unit.hasAbilityActive("Disguise Aura"),
+            madeOfFire?.getPower(),
+            auraEffects.length,
+        );
+        if (!this.appendUnitAuraRefreshDetail(fingerprint, unit, auraEffects, fightProperties)) {
+            return false;
+        }
+        fingerprint[lengthIndex] = fingerprint.length - lengthIndex - 1;
+        return true;
+    }
+    /** A unit's fingerprint after its header: aura power inputs, aura definitions, and applied aura state. */
+    private appendUnitAuraRefreshDetail(
+        fingerprint: AuraRefreshFingerprintValue[],
+        unit: Unit,
+        auraEffects: ReturnType<Unit["getAuraEffects"]>,
+        fightProperties: FightProperties,
+    ): boolean {
+        if (auraEffects.length) {
+            fingerprint.push(
+                unit.getStackPower(),
+                fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam()),
+                fightProperties.getAdditionalAuraRangePerTeam(unit.getTeam()),
+            );
+        }
+        for (const auraEffect of auraEffects) {
+            const defaultProperties = auraEffect.defaultProperties;
+            const currentProperties = auraEffect.getProperties();
+            if (
+                !this.appendAuraDefinition(fingerprint, defaultProperties) ||
+                !this.appendAuraDefinition(fingerprint, currentProperties)
+            ) {
+                return false;
+            }
+        }
+
+        const properties = unit.getUnitProperties();
+        if (
+            !this.appendAppliedAuraState(
+                fingerprint,
+                "buff-properties",
+                properties.applied_buffs,
+                properties.applied_buffs_laps,
+                properties.applied_buffs_descriptions,
+                properties.applied_buffs_powers,
+            ) ||
+            !this.appendAppliedAuraState(
+                fingerprint,
+                "debuff-properties",
+                properties.applied_debuffs,
+                properties.applied_debuffs_laps,
+                properties.applied_debuffs_descriptions,
+                properties.applied_debuffs_powers,
+            )
+        ) {
+            return false;
+        }
+
+        for (const [channel, spells] of [
+            ["buff-objects", unit.getBuffs()],
+            ["debuff-objects", unit.getDebuffs()],
+        ] as const) {
+            fingerprint.push(channel, spells.length);
+            for (let i = 0; i < spells.length; i++) {
+                const spell = spells[i];
+                const name = spell.getName();
+                if (spell.getLaps() === Number.MAX_SAFE_INTEGER || name.endsWith(" Aura") || name === "Made of Fire") {
+                    fingerprint.push(
+                        i,
+                        name,
+                        spell.getPower(),
+                        spell.getLaps(),
+                        spell.getFirstSpellProperty(),
+                        spell.getSecondSpellProperty(),
+                    );
+                }
+            }
+        }
+        return true;
+    }
     private captureAuraRefreshFingerprint(): AuraRefreshFingerprintValue[] | undefined {
         const fingerprint: AuraRefreshFingerprintValue[] = [];
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         for (const unit of this.getAllUnitsIterator()) {
-            const baseCell = unit.getBaseCell();
-            const cells = unit.getCells();
-            const auraEffects = unit.getAuraEffects();
-            const madeOfFire = unit.getBuff("Made of Fire");
-
-            fingerprint.push(
-                "unit",
-                unit.getId(),
-                unit.getTeam(),
-                baseCell.x,
-                baseCell.y,
-                cells.length,
-                unit.getAttackType(),
-                unit.canFly(),
-                unit.getLuck(),
-                unit.hasEffectActive("Break"),
-                unit.hasAuraEffect("Disguise"),
-                unit.hasAbilityActive("Disguise Aura"),
-                madeOfFire?.getPower(),
-                auraEffects.length,
-            );
-            for (const cell of cells) {
-                fingerprint.push(cell.x, cell.y);
-            }
-
-            if (auraEffects.length) {
-                fingerprint.push(
-                    unit.getStackPower(),
-                    fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam()),
-                    fightProperties.getAdditionalAuraRangePerTeam(unit.getTeam()),
-                );
-            }
-            for (const auraEffect of auraEffects) {
-                const defaultProperties = auraEffect.defaultProperties;
-                const currentProperties = auraEffect.getProperties();
-                if (
-                    !this.appendAuraDefinition(fingerprint, defaultProperties) ||
-                    !this.appendAuraDefinition(fingerprint, currentProperties)
-                ) {
-                    return undefined;
-                }
-            }
-
-            const properties = unit.getUnitProperties();
-            if (
-                !this.appendAppliedAuraState(
-                    fingerprint,
-                    "buff-properties",
-                    properties.applied_buffs,
-                    properties.applied_buffs_laps,
-                    properties.applied_buffs_descriptions,
-                    properties.applied_buffs_powers,
-                ) ||
-                !this.appendAppliedAuraState(
-                    fingerprint,
-                    "debuff-properties",
-                    properties.applied_debuffs,
-                    properties.applied_debuffs_laps,
-                    properties.applied_debuffs_descriptions,
-                    properties.applied_debuffs_powers,
-                )
-            ) {
+            if (!this.appendUnitAuraRefreshFingerprint(fingerprint, unit, fightProperties)) {
                 return undefined;
-            }
-
-            for (const [channel, spells] of [
-                ["buff-objects", unit.getBuffs()],
-                ["debuff-objects", unit.getDebuffs()],
-            ] as const) {
-                fingerprint.push(channel, spells.length);
-                for (let i = 0; i < spells.length; i++) {
-                    const spell = spells[i];
-                    const name = spell.getName();
-                    if (
-                        spell.getLaps() === Number.MAX_SAFE_INTEGER ||
-                        name.endsWith(" Aura") ||
-                        name === "Made of Fire"
-                    ) {
-                        fingerprint.push(
-                            i,
-                            name,
-                            spell.getPower(),
-                            spell.getLaps(),
-                            spell.getFirstSpellProperty(),
-                            spell.getSecondSpellProperty(),
-                        );
-                    }
-                }
             }
         }
 
         return fingerprint;
     }
-    private auraRefreshFingerprintMatches(candidate: readonly AuraRefreshFingerprintValue[]): boolean {
+    /**
+     * The same verdict as capturing a fresh fingerprint and comparing it with the stored one, in two passes.
+     *
+     * The stored fingerprint differs on almost nine in ten a19 refreshes, and what differs is nearly always a
+     * header value: a unit moved, rolled luck, or gained Break. So the first pass reads only each unit's header
+     * straight against the stored values, hopping segment to segment by the stored lengths and building nothing.
+     * Only when every header and the unit count match does the second pass rebuild and compare the details.
+     * Every read is a pure getter, so stopping early has no side effect.
+     */
+    private auraRefreshFingerprintStillMatches(): boolean {
         const current = this.auraRefreshFingerprint;
-        if (!current || current.length !== candidate.length) {
+        if (!current) {
             return false;
         }
 
-        for (let i = 0; i < current.length; i++) {
-            if (!Object.is(current[i], candidate[i])) {
+        let offset = 0;
+        for (const unit of this.getAllUnitsIterator()) {
+            if (offset + 1 + AURA_REFRESH_FINGERPRINT_HEADER_LENGTH > current.length) {
                 return false;
             }
+            const position = unit.getPosition();
+            if (
+                !Object.is(current[offset + 4], position.x) ||
+                !Object.is(current[offset + 5], position.y) ||
+                !Object.is(current[offset + 10], unit.getLuck()) ||
+                current[offset + 1] !== "unit" ||
+                !Object.is(current[offset + 2], unit.getId()) ||
+                !Object.is(current[offset + 3], unit.getTeam()) ||
+                !Object.is(current[offset + 6], unit.getFootprintWidth()) ||
+                !Object.is(current[offset + 7], unit.getFootprintHeight()) ||
+                !Object.is(current[offset + 8], unit.getAttackType()) ||
+                !Object.is(current[offset + 9], unit.canFly()) ||
+                !Object.is(current[offset + 11], unit.hasEffectActive("Break")) ||
+                !Object.is(current[offset + 12], unit.hasAuraEffect("Disguise")) ||
+                !Object.is(current[offset + 13], unit.hasAbilityActive("Disguise Aura")) ||
+                !Object.is(current[offset + 14], unit.getBuff("Made of Fire")?.getPower()) ||
+                !Object.is(current[offset + 15], unit.getAuraEffects().length)
+            ) {
+                return false;
+            }
+            offset += 1 + (current[offset] as number);
+        }
+        if (offset !== current.length) {
+            return false;
+        }
+
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        const detail = AURA_REFRESH_FINGERPRINT_SEGMENT;
+        offset = 0;
+        for (const unit of this.getAllUnitsIterator()) {
+            detail.length = 0;
+            if (!this.appendUnitAuraRefreshDetail(detail, unit, unit.getAuraEffects(), fightProperties)) {
+                return false;
+            }
+            const segmentLength = current[offset] as number;
+            if (segmentLength !== AURA_REFRESH_FINGERPRINT_HEADER_LENGTH + detail.length) {
+                return false;
+            }
+            const detailStart = offset + 1 + AURA_REFRESH_FINGERPRINT_HEADER_LENGTH;
+            for (let i = 0; i < detail.length; i++) {
+                if (!Object.is(current[detailStart + i], detail[i])) {
+                    return false;
+                }
+            }
+            offset += 1 + segmentLength;
         }
         return true;
     }
@@ -1408,8 +1640,7 @@ export class UnitsHolder {
             return true;
         }
 
-        const before = this.captureAuraRefreshFingerprint();
-        if (before && this.auraRefreshFingerprintMatches(before)) {
+        if (this.auraRefreshFingerprintStillMatches()) {
             return false;
         }
 
@@ -1431,13 +1662,19 @@ export class UnitsHolder {
             [PBTypes.TeamVals.RIGHT, rightAuraEffects],
             [PBTypes.TeamVals.LEFT, leftAuraEffects],
         ]);
-        const rightAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
-        const leftAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
-
-        // Fill each cell with its strongest aura of each name as sources are visited. The companion indexes
-        // retain first-seen order while allowing a stronger later source to replace the value in-place. This
-        // produces the same final arrays as the old append-everything-then-squash pass without allocating and
-        // walking the duplicate AppliedAuraEffectProperties entries created by overlapping source footprints.
+        // Fill each cell with its strongest aura of each name as sources are visited. A cell's list keeps
+        // first-seen name order while a stronger later source replaces its entry in place, which produces
+        // the same final arrays as the old append-everything-then-squash pass without allocating and walking
+        // the duplicate AppliedAuraEffectProperties entries created by overlapping source footprints.
+        //
+        // A cell's list holds one entry per aura NAME, and a board carries only a handful of aura names, so
+        // the name lookup is a short linear scan of that list rather than a per-cell Map: allocating one Map
+        // per covered cell per refresh was the single hottest line of the A19 rollout search, and this
+        // refresh runs after every engine action. The stamp skips the cells a multi-cell body's per-cell
+        // balls cover more than once — a source revisiting its own cell can never win the strictly-greater
+        // power test below, so skipping it changes nothing; keys outside the 16x16 pack are never stamped.
+        const coverageStamp = new Uint32Array(256);
+        let coverageGeneration = 0;
         for (const u of this.getAllUnitsIterator()) {
             // The WHOLE body must be on the board, not just the anchor: a 2x1 dragged half off the
             // edge still radiated an aura from ground nobody can stand on, and its negative-x cell
@@ -1488,35 +1725,38 @@ export class UnitsHolder {
                         : recipientTeam === PBTypes.TeamVals.LEFT
                           ? leftAuraEffects
                           : undefined;
-                const teamAuraEffectIndexes =
-                    recipientTeam === PBTypes.TeamVals.RIGHT
-                        ? rightAuraEffectIndexes
-                        : recipientTeam === PBTypes.TeamVals.LEFT
-                          ? leftAuraEffectIndexes
-                          : undefined;
 
-                if (!teamAuraEffects || !teamAuraEffectIndexes) {
+                if (!teamAuraEffects) {
                     continue;
                 }
 
+                coverageGeneration += 1;
+                const auraName = unitAuraEffectProperties.name;
                 for (const c of unitCells) {
-                    const affectedCellKeys = EffectHelper.getAuraCellKeysView(this.gridSettings, c, auraRange);
-                    for (const ack of affectedCellKeys) {
+                    const affectedCellKeys = EffectHelper.getAuraCellKeyBuffer(this.gridSettings, c, auraRange);
+                    for (let k = 0; k < affectedCellKeys.length; k++) {
+                        const ack = affectedCellKeys[k];
+                        if (ack >= 0 && ack < 256) {
+                            if (coverageStamp[ack] === coverageGeneration) {
+                                continue;
+                            }
+                            coverageStamp[ack] = coverageGeneration;
+                        }
+
                         let teamAuraEffectsPerCell = teamAuraEffects.get(ack);
                         if (!teamAuraEffectsPerCell) {
                             teamAuraEffectsPerCell = [];
                             teamAuraEffects.set(ack, teamAuraEffectsPerCell);
                         }
 
-                        let auraEffectIndexes = teamAuraEffectIndexes[ack];
-                        if (!auraEffectIndexes) {
-                            auraEffectIndexes = new Map();
-                            teamAuraEffectIndexes[ack] = auraEffectIndexes;
+                        let existingIndex = -1;
+                        for (let i = 0; i < teamAuraEffectsPerCell.length; i++) {
+                            if (teamAuraEffectsPerCell[i].getAuraEffectProperties().name === auraName) {
+                                existingIndex = i;
+                                break;
+                            }
                         }
-
-                        const existingIndex = auraEffectIndexes.get(unitAuraEffectProperties.name);
-                        if (existingIndex === undefined) {
-                            auraEffectIndexes.set(unitAuraEffectProperties.name, teamAuraEffectsPerCell.length);
+                        if (existingIndex < 0) {
                             teamAuraEffectsPerCell.push(
                                 new AppliedAuraEffectProperties(unitAuraEffectProperties, baseCell),
                             );

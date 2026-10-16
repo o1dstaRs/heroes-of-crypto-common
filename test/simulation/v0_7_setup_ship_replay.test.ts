@@ -46,7 +46,110 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // trace holding one diverges from the first blow struck against it. Two isolated runs reproduced this
 // value byte-identically.
 // Previous approved digest: 16bdeb8e89b6705d7c08f18bc7c7fde614f47be7c57e3c64591571b8f07e8f7f
-const EXPECTED_REPLAY_SHA256 = "ebc718ae48eb24ad1ce2f7240b7c055a8dcc71058f1772b88d230d132d78492a";
+// Previous approved digest: ebc718ae48eb24ad1ce2f7240b7c055a8dcc71058f1772b88d230d132d78492a
+// Re-pinned 2026-09-13 for an Abomination balance pass: hp 550 -> 500 (owner request). Abomination is
+// fielded across the seeded draws and its hp decides when each wound kills, so any trace holding one
+// diverges from its first wound on. Two isolated runs reproduced this value byte-identically.
+// Previous approved digest: c10760dc2f4cd31ad40a58886582fe10e6f856ae024c9dcf3b77732ceef7b061
+// Re-pinned 2026-09-13 for a second Abomination balance pass: armor 49 -> 45 (owner request). Its armor
+// prices every hit it takes in the seeded draws, so the trace diverges from its first wound on. Two runs
+// reproduced this value byte-identically.
+// Previous approved digest: 5b42ca8c8d93a8c00e98a448074bdc374e5c6895418146d9ff2e182c5522f17b
+// Re-pinned 2026-09-18: Stun Aura taken off the Abomination (owner, "for now"), so allies standing in its
+// field no longer roll a stun on their hits and the seeded traces diverge from the first exchange on. Two
+// isolated runs reproduced this value byte-identically.
+// Previous approved digest: 3a50d04db5eb08aa9e3c64326f1676e490ccbb7c42908c99289d3c584ed7d29b
+// Re-pinned 2026-09-19 for a Trent balance pass (owner request): its own vines are now FREE to walk (was
+// half a step per vined cell) and its base steps drop 3.9 -> 2.9. Trent is fielded across the seeded draws
+// and its steps decide every move it makes, so any trace holding one diverges from its first move on. Two
+// isolated runs reproduced this value byte-identically.
+// Previous approved digest: f6eac4417823a2721740915c73a90fd9ca889125fceb78570717ac616102db3b
+// Re-pinned 2026-09-20: Blindness now rides the blow its owner STRIKES as well as the one it answers
+// (owner request), so a Unicorn that opens an exchange blinds the target it hits. Unicorn is a Nature
+// level-3 stack fielded across the seeded draws, and a blinded stack forfeits its turn, so any trace
+// holding one diverges from its first attack on. Two isolated runs reproduced this value byte-identically.
+// Previous approved digest: 391bb66a51a2a5384211593c161152f502be220a77ddc006a478662383b4dd73
+// Re-pinned 2026-09-20 for a Goblin Knight / Crusader balance pass (owner request): Goblin Knight loses
+// Wardguard and goes hp 85 -> 100, steps 5.1 -> 4.9; Crusader goes steps 5 -> 4.8. Both are level-3 stacks
+// fielded across the seeded draws, and steps decide every move while hp decides when each wound kills, so
+// any trace holding either diverges from its first move on. Measured in a clean worktree at HEAD with ONLY
+// creatures.json changed (a peer had unrelated WIP in the shared tree): the digest is green at HEAD and two
+// isolated runs reproduced this value byte-identically.
+// Previous approved digest: dae4aa5cd272b91496c09b869276e9a025dd9a567214597109058c13ce838392
+// Re-pinned 2026-09-20 (owner walk-back): Goblin Knight's steps go back 4.9 -> 5.1 — hp 100 and losing
+// Wardguard from the pass above stand. Goblin Knight is a level-3 stack fielded across the seeded draws
+// and steps decide every move, so any trace holding one diverges from its first move on. Measured at a
+// clean HEAD with only this one-line change; two isolated runs reproduced this value byte-identically.
+// Previous approved digest: d58a6db6df70cbfbd90b33ed893dccb86108c50f864bbfec3970060776f2f35c
+// Re-pinned 2026-09-21 for a Goblin Knight balance pass (owner request): attack_damage_max 18 -> 17.
+// Goblin Knight is a level-3 stack fielded across the seeded draws and its damage roll decides when
+// each wound kills, so any trace holding one diverges from its first landed hit. Measured at a clean
+// HEAD with only this one-line change; two isolated runs reproduced this value byte-identically.
+// Previous approved digest: 80b1633a7a6b4cf9fb91657c80ba5d2f331bcc7cbd9492d610f1212f57a058b7
+// Re-pinned 2026-09-24 for the Knowledge Base audit fixes (server docs/ENGINE_ISSUES.md G8, G9): a hit the
+// protected unit's Water Shield absorbs is no longer redirected onto the Abomination, and Flesh Shield's
+// absorbed share no longer rolls Break a second time — Break draws its RNG only when its chance is above 0,
+// so dropping that roll shifts the seeded stream from the first Flesh Shield absorption on. Bisected: every
+// other audit fix leaves this digest unchanged. Two isolated runs reproduced this value byte-identically.
+// Previous approved digest: e1b08d3259ddaf10680391606a1c668e2d6ff8e7d7e2091b03389f990669c8a9
+// Re-pinned 2026-09-25: Unicorn hp 70 -> 75, and Flesh Shield is sampled at the landing cell.
+// Unicorn is fielded across the seeded draws, and a different absorption changes the trace from
+// the first exchange on. Verified against this tree.
+// Previous approved digest: 8fcbcc222394d36d7f012ca5f8dc676ba8eb124d2f8149864b6ccafd1a384655
+// Re-pinned 2026-09-25: Unicorn melee damage 11-15 -> 12-16. Unicorn is fielded across the
+// seeded draws, so the new roll changes the trace from the first landed hit.
+// Re-pinned 2026-09-28: Dulling Defense riding the knight's own blow (6e4f86d) changes landed
+// damage in the seeded fights, and corner shooters against splashless enemies (1c9f1f03) move
+// the setup the trace fights from. Both are reviewed mainline behavior changes.
+// Re-pinned 2026-10-02: Blacksmith exp 9.5 -> 8.8 (3ed15b6), Castling's one-cell-wider swap
+// reach (253a2e5), and Small Specie dodging level-4 attackers only (66ae0fed) each move the
+// setup trace the resolver replays.
+// Re-pinned 2026-10-03: Amulet of Resolve adds 25% mind resistance and id 11 becomes two
+// deployed one-hit barrels. These seeded fights include the affected artifacts; two isolated
+// runs reproduced the new trace, and the committed pre-change source reproduces the prior digest.
+// Previous approved digest: e73312e64d106a395a55ad53532de4f2f88534db782c382e3a793720beeebd6d
+// Re-pinned 2026-10-04: the opt-in v0.7 setup search extensions — material arbitration
+// (e067d75), public formation support and dispersion (ec1700f), own-army role search plans
+// (7bdb3a9) — move the seeded setup traces even before their gates are enabled. Two isolated
+// runs reproduce the new trace; the fcfd347 source reproduces the prior digest.
+// Previous approved digest: d327ffd27f762e9c74261717eea8d9e575890665aab0ddbc4986c00ce5c3cb47
+// Re-pinned 2026-10-04: the barrel-aware a19 work — artifact barrels reserving their neighbourhood
+// during deployment (d9cb151), the opt-in ranked role candidate (5f44d114), regenerative-artillery
+// damage plans (754dd960), public barrel target coverage (42f30c6) and a19 screening behind barrels
+// (df07612) — each moves the seeded setup traces. Two isolated runs reproduce the new trace, and CI
+// (which checks out the pinned submodule directly) received the same digest byte-for-byte.
+// Previous approved digest: d1aab87bed24cbd7a6e26a3c824504819639631057b28e98c869377aba922ee3
+// Re-pinned 2026-10-13 for Arachna Queen armor 35 -> 40 (561639d). The frozen 4a2bb2e
+// source still reproduces the prior digest; only creatures.json changes between those commits.
+// Two fresh runs reproduce this digest with zero rejected actions in all eight fights.
+// Previous approved digest: ca158ed411bbd95b0391bd67a55b6ddeddd6e5d2fc202ac070db5be92c21b44d
+// Re-pinned 2026-10-13 for Predatory Assimilation's direct-hit poison. The prior armor-only
+// revision passes the previous digest; the poison changes the seeded combat traces.
+// Two isolated runs reproduce this digest with zero rejected actions in all eight fights.
+// Previous approved digest: debd6769f2961bfeae111d859aac0ac52a9bcf1666e2b54f319bff5045305f85
+// Re-pinned 2026-10-13 for Barrel Barricade collision on non-barrel maps. The prior grid source
+// reproduces the old digest; only the two normal-map fights at seed 2147640168 change. Two isolated
+// corrected runs are byte-identical, with zero rejected actions across all eight fights.
+// Previous approved digest: be18d60390a885664fda366264f653c56097838c5e5bc3411402fa32d5061a74
+// Re-pinned 2026-10-14: Tome of Amplification is tier 1 at 40%, and tier-2 id 10 is retired.
+// Seeded setups can draft it as a tier-1 artifact, and the weaker buffs change the combat traces.
+// Two runs of that tree reproduced this digest byte-identically.
+// Previous approved digest: 84e8cbcb4be169a34bc510c7c334cf3a14a7ef5e6c0c52dfc4eef080c1593bc2
+// Re-pinned 2026-10-14: Aegis of the Arcane joined the live tier-2 pool, and a merge keeps the
+// deleted stack's remaining spell charges. Seeded setups can draft the new artifact, and the
+// charge fix changes combat traces. Two runs reproduced this digest byte-identically.
+// Previous approved digest: 2b0b1de14709f12542a68ee29f8911acc6eb4cf53ab5d3a60bcd11d08368dcf2
+// Quiver of Echoes adds a live Tier-2 draft option (2026-10-14). Two isolated runs reproduce this digest;
+// removing only that option from the live lists restores the previous digest exactly.
+// Previous digest: 0c89c8d9586bec1f697581a8a99ffbff62887c9c809817ce14ba37dcca0c781b
+// Re-pinned 2026-10-14 after the Rime Charm tier migration and Gravechain joining the live Tier-2 pool.
+// Two isolated runs are identical with zero rejected actions. A clean d2181a2 archive without Gravechain
+// reproduces 0797770ee08f12bbd08377557149b48c92a8a5181460406b54f0deadab8ca9f5; adding Gravechain changes
+// only the two normal-map fights at seed 2147640168. Previous pinned digest: 8a627bec8c276376a0ad66277c6b7c9acd13d5cc7052680266d97a99e0400729.
+// Last Fuse joins the live Tier-2 pool (2026-10-14), changing seeded draft offers and combat.
+// Two runs produce identical traces; excluding only Last Fuse from the live pool restores the previous digest.
+// Previous digest: ece87aaa802fd7e723474b9b7e2836b72681e04d8fbee8b997e774c00b834119.
+const EXPECTED_REPLAY_SHA256 = "d87e778b92b5fceb891a7d18e61c9992f95050be431dedd57f73adfab5ee2663";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

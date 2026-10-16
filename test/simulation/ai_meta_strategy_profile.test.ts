@@ -14,7 +14,6 @@ import { describe, expect, it } from "bun:test";
 import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { V08A19RankedPlacementStrategy } from "../../src/ai/versions/v0_8_a19_ranked_placement";
 import {
-    AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
     AI_META_NATIVE_V08_STRATEGY_PROFILE,
     AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
     createAiMetaMatchStrategyOverrides,
@@ -52,31 +51,6 @@ describe("AI-meta match strategy profiles", () => {
         expect(first.redStrategyOverride?.version).toBe("v0.8");
         expect(first.greenSetupPlacementPolicy).toBeUndefined();
         expect(first.redSetupPlacementPolicy).toBeUndefined();
-    });
-
-    it("creates independent A19 placement decorators and complete public-roster contexts per match", () => {
-        const first = createAiMetaMatchStrategyOverrides(
-            AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
-            publicOpponents,
-        );
-        const second = createAiMetaMatchStrategyOverrides(
-            AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
-            publicOpponents,
-        );
-
-        expect(first.greenStrategyOverride).toBeInstanceOf(V08A19RankedPlacementStrategy);
-        expect(first.redStrategyOverride).toBeInstanceOf(V08A19RankedPlacementStrategy);
-        expect(first.greenStrategyOverride).not.toBe(first.redStrategyOverride);
-        expect(second.greenStrategyOverride).not.toBe(first.greenStrategyOverride);
-        expect(second.redStrategyOverride).not.toBe(first.redStrategyOverride);
-        expect(first.greenStrategyOverride?.version).toBe("v0.8");
-        expect(first.redStrategyOverride?.version).toBe("v0.8");
-        expect(first.greenSetupPlacementPolicy).toBe("public-roster");
-        expect(first.redSetupPlacementPolicy).toBe("public-roster");
-        expect(first.greenPublicOpponentCreatures).toEqual([4, 5, 6]);
-        expect(first.redPublicOpponentCreatures).toEqual([11, 12, 13]);
-        expect(first.greenPublicOpponentCreatures).not.toBe(publicOpponents.greenOpponentCreatureIds);
-        expect(first.redPublicOpponentCreatures).not.toBe(publicOpponents.redOpponentCreatureIds);
     });
 
     it("fails closed for an unknown serialized profile id", () => {

@@ -17,6 +17,7 @@ import { enumerateCandidates, type IEnumeratedCandidate } from "../candidates";
 import { buildV08BacklineProtectorIntent, isImmediateMeleeResponseExposed } from "./v0_8_backline_protector";
 import { isV08DirectCombatDecision } from "./v0_8_dominant_finish";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
+import { v08RoleReleasedForTeam } from "./v0_8_role_release";
 
 const WANDERING_MAGE = "Wandering Mage";
 const HEALER = "Healer";
@@ -26,6 +27,7 @@ const FIRE_WALL = "Fire Wall";
 const HEAL = "Heal";
 const MASS_HEAL = "Mass Heal";
 const SPIRITUAL_ARMOR = "Spiritual Armor";
+const BLESSING = "Blessing";
 
 /**
  * These are the expensive, durable stacks for which a Healer slot has an explicit sustain job. This is
@@ -101,6 +103,7 @@ export function prioritizeV08WanderingMageSmoke(
 ): GameAction[] {
     if (
         unit.getName() !== WANDERING_MAGE ||
+        v08RoleReleasedForTeam("wandering_mage_smoke", unit.getTeam()) ||
         v08DominantFinishState(context.unitsHolder, unit.getTeam(), context.fightProperties?.getCurrentLap() ?? 0)
             .active
     ) {
@@ -152,12 +155,16 @@ const spellPower = (unit: Unit, name: string): number =>
 const effectiveFrontHeal = (target: Unit, rawPower: number): number =>
     Math.max(0, Math.min(rawPower, target.getMaxHp() - target.getHp()));
 
+const isTrivialHeal = (target: Unit, rawPower: number): boolean =>
+    effectiveFrontHeal(target, rawPower) < rawPower * 0.05 &&
+    target.getMaxHp() - target.getHp() < target.getMaxHp() * 0.05;
+
 const anchorMultiplier = (target: Unit, context: IDecisionContext): number =>
     isV08DurableHealAnchor(target, context) ? 3 : 1;
 
 const singleHealValue = (target: Unit, rawPower: number, context: IDecisionContext): number => {
     const effective = effectiveFrontHeal(target, rawPower);
-    if (effective <= 0) return 0;
+    if (effective <= 0 || isTrivialHeal(target, rawPower)) return 0;
     const missingFraction = Math.max(0, target.getMaxHp() - target.getHp()) / Math.max(1, target.getMaxHp());
     const importantBody = isV08DurableHealAnchor(target, context) || target.getLevel() >= 3;
     // Low-tier bodies remain valid emergency targets, but do not consume a finite charge for a scratch.
@@ -207,7 +214,7 @@ const massHealValue = (unit: Unit, context: IDecisionContext): { value: number; 
     for (const ally of context.unitsHolder.getAllAllies(unit.getTeam())) {
         if (ally.isDead() || !ally.canBeHealed() || ally.getMagicResist() === 100) continue;
         const effective = effectiveFrontHeal(ally, rawPower);
-        if (effective <= 0) continue;
+        if (effective <= 0 || isTrivialHeal(ally, rawPower)) continue;
         recipients += 1;
         value += effective * anchorMultiplier(ally, context);
     }
@@ -235,30 +242,83 @@ const bestArmor = (
     return best;
 };
 
+const bestBlessing = (
+    unit: Unit,
+    context: IDecisionContext,
+    candidates: readonly IEnumeratedCandidate[],
+): { candidate: IEnumeratedCandidate; value: number } | undefined => {
+    const laps = Math.min(
+        2,
+        unit
+            .getSpells()
+            .find((spell) => spell.getName() === BLESSING)
+            ?.getLapsTotal() ?? 0,
+    );
+    let best: { candidate: IEnumeratedCandidate; value: number } | undefined;
+    for (const candidate of candidates) {
+        if (candidate.spellName !== BLESSING) continue;
+        const target = targetForCandidate(context, candidate);
+        if (
+            !target ||
+            target.hasBuffActive(BLESSING) ||
+            target.hasEffectActive("Stun") ||
+            target.hasEffectActive("Blindness")
+        )
+            continue;
+        const min = target.getAttackDamageMin();
+        const max = target.getAttackDamageMax();
+        if (max <= min || max + min <= 0) continue;
+        // Price the extra damage on an attack the ally can actually make, including range falloff,
+        // armor, ammunition and multi-hit mechanics. Spell damage does not benefit from Blessing.
+        const attacks = enumerateSupportCandidates(target, context, []);
+        const attack = attacks
+            .filter(
+                (attack) =>
+                    isV08DirectCombatDecision(attack.actions) &&
+                    !attack.actions.some((action) => action.type === "cast_spell"),
+            )
+            .sort((a, b) => b.features.expectedDamage - a.features.expectedDamage)[0];
+        if (!attack) continue;
+        // Two productive turns are a conservative horizon for the three-lap buff. A finite quiver
+        // with only one shot left cannot earn a second ranged turn from this cast.
+        const ranged = attack.actions.some(
+            (action) => action.type === "range_attack" || action.type === "area_throw_attack",
+        );
+        const turns =
+            ranged && !target.hasAbilityActive("Endless Quiver") ? Math.min(laps, target.getRangeShots()) : laps;
+        const value = ((attack.features.expectedDamage * (max - min)) / (max + min)) * turns;
+        if (value > 0 && (!best || value > best.value)) best = { candidate, value };
+    }
+    return best;
+};
+
 /**
  * v0.4's Healer branch waits for a coarse >30% whole-stack wound and then sorts by wound percentage. Healing
  * cannot resurrect bodies: the engine restores only the current front creature, so that metric frequently saves
  * little while ignoring a damaged 500-HP Abomination or healthy-but-about-to-tank Angel. Price the health the
  * spell can actually restore, prioritize the durable screen anchors, use Mass Heal only when it beats the best
- * single charge across multiple bodies, and put preventative armor on the same anchor class.
+ * single charge across multiple bodies, compare that recovery with Blessing's extra physical damage,
+ * and put preventative armor on the same anchor class when neither active benefit is worthwhile.
  */
 export function prioritizeV08HealerSustain(
     unit: Unit,
     context: IDecisionContext,
     decision: GameAction[],
 ): GameAction[] {
-    if (unit.getName() !== HEALER) return decision;
+    if (unit.getName() !== HEALER || v08RoleReleasedForTeam("healer_sustain", unit.getTeam())) return decision;
     const candidates = enumerateSupportCandidates(unit, context, decision);
     if (incumbentGuaranteedKill(unit, context, candidates)) return decision;
 
     const single = bestSingleHeal(unit, context, candidates);
+    const blessing = bestBlessing(unit, context, candidates);
     const mass = candidates.find((candidate) => candidate.spellName === MASS_HEAL);
     if (mass) {
         const massValue = massHealValue(unit, context);
-        if (massValue.recipients >= 2 && massValue.value > (single?.value ?? 0)) {
+        if (massValue.recipients >= 2 && massValue.value > Math.max(single?.value ?? 0, blessing?.value ?? 0)) {
             return mass.actions;
         }
     }
+    if (blessing && blessing.value > (single?.value ?? 0)) return blessing.candidate.actions;
     if (single) return single.candidate.actions;
 
     return bestArmor(context, candidates)?.actions ?? decision;

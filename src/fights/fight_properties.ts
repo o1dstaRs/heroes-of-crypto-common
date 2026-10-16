@@ -113,6 +113,15 @@ const parseLegacySynergyKey = (synergy: string): IParsedSynergyKey | undefined =
 };
 
 export class FightProperties {
+    /** The highest level each augment has (Placement counts from 0: LEVEL_1..LEVEL_3). */
+    public static readonly AUGMENT_MAX_LEVEL: Readonly<Record<AugmentType["type"], number>> = {
+        Placement: PlacementAugment.LEVEL_3,
+        Armor: ArmorAugment.LEVEL_3,
+        Might: MightAugment.LEVEL_3,
+        Empower: EmpowerAugment.LEVEL_3,
+        Sniper: SniperAugment.LEVEL_3,
+        Movement: MovementAugment.LEVEL_2,
+    };
     private id: string;
     private currentLap: number;
     private gridType: GridType;
@@ -475,7 +484,12 @@ export class FightProperties {
     public setHighestInitiativeThisTurn(highestInitiativeThisTurn: number): void {
         this.highestInitiativeThisTurn = highestInitiativeThisTurn;
     }
-    public startTurn(teamType: TeamType, nowMillis: number = getTimeMillis()): void {
+    /**
+     * Start the turn clock. `stacksToAct` is how many of the team's living stacks still have to act this lap,
+     * the starting one included; callers that can see the board pass it. The fallback — the stack count
+     * stored at fight start minus the stacks that acted — never saw losses or summons.
+     */
+    public startTurn(teamType: TeamType, nowMillis: number = getTimeMillis(), stacksToAct?: number): void {
         let currentTotalTimePerTeam = this.currentLapTotalTimePerTeam.get(teamType);
         if (currentTotalTimePerTeam === undefined) {
             currentTotalTimePerTeam = 0;
@@ -490,22 +504,17 @@ export class FightProperties {
             teamType === PBTypes.TeamVals.LEFT
                 ? (this.teamUnitsAlive.get(PBTypes.TeamVals.LEFT) ?? 0)
                 : (this.teamUnitsAlive.get(PBTypes.TeamVals.RIGHT) ?? 0);
-        let teamMembersToMakeTurn = teamMembersAlive - alreadyMadeTurnTeamMembers - 1;
-        if (teamMembersToMakeTurn < 0) {
-            teamMembersToMakeTurn = 0;
-        }
+        const stillToAct = stacksToAct ?? teamMembersAlive - alreadyMadeTurnTeamMembers;
+        const teamMembersToMakeTurn = Math.max(0, stillToAct - 1);
 
         const allocatedForOtherUnits = MIN_TIME_TO_MAKE_TURN_MILLIS * teamMembersToMakeTurn;
         const timeRemaining = TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam - allocatedForOtherUnits;
 
         let maxTimeToMakeTurn = MAX_TIME_TO_MAKE_TURN_MILLIS;
-        if (teamMembersAlive > 0 && teamMembersAlive - alreadyMadeTurnTeamMembers > 0) {
+        if (stillToAct > 0) {
             maxTimeToMakeTurn = Math.min(
                 maxTimeToMakeTurn,
-                Math.ceil(
-                    (TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam) /
-                        (teamMembersAlive - alreadyMadeTurnTeamMembers),
-                ),
+                Math.ceil((TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam) / stillToAct),
             );
         }
 
@@ -515,7 +524,8 @@ export class FightProperties {
         // `timeRemaining:${timeRemaining} currentTotalTimePerTeam:${currentTotalTimePerTeam} maxTimeToMakeTurn:${maxTimeToMakeTurn} alreadyMadeTurnTeamMembers:${alreadyMadeTurnTeamMembers}`,
         // );
     }
-    public requestAdditionalTurnTime(teamType?: TeamType, justCheck = false): number {
+    /** Once per lap per team: more time on the running turn. `stacksToAct` as in startTurn. */
+    public requestAdditionalTurnTime(teamType?: TeamType, justCheck = false, stacksToAct?: number): number {
         if (!teamType) {
             return 0;
         }
@@ -540,19 +550,14 @@ export class FightProperties {
                 ? (this.teamUnitsAlive.get(PBTypes.TeamVals.LEFT) ?? 0)
                 : (this.teamUnitsAlive.get(PBTypes.TeamVals.RIGHT) ?? 0);
 
-        let teamMembersToMakeTurn = teamMembersAlive - alreadyMadeTurnTeamMembers;
-        if (teamMembersToMakeTurn < 0) {
-            teamMembersToMakeTurn = 0;
-        }
+        const stillToAct = stacksToAct ?? teamMembersAlive - alreadyMadeTurnTeamMembers;
+        const teamMembersToMakeTurn = Math.max(0, stillToAct);
         const allocatedForOtherUnits = MIN_TIME_TO_MAKE_TURN_MILLIS * (teamMembersToMakeTurn - 1);
         const timeRemaining = TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam - allocatedForOtherUnits;
-        if (timeRemaining > 0 && teamMembersAlive - alreadyMadeTurnTeamMembers > 0) {
+        if (timeRemaining > 0 && stillToAct > 0) {
             const additionalTime = Math.min(
                 MAX_TIME_TO_MAKE_TURN_MILLIS,
-                Math.ceil(
-                    (TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam) /
-                        (teamMembersAlive - alreadyMadeTurnTeamMembers),
-                ),
+                Math.ceil((TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam) / stillToAct),
             );
             if (!justCheck) {
                 this.hasAdditionalTimeRequestedPerTeam.set(teamType, true);
@@ -1157,6 +1162,12 @@ export class FightProperties {
     }
     public canAugment(teamType: TeamType, augmentType: AugmentType): boolean {
         if (teamType === PBTypes.TeamVals.NO_TEAM || !augmentType || augmentType.value < 0 || !augmentType.type) {
+            return false;
+        }
+        // Only a level the augment actually has: the budget below would accept Movement 3 or Armor 2.5, and the
+        // fight then threw when it applied the augment at start (getMovementPower and friends reject them).
+        const maxLevel = FightProperties.AUGMENT_MAX_LEVEL[augmentType.type];
+        if (maxLevel === undefined || !Number.isInteger(augmentType.value) || augmentType.value > maxLevel) {
             return false;
         }
 

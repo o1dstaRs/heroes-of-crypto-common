@@ -9,6 +9,19 @@
  * -----------------------------------------------------------------------------
  */
 
+import { readAiMetaFrozenSource, type IAiMetaFrozenSource } from "./ai_meta_frozen_source";
+import {
+    aiMetaStudyFromEnvironment,
+    premiumStudyEvidenceSchema,
+    PREMIUM_META_DRAFT_SPEC,
+    PREMIUM_META_FULL_AUGMENTS_STUDY,
+    isPublicSetupStudy,
+} from "./ai_meta_study";
+import {
+    enumeratePremiumAugmentPlans,
+    premiumAugmentPlanId,
+    type IPremiumAugmentPlan,
+} from "../ai/setup/premium_augment_plans";
 import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import { arch, availableParallelism, cpus, platform, release, totalmem } from "node:os";
 import { basename, join, resolve } from "node:path";
@@ -18,8 +31,6 @@ import { createGzip, type Gzip } from "node:zlib";
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { V08_A13_PROFILE } from "../ai/versions/v0_8_a13_profile";
 import { buildV08A19SearchEnvironment, V08_A19_PROFILE } from "../ai/versions/v0_8_a19_profile";
-import { buildV08A19H18SearchEnvironment, V08_A19_H18_PROFILE } from "../ai/versions/v0_8_a19_h18_profile";
-import { V08_A19_H18_RANKED_PLACEMENT_PROFILE } from "../ai/versions/v0_8_a19_h18_ranked_placement_profile";
 import {
     AI_META_COHORT_DESCRIPTIONS,
     AI_META_COHORTS,
@@ -51,12 +62,7 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "./ai_meta_cohorts_core";
-import {
-    AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
-    AI_META_NATIVE_V08_STRATEGY_PROFILE,
-    AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
-    type AiMetaStrategyProfileId,
-} from "./ai_meta_strategy_profile";
+import { AI_META_REGISTERED_VERSION_STRATEGY_PROFILE, type AiMetaStrategyProfileId } from "./ai_meta_strategy_profile";
 import {
     AI_META_UNIT_INTERACTION_SCHEMA,
     AiMetaUnitInteractionCollector,
@@ -65,6 +71,7 @@ import {
 import { creaturesByLevel, DEFAULT_ROSTER_COMPOSITION } from "./army";
 import { captureGitSourceStatus } from "./git_source_status";
 import { fingerprintSourceTree } from "./source_tree_fingerprint";
+import { AI_META_EVIDENCE_SCHEMA } from "./ai_meta_evidence";
 
 interface ICountedOutcome {
     score: number;
@@ -342,6 +349,17 @@ export class AiMetaAccumulator {
         }
     }
     public add(record: IAiMetaPairRecord): void {
+        if (record.evidence?.studyProfile)
+            for (const budget of [5, 6, 7])
+                for (const plan of record.evidence.studyProfile === PREMIUM_META_FULL_AUGMENTS_STUDY
+                    ? enumeratePremiumAugmentPlans(budget)
+                    : allAugmentPlans(budget)) {
+                    if (!this.augmentPlans.has(planKey(plan))) this.augmentPlans.set(planKey(plan), emptyBucket());
+                }
+        if (record.evidence?.studyProfile === PREMIUM_META_FULL_AUGMENTS_STUDY)
+            for (let level = 0; level <= 3; level++)
+                if (!this.augmentLevels.has(`Empower:${level}`))
+                    this.augmentLevels.set(`Empower:${level}`, emptyBucket());
         this.pairs += 1;
         this.games += record.games.length;
         this.mapGames[String(record.map)] = (this.mapGames[String(record.map)] ?? 0) + record.games.length;
@@ -463,10 +481,16 @@ export class AiMetaAccumulator {
         outcomeA: ICountedOutcome,
         outcomeB: ICountedOutcome,
     ): void {
-        for (const kind of ["Placement", "Armor", "Might", "Sniper", "Movement"] as const) {
-            const key = kind.toLowerCase() as "placement" | "armor" | "might" | "sniper" | "movement";
-            const levelA = armyA.augment.plan[key];
-            const levelB = armyB.augment.plan[key];
+        for (const kind of ["Placement", "Armor", "Might", "Sniper", "Movement", "Empower"] as const) {
+            if (
+                kind === "Empower" &&
+                armyA.augment.plan.empower === undefined &&
+                armyB.augment.plan.empower === undefined
+            )
+                continue;
+            const key = kind.toLowerCase() as keyof IPremiumAugmentPlan;
+            const levelA = armyA.augment.plan[key] ?? 0;
+            const levelB = armyB.augment.plan[key] ?? 0;
             const bucketA = bucketFor(this.augmentLevels, `${kind}:${levelA}`);
             const bucketB = bucketFor(this.augmentLevels, `${kind}:${levelB}`);
             for (const [bucket, mode] of [
@@ -618,8 +642,8 @@ export class AiMetaAccumulator {
 
 const UNIT_LEVEL_BY_NAME = new Map<string, number>();
 
-function planKey(plan: { placement: number; armor: number; might: number; sniper: number; movement: number }): string {
-    return `P${plan.placement}-A${plan.armor}-M${plan.might}-S${plan.sniper}-V${plan.movement}`;
+function planKey(plan: IPremiumAugmentPlan): string {
+    return premiumAugmentPlanId(plan);
 }
 
 function primeUnitLevels(record: IAiMetaPairRecord): void {
@@ -714,7 +738,7 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
-export type AiMetaFightProfileId = "a13" | "a19" | "a19-h18" | "a19-h18-ranked-placement";
+export type AiMetaFightProfileId = "a13" | "a19" | "a19-work";
 
 export interface IAiMetaFightProfile {
     id: AiMetaFightProfileId;
@@ -722,6 +746,8 @@ export interface IAiMetaFightProfile {
     provenance: Readonly<Record<string, unknown>>;
     workerEnvironment: Readonly<Record<string, string>>;
     strategyProfileId: AiMetaStrategyProfileId;
+    /** Finite search operation budgets decide every move instead of wall-clock deadlines (host-independent). */
+    offlineDeterministicWork?: boolean;
 }
 
 const definedEnvironment = (
@@ -760,12 +786,11 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             candidateId: V08_A19_PROFILE.candidateId,
             researchOnly: V08_A19_PROFILE.researchOnly,
             productionVersion: V08_A19_PROFILE.productionVersion,
-            promotedFrom: V08_A19_PROFILE.promotedFrom,
             genomeSha256: V08_A19_PROFILE.genomeSha256,
             behaviorEnvironmentSha256: V08_A19_PROFILE.behaviorEnvironmentSha256,
             search: V08_A19_PROFILE.search,
             policy: V08_A19_PROFILE.policy,
-            searchPolicy: V08_A19_PROFILE.searchPolicy,
+            searchRules: V08_A19_PROFILE.searchRules,
             placementPolicy: V08_A19_PROFILE.placementPolicy,
             workerOverride: "V08_A19_SEARCH=1",
         }),
@@ -775,51 +800,30 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
         }),
         strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
     }),
-    "a19-h18": Object.freeze({
-        id: "a19-h18",
-        title: "Heroes of Crypto — v0.8+a19-h18 Research AI Meta Balance Cohorts",
+    "a19-work": Object.freeze({
+        id: "a19-work",
+        title: "Heroes of Crypto — v0.8+a19 Full-Search AI Meta Balance Cohorts",
         provenance: Object.freeze({
-            name: "v0.8+a19-h18-research",
-            schema: V08_A19_H18_PROFILE.schema,
-            candidateId: V08_A19_H18_PROFILE.candidateId,
-            researchOnly: V08_A19_H18_PROFILE.researchOnly,
-            derivesFrom: V08_A19_H18_PROFILE.derivesFrom,
-            genomeSha256: V08_A19_H18_PROFILE.genomeSha256,
-            behaviorEnvironmentSha256: V08_A19_H18_PROFILE.behaviorEnvironmentSha256,
-            search: V08_A19_H18_PROFILE.search,
-            policy: V08_A19_H18_PROFILE.policy,
-            strategyProfileId: AI_META_NATIVE_V08_STRATEGY_PROFILE,
-            workerOverride: "V07_SEARCH=1; V08_A13_SEARCH=0",
+            name: "v0.8+a19-work",
+            schema: V08_A19_PROFILE.schema,
+            candidateId: V08_A19_PROFILE.candidateId,
+            researchOnly: true,
+            productionVersion: V08_A19_PROFILE.productionVersion,
+            genomeSha256: V08_A19_PROFILE.genomeSha256,
+            behaviorEnvironmentSha256: V08_A19_PROFILE.behaviorEnvironmentSha256,
+            search: V08_A19_PROFILE.search,
+            policy: V08_A19_PROFILE.policy,
+            searchRules: V08_A19_PROFILE.searchRules,
+            placementPolicy: V08_A19_PROFILE.placementPolicy,
+            searchBudget: "offline-deterministic-work",
+            workerOverride: "V08_A19_SEARCH=1; searchOfflineDeterministicWork=true",
         }),
         workerEnvironment: definedEnvironment({
-            ...buildV08A19H18SearchEnvironment(),
-            V08_A13_SEARCH: "0",
+            ...buildV08A19SearchEnvironment(),
+            V08_A19_SEARCH: "1",
         }),
-        strategyProfileId: AI_META_NATIVE_V08_STRATEGY_PROFILE,
-    }),
-    "a19-h18-ranked-placement": Object.freeze({
-        id: "a19-h18-ranked-placement",
-        title: "Heroes of Crypto — v0.8+a19-h18 Ranked Placement Research AI Meta Balance Cohorts",
-        provenance: Object.freeze({
-            name: "v0.8+a19-h18-ranked-placement-v8-research",
-            schema: V08_A19_H18_RANKED_PLACEMENT_PROFILE.schema,
-            candidateId: V08_A19_H18_RANKED_PLACEMENT_PROFILE.candidateId,
-            researchOnly: V08_A19_H18_RANKED_PLACEMENT_PROFILE.researchOnly,
-            baseVersion: V08_A19_H18_RANKED_PLACEMENT_PROFILE.baseVersion,
-            derivesFrom: V08_A19_H18_RANKED_PLACEMENT_PROFILE.derivesFrom,
-            genomeSha256: V08_A19_H18_RANKED_PLACEMENT_PROFILE.genomeSha256,
-            behaviorEnvironmentSha256: V08_A19_H18_RANKED_PLACEMENT_PROFILE.behaviorEnvironmentSha256,
-            search: V08_A19_H18_RANKED_PLACEMENT_PROFILE.search,
-            policy: V08_A19_H18_RANKED_PLACEMENT_PROFILE.policy,
-            placementPolicy: V08_A19_H18_RANKED_PLACEMENT_PROFILE.placementPolicy,
-            strategyProfileId: AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
-            workerOverride: "V07_SEARCH=1; V08_A13_SEARCH=0",
-        }),
-        workerEnvironment: definedEnvironment({
-            ...buildV08A19H18SearchEnvironment(),
-            V08_A13_SEARCH: "0",
-        }),
-        strategyProfileId: AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+        offlineDeterministicWork: true,
     }),
 });
 
@@ -943,7 +947,11 @@ export async function runAiMetaWorkerPool(
                 return;
             }
             const worker = new Worker(workerUrl, {
-                workerData: { options, strategyProfileId: fightProfile.strategyProfileId },
+                workerData: {
+                    options,
+                    strategyProfileId: fightProfile.strategyProfileId,
+                    offlineDeterministicWork: fightProfile.offlineDeterministicWork === true,
+                },
                 env: workerEnvironment,
             });
             workers.add(worker);
@@ -1027,6 +1035,7 @@ export interface IAiMetaSourceIdentity {
     commonDirty: boolean;
     commonStatus: string[];
     sourceSha256: string;
+    frozenSource?: IAiMetaFrozenSource;
     runtime: string;
     executionHost: {
         platform: string;
@@ -1042,11 +1051,14 @@ export interface IAiMetaSourceIdentity {
 export function captureAiMetaSourceIdentity(): IAiMetaSourceIdentity {
     const { commit, status } = captureGitSourceStatus();
     const processors = cpus();
+    const sourceSha256 = sourceFingerprint();
+    const frozenSource = readAiMetaFrozenSource(process.cwd(), sourceSha256);
     return {
-        commonCommit: commit,
-        commonDirty: Boolean(status),
-        commonStatus: status.split("\n").filter(Boolean),
-        sourceSha256: sourceFingerprint(),
+        commonCommit: frozenSource?.commonCommit ?? commit,
+        commonDirty: frozenSource?.commonDirty ?? Boolean(status),
+        commonStatus: frozenSource?.commonStatus ?? status.split("\n").filter(Boolean),
+        sourceSha256,
+        ...(frozenSource ? { frozenSource } : {}),
         runtime: `bun ${process.versions.bun ?? "unknown"}`,
         executionHost: {
             platform: platform(),
@@ -1126,14 +1138,56 @@ function writeSummary(
             concurrency,
             parallelCohorts,
             fightVersion: AI_META_FIGHT_VERSION,
-            fightProfile: fightProfile.provenance,
-            selectionPolicy: AI_META_POLICY,
+            fightProfile: {
+                ...fightProfile.provenance,
+                // The sharded merger compares this object: captures and legacy runs must not be mixed.
+                evidenceSchema: aiMetaStudyFromEnvironment()
+                    ? premiumStudyEvidenceSchema(aiMetaStudyFromEnvironment()!)
+                    : process.env.AI_META_COLLECT_EVIDENCE === "1"
+                      ? AI_META_EVIDENCE_SCHEMA
+                      : null,
+                studyProfile: aiMetaStudyFromEnvironment() ?? "legacy-oracle",
+                draftExplorationRate: aiMetaStudyFromEnvironment() ? 0.2 : 0,
+                artifactExplorationRate: process.env.AI_META_ARTIFACT_UNIFORM === "1" ? 1 : AI_META_EXPLORATION_RATE,
+            },
+            selectionPolicy: aiMetaStudyFromEnvironment() ?? AI_META_POLICY,
             rankedDraftPolicy: {
-                spec: AI_META_RANKED_DRAFT_POLICY_SPEC,
+                spec: aiMetaStudyFromEnvironment() ? PREMIUM_META_DRAFT_SPEC : AI_META_RANKED_DRAFT_POLICY_SPEC,
                 sequence: "live-ranked-pick-v1",
                 visibility: "own prior picks plus legitimately revealed opponent identities",
             },
             explorationRate: AI_META_EXPLORATION_RATE,
+            evidenceCollection:
+                process.env.AI_META_COLLECT_EVIDENCE === "1"
+                    ? {
+                          schema: aiMetaStudyFromEnvironment()
+                              ? premiumStudyEvidenceSchema(aiMetaStudyFromEnvironment()!)
+                              : AI_META_EVIDENCE_SCHEMA,
+                          lane: "baseline",
+                          partition: "scenario-family-hash-80-10-10-v1",
+                          records: [
+                              "viewer-safe-draft-decisions",
+                              "selection-distributions",
+                              "split-ancestry",
+                              "seat-formations",
+                              "accepted-action-traces",
+                              "attrition",
+                          ],
+                          telemetryScope: "accepted-action-events-not-complete-damage-attribution",
+                          effectiveStartingUnits: Boolean(aiMetaStudyFromEnvironment()),
+                          effectiveStartingBoard: Boolean(aiMetaStudyFromEnvironment()),
+                          committedFightEvents: Boolean(aiMetaStudyFromEnvironment()),
+                          terminalUnitsAndDisplayDamage: Boolean(aiMetaStudyFromEnvironment()),
+                          turnExecutionTraces: Boolean(aiMetaStudyFromEnvironment()),
+                          geometry: aiMetaStudyFromEnvironment() ? "ranked-sides" : "legacy-corners",
+                          setupVisibility: aiMetaStudyFromEnvironment()
+                              ? isPublicSetupStudy(aiMetaStudyFromEnvironment())
+                                  ? "post-draft-public-roster"
+                                  : "draft-reveals-only"
+                              : "post-draft-full-roster-oracle",
+                          liveAdvisorEvaluation: false,
+                      }
+                    : null,
             rankingDimensions: ["units", "artifactsT1", "artifactsT2", "augmentPlans", "augmentLevels", "synergies"],
             synergyTracking: {
                 schema: AI_META_SYNERGY_TRACKING,
@@ -1149,13 +1203,17 @@ function writeSummary(
                 estimator: "Five-fold cross-fitted ridge residuals with unit and setup controls per cohort/map.",
             },
             maps: AI_META_MAPS,
+            mapAllocation: aiMetaStudyFromEnvironment()
+                ? "deterministic-pair-cycle-with-recorded-remainder"
+                : "exact-three-map-seat-balance",
             rosterSlots: "2xL1, 2xL2, 1xL3, 1xL4",
             stackSizing: "expBudget (1000 XP per stack)",
-            doctrineAndSynergies: `SEE_NONE (7 points) with ${AI_META_SYNERGY_POLICY_SPEC} faction synergy picks`,
+            doctrineAndSynergies: `${aiMetaStudyFromEnvironment() ? "uniform doctrines (5/6/7 points)" : "SEE_NONE (7 points)"} with ${AI_META_SYNERGY_POLICY_SPEC} faction synergy picks`,
             nonMirroredGuarantee: "Opposing rosters have distinct signatures and no shared creature identities.",
             seatControl: "Each distinct matchup is fought twice with the complete armies and setups swapping seats.",
-            interpretation:
-                "Artifact and augment strength uses uniform exploration assignments; policyScoreRate describes all contextual-policy selections. Synergy rows are exact active choice/level associations confounded by faction composition, not randomized causal effects. Tier-1/Tier-2 contextual selection is a post-draft oracle, not deployable live timing.",
+            interpretation: aiMetaStudyFromEnvironment()
+                ? "Premium coverage study: ranked-draft retains draft artifacts; synthetic artifact sampling uses no enemy roster. Augment setup visibility follows the recorded study profile. Draft actions explore visible attempts, including collisions. Results are associations under the recorded continuation, not proven advisor improvements."
+                : "Artifact and augment strength uses uniform exploration assignments; policyScoreRate describes all contextual-policy selections. Synergy rows are exact active choice/level associations confounded by faction composition, not randomized causal effects. Tier-1/Tier-2 contextual selection is a post-draft oracle, not deployable live timing.",
             ...runIdentity,
         },
         cohorts: qualities,
@@ -1182,7 +1240,13 @@ async function runCohort(
     aggregation: AiMetaAggregation,
     runIdentity: IAiMetaSourceIdentity,
 ): Promise<ICohortRunResult> {
-    const options: IAiMetaRunOptions = { cohort, games: gamesPerCohort, baseSeed };
+    const options: IAiMetaRunOptions = {
+        cohort,
+        games: gamesPerCohort,
+        baseSeed,
+        collectEvidence: process.env.AI_META_COLLECT_EVIDENCE === "1",
+        studyProfile: aiMetaStudyFromEnvironment(),
+    };
     const accumulator = new AiMetaAccumulator(cohort);
     const rawPath = join(outDir, `${cohort}.pairs.jsonl.gz`);
     const output = createWriteStream(rawPath);
@@ -1248,10 +1312,11 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "<fight-profile=a13|a19|a19-h18|a19-h18-ranked-placement> [pair-start=0] [pair-count=all]";
+    "<fight-profile=a13|a19|a19-work> [pair-start=0] [pair-count=all]. " +
+    "Set AI_META_COLLECT_EVIDENCE=1 for legacy evidence capture, or AI_META_STUDY_PROFILE=premium-ranked-v3 for ranked-side coverage with public setup and capture (requires a19-work).";
 
-export function validateAiMetaGamesPerCohort(games: number): void {
-    const mapCycleGames = AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;
+export function validateAiMetaGamesPerCohort(games: number, premiumStudy = false): void {
+    const mapCycleGames = premiumStudy ? AI_META_GAMES_PER_MATCHUP : AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;
     if (!Number.isSafeInteger(games) || games < mapCycleGames || games % mapCycleGames !== 0) {
         throw new RangeError(
             `gamesPerCohort must be a positive safe integer divisible by ${mapCycleGames}; got ${games}`,
@@ -1265,7 +1330,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         return;
     }
     const gamesPerCohort = Number(argv[0] ?? 150_000);
-    validateAiMetaGamesPerCohort(gamesPerCohort);
+    validateAiMetaGamesPerCohort(gamesPerCohort, Boolean(aiMetaStudyFromEnvironment()));
     const baseSeed = Number(argv[1] ?? 85_000_717);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const outDir = resolve(argv[2] ?? join(process.cwd(), "sim-out", `ai-meta-${stamp}`));
@@ -1282,6 +1347,14 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
     });
     const parallelCohorts = Math.min(Number(argv[5] ?? Math.min(3, cohorts.length)), cohorts.length, concurrency);
     const fightProfile = resolveAiMetaFightProfile(argv[6]);
+    if (aiMetaStudyFromEnvironment()) {
+        if (process.env.AI_META_ARTIFACT_UNIFORM === "1")
+            throw new Error("Premium study fixes exploration; unset AI_META_ARTIFACT_UNIFORM");
+        process.env.AI_META_COLLECT_EVIDENCE = "1";
+    }
+    if (process.env.AI_META_COLLECT_EVIDENCE === "1" && !fightProfile.offlineDeterministicWork) {
+        throw new Error("AI_META_COLLECT_EVIDENCE=1 requires the a19-work fight profile");
+    }
     const completePairWindow = pairStart === 0 && pairCount === fullPairCount;
     if (!Number.isSafeInteger(baseSeed)) throw new RangeError(`baseSeed must be a safe integer; got ${baseSeed}`);
     if (
@@ -1325,7 +1398,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         );
     }
     console.log(
-        `Policy ${AI_META_POLICY}; exploration ${(AI_META_EXPLORATION_RATE * 100).toFixed(0)}% per setup component.`,
+        `Policy ${aiMetaStudyFromEnvironment() ?? AI_META_POLICY}; exploration ${(AI_META_EXPLORATION_RATE * 100).toFixed(0)}% per setup component.`,
     );
 
     for (let offset = 0; offset < cohorts.length; offset += parallelCohorts) {

@@ -10,17 +10,20 @@
  */
 
 import Denque from "denque";
+import { observeUnitHpChange } from "./hp_change_capture";
 import { Ability } from "../abilities/ability";
 import { BLIND_FURY_ABILITY_NAME, blindFuryDescription } from "../abilities/blind_fury_ability";
 import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
 import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilities/absolving_arrow_ability";
+import { BORROWED_GRACE_NAME, borrowedGraceChance } from "../abilities/borrowed_grace_ability";
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
 import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/double_shot_names";
 import { getCraftChances } from "../abilities/craft_ability";
-import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
+import { lastFuseDamage } from "../abilities/last_fuse_ability";
+import { ARTIFACT_POWER, BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { empowerMultiplier } from "../augments/augment_properties";
-import { getSpellConfig } from "../configuration/config_provider";
+import { getAbilityConfig, getSpellConfig } from "../configuration/config_provider";
 import {
     LUCK_CHANGE_FOR_SHIELD,
     LUCK_MAX_CHANGE_FOR_TURN,
@@ -54,6 +57,7 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { fillEffectPowerPlaceholders, positionalPropertyCount } from "../spells/effect_description";
 import { Spell } from "../spells/spell";
+import { isMagicDamageAbility } from "../spells/spell_damage";
 import { recordEffectApplication, recordWaterShieldAbsorb } from "./effect_application_capture";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
@@ -74,13 +78,6 @@ const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
 // adjustBaseStats only while the initial shot_distance is 0, so natural shooters keep their own range.
 const STOLEN_ENDLESS_QUIVER_SHOT_DISTANCE = 6.5;
 
-// The abilities whose damage is MAGIC and therefore scales with the team's Empower Augment. Everything else
-// that goes through calculateAbilityMultiplier (Double Punch, Lightning Spin, Through Shot, Boost Health,
-// Magic Shield, …) is physical output or a defensive figure and is deliberately left alone — Empower buys
-// magic damage, not a blanket ability buff. Fire Shield is included even though it triggers on being hit:
-// the flames it throws back are the holder's own magic damage.
-const EMPOWERED_MAGIC_ABILITIES: ReadonlySet<string> = new Set(["Chain Lightning", "Fire Breath", "Fire Shield"]);
-
 // SPELLBOOK cards own these faction-prefixed spell charges. Keep the mapping explicit: a unit can have
 // unrelated castable abilities (stored with a leading colon) or, in the future, more than one spell source,
 // and Assimilation must transfer only the remaining charges belonging to the stolen card.
@@ -88,7 +85,7 @@ const SPELLBOOK_SPELL_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
     "Book of Healing": new Set(["Heal", "Spiritual Armor", "Blessing", "Mass Heal"]),
     "Forest Spellbook": new Set(["Courage", "Helping Hand", "Summon Wolves"]),
     "Tome of Might": new Set(["Riot", "Magic Mirror", "Mass Riot", "Mass Magic Mirror"]),
-    "Book of Chaos": new Set(["Smoke", "Misfortune", "Fireforged Sword"]),
+    "Book of Chaos": new Set(["Smoke", "Misfortune", "Fireforged Sword", "Fireball"]),
     "Book of Nightmares": new Set(["Fire Wall", "Empower"]),
     "Basic Tome of Battle Magic": new Set(["Fire Strike", "Meteorite"]),
     "Tome of Elements": new Set(["Whirlpool", "Lightning Strike", "Ring of Fire", "Meteor Shower"]),
@@ -215,6 +212,7 @@ export interface IUnitAIRepr {
     getAttackType(): AttackType;
     hasAbilityActive(abilityName: string): boolean;
     hasDebuffActive(debuffName: string): boolean;
+    hasBuffActive?(buffName: string): boolean;
     /**
      * Debuff/effect check that also reads the authoritative display list, so the rule holds for a ranked
      * client (which leaves the OBJECT arrays empty) as well as for the engine and the simulator.
@@ -304,6 +302,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // Water Shield: set once this unit's one-per-battle absorb shield has been consumed, so the seeding
     // refresh (UnitsHolder.refreshWaterShieldForAllUnits) never re-grants it after it breaks.
     protected waterShieldSpent = false;
+    protected lastFuseFatalHit: { damage: number; stackPower: number } | undefined = undefined;
     protected onHourglass = false;
     // True once this unit has moved during its current turn. Reset when its turn completes. Lets the
     // engine tell a real "manual" end-of-turn (it moved, then finished) from a do-nothing turn (e.g. an
@@ -314,6 +313,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // engine actions; clients cannot inflate it because GameActionEngine records the resolved known route.
     protected movedRouteCellsThisTurn = 0;
     protected currentAttackModIncrease = 0;
+    protected warlordsEdgeAttackBase = 0;
+    protected warlordsEdgeAppliedAttackBonus = 0;
     protected adjustedBaseStatsLaps: number[] = [];
     protected luckPerTurn: number = 0;
     protected constructor(
@@ -331,7 +332,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // `abilities_descriptions` / ... arrays. Without this clone, grantAbility() pushing to one unit's
         // `abilities` leaked onto every same-type unit (e.g. Craft's Crafted Frozen Bow on ALL Elves).
         this.unitProperties = structuredClone(unitProperties);
-        this.initialUnitProperties = structuredClone(unitProperties);
+        this.normalizeLegacyRallyingVolley();
+        this.initialUnitProperties = structuredClone(this.unitProperties);
         this.gridSettings = gridSettings;
         this.teamType = teamType;
         this.unitType = unitType;
@@ -363,6 +365,49 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.parseAbilities(addConfiguredAbilitySpells);
         this.unitProperties.spell_entries_authoritative = true;
         this.parseAuraEffects();
+    }
+    /** Keep old saved cards/markers readable without restoring the retired local aura or gifting ammo twice. */
+    private normalizeLegacyRallyingVolley(): void {
+        const properties = this.unitProperties;
+        const oldName = "Rallying Volley Aura";
+        const blessingName = "Rallying Volley Blessing";
+        if (
+            !properties.abilities.includes(oldName) &&
+            !properties.applied_buffs.includes(oldName) &&
+            !properties.aura_effects.includes("Rallying Volley") &&
+            !properties.stolen_abilities?.includes(oldName) &&
+            !properties.artifact_granted_abilities?.includes(oldName)
+        ) {
+            properties.rallying_volley_granted ??= 0;
+            return;
+        }
+        const config = properties.abilities.includes(oldName) ? getAbilityConfig(blessingName) : undefined;
+        for (let i = 0; i < properties.abilities.length; i++) {
+            if (properties.abilities[i] !== oldName || !config) continue;
+            properties.abilities[i] = blessingName;
+            properties.abilities_descriptions[i] = config.desc.join("\n").replace(/\{\}/g, config.power.toString());
+            properties.abilities_stack_powered[i] = false;
+            properties.abilities_auras[i] = false;
+            properties.aura_ranges[i] = 0;
+            properties.aura_is_buff[i] = true;
+        }
+        properties.aura_effects = properties.aura_effects.filter((name) => name !== "Rallying Volley");
+        properties.stolen_abilities = (properties.stolen_abilities ?? []).map((name) =>
+            name === oldName ? blessingName : name,
+        );
+        properties.artifact_granted_abilities = properties.artifact_granted_abilities?.map((name) =>
+            name === oldName ? blessingName : name,
+        );
+        let legacyGrant = 0;
+        for (let i = 0; i < properties.applied_buffs.length; i++) {
+            if (properties.applied_buffs[i] !== oldName) continue;
+            const power = properties.applied_buffs_powers[i] ?? 0;
+            legacyGrant = Math.max(legacyGrant, power);
+            properties.applied_buffs[i] = blessingName;
+            properties.applied_buffs_descriptions[i] =
+                `Rallying Volley Blessing grants +${power} ranged shots once, anywhere on the battlefield.;;`;
+        }
+        properties.rallying_volley_granted ??= Math.max(0, Math.floor(legacyGrant));
     }
     public static createUnit(
         unitProperties: UnitProperties,
@@ -475,6 +520,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // real Ability (with its effect) via the ability factory and registers it in both lists so getAbility /
     // hasAbilityActive / processDeepWoundsAbility all see it.
     public grantAbility(abilityName: string, options: { restoreStolen?: boolean; spellEntries?: string[] } = {}): void {
+        if (abilityName === "Rallying Volley Aura") abilityName = "Rallying Volley Blessing";
         if (this.abilities.some((ability) => ability.getName() === abilityName)) {
             return;
         }
@@ -690,12 +736,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return chakramDescription(ability.getDesc().join("\n"), this.getStackPower());
         }
         if (ability.getName() === "Paralysis") {
-            const description = ability.getDesc().join("\n");
-            const reduction = this.calculateAbilityApplyChance(ability, 0);
-            const chance = Math.min(100, reduction * 2);
-            return description
-                .replace("{}", Number(chance.toFixed(2)).toString())
-                .replace("{}", Number(reduction.toFixed(2)).toString());
+            return this.getParalysisDescription(ability, 0);
         }
         if (ability.getName() === ABSOLVING_ARROW_NAME) {
             // Stack-and-luck scaled like the generic apply chance, but routed through the ability's own
@@ -705,6 +746,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 .getDesc()
                 .join("\n")
                 .replace(/\{\}/g, Number(absolvingArrowFirstLiftChance(this, 0).toFixed(2)).toString());
+        }
+        if (ability.getName() === BORROWED_GRACE_NAME) {
+            return ability
+                .getDesc()
+                .join("\n")
+                .replace(/\{\}/g, Number(borrowedGraceChance(this, 0).toFixed(2)).toString());
         }
         if (
             ability.getName() === "Stun Aura" ||
@@ -736,19 +783,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         if (ability.getName() === "Magic Reflection") {
             // The Magic Dragon's passive: stack-scaled 15/30/45/60/75 at power 75, shifted by luck — the exact
-            // figure getMagicMirrorAbilityChance rolls, so the card matches the rebound the engine performs.
+            // share mirroredDamageShare always returns (and the chance a debuff is copied), so the card matches
+            // the rebound the engine performs.
             const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, this.getStackPower()));
-            const chance = Math.max(
+            const share = Math.max(
                 0,
                 Math.min(100, Math.floor((ability.getPower() / MAX_UNIT_STACK_POWER) * stackPower + this.getLuck())),
             );
-            return ability.getDesc().join("\n").replace(/\{\}/g, chance.toString());
+            return ability.getDesc().join("\n").replace(/\{\}/g, share.toString());
         }
         // Fire Breath / Fire Shield print a flat percentage off the ability config, so an Empowered team has to
         // see the RAISED figure or the card would promise 40% while the flames throw back 49.6%. Chain
         // Lightning needs no branch here: its percentages already come from calculateAbilityMultiplier above,
         // which applies Empower itself.
-        if (EMPOWERED_MAGIC_ABILITIES.has(ability.getName()) && ability.getName() !== "Chain Lightning") {
+        if (isMagicDamageAbility(ability.getName()) && ability.getName() !== "Chain Lightning") {
             const empowered = ability.getPower() * empowerMultiplier(this.getEmpowerPercentage());
             return ability
                 .getDesc()
@@ -817,6 +865,23 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         return false;
+    }
+    /**
+     * Heavy Armor's other side: every source of magic damage — spells, Fire Wall, Fireforged burns, Chain
+     * Lightning, Fire Breath, Fire Shield — hits this unit harder by the card's power per stack power (+50% at
+     * a full stack, shifted by luck). 1 without the card, or while Broken.
+     */
+    public getMagicDamageTakenMultiplier(): number {
+        const heavyArmor = this.getAbility("Heavy Armor");
+        if (!heavyArmor) {
+            return 1;
+        }
+        return Number(
+            (
+                ((heavyArmor.getPower() + this.getLuck()) / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                1
+            ).toFixed(2),
+        );
     }
     public getAbility(abilityName: string): Ability | undefined {
         // Missing-ability probes dominate AI evaluation. Establish absence before consulting Break: Break can
@@ -913,7 +978,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.web_movement_locked = this.canFly() && this.hasDebuffActive("Web Aura");
         if (this.unitProperties.hp !== this.unitProperties.max_hp && this.hasAbilityActive("Wild Regeneration")) {
             const healedHp = this.unitProperties.max_hp - this.unitProperties.hp;
+            const observed = observeUnitHpChange(this, "regeneration", healedHp, this);
             this.unitProperties.hp = this.unitProperties.max_hp;
+            observed?.();
             sceneLog.updateLog(`${this.getName()} auto regenerated to its maximum hp (+${healedHp})`);
         }
         this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
@@ -974,7 +1041,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.applied_buffs.length == this.unitProperties.applied_buffs_descriptions.length &&
             this.unitProperties.applied_buffs.length == this.unitProperties.applied_buffs_powers.length
         ) {
-            for (let i = this.unitProperties.applied_buffs.length - 1; i >= 0; i--) {
+            // Start at the last match: nothing above it can equal the name, and a miss skips the walk entirely.
+            for (let i = this.unitProperties.applied_buffs.lastIndexOf(buffName); i >= 0; i--) {
                 if (this.unitProperties.applied_buffs[i] === buffName) {
                     this.unitProperties.applied_buffs.splice(i, 1);
                     this.unitProperties.applied_buffs_laps.splice(i, 1);
@@ -1011,7 +1079,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.applied_debuffs.length == this.unitProperties.applied_debuffs_descriptions.length &&
             this.unitProperties.applied_debuffs.length == this.unitProperties.applied_debuffs_powers.length
         ) {
-            for (let i = this.unitProperties.applied_debuffs.length - 1; i >= 0; i--) {
+            for (let i = this.unitProperties.applied_debuffs.lastIndexOf(debuffName); i >= 0; i--) {
                 if (this.unitProperties.applied_debuffs[i] === debuffName) {
                     this.unitProperties.applied_debuffs.splice(i, 1);
                     this.unitProperties.applied_debuffs_laps.splice(i, 1);
@@ -1219,9 +1287,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public getSteps(): number {
         // OWNER call (2026-08-06): the movement budget is the PURE fractional stat — no rounding, no
         // flooring, server and client alike. The path walk always priced cells fractionally (straight 1,
-        // diagonal ~1.414, Trent's own vines 0.5), so a 3.9-step unit reaches 3 straight cells with 0.9
-        // left over — enough for a vine stride, never for a fourth plain cell. The old Math.round here
-        // silently gifted every x.5–x.9 creature a whole extra cell.
+        // diagonal ~1.414, Trent's own vines 0), so a 2.9-step unit reaches 2 straight cells with 0.9
+        // left over — never a third plain cell. The old Math.round here silently gifted every x.5–x.9
+        // creature a whole extra cell.
         return this.unitProperties.steps + this.unitProperties.steps_mod;
     }
     public getMorale(): number {
@@ -1323,6 +1391,68 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * pure counterpart, so a preview can gate a follow-up volley (Double Shot's second arrow) on exactly
      * the `getRangeShots() <= 0` bail calculateAttackDamage will hit. Nothing is spent here.
      */
+    /** Artifact chance is per ranged attack action, independent of stack power and ability amplification. */
+    public getBonusRangedAttackChance(): number {
+        if (this.getAttackType() !== PBTypes.AttackVals.RANGE || !this.hasBuffActive("Quiver of Echoes")) return 0;
+        const power =
+            this.getBuffPower("Quiver of Echoes") ||
+            Number(this.getBuffProperties("Quiver of Echoes")[0]) ||
+            ARTIFACT_POWER.QUIVER_OF_ECHOES_CHANCE;
+        return Math.max(0, Math.min(100, power + this.getLuck()));
+    }
+    /** Artifact chance is per landed hit, independent of stack power. Luck is this unit's current luck. */
+    public getRimeCharmChance(): number {
+        if (!this.hasBuffActive("Rime Charm")) return 0;
+        const power =
+            this.getBuffPower("Rime Charm") ||
+            Number(this.getBuffProperties("Rime Charm")[0]) ||
+            ARTIFACT_POWER.RIME_PROC_PERCENT;
+        return Math.max(0, Math.min(100, power + this.getLuck()));
+    }
+    public getGravechainChance(): number {
+        if (!this.hasBuffActive("Gravechain")) return 0;
+        const power = this.getBuffPower("Gravechain") ?? ARTIFACT_POWER.GRAVECHAIN_CHANCE;
+        return Math.max(0, Math.min(100, power + this.getLuck()));
+    }
+    public getLastFuseDamage(): number {
+        const percent = this.getBuffPower("Last Fuse");
+        if (percent === undefined) return 0;
+        return lastFuseDamage(
+            this.isDead() ? (this.lastFuseFatalHit?.damage ?? 0) : this.getCumulativeHp(),
+            this.isDead() ? (this.lastFuseFatalHit?.stackPower ?? this.getStackPower()) : this.getStackPower(),
+            percent,
+        );
+    }
+    private refreshLastFuseDescription(): void {
+        const index = this.unitProperties.applied_buffs.indexOf("Last Fuse");
+        if (index < 0) return;
+        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        this.unitProperties.applied_buffs_descriptions[index] =
+            `Artifact. When this stack is destroyed, it explodes. Every adjacent enemy takes ${this.getLastFuseDamage()} damage.;${properties.join(";")}`;
+    }
+    private refreshQuiverOfEchoesDescription(): void {
+        const index = this.unitProperties.applied_buffs.indexOf("Quiver of Echoes");
+        if (index < 0) return;
+        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        this.unitProperties.applied_buffs_descriptions[index] =
+            `Artifact. Ranged attacks have a ${this.getBonusRangedAttackChance()}% chance to make one extra attack.;${properties.join(";")}`;
+    }
+    private refreshRimeCharmDescription(): void {
+        const index = this.unitProperties.applied_buffs.indexOf("Rime Charm");
+        if (index < 0) return;
+        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        const laps = Number(properties[1]) || ARTIFACT_POWER.RIME_SLOW_LAPS;
+        this.unitProperties.applied_buffs_descriptions[index] =
+            `Artifact. ${this.getRimeCharmChance()}% chance for any attack to slow the target for ${laps} laps.;${properties.join(";")}`;
+    }
+    private refreshGravechainDescription(): void {
+        const index = this.unitProperties.applied_buffs.indexOf("Gravechain");
+        if (index < 0) return;
+        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        const laps = Number(properties[1]) || ARTIFACT_POWER.GRAVECHAIN_SLOW_LAPS;
+        this.unitProperties.applied_buffs_descriptions[index] =
+            `Artifact. Attacks have a ${this.getGravechainChance()}% chance per enemy to inflict Gravebound, chaining through connected enemies up to ${ARTIFACT_POWER.GRAVECHAIN_CONNECTIONS} links away: −25% movement for ${laps} laps. Failed rolls do not stop the chain.;${properties.join(";")}`;
+    }
     public projectRangeShotsAfterVolleys(target?: Unit, volleys = 1): number {
         const cost = projectShotCost(this, target) * Math.max(0, volleys);
         if (cost <= 0) {
@@ -1351,13 +1481,25 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ? this.unitProperties.magic_resist_mod
             : this.unitProperties.magic_resist;
     }
-    // Chance-reduction (%) against STATUS effects — Stun and Paralysis. Granted by the Amulet of Resolve
+    private getAmuletOfResolveResistance(): number {
+        const power = this.getBuffPower("Amulet of Resolve");
+        if (power === undefined) {
+            return 0;
+        }
+        if (power !== 0 || this.getBuff("Amulet of Resolve")) {
+            return power;
+        }
+        // Ranked snapshots carry zero in the display power array. The actual resistance travels as the
+        // first stored property in the server's description (`description;25;`).
+        const storedPower = Number(this.getBuffProperties("Amulet of Resolve")[0]);
+        return Number.isFinite(storedPower) ? storedPower : 0;
+    }
+    // Chance-reduction (%) against STATUS effects — Stun, Freeze and Paralysis. Granted by the Amulet of Resolve
     // artifact. Deliberately SEPARATE from magic resist (which governs magic damage and spell debuffs):
     // status resistance only lowers the odds a status effect lands. Read as a per-unit artifact "marker"
     // buff, like Broken Aegis / Giant's Maul. 0 when the unit carries no status-resist source.
     public getStatusResist(): number {
-        const amuletOfResolveBuff = this.getBuff("Amulet of Resolve");
-        return amuletOfResolveBuff ? amuletOfResolveBuff.getPower() : 0;
+        return this.getAmuletOfResolveResistance();
     }
     // Multiplier applied to PHYSICAL area-of-effect damage this unit TAKES (Area Throw, Large Caliber,
     // Lightning Spin, Skewer Strike, Through Shot). Status resistance (Amulet of Resolve) hardens the army
@@ -1371,12 +1513,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Math.max(0, 1 - effectiveResist / 100);
     }
     // Chance-reduction (%) against MIND-type abilities — Petrifying Gaze, Blindness, Boar Saliva, Aggr.
-    // Granted by the Helm of Focus artifact. SEPARATE from magic resist (which is magic armor — flat % off
+    // Granted by Amulet of Resolve. SEPARATE from magic resist (which is magic armor — flat % off
     // magic damage); mind resistance only lowers the odds a MIND effect lands. Read as a per-unit artifact
     // "marker" buff, exactly like getStatusResist above. 0 when the unit carries no mind-resist source.
     public getMindResist(): number {
-        const helmOfFocusBuff = this.getBuff("Helm of Focus");
-        return helmOfFocusBuff ? helmOfFocusBuff.getPower() : 0;
+        return this.getAmuletOfResolveResistance();
     }
     public getSpellsCount(): number {
         if (this.unitType === PBTypes.UnitVals.CREATURE && this.hasEffectActive("Break")) {
@@ -1580,6 +1721,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.unitProperties.amount_alive += revived;
         this.unitProperties.amount_died -= revived;
+        this.lastFuseFatalHit = undefined;
+        this.refreshLastFuseDescription();
         return revived;
     }
     public getLevel(): number {
@@ -1629,6 +1772,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public increaseAmountAlive(increaseBy: number): void {
         if ((!this.isDead() && this.isSummoned()) || (this.isDead() && !this.isSummoned())) {
             this.unitProperties.amount_alive += increaseBy;
+            this.refreshLastFuseDescription();
         }
     }
     public increaseAttackMod(increaseBy: number): void {
@@ -1651,7 +1795,24 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.amount_died -= Math.min(this.unitProperties.amount_died, decreaseBy);
         }
     }
+    /**
+     * Misfortune OWNS luck for as long as it lasts: adjustBaseStats pins the value (the floor, or zero for a
+     * luck-buffed target) and zeroes the modifier, so every other writer has to stand down until the debuff
+     * expires. Without this the next per-turn roll or Luck Shield added its +3 straight back on top of the
+     * floor and the unit sat at -7 wearing a debuff that promises the minimum.
+     */
+    private luckIsPinnedByMisfortune(): boolean {
+        if (!this.hasDebuffActive("Misfortune")) {
+            return false;
+        }
+        this.unitProperties.luck_mod = 0;
+        this.luckPerTurn = 0;
+        return true;
+    }
     public randomizeLuckPerTurn(): void {
+        if (this.luckIsPinnedByMisfortune()) {
+            return;
+        }
         let calculatedLuck = getRandomInt(-LUCK_MAX_CHANGE_FOR_TURN, LUCK_MAX_CHANGE_FOR_TURN + 1);
         if (calculatedLuck + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
             calculatedLuck = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
@@ -1661,17 +1822,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.luck_mod = calculatedLuck;
         this.luckPerTurn = calculatedLuck;
     }
-    public applyLuckShield(): void {
+    /** True when the shield actually raised luck; false while Misfortune holds it at the floor. */
+    public applyLuckShield(): boolean {
         // Luck Shield: replace this turn's random luck spread with a fixed positive bonus (so a bad roll
         // like -3 becomes +LUCK_CHANGE_FOR_SHIELD). Persisting it via luckPerTurn keeps it for the rest
         // of the lap — adjustBaseStats re-derives luck_mod from luckPerTurn and only re-rolls once per
         // lap, so it won't be overwritten. Clamped so base + bonus never exceeds the luck cap.
+        if (this.luckIsPinnedByMisfortune()) {
+            return false;
+        }
         let luckMod = LUCK_CHANGE_FOR_SHIELD;
         if (luckMod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
             luckMod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
         }
         this.unitProperties.luck_mod = luckMod;
         this.luckPerTurn = luckMod;
+        return true;
     }
     public applyArmageddonDamage(armageddonWave: number, sceneLog: ISceneLog): number {
         const aw = Math.floor(armageddonWave);
@@ -1705,92 +1871,101 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         extendBreak = false,
         attacker?: Unit,
     ): number {
-        if (minusHp <= 0) {
-            return 0;
-        }
+        const observed = observeUnitHpChange(this, "damage", minusHp, attacker);
+        try {
+            if (minusHp <= 0) {
+                return 0;
+            }
 
-        // Water Shield: once per battle, the first incoming damage instance is fully absorbed (0 damage taken)
-        // and the shield breaks. Sits above the Break roll and the HP subtraction so an absorbed hit lands
-        // nothing at all; `waterShieldSpent` stops the seeding refresh from re-granting the buff afterwards.
-        // FIRE IGNORES IT: a Fire Element attacker (and the fire abilities they cast — Fire Breath, Fire
-        // Shield) passes straight through, dealing full damage without absorbing OR consuming the shield.
-        if (this.willWaterShieldAbsorb(attacker)) {
-            this.waterShieldSpent = true;
-            this.deleteBuff("Water Shield");
-            // Name the striker when the caller passed one — "the shield broke" without a culprit reads
-            // like a bug. The capture below is what carries this to RANKED: its log rebuilds from events,
-            // so the engine drains the record into the action's damage payload (source "water_shield").
-            sceneLog.updateLog(
-                `${this.getName()}'s Water Shield absorbs ${
-                    attacker ? `${attacker.getName()}'s hit` : "the hit"
-                } and breaks`,
-            );
-            recordWaterShieldAbsorb({ unitId: this.getId(), amount: minusHp });
-            return 0;
-        }
+            // Water Shield: once per battle, the first incoming damage instance is fully absorbed (0 damage taken)
+            // and the shield breaks. Sits above the Break roll and the HP subtraction so an absorbed hit lands
+            // nothing at all; `waterShieldSpent` stops the seeding refresh from re-granting the buff afterwards.
+            // FIRE IGNORES IT: a Fire Element attacker (and the fire abilities they cast — Fire Breath, Fire
+            // Shield) passes straight through, dealing full damage without absorbing OR consuming the shield.
+            if (this.willWaterShieldAbsorb(attacker)) {
+                this.waterShieldSpent = true;
+                this.deleteBuff("Water Shield");
+                // Name the striker when the caller passed one — "the shield broke" without a culprit reads
+                // like a bug. The capture below is what carries this to RANKED: its log rebuilds from events,
+                // so the engine drains the record into the action's damage payload (source "water_shield").
+                sceneLog.updateLog(
+                    `${this.getName()}'s Water Shield absorbs ${
+                        attacker ? `${attacker.getName()}'s hit` : "the hit"
+                    } and breaks`,
+                );
+                recordWaterShieldAbsorb({ unitId: this.getId(), amount: minusHp });
+                return 0;
+            }
 
-        // Break-on-attack: `chanceToBreak` is the ATTACKER's team break chance (Chaos synergy + the
-        // Broken Aegis artifact — see FightProperties.getBreakChancePerTeam), applied to the unit being
-        // hit (`this`). Break is OFFENSIVE: it mutes the ENEMY the wielder struck, never the wielder.
-        // Break doesn't stack: if the unit is already Broken, don't attempt it again — re-applying would
-        // just reset the same 1-lap effect and spam a duplicate "got Break" log (e.g. a Double Shot's two
-        // hits, or a hit + counter). Skip the whole thing (including the RNG draw) when it's already active,
-        // unless a caller explicitly wants to extend it.
-        // The break RNG is drawn ONCE (only when a break is actually possible), then used for both the live
-        // decision and the diagnostic below — so the two can never disagree, and production's draw count is
-        // unchanged (the draw still happens iff chance>0 and the unit isn't already Broken / we're extending).
-        const breakPossible = chanceToBreak > 0 && (extendBreak || !this.hasEffectActive("Break"));
-        const breakRoll = breakPossible ? getRandomInt(0, 100) : -1;
+            // Break-on-attack: `chanceToBreak` is the ATTACKER's team break chance (Chaos synergy + the
+            // Broken Aegis artifact — see FightProperties.getBreakChancePerTeam), applied to the unit being
+            // hit (`this`). Break is OFFENSIVE: it mutes the ENEMY the wielder struck, never the wielder.
+            // Break doesn't stack: if the unit is already Broken, don't attempt it again — re-applying would
+            // just reset the same 1-lap effect and spam a duplicate "got Break" log (e.g. a Double Shot's two
+            // hits, or a hit + counter). Skip the whole thing (including the RNG draw) when it's already active,
+            // unless a caller explicitly wants to extend it.
+            // The break RNG is drawn ONCE (only when a break is actually possible), then used for both the live
+            // decision and the diagnostic below — so the two can never disagree, and production's draw count is
+            // unchanged (the draw still happens iff chance>0 and the unit isn't already Broken / we're extending).
+            const breakPossible = chanceToBreak > 0 && (extendBreak || !this.hasEffectActive("Break"));
+            const breakRoll = breakPossible ? getRandomInt(0, 100) : -1;
 
-        // Diagnostic (env-gated, off by default): trace every break-on-attack decision so a live ranked game
-        // can show whether Break was even ATTEMPTED (chance>0 => the attacker's team really has Broken Aegis /
-        // Chaos BREAK_ON_ATTACK), the exact RNG roll, and the outcome. Answers "break didn't apply to X":
-        // chance=0 => seeding gap; roll>=chance => just RNG; applied=true => it worked (a VFX/log gap, not a
-        // mechanics bug). Magic immunity is intentionally irrelevant here — see break_magic_immunity.test.
-        if (typeof process !== "undefined" && process.env?.HOC_BREAK_DEBUG === "1") {
-            console.warn(
-                `[BREAK-DEBUG] target=${this.getName()} magicResist=${this.getMagicResist()} ` +
-                    `chance=${chanceToBreak} alreadyBroken=${this.hasEffectActive("Break")} roll=${breakRoll} ` +
-                    `applied=${breakPossible && breakRoll < Math.min(chanceToBreak, 100)}`,
-            );
-        }
-        if (breakPossible && breakRoll < Math.min(chanceToBreak, 100)) {
-            const breakEffect = this.effectFactory.makeEffect("Break");
-            if (breakEffect) {
-                if (extendBreak) {
-                    breakEffect.extend();
-                }
-                const laps = breakEffect.getLaps();
-                if (this.applyEffect(breakEffect)) {
-                    sceneLog.updateLog(`${this.getName()} got Break for ${getLapString(laps)}`);
+            // Diagnostic (env-gated, off by default): trace every break-on-attack decision so a live ranked game
+            // can show whether Break was even ATTEMPTED (chance>0 => the attacker's team really has Broken Aegis /
+            // Chaos BREAK_ON_ATTACK), the exact RNG roll, and the outcome. Answers "break didn't apply to X":
+            // chance=0 => seeding gap; roll>=chance => just RNG; applied=true => it worked (a VFX/log gap, not a
+            // mechanics bug). Magic immunity is intentionally irrelevant here — see break_magic_immunity.test.
+            if (typeof process !== "undefined" && process.env?.HOC_BREAK_DEBUG === "1") {
+                console.warn(
+                    `[BREAK-DEBUG] target=${this.getName()} magicResist=${this.getMagicResist()} ` +
+                        `chance=${chanceToBreak} alreadyBroken=${this.hasEffectActive("Break")} roll=${breakRoll} ` +
+                        `applied=${breakPossible && breakRoll < Math.min(chanceToBreak, 100)}`,
+                );
+            }
+            if (breakPossible && breakRoll < Math.min(chanceToBreak, 100)) {
+                const breakEffect = this.effectFactory.makeEffect("Break");
+                if (breakEffect) {
+                    if (extendBreak) {
+                        breakEffect.extend();
+                    }
+                    const laps = breakEffect.getLaps();
+                    if (this.applyEffect(breakEffect)) {
+                        sceneLog.updateLog(`${this.getName()} got Break for ${getLapString(laps)}`);
+                    }
                 }
             }
+
+            const damage = projectStackDamage(
+                {
+                    hp: this.unitProperties.hp,
+                    maxHp: this.unitProperties.max_hp,
+                    amountAlive: this.unitProperties.amount_alive,
+                    amountDied: this.unitProperties.amount_died,
+                },
+                minusHp,
+            );
+            this.unitProperties.hp = damage.state.hp;
+            this.unitProperties.max_hp = damage.state.maxHp;
+            this.unitProperties.amount_alive = damage.state.amountAlive;
+            this.unitProperties.amount_died = damage.state.amountDied;
+            if (damage.dead && damage.unitsDied > 0) {
+                this.lastFuseFatalHit = { damage: damage.appliedDamage, stackPower: this.getStackPower() };
+            }
+            this.handleDamageAnimation(damage.animationDeaths);
+
+            // Apply "Bitter Experience" if available
+            if (!damage.dead && damage.unitsDied > 0 && this.hasAbilityActive("Bitter Experience")) {
+                this.unitProperties.base_armor += 1;
+                this.initialUnitProperties.base_armor += 1;
+                this.unitProperties.steps += 1;
+                this.initialUnitProperties.steps += 1;
+            }
+
+            return damage.appliedDamage;
+        } finally {
+            this.refreshLastFuseDescription();
+            observed?.();
         }
-
-        const damage = projectStackDamage(
-            {
-                hp: this.unitProperties.hp,
-                maxHp: this.unitProperties.max_hp,
-                amountAlive: this.unitProperties.amount_alive,
-                amountDied: this.unitProperties.amount_died,
-            },
-            minusHp,
-        );
-        this.unitProperties.hp = damage.state.hp;
-        this.unitProperties.max_hp = damage.state.maxHp;
-        this.unitProperties.amount_alive = damage.state.amountAlive;
-        this.unitProperties.amount_died = damage.state.amountDied;
-        this.handleDamageAnimation(damage.animationDeaths);
-
-        // Apply "Bitter Experience" if available
-        if (!damage.dead && damage.unitsDied > 0 && this.hasAbilityActive("Bitter Experience")) {
-            this.unitProperties.base_armor += 1;
-            this.initialUnitProperties.base_armor += 1;
-            this.unitProperties.steps += 1;
-            this.initialUnitProperties.steps += 1;
-        }
-
-        return damage.appliedDamage;
     }
     public isDead(): boolean {
         return this.unitProperties.amount_alive <= 0;
@@ -1802,6 +1977,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         this.unitProperties.amount_alive = Math.floor(amountAlive);
         this.initialUnitProperties.amount_alive = Math.floor(amountAlive);
+        this.refreshLastFuseDescription();
     }
     public increaseMorale(moraleAmount: number, _synergyMoraleIncrease: number): void {
         if (
@@ -1994,7 +2170,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * on-hit riders (debuffs, gazes, auras) must not land: an absorbed hit applies nothing, like a miss.
      */
     public willWaterShieldAbsorb(attacker?: Unit): boolean {
-        return this.hasBuffActive("Water Shield") && !attacker?.hasAbilityActive("Fire Element");
+        // The shield is the Water Shield ability at work, so Break turns it off like every other ability: a
+        // Broken holder takes the hit and keeps the shield for when Break wears off.
+        return (
+            this.hasBuffActive("Water Shield") &&
+            !this.hasEffectActive("Break") &&
+            !attacker?.hasAbilityActive("Fire Element")
+        );
     }
     public calculatePossibleLosses(minusHp: number): number {
         let amountDied = 0;
@@ -2061,10 +2243,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return auraEffect.getPower();
         }
 
-        // Rallying Volley (Zena) hands over a flat COUNT of shots, not a percentage and not stack-powered,
-        // so the stored aura power is the raw configured value. Every power type missing from this function
-        // falls through to the percentage tail at the end, which returns (1 * 100) - 100 = 0 — that is why
-        // the aura applied to ranged allies but granted them nothing.
+        // Extra-shot aura powers are flat counts, rather than percentage multipliers.
         if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_RANGE_SHOTS) {
             return auraEffect.getPower();
         }
@@ -2171,6 +2350,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public canBeHealed(): boolean {
         return !this.hasAbilityActive("Mechanism");
     }
+    // A machine has nothing alive in it to bring back either: Resurrection skips Mechanism stacks (while Break
+    // is off Mechanism, like every other ability, it works on them again).
+    public canBeResurrected(): boolean {
+        return !this.hasAbilityActive("Mechanism");
+    }
     // Mechanism constructs are machines: the Mechanism ability text promises immunity to poison, and there is
     // nothing alive in them for a damage-over-time to corrode. Enforced at the applyPoisonEffect chokepoint.
     public canBePoisoned(): boolean {
@@ -2196,11 +2380,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Number(Math.max(0, stackedPower + this.getLuck() + synergyAbilityPowerIncrease).toFixed(1));
     }
     public calculateAbilityCount(ability: Ability, synergyAbilityPowerIncrease: number): number {
+        // Dulling Defense removes a flat amount of base attack. Stack power, luck and synergy do not
+        // change the blow, so a partial stack must not turn the card's {} into 0.4 or 1.2.
+        if (ability.getPowerType() === AbilityPowerType.REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK) {
+            return ability.getPower();
+        }
+
         if (
             ability.getPowerType() !== AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP &&
             ability.getPowerType() !== AbilityPowerType.ADDITIONAL_STEPS &&
             ability.getPowerType() !== AbilityPowerType.STEAL_ARMOR_ON_HIT &&
-            ability.getPowerType() !== AbilityPowerType.REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK &&
             ability.getName() !== "Shatter Armor" &&
             ability.getName() !== "Deep Wounds Level 0" &&
             ability.getName() !== "Deep Wounds Level 1" &&
@@ -2364,7 +2553,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // to the finished coefficient (not folded into combinedPower) so it reads as exactly "+X% damage",
         // and applied HERE so the engine's cast, the AI's damage estimate and the card in the sidebar all
         // pick it up from one place — every one of them calls this method.
-        if (EMPOWERED_MAGIC_ABILITIES.has(ability.getName())) {
+        if (isMagicDamageAbility(ability.getName())) {
             calculatedCoeff *= empowerMultiplier(this.getEmpowerPercentage());
         }
 
@@ -2386,7 +2575,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             combinedMissChances.push(dodgeChance);
         }
 
-        if (!this.isSmallSize()) {
+        // Small Specie dodges LEVEL-4 attackers only — the 2x2 giants (every level 4 is a 2x2). A mere
+        // "not small" gate also caught the 2x1/1x2 rectangles, which are not the towering bodies the
+        // ability is about; small (1x1) attackers were and remain impossible to dodge this way.
+        if (this.getLevel() === 4) {
             const smallSpecieAbility = enemyUnit.getAbility("Small Specie");
             if (smallSpecieAbility) {
                 const dodgeChance =
@@ -2421,6 +2613,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return combinedPower;
     }
+    private adjustWarlordsEdgeAttackRate(attackRate: number, isRangeAttack: boolean): number {
+        const buff = this.getBuff("Warlords Edge");
+        if (!buff || !this.warlordsEdgeAttackBase) {
+            return attackRate;
+        }
+        const percent = isRangeAttack ? buff.getPower() : (buff.getSecondSpellProperty() ?? buff.getPower());
+        const bonus = roundUnitStat((this.warlordsEdgeAttackBase / 100) * percent, 2);
+        if (bonus === this.warlordsEdgeAppliedAttackBonus) {
+            return attackRate;
+        }
+        // A shooter can retaliate in melee while RANGE remains selected. Price the actual strike type
+        // using the same pre-aura base as the stat bonus, including damage previews and AI estimates.
+        return roundUnitStat(attackRate - this.warlordsEdgeAppliedAttackBonus + bonus, 2);
+    }
     public calculateAttackDamageMin(
         attackRate: number,
         enemyUnit: Unit,
@@ -2430,6 +2636,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         abilityMultiplier = 1,
         amountAliveOverride?: number,
     ): number {
+        attackRate = this.adjustWarlordsEdgeAttackRate(attackRate, isRangeAttack);
         if (divisor <= 0) {
             divisor = 1;
         }
@@ -2457,6 +2664,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         abilityMultiplier = 1,
         amountAliveOverride?: number,
     ): number {
+        attackRate = this.adjustWarlordsEdgeAttackRate(attackRate, isRangeAttack);
         if (divisor <= 0) {
             divisor = 1;
         }
@@ -2534,7 +2742,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return applyAttackDamageChain(chain, getRandomInt(chain.rollMin, chain.rollMaxExclusive));
     }
     public canSkipResponse(): boolean {
-        if (!this.hasAbilityActive("Break")) {
+        // Break is an EFFECT: asking for an ability of that name never matched, so a Broken Shadow Touch or
+        // Lightning Spin stayed unanswerable although Break switches every ability off.
+        if (!this.hasEffectActive("Break")) {
             for (const a of this.abilities) {
                 if (a.getSkipResponse()) {
                     return true;
@@ -2758,18 +2968,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const lapsTotal = Number.MAX_SAFE_INTEGER;
         const applied = new AppliedSpell(auraEffectName, power, lapsTotal, firstSpellProperty, secondSpellProperty);
-        // AURA Rallying Volley (Zena): hand the ranged ally its extra shots HERE, as the aura lands. It cannot
-        // be done in adjustBaseStats — that pass runs before the aura refresh, so it would never see one — and
-        // the top-up must happen exactly once: rallying_volley_granted makes stepping out and back in, a
-        // second Zena, or another refresh a no-op, so shots already FIRED stay spent. The quiver is topped up,
-        // never refilled. Effect-helper scoping already guarantees only RANGED allies get here.
-        if (isBuff && auraEffectName === "Rallying Volley Aura") {
-            const bonus = Math.max(0, Math.floor(power));
-            if (bonus > this.unitProperties.rallying_volley_granted) {
-                this.unitProperties.range_shots += bonus - this.unitProperties.rallying_volley_granted;
-                this.unitProperties.rallying_volley_granted = bonus;
-            }
-        }
         if (isBuff) {
             this.deleteBuff(auraEffectName);
             this.buffs.push(applied);
@@ -2792,6 +2990,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         secondBuffProperty?: number,
         extend: boolean = false,
     ): void {
+        if (buff.getName() === "Rallying Volley Blessing") this.tryGrantRallyingVolleyShots(buff.getPower());
         // not checking for duplicates here, do it on a caller side
         const lapsTotal = buff.getLapsTotal() + (extend ? 1 : 0);
         const firstBuffPropertyString = firstBuffProperty === undefined ? "" : firstBuffProperty.toString();
@@ -2816,6 +3015,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Keep the wire/snapshot representation aligned with the AppliedSpell. This matters for buffs whose
         // cast-time power differs from configuration (for example, Tome-amplified castable buffs).
         this.unitProperties.applied_buffs_powers.push(buff.getPower());
+        if (buff.getName() === "Last Fuse") this.refreshLastFuseDescription();
+    }
+    /** Once-only ammunition; the army marker itself may also land on allies that cannot shoot. */
+    private tryGrantRallyingVolleyShots(power: number): void {
+        if (
+            this.unitProperties.range_shots_authoritative ||
+            (!this.isRangeCapable() && !this.hasAbilityActive("Endless Quiver"))
+        ) {
+            return;
+        }
+        const bonus = Math.max(0, Math.floor(power));
+        const alreadyGranted = this.unitProperties.rallying_volley_granted;
+        if (bonus > alreadyGranted) {
+            this.unitProperties.range_shots += bonus - alreadyGranted;
+            this.unitProperties.rallying_volley_granted = bonus;
+        }
     }
     public getBuffProperties(buffName: string): [string, string] {
         const buffProperties: [string, string] = ["", ""];
@@ -2864,13 +3079,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Number.isFinite(stored) ? stored : 0;
     }
     /**
-     * Moves ONE applied buff off `from` and onto this unit, carrying its power, the laps it has LEFT and
-     * its rendered description across. Borrowed Grace (Monk) takes a blessing rather than copying it, so
-     * the entry has to survive the move intact — rebuilding it from configuration would hand back a full
-     * duration and lose any cast-time power (a Tome-amplified buff, an artifact's `;primary;secondary`
-     * suffix). An identically named buff already on the thief is replaced, never doubled.
+     * Copies ONE applied buff from `from` onto this unit, leaving it on the donor, and carries its power,
+     * the laps it has LEFT and its rendered description across. Borrowed Grace (Monk) wears a copy rather
+     * than stripping the blessing, so the entry has to survive intact — rebuilding it from configuration
+     * would hand back a full duration and lose any cast-time power (a Tome-amplified buff, an artifact's
+     * `;primary;secondary` suffix). An identically named buff already on the copier is replaced, never doubled.
      */
-    public takeBuffFrom(from: Unit, buffName: string): boolean {
+    public takeBuffFrom(from: Unit, buffName: string, extend: boolean = false): boolean {
         const applied = from.getBuff(buffName);
         if (!applied) {
             return false;
@@ -2887,17 +3102,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return false;
         }
 
-        const laps = from.unitProperties.applied_buffs_laps[index];
+        const laps =
+            applied.getLaps() +
+            (extend && !this.getBuff("Morale") && applied.getLaps() > 0 && applied.getLaps() < NUMBER_OF_LAPS_TOTAL
+                ? 1
+                : 0);
         const description = from.unitProperties.applied_buffs_descriptions[index];
         const power = from.unitProperties.applied_buffs_powers[index];
 
-        from.deleteBuff(buffName);
         this.deleteBuff(buffName);
         this.buffs.push(
             new AppliedSpell(
                 buffName,
                 applied.getPower(),
-                applied.getLaps(),
+                laps,
                 applied.getFirstSpellProperty(),
                 applied.getSecondSpellProperty(),
             ),
@@ -2906,6 +3124,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.applied_buffs_laps.push(laps);
         this.unitProperties.applied_buffs_descriptions.push(description);
         this.unitProperties.applied_buffs_powers.push(power);
+        recordEffectApplication({
+            unitId: this.getId(),
+            name: buffName,
+            kind: "buff",
+            laps,
+            sourceUnitId: from.getId(),
+        });
 
         return true;
     }
@@ -2936,7 +3161,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 positionalPropertyCount(firstDebuffProperty, secondDebuffProperty),
             )};${firstDebuffPropertyString};${secondDebuffPropertyString}`,
         );
-        this.unitProperties.applied_debuffs_powers.push(0);
+        this.unitProperties.applied_debuffs_powers.push(debuff.getPower());
     }
     /**
      * Overwrite the spellbook authoritatively from a ranked snapshot's exact entry list (each entry
@@ -2947,17 +3172,106 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * base value after every ranked cast). Sandbox never needs this: useSpell keeps both in lockstep.
      */
     public syncAuthoritativeSpellEntries(entries: string[]): void {
+        const incomingEntries = entries === this.unitProperties.spells ? [...entries] : entries;
         // In place, not a new array: getUnitProperties() hands out the live object and the HUD reads
         // spells.length off whatever reference it already holds.
         this.unitProperties.spells.length = 0;
-        this.unitProperties.spells.push(...entries);
+        this.unitProperties.spells.push(...incomingEntries);
+        this.unitProperties.can_cast_spells = incomingEntries.length > 0;
         const remainingByName = new Map<string, number>();
-        for (const entry of entries) {
+        for (const entry of incomingEntries) {
             const name = entry.substring(entry.indexOf(":") + 1);
             remainingByName.set(name, (remainingByName.get(name) ?? 0) + 1);
         }
         for (const spell of this.spells) {
             spell.setAmount(remainingByName.get(spell.getName()) ?? 0);
+        }
+        // A reconstructed empty or partial book has no Spell object for charges returned by a merge.
+        // Add those spells without replacing existing objects a client may already have armed.
+        for (const [entry] of this.parseSpellData(incomingEntries)) {
+            const parts = entry.split(":");
+            if (parts.length !== 2 || !parts[1] || this.spells.some((spell) => spell.getName() === parts[1])) {
+                continue;
+            }
+            this.spells.push(
+                new Spell({
+                    spellProperties: getSpellConfig(parts[0] || "System", parts[1]),
+                    amount: remainingByName.get(parts[1]) ?? 0,
+                }),
+            );
+        }
+    }
+    /**
+     * A split peels `amount` creatures off this stack into `part`. Spell charges are shared, never
+     * duplicated: `part` gets its share of every charge, in proportion to the creatures it takes and
+     * rounded down, and this stack keeps the rest — a single Resurrection, Castling or Battle Roar charge
+     * always stays here. A one-creature split is the exception for every spell whose own requirement is
+     * already stack power 1 and that this stack has more than one charge of: that lone caster takes one,
+     * so it can still cast Fire Strike or Fireforged Sword. Arrows are not shared: `part` copies this
+     * stack's remaining quiver, and this stack keeps every arrow it has left. Call it before this
+     * stack's count is reduced.
+     */
+    public shareResourcesWithSplit(part: Unit, amount: number): void {
+        const total = this.getAmountAlive();
+        if (total <= 0 || amount <= 0 || amount >= total) {
+            return;
+        }
+        this.moveResourcesTo(part, amount / total, false, amount);
+    }
+    /**
+     * Merging `moved` of `from`'s creatures back into this stack brings their share of `from`'s spell
+     * charges along (all of them when the whole stack merges). Arrows stay where they are: the absorbed
+     * stack's quiver is not added to this one. Call it before `from`'s count is reduced.
+     */
+    public takeResourcesFromMerge(from: Unit, moved: number): void {
+        const total = from.getAmountAlive();
+        if (total <= 0 || moved <= 0) {
+            return;
+        }
+        from.moveResourcesTo(this, Math.min(1, moved / total), true);
+    }
+    private moveResourcesTo(other: Unit, share: number, addToOther: boolean, peeledCreatures = 0): void {
+        const counts = new Map<string, number>();
+        for (const rawEntry of this.unitProperties.spells) {
+            const entry = normalizeSpellEntry(rawEntry);
+            counts.set(entry, (counts.get(entry) ?? 0) + 1);
+        }
+        // A one-creature peel of a large stack rounds every share to 0. Any spell whose own
+        // requirement is already 1 is still a cast that stack can make, so it takes one charge of
+        // each when this stack has a spare. A higher requirement, or the last charge, stays here.
+        const basicSpells = new Set(
+            this.spells.filter((spell) => spell.getMinimalCasterStackPower() <= 1).map((spell) => spell.getName()),
+        );
+        const toMove = new Map<string, number>();
+        for (const [entry, count] of counts) {
+            let moving = Math.floor(count * share);
+            const spellName = entry.substring(entry.indexOf(":") + 1);
+            if (moving === 0 && peeledCreatures === 1 && count > 1 && basicSpells.has(spellName)) {
+                moving = 1;
+            }
+            toMove.set(entry, moving);
+        }
+        const moved: string[] = [];
+        const kept: string[] = [];
+        for (const rawEntry of this.unitProperties.spells) {
+            const entry = normalizeSpellEntry(rawEntry);
+            const left = toMove.get(entry) ?? 0;
+            if (left > 0) {
+                moved.push(rawEntry);
+                toMove.set(entry, left - 1);
+            } else {
+                kept.push(rawEntry);
+            }
+        }
+        this.syncAuthoritativeSpellEntries(kept);
+        other.syncAuthoritativeSpellEntries(addToOther ? [...other.unitProperties.spells, ...moved] : moved);
+
+        // Arrows are not a shared pool. A split copies this stack's remaining quiver (and the blessing
+        // ledger already counted in it, so those arrows are not granted a second time) and leaves this
+        // stack's arrows untouched. A merge does not move them: absorbing a stack must not refill this one.
+        if (!addToOther) {
+            other.unitProperties.range_shots = Math.max(0, Math.floor(this.unitProperties.range_shots));
+            other.unitProperties.rallying_volley_granted = this.unitProperties.rallying_volley_granted;
         }
     }
     public useSpell(spellName: string): void {
@@ -2982,58 +3296,70 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.deleteAbility("Resurrection");
             }
         }
+        this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
     }
     public getAllProperties(): UnitProperties {
         return structuredClone(this.unitProperties);
     }
     // returns number of units resurrected
     public applyResurrection(resurrectionPower: number): number {
-        const hpDiff = this.unitProperties.max_hp - this.unitProperties.hp;
-        if (hpDiff >= resurrectionPower) {
-            this.unitProperties.hp += resurrectionPower;
-            return 0;
-        } else {
-            this.unitProperties.hp = this.unitProperties.max_hp;
-            resurrectionPower -= hpDiff;
+        const observed = observeUnitHpChange(this, "resurrection", resurrectionPower);
+        try {
+            const hpDiff = this.unitProperties.max_hp - this.unitProperties.hp;
+            if (hpDiff >= resurrectionPower) {
+                this.unitProperties.hp += resurrectionPower;
+                return 0;
+            } else {
+                this.unitProperties.hp = this.unitProperties.max_hp;
+                resurrectionPower -= hpDiff;
+            }
+
+            const projectedAmountResurrected = Math.ceil(resurrectionPower / this.unitProperties.max_hp);
+            const actualAmountResurrected = Math.min(this.unitProperties.amount_died, projectedAmountResurrected);
+
+            if (projectedAmountResurrected > actualAmountResurrected) {
+                this.unitProperties.hp = this.unitProperties.max_hp;
+            } else {
+                // Health left over after the whole members the budget paid for; it belongs to the last one
+                // raised, which becomes the stack's wounded front member. A remainder of ZERO means the budget
+                // covered that member exactly, so it comes back at FULL health — writing the bare remainder
+                // here resurrected the stack with a 0 hp front member ("resurrection doesn't recover hp").
+                const hpStillToHeal = resurrectionPower % this.unitProperties.max_hp;
+                this.unitProperties.hp = hpStillToHeal === 0 ? this.unitProperties.max_hp : hpStillToHeal;
+            }
+
+            const newAmountDied = this.unitProperties.amount_died - actualAmountResurrected;
+            this.unitProperties.amount_alive += actualAmountResurrected;
+            this.unitProperties.amount_died = newAmountDied < 0 ? 0 : newAmountDied;
+
+            return actualAmountResurrected;
+        } finally {
+            observed?.();
         }
-
-        const projectedAmountResurrected = Math.ceil(resurrectionPower / this.unitProperties.max_hp);
-        const actualAmountResurrected = Math.min(this.unitProperties.amount_died, projectedAmountResurrected);
-
-        if (projectedAmountResurrected > actualAmountResurrected) {
-            this.unitProperties.hp = this.unitProperties.max_hp;
-        } else {
-            // Health left over after the whole members the budget paid for; it belongs to the last one
-            // raised, which becomes the stack's wounded front member. A remainder of ZERO means the budget
-            // covered that member exactly, so it comes back at FULL health — writing the bare remainder
-            // here resurrected the stack with a 0 hp front member ("resurrection doesn't recover hp").
-            const hpStillToHeal = resurrectionPower % this.unitProperties.max_hp;
-            this.unitProperties.hp = hpStillToHeal === 0 ? this.unitProperties.max_hp : hpStillToHeal;
-        }
-
-        const newAmountDied = this.unitProperties.amount_died - actualAmountResurrected;
-        this.unitProperties.amount_alive += actualAmountResurrected;
-        this.unitProperties.amount_died = newAmountDied < 0 ? 0 : newAmountDied;
-
-        return actualAmountResurrected;
     }
     public applyHeal(healPower: number): number {
-        // Mechanism units (e.g. Tsar Cannon) cannot be healed — enforce it at the HP-restore chokepoint so
-        // NO path (single Heal, Mass Heal, Devour Essence, or any future caller) can restore their HP, even
-        // if a caller forgets the canBeHealed() pre-check.
-        if (healPower < 0 || !this.canBeHealed()) {
-            return 0;
-        }
+        const observed = observeUnitHpChange(this, "heal", healPower);
+        try {
+            // Mechanism units (e.g. Tsar Cannon) cannot be healed — enforce it at the HP-restore chokepoint so
+            // NO path (single Heal, Mass Heal, Devour Essence, or any future caller) can restore their HP, even
+            // if a caller forgets the canBeHealed() pre-check.
+            if (healPower < 0 || !this.canBeHealed()) {
+                return 0;
+            }
 
-        let healedFor = Math.floor(healPower);
-        const wasHp = this.unitProperties.hp;
-        this.unitProperties.hp += healedFor;
-        if (this.unitProperties.hp > this.unitProperties.max_hp) {
-            healedFor = this.unitProperties.max_hp - wasHp;
-            this.unitProperties.hp = this.unitProperties.max_hp;
-        }
+            let healedFor = Math.floor(healPower);
+            const wasHp = this.unitProperties.hp;
+            this.unitProperties.hp += healedFor;
+            if (this.unitProperties.hp > this.unitProperties.max_hp) {
+                healedFor = this.unitProperties.max_hp - wasHp;
+                this.unitProperties.hp = this.unitProperties.max_hp;
+            }
 
-        return healedFor;
+            return healedFor;
+        } finally {
+            this.refreshLastFuseDescription();
+            observed?.();
+        }
     }
     public handleResurrectionAnimation(): void {}
     public reduceBaseAttack(reduceBy: number): number {
@@ -3078,16 +3404,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const authoritativeBaseAttack = this.unitProperties.base_attack_authoritative
             ? this.unitProperties.base_attack
             : undefined;
+        // Probed at four sites below and pushed only at the very end, so one read serves the whole refresh.
+        const lapAlreadyAdjusted = this.adjustedBaseStatsLaps.includes(currentLap);
 
         // Stat refresh probes the same compact buff list dozens of times. Index it once for this refresh,
         // preserving getBuff's first-match behavior for defensive compatibility with malformed duplicate rows.
         // The index is deliberately local: buff mutation, battle rollback, and authoritative reconstruction cannot
         // make it stale, and the AppliedSpell objects themselves remain the exact live instances.
-        const statBuffs: Record<string, AppliedSpell | undefined> = {};
+        const statBuffs = new Map<string, AppliedSpell>();
         for (const buff of this.buffs) {
             const name = buff.getName();
-            if (statBuffs[name] === undefined) {
-                statBuffs[name] = buff;
+            if (!statBuffs.has(name)) {
+                statBuffs.set(name, buff);
             }
         }
 
@@ -3107,7 +3435,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // HP
-        const madeOfFireBuff = statBuffs["Made of Fire"];
+        const madeOfFireBuff = statBuffs.get("Made of Fire");
         const baseStatsDiff = calculateBuffsDebuffsEffect(this.getBuffs(), this.getDebuffs());
 
         // This refresh probes a fixed set of ability names repeatedly. The simulation path owns native Unit,
@@ -3272,7 +3600,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
             // ARTIFACTS: Pendant of Vitality adds % HP here. Tome of Amplification is intentionally absent from
             // base-stat recomputation: it applies only at the unit-cast buff boundary (spells/castable_buff.ts).
-            const pendantOfVitalityBuff = statBuffs["Pendant of Vitality"];
+            const pendantOfVitalityBuff = statBuffs.get("Pendant of Vitality");
             if (pendantOfVitalityBuff) {
                 this.unitProperties.max_hp += roundUnitStat(
                     (this.unitProperties.max_hp / 100) * pendantOfVitalityBuff.getPower(),
@@ -3280,7 +3608,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 );
             }
 
-            if (hasFightStarted && hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+            if (hasFightStarted && hasUnyieldingPower && !lapAlreadyAdjusted) {
                 this.unitProperties.hp += 5;
             }
 
@@ -3308,9 +3636,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 // rolls, synergy or artifact luck. See the Sadness block below for the morale equivalent.
                 const luckBuffed =
                     baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER ||
-                    !!statBuffs["Luck Aura"] ||
-                    !!statBuffs["Clover of Fortune"] ||
-                    !!statBuffs.Fortune;
+                    !!statBuffs.get("Luck Aura") ||
+                    !!statBuffs.get("Clover of Fortune") ||
+                    !!statBuffs.get("Fortune");
                 this.unitProperties.luck = luckBuffed ? 0 : -LUCK_MAX_VALUE_TOTAL;
                 this.unitProperties.luck_mod = 0;
             } else if (baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER) {
@@ -3321,7 +3649,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 if (this.unitProperties.luck !== this.initialUnitProperties.luck) {
                     this.unitProperties.luck = this.initialUnitProperties.luck;
                 }
-                if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+                if (hasFightStarted && !lapAlreadyAdjusted) {
                     this.randomizeLuckPerTurn();
                 }
 
@@ -3335,11 +3663,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
                 // ARTIFACTS: Cursed Ward (+luck) and Clover of Fortune (+luck).
                 let artifactLuck = 0;
-                const cursedWardLuckBuff = statBuffs["Cursed Ward"];
+                const cursedWardLuckBuff = statBuffs.get("Cursed Ward");
                 if (cursedWardLuckBuff) {
                     artifactLuck += cursedWardLuckBuff.getPower();
                 }
-                const cloverOfFortuneBuff = statBuffs["Clover of Fortune"];
+                const cloverOfFortuneBuff = statBuffs.get("Clover of Fortune");
                 if (cloverOfFortuneBuff) {
                     artifactLuck += cloverOfFortuneBuff.getPower();
                 }
@@ -3369,11 +3697,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
             // ARTIFACTS: Cursed Ward (-morale) and Crown of Command (+morale). Crown's first stored
             // property carries morale; its AppliedSpell power carries movement and its second property armor.
-            const cursedWardMoraleBuff = statBuffs["Cursed Ward"];
+            const cursedWardMoraleBuff = statBuffs.get("Cursed Ward");
             if (cursedWardMoraleBuff) {
                 this.unitProperties.morale -= parseInt(this.getBuffProperties("Cursed Ward")[1] || "0", 10);
             }
-            const crownOfCommandMoraleBuff = statBuffs["Crown of Command"];
+            const crownOfCommandMoraleBuff = statBuffs.get("Crown of Command");
             if (crownOfCommandMoraleBuff) {
                 this.unitProperties.morale += parseInt(this.getBuffProperties("Crown of Command")[0] || "0", 10);
             }
@@ -3383,14 +3711,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         } else {
             let lockedMorale = false;
             if (this.hasDebuffActive("Sadness")) {
-                if (statBuffs.Courage) {
+                if (statBuffs.get("Courage")) {
                     this.unitProperties.morale = 0;
                     lockedMorale = true;
                 } else {
                     this.unitProperties.morale = -MORALE_MAX_VALUE_TOTAL;
                 }
             }
-            if (statBuffs.Courage) {
+            if (statBuffs.get("Courage")) {
                 if (this.hasDebuffActive("Sadness")) {
                     this.unitProperties.morale = 0;
                     lockedMorale = true;
@@ -3431,11 +3759,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (pegasusMightAura) {
             this.unitProperties.base_armor += pegasusMightAura.getPower();
         }
-        const windFlowBuff = statBuffs["Wind Flow"];
+        const windFlowBuff = statBuffs.get("Wind Flow");
         if (windFlowBuff) {
             this.unitProperties.base_armor += windFlowBuff.getPower();
         }
-        const armorAugmentBuff = statBuffs["Armor Augment"];
+        const armorAugmentBuff = statBuffs.get("Armor Augment");
         if (armorAugmentBuff) {
             this.unitProperties.base_armor += roundUnitStat(
                 (this.unitProperties.base_armor / 100) * armorAugmentBuff.getPower(),
@@ -3448,28 +3776,28 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Titan Plate: +% defense as an ADDITIONAL stat (armor_mod), not folded into base_armor — so it never
         // compounds with the armor multiplier or other % defense buffs, and (feeding armor_mod) it guards melee
         // AND ranged. Capture 15% of base here (pre-multiplier); apply into armor_mod at the Veteran Helm block.
-        const titanPlateBuff = statBuffs["Titan Plate"];
+        const titanPlateBuff = statBuffs.get("Titan Plate");
         const titanPlateArmorBonus = titanPlateBuff
             ? roundUnitStat((this.unitProperties.base_armor / 100) * titanPlateBuff.getPower(), 2)
             : 0;
-        const ironPlateBuff = statBuffs["Iron Plate"];
+        const ironPlateBuff = statBuffs.get("Iron Plate");
         if (ironPlateBuff) {
             this.unitProperties.base_armor += ironPlateBuff.getPower();
         }
         // ARTIFACT Winged Boots: flat armour for flyers, alongside the movement it grants below. Only
         // flying units ever carry the buff (applyArtifacts gates it), so its presence is sufficient here.
         // The armour is the SECOND stored value — the power is the steps, which the movement hook reads.
-        const wingedBootsArmorBuff = statBuffs["Winged Boots"];
+        const wingedBootsArmorBuff = statBuffs.get("Winged Boots");
         if (wingedBootsArmorBuff) {
             this.unitProperties.base_armor += parseInt(this.getBuffProperties("Winged Boots")[1] || "0", 10);
         }
         // Crown of Command carries armor in its second stored property (movement remains the buff power and
         // morale the first property), so all three values survive authoritative ranked snapshots.
-        const crownOfCommandArmorBuff = statBuffs["Crown of Command"];
+        const crownOfCommandArmorBuff = statBuffs.get("Crown of Command");
         if (crownOfCommandArmorBuff) {
             this.unitProperties.base_armor += parseInt(this.getBuffProperties("Crown of Command")[1] || "0", 10);
         }
-        const berserkersBondArmorBuff = statBuffs["Berserkers Bond"];
+        const berserkersBondArmorBuff = statBuffs.get("Berserkers Bond");
         if (berserkersBondArmorBuff) {
             this.unitProperties.base_armor = Math.max(
                 1,
@@ -3515,7 +3843,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (this.getMovementType() === PBTypes.MovementVals.FLY && synergyFlyArmorIncrease > 0) {
             armorModMultiplier = synergyFlyArmorIncrease / 100;
         }
-        const spiritualArmorBuff = statBuffs["Spiritual Armor"];
+        const spiritualArmorBuff = statBuffs.get("Spiritual Armor");
         if (spiritualArmorBuff) {
             armorModMultiplier = (spiritualArmorBuff.getPower() / 100) * (1 + armorModMultiplier);
         }
@@ -3533,7 +3861,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // armor_mod feeds BOTH getArmor and getRangeArmor it now protects vs melee AND ranged — the "+defense
         // (all)" it was always described as (folding into base_armor only guarded melee). Additive off base, so
         // it never compounds with other % defense buffs.
-        const veteranHelmArmorBuff = statBuffs["Veteran Helm"];
+        const veteranHelmArmorBuff = statBuffs.get("Veteran Helm");
         if (veteranHelmArmorBuff) {
             this.unitProperties.armor_mod += roundUnitStat(
                 (this.unitProperties.base_armor / 100) * veteranHelmArmorBuff.getPower(),
@@ -3547,7 +3875,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.armor_mod = roundUnitStat(this.unitProperties.armor_mod + titanPlateArmorBonus, 2);
         }
 
-        const angelicHostBuff = statBuffs["Angelic Host Blessing"];
+        const angelicHostBuff = statBuffs.get("Angelic Host Blessing");
         if (angelicHostBuff) {
             this.unitProperties.armor_mod = roundUnitStat(
                 this.unitProperties.armor_mod + angelicHostBuff.getPower(),
@@ -3578,10 +3906,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Arrows Wingshield Blessing (Angel): the strongest living allied Angel projects this board-wide. Its
         // marker carries the source's already stack- and luck-scaled percentage, so every ally reads the same
         // figure no matter where it stands — this used to be a range-2 aura painted around the Angel.
-        const arrowsWingshieldBlessing = statBuffs["Arrows Wingshield Blessing"];
+        const arrowsWingshieldBlessing = statBuffs.get("Arrows Wingshield Blessing");
         if (arrowsWingshieldBlessing) {
             rangeArmorMultiplier = rangeArmorMultiplier * (1 + Math.max(0, arrowsWingshieldBlessing.getPower()) / 100);
         }
+
+        this.refreshQuiverOfEchoesDescription();
+        this.refreshRimeCharmDescription();
+        this.refreshGravechainDescription();
 
         // MDEF
         this.unitProperties.magic_resist = madeOfFireBuff
@@ -3594,7 +3926,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // so a percentage gave a level 1 unit 21% of nothing and a level 2 unit barely one point. Applied to
         // the base here, BEFORE the independent ability rolls below, so Magic Shield / Wardguard / Warding
         // Mane Blessing still compose on top of the raised figure.
-        const armorAugmentMagicBuff = statBuffs["Armor Augment"];
+        const armorAugmentMagicBuff = statBuffs.get("Armor Augment");
         if (armorAugmentMagicBuff) {
             this.unitProperties.magic_resist = roundUnitStat(
                 this.unitProperties.magic_resist + armorAugmentMagicBuff.getPower(),
@@ -3605,6 +3937,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (enchantedSkinAbility) {
             this.unitProperties.magic_resist_mod = enchantedSkinAbility.getPower();
         } else {
+            // Only Enchanted Skin writes the override, so clear it whenever the skin is off (Break): a stale 100
+            // here outranked the resistance recomputed below and kept a Broken Black Dragon immune to magic.
+            this.unitProperties.magic_resist_mod = 0;
             const magicResists: number[] = [this.getMagicResist() / 100];
             magicShieldAbility = getStatAbility(magicShieldAbility, "Magic Shield");
             if (magicShieldAbility) {
@@ -3618,34 +3953,45 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
             // Warding Mane Blessing (Manticore): the strongest living allied source projects this board-wide.
             // It composes as an independent resistance roll, just like Magic Shield and Arcane Ward Blessing.
-            const wardingManeBlessing = statBuffs["Warding Mane Blessing"];
+            const wardingManeBlessing = statBuffs.get("Warding Mane Blessing");
             if (wardingManeBlessing) {
                 magicResists.push(Math.max(0, wardingManeBlessing.getPower()) / 100);
             }
 
             // Arcane Ward Blessing (Squire): the strongest living allied Squire projects this board-wide.
             // Its marker carries the source's already-scaled percentage and composes as an independent roll.
-            const arcaneWardBlessing = statBuffs["Arcane Ward Blessing"];
+            const arcaneWardBlessing = statBuffs.get("Arcane Ward Blessing");
             if (arcaneWardBlessing) {
                 magicResists.push(Math.max(0, arcaneWardBlessing.getPower()) / 100);
+            }
+
+            // Aegis of the Arcane is the same kind of roll, not points added onto the base the way the Armor
+            // augment is. A unit with 15 and this 18% roll lands on 30.3 — 1 − 0.85 × 0.82 — not 33.
+            const arcaneAegis = statBuffs.get("Aegis of the Arcane");
+            if (arcaneAegis) {
+                const chance = Math.min(1, Math.max(0, arcaneAegis.getPower()) / 100);
+                if (chance > 0) {
+                    magicResists.push(chance);
+                }
             }
 
             this.unitProperties.magic_resist = roundUnitStat(winningAtLeastOneEventProbability(magicResists) * 100, 2);
         }
 
-        // NOTE: Helm of Focus is intentionally NOT folded into magic_resist (which is magic armor — flat % off
+        // NOTE: Amulet of Resolve is intentionally NOT folded into magic_resist (which is magic armor — flat % off
         // magic DAMAGE). It grants MIND resistance instead (see getMindResist), which lowers the chance a
         // MIND-type ability lands — read as a marker buff at the ability hooks, exactly like getStatusResist.
 
         // SHOTS
-        if (hasStatAbilityActive(limitedSupplyAbility, "Limited Supply")) {
+        // A ranked client's count is authoritative (range_shots_authoritative): the server applied this cap to
+        // the FULL quiver, while a rebuilt unit's maxRangeShots is only the remaining count, so re-capping
+        // here compounded it — a stack-power-1 Arbalester the server had at 4 (2 capped + Zena's 2) showed 2.
+        if (
+            hasStatAbilityActive(limitedSupplyAbility, "Limited Supply") &&
+            !this.unitProperties.range_shots_authoritative
+        ) {
             const actualStackPowerCoeff = this.getStackPower() / MAX_UNIT_STACK_POWER;
-            // Rallying Volley's arrows sit ON TOP of the supply cap rather than inside it. The ceiling is
-            // derived from maxRangeShots — the unit's OWN quiver — so without this the aura handed an
-            // Arbalester two arrows and this line immediately clamped them away again, while
-            // rallying_volley_granted still recorded the grant as spent: the top-up is once-only, so the
-            // bonus could never be handed over again. A Limited Supply archer standing in the aura simply
-            // never got it, which is exactly what "Rallying Volley does nothing" looked like.
+            // Rallying Volley's once-only arrows sit above the unit's own Limited Supply cap.
             this.unitProperties.range_shots = Math.min(
                 this.unitProperties.range_shots,
                 Math.floor(this.maxRangeShots * actualStackPowerCoeff) + this.unitProperties.rallying_volley_granted,
@@ -3670,7 +4016,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.steps_mod =
             roundUnitStat(stepsMoraleMultiplier * this.getMorale(), 1) + synergyMovementStepsIncrease;
         skyRunnerAbility = getStatAbility(skyRunnerAbility, "Sky Runner");
-        if (hasFightStarted && hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+        if (hasFightStarted && hasUnyieldingPower && !lapAlreadyAdjusted) {
             this.initialUnitProperties.steps += 1;
         }
 
@@ -3690,13 +4036,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.steps_mod += tieUpTheHorsesAuraEffect.getPower();
             }
         }
-        const movementAugmentBuff = statBuffs["Movement Augment"];
+        const movementAugmentBuff = statBuffs.get("Movement Augment");
         if (movementAugmentBuff) {
             this.unitProperties.steps += movementAugmentBuff.getPower();
         }
         // ARTIFACTS: movement. Swift Boots (melee) and Winged Boots (flyers) are only applied to eligible
         // units in applyArtifacts, so buff presence is sufficient. Crown of Command grants +steps to all.
-        const swiftBootsBuff = statBuffs["Swift Boots"];
+        const swiftBootsBuff = statBuffs.get("Swift Boots");
         if (swiftBootsBuff) {
             // Percent of base steps (power is a %), not a flat +1 — scales with the unit's own movement.
             this.unitProperties.steps += roundUnitStat(
@@ -3704,20 +4050,26 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 2,
             );
         }
-        const wingedBootsBuff = statBuffs["Winged Boots"];
+        const wingedBootsBuff = statBuffs.get("Winged Boots");
         if (wingedBootsBuff) {
             this.unitProperties.steps += wingedBootsBuff.getPower();
         }
-        const crownOfCommandStepsBuff = statBuffs["Crown of Command"];
+        const crownOfCommandStepsBuff = statBuffs.get("Crown of Command");
         if (crownOfCommandStepsBuff) {
             this.unitProperties.steps += crownOfCommandStepsBuff.getPower();
         }
-        const battleRoarBuff = statBuffs["Battle Roar"];
+        if (statBuffs.has("Gravechain")) {
+            this.unitProperties.steps -= ARTIFACT_POWER.GRAVECHAIN_STEPS_PENALTY;
+        }
+        const battleRoarBuff = statBuffs.get("Battle Roar");
         if (battleRoarBuff) {
             this.unitProperties.steps_mod += battleRoarBuff.getPower();
         }
         if (windFlowBuff) {
-            const newSteps = this.unitProperties.steps - windFlowBuff.getPower();
+            // Tome of Amplification strengthens Wind Flow's armor for the caster's flyers, never its slow: the
+            // movement penalty stays at the spell's own power.
+            const slow = Math.min(windFlowBuff.getPower(), getSpellConfig("System", "Wind Flow").power);
+            const newSteps = this.unitProperties.steps - slow;
             this.unitProperties.steps = Math.max(1, newSteps);
         }
         // Vine Throw (Trent / Grove Spellbook): the struck creature is snared by the vine and loses a flat
@@ -3729,10 +4081,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         const quagmireDebuff = this.getDebuff("Quagmire");
+        const graveboundDebuff = this.getDebuff("Gravebound");
         const hamstrungDebuff = this.getDebuff("Hamstrung");
         let stepsMultiplier = 1;
         if (quagmireDebuff) {
             stepsMultiplier *= (100 - quagmireDebuff.getPower()) / 100;
+        }
+        if (graveboundDebuff) {
+            stepsMultiplier *= (100 - graveboundDebuff.getPower()) / 100;
         }
         if (hamstrungDebuff) {
             stepsMultiplier *= (100 - hamstrungDebuff.getPower()) / 100;
@@ -3756,7 +4112,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // ATTACK
-        if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+        if (hasFightStarted && !lapAlreadyAdjusted) {
             if (hasUnyieldingPower) {
                 this.initialUnitProperties.base_attack += 2;
             }
@@ -3780,7 +4136,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.base_attack += pegasusMightAura.getPower();
         }
 
-        const mightAugmentBuff = statBuffs["Might Augment"];
+        const mightAugmentBuff = statBuffs.get("Might Augment");
 
         if (this.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE && mightAugmentBuff) {
             this.unitProperties.base_attack += roundUnitStat(
@@ -3789,7 +4145,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
-        const sniperAugmentBuff = statBuffs["Sniper Augment"];
+        const sniperAugmentBuff = statBuffs.get("Sniper Augment");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && sniperAugmentBuff) {
             const buffProperties = this.getBuffProperties(sniperAugmentBuff.getName());
             if (buffProperties?.length === 2) {
@@ -3805,22 +4161,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        // ARTIFACT Farsight Quiver: extend an archer's BASIC shot range by +% as an ADDITIONAL modifier. Added
-        // off the INITIAL shot_distance (not the Sniper-Augment-boosted value above), so it doesn't compound with
-        // Sniper Augment. This pushes out the range-falloff threshold (attack_handler.getRangeAttackDivisor)
-        // rather than removing falloff entirely (which is what it used to do).
-        const farsightQuiverBuff = statBuffs["Farsight Quiver"];
-        if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && farsightQuiverBuff) {
-            this.unitProperties.shot_distance += roundUnitStat(
-                (this.initialUnitProperties.shot_distance / 100) * farsightQuiverBuff.getPower(),
-                2,
-            );
-        }
-
-        // AURA Guiding Winds (Dryad): ranged allies within 2 cells shoot +% further. Same shape as the
-        // Farsight Quiver above — added off the INITIAL shot_distance so it neither compounds with Sniper
-        // Augment nor with the quiver, and so it self-reverts the moment the archer leaves the aura
-        // (shot_distance is rebuilt from initialUnitProperties on every pass).
+        // AURA Guiding Winds (Dryad): ranged allies within 2 cells shoot +% further. Added off the
+        // INITIAL shot_distance so it does not compound with Sniper Augment, and so it self-reverts
+        // the moment the archer leaves the aura (shot_distance is rebuilt from initialUnitProperties
+        // on every pass). It widens falloff bands; it does not remove them. Farsight Quiver does that.
         const guidingWindsAura = this.getAppliedAuraEffect("Guiding Winds Aura");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && guidingWindsAura) {
             this.unitProperties.shot_distance += roundUnitStat(
@@ -3830,29 +4174,36 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // ARTIFACTS: attack. Flat bonuses first, then percentage bonuses off the running base_attack.
-        const keenBladeBuff = statBuffs["Keen Blade"];
+        const keenBladeBuff = statBuffs.get("Keen Blade");
         if (keenBladeBuff) {
             this.unitProperties.base_attack += keenBladeBuff.getPower();
         }
-        const berserkersBondAttackBuff = statBuffs["Berserkers Bond"];
+        const berserkersBondAttackBuff = statBuffs.get("Berserkers Bond");
         if (berserkersBondAttackBuff) {
             this.unitProperties.base_attack += berserkersBondAttackBuff.getPower();
         }
         // Veteran Helm grants NO attack — it is a DEFENSE-ONLY artifact (armor_mod block above).
         // Warlord's Edge: +% attack as an ADDITIONAL stat (attack_mod), not folded into base_attack — so it never
         // compounds with the Sharpened Weapons aura multiplier and isn't amplified by base_attack-derived effects
-        // (Riot/Weakness). Capture 15% of base here (pre-aura); apply into attack_mod after those overwrites below.
-        const warlordsEdgeBuff = statBuffs["Warlords Edge"];
+        // (Riot/Weakness). The power holds the ranged percentage; the second property holds the melee percentage.
+        // A legacy single-value buff retains its original percentage for both modes.
+        const warlordsEdgeBuff = statBuffs.get("Warlords Edge");
+        const warlordsEdgePercent =
+            this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE
+                ? warlordsEdgeBuff?.getPower()
+                : (warlordsEdgeBuff?.getSecondSpellProperty() ?? warlordsEdgeBuff?.getPower());
         const warlordsEdgeAttackBonus = warlordsEdgeBuff
-            ? roundUnitStat((this.unitProperties.base_attack / 100) * warlordsEdgeBuff.getPower(), 2)
+            ? roundUnitStat((this.unitProperties.base_attack / 100) * (warlordsEdgePercent ?? 0), 2)
             : 0;
-        const huntersLongbowAttackBuff = statBuffs["Hunters Longbow"];
+        this.warlordsEdgeAttackBase = warlordsEdgeBuff ? this.unitProperties.base_attack : 0;
+        this.warlordsEdgeAppliedAttackBonus = warlordsEdgeAttackBonus;
+        const huntersLongbowAttackBuff = statBuffs.get("Hunters Longbow");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && huntersLongbowAttackBuff) {
             // Flat additional attack (NOT a percent of base attack) for ranged units.
             const longbowAttackFlat = parseInt(this.getBuffProperties("Hunters Longbow")[0] || "0", 10);
             this.unitProperties.base_attack += longbowAttackFlat;
         }
-        const pendantOfVitalityAttackBuff = statBuffs["Pendant of Vitality"];
+        const pendantOfVitalityAttackBuff = statBuffs.get("Pendant of Vitality");
         if (pendantOfVitalityAttackBuff) {
             // parseFloat (not parseInt) so a fractional penalty like 12.5% applies exactly rather than truncating to 12.
             const pendantAttackPenaltyPercent = parseFloat(this.getBuffProperties("Pendant of Vitality")[1] || "0");
@@ -3876,13 +4227,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // still shows 2-3" report). The transform is idempotent and non-stacking, and on the server /
         // sandbox the label stays in lockstep with the object, so this only corrects the display path.
         const appliedBuffLabels = this.unitProperties.applied_buffs ?? [];
-        const blessed = !!statBuffs["Blessing"] || appliedBuffLabels.includes("Blessing");
+        const blessed = !!statBuffs.get("Blessing") || appliedBuffLabels.includes("Blessing");
         const roared = !!battleRoarBuff || appliedBuffLabels.includes("Battle Roar");
         // Curse is Blessing's mirror: every roll drops to the MINIMUM, so a 2-4 attacker reads 2-2. Same
         // dual read of object + DISPLAY list, for the same reason (ranked mirrors debuff names but never
-        // rebuilds the objects). The two can never sit together — each names the other in conflicts_with
-        // — but check blessing first anyway so a stale label can only ever be generous, never silently
-        // zero a unit's spread.
+        // rebuilds the objects). The two CAN sit together: conflicts_with only gates a cast against effects
+        // of its own kind (a buff against buffs), and Curse arrives through Spit Ball's roll, never a cast
+        // check. Blessing wins that tie, as the Knowledge Base says — never a silent zeroing of the spread.
         const appliedDebuffLabels = this.unitProperties.applied_debuffs ?? [];
         const cursed = !!this.getDebuff("Curse") || appliedDebuffLabels.includes("Curse");
         // Restore BOTH ends from the base first: this pass is re-run every refresh, so a Curse that has
@@ -3896,8 +4247,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.attack_damage_max = this.unitProperties.attack_damage_min;
         }
 
-        const riotBuff = statBuffs["Riot"];
-        const massRiotBuff = statBuffs["Mass Riot"];
+        const riotBuff = statBuffs.get("Riot");
+        const massRiotBuff = statBuffs.get("Mass Riot");
         if (riotBuff) {
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * riotBuff.getPower()) / 100;
         } else if (massRiotBuff) {
@@ -3951,17 +4302,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         this.unitProperties.range_armor = roundUnitStat(this.unitProperties.base_armor * rangeArmorMultiplier, 2);
 
-        if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+        if (hasFightStarted && !lapAlreadyAdjusted) {
             this.adjustedBaseStatsLaps.push(currentLap);
         }
 
         this.refreshAbilitiesDescriptions(synergyAbilityPowerIncrease);
+        this.refreshLastFuseDescription();
     }
     public setRangeShotDistance(distance: number) {
         this.unitProperties.shot_distance = distance;
     }
     public setStackPower(stackPower: number): void {
         this.unitProperties.stack_power = stackPower;
+        this.refreshLastFuseDescription();
     }
     public attackMeleeAllowed(
         enemyTeam: Unit[],
@@ -4233,27 +4586,99 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return spellAdded;
     }
     protected refreshAbilitiesDescriptions(_synergyAbilityPowerIncrease: number): void {
+        // One pass over the unit's ability names decides which cards below can possibly change. Every
+        // rewriter opens with an `abilities.indexOf(name)` probe and returns on a miss, so a unit without
+        // the ability sees exactly the same result whether the rewriter runs or not — and this refresh runs
+        // for every unit after every engine action, where a dozen probing calls per unit were most of the
+        // cost. The rewriters still run in their original order.
+        let hasBlindFury = false;
+        let hasStunAura = false;
+        let hasChakram = false;
+        let hasMiner = false;
+        let hasParalysis = false;
+        let hasDoubleShot = false;
+        let hasMaulAoe = false;
+        let hasBorrowedGrace = false;
+        for (const abilityName of this.unitProperties.abilities) {
+            switch (abilityName) {
+                case BLIND_FURY_ABILITY_NAME:
+                    hasBlindFury = true;
+                    break;
+                case "Stun Aura":
+                    hasStunAura = true;
+                    break;
+                case CHAKRAM_ABILITY_NAME:
+                    hasChakram = true;
+                    break;
+                case "Miner":
+                    hasMiner = true;
+                    break;
+                case "Paralysis":
+                    hasParalysis = true;
+                    break;
+                case BORROWED_GRACE_NAME:
+                    hasBorrowedGrace = true;
+                    break;
+                default:
+                    if (DOUBLE_SHOT_ABILITY_NAMES.includes(abilityName)) {
+                        hasDoubleShot = true;
+                    } else if (Unit.GIANTS_MAUL_AOE_DESCRIPTION_ABILITIES.includes(abilityName)) {
+                        hasMaulAoe = true;
+                    }
+                    break;
+            }
+        }
+
         // Blind Fury's card has to be refreshed HERE, in common, and not only in the client's override:
         // its power is the share of the stack already lost, so it changes with every casualty, and in a
         // ranked fight the card text a player reads is the one the SERVER put in the snapshot
         // (RankedPlayScene reads abilities_descriptions straight off the base properties). With the refresh
         // living only in RenderableUnit, the sandbox showed the live number while every ranked player kept
         // reading the seeded "0%" for the whole fight.
-        this.refreshBlindFuryDescription();
+        if (hasBlindFury) {
+            this.refreshBlindFuryDescription();
+        }
         // The Stun Aura card is a live chance: stack-scaled power plus the owner's CURRENT luck.
-        this.refreshStunAuraDescription(_synergyAbilityPowerIncrease);
+        if (hasStunAura) {
+            this.refreshStunAuraDescription(_synergyAbilityPowerIncrease);
+        }
         // Chakram's maximum TOTAL victims follows the live stack tier, which can change after casualties.
-        this.refreshChakramDescription();
+        if (hasChakram) {
+            this.refreshChakramDescription();
+        }
         // Miner scales with stack power, luck and Might synergy. Keep the shared/server-owned description
         // aligned with the amount processMinerAbility actually transfers, including sane decimal rounding.
-        this.refreshMinerDescription(_synergyAbilityPowerIncrease);
+        if (hasMiner) {
+            this.refreshMinerDescription(_synergyAbilityPowerIncrease);
+        }
+        // Paralysis's chance and damage cut both follow the live stack tier, luck and synergy.
+        if (hasParalysis) {
+            this.refreshParalysisDescription(_synergyAbilityPowerIncrease);
+        }
+        if (hasBorrowedGrace) {
+            const ability = this.getAbility(BORROWED_GRACE_NAME);
+            if (ability) {
+                const index = this.unitProperties.abilities.indexOf(BORROWED_GRACE_NAME);
+                this.unitProperties.abilities_descriptions[index] = ability
+                    .getDesc()
+                    .join("\n")
+                    .replace(
+                        /\{\}/g,
+                        Number(borrowedGraceChance(this, _synergyAbilityPowerIncrease).toFixed(2)).toString(),
+                    );
+            }
+        }
         // The second-shot cards are a live percentage too: the ability's power plus the owner's CURRENT
         // luck, and for the stack-powered members its current stack tier on top.
-        this.refreshDoubleShotDescriptions(_synergyAbilityPowerIncrease);
+        if (hasDoubleShot) {
+            this.refreshDoubleShotDescriptions(_synergyAbilityPowerIncrease);
+        }
         // The non-magical AOE damage cards: the live percentage the fight applies — the owner's luck, Might
         // synergy and stack scaling through calculateAbilityMultiplier, then ARTIFACT Giant's Maul on top
         // while its buff is up. Runs LAST, so it is the figure every surface ends up showing.
-        this.refreshGiantsMaulAoeDescriptions(_synergyAbilityPowerIncrease);
+        if (hasMaulAoe) {
+            this.refreshGiantsMaulAoeDescriptions(_synergyAbilityPowerIncrease);
+        }
     }
     /**
      * The non-magical AOE damage abilities Giant's Maul boosts (the same set that reads its buff in the
@@ -4373,6 +4798,37 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             .join("\n")
             .replace(/\{\}/g, chance.toString());
     }
+    /**
+     * The Paralysis card: the ability's power sets the landing chance (doubled when it rolls), while the
+     * damage cut is the Paralysis EFFECT's own power, scaled exactly as processParalysisAbility applies it.
+     * The card used to print the ability's power as the cut too, promising 50% where the effect cuts 40%.
+     */
+    private getParalysisDescription(ability: Ability, synergyAbilityPowerIncrease: number): string {
+        const chance = Math.min(100, this.calculateAbilityApplyChance(ability, synergyAbilityPowerIncrease) * 2);
+        const paralysisEffect = ability.getEffect();
+        const reduction = paralysisEffect
+            ? this.calculateEffectMultiplier(paralysisEffect, synergyAbilityPowerIncrease) * 100
+            : 0;
+        return ability
+            .getDesc()
+            .join("\n")
+            .replace("{}", Number(chance.toFixed(2)).toString())
+            .replace("{}", Number(reduction.toFixed(2)).toString());
+    }
+    private refreshParalysisDescription(synergyAbilityPowerIncrease: number): void {
+        const index = this.unitProperties.abilities.indexOf("Paralysis");
+        if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
+            return;
+        }
+        const ability = this.abilities.find((candidate) => candidate.getName() === "Paralysis");
+        if (!ability) {
+            return;
+        }
+        this.unitProperties.abilities_descriptions[index] = this.getParalysisDescription(
+            ability,
+            synergyAbilityPowerIncrease,
+        );
+    }
     private getMinerDescription(ability: Ability, synergyAbilityPowerIncrease: number): string {
         const amount = Number(this.calculateAbilityCount(ability, synergyAbilityPowerIncrease).toFixed(2));
         return ability.getDesc().join("\n").replace(/\{\}/g, amount.toString());
@@ -4459,6 +4915,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             newSpells.push(new Spell({ spellProperties: spellProperties, amount: v }));
         }
         this.spells = newSpells;
+        this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
     }
     protected parseAuraEffects(): void {
         const activeAuraEffectNames = new Set(

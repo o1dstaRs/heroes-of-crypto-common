@@ -26,7 +26,11 @@ import {
 import { EmpowerAugment, getEmpowerPower } from "../../src/augments/augment_properties";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { LIVE_TIER1_ARTIFACT_COUNT, LIVE_TIER2_ARTIFACT_COUNT } from "../../src/picks/pick_sim";
+import {
+    LIVE_TIER1_ARTIFACT_COUNT,
+    LIVE_TIER1_ARTIFACT_IDS,
+    LIVE_TIER2_ARTIFACT_COUNT,
+} from "../../src/picks/pick_sim";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
 const MAGE = ARTIFACT_POWER.MAGES_RING_MAGIC_PERCENT;
@@ -165,8 +169,9 @@ describe("Arcane rings", () => {
 
 describe("Arcane rings — draft pool", () => {
     it("is offered by the live pick, both tiers", () => {
-        expect(LIVE_TIER1_ARTIFACT_COUNT).toBe(Tier1Artifact.MAGES_RING);
-        expect(LIVE_TIER2_ARTIFACT_COUNT).toBe(Tier2Artifact.ARCHMAGES_RING);
+        expect(LIVE_TIER1_ARTIFACT_IDS).toContain(Tier1Artifact.MAGES_RING);
+        expect(LIVE_TIER1_ARTIFACT_COUNT).toBe(Tier1Artifact.RIME_CHARM);
+        expect(LIVE_TIER2_ARTIFACT_COUNT).toBe(Math.max(...TIER2_ARTIFACT_LIST.map((artifact) => artifact.id)));
     });
 
     it("shows up in the selection lists the pick UI builds", () => {

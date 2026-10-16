@@ -9,6 +9,15 @@
 import { describe, expect, it } from "bun:test";
 
 import { conditionalArtifactT2, parseConditionalRules } from "../../src/ai/setup/setup_conditional";
+import {
+    ARTIFACT_FIT_SETUP_PREFIX,
+    ARTIFACT_FIT_SETUP_PREFIX_V2,
+    ARTIFACT_FIT_SETUP_PREFIX_V3,
+    ARTIFACT_FIT_SETUP_PREFIX_V4,
+    ARTIFACT_FIT_SETUP_PREFIX_V5,
+} from "../../src/ai/setup/artifact_fit";
+import { resolveSetupPolicy } from "../../src/ai/setup/setup_ship";
+import { Doctrine } from "../../src/doctrines/doctrine_properties";
 import { RANKED_A19_CASTER_EMPOWER_SETUP_SPEC, V07_NONFIGHT_SETUP_SPEC } from "../../src/ai/setup/setup_ship";
 import { creatureInfo } from "../../src/ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../../src/ai/setup/setup_v0";
@@ -22,6 +31,15 @@ import {
 import { RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../../src/ai/setup/draft_interaction_prior";
 import { RANKED_DRAFT_VARIETY_POLICY_ID } from "../../src/ai/setup/draft_variety";
 import {
+    parseDraftGenome,
+    pickDraftGenomeCreature,
+    pickRankedLiveDraftCreature,
+    rankedFactionDiversityTaxUnits,
+} from "../../src/ai/setup/draft_ship";
+import {
+    loadRankedDraftPool,
+    RANKED_DRAFT_LIVE_INCUMBENT_ID,
+    rankedDraftLiveIncumbent,
     normalizeRankedDraftGenome,
     permuteRankedDraftSeed,
     playRankedDraftGame,
@@ -35,6 +53,7 @@ import {
     evaluateRankedDraftTasks,
     inspectRankedDraftBoard,
     resolveRankedDraftPick,
+    type IRankedDraftTier2Decision,
     summarizeRankedDraftRecords,
 } from "../../src/simulation/ranked_draft_eval";
 
@@ -182,6 +201,61 @@ describe("exact ranked draft evaluator", () => {
         expect(witnessedConditionalOverride).toBeTrue();
     });
 
+    it.each([
+        ARTIFACT_FIT_SETUP_PREFIX,
+        ARTIFACT_FIT_SETUP_PREFIX_V2,
+        ARTIFACT_FIT_SETUP_PREFIX_V3,
+        ARTIFACT_FIT_SETUP_PREFIX_V4,
+        ARTIFACT_FIT_SETUP_PREFIX_V5,
+    ])("records the ranked artifact decision's public view before the final creature pick for %s", (prefix) => {
+        const live = rankedDraftLiveIncumbent();
+        const spec = `${prefix}conditional-v1:sniper+t2a19`;
+        const decisions: IRankedDraftTier2Decision[] = [];
+        const state = resolveRankedDraftPick(
+            9141515,
+            live,
+            live,
+            { left: spec, right: spec, leftDoctrine: Doctrine.SEE_ALL, rightDoctrine: Doctrine.SEE_NONE },
+            {
+                liveDraftRules: true,
+                gridType: PBTypes.GridVals.BLOCK_CENTER,
+                onTier2Decision: (d) => decisions.push(d),
+            },
+        );
+        expect(decisions).toHaveLength(2);
+        for (const decision of decisions) {
+            const own = decision.team === PBTypes.TeamVals.LEFT ? state.left : state.right;
+            expect(decision.ownCreatureIds).toHaveLength(5);
+            expect(own.creatures).toHaveLength(6);
+            expect(decision.context.ownArtifactIds).toEqual([own.tier1Artifact!]);
+            expect(decision.context.gridType).toBe(PBTypes.GridVals.BLOCK_CENTER);
+            expect(decision.chosen).toBe(
+                resolveSetupPolicy(spec).pickArtifactT2(decision.offered, decision.ownCreatureIds, decision.context),
+            );
+            expect(own.tier2Artifact).toBe(decision.chosen);
+            expect(own.creatures.map((id) => creatureInfo(id)!.level)).toEqual([1, 1, 2, 2, 3, 4]);
+        }
+        expect(decisions[0].context.publicOpponentCreatureIds).toHaveLength(5);
+        expect(decisions[1].context.publicOpponentCreatureIds.length).toBeLessThan(5);
+    });
+
+    it("keeps both artifact decision traces in recorded full-game outcomes", () => {
+        const live = rankedDraftLiveIncumbent();
+        const record = playRankedDraftGame(
+            live,
+            { ...live, id: "artifact-control" },
+            { gamesPerOpponent: 8, baseSeed: 9141500, liveDraftRules: true, recordArmies: true },
+            0,
+            0,
+            { matchRunner: (config) => fakeMatch("green", config) },
+        );
+        for (const army of [record.armies!.candidate, record.armies!.opponent]) {
+            expect(army.tier2Decision!.ownCreatureIds).toHaveLength(5);
+            expect(army.tier2Decision!.offered).toEqual(army.tier2Offers!);
+            expect(army.tier2Decision!.chosen).toBe(army.tier2Artifact);
+        }
+    });
+
     it("uses opposite draft seats, exact battle mirrors, and one common battle seed per board", () => {
         const candidate = rankedDraftCurrentIncumbent();
         const opponent = { ...candidate, id: "same-policy-control" };
@@ -241,9 +315,12 @@ describe("exact ranked draft evaluator", () => {
 
         expect(record.pickSeat).toBe("candidate-lower");
         expect(configs).toHaveLength(1);
-        expect(configs.some((config) => config.greenAugments?.some((augment) => augment.kind === "Empower"))).toBe(
-            true,
-        );
+        // Since Hydra's hp rose to 190 (owner call 2026-10-02) the optimizer prefers a Hydra roster with
+        // no ranged-spell carry on this fixture, so the caster policy's eligibility gate correctly REFUSES
+        // to spend the team's Empower augment and the setup falls back to the conditional [Armor, Might,
+        // Movement] plan. The positive routing — an eligible roster earning RANKED_A19_CASTER_EMPOWER_
+        // AUGMENTS — is covered hp-independently in setup_ship.test.ts.
+        expect(configs[0].greenAugments?.map((augment) => augment.kind)).toEqual(["Armor", "Might", "Movement"]);
         expect(configs.every((config) => config.redAugments?.every((augment) => augment.kind !== "Empower"))).toBe(
             true,
         );
@@ -312,5 +389,155 @@ describe("exact ranked draft evaluator", () => {
                 0,
             ),
         ).toThrow("WATER (2) is not live");
+    });
+
+    it("drafts the deployed genome with the server's faction-diversity tax only under live rules", () => {
+        const live = rankedDraftLiveIncumbent();
+        const versatile = rankedDraftVersatileCandidate();
+        expect(live.id).toBe(RANKED_DRAFT_LIVE_INCUMBENT_ID);
+        expect(live.weights).toEqual(versatile.weights);
+        expect(live.draftInteractionPrior).toBe(versatile.draftInteractionPrior);
+        expect(live.draftVarietyPolicy).toBe(versatile.draftVarietyPolicy);
+        expect(loadRankedDraftPool("live").map((entry) => entry.id)).toEqual([RANKED_DRAFT_LIVE_INCUMBENT_ID]);
+        expect(loadRankedDraftPool("reference").map((entry) => entry.id)).toEqual([
+            "untrained-heuristic",
+            "league-round3-exploiter",
+        ]);
+        const [policyIncumbent] = loadRankedDraftPool("policy:ranked-unit-strength-a19-side-v1-w1");
+        expect(policyIncumbent.id).toBe("incumbent:ranked-unit-strength-a19-side-v1-w1");
+        expect(policyIncumbent.draftStrengthPolicy).toBe("ranked-unit-strength-a19-side-v1-w1");
+        expect(() => loadRankedDraftPool("policy:not-a-policy")).toThrow("Unknown ranked draft strength policy");
+
+        const byFaction = new Map<number, number[]>();
+        for (const creatureId of Object.values(PBTypes.CreatureVals)) {
+            if (typeof creatureId !== "number" || creatureId <= 0) continue;
+            const faction = creatureInfo(creatureId)?.faction;
+            if (!faction) continue;
+            byFaction.set(faction, [...(byFaction.get(faction) ?? []), creatureId]);
+        }
+        const [first, second, third, fourth, fifth] = [...byFaction.values()].find((ids) => ids.length >= 5) ?? [];
+        if (fifth === undefined) throw new Error("Test catalog has no faction with five creatures");
+        expect(rankedFactionDiversityTaxUnits(first, [])).toBe(0);
+        expect(rankedFactionDiversityTaxUnits(first, [second])).toBe(0);
+        expect(rankedFactionDiversityTaxUnits(first, [second, third])).toBe(1);
+        expect(rankedFactionDiversityTaxUnits(first, [second, third, fourth, fifth, second])).toBe(3);
+
+        // With nothing drafted there is no tax, so the live pick is the League-era pick.
+        const offer = [...byFaction.values()].map((ids) => ids[0]);
+        expect(pickRankedLiveDraftCreature(live, offer, [], [])).toBe(pickDraftGenomeCreature(live, offer, [], []));
+
+        let differed = 0;
+        let legacyTax = 0;
+        let serverTax = 0;
+        const paidTax = (creatureIds: readonly number[]): number =>
+            creatureIds.reduce(
+                (sum, id, index) => sum + rankedFactionDiversityTaxUnits(id, creatureIds.slice(0, index)),
+                0,
+            );
+        for (let seed = 0; seed < 60; seed += 1) {
+            const legacy = resolveRankedDraftPick(seed, live, live);
+            const server = resolveRankedDraftPick(seed, live, live, {}, { liveDraftRules: true });
+            if (
+                JSON.stringify([legacy.left.creatures, legacy.right.creatures]) !==
+                JSON.stringify([server.left.creatures, server.right.creatures])
+            ) {
+                differed += 1;
+            }
+            legacyTax += paidTax(legacy.left.creatures) + paidTax(legacy.right.creatures);
+            serverTax += paidTax(server.left.creatures) + paidTax(server.right.creatures);
+        }
+        expect(differed).toBeGreaterThan(0);
+        expect(serverTax).toBeLessThan(legacyTax);
+    });
+
+    it("explores from its own stream: rate zero is the policy draft and a positive rate is reproducible", () => {
+        const live = rankedDraftLiveIncumbent();
+        const rules = { liveDraftRules: true };
+        const policy = resolveRankedDraftPick(11, live, live, {}, rules);
+        expect(resolveRankedDraftPick(11, live, live, {}, { ...rules, explorationRate: 0 }).transcript).toEqual(
+            policy.transcript,
+        );
+        const explored = resolveRankedDraftPick(11, live, live, {}, { ...rules, explorationRate: 0.5 });
+        expect(resolveRankedDraftPick(11, live, live, {}, { ...rules, explorationRate: 0.5 }).transcript).toEqual(
+            explored.transcript,
+        );
+        let changed = 0;
+        for (let seed = 0; seed < 20; seed += 1) {
+            const plain = resolveRankedDraftPick(seed, live, live, {}, rules);
+            const noisy = resolveRankedDraftPick(seed, live, live, {}, { ...rules, explorationRate: 0.5 });
+            if (JSON.stringify(plain.left.creatures) !== JSON.stringify(noisy.left.creatures)) changed += 1;
+        }
+        expect(changed).toBeGreaterThan(0);
+        expect(() =>
+            playRankedDraftGame(
+                live,
+                { ...live, id: "exploration-control" },
+                { gamesPerOpponent: 8, baseSeed: 91_450_000, explorationRate: 1 },
+                0,
+            ),
+        ).toThrow("explorationRate");
+    });
+
+    it("shows the map to creature picks only from level 3 on, as the live pick phase reveals it", () => {
+        const mapAware = normalizeRankedDraftGenome(parseDraftGenome("ranked-unit-synergy-a19-side-v2-w4"));
+        const live = rankedDraftLiveIncumbent();
+        const picksAt = (state: ReturnType<typeof resolveRankedDraftPick>, levels: readonly number[]): number[] =>
+            state.transcript.flatMap((entry) =>
+                entry.type === "creature_picked" && levels.includes(entry.creatureLevel) ? [entry.creatureId] : [],
+            );
+        let lateDifferences = 0;
+        for (let seed = 0; seed < 40; seed += 1) {
+            const normal = resolveRankedDraftPick(seed, mapAware, live, {}, { liveDraftRules: true, gridType: 1 });
+            const block = resolveRankedDraftPick(seed, mapAware, live, {}, { liveDraftRules: true, gridType: 4 });
+            expect(picksAt(block, [1, 2])).toEqual(picksAt(normal, [1, 2]));
+            if (JSON.stringify(picksAt(block, [3, 4])) !== JSON.stringify(picksAt(normal, [3, 4])))
+                lateDifferences += 1;
+        }
+        expect(lateDifferences).toBeGreaterThan(0);
+    });
+
+    it("fights live-board, deterministic-search games and records both drafted armies", () => {
+        const live = rankedDraftLiveIncumbent();
+        const opponent = { ...live, id: "live-control" };
+        const configs: IMatchConfig[] = [];
+        const options = {
+            gamesPerOpponent: 8,
+            baseSeed: 91_500_000,
+            mapTypes: [PBTypes.GridVals.BLOCK_CENTER],
+            fightProfile: "a19" as const,
+            liveDraftRules: true,
+            sideBoard: true,
+            deterministicSearch: true,
+            explorationRate: 0.25,
+            recordArmies: true,
+        };
+        const records = Array.from({ length: 8 }, (_, game) =>
+            playRankedDraftGame(live, opponent, options, game, 0, {
+                matchRunner: (config) => {
+                    configs.push(structuredClone(config));
+                    return fakeMatch("green", config);
+                },
+            }),
+        );
+        expect(
+            configs.every((config) => config.sideOrientedPlacement === true && config.searchOfflineDeterministicWork),
+        ).toBeTrue();
+        expect(configs.every((config) => config.greenVersion === "v0.8" && config.redVersion === "v0.8")).toBeTrue();
+        const armies = records[0].armies;
+        if (!armies) throw new Error("Record omitted the drafted armies");
+        expect(armies.candidate.creatureIds).toHaveLength(6);
+        expect(armies.opponent.creatureIds).toHaveLength(6);
+        // Game 0: the candidate drafted LEFT and fights green.
+        expect(configs[0].roster.map((unit) => unit.creatureName)).toEqual(
+            armies.candidate.creatureIds.map((id) => creatureInfo(id)?.name ?? `unknown-${id}`),
+        );
+        expect(records[1].armies).toEqual(armies);
+        const report = summarizeRankedDraftRecords(live, [opponent], options, records);
+        expect(report.options).toMatchObject({
+            liveDraftRules: true,
+            sideBoard: true,
+            deterministicSearch: true,
+            explorationRate: 0.25,
+        });
     });
 });

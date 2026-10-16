@@ -14,13 +14,11 @@ import type { XY } from "../utils/math";
 /**
  * How many single-cell mountains ("barrels" on the Cemetery board) a scattered BLOCK_CENTER layout drops.
  *
- * OWNER CALL (2026-08-28): every cemetery board carries TWELVE barrels. The count briefly rolled per
- * game in [MIN, MAX] like the map itself; the owner asked for the fixed twelve back, so MIN is pinned to
- * MAX. The roll plumbing is deliberately kept — the count still rides the game's own seed, so no wire
- * field is needed and server, both seats, replays and the headless sim all agree by derivation — which
- * means restoring the variety later is a one-constant change (drop MIN back to 9) rather than a rewrite.
+ * The count is rolled per game in [MIN, MAX] from the game id, not from Math.random(). Server, both
+ * seats, replays and the headless sim hash the same id and agree without a wire field. It was briefly
+ * pinned at twelve (2026-08-28); ranked cemetery boards roll 9-12 again.
  */
-export const SCATTERED_MOUNTAIN_MIN_COUNT = 12;
+export const SCATTERED_MOUNTAIN_MIN_COUNT = 9;
 export const SCATTERED_MOUNTAIN_MAX_COUNT = 12;
 /** The neutral middle band the rocks land in: this many full-HEIGHT columns, centred horizontally.
  *  Every surface is SIDE-oriented now (owner call 2026-08-25: everything fights left-to-right) —
@@ -31,8 +29,8 @@ export const SCATTERED_MOUNTAIN_BAND_ROWS = 4;
 /**
  * Distinct obstacle art variants the client can draw (variant indices are 0..VARIANTS-1) — the nine-barrel
  * cemetery_obstacles_9x_256 atlas. The roll deals this full deck FIRST and only then fills any surplus
- * slot with a repeat, so a 12-barrel board shows all nine authored barrels plus exactly three repeats
- * rather than dealing twelve independent draws and leaving several barrels unused.
+ * slot with a repeat, so a 9-barrel board shows each authored barrel once and a 10-12 board adds that
+ * many repeats, rather than drawing each slot independently and leaving several barrels unused.
  */
 export const SCATTERED_MOUNTAIN_VARIANTS = 9;
 
@@ -92,11 +90,15 @@ export const scatteredMountainCountForSeed = (seed: string): number => {
  *
  * Same drawing discipline throughout: partial Fisher-Yates for distinct uniform cells, and art variants
  * deal the full deck before repeating.
+ *
+ * `count` is for a caller that already rolled (the sandbox). Ranked omits it and uses the seeded 9-12
+ * roll. A higher count only appends cells; it does not move the earlier ones.
  */
 export const scatteredMountainsForSeed = (
     seed: string,
     gridSize = 16,
     sideOriented = true,
+    count = scatteredMountainCountForSeed(seed),
 ): ISeededScatteredMountain[] => {
     const next = streamFor(seed, "");
 
@@ -110,7 +112,10 @@ export const scatteredMountainsForSeed = (
             free.push(sideOriented ? { x: major, y: minor } : { x: minor, y: major });
         }
     }
-    const wanted = Math.min(scatteredMountainCountForSeed(seed), free.length);
+    const wanted = Math.min(
+        free.length,
+        Math.max(SCATTERED_MOUNTAIN_MIN_COUNT, Math.min(SCATTERED_MOUNTAIN_MAX_COUNT, count)),
+    );
     for (let i = 0; i < wanted; i++) {
         const j = i + Math.floor(next() * (free.length - i));
         const swap = free[i];

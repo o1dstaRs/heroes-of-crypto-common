@@ -18,6 +18,7 @@ import { type AiMetaStrategyProfileId } from "./ai_meta_strategy_profile";
 interface IAiMetaWorkerData {
     options: IAiMetaRunOptions;
     strategyProfileId: AiMetaStrategyProfileId;
+    offlineDeterministicWork?: boolean;
 }
 
 type WorkerRequest = { type: "pair"; pair: number } | { type: "stop" };
@@ -33,7 +34,7 @@ process.env.LIVETWIN = "1";
 process.env.FIGHT_MELEE_ROSTERS = "0";
 
 if (!parentPort) throw new Error("ai_meta_cohorts_worker must run in a worker thread");
-const { options, strategyProfileId } = workerData as IAiMetaWorkerData;
+const { options, strategyProfileId, offlineDeterministicWork = false } = workerData as IAiMetaWorkerData;
 
 parentPort.on("message", (message: WorkerRequest) => {
     if (message.type === "stop") {
@@ -43,7 +44,7 @@ parentPort.on("message", (message: WorkerRequest) => {
     try {
         parentPort!.postMessage({
             type: "result",
-            record: playMetaPair(options, message.pair, strategyProfileId),
+            record: playMetaPair(options, message.pair, strategyProfileId, offlineDeterministicWork),
         } satisfies WorkerResponse);
     } catch (error) {
         parentPort!.postMessage({

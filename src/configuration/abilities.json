@@ -238,7 +238,7 @@
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",
         "skip_reponse": true,
-        "stack_powered": true,
+        "stack_powered": false,
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false
@@ -354,7 +354,7 @@
     "Blindness": {
         "name": "Blindness",
         "type": "MIND",
-        "desc": ["When responding to a melee attack, there is a {}% chance to blind (Mind) the enemy for 2 turns"],
+        "desc": ["On attack, has a {}% chance to blind (Mind) an enemy for 2 turns"],
         "power": 25,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,
@@ -451,16 +451,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Rallying Volley Aura": {
-        "name": "Rallying Volley Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allied RANGED units in range gain +{} shots"],
+    "Rallying Volley Blessing": {
+        "name": "Rallying Volley Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "All allied ranged units, including this unit, gain +{} shots once, anywhere on the battlefield.",
+            "Does not stack with other Rallying Volley Blessings."
+        ],
         "power": 2,
         "power_type": "ADDITIONAL_RANGE_SHOTS",
         "skip_reponse": false,
         "stack_powered": false,
         "effect": null,
-        "aura_effect": "Rallying Volley",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Angelic Host Blessing": {
@@ -528,7 +531,7 @@
     "Small Specie": {
         "name": "Small Specie",
         "type": "DEFENCE",
-        "desc": ["Unit has {}% chance to dodge large unit physical attack"],
+        "desc": ["Unit has {}% chance to dodge a level 4 (2x2) unit's physical attack"],
         "power": 50,
         "power_type": "DODGE_LARGE_PERCENTAGE",
         "skip_reponse": false,
@@ -540,7 +543,9 @@
     "Bitter Experience": {
         "name": "Bitter Experience",
         "type": "DEFENCE",
-        "desc": ["Every time unit gets hit, it gains +1 armor and step for the rest of the battle"],
+        "desc": [
+            "Every time the unit loses creatures to a hit and survives, it gains +1 armor and step for the rest of the battle"
+        ],
         "power": 1,
         "power_type": "GAIN_ARMOR_AND_STEPS_TAKING_DAMAGE",
         "skip_reponse": false,
@@ -692,7 +697,7 @@
         "name": "Chakram",
         "type": "ATTACK",
         "desc": [
-            "Maximum targets: {}. Ranged attacks hit the chosen enemy, then bounce to the nearest eligible enemies.",
+            "Maximum targets: {}. Ranged attacks hit the chosen enemy, then bounce clockwise to eligible enemies.",
             "A 1-cell gap keeps full damage; a 2-cell gap halves it and ends the flight there.",
             "A dodged target also ends it. Each enemy is hit once, and allies are never hit."
         ],
@@ -747,9 +752,10 @@
         "name": "In Its Own World",
         "type": "MOVEMENT",
         "desc": [
-            "Moves through its own vines at half the usual cost, and crosses them diagonally for the price of a straight step."
+            "Walks its own vines for free: a vined cell costs no steps at all, straight or diagonal,",
+            "so it can follow a connected vine to its far end. Plain ground stays within its normal movement range."
         ],
-        "power": 50,
+        "power": 100,
         "power_type": "VINE_STRIDE",
         "skip_reponse": false,
         "stack_powered": false,
@@ -815,7 +821,7 @@
     "Book of Chaos": {
         "name": "Book of Chaos",
         "type": "INFO",
-        "desc": ["Allows the caster to access the following spells:", "Smoke, Misfortune, Fireforged Sword"],
+        "desc": ["Allows the caster to access the following spells:", "Smoke, Misfortune, Fireforged Sword, Fireball"],
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
@@ -859,7 +865,7 @@
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
-        "stack_powered": true,
+        "stack_powered": false,
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false
@@ -868,9 +874,9 @@
         "name": "Magic Reflection",
         "type": "REFLECT",
         "desc": [
-            "Rebounds every spell aimed at this creature {}% of the time.",
-            "The spell still lands on the dragon in full — the rebound is on top of it,",
-            "striking the caster with the same damage and the same effects"
+            "Every spell still lands on the dragon in full, but its caster takes {}%",
+            "of the magic damage that landed straight back — always, like magic resistance.",
+            "Any debuff has the same {}% chance to be copied onto the caster as well"
         ],
         "power": 75,
         "power_type": "MAGIC_MIRROR_REFLECT",
@@ -931,7 +937,7 @@
     "Penetrating Bite": {
         "name": "Penetrating Bite",
         "type": "ATTACK",
-        "desc": ["Melee attacks deal additional damage equal to {}% of unit's max hp"],
+        "desc": ["Melee attacks deal additional damage equal to {}% of the target's max hp"],
         "power": 35,
         "power_type": "ADDITIONAL_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
@@ -969,7 +975,8 @@
         "type": "STATUS",
         "desc": [
             "When applied with a {}% chance,",
-            "Paralysis (Status) prevents the affected enemy from moving and reduces their damage by {}%"
+            "Paralysis (Status) prevents the affected enemy from moving and reduces their damage by {}%",
+            "for 1 lap."
         ],
         "power": 50,
         "power_type": "APPLY_EFFECT",
@@ -1082,8 +1089,8 @@
         "name": "Mechanism",
         "type": "UNIT_TYPE",
         "desc": [
-            "Invulnerable to Mind attacks and spells, poison and vampirism.",
-            "While 50% more vulnerable to Status attacks. Cannot be healed and always has 0 morale"
+            "Invulnerable to Mind attacks and spells, and to poison.",
+            "While 50% more vulnerable to Status attacks. Cannot be healed or resurrected and always has 0 morale"
         ],
         "power": 1,
         "power_type": "MECHANISM",
@@ -1122,7 +1129,7 @@
         "type": "DEFENCE",
         "desc": [
             "50% of the initial units supply will be restored after full stack death.",
-            "Can be cast to resurrect fallen ally units on the battlefield"
+            "Can be cast to resurrect fallen ally units on the battlefield (never a Mechanism unit)"
         ],
         "power": 1,
         "power_type": "RESURRECTION",
@@ -1193,7 +1200,7 @@
     "Castling": {
         "name": "Castling",
         "type": "ATTACK",
-        "desc": ["Swaps small opponent within movement range when casted"],
+        "desc": ["Swaps with an opponent of the same size up to one cell beyond its movement range when casted"],
         "power": 0,
         "power_type": "SWAP_WITH_OPPONENT",
         "skip_reponse": false,
@@ -1206,7 +1213,7 @@
         "name": "Chain Lightning",
         "type": "ATTACK",
         "desc": [
-            "On attack or reponse, deals {}/{}/{}/{}% of the damage",
+            "On attack or response, deals {}/{}/{}/{}% of the damage",
             "to the connected enemy (Wind). Depending on how far the enemy is from the target.",
             "Earth Elements take 50% more. A Wind Element earths the bolt: it takes nothing",
             "and the chain stops there"
@@ -1289,7 +1296,7 @@
     "Dulling Defense": {
         "name": "Dulling Defense",
         "type": "DEFENCE",
-        "desc": ["The enemy permanently loses {} base attack points upon attacking the owner with a melee attack"],
+        "desc": ["A landed melee attack or retaliation permanently reduces the struck unit's base attack by {}"],
         "power": 2,
         "power_type": "REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK",
         "skip_reponse": false,
@@ -1327,6 +1334,7 @@
         "type": "BUFF_AURA",
         "desc": [
             "Absorbs {}% of the physical damage dealt to allies within range.",
+            "Absorption cannot exceed the protected stack's remaining HP.",
             "The absorbed damage is recalculated against the owner's armor",
             "and dealt to the owner instead. Magical damage is not absorbed."
         ],
@@ -1381,7 +1389,8 @@
         "name": "Predatory Assimilation",
         "type": "ATTACK",
         "desc": [
-            "Each landed direct attack has a {}% chance to permanently disable and steal one random active ability from the target"
+            "Each landed direct attack has a {}% chance to permanently disable and steal one random active ability from the target.",
+            "The same hit poisons the target for 25% of the damage dealt, plus the attacker's luck. It is not an aura and stacks with Venom Cloud"
         ],
         "power": 25,
         "power_type": "STEAL_ABILITY",
@@ -1441,8 +1450,8 @@
         "name": "Borrowed Grace",
         "type": "ATTACK",
         "desc": [
-            "Each landed shot has a {}% chance to take one random active buff off the target",
-            "and wear it for the rest of its duration. Auras and equipment cannot be taken"
+            "Each landed shot or counter-shot has a {}% chance to copy one random active buff from the target",
+            "and wear that copy for the rest of its duration. The target keeps the buff. Auras, army blessings, Water Shield, artifacts and augments cannot be copied"
         ],
         "power": 70,
         "power_type": "STEAL_BUFF",

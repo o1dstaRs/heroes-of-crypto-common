@@ -17,6 +17,46 @@ import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { createCombatTestContext, createTestUnit, DamageStatisticHolder, placeUnit } from "../helpers/combat";
 
 describe("lightning spin branches", () => {
+    for (const isAttack of [true, false]) {
+        it(`returns the real stack ID when Fire Shield kills the spinner (${isAttack ? "attack" : "response"})`, () => {
+            const { grid, unitsHolder } = createCombatTestContext();
+            const spinner = createTestUnit({
+                name: "Spinner",
+                team: PBTypes.TeamVals.RIGHT,
+                abilities: ["Lightning Spin"],
+                maxHp: 1,
+                amountAlive: 1,
+                attack: 100,
+                damageMin: 100,
+                damageMax: 100,
+            });
+            const shield = createTestUnit({
+                name: "Shield",
+                team: PBTypes.TeamVals.LEFT,
+                maxHp: 1000,
+                amountAlive: 10,
+                abilities: ["Fire Shield"],
+            });
+            placeUnit(grid, unitsHolder, spinner, { x: 5, y: 5 });
+            placeUnit(grid, unitsHolder, shield, { x: 5, y: 6 });
+
+            const result = processLightningSpinAbility(
+                spinner,
+                new SceneLogMock(),
+                unitsHolder,
+                0,
+                new DamageStatisticHolder(),
+                { x: 5, y: 5 },
+                isAttack,
+            );
+
+            expect(result.landed).toBe(true);
+            expect(spinner.isDead()).toBe(true);
+            expect(shield.isDead()).toBe(false);
+            expect(result.unitIdsDied).toEqual([spinner.getId()]);
+        });
+    }
+
     it("runs the on-hit sub-ability chain when the enemy survives", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const stats = new DamageStatisticHolder();

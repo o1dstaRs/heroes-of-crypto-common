@@ -16,7 +16,7 @@ import { getAbilityConfig, getCreatureConfig, getSpellConfig } from "../../confi
 import { CreatureFactions, CreatureLevels } from "../../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { normalizeFootprintSide } from "../../grid/grid_math";
-import { isOffensiveSpellMultiplier } from "../../spells/spell_damage";
+import { isMagicDamageAbility, isOffensiveSpellMultiplier } from "../../spells/spell_damage";
 import { SpellPowerType } from "../../spells/spell_properties";
 
 /**
@@ -62,6 +62,19 @@ export interface ICreatureInfo {
     hp: number;
     armor: number;
     initiative: number;
+    /** Printed draft-time movement, before artifacts or placement-dependent auras. */
+    movementSteps?: number;
+    /** Legacy v1-v3 catalog luck signal, retained for exact artifact-policy replay. */
+    luck?: number;
+    /** Engine-configured initial luck, including the faction default, before artifacts and auras. */
+    baseLuck?: number;
+    /** Legacy v1/v2 artifact signal, retained for exact policy replay. MELEE_MAGIC is not magic damage. */
+    magicAttack?: boolean;
+    /** Has an offensive spell or a magic-damage ability, using the combat engine's damage contract. */
+    dealsMagicDamage?: boolean;
+    /** Fire Breath / Fire Shield are magic damage even though their configured power is a damage percentage. */
+    magicalSplash?: boolean;
+    magicImmune?: boolean;
     abilities: string;
     /** movement_type === "FLY" — the beneficiary signal for Nature's +Fly-Armor synergy. */
     canFly: boolean;
@@ -82,7 +95,7 @@ export interface ICreatureInfo {
      * identity, or a policy that reserves zone depth, screens a firing line or measures a gap has to guess.
      *
      * This is the shape the engine will actually build the stack with, resolved through the engine's own
-     * creature config rather than read off the catalog row — see resolveCreatureFootprint below for why the
+     * creature config rather than read off the catalog row — see resolveCreatureDraftProperties below for why the
      * two are not the same thing. The shipped roster is entirely square, so every creature reports 1x1 or 2x2.
      *
      * Descriptive ONLY. These are deliberately absent from DRAFT_FEATURE_NAMES: the baked DRAFT_ANCHOR_W /
@@ -106,6 +119,8 @@ const CreatureJsonShape = CREATURES_JSON as unknown as Record<
             hp?: number;
             armor?: number;
             initiative?: number;
+            steps?: number;
+            luck?: number;
             level?: number;
             spells?: string[];
             abilities?: string[];
@@ -220,16 +235,17 @@ export const creatureIdForName = (name: string): number | undefined => {
  * policies planning around a 1x1 body that the engine then places as a 2x1 — and an anchor chosen for the
  * wrong shape is not a weak move, it is an action the engine rejects.
  *
+ * Initial luck also comes from getCreatureConfig: it is a faction default, absent from the catalog rows.
  * Asking getCreatureConfig keeps the resolution order (override, then declared footprint, then the legacy
  * square `size`) in the one place that owns it instead of copying it here, where it could drift. The cost is
  * paid once per index build. A catalog row too malformed to build full UnitProperties from falls back to the
  * declared shape: this index is a draft convenience, and it must not be the thing that takes a match down.
  */
-const resolveCreatureFootprint = (
+const resolveCreatureDraftProperties = (
     factionName: string,
     creatureName: string,
     cfg: { size?: number; footprint_width?: number; footprint_height?: number },
-): { width: number; height: number } => {
+): { width: number; height: number; baseLuck: number } => {
     try {
         const properties = getCreatureConfig(
             PBTypes.TeamVals.LEFT,
@@ -239,11 +255,12 @@ const resolveCreatureFootprint = (
             `${creatureName.replace(/ /g, "_")}_512`,
             1,
         );
-        return { width: properties.footprint_width, height: properties.footprint_height };
+        return { width: properties.footprint_width, height: properties.footprint_height, baseLuck: properties.luck };
     } catch {
         return {
             width: normalizeFootprintSide(cfg.footprint_width, cfg.size ?? 1),
             height: normalizeFootprintSide(cfg.footprint_height, cfg.size ?? 1),
+            baseLuck: 0,
         };
     }
 };
@@ -266,7 +283,7 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
             }
             const abilityList = cfg.abilities ?? [];
             const spellList = cfg.spells ?? [];
-            const footprint = resolveCreatureFootprint(factionName, name, cfg);
+            const footprint = resolveCreatureDraftProperties(factionName, name, cfg);
             index.set(id, {
                 id,
                 name,
@@ -277,6 +294,8 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 caster: spellList.length > 0 || abilityList.some(isCastableAbility),
                 nativeSpellbook: spellList.length > 0,
                 rangedSpellDamage: spellList.some(isRangedDamageSpellbookEntry),
+                dealsMagicDamage:
+                    spellList.some(isRangedDamageSpellbookEntry) || abilityList.some(isMagicDamageAbility),
                 maxDamage: cfg.attack_damage_max ?? 0,
                 shots: cfg.range_shots ?? 0,
                 distance: cfg.shot_distance ?? 0,
@@ -284,6 +303,26 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 hp: cfg.hp ?? 0,
                 armor: cfg.armor ?? 0,
                 initiative: cfg.initiative ?? 0,
+                movementSteps: cfg.steps ?? 0,
+                luck: cfg.luck ?? 0,
+                baseLuck: footprint.baseLuck,
+                magicAttack:
+                    cfg.attack_type === "MELEE_MAGIC" ||
+                    abilityList.some((ability) => {
+                        try {
+                            return getAbilityConfig(ability).power_type === AbilityPowerType.MAGIC_DAMAGE;
+                        } catch {
+                            return false;
+                        }
+                    }),
+                magicalSplash: abilityList.some((ability) => ability === "Fire Breath" || ability === "Fire Shield"),
+                magicImmune: abilityList.some((ability) => {
+                    try {
+                        return getAbilityConfig(ability).power_type === AbilityPowerType.MAGIC_RESIST_100;
+                    } catch {
+                        return false;
+                    }
+                }),
                 abilities: abilityList.join(" "),
                 canFly: cfg.movement_type === "FLY",
                 melee: (cfg.attack_type ?? "").includes("MELEE"),

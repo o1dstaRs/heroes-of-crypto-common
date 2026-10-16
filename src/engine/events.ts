@@ -55,6 +55,8 @@ export type GameEvent =
     | { type: "unit_defended"; unitId: string; team: TeamType }
     | { type: "attack_type_selected"; unitId: string; team: TeamType; attackType: AttackType }
     | { type: "unit_moved"; unitId: string; from: XY; to: XY; path: XY[]; targetCells: XY[] }
+    | { type: "barrel_placed"; team: TeamType; barrelIndex: number; cell: XY }
+    | { type: "barrel_unplaced"; team: TeamType; barrelIndex: number }
     | { type: "unit_placed"; unitId: string; team: TeamType; position: XY; cells: XY[] }
     | {
           type: "unit_split";
@@ -91,6 +93,8 @@ export type GameEvent =
               name: string;
               kind: "buff" | "debuff" | "effect";
               laps?: number;
+              /** Previous owner when this application transfers a buff. */
+              sourceUnitId?: string;
               resisted?: boolean;
           }[];
       }
@@ -99,6 +103,8 @@ export type GameEvent =
           attackType: "melee" | "range";
           attackerId: string;
           targetId: string;
+          /** Accepted approach route; absent in stationary attacks and older journals. */
+          approachPath?: XY[];
           unitIdsDied: string[];
           damage: IVisibleDamage;
           animations: IGameAnimationEvent[];
@@ -108,6 +114,8 @@ export type GameEvent =
           attackerId: string;
           targetPosition: XY;
           attackFrom?: XY;
+          /** Accepted approach route; absent in ranged attacks and older journals. */
+          approachPath?: XY[];
           hitsBefore: number;
           hitsAfter: number;
           // Remaining hit points of EACH of the two BLOCK_CENTER mountains after this strike. The total
@@ -118,6 +126,19 @@ export type GameEvent =
           hitsAfterLeft?: number;
           hitsAfterRight?: number;
           animations: IGameAnimationEvent[];
+          // Set when the stone did not fall to a blow of its own. "lightning_spin": Hydra's Lightning Spin broke it
+          // in the SAME radial impact as the strike that set the spin off, whether that strike was aimed at a
+          // barrel or at a unit — clients land it on that impact instead of animating a strike for it.
+          // "skewer_strike" / "fire_breath": a unit strike's Skewer Strike ran on into the barrel behind its small
+          // target, or its Fire Breath burned a barrel in the band behind its target. Absent for the aimed stone, a
+          // projectile impact and a pierce past a barrel — each lands on a strike of its own.
+          source?: "lightning_spin" | "skewer_strike" | "fire_breath";
+          // Unit damage dealt by the same obstacle strike. Lightning Spin catches every enemy around the attacker
+          // even when the blow was aimed at a barrel, and a barrel is no unit to hang an attack payload on, so
+          // the action's FIRST obstacle_attacked carries it: `damage.secondary` holds the spin's hits (plus any
+          // Fire Shield reflection / Devour Essence heal), `unitIdsDied` every stack that died to them.
+          damage?: IVisibleDamage;
+          unitIdsDied?: string[];
       }
     | {
           type: "area_attacked";
@@ -203,7 +224,7 @@ export type GameEvent =
            */
           outcomes?: { unitId: string; outcome: string; grantedAbility?: string; amount?: number }[];
       }
-    // Smoke spell: clouds placed on free cells of a 2x2 block. lapsRemaining is the per-cell budget at place
+    // Smoke spell: clouds placed on free cells of a 3x3 block. lapsRemaining is the per-cell budget at place
     // time (mirrors SmokeClouds.add) — the client renders the cloud and can show the countdown.
     | { type: "smoke_placed"; casterId: string; cells: XY[]; lapsRemaining: number }
     // A creature stepped onto a smoked cell (or otherwise occupied it) — that cell's smoke disperses now.
@@ -224,8 +245,9 @@ export type GameEvent =
       }
     // Vines that withered on lap transition — the client drops their visuals.
     | { type: "vine_expired"; cells: XY[] }
-    // Fire Wall: the three cells set alight by one cast, in wall order (so the client can light them up in
-    // sequence). lapsRemaining is the per-cell budget at place time, mirroring FireWalls.add.
+    // Fire Wall: the cells set alight by one cast, in wall order (so the client can light them up in
+    // sequence) — up to FIRE_WALL_LENGTH, fewer where a creature, the mountain, a narrowed cell or the board
+    // edge sat under the line. lapsRemaining is the per-cell budget at place time, mirroring FireWalls.add.
     | { type: "fire_wall_placed"; casterId: string; cells: XY[]; lapsRemaining: number }
     // Walls that burnt out on lap transition — the client drops their visuals.
     | { type: "fire_wall_expired"; cells: XY[] }
@@ -245,6 +267,17 @@ export type GameEvent =
           position: XY;
           amount: number;
           unitsDied: number;
+      }
+    /**
+     * Pyre Oath: a destroyed stack burst. `position` is the corpse, captured before it left the board.
+     * Each hit's position is the victim at the moment the blast landed, because a victim the blast kills
+     * is gone before the client draws the number.
+     */
+    | {
+          type: "pyre_exploded";
+          unitId: string;
+          position: XY;
+          hits: { unitId: string; position: XY; amount: number; unitsDied: number }[];
       }
     | { type: "fight_finished"; winningTeam: TeamType };
 

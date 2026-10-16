@@ -14,7 +14,12 @@ import { describe, expect, it } from "bun:test";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Spell } from "../../src/spells/spell";
-import { canCastSummon, resolveSummonAnchor, summonFootprintOf } from "../../src/spells/spell_helper";
+import {
+    canCastSummon,
+    noSpaceToSummonMessage,
+    resolveSummonAnchor,
+    summonFootprintOf,
+} from "../../src/spells/spell_helper";
 import type { XY } from "../../src/utils/math";
 
 const summonWolves = (): Spell => new Spell({ spellProperties: getSpellConfig("Nature", "Summon Wolves"), amount: 1 });
@@ -57,7 +62,7 @@ describe("a summon is seated with the summoned creature's real body", () => {
         expect(seated).toEqual({ x: 9, y: 9 });
     });
 
-    it("still refuses when nothing around the caster can hold the body", () => {
+    it("still refuses the real body when neither candidate can hold it", () => {
         const spell = summonWolves();
         const matrix = emptyBoard();
         matrix[5][4] = PBTypes.TeamVals.LEFT;
@@ -73,5 +78,33 @@ describe("a summon is seated with the summoned creature's real body", () => {
                 { x: 5, y: 5 },
             ),
         ).toBeUndefined();
+    });
+
+    it("has no seat when one free cell is not wide enough for the Wolf", () => {
+        const spell = summonWolves();
+        const matrix = emptyBoard();
+        // The reported fight: Satyr on the right edge, one empty cell beside him, and the cell a
+        // left-extending Wolf would also need is occupied. The cast used to be refused.
+        const occupy = (x: number, y: number) => {
+            matrix[y][x] = PBTypes.TeamVals.LEFT;
+        };
+        occupy(15, 7); // Satyr
+        occupy(15, 6); // Wandering Mage
+        occupy(14, 7); // Manticore
+        occupy(13, 7);
+        occupy(14, 8); // Efreet
+        occupy(13, 6); // Troglodyte
+        const ring: XY[] = [
+            { x: 14, y: 6 },
+            { x: 14, y: 7 },
+            { x: 14, y: 8 },
+            { x: 15, y: 6 },
+            { x: 15, y: 8 },
+        ];
+
+        expect(resolveSummonAnchor(spell, matrix, ring)).toBeUndefined();
+        expect(noSpaceToSummonMessage("Satyr", "Wolf", 2, 1)).toBe(
+            "No space next to Satyr. Wolf needs 2×1 free cells.",
+        );
     });
 });

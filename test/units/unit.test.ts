@@ -889,6 +889,24 @@ describe("Unit", () => {
             expect(lcLone).toBeCloseTo(lcFull / maxStack, 5);
         });
 
+        it("keeps Lightning Spin at 100% plus luck across every stack power", () => {
+            for (const luck of [-5, 0, 5]) {
+                const unit = createTestUnit({ luck, abilities: ["Lightning Spin"] });
+                const ability = unit.getAbility("Lightning Spin")!;
+                expect(ability.isStackPowered()).toBe(false);
+
+                for (const stackPower of [1, 2, 3, 4, 5]) {
+                    unit.setStackPower(stackPower);
+                    expect(unit.calculateAbilityMultiplier(ability, 0)).toBeCloseTo((100 + luck) / 100, 5);
+                    unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+                    const properties = unit.getUnitProperties();
+                    const index = properties.abilities.indexOf("Lightning Spin");
+                    expect(properties.abilities_stack_powered[index]).toBe(false);
+                    expect(properties.abilities_descriptions[index]).toContain(`${100 + luck}% damage`);
+                }
+            }
+        });
+
         it("finds melee attack targets for mobile and immobilized units", () => {
             const attacker = createTestUnit();
             const enemy = createTestUnit({ team: PBTypes.TeamVals.LEFT });

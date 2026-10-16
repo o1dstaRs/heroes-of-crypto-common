@@ -14,6 +14,7 @@ import { Worker } from "node:worker_threads";
 
 import { LEAGUE_ROUND1_DRAFT_SPEC } from "../../src/ai/setup/draft_ship";
 import { isBacklineProtectionBeneficiaryCreature } from "../../src/ai/setup/creature_score";
+import { CreatureFactions } from "../../src/generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { creaturesByLevel, DEFAULT_ROSTER_COMPOSITION } from "../../src/simulation/army";
 import {
@@ -134,12 +135,16 @@ describe("AI meta cohort generation", () => {
                 }
                 const chaos = army.synergies.find((choice) => choice.faction === PBTypes.FactionVals.CHAOS);
                 if (!chaos) continue;
-                const creatureId = army.creatureIds.find((id) => aiMetaSynergyLevel([id, id], chaos.faction) === 1);
+                const creatureId = army.creatureIds.find((id) => CreatureFactions[id] === chaos.faction);
                 expect(creatureId).toBeDefined();
                 expect(aiMetaSynergyLevel([creatureId!], chaos.faction)).toBe(0);
-                expect(aiMetaSynergyLevel([creatureId!, creatureId!], chaos.faction)).toBe(1);
-                expect(aiMetaSynergyLevel(Array(4).fill(creatureId!), chaos.faction)).toBe(2);
-                expect(aiMetaSynergyLevel(Array(6).fill(creatureId!), chaos.faction)).toBe(3);
+                expect(aiMetaSynergyLevel(Array(6).fill(creatureId!), chaos.faction)).toBe(0);
+                const distinct = Object.entries(CreatureFactions)
+                    .filter(([, faction]) => faction === chaos.faction)
+                    .map(([id]) => Number(id));
+                expect(aiMetaSynergyLevel(distinct.slice(0, 2), chaos.faction)).toBe(1);
+                expect(aiMetaSynergyLevel(distinct.slice(0, 4), chaos.faction)).toBe(2);
+                expect(aiMetaSynergyLevel(distinct.slice(0, 6), chaos.faction)).toBe(3);
             }
         }
         expect(seenVariants).toEqual(expectedVariants);
@@ -291,43 +296,7 @@ describe("AI meta cohort generation", () => {
         expect(environment.V08_A13_SEARCH).toBe("1");
     });
 
-    it("materializes the explicit a19 h18 worker profile without ambient experiment leakage", () => {
-        const baseProfile = resolveAiMetaFightProfile("a19-h18");
-        const environment = sanitizedAiMetaEnvironment(
-            {
-                SEARCH_HORIZON: "999",
-                V07_SEARCH: "0",
-                V08_A13_SEARCH: "1",
-            },
-            baseProfile,
-        );
-        expect(environment).toMatchObject({
-            V07_SEARCH: "1",
-            SEARCH_HORIZON: "18",
-            SEARCH_DECISION_DEADLINE_MS: "175",
-            SEARCH_CIRCUIT_BREAKER_MS: "275",
-            SEARCH_SHORTLIST: "3",
-            V08_A13_SEARCH: "0",
-        });
-        expect(environment.SEARCH_INCUMBENT_KINDS).toBeUndefined();
-        expect(environment.SEARCH_CHALLENGER_KINDS).toBeUndefined();
-        expect(Object.values(environment)).not.toContain("undefined");
-        expect(baseProfile.strategyProfileId).toBe("native-v0.8");
-        expect(baseProfile.provenance).toMatchObject({ strategyProfileId: "native-v0.8" });
-
-        const placementProfile = resolveAiMetaFightProfile("a19-h18-ranked-placement");
-        expect(placementProfile.strategyProfileId).toBe("a19-h18-ranked-placement-v8");
-        expect(placementProfile.provenance).toMatchObject({
-            name: "v0.8+a19-h18-ranked-placement-v8-research",
-            researchOnly: true,
-            strategyProfileId: "a19-h18-ranked-placement-v8",
-            placementPolicy: {
-                informationRequirement: "public-roster",
-                scope: { map: "NORMAL" },
-            },
-        });
-        expect(placementProfile.workerEnvironment).toEqual(baseProfile.workerEnvironment);
-
+    it("materializes the production a19 worker profile without ambient experiment leakage", () => {
         const productionProfile = resolveAiMetaFightProfile("a19");
         const productionEnvironment = sanitizedAiMetaEnvironment({ V08_A13_SEARCH: "1" }, productionProfile);
         expect(productionProfile.provenance).toMatchObject({
@@ -342,6 +311,20 @@ describe("AI meta cohort generation", () => {
             V08_A19_SEARCH: "1",
         });
         expect(productionEnvironment.V08_A13_SEARCH).toBeUndefined();
+        expect(productionProfile.offlineDeterministicWork).toBeUndefined();
+
+        const workProfile = resolveAiMetaFightProfile("a19-work");
+        expect(workProfile.offlineDeterministicWork).toBe(true);
+        expect(workProfile.strategyProfileId).toBe(productionProfile.strategyProfileId);
+        expect(workProfile.workerEnvironment).toEqual(productionProfile.workerEnvironment);
+        expect(workProfile.provenance).toMatchObject({
+            name: "v0.8+a19-work",
+            candidateId: "a19",
+            researchOnly: true,
+            searchBudget: "offline-deterministic-work",
+            genomeSha256: productionProfile.provenance.genomeSha256,
+            search: productionProfile.provenance.search,
+        });
 
         expect(() => resolveAiMetaFightProfile(undefined)).toThrow("AI meta fight profile is required");
         expect(() => resolveAiMetaFightProfile("   ")).toThrow("AI meta fight profile is required");

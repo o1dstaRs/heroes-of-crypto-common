@@ -29,6 +29,8 @@ export interface IArmyUnitSpec {
     size: number;
     /** Number of creatures in the stack. */
     amount: number;
+    /** Exact remaining spell charges after a pre-fight split; absent uses the creature's initial book. */
+    initialSpellEntries?: readonly string[];
     /**
      * The stack's footprint when it is NOT the square `size x size` block — e.g. 1x2 or 2x1. Absent for the
      * two shipped shapes, so every roster artifact ever written (and every JSONL a trainer reads back) stays
@@ -262,21 +264,32 @@ export function creaturesByLevel(level: number, faction?: string): ICatalogEntry
  * copy of this list, so the only difference between the sides is the AI driving them.
  */
 /**
- * Diagnostic-only: force specific creatures into a level's first slot via FORCE_CREATURES, e.g.
+ * Diagnostic-only: force specific creatures into a level's first slots via FORCE_CREATURES, e.g.
  * `FORCE_CREATURES="2:Pikeman,4:Black Dragon"`. Lets an A/B target a specific matchup without changing
  * the random rng sequence (the pick is still rolled, then overridden), so runs stay reproducible.
+ *
+ * Repeating a level fills successive slots of it, so a roster can be loaded with more than one named
+ * creature of the same level — `FORCE_CREATURES="4:Gargantuan,4:Tsar Cannon"` with two L4 slots fields
+ * both. Both splash shooters are level 4, and pinning only one of them could never exercise the pair
+ * together. A single entry per level behaves exactly as before.
  */
-function forcedByLevel(): Record<number, string> {
+function forcedByLevel(): Record<number, string[]> {
     const raw = process.env.FORCE_CREATURES;
     if (!raw) {
         return {};
     }
-    const out: Record<number, string> = {};
+    const out: Record<number, string[]> = {};
     for (const part of raw.split(",")) {
-        const [lvl, name] = part.split(":");
-        if (lvl && name) {
-            out[Number(lvl)] = name.trim();
+        const separator = part.indexOf(":");
+        if (separator <= 0) {
+            continue;
         }
+        const level = Number(part.slice(0, separator));
+        const name = part.slice(separator + 1).trim();
+        if (!Number.isFinite(level) || !name) {
+            continue;
+        }
+        (out[level] ??= []).push(name);
     }
     return out;
 }
@@ -353,8 +366,9 @@ export function buildRoster(
             }
             for (let i = 0; i < count; i += 1) {
                 let pick = pool[Math.floor(rng() * pool.length)];
-                if (i === 0 && forced[level]) {
-                    const forcedPick = pool.find((p) => p.creatureName === forced[level]);
+                const forcedName = forced[level]?.[i];
+                if (forcedName) {
+                    const forcedPick = pool.find((p) => p.creatureName === forcedName);
                     if (forcedPick) {
                         pick = forcedPick;
                     }
@@ -444,7 +458,7 @@ export function createUnitFromSpec(
         Object.defineProperty(properties, "footprint_width", { value: width, enumerable: true, writable: true });
         Object.defineProperty(properties, "footprint_height", { value: height, enumerable: true, writable: true });
     }
-    return Unit.createUnit(
+    const unit = Unit.createUnit(
         properties,
         gridSettings,
         team,
@@ -453,6 +467,10 @@ export function createUnitFromSpec(
         effectFactory,
         summoned,
     );
+    if (spec.initialSpellEntries !== undefined) {
+        unit.syncAuthoritativeSpellEntries([...spec.initialSpellEntries]);
+    }
+    return unit;
 }
 
 export function createCombatFactories(): { abilityFactory: AbilityFactory; effectFactory: EffectFactory } {

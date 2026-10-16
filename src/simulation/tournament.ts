@@ -18,25 +18,11 @@ import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { SetupPolicyWeighted } from "../ai/setup/setup_policy_weighted";
 import { StrategyV0_8 } from "../ai/versions/v0_8";
 import {
-    buildV08A19H64FinalistV6SearchEnvironment,
-    buildV08A19H18F184LowerHumanRankedFallbackSearchEnvironment,
-    buildV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactValidatedSearchEnvironment,
-    buildV08A19H64F184LowerHumanRankedFallbackScoreSafeSearchEnvironment,
-    createV08A19H18F184LowerHumanRankedFallbackStrategy,
-    createV08A19H64FinalistV6Strategy,
-    createV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactStrategy,
-    createV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactValidatedStrategy,
-    V08_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK_PROFILE,
-    V08_A19_H64_FINALIST_V6_PLACEMENT_IMPLEMENTATION_SHA256,
-    V08_A19_H64_FINALIST_V6_PROFILE,
-    V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER,
-    V08_A19_H64_FINALIST_V6_SEARCH_IMPLEMENTATION_SHA256,
-    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_IMPLEMENTATION_SHA256,
-    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_PROFILE,
-    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_IMPLEMENTATION_SHA256,
-    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_PLACEMENT_IMPLEMENTATION_SHA256,
-    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_PROFILE,
-} from "../ai/versions/v0_8_a19_h18_f184_lower_human_placement_profile";
+    buildV08A19SearchEnvironment,
+    createV08A19Strategy,
+    V08_A19_PROFILE,
+    V08_A19_SOURCE_LEDGER,
+} from "../ai/versions/v0_8_a19_profile";
 import {
     buildRoster,
     makeRng,
@@ -60,20 +46,11 @@ import { creatureIdForName, DEFAULT_OFFER_K, draftRoster } from "./draft";
 import { isLiveTwin, LIVETWIN_PRESET, liveTwinMeleeFraction, liveTwinSetup } from "./livetwin";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
 
-export const TOURNAMENT_RESEARCH_A19_H18_F184_LEFT_HUMAN_RANKED_FALLBACK =
-    "v0.8-a19-h18-f184-lower-human-ranked-fallback" as const;
-export const TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT =
-    "v0.8-a19-h64-f184-lower-human-ranked-fallback-score-safe-compact" as const;
-export const TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED =
-    "v0.8-a19-h64-f184-lower-human-ranked-fallback-score-safe-compact-validated" as const;
-export const TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6 = "v0.8-a19-h64-finalist-v6" as const;
+/** Entrant A runs the production a19 profile (placement + sealed search); entrant B is native v0.8 without search. */
+export const TOURNAMENT_RESEARCH_A19 = "v0.8-a19" as const;
 export const TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID =
     "entrant-a-physical-team-search-scope-v1" as const;
-export type TournamentResearchEntrantAStrategyProfile =
-    | typeof TOURNAMENT_RESEARCH_A19_H18_F184_LEFT_HUMAN_RANKED_FALLBACK
-    | typeof TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT
-    | typeof TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED
-    | typeof TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6;
+export type TournamentResearchEntrantAStrategyProfile = typeof TOURNAMENT_RESEARCH_A19;
 
 export interface ITournamentOptions {
     versionA: string;
@@ -442,80 +419,25 @@ interface IResolvedTournamentResearchProfile {
 const resolveTournamentResearchProfile = (
     selector: TournamentResearchEntrantAStrategyProfile,
 ): IResolvedTournamentResearchProfile => {
-    if (selector === TOURNAMENT_RESEARCH_A19_H18_F184_LEFT_HUMAN_RANKED_FALLBACK) {
-        const profile = V08_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK_PROFILE;
-        return {
-            createStrategy: createV08A19H18F184LowerHumanRankedFallbackStrategy,
-            environment: buildV08A19H18F184LowerHumanRankedFallbackSearchEnvironment(),
-            provenance: Object.freeze({
-                selector,
-                schema: profile.schema,
-                candidateId: profile.candidateId,
-                behaviorEnvironmentSha256: profile.behaviorEnvironmentSha256,
-                genomeSha256: profile.genomeSha256,
-                placementPolicyId: profile.placementPolicy.policyId,
-                searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
-            }),
-        };
+    if (selector !== TOURNAMENT_RESEARCH_A19) {
+        throw new Error(`Unknown tournament entrant-A research strategy profile ${String(selector)}`);
     }
-    if (selector === TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT) {
-        const profile = V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_PROFILE;
-        return {
-            createStrategy: createV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactStrategy,
-            environment: buildV08A19H64F184LowerHumanRankedFallbackScoreSafeSearchEnvironment(),
-            provenance: Object.freeze({
-                selector,
-                schema: profile.schema,
-                candidateId: profile.candidateId,
-                behaviorEnvironmentSha256: profile.behaviorEnvironmentSha256,
-                genomeSha256: profile.genomeSha256,
-                placementPolicyId: profile.placementPolicy.policyId,
-                placementImplementationSha256:
-                    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_IMPLEMENTATION_SHA256,
-                searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
-            }),
-        };
-    }
-    if (selector === TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED) {
-        const profile = V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_PROFILE;
-        return {
-            createStrategy: createV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactValidatedStrategy,
-            environment: buildV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactValidatedSearchEnvironment(),
-            provenance: Object.freeze({
-                selector,
-                schema: profile.schema,
-                candidateId: profile.candidateId,
-                behaviorEnvironmentSha256: profile.behaviorEnvironmentSha256,
-                genomeSha256: profile.genomeSha256,
-                placementPolicyId: profile.placementPolicy.policyId,
-                placementImplementationSha256:
-                    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_PLACEMENT_IMPLEMENTATION_SHA256,
-                searchImplementationSha256:
-                    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_IMPLEMENTATION_SHA256,
-                searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
-            }),
-        };
-    }
-    if (selector === TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6) {
-        const profile = V08_A19_H64_FINALIST_V6_PROFILE;
-        return {
-            createStrategy: createV08A19H64FinalistV6Strategy,
-            environment: buildV08A19H64FinalistV6SearchEnvironment(),
-            provenance: Object.freeze({
-                selector,
-                schema: profile.schema,
-                candidateId: profile.candidateId,
-                behaviorEnvironmentSha256: profile.behaviorEnvironmentSha256,
-                genomeSha256: profile.genomeSha256,
-                placementPolicyId: profile.placementPolicy.policyId,
-                placementImplementationSha256: V08_A19_H64_FINALIST_V6_PLACEMENT_IMPLEMENTATION_SHA256,
-                searchImplementationSha256: V08_A19_H64_FINALIST_V6_SEARCH_IMPLEMENTATION_SHA256,
-                searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
-                runtimeSourceLedger: V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER,
-            }),
-        };
-    }
-    throw new Error(`Unknown tournament entrant-A research strategy profile ${String(selector)}`);
+    const searchDriverPin = V08_A19_SOURCE_LEDGER.find((pin) => pin.role === "search-driver");
+    return {
+        createStrategy: createV08A19Strategy,
+        environment: buildV08A19SearchEnvironment(),
+        provenance: Object.freeze({
+            selector,
+            schema: V08_A19_PROFILE.schema,
+            candidateId: V08_A19_PROFILE.candidateId,
+            behaviorEnvironmentSha256: V08_A19_PROFILE.behaviorEnvironmentSha256,
+            genomeSha256: V08_A19_PROFILE.genomeSha256,
+            placementPolicyId: V08_A19_PROFILE.placementPolicy.policyId,
+            searchImplementationSha256: searchDriverPin?.sha256,
+            searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
+            runtimeSourceLedger: V08_A19_SOURCE_LEDGER,
+        }),
+    };
 };
 
 const createResearchEntrantAStrategyOverrides = (

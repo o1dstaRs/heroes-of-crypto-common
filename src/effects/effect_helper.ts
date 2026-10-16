@@ -64,7 +64,7 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
         return true;
     }
 
-    // AURA Rallying Volley (Zena) and Guiding Winds (Dryad): extra shots and extra shot range are only
+    // Ranged-only auras such as Guiding Winds (Dryad): extra shots and extra shot range are only
     // meaningful to a unit that SHOOTS, so they land on ranged allies alone — the same shape as the
     // DISABLE_RANGE_ATTACK rule just below. An aura power type absent from these lists is silently never
     // applied, which is why a new aura shows up on nobody.
@@ -186,6 +186,29 @@ export function getAuraCellKeysView(gridSettings: GridSettings, cell: XY, auraRa
     const calculated = Object.freeze(calculateAuraCellKeys(gridSettings, cell, auraRange));
     keysPerRange.set(auraRange, calculated);
     return calculated;
+}
+
+const auraCellKeyBuffersByView = new WeakMap<ReadonlyArray<number>, Int32Array>();
+
+/**
+ * The exact geometry of getAuraCellKeysView as a typed buffer, for the engine's per-cell loops.
+ *
+ * The frozen view is the right public contract, but JavaScriptCore keeps a frozen array out of its fast
+ * indexed storage: iterating one measured 10-17x slower than a plain array on this exact shape, and the
+ * aura refresh walks these keys for every source cell after every engine action, which made that loop the
+ * hottest line of the A19 rollout search. A typed array cannot be frozen, but this one is private to the
+ * cache (one per view, same lifetime, never handed out through the public mutable result) and indexed reads
+ * on it are as fast as a plain array. Consumers must INDEX it (`for (let i = 0; ...)`): the iterator
+ * protocol on a typed array is slow again.
+ */
+export function getAuraCellKeyBuffer(gridSettings: GridSettings, cell: XY, auraRange: number): Int32Array {
+    const keys = getAuraCellKeysView(gridSettings, cell, auraRange);
+    let buffer = auraCellKeyBuffersByView.get(keys);
+    if (!buffer) {
+        buffer = Int32Array.from(keys);
+        auraCellKeyBuffersByView.set(keys, buffer);
+    }
+    return buffer;
 }
 
 /** Shared membership view for hot AI scoring; its lifetime follows the corresponding immutable geometry view. */

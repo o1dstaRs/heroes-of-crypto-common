@@ -35,6 +35,7 @@ import {
     SpellProperties,
     SpellTargetType,
 } from "../../src/spells/spell_properties";
+import type { Unit } from "../../src/units/unit";
 import { createTestUnit, testGridSettings } from "../helpers/combat";
 
 describe("spell_helper", () => {
@@ -383,7 +384,7 @@ describe("spell_helper", () => {
         ).toBe(false);
     });
 
-    it("rejects Castling inherited by a large caster", () => {
+    it("lets a large caster that inherited Castling swap with another large unit, but not with a small one", () => {
         const caster = createTestUnit({
             name: "Arachna Queen",
             team: PBTypes.TeamVals.RIGHT,
@@ -391,25 +392,81 @@ describe("spell_helper", () => {
             spells: ["System:Castling"],
             stackPower: 5,
         });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LEFT });
+        const smallEnemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LEFT });
+        const largeEnemy = createTestUnit({
+            name: "Large Enemy",
+            team: PBTypes.TeamVals.LEFT,
+            size: PBTypes.UnitSizeVals.LARGE,
+        });
         const castling = caster.getSpells().find((candidate) => candidate.getName() === "Castling");
-
-        expect(
+        const cast = (target: Unit): boolean | undefined =>
             canCastSpell(
                 false,
                 testGridSettings,
                 emptyMatrix(),
                 caster,
-                enemy,
+                target,
                 castling,
-                enemy.getBaseCell(),
-                enemy.getMagicResist(),
+                target.getBaseCell(),
+                target.getMagicResist(),
                 false,
-                enemy.canBeHealed(),
-                [enemy.getBaseCell()],
-            ),
-        ).toBe(false);
+                target.canBeHealed(),
+                [target.getBaseCell()],
+            );
+
+        expect(cast(smallEnemy)).toBe(false);
+        expect(cast(largeEnemy)).toBe(true);
     });
+
+    // Castling swaps bodies of the SAME footprint, and only those. The four shapes below are compared
+    // pairwise, every direction: the diagonal (like with like) is the whole legal set, and every other
+    // pairing is refused. Two of the shapes are RECTANGLES, which no `size` value can express — and 2x1
+    // against 1x2 is the pairing that proves the rule compares both sides rather than cell counts.
+    const SWAP_SHAPES = [
+        ["1x1", 1, 1],
+        ["2x1", 2, 1],
+        ["1x2", 1, 2],
+        ["2x2", 2, 2],
+    ] as const;
+
+    for (const [casterLabel, casterWidth, casterHeight] of SWAP_SHAPES) {
+        for (const [targetLabel, targetWidth, targetHeight] of SWAP_SHAPES) {
+            const sameShape = casterWidth === targetWidth && casterHeight === targetHeight;
+            it(`${sameShape ? "allows" : "refuses"} a ${casterLabel} caster swapping with a ${targetLabel} target`, () => {
+                const caster = createTestUnit({
+                    name: `Caster ${casterLabel}`,
+                    team: PBTypes.TeamVals.RIGHT,
+                    spells: ["System:Castling"],
+                    stackPower: 5,
+                    footprintWidth: casterWidth,
+                    footprintHeight: casterHeight,
+                });
+                const target = createTestUnit({
+                    name: `Target ${targetLabel}`,
+                    team: PBTypes.TeamVals.LEFT,
+                    footprintWidth: targetWidth,
+                    footprintHeight: targetHeight,
+                });
+                const castling = caster.getSpells().find((candidate) => candidate.getName() === "Castling");
+
+                expect(
+                    canCastSpell(
+                        false,
+                        testGridSettings,
+                        emptyMatrix(),
+                        caster,
+                        target,
+                        castling,
+                        target.getBaseCell(),
+                        target.getMagicResist(),
+                        false,
+                        target.canBeHealed(),
+                        [target.getBaseCell()],
+                    ),
+                ).toBe(sameShape);
+            });
+        }
+    }
 
     it("rejects direct spell casts for missing spells, immunity, and already-applied effects", () => {
         const caster = createTestUnit({
@@ -525,6 +582,76 @@ describe("spell_helper", () => {
                 enemy.canBeHealed(),
             ),
         ).toBe(false);
+    });
+
+    describe("a ranked unit, which mirrors only the authoritative display lists", () => {
+        const mirrorBuff = (unit: Unit, name: string): void => {
+            const properties = unit.getUnitProperties();
+            properties.applied_buffs.push(name);
+            properties.applied_buffs_laps.push(2);
+            properties.applied_buffs_descriptions.push(name);
+            properties.applied_buffs_powers.push(0);
+        };
+        const mirrorDebuff = (unit: Unit, name: string): void => {
+            const properties = unit.getUnitProperties();
+            properties.applied_debuffs.push(name);
+            properties.applied_debuffs_laps.push(2);
+            properties.applied_debuffs_descriptions.push(name);
+            properties.applied_debuffs_powers.push(0);
+        };
+        const caster = (): Unit =>
+            createTestUnit({
+                name: "Caster",
+                team: PBTypes.TeamVals.RIGHT,
+                spells: ["Chaos:Riot", "Death:Sadness", "System:Armor Rune"],
+                stackPower: 5,
+            });
+        const castOn = (from: Unit, target: Unit, spellName: string): boolean =>
+            !!canCastSpell(
+                false,
+                testGridSettings,
+                emptyMatrix(),
+                from,
+                target,
+                from.getSpells().find((candidate) => candidate.getName() === spellName),
+                target.getBaseCell(),
+                target.getMagicResist(),
+                target.hasMindAttackResistance(),
+                target.canBeHealed(),
+            );
+
+        it("refuses Riot on a stack under Mass Riot, and a second Riot", () => {
+            const from = caster();
+            const underMassRiot = createTestUnit({ name: "Mass Rioted", team: PBTypes.TeamVals.RIGHT });
+            const underRiot = createTestUnit({ name: "Rioted", team: PBTypes.TeamVals.RIGHT });
+            const clean = createTestUnit({ name: "Clean", team: PBTypes.TeamVals.RIGHT });
+            mirrorBuff(underMassRiot, "Mass Riot");
+            mirrorBuff(underRiot, "Riot");
+
+            expect(underMassRiot.getBuffs()).toHaveLength(0);
+            expect(castOn(from, underMassRiot, "Riot")).toBe(false);
+            expect(castOn(from, underRiot, "Riot")).toBe(false);
+            expect(castOn(from, clean, "Riot")).toBe(true);
+        });
+
+        it("refuses a debuff the enemy already carries", () => {
+            const from = caster();
+            const saddened = createTestUnit({ name: "Saddened", team: PBTypes.TeamVals.LEFT });
+            const clean = createTestUnit({ name: "Clean", team: PBTypes.TeamVals.LEFT });
+            mirrorDebuff(saddened, "Sadness");
+
+            expect(saddened.getDebuffs()).toHaveLength(0);
+            expect(castOn(from, saddened, "Sadness")).toBe(false);
+            expect(castOn(from, clean, "Sadness")).toBe(true);
+        });
+
+        it("still lets a rune stack onto a stack that already carries it", () => {
+            const from = caster();
+            const runed = createTestUnit({ name: "Runed", team: PBTypes.TeamVals.RIGHT });
+            mirrorBuff(runed, "Armor Rune");
+
+            expect(castOn(from, runed, "Armor Rune")).toBe(true);
+        });
     });
 
     it("calculates buff and debuff stat effects", () => {

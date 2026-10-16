@@ -18,7 +18,14 @@ import {
 import * as AbilityHelper from "../abilities/ability_helper";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { processCraftAbility } from "../abilities/craft_ability";
+import { detonateLastFuseChain, explodeLastFuse, type IPyreExplosion } from "../abilities/last_fuse_ability";
 import * as EffectHelper from "../effects/effect_helper";
+import { Tier1Artifact, ARTIFACT_POWER } from "../artifacts/artifact_properties";
+import {
+    artifactBarrelPlacementCells,
+    artifactBarrelShooterCells,
+    autoPlaceArtifactBarrels,
+} from "../grid/artifact_barrels";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { AttackType, FactionType, TeamType } from "../generated/protobuf/v1/types_gen";
 import {
@@ -42,15 +49,10 @@ import { amplifyCastBuffForTarget } from "../spells/castable_buff";
 import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
-import { isSmokeableCell } from "../spells/smoke_clouds";
+import { dispelSmokeOnOccupiedCells, isSmokeableCell } from "../spells/smoke_clouds";
 import { projectSpellRebound, spellDamageAgainstUnit, spellRawDamage } from "../spells/spell_cast_projection";
-import { VINE_STRIDE_COST_MULTIPLIER, canVineTakeRoot, vinePathCells } from "../spells/vines";
-import {
-    fireWallBurnPercentage,
-    fireWallCells,
-    isFireWallableCell,
-    normalizeFireWallOrientation,
-} from "../spells/fire_walls";
+import { canVineTakeRoot, maxCellsForStepBudget, vinePathCells } from "../spells/vines";
+import { fireWallBurnPercentage, fireWallLitCells, normalizeFireWallOrientation } from "../spells/fire_walls";
 import { getSpellConfig } from "../configuration/config_provider";
 import { Unit } from "../units/unit";
 import {
@@ -59,14 +61,14 @@ import {
     endWaterShieldAbsorbCapture,
     recordEffectApplication,
 } from "../units/effect_application_capture";
-import { getLapString, getRandomInt } from "../utils/lib";
+import { getLapString, getRandomInt, killTag } from "../utils/lib";
 import type { XY } from "../utils/math";
 import type { GameAction } from "./actions";
 import { isHeadlessSimulationEvent, type GameEvent, type IGameAnimationEvent } from "./events";
 import { canWaitOnHourglass } from "./hourglass";
 import {
-    bodyCellsEnteredAlongPath,
     burnUnitOnFireWallCells,
+    fireWallCellsForTraversal,
     isMovePathFootprintOnly,
     moveCellsMatchAsSet,
     resolveMoveTargetCells,
@@ -104,12 +106,46 @@ export type GameActionRejectionReason =
     | "augment_not_available"
     | "unsupported_action";
 
+/**
+ * Only melee may follow a move in the same turn. A unit that has moved cannot shoot, throw, fire at an obstacle from
+ * range, cast or wait on the hourglass (which would hand it a fresh turn later in the lap): the player's board ends
+ * the turn when a plain move lands, and the engine holds every other caller (the AI, the server, a tampered client)
+ * to the same rule.
+ */
+export const MOVED_THIS_TURN_MELEE_ONLY_MESSAGE = "a unit that moved this turn can only strike in melee";
+
 export interface IGameActionResult {
     completed: boolean;
     events: GameEvent[];
     rejectionReason?: GameActionRejectionReason;
     message?: string;
 }
+
+/**
+ * The time a request_additional_time from `team` adds to the running turn right now; 0 means it is refused.
+ *
+ * Valid only while one of that team's units is active (a team must not pad the opponent's clock) and once
+ * per lap, from what is left of the lap's budget for the stacks still to act. The engine grants exactly this
+ * amount. With `justCheck` (the default) nothing changes, so a server can put the answer on its snapshot:
+ * a ranked client's own FightProperties never learn that its team already asked this lap, and offering the
+ * button from them brought it back on the next unit, where the request was refused.
+ */
+export const additionalTurnTimeFor = (
+    context: Pick<ITurnEngineContext, "fightProperties" | "unitsHolder" | "getCurrentActiveUnitId">,
+    team: TeamType,
+    justCheck = true,
+): number => {
+    const activeUnitId = context.getCurrentActiveUnitId?.();
+    const activeUnit = activeUnitId ? context.unitsHolder.getAllUnits().get(activeUnitId) : undefined;
+    if (!activeUnit || activeUnit.getTeam() !== team) {
+        return 0;
+    }
+    const stacksToAct = context.unitsHolder
+        .getAllAllies(team)
+        .filter((ally) => !ally.isDead() && !context.fightProperties.hasAlreadyMadeTurn(ally.getId())).length;
+
+    return context.fightProperties.requestAdditionalTurnTime(team, justCheck, stacksToAct);
+};
 
 export interface IGameActionEngineContext extends ITurnEngineContext {
     attackHandler?: AttackHandler;
@@ -129,6 +165,7 @@ export interface IGameActionEngineContext extends ITurnEngineContext {
         spell?: Spell;
         sourceAbility?: string;
     }) => Unit | undefined;
+    canPlaceBarrel?: (team: TeamType, cell: XY) => boolean;
     canPlaceUnit?: (unit: Unit, cells: XY[], action: Extract<GameAction, { type: "place_unit" }>) => boolean;
     canSplitUnit?: (unit: Unit, action: Extract<GameAction, { type: "split_unit" }>) => boolean;
     createSplitUnit?: (
@@ -280,6 +317,10 @@ export class GameActionEngine {
                 return this.areaThrowAttack(action);
             case "cast_spell":
                 return this.castSpell(action);
+            case "place_barrel":
+                return this.placeBarrel(action);
+            case "unplace_barrel":
+                return this.unplaceBarrel(action);
             case "place_unit":
                 return this.placeUnit(action);
             case "split_unit":
@@ -313,6 +354,18 @@ export class GameActionEngine {
         this.context.unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.LEFT);
         this.context.unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.RIGHT);
         this.context.unitsHolder.haveDistancesToClosestEnemiesDecreased();
+        for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
+            if (!this.context.fightProperties.hasArtifactTier1(team, Tier1Artifact.BARREL_BARRICADE)) continue;
+            const cells = artifactBarrelPlacementCells(this.context.grid, this.context.fightProperties, team).filter(
+                (cell) => !this.context.canPlaceBarrel || this.context.canPlaceBarrel(team, cell),
+            );
+            const shooterCells = artifactBarrelShooterCells(
+                this.context.grid,
+                this.context.unitsHolder.getAllUnits().values(),
+                team,
+            );
+            autoPlaceArtifactBarrels(this.context.grid, this.context.fightProperties, team, cells, shooterCells);
+        }
         this.context.fightProperties.startFight();
         this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, leftUnitsAlive);
         this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, rightUnitsAlive);
@@ -363,6 +416,9 @@ export class GameActionEngine {
         if (unit instanceof Error) {
             return this.reject(unit.message as GameActionRejectionReason);
         }
+        if (unit.hasMovedThisTurn()) {
+            return this.reject("hourglass_not_available", MOVED_THIS_TURN_MELEE_ONLY_MESSAGE);
+        }
         if (!this.canWaitOnHourglass(unit)) {
             return this.reject("hourglass_not_available");
         }
@@ -385,13 +441,17 @@ export class GameActionEngine {
             return this.reject(unit.message as GameActionRejectionReason);
         }
 
-        unit.applyLuckShield();
+        // Misfortune pins luck at the floor for its duration, so a defending unit under it pays the morale
+        // and gains no luck. Say so rather than printing a bonus the unit never got.
+        const luckRaised = unit.applyLuckShield();
         unit.decreaseMorale(
             MORALE_CHANGE_FOR_SHIELD,
             this.context.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
         );
         this.context.sceneLog.updateLog(
-            `${unit.getName()} uses Luck Shield (luck +${LUCK_CHANGE_FOR_SHIELD}, morale -${MORALE_CHANGE_FOR_SHIELD})`,
+            luckRaised
+                ? `${unit.getName()} uses Luck Shield (luck +${LUCK_CHANGE_FOR_SHIELD}, morale -${MORALE_CHANGE_FOR_SHIELD})`
+                : `${unit.getName()} uses Luck Shield (luck held by Misfortune, morale -${MORALE_CHANGE_FOR_SHIELD})`,
         );
 
         const events: GameEvent[] = [{ type: "unit_defended", unitId: unit.getId(), team: unit.getTeam() }];
@@ -416,19 +476,12 @@ export class GameActionEngine {
         };
     }
     /**
-     * Extend the acting team's running turn clock (once per lap per team). Only valid while a unit of
-     * that team is the active unit — otherwise a team could pad the opponent's clock. Rejects if the
-     * team already used its request this lap or there's no remaining budget (both surface as
-     * requestAdditionalTurnTime() returning 0). Produces no game events — the extension lives entirely
-     * in fightProperties.currentTurnEnd, which the snapshot re-broadcasts.
+     * Extend the acting team's running turn clock by what additionalTurnTimeFor grants (once per lap per
+     * team, only on that team's own turn). Produces no game events — the extension lives entirely in
+     * fightProperties.currentTurnEnd, which the snapshot re-broadcasts.
      */
     private requestAdditionalTime(team: TeamType): IGameActionResult {
-        const activeUnitId = this.context.getCurrentActiveUnitId?.();
-        const activeUnit = activeUnitId ? this.context.unitsHolder.getAllUnits().get(activeUnitId) : undefined;
-        if (!activeUnit || activeUnit.getTeam() !== team) {
-            return this.reject("additional_time_not_available");
-        }
-        const additionalTime = this.context.fightProperties.requestAdditionalTurnTime(team);
+        const additionalTime = additionalTurnTimeFor(this.context, team, false);
         if (additionalTime <= 0) {
             return this.reject("additional_time_not_available");
         }
@@ -482,22 +535,31 @@ export class GameActionEngine {
         if (knownMoveRoute instanceof Error) {
             return this.reject("invalid_move");
         }
+        const movementRoute = knownMoveRoute?.route ?? (pathIsFootprintOnly ? undefined : action.path);
+        if (movementRoute && this.groundRouteCrossesObstacle(unit, movementRoute)) {
+            return this.reject("move_blocked");
+        }
         // Captured BEFORE the move resolves: the Fire Wall burn below needs the body the unit LEFT, so it
         // can charge only for what the walk moved into. After the move `getCells()` is the destination.
         const startCells = unit.getCells();
         const travelledPath = pathIsFootprintOnly
             ? action.path
             : travelledMovePath(unit.getBaseCell(), knownMoveRoute?.route ?? action.path);
+        const routeModifierPath = knownMoveRoute
+            ? travelledMovePath(unit.getBaseCell(), knownMoveRoute.route)
+            : pathIsFootprintOnly
+              ? []
+              : travelledPath;
         // The cell COUNT is a cheap sanity bound on the walk (real reachability is enforced by knownPaths
-        // above). It assumed a cell costs at least one step — no longer true: a vine strider (Trent, "In Its
-        // Own World") pays half a step per vined cell, so the same budget legitimately covers twice as many
-        // cells. Bound by the cheapest cell THIS unit could pay for, or a legal vine walk is rejected as
+        // above). It assumed a cell costs at least one step — not true for a vine strider (Trent, "In Its
+        // Own World"), who walks a vined cell for free, so no cell count follows from its budget at all: the
+        // board itself is the only bound then. A tighter guess here rejected legal vine walks as
         // invalid_move — which is exactly what "the range shows further but I cannot step there" looked like.
-        const cheapestCellCost =
-            unit.hasAbilityActive("In Its Own World") && this.context.fightProperties.getVines().size() > 0
-                ? VINE_STRIDE_COST_MULTIPLIER
-                : 1;
-        const maxTravelledCells = Math.max(1, Math.ceil(unit.getSteps() / cheapestCellCost));
+        const maxTravelledCells = maxCellsForStepBudget(
+            unit.getSteps(),
+            unit.hasAbilityActive("In Its Own World") && this.context.fightProperties.getVines().size() > 0,
+            this.context.grid.getSettings().getGridSize(),
+        );
         if (
             !pathIsFootprintOnly &&
             (!travelledPath.length ||
@@ -534,15 +596,16 @@ export class GameActionEngine {
             return this.reject("move_blocked", result.log || undefined);
         }
 
-        if (!pathIsFootprintOnly) {
+        if (routeModifierPath.length) {
             this.context.moveHandler.applyRouteMoveModifiers(
-                travelledPath,
+                routeModifierPath,
                 unit,
                 this.context.fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam()),
                 this.context.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
                 knownMoveRoute?.hasLavaCell ?? action.hasLavaCell ?? false,
                 knownMoveRoute?.hasWaterCell ?? action.hasWaterCell ?? false,
                 from,
+                to,
             );
         } else {
             // Footprint-only large-unit move: there's no ordered step route to derive a travelled
@@ -556,28 +619,7 @@ export class GameActionEngine {
             );
         }
 
-        // Vine Throw: standing in the enemy's vine is the same snare the throw itself applies. Charged on
-        // ARRIVAL, not on crossing — the movement penalty already prices passing through, and this is the
-        // price of ending up in it. Flyers are not spared here: they clear a vine they fly OVER, but one
-        // they choose to land in grips them like anything else.
-        //
-        // Own-team vines never snare. Trent walks his own vines at half price, and a vine that also
-        // punished his own side would fight the passive it exists to serve.
-        const vinesOnBoard = this.context.fightProperties.getVines();
-        if (vinesOnBoard.size() && !unit.hasDebuffActive("Vine Throw")) {
-            const snaringCell = targetCells.find((cell) => vinesOnBoard.snares(cell, unit.getTeam()));
-            if (snaringCell) {
-                unit.applyDebuff(
-                    new Spell({
-                        // Same lifetime the throw itself grants: read straight off the spell config so the
-                        // two can never drift apart.
-                        spellProperties: getSpellConfig("System", "Vine Throw"),
-                        amount: 1,
-                    }),
-                );
-                this.context.sceneLog.updateLog(`${unit.getName()} is snared by the vine`);
-            }
-        }
+        this.snareOnVineArrival(unit, targetCells);
 
         // Mark that the unit moved this turn so a later end_turn reads as a real "manual" finish (it
         // acted) rather than a do-nothing skip.
@@ -591,8 +633,11 @@ export class GameActionEngine {
                 unitId: unit.getId(),
                 from,
                 to: { ...result.newPosition },
-                path: structuredClone(action.path),
-                targetCells: structuredClone(targetCells),
+                // Own-property copies of plain cells: what structuredClone produced for these, without its
+                // serialization round-trip (it ran once per rollout move and showed up in the search profile).
+                // Replay the accepted route, including the detour resolved for a footprint-only move.
+                path: (knownMoveRoute?.route ?? action.path).map((cell) => ({ ...cell })),
+                targetCells: targetCells.map((cell) => ({ ...cell })),
             });
         }
         if (!this.headlessEvents && result.dispelledSmokeCells?.length) {
@@ -604,12 +649,12 @@ export class GameActionEngine {
         // Angel gliding onto a wall that sits under any of its other three cells crossed real fire and was
         // charged nothing. Expand each travelled anchor to the block it actually occupied, minus the body
         // the unit started on (staying put is still free). A 1x1 is unaffected: its body IS its anchor.
+        // A flyer is only seared for the burning cells it LANDS on (owner call 2026-09-30): it clears the
+        // flames it crosses, exactly like it clears a vine, and pays only for standing in the fire.
         events.push(
             ...this.applyFireWallBurn(
                 unit,
-                pathIsFootprintOnly
-                    ? targetCells
-                    : bodyCellsEnteredAlongPath(startCells, travelledPath, footprintWidth, footprintHeight),
+                fireWallCellsForTraversal(unit, startCells, travelledPath, targetCells, pathIsFootprintOnly),
             ),
         );
         return { completed: true, events };
@@ -625,7 +670,7 @@ export class GameActionEngine {
      * Damage is re-derived per cell rather than multiplied out, because a stack thinned by the first cell has
      * a smaller maximum health for the second to take its share of.
      */
-    private applyFireWallBurn(unit: Unit, crossedCells: XY[]): GameEvent[] {
+    private applyFireWallBurn(unit: Unit, crossedCells: readonly XY[]): GameEvent[] {
         const position = this.headlessEvents ? undefined : { ...unit.getPosition() };
         const { burning, total, unitsDied } = burnUnitOnFireWallCells(
             unit,
@@ -653,6 +698,37 @@ export class GameActionEngine {
         }
         return events;
     }
+    /**
+     * Vine Throw: standing in the enemy's vine is the same snare the throw itself applies. Charged on ARRIVAL,
+     * not on crossing — the movement penalty already prices passing through, and this is the price of ending up
+     * in it — whether the unit arrived by a move or by walking in to strike. Flyers are not spared here: they
+     * clear a vine they fly OVER, but one they choose to land in grips them like anything else.
+     *
+     * Own-team vines never snare. Trent walks his own vines at half price, and a vine that also punished his own
+     * side would fight the passive it exists to serve. The arriving unit is the one whose turn it is, so the
+     * snare gets the extra lap every effect landed mid-turn gets (it lasted a turn less before).
+     */
+    private snareOnVineArrival(unit: Unit, cells: XY[]): void {
+        const vinesOnBoard = this.context.fightProperties.getVines();
+        if (!vinesOnBoard.size() || unit.isDead() || unit.hasDebuffActive("Vine Throw")) {
+            return;
+        }
+        if (!cells.some((cell) => vinesOnBoard.snares(cell, unit.getTeam()))) {
+            return;
+        }
+        unit.applyDebuff(
+            new Spell({
+                // Same lifetime the throw itself grants: read straight off the spell config so the two can never
+                // drift apart.
+                spellProperties: getSpellConfig("System", "Vine Throw"),
+                amount: 1,
+            }),
+            undefined,
+            undefined,
+            true,
+        );
+        this.context.sceneLog.updateLog(`${unit.getName()} is snared by the vine`);
+    }
     private meleeAttack(action: Extract<GameAction, { type: "melee_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
         if (attacker instanceof Error) {
@@ -674,6 +750,15 @@ export class GameActionEngine {
             action.hasLavaCell,
             action.hasWaterCell,
         );
+        const approachRoute = knownPaths?.get(this.cellKey(action.attackFrom))?.[0]?.route;
+        const approaching = !this.sameCell(attacker.getBaseCell(), action.attackFrom);
+        if (approaching && approachRoute && this.groundRouteCrossesObstacle(attacker, approachRoute)) {
+            return this.reject("attack_not_available");
+        }
+        const cellsBefore = attacker
+            .getCells()
+            .map((cell) => `${cell.x}:${cell.y}`)
+            .join("|");
         const result = this.context.attackHandler.handleMeleeAttack(
             this.context.unitsHolder,
             this.context.moveHandler,
@@ -686,6 +771,12 @@ export class GameActionEngine {
         if (!result.completed) {
             return this.reject("attack_not_available");
         }
+        // Walking in to strike ends the walk on those cells as surely as a move does, so an enemy vine there
+        // snares the attacker the same way.
+        const attackerCells = attacker.getCells();
+        if (attackerCells.map((cell) => `${cell.x}:${cell.y}`).join("|") !== cellsBefore) {
+            this.snareOnVineArrival(attacker, attackerCells);
+        }
 
         const unitIdsDied = [...new Set(result.unitIdsDied)];
         const killAttributions = this.createDirectKillAttributions(unitIdsDied, [
@@ -693,16 +784,34 @@ export class GameActionEngine {
             { victim: attacker, killer: target },
         ]);
         const events: GameEvent[] = [];
-        if (!this.headlessEvents) {
+        // Fire Wall: the attacker paid for walking into the flames the moment it arrived, before its blow, so
+        // the burn leads. When the flames killed it there is no blow to report at all — the move still
+        // happened, so this is a completed action rather than a refusal.
+        if (!this.headlessEvents && result.dispelledSmokeCells?.length) {
+            events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+        }
+        if (result.fireWallBurn && !this.headlessEvents) {
+            events.push({ type: "fire_wall_burned", ...result.fireWallBurn });
+        }
+        if (!this.headlessEvents && !result.strikeSkipped) {
             events.push({
                 type: "unit_attacked",
                 attackType: "melee",
                 attackerId: attacker.getId(),
                 targetId: target.getId(),
+                ...(approaching && approachRoute ? { approachPath: approachRoute.map((cell) => ({ ...cell })) } : {}),
                 unitIdsDied,
                 damage: this.cloneVisibleDamage(damage),
                 animations: this.serializeAnimations(result.animationData ?? []),
             });
+            // Lightning Spin broke the cemetery barrels around the attacker in the same impact as the strike, and a
+            // Skewer Strike / Fire Breath the ones it ran on into behind the target.
+            events.push(
+                ...this.scatteredObstacleDestroyedEvents(attacker, result.spunObstacleCells ?? [], "lightning_spin"),
+                ...(result.piercedObstacles ?? []).flatMap((pierced) =>
+                    this.scatteredObstacleDestroyedEvents(attacker, [pierced.cell], pierced.source),
+                ),
+            );
         }
         events.push(...this.createAbilityStolenEvents(result.abilityStolen));
         events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
@@ -714,19 +823,23 @@ export class GameActionEngine {
         if (attacker instanceof Error) {
             return this.reject(attacker.message as GameActionRejectionReason);
         }
-        const target = this.context.unitsHolder.getAllUnits().get(action.targetId);
-        const freeAim = action.targetPosition;
-        if (
-            freeAim !== undefined &&
-            (!attacker.hasAbilityActive("Through Shot") ||
-                !Number.isFinite(freeAim.x) ||
-                !Number.isFinite(freeAim.y) ||
-                !isPositionWithinGrid(this.context.grid.getSettings(), freeAim) ||
-                (freeAim.x === attacker.getPosition().x && freeAim.y === attacker.getPosition().y))
-        ) {
+        if (attacker.hasMovedThisTurn()) {
+            return this.reject("attack_not_available", MOVED_THIS_TURN_MELEE_ONLY_MESSAGE);
+        }
+        // Through Shot may be aimed at a free world point instead of a declared stack: the shot pierces,
+        // so its victims are whatever the ray actually crosses rather than one nominated target. Every
+        // other ranged attack still has to name one — honouring a bare position from them would let a
+        // client fabricate a trajectory no legal aim could ever produce.
+        const freeAimPosition = action.targetPosition;
+        const isFreeAim = freeAimPosition !== undefined && !action.targetId;
+        if (isFreeAim && !attacker.hasAbilityActive("Through Shot")) {
             return this.reject("attack_not_available");
         }
-        if (!target && !freeAim) {
+        if (isFreeAim && (!Number.isFinite(freeAimPosition.x) || !Number.isFinite(freeAimPosition.y) || !isPositionWithinGrid(this.context.grid.getSettings(), freeAimPosition) || (freeAimPosition.x === attacker.getPosition().x && freeAimPosition.y === attacker.getPosition().y))) {
+            return this.reject("attack_not_available");
+        }
+        const target = isFreeAim ? undefined : this.context.unitsHolder.getAllUnits().get(action.targetId);
+        if (!isFreeAim && !target) {
             return this.reject("unit_not_found");
         }
         if (!this.context.attackHandler) {
@@ -746,9 +859,11 @@ export class GameActionEngine {
         // a legal edge, so the server geometry can never be compromised. No visible edge at all means
         // the target is fully screened by its own side and there is nothing legal to aim at — reject
         // rather than aim at its center.
-        const toPosition =
-            freeAim ??
-            (target ? this.resolveRangeTargetPosition(attacker, target, action.aimCell, action.aimSide) : undefined);
+        // A free shot already carries its own endpoint; only a declared target needs its visible
+        // edge reconstructed.
+        const toPosition = target
+            ? this.resolveRangeTargetPosition(attacker, target, action.aimCell, action.aimSide)
+            : freeAimPosition;
         if (!toPosition) {
             return this.reject("attack_not_available");
         }
@@ -762,7 +877,7 @@ export class GameActionEngine {
             false,
             attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
         );
-        if (freeAim && evalResult.affectedUnits.length === 0) {
+        if (isFreeAim && evalResult.affectedUnits.length === 0) {
             if (
                 !this.context.attackHandler.canLandRangeAttack(
                     attacker,
@@ -849,11 +964,6 @@ export class GameActionEngine {
                 attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
             );
         }
-        if (this.context.grid.hasScatteredMountains() && ignoresStructures) {
-            destroyedScatteredCells.push(
-                ...this.context.grid.clearScatteredMountainsInCells(evalResult.affectedCells.flat()),
-            );
-        }
         // `target` is the declared aim anchor used to reconstruct the trajectory. Special shots may legally
         // aim at a rear stack while the authoritative first intersection is a different front stack. Response
         // ownership must follow that actual primary, exactly as damage does; using the aim anchor can suppress
@@ -906,6 +1016,13 @@ export class GameActionEngine {
         if (!result.completed) {
             return this.reject("attack_not_available");
         }
+        // A shot that ignores structures breaks every barrel in its blast — once the shot has been accepted, so a
+        // refused shot never knocks stones out of the authoritative board.
+        if (this.context.grid.hasScatteredMountains() && ignoresStructures) {
+            destroyedScatteredCells.push(
+                ...this.context.grid.clearScatteredMountainsInCells(evalResult.affectedCells.flat()),
+            );
+        }
 
         const unitIdsDied = [...new Set(result.unitIdsDied)];
         const responseTarget = responseUnits?.[0];
@@ -920,6 +1037,7 @@ export class GameActionEngine {
                 type: "unit_attacked",
                 attackType: "range",
                 attackerId: attacker.getId(),
+                // A free shot names no target, so the event reports whoever the ray actually hit first.
                 targetId: target?.getId() ?? primaryRangeTarget?.getId() ?? "",
                 unitIdsDied,
                 damage: this.cloneVisibleDamage(damage),
@@ -963,6 +1081,7 @@ export class GameActionEngine {
             attacker.hasAbilityActive("Through Shot"),
             aimCell,
             aimSide,
+            attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
         )?.position;
     }
     private obstacleAttack(action: Extract<GameAction, { type: "obstacle_attack" }>): IGameActionResult {
@@ -974,12 +1093,15 @@ export class GameActionEngine {
             return this.reject("attack_handler_missing");
         }
         // A scattered layout has no hit-point counters: what is left to hit is simply what still stands.
-        const scattered = this.context.grid.hasScatteredMountains();
-        const standingCellsBefore = scattered ? this.context.grid.getScatteredMountainsStanding() : [];
+        const scattered = this.context.grid.isScatteredMountainCell(
+            getCellForPosition(this.context.grid.getSettings(), action.targetPosition),
+        );
+        const standingCellsBefore = this.context.grid.getScatteredMountainsStanding();
         const standingBefore = standingCellsBefore.length;
         if (
-            this.context.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
-            this.context.fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+            (!scattered &&
+                (this.context.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+                    this.context.fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER)) ||
             (scattered ? standingBefore <= 0 : this.context.fightProperties.getObstacleHitsLeft() <= 0)
         ) {
             return this.reject("obstacle_not_available");
@@ -994,11 +1116,46 @@ export class GameActionEngine {
         if (!canLandRangeHit && !action.attackFrom) {
             return this.reject("attack_not_available");
         }
+        // handleObstacleAttack fires from range whenever it can land a ranged hit, so that is the case a move rules
+        // out; a melee strike on the obstacle after walking up to it stays legal.
+        if (canLandRangeHit && attacker.hasMovedThisTurn()) {
+            return this.reject("attack_not_available", MOVED_THIS_TURN_MELEE_ONLY_MESSAGE);
+        }
+        // A splash shooter aimed at a cemetery barrel lands its shot ON that barrel: a Gargantuan's Area Throw and a
+        // Cyclops' Large Caliber both ignore structures on the way, and their 3x3 breaks every barrel and hits every
+        // unit there, exactly like a throw anywhere else. The stone-by-stone projectile rule below is for shooters
+        // whose shots stop at structures.
+        if (
+            scattered &&
+            canLandRangeHit &&
+            (attacker.hasAbilityActive("Area Throw") || attacker.hasAbilityActive("Large Caliber"))
+        ) {
+            const aimedCell = getCellForPosition(this.context.grid.getSettings(), action.targetPosition);
+            if (
+                !isCellWithinGrid(this.context.grid.getSettings(), aimedCell) ||
+                this.context.grid.getOccupantUnitId(aimedCell) !== "B"
+            ) {
+                return this.reject("attack_not_available");
+            }
+            return this.areaStrikeAtCell(attacker, aimedCell);
+        }
 
         const hitsBefore = this.context.fightProperties.getObstacleHitsLeft();
         const knownPaths = action.attackFrom
             ? this.resolveKnownPaths(attacker, action.attackFrom, action.path, action.hasLavaCell, action.hasWaterCell)
             : undefined;
+        const approachRoute = action.attackFrom
+            ? knownPaths?.get(this.cellKey(action.attackFrom))?.[0]?.route
+            : undefined;
+        const approaching =
+            !canLandRangeHit && action.attackFrom && !this.sameCell(attacker.getBaseCell(), action.attackFrom);
+        if (approaching && approachRoute && this.groundRouteCrossesObstacle(attacker, approachRoute)) {
+            return this.reject("attack_not_available");
+        }
+        const approach =
+            approaching && approachRoute ? { approachPath: approachRoute.map((cell) => ({ ...cell })) } : {};
+        // A Lightning Spin off the blow hits the enemies around the attacker, so this strike can deal unit damage.
+        const damage = this.createVisibleDamage();
         const result = this.context.attackHandler.handleObstacleAttack(
             action.targetPosition,
             this.context.unitsHolder,
@@ -1006,23 +1163,37 @@ export class GameActionEngine {
             attacker,
             action.attackFrom,
             knownPaths,
+            damage,
         );
         const hitsAfter = this.context.fightProperties.getObstacleHitsLeft();
         const standingAfter = scattered ? this.context.grid.getScatteredMountainsStanding().length : 0;
         // "Did the attack achieve anything?" — for scattered stones that is one fewer standing, not one
         // fewer hit point, because their counters never move.
         const landed = scattered ? standingAfter < standingBefore : hitsAfter < hitsBefore;
+        // Burned to death walking into a Fire Wall on the way in: nothing was struck, but the move happened
+        // and the stack is gone, so this completes with the burn alone rather than rejecting a board that has
+        // already moved.
+        if (result.strikeSkipped) {
+            const burnEvents: GameEvent[] = [];
+            if (!this.headlessEvents && result.dispelledSmokeCells?.length) {
+                burnEvents.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+            }
+            if (result.fireWallBurn && !this.headlessEvents) {
+                burnEvents.push({ type: "fire_wall_burned", ...result.fireWallBurn });
+            }
+            burnEvents.push(...this.cleanupDeadUnits([...new Set(result.unitIdsDied)]));
+            burnEvents.push(...this.turnEngine.completeTurn(attacker));
+            return { completed: true, events: burnEvents };
+        }
         if (!result.completed || !landed) {
             return this.reject("attack_not_available");
         }
 
         this.context.unitsHolder.refreshStackPowerForAllUnits();
-        const standingCellsAfter = scattered ? this.context.grid.getScatteredMountainsStanding() : [];
-        const removedCellCandidates = scattered
-            ? standingCellsBefore.filter(
-                  (before) => !standingCellsAfter.some((after) => after.x === before.x && after.y === before.y),
-              )
-            : [];
+        const standingCellsAfter = this.context.grid.getScatteredMountainsStanding();
+        const removedCellCandidates = standingCellsBefore.filter(
+            (before) => !standingCellsAfter.some((after) => after.x === before.x && after.y === before.y),
+        );
         // Preserve the actual projectile order, not the random layout-array order. Double Shot can clear two
         // aligned tombstones in one action; replay must emit the nearer impact first so clients can animate
         // shot one -> stone one, then shot two -> stone two. Any non-trajectory removals fall back to stable
@@ -1039,16 +1210,54 @@ export class GameActionEngine {
             removedCells.push(removed);
             removedByKey.delete(key);
         }
+        // A piercing melee strike (Skewer Strike / Fire Breath) takes the barrel BEHIND the aimed one as well,
+        // and the melee path carries no per-impact animation to order by — so the aimed stone leads and the
+        // pierced one follows, which is the order the client's strike sequence lands them in.
+        const aimedCell = getCellForPosition(this.context.grid.getSettings(), action.targetPosition);
+        const aimedKey = `${aimedCell.x}:${aimedCell.y}`;
+        const aimedRemoved = removedByKey.get(aimedKey);
+        if (aimedRemoved) {
+            removedCells.push(aimedRemoved);
+            removedByKey.delete(aimedKey);
+        }
+        // A Lightning Spin's barrels fall in the SAME impact as the aimed blow rather than on strikes of their own,
+        // so they trail everything else, in the ring order the spin swept them.
+        const spunCells: XY[] = [];
+        for (const cell of result.spunObstacleCells ?? []) {
+            const key = `${cell.x}:${cell.y}`;
+            const removed = removedByKey.get(key);
+            if (removed) {
+                spunCells.push(removed);
+                removedByKey.delete(key);
+            }
+        }
         removedCells.push(...removedByKey.values());
+        const unitIdsDied = [...new Set(result.unitIdsDied)];
+        // The spin's unit hits have no unit target to ride on, so the action's first obstacle event carries them.
+        const unitDamage =
+            unitIdsDied.length || damage.secondary?.length || damage.extraRangedAttackChance !== undefined
+                ? { damage: this.cloneVisibleDamage(damage), unitIdsDied }
+                : {};
         const serializedAnimations = this.serializeAnimations(result.animationData ?? []);
         const events: GameEvent[] = [];
+        // The walk in burned before the barrel was struck, so the burn leads the strike's own events.
+        if (!this.headlessEvents && result.dispelledSmokeCells?.length) {
+            events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+        }
+        if (result.fireWallBurn && !this.headlessEvents) {
+            events.push({ type: "fire_wall_burned", ...result.fireWallBurn });
+        }
         if (!this.headlessEvents) {
             if (scattered) {
                 events.push(
-                    ...this.scatteredObstacleDestroyedEvents(attacker, removedCells).map((event, index) => ({
+                    ...[
+                        ...this.scatteredObstacleDestroyedEvents(attacker, removedCells),
+                        ...this.scatteredObstacleDestroyedEvents(attacker, spunCells, "lightning_spin"),
+                    ].map((event, index) => ({
                         ...event,
                         attackFrom: action.attackFrom ? { ...action.attackFrom } : undefined,
                         animations: serializedAnimations[index] ? [serializedAnimations[index]] : [],
+                        ...(index === 0 ? { ...unitDamage, ...approach } : {}),
                     })),
                 );
             } else {
@@ -1062,9 +1271,16 @@ export class GameActionEngine {
                     hitsAfterLeft: this.context.fightProperties.getObstacleHitsLeftLeft(),
                     hitsAfterRight: this.context.fightProperties.getObstacleHitsLeftRight(),
                     animations: serializedAnimations,
+                    ...unitDamage,
+                    ...approach,
                 });
+                events.push(
+                    ...this.scatteredObstacleDestroyedEvents(attacker, removedCells),
+                    ...this.scatteredObstacleDestroyedEvents(attacker, spunCells, "lightning_spin"),
+                );
             }
         }
+        events.push(...this.cleanupDeadUnits(unitIdsDied));
         // Destroy whichever 2x2 mountain just ran out of hits (each is independent). clearMountainSide is
         // idempotent, so checking both after every obstacle attack is safe and cheap.
         let clearedMountain = false;
@@ -1091,7 +1307,11 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
     }
-    private scatteredObstacleDestroyedEvents(attacker: Unit, cells: readonly XY[]): GameEvent[] {
+    private scatteredObstacleDestroyedEvents(
+        attacker: Unit,
+        cells: readonly XY[],
+        source?: Extract<GameEvent, { type: "obstacle_attacked" }>["source"],
+    ): Extract<GameEvent, { type: "obstacle_attacked" }>[] {
         if (!cells.length) {
             return [];
         }
@@ -1107,12 +1327,16 @@ export class GameActionEngine {
             hitsAfterLeft: fightProperties.getObstacleHitsLeftLeft(),
             hitsAfterRight: fightProperties.getObstacleHitsLeftRight(),
             animations: [],
+            ...(source ? { source } : {}),
         }));
     }
     private areaThrowAttack(action: Extract<GameAction, { type: "area_throw_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
         if (attacker instanceof Error) {
             return this.reject(attacker.message as GameActionRejectionReason);
+        }
+        if (attacker.hasMovedThisTurn()) {
+            return this.reject("attack_not_available", MOVED_THIS_TURN_MELEE_ONLY_MESSAGE);
         }
         if (!this.context.attackHandler) {
             return this.reject("attack_handler_missing");
@@ -1125,7 +1349,35 @@ export class GameActionEngine {
         ) {
             return this.reject("attack_not_available");
         }
-        const targetCell = { ...action.targetCell };
+        const occupantId = this.context.grid.getOccupantUnitId(action.targetCell);
+        if (
+            occupantId &&
+            occupantId !== "L" &&
+            occupantId !== "W" &&
+            !(occupantId === "B" && this.context.grid.hasScatteredMountains())
+        ) {
+            return this.reject("attack_not_available");
+        }
+        return this.areaStrikeAtCell(attacker, action.targetCell);
+    }
+    /**
+     * A ranged splash landing on one cell: a Gargantuan's Area Throw at any cell, or an Area Throw / Large Caliber shot
+     * aimed at a cemetery barrel. Its 3x3 hits every unit there and, once the shot is accepted, breaks every barrel.
+     * Nothing was aimed at a unit, so there is no retaliation.
+     */
+    private areaStrikeAtCell(attacker: Unit, aimedCell: XY): IGameActionResult {
+        if (!this.context.attackHandler) {
+            return this.reject("attack_handler_missing");
+        }
+        // Project the throw onto the first enemy standing on the trajectory between the attacker and
+        // the aimed (empty) cell. A unit on the line intercepts the throw instead of it passing
+        // through to the cell behind — matching legacy test_heroes.ts. With a clear path the aimed
+        // cell is used unchanged.
+        const targetCell = this.context.attackHandler.projectAreaThrowTargetCell(
+            this.context.unitsHolder.getAllUnits(),
+            attacker,
+            aimedCell,
+        );
         const targetPosition = getPositionForCell(
             targetCell,
             this.context.grid.getSettings().getMinX(),
@@ -1134,9 +1386,6 @@ export class GameActionEngine {
         );
         const affectedCells = [...getCellsAroundCell(this.context.grid.getSettings(), targetCell), targetCell];
         const affectedUnits = evaluateAffectedUnits(affectedCells, this.context.unitsHolder, this.context.grid);
-        const destroyedScatteredCells = this.context.grid.hasScatteredMountains()
-            ? this.context.grid.clearScatteredMountainsInCells(affectedCells)
-            : [];
         const divisor = this.context.attackHandler.getRangeAttackDivisor(attacker, targetPosition);
         const damage = this.createVisibleDamage();
         const result = this.context.attackHandler.handleRangeAttack(
@@ -1153,6 +1402,15 @@ export class GameActionEngine {
         );
         if (!result.completed) {
             return this.reject("attack_not_available");
+        }
+        // Every barrel in the 3x3 breaks — once the throw has been accepted, so a refused throw leaves the board as it was.
+        const destroyedScatteredCells = this.context.grid.hasScatteredMountains()
+            ? this.context.grid.clearScatteredMountainsInCells(affectedCells)
+            : [];
+        // A blast that catches no unit resolves as a "miss" before the range handler ever spends the shot. Breaking
+        // barrels is no miss: the rock landed, so it costs the shot a throw at units would.
+        if (!affectedUnits && destroyedScatteredCells.length) {
+            attacker.decreaseNumberOfShots();
         }
 
         const affectedUnitIds = affectedUnits?.[0]?.map((unit) => unit.getId()) ?? [];
@@ -1189,6 +1447,9 @@ export class GameActionEngine {
         if (caster instanceof Error) {
             return this.reject(caster.message as GameActionRejectionReason);
         }
+        if (caster.hasMovedThisTurn()) {
+            return this.reject("spell_not_available", MOVED_THIS_TURN_MELEE_ONLY_MESSAGE);
+        }
         if (!this.context.attackHandler) {
             return this.reject("attack_handler_missing");
         }
@@ -1216,10 +1477,15 @@ export class GameActionEngine {
                 (cell) => isCellWithinGrid(this.context.grid.getSettings(), cell),
                 caster.getBaseCell(),
                 target.getBaseCell(),
-                // Only Fire Strike arcs over the caster's own troops. Every other thrown spell is blocked by
-                // ANY body, and each re-checks that strictly in its own handler — scoping the transparency
-                // here keeps this gate from quietly becoming the more permissive of the two.
-                spell.getName() === "Fire Strike" ? (unitId) => this.isAllyOfCaster(caster, unitId) : undefined,
+                // The intercepted throws (Fire Strike, Fireball) arc over the caster's own troops — for
+                // the visible-edge gate too, or a target screened by the caster's own front line was refused
+                // here before fireballCast could fly over them (owner report 2026-09-20, "my allies also can
+                // block"). Every other thrown spell is blocked by ANY body, and each re-checks that strictly in
+                // its own handler — scoping the transparency here keeps this gate from quietly becoming the
+                // more permissive of the two.
+                SpellHelper.isInterceptedThrownSpell(spell.getName())
+                    ? (unitId) => this.isAllyOfCaster(caster, unitId)
+                    : undefined,
                 // The whole footprint, so a large target boxed in on one corner is still reachable by the
                 // open edge of another of its cells.
                 target.getCells(),
@@ -1261,7 +1527,8 @@ export class GameActionEngine {
         if (!target && spell.getName() === "Smoke") {
             return this.smokeCast(action, caster, spell);
         }
-        // Fire Wall: a cell-targeted 3-cell line, laid anywhere on the field in one of four orientations.
+        // Fire Wall: a cell-targeted 4-cell line, laid anywhere on the field in one of four orientations;
+        // only the free cells of the line light.
         if (!target && spell.getName() === "Fire Wall") {
             return this.fireWallCast(action, caster, spell);
         }
@@ -1275,6 +1542,11 @@ export class GameActionEngine {
         // Battle Mage's Fire Strike: a fireball at one enemy in line of sight.
         if (target && spell.getName() === "Fire Strike") {
             return this.fireStrikeCast(caster, target, spell);
+        }
+        // Wandering Mage's Fireball: Fire Strike with a blast radius — it burns what it hits AND what
+        // stands beside it.
+        if (target && spell.getName() === "Fireball") {
+            return this.fireballCast(caster, target, spell);
         }
         // Battle Mage's Meteorite: a 2x2 impact aimed at a cell rather than a unit (no range gate).
         if (!target && spell.getName() === "Meteorite") {
@@ -1324,6 +1596,9 @@ export class GameActionEngine {
                 abilityTransfers: result.abilityTransfers?.length ? result.abilityTransfers : undefined,
             },
         ];
+        if (!this.headlessEvents && result.dispelledSmokeCells?.length) {
+            events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+        }
         events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
@@ -1342,7 +1617,7 @@ export class GameActionEngine {
         }
         const c = action.targetCell;
         const cells: XY[] = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
-        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? [];
+        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? [];
         const allies = affected.filter((u) => u.getTeam() === caster.getTeam());
         const crafted = processCraftAbility(caster, allies, this.context.sceneLog);
         caster.useSpell(spell.getName());
@@ -1368,11 +1643,10 @@ export class GameActionEngine {
         return { completed: true, events };
     }
     /**
-     * Smoke spell (Wandering Mage / Book of Chaos): throws a 2x2 smoke cloud onto FREE cells anywhere on the
-     * battlefield. Only empty cells of the 2x2 block become smoked — cells already occupied by a creature (or
-     * off-grid) are skipped, so the cloud shapes around whatever is standing in it. Ranged attacks crossing a
-     * smoked cell have their damage halved (divisor x2); a creature stepping on a smoked cell dispels it; the
-     * cloud lasts `spell.getLapsTotal()` laps. One cast = one charge.
+     * Smoke spell (Wandering Mage / Book of Chaos): throws a 3x3 smoke cloud onto FREE cells anywhere on the
+     * battlefield, CENTRED on the aimed cell the way Meteor Shower's 3x3 is. Ranged attacks crossing a smoked
+     * cell have their damage halved (divisor x2); a creature stepping on a smoked cell dispels it; the cloud
+     * lasts `spell.getLapsTotal()` laps. One cast = one charge.
      */
     private smokeCast(
         action: Extract<GameAction, { type: "cast_spell" }>,
@@ -1383,9 +1657,9 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
         const c = action.targetCell;
-        const cells: XY[] = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
-        // The WHOLE 2x2 must be placeable — a partial cast is rejected outright rather than quietly
-        // smoking two of four cells, so what the aim preview highlights is exactly what lands. Blocked by
+        const cells = SpellHelper.cellTargetedSpellBlockCells(spell.getName(), c);
+        // The WHOLE 3x3 must be placeable — a partial cast is rejected outright rather than quietly
+        // smoking part of the block, so what the aim preview highlights is exactly what lands. Blocked by
         // the mountain, a narrowed-away cell, a creature, or the edge of the board; lava and water are
         // fine (smoking the lava lane is an intended play). See isSmokeableCell, shared with the client.
         const settings = this.context.grid.getSettings();
@@ -1430,16 +1704,21 @@ export class GameActionEngine {
         return { completed: true, events };
     }
     /**
-     * Fire Wall (Nightmare / Book of Nightmares): lays a burning wall across 3 cells in a straight line,
-     * anywhere on the battlefield, in whichever of the four orientations the player rotated the aim to.
+     * Fire Wall (Nightmare / Book of Nightmares): lays a burning wall across FIRE_WALL_LENGTH (4) cells in a
+     * straight line, anywhere on the battlefield, in whichever of the four orientations the player rotated
+     * the aim to.
      *
-     * All-or-nothing like Smoke: the WHOLE line must be placeable or the cast is refused outright, so the
-     * three cells the aim preview highlighted are exactly the three that light up. Lava and water are
-     * ground the flames sit over; the mountain, a narrowed-away cell, a creature or the board edge are not.
+     * NOT all-or-nothing, unlike Smoke (owner call 2026-09-19: the wall goes anywhere, it just lights the
+     * empty cells): a creature, the mountain, a narrowed-away cell or the board edge under part of the line
+     * leaves that cell unlit and the rest burns. Lava and water are ground the flames sit over. The only
+     * refused placement is one where nothing on the line can burn — a charge that lights nothing is wasted.
+     * fireWallLitCells is the shared readout, so the cells the aim preview highlighted are exactly the cells
+     * that light up.
      *
      * Two effects, both lasting `spell.getLapsTotal()` laps: entering a burning cell costs one extra step
      * (see FIRE_WALL_CROSS_PENALTY in path_helper) and sears the crossing stack for a share of its maximum
-     * health (see applyFireWallBurn on the move path). Neither spares flyers. One cast = one charge.
+     * health (see applyFireWallBurn on the move path). A flyer clears both in flight (owner call
+     * 2026-09-30) and is only seared for the burning cells it lands on. One cast = one charge.
      */
     private fireWallCast(
         action: Extract<GameAction, { type: "cast_spell" }>,
@@ -1450,12 +1729,14 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
         const orientation = normalizeFireWallOrientation(action.targetOrientation);
-        const cells = fireWallCells(action.targetCell, orientation);
         const settings = this.context.grid.getSettings();
-        const allPlaceable = cells.every((cell) =>
-            isFireWallableCell(this.context.grid, isCellWithinGrid(settings, cell), cell),
+        const cells = fireWallLitCells(
+            this.context.grid,
+            (cell) => isCellWithinGrid(settings, cell),
+            action.targetCell,
+            orientation,
         );
-        if (!allPlaceable) {
+        if (!cells.length) {
             return this.reject("spell_not_available");
         }
         const laps = spell.getLapsTotal();
@@ -1821,7 +2102,7 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? [];
+        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? [];
         const enemies = affected.filter((unit) => unit.getTeam() !== caster.getTeam() && !unit.isDead());
         if (!enemies.length) {
             return this.reject("spell_not_available");
@@ -1853,8 +2134,8 @@ export class GameActionEngine {
     }
     /**
      * Turn one raw (pre-resistance) spell-damage number into the units that actually take it, including each
-     * Magic Mirror return. The spell buffs return their configured share deterministically; Magic Reflection
-     * keeps its chance-based proc and uses that same advertised percentage as its returned share.
+     * Magic Mirror return. Every mirror — the spell buffs and the Magic Dragon's passive alike — returns its
+     * advertised share DETERMINISTICALLY, the way magic resistance cuts a hit; only the debuff copy rolls.
      *
      * A rebound is an EXTRA hit, not a redirection: the spell still lands on the holder in full, then the
      * caster takes the resolved share, cut down by the CASTER's own element and magic resistance. Two mirrored
@@ -1891,13 +2172,14 @@ export class GameActionEngine {
             const landedDamage = this.elementalDamageAgainst(spell, rawDamage, unit);
             victims.push({ unit, damage: landedDamage });
             // A mirror returns what it REFLECTS, not the whole spell: the caster takes the mirror's own share
-            // (the percentage its card advertises) of the damage that actually landed on the holder.
-            // Reflecting 100% made a 75% card a lie and turned every dragon into a death trap. The caster's
-            // OWN element and magic resistance then cut the rebound down, so what comes back is what the
-            // caster actually takes — projected by the same helper the client's aim preview draws over the
-            // caster, so aiming at a mirror warns about the return hit before it is taken.
+            // (the percentage its card advertises) of the damage that actually landed on the holder — ALWAYS,
+            // as an amount the way magic resistance cuts one, never a roll. Reflecting 100% made a 75% card a
+            // lie and turned every dragon into a death trap; a chance to return nothing made it a second lie.
+            // The caster's OWN element and magic resistance then cut the rebound down, so what comes back is
+            // what the caster actually takes — projected by the same helper the client's aim preview draws
+            // over the caster, so aiming at a mirror warns about the return hit before it is taken.
             const reflectionPercent =
-                landedDamage > 0 && unit.getId() !== caster.getId() ? SpellHelper.rollMagicMirrorDamageShare(unit) : 0;
+                landedDamage > 0 && unit.getId() !== caster.getId() ? SpellHelper.mirroredDamageShare(unit) : 0;
             const rebound = reflectionPercent
                 ? projectSpellRebound({
                       spell,
@@ -2044,9 +2326,9 @@ export class GameActionEngine {
         // evaluateAffectedUnits dedupes by unit, so a large creature straddling two of the ring's cells burns
         // once. The aimed target owns none of these cells, so it is already absent; it is filtered by id too
         // so the "spares its target" rule survives any future change to how occupancy is reported.
-        const caught = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
-            (unit) => !unit.isDead() && unit.getId() !== caster.getId() && unit.getId() !== target.getId(),
-        );
+        const caught = (
+            evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? []
+        ).filter((unit) => !unit.isDead() && unit.getId() !== caster.getId() && unit.getId() !== target.getId());
         // An empty ring is NOT a refusal: the owner wants Ring of Fire castable at any enemy in sight, so a
         // lone target simply spends the charge and burns no one. Refusing here was the "sometimes it will not
         // cast — with no barrier in the way" report: the barrier was this neighbour requirement, invisible to
@@ -2079,11 +2361,129 @@ export class GameActionEngine {
         return { completed: true, events };
     }
     /**
+     * Fireball (Wandering Mage / Book of Chaos): a thrown fireball that bursts where it lands.
+     *
+     * Ring of Fire's opposite number, and deliberately built from the same parts. Both are aimed at one
+     * enemy in line of sight and both catch everything on the cells touching it, friend or foe — but the
+     * ring SPARES the creature at its centre while the fireball is thrown AT it, so the aim point takes the
+     * blast like everyone else (owner call 2026-09-20: "like fire arrow, but with AOE around the target,
+     * like cyclops attack"). That is the whole difference, and it is why the target is in the victim list
+     * here and filtered out there.
+     *
+     * Everything else is the shared spell tail: each victim resists separately, a Fire Element shrugs the
+     * whole thing off and a Water Element takes half again as much, and the damage is magical so armour
+     * does nothing. Its power is per CREATURE in the caster's stack (UNIT_AMOUNT_DAMAGE), priced well under
+     * Fire Strike's because it lands on a whole cluster rather than one body.
+     */
+    private fireballCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
+        const from = caster.getBaseCell();
+        const to = target.getBaseCell();
+        if (!from || !to) {
+            return this.reject("spell_not_available");
+        }
+        if (
+            !SpellHelper.canCastSpell(
+                false,
+                this.context.grid.getSettings(),
+                this.context.grid.getMatrix(),
+                caster,
+                target,
+                spell,
+                to,
+                target.getMagicResist(),
+                target.hasMindAttackResistance(),
+                target.canBeHealed(),
+            )
+        ) {
+            return this.reject("spell_not_available");
+        }
+        // Thrown like Fire Strike, which is the half of it the owner described as "like fire arrow": it
+        // arcs over the caster's own troops, and a screening ENEMY intercepts it and wears the burst
+        // itself rather than the cast being refused. Only terrain stops it outright. Resolved through the
+        // shared helper, so the trajectory the client draws names the creature that actually burns.
+        const settings = this.context.grid.getSettings();
+        const impact = SpellHelper.resolveThrownSpellImpact(
+            spell.getName(),
+            this.context.grid,
+            (cell) => isCellWithinGrid(settings, cell),
+            from,
+            to,
+            (unitId) => this.isAllyOfCaster(caster, unitId),
+        );
+        if (impact.blockedByTerrain) {
+            return this.reject("spell_not_available");
+        }
+        let epicentre = target;
+        if (impact.interceptedBy && impact.interceptedBy !== target.getId()) {
+            const intercepting = this.context.unitsHolder.getAllUnits().get(impact.interceptedBy);
+            if (!intercepting || intercepting.isDead()) {
+                return this.reject("spell_not_available");
+            }
+            epicentre = intercepting;
+            this.context.sceneLog.updateLog(
+                `${intercepting.getName()} intercepted ${spell.getName()} aimed at ${target.getName()}`,
+            );
+        }
+
+        // The blast is lifted from the epicentre's own cells, so a 2x2 creature is ringed by the 12 cells
+        // that touch it rather than the 8 around one corner — the same footprint rule Ring of Fire uses,
+        // and the reason a big body is not blasted through its own middle.
+        const cells = getCellsAroundFootprint(settings, epicentre.getCells());
+        const splashed = (
+            evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? []
+        ).filter(
+            // The caster is spared: a mage does not blow itself up with its own throw. The epicentre is
+            // not — it owns none of the surrounding cells, so it is absent here and added below by name.
+            (unit) => !unit.isDead() && unit.getId() !== caster.getId() && unit.getId() !== epicentre.getId(),
+        );
+        // The unit it burst on first, so the log and the damage list read epicentre-then-splash.
+        const caught = [epicentre, ...splashed];
+
+        const rawDamage = spellRawDamage(spell, caster);
+        const victims = this.resolveSpellVictims(caster, spell, rawDamage, caught);
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        caster.useSpell(spell.getName());
+        // One line per victim, not one total. A blast is priced per creature — each resists separately, an
+        // element can halve or void it, and a Water Shield can eat one outright — so a single summed number
+        // told the player nothing about who actually took what (owner report 2026-09-20, reading
+        // "burst a Fireball on Centaur, catching 2 more (984)" off the battle log). Same shape the engine
+        // already uses for a splash shot and a multi-hit attack: a headline saying WHERE it burst, then the
+        // damage broken out. Rebounds are excluded here; Magic Mirror writes its own line.
+        this.context.sceneLog.updateLog(`${caster.getName()} burst a Fireball on ${epicentre.getName()}`);
+        for (const entry of damaged) {
+            if (entry.rebounded) {
+                continue;
+            }
+            const victim = this.context.unitsHolder.getAllUnits().get(entry.unitId);
+            this.context.sceneLog.updateLog(
+                `${victim?.getName() ?? "Unit"} burned for (${entry.amount}) by Fireball${killTag(entry.unitsDied)}`,
+            );
+        }
+
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                // The unit it BURST on, not the one aimed at — a screening enemy may have taken it. The
+                // client centres the explosion here, so it must be where the fire actually went.
+                targetId: epicentre.getId(),
+                targetCell: impact.cell,
+                unitIdsDied,
+                animations: [],
+                damaged,
+            },
+        ];
+        events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
      * Meteor Shower (Magic Dragon / Tome of Elements): meteors rained over a 3x3 block of the board.
      *
      * Aimed at a CELL rather than a unit, anywhere the dragon likes — no range gate and no line of sight,
      * because it falls out of the sky. `action.targetCell` is the CENTRE of the block: an odd-sided footprint
-     * pivots around the cursor the way the Fire Wall's 3-cell line does, unlike the even-sided 2x2 of Meteorite
+     * pivots around the cursor the way the Fire Wall's line does, unlike the even-sided 2x2 of Meteorite
      * and Craft, which have no centre cell to anchor on and take a corner instead.
      *
      * Every ENEMY standing under the block takes the damage — allies are not caught (that is Ring of Fire's
@@ -2110,7 +2510,7 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? [];
+        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? [];
         const enemies = affected.filter((unit) => unit.getTeam() !== caster.getTeam() && !unit.isDead());
         if (!enemies.length) {
             return this.reject("spell_not_available");
@@ -2120,10 +2520,18 @@ export class GameActionEngine {
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, enemies);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
-        this.context.sceneLog.updateLog(
-            // Post-resistance total, as with Ring of Fire above.
-            `${caster.getName()} called a Meteor Shower onto ${enemies.length} target(s) (${spellDamageTotal(damaged)})`,
-        );
+        // One line per victim, same as Fireball. A summed "across N units" hides who actually took the
+        // stone — each resists separately, and an Earth Element takes none of it.
+        this.context.sceneLog.updateLog(`${caster.getName()} cast Meteor Shower`);
+        for (const entry of damaged) {
+            if (entry.rebounded) {
+                continue;
+            }
+            const victim = this.context.unitsHolder.getAllUnits().get(entry.unitId);
+            this.context.sceneLog.updateLog(
+                `${victim?.getName() ?? "Unit"} hit for (${entry.amount}) by Meteor Shower${killTag(entry.unitsDied)}`,
+            );
+        }
 
         const events: GameEvent[] = [
             {
@@ -2189,11 +2597,9 @@ export class GameActionEngine {
         return spell.isSummon() && spell.getSpellTargetType() === SpellTargetType.RANDOM_CLOSE_TO_CASTER;
     }
     private canUseSpell(caster: Unit, spell: Spell): boolean {
-        return (
-            spell.getLapsTotal() > 0 &&
-            spell.isRemaining() &&
-            spell.getMinimalCasterStackPower() <= caster.getStackPower()
-        );
+        // One gate for the engine and the AI (a Broken unit can't cast, plus charges and stack power): the AI kept
+        // proposing Broken casts the engine refused while the Break rule lived only in a copy here.
+        return SpellHelper.isSpellUsableByCaster(caster, spell);
     }
     private massCastSpell(
         action: Extract<GameAction, { type: "cast_spell" }>,
@@ -2253,22 +2659,51 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const targetCell = action.targetCell ?? this.context.getSummonTargetCell?.(caster, spell, action);
-        if (!SpellHelper.canCastSummon(spell, this.context.grid.getMatrix(), targetCell)) {
-            return this.reject("spell_not_available");
-        }
-
         const unitName = spell.getSummonUnitName();
         const team = caster.getTeam();
         const existing = this.context.unitsHolder.getSummonedUnitByName(team, unitName);
         if (existing) {
             existing.increaseAmountAlive(amount);
+            const cells = existing.getCells();
+            const dispelledSmokeCells = dispelSmokeOnOccupiedCells(
+                this.context.fightProperties.getSmokeClouds(),
+                this.context.grid,
+                existing.getId(),
+                cells,
+            );
             this.context.sceneLog.updateLog(`${caster.getName()} summoned ${amount} x ${unitName}`);
             caster.useSpell(spell.getName());
 
-            const events = this.createSummonEvents(caster, spell, existing, amount, existing.getCells(), true);
+            const events = this.createSummonEvents(caster, spell, existing, amount, cells, true);
+            if (!this.headlessEvents && dispelledSmokeCells.length) {
+                events.push({ type: "smoke_dispel", cells: dispelledSmokeCells });
+            }
             events.push(...this.turnEngine.completeTurn(caster));
             return { completed: true, events };
+        }
+
+        // The summoned creature's real body has to fit. An explicit cell is not relocated. A cast
+        // with no cell (what the ranked client sends) takes the first cell around the caster that
+        // holds that body. One empty cell is not enough for a 2×1 Wolf.
+        const native = SpellHelper.summonFootprintOf(spell);
+        const ring = getCellsAroundFootprint(this.context.grid.getSettings(), caster.getCells());
+        const hinted = action.targetCell ?? this.context.getSummonTargetCell?.(caster, spell, action);
+        const seatCell = action.targetCell
+            ? SpellHelper.canCastSummon(
+                  spell,
+                  this.context.grid.getMatrix(),
+                  action.targetCell,
+                  native.width,
+                  native.height,
+              )
+                ? action.targetCell
+                : undefined
+            : SpellHelper.resolveSummonAnchor(spell, this.context.grid.getMatrix(), ring, hinted);
+        if (!seatCell) {
+            return this.reject(
+                "spell_not_available",
+                SpellHelper.noSpaceToSummonMessage(caster.getName(), unitName, native.width, native.height),
+            );
         }
 
         if (!this.context.createSummonedUnit) {
@@ -2287,43 +2722,10 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        // The FALLBACK target (no explicit cell on the action) was chosen before the creature existed,
-        // so it could only be vetted as a 1x1. Now that the body's true shape is known, a fallback cell
-        // that cannot seat it retries the ring around the caster's whole footprint for the first anchor
-        // that can — the seam firstSummonableAnchor was written for. An explicit player-chosen cell is
-        // never re-routed: refusing it is the correct answer.
-        let seatCell = targetCell;
-        if (
-            action.targetCell === undefined &&
-            seatCell &&
-            !SpellHelper.canCastSummon(
-                spell,
-                this.context.grid.getMatrix(),
-                seatCell,
-                summoned.getFootprintWidth(),
-                summoned.getFootprintHeight(),
-            )
-        ) {
-            seatCell = SpellHelper.firstSummonableAnchor(
-                spell,
-                this.context.grid.getMatrix(),
-                getCellsAroundFootprint(this.context.grid.getSettings(), caster.getCells()),
-                summoned.getFootprintWidth(),
-                summoned.getFootprintHeight(),
-            );
-            if (!seatCell) {
-                return this.reject("spell_not_available");
-            }
-        }
         const cells = this.resolveSummonCells(summoned, seatCell);
         if (!cells.length) {
             return this.reject("spell_not_available");
         }
-        // The gate at the top of this cast could only prove the ANCHOR cell was free: the creature that
-        // would stand on it did not exist yet. It does now, so put its whole body through the same
-        // authoritative gate. Every shipped summon is a 1x1, for which this re-asks the identical question
-        // and gets the identical answer; for anything wider it is the difference between refusing the cast
-        // and dropping a body across cells that were never looked at.
         if (
             !SpellHelper.canCastSummon(
                 spell,
@@ -2354,12 +2756,21 @@ export class GameActionEngine {
 
         summoned.setPosition(position.x, position.y);
         this.context.unitsHolder.addUnit(summoned);
+        const dispelledSmokeCells = dispelSmokeOnOccupiedCells(
+            this.context.fightProperties.getSmokeClouds(),
+            this.context.grid,
+            summoned.getId(),
+            cells,
+        );
         this.context.sceneLog.updateLog(`${caster.getName()} summoned ${amount} x ${unitName}`);
         const summonCell = summoned.getBaseCell();
         this.context.sceneLog.updateLog(`${unitName} spawned at (${summonCell.x}, ${summonCell.y})`);
         caster.useSpell(spell.getName());
 
         const events = this.createSummonEvents(caster, spell, summoned, amount, cells, false);
+        if (!this.headlessEvents && dispelledSmokeCells.length) {
+            events.push({ type: "smoke_dispel", cells: dispelledSmokeCells });
+        }
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
     }
@@ -2524,7 +2935,16 @@ export class GameActionEngine {
             );
             const debuffTarget = absorptionTarget ?? enemy;
 
+            // Full immunity reads as a resist to the player exactly like a won roll does — it was silent
+            // before, so a mass debuff that touched nobody looked like a spell that had simply done nothing.
             if (debuffTarget.getMagicResist() === 100) {
+                this.context.sceneLog.updateLog(`${debuffTarget.getName()} resisted from ${spell.getName()}`);
+                recordEffectApplication({
+                    unitId: debuffTarget.getId(),
+                    name: spell.getName(),
+                    kind: "debuff",
+                    resisted: true,
+                });
                 continue;
             }
             if (getRandomInt(0, 100) < Math.floor(debuffTarget.getMagicResist())) {
@@ -2537,10 +2957,19 @@ export class GameActionEngine {
                 });
                 continue;
             }
-            if (
-                SpellHelper.hasAlreadyAppliedSpell(debuffTarget, spell) ||
-                (spell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance())
-            ) {
+            // Shrugging off a MIND spell is a resist and reads as one; say so. An already-applied spell is
+            // not a resist — it stays silent, as the "suffers" line for it was already written.
+            if (spell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance()) {
+                this.context.sceneLog.updateLog(`${debuffTarget.getName()} resisted from ${spell.getName()}`);
+                recordEffectApplication({
+                    unitId: debuffTarget.getId(),
+                    name: spell.getName(),
+                    kind: "debuff",
+                    resisted: true,
+                });
+                continue;
+            }
+            if (SpellHelper.hasAlreadyAppliedSpell(debuffTarget, spell)) {
                 continue;
             }
 
@@ -2567,6 +2996,42 @@ export class GameActionEngine {
                 );
             }
         }
+    }
+    private placeBarrel(action: Extract<GameAction, { type: "place_barrel" }>): IGameActionResult {
+        const fp = this.context.fightProperties;
+        if (fp.hasFightStarted() || fp.hasFightFinished()) return this.reject("placement_not_available");
+        if (
+            !fp.hasArtifactTier1(action.team, Tier1Artifact.BARREL_BARRICADE) ||
+            !Number.isInteger(action.barrelIndex) ||
+            action.barrelIndex < 0 ||
+            action.barrelIndex >= ARTIFACT_POWER.BARREL_BARRICADE_COUNT
+        ) {
+            return this.reject("invalid_placement");
+        }
+        const allowed = this.context.canPlaceBarrel
+            ? this.context.canPlaceBarrel(action.team, action.cell)
+            : artifactBarrelPlacementCells(this.context.grid, fp, action.team).some(
+                  (cell) => cell.x === action.cell.x && cell.y === action.cell.y,
+              );
+        if (!allowed) return this.reject("placement_not_available");
+        if (!this.context.grid.placeArtifactBarrel(action.team, action.barrelIndex, action.cell))
+            return this.reject("placement_blocked");
+        return {
+            completed: true,
+            events: [
+                { type: "barrel_placed", team: action.team, barrelIndex: action.barrelIndex, cell: { ...action.cell } },
+            ],
+        };
+    }
+    private unplaceBarrel(action: Extract<GameAction, { type: "unplace_barrel" }>): IGameActionResult {
+        if (this.context.fightProperties.hasFightStarted() || this.context.fightProperties.hasFightFinished())
+            return this.reject("placement_not_available");
+        if (!this.context.grid.unplaceArtifactBarrel(action.team, action.barrelIndex))
+            return this.reject("invalid_placement");
+        return {
+            completed: true,
+            events: [{ type: "barrel_unplaced", team: action.team, barrelIndex: action.barrelIndex }],
+        };
     }
     private placeUnit(action: Extract<GameAction, { type: "place_unit" }>): IGameActionResult {
         if (this.context.fightProperties.hasFightStarted() || this.context.fightProperties.hasFightFinished()) {
@@ -2664,6 +3129,7 @@ export class GameActionEngine {
             return this.reject("delete_not_available");
         }
         if (mergeTarget && deletedAmount > 0) {
+            mergeTarget.takeResourcesFromMerge(unit, deletedAmount);
             mergeTarget.setAmountAlive(mergeTarget.getAmountAlive() + deletedAmount);
         }
 
@@ -2726,6 +3192,11 @@ export class GameActionEngine {
             return this.reject(refusal ?? "invalid_placement");
         }
 
+        // The peeled stack takes its share of the spell charges; a one-per-fight cast is never duplicated.
+        // A one-creature split still receives one charge of each stack-power-1 spell the source has more than one of.
+        // Arrows are copied, not divided: the new stack gets the source's remaining quiver, and the source
+        // keeps its own.
+        sourceUnit.shareResourcesWithSplit(splitUnit, action.amount);
         const sourceAmount = sourceUnit.getAmountAlive() - action.amount;
         sourceUnit.setAmountAlive(sourceAmount);
         this.context.unitsHolder.addUnit(splitUnit);
@@ -2899,6 +3370,17 @@ export class GameActionEngine {
         }
 
         return true;
+    }
+    /** Cached or externally supplied routes must not carry a ground footprint through standing terrain. */
+    private groundRouteCrossesObstacle(unit: Unit, route: readonly XY[]): boolean {
+        return (
+            !unit.canFly() &&
+            route.some((anchor) =>
+                unit
+                    .getFootprintCellsForAnchor(anchor)
+                    .some((cell) => this.context.grid.getOccupantUnitId(cell) === "B"),
+            )
+        );
     }
     private cellsMatchInOrder(left: XY[], right: XY[]): boolean {
         return (
@@ -3110,7 +3592,32 @@ export class GameActionEngine {
             unitPosition: { ...damage.unitPosition },
             hits: damage.hits?.map((hit) => ({ ...hit })),
             splash: damage.splash?.map((entry) => ({ ...entry, position: { ...entry.position } })),
+            chakramArcs: damage.chakramArcs?.map((arc) => ({
+                ...arc,
+                cells: arc.cells.map((cell) => ({ ...cell })),
+                hitUnitIds: arc.hitUnitIds ? [...arc.hitUnitIds] : undefined,
+                mountainCells: arc.mountainCells?.map((cell) => ({ ...cell })),
+            })),
+            chakramFlights: damage.chakramFlights?.map((flight) => ({
+                ...flight,
+                arcs: flight.arcs.map((arc) => ({
+                    ...arc,
+                    cells: arc.cells.map((cell) => ({ ...cell })),
+                    hitUnitIds: arc.hitUnitIds ? [...arc.hitUnitIds] : undefined,
+                    mountainCells: arc.mountainCells?.map((cell) => ({ ...cell })),
+                })),
+                splash: flight.splash.map((entry) => ({ ...entry, position: { ...entry.position } })),
+            })),
             secondary: damage.secondary?.map((entry) => ({ ...entry, position: { ...entry.position } })),
+            absolutions: damage.absolutions?.map((entry) => ({
+                ...entry,
+                position: { ...entry.position },
+                liftedNames: [...entry.liftedNames],
+            })),
+            gravechains: damage.gravechains?.map((wave) => ({
+                ...wave,
+                links: wave.links.map((link) => ({ ...link, position: { ...link.position } })),
+            })),
         };
     }
     private serializeAnimations(animationData: IAnimationData[]): IGameAnimationEvent[] {
@@ -3146,6 +3653,17 @@ export class GameActionEngine {
         }
         return attributions;
     }
+    private emitPyreExplosion(events: GameEvent[], explosion: IPyreExplosion | undefined): void {
+        if (!explosion || this.headlessEvents) {
+            return;
+        }
+        events.push({
+            type: "pyre_exploded",
+            unitId: explosion.unitId,
+            position: explosion.position,
+            hits: explosion.hits,
+        });
+    }
     private cleanupDeadUnits(unitIdsDied: string[], killAttributions = new Map<string, Unit>()): GameEvent[] {
         const events: GameEvent[] = [];
         const processed = new Set<string>();
@@ -3167,12 +3685,41 @@ export class GameActionEngine {
             const deleted = this.context.unitsHolder.deleteUnitById(unitId, true);
             if (deleted) {
                 events.push({ type: "unit_destroyed", unitId, reason: "dead_cleanup" });
+                const explosion = explodeLastFuse(unit, this.context.unitsHolder, this.context.sceneLog);
+                this.emitPyreExplosion(events, explosion);
                 const killer = killAttributions.get(unitId);
                 if (killer?.hasAbilityActive("Infest")) {
                     const infested = this.spawnInfestedUnit(killer, corpseLevel, corpseCells);
                     if (infested) {
-                        events.push(infested);
+                        events.push(...infested);
                     }
+                }
+                if (explosion) {
+                    detonateLastFuseChain(
+                        explosion.unitIdsDied,
+                        this.context.unitsHolder,
+                        this.context.sceneLog,
+                        (killedId) => {
+                            events.push({ type: "unit_destroyed", unitId: killedId, reason: "dead_cleanup" });
+                        },
+                        (chain) => {
+                            this.emitPyreExplosion(events, chain);
+                        },
+                        (resurrected) => {
+                            if (this.headlessEvents) {
+                                return;
+                            }
+                            this.context.sceneLog.updateLog(`${resurrected.getName()} is resurrecting!`);
+                            events.push({
+                                type: "unit_resurrected",
+                                unitId: resurrected.getId(),
+                                team: resurrected.getTeam(),
+                                amount: resurrected.getAmountAlive(),
+                                hp: resurrected.getHp(),
+                                position: { ...resurrected.getPosition() },
+                            });
+                        },
+                    );
                 }
                 continue;
             }
@@ -3193,7 +3740,7 @@ export class GameActionEngine {
 
         return events;
     }
-    private spawnInfestedUnit(killer: Unit, corpseLevel: number, corpseCells: XY[]): GameEvent | undefined {
+    private spawnInfestedUnit(killer: Unit, corpseLevel: number, corpseCells: XY[]): GameEvent[] | undefined {
         if (!this.context.createSummonedUnit || !corpseCells.length) {
             return undefined;
         }
@@ -3255,24 +3802,33 @@ export class GameActionEngine {
 
         spawned.setPosition(position.x, position.y);
         this.context.unitsHolder.addUnit(spawned);
+        const dispelledSmokeCells = dispelSmokeOnOccupiedCells(
+            this.context.fightProperties.getSmokeClouds(),
+            this.context.grid,
+            spawned.getId(),
+            cells,
+        );
         if (this.headlessEvents) {
             return undefined;
         }
         this.context.sceneLog.updateLog(`${killer.getName()} infested the fallen stack with ${unitName}`);
         const spawnCell = spawned.getBaseCell();
         this.context.sceneLog.updateLog(`${unitName} spawned at (${spawnCell.x}, ${spawnCell.y})`);
-        return {
-            type: "unit_summoned",
-            casterId: killer.getId(),
-            unitId: spawned.getId(),
-            team: spawned.getTeam(),
-            unitName,
-            amount: 1,
-            position: { ...spawned.getPosition() },
-            cells: structuredClone(cells),
-            merged: false,
-            sourceAbility: "Infest",
-        };
+        return [
+            {
+                type: "unit_summoned",
+                casterId: killer.getId(),
+                unitId: spawned.getId(),
+                team: spawned.getTeam(),
+                unitName,
+                amount: 1,
+                position: { ...spawned.getPosition() },
+                cells: structuredClone(cells),
+                merged: false,
+                sourceAbility: "Infest",
+            },
+            ...(dispelledSmokeCells.length ? [{ type: "smoke_dispel" as const, cells: dispelledSmokeCells }] : []),
+        ];
     }
     private reject(rejectionReason: GameActionRejectionReason, message?: string): IGameActionResult {
         return { completed: false, events: [], rejectionReason, message };

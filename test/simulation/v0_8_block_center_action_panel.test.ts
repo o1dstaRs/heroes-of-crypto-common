@@ -298,6 +298,9 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             name: "Large attacker",
             attackType: PBTypes.AttackVals.MELEE,
             size: PBTypes.UnitSizeVals.LARGE,
+            // Small Specie only dodges LEVEL-4 attackers — the sentinel below lifts it to 100% and the
+            // direct-attack option must vanish, which only bites when the gate actually applies.
+            level: PBTypes.UnitLevelVals.FOURTH,
         });
         const target = createTestUnit({
             team: PBTypes.TeamVals.RIGHT,

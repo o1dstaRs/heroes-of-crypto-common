@@ -899,7 +899,8 @@ export function getRangeAttackSideCenter(
 /**
  * Whether a ranged shot fired by `fromTeamType` can see (is not blocked at) a given cell side. A
  * side is observable when the neighbouring cell is empty, holds a friendly unit, or is flat hazard
- * terrain (lava/water/hole — narrowing consumes cells as holes) — i.e. NOT an enemy unit hiding the edge. Through Shot only treats hard BLOCK obstacles as occluders.
+ * terrain (lava/water/hole — narrowing consumes cells as holes) — i.e. NOT an enemy unit hiding the edge.
+ * Through Shot pierces bodies. A shot that ignores structures can also aim at a side next to a BLOCK cell.
  * This is the authoritative "visible edge" rule, shared by the client preview and the server engine.
  */
 export function isRangeAttackSideObservable(
@@ -908,6 +909,7 @@ export function isRangeAttackSideObservable(
     side: RangeAttackCellSide,
     fromTeamType: TeamType,
     isThroughShot = false,
+    ignoresStructures = false,
 ): boolean {
     let neighbour: number;
     switch (side) {
@@ -924,6 +926,9 @@ export function isRangeAttackSideObservable(
         default:
             neighbour = matrixElement(gridMatrix, cell.x, cell.y + 1);
             break;
+    }
+    if (ignoresStructures && neighbour === ObstacleType.BLOCK) {
+        return true;
     }
     if (isThroughShot) {
         return neighbour !== ObstacleType.BLOCK;
@@ -962,11 +967,12 @@ export function observableRangeAttackEdges(
     targetCells: readonly XY[],
     fromTeamType: TeamType,
     isThroughShot = false,
+    ignoresStructures = false,
 ): Array<{ cell: XY; side: RangeAttackCellSide }> {
     const edges: Array<{ cell: XY; side: RangeAttackCellSide }> = [];
     for (const cell of targetCells) {
         for (const side of RANGE_ATTACK_CELL_SIDES) {
-            if (isRangeAttackSideObservable(gridMatrix, cell, side, fromTeamType, isThroughShot)) {
+            if (isRangeAttackSideObservable(gridMatrix, cell, side, fromTeamType, isThroughShot, ignoresStructures)) {
                 edges.push({ cell, side });
             }
         }
@@ -980,10 +986,11 @@ export function hasObservableRangeAttackEdge(
     targetCells: readonly XY[],
     fromTeamType: TeamType,
     isThroughShot = false,
+    ignoresStructures = false,
 ): boolean {
     for (const cell of targetCells) {
         for (const side of RANGE_ATTACK_CELL_SIDES) {
-            if (isRangeAttackSideObservable(gridMatrix, cell, side, fromTeamType, isThroughShot)) {
+            if (isRangeAttackSideObservable(gridMatrix, cell, side, fromTeamType, isThroughShot, ignoresStructures)) {
                 return true;
             }
         }
@@ -1009,8 +1016,9 @@ export function resolveRangeAttackAimEdge(
     isThroughShot = false,
     aimCell?: XY,
     aimSide?: number,
+    ignoresStructures = false,
 ): IClosestSideCenter | undefined {
-    const edges = observableRangeAttackEdges(gridMatrix, targetCells, fromTeamType, isThroughShot);
+    const edges = observableRangeAttackEdges(gridMatrix, targetCells, fromTeamType, isThroughShot, ignoresStructures);
     if (!edges.length) {
         return undefined;
     }
@@ -1060,6 +1068,7 @@ export function getClosestSideCenterDetailed(
     isSmallUnitTo: boolean,
     fromTeamType: TeamType,
     isThroughShot = false,
+    ignoresStructures = false,
 ): IClosestSideCenter | undefined {
     const cell = getCellForPosition(gridSettings, mousePosition);
     if (!cell) {
@@ -1082,6 +1091,7 @@ export function getClosestSideCenterDetailed(
         RangeAttackCellSide.LEFT,
         fromTeamType,
         isThroughShot,
+        ignoresStructures,
     );
     const observableRight = isRangeAttackSideObservable(
         gridMatrix,
@@ -1089,6 +1099,7 @@ export function getClosestSideCenterDetailed(
         RangeAttackCellSide.RIGHT,
         fromTeamType,
         isThroughShot,
+        ignoresStructures,
     );
     const observableUp = isRangeAttackSideObservable(
         gridMatrix,
@@ -1096,6 +1107,7 @@ export function getClosestSideCenterDetailed(
         RangeAttackCellSide.UP,
         fromTeamType,
         isThroughShot,
+        ignoresStructures,
     );
     const observableDown = isRangeAttackSideObservable(
         gridMatrix,
@@ -1103,6 +1115,7 @@ export function getClosestSideCenterDetailed(
         RangeAttackCellSide.DOWN,
         fromTeamType,
         isThroughShot,
+        ignoresStructures,
     );
 
     if (
@@ -1203,6 +1216,7 @@ export function getClosestSideCenter(
     isSmallUnitTo: boolean,
     fromTeamType: TeamType,
     isThroughShot = false,
+    ignoresStructures = false,
 ): XY | undefined {
     return getClosestSideCenterDetailed(
         gridMatrix,
@@ -1214,5 +1228,6 @@ export function getClosestSideCenter(
         isSmallUnitTo,
         fromTeamType,
         isThroughShot,
+        ignoresStructures,
     )?.position;
 }

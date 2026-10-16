@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "status": "research_only_no_bake",
+  "candidateId": "ranked-unit-strength-a19-side-v1-w2",
+  "totalGames": 2000,
+  "options": {
+    "gamesPerOpponent": 2000,
+    "baseSeed": 97200001,
+    "concurrency": 14,
+    "fightProfile": "a19",
+    "fightVersion": "v0.8",
+    "maxLaps": 60,
+    "mapTypes": [
+      1,
+      3,
+      4
+    ],
+    "setupRules": "all",
+    "candidateSetupPolicySpec": "v07-nonfight-4eda84635fe7",
+    "opponentSetupPolicySpec": "v07-nonfight-4eda84635fe7",
+    "draftDimensions": {
+      "offset": 0,
+      "length": 15
+    },
+    "clusterSize": 4,
+    "seedAllocation": "indexed-bijective-v1",
+    "seedChannelsPerBoard": 3,
+    "commonBattleSeed": true,
+    "behaviorTrace": "canonical-sha256-v1",
+    "executedActionsRecorded": true,
+    "liveDraftRules": true,
+    "sideBoard": true,
+    "deterministicSearch": true,
+    "explorationRate": 0
+  },
+  "opponents": [
+    {
+      "opponentId": "ranked-live-incumbent",
+      "games": 2000,
+      "offerBoards": 500,
+      "wins": 1249,
+      "losses": 720,
+      "draws": 31,
+      "decisiveGames": 1969,
+      "decisiveWinRate": 0.6343321482986287,
+      "confidence95": {
+        "low": 0.591241107190911,
+        "high": 0.6753747266319188
+      },
+      "clusteredLowerBound": 0.591241107190911,
+      "drawOrArmageddonRate": 0.0385,
+      "rejectedCandidate": 0,
+      "rejectedOpponent": 0,
+      "avgLaps": 6.943,
+      "endReasons": {
+        "elimination": 2000,
+        "turn_cap": 0,
+        "stuck": 0
+      }
+    }
+  ],
+  "maps": [
+    {
+      "mapType": 1,
+      "games": 668,
+      "offerBoards": 167,
+      "wins": 416,
+      "losses": 243,
+      "draws": 9,
+      "decisiveGames": 659,
+      "decisiveWinRate": 0.6312594840667678,
+      "confidence95": {
+        "low": 0.5559002395735163,
+        "high": 0.7007156413261032
+      },
+      "clusteredLowerBound": 0.5559002395735163,
+      "drawOrArmageddonRate": 0.038922155688622756,
+      "rejectedCandidate": 0,
+      "rejectedOpponent": 0,
+      "avgLaps": 6.866766467065868,
+      "endReasons": {
+        "elimination": 668,
+        "turn_cap": 0,
+        "stuck": 0
+      }
+    },
+    {
+      "mapType": 3,
+      "games": 668,
+      "offerBoards": 167,
+      "wins": 405,
+      "losses": 253,
+      "draws": 10,
+      "decisiveGames": 658,
+      "decisiveWinRate": 0.6155015197568389,
+      "confidence95": {
+        "low": 0.5399087945246767,
+        "high": 0.6858998352164648
+      },
+      "clusteredLowerBound": 0.5399087945246767,
+      "drawOrArmageddonRate": 0.040419161676646706,
+      "rejectedCandidate": 0,
+      "rejectedOpponent": 0,
+      "avgLaps": 7.151197604790419,
+      "endReasons": {
+        "elimination": 668,
+        "turn_cap": 0,
+        "stuck": 0
+      }
+    },
+    {
+      "mapType": 4,
+      "games": 664,
+      "offerBoards": 166,
+      "wins": 428,
+      "losses": 224,
+      "draws": 12,
+      "decisiveGames": 652,
+      "decisiveWinRate": 0.656441717791411,
+      "confidence95": {
+        "low": 0.5813935507136108,
+        "high": 0.7244128613005745
+      },
+      "clusteredLowerBound": 0.5813935507136108,
+      "drawOrArmageddonRate": 0.03614457831325301,
+      "rejectedCandidate": 0,
+      "rejectedOpponent": 0,
+      "avgLaps": 6.8102409638554215,
+      "endReasons": {
+        "elimination": 664,
+        "turn_cap": 0,
+        "stuck": 0
+      }
+    }
+  ],
+  "cohortDefinitions": {
+    "ranged": "candidate roster contains at least one RANGE creature",
+    "mage": "candidate roster contains at least one MAGIC creature",
+    "melee_magic": "candidate roster contains at least one MELEE_MAGIC creature",
+    "aura_heavy": "candidate roster contains at least one creature carrying an aura"
+  },
+  "cohorts": [
+    {
+      "cohort": "ranged",
+      "games": 468,
+      "wins": 332,
+      "losses": 128,
+      "draws": 8,
+      "decisiveGames": 460,
+      "decisiveWinRate": 0.7217391304347827,
+      "confidence95": {
+        "low": 0.6569085568493599,
+        "high": 0.7784508844584191
+      }
+    },
+    {
+      "cohort": "mage",
+      "games": 178,
+      "wins": 86,
+      "losses": 86,
+      "draws": 6,
+      "decisiveGames": 172,
+      "decisiveWinRate": 0.5,
+      "confidence95": {
+        "low": 0.3977398665504473,
+        "high": 0.6022601334495526
+      }
+    },
+    {
+      "cohort": "melee_magic",
+      "games": 1286,
+      "wins": 768,
+      "losses": 499,
+      "draws": 19,
+      "decisiveGames": 1267,
+      "decisiveWinRate": 0.606156274664562,
+      "confidence95": {
+        "low": 0.5600359222098977,
+        "high": 0.6504594606856722
+      }
+    },
+    {
+      "cohort": "aura_heavy",
+      "games": 1860,
+      "wins": 1144,
+      "losses": 686,
+      "draws": 30,
+      "decisiveGames": 1830,
+      "decisiveWinRate": 0.6251366120218579,
+      "confidence95": {
+        "low": 0.5817694290393619,
+        "high": 0.6665841269546424
+      }
+    }
+  ],
+  "aggregate": {
+    "fitness": 0.591241107190911,
+    "worstCaseLowerBound": 0.591241107190911,
+    "worstCaseOpponent": "ranked-live-incumbent",
+    "rejectedCandidate": 0,
+    "rejectedOpponent": 0,
+    "drawOrArmageddonRate": 0.0385,
+    "avgLaps": 6.943,
+    "endReasons": {
+      "elimination": 2000,
+      "turn_cap": 0,
+      "stuck": 0
+    },
+    "behaviorTraceSetSha256": "fcf4bc291eb2e896d4be1cd3e26aebfbf90ff77b888193c0101b3d812dd8da26"
+  },
+  "qualification": "Research-only exact ranked draft evaluation; no candidate is baked or promoted by this report."
+}

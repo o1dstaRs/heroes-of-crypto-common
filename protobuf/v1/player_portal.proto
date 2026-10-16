@@ -69,6 +69,13 @@ message PortalMatch {
     // did not advance the calibration counter (RankedOutcomeReason, ranked_math.ts) — only a fully
     // played-out game does.
     string outcome_reason = 26;
+    // Exit rules: how an early ending was resolved, read from the ranked result. False for a played-out game, a lobby
+    // game, and a game settled before exits were recorded; the two fields below are then empty.
+    bool exit_recorded = 27;
+    // The share of both starting armies' XP destroyed when the exit resolved, in basis points (5000 = the 50% line).
+    int32 exit_casualty_bp = 28;
+    // Who left, from the requesting player's side: "player", "opponent", "both" (a double abandon), or "" (a void).
+    string exit_leaver = 29;
 }
 
 // A creature combo (a sorted set of creature ids the viewer played together) with its record.

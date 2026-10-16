@@ -10,6 +10,8 @@ import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
+import { FIRE_WALL_LENGTH } from "../../src/spells/fire_walls";
+import { cellTargetedSpellBlockCells } from "../../src/spells/spell_helper";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Unit } from "../../src/units/unit";
@@ -135,12 +137,8 @@ describe("v0.8 Wandering Mage anti-ranged role", () => {
 
         const smoke = candidates.find((candidate) => candidate.spellName === "Smoke");
         expect(smoke?.targetCell).toBeDefined();
-        const smokeCells = [
-            smoke!.targetCell!,
-            { x: smoke!.targetCell!.x + 1, y: smoke!.targetCell!.y },
-            { x: smoke!.targetCell!.x, y: smoke!.targetCell!.y + 1 },
-            { x: smoke!.targetCell!.x + 1, y: smoke!.targetCell!.y + 1 },
-        ];
+        // The engine's own footprint, so this never drifts from the block smokeCast actually lays.
+        const smokeCells = cellTargetedSpellBlockCells("Smoke", smoke!.targetCell!);
         const friendlyBefore = findBestLegalStationaryRangeAttack(friendlyRanger, context)?.expectedDamage;
         const friendlyAfter = findBestLegalStationaryRangeAttack(friendlyRanger, context, smokeCells)?.expectedDamage;
         expect(friendlyAfter).toBe(friendlyBefore);
@@ -178,7 +176,8 @@ describe("v0.8 Nightmare roadblock role", () => {
 
         const result = startEngine(combat, nightmare, context).apply(decision!);
         expect(result.completed).toBe(true);
-        expect(context.fightProperties!.getFireWalls().size()).toBe(3);
+        // The whole line lit: the roadblock role only proposes a wall with no gap in it.
+        expect(context.fightProperties!.getFireWalls().size()).toBe(FIRE_WALL_LENGTH);
     });
 
     test("keeps an immediate melee attack instead of spending the wall", () => {

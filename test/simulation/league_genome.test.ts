@@ -178,13 +178,22 @@ describe("B1 full-game league genome", () => {
         expect(
             pickLeagueCreature(levelFourPickState([queen, champion], [ward], [flyer]), PBTypes.TeamVals.LEFT, anchor),
         ).toBe(champion);
+        // The level-2 Manticore sits in the first level-2 slot of the six-slot board, so that is the slot
+        // a Scout has to watch to see it.
+        expect(
+            pickLeagueCreature(
+                levelFourPickState([queen, champion], [ward], [flyer], [2]),
+                PBTypes.TeamVals.LEFT,
+                anchor,
+            ),
+        ).toBe(queen);
         expect(
             pickLeagueCreature(
                 levelFourPickState([queen, champion], [ward], [flyer], [0]),
                 PBTypes.TeamVals.LEFT,
                 anchor,
             ),
-        ).toBe(queen);
+        ).toBe(champion);
         expect(
             [abomination, queen].includes(
                 pickLeagueCreature(levelFourPickState([abomination, queen], [], []), PBTypes.TeamVals.LEFT, anchor),

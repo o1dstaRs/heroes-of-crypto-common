@@ -179,8 +179,10 @@ export const getHeroConfig = (
 };
 
 export const getAbilityConfig = (abilityName: string): AbilityProperties => {
+    // Saved units may still carry the former local-aura name. Return the canonical blessing card.
+    const canonicalName = abilityName === "Rallying Volley Aura" ? "Rallying Volley Blessing" : abilityName;
     // @ts-ignore: we do not know the type here yet
-    const ability = abilitiesJson[abilityName];
+    const ability = abilitiesJson[canonicalName];
     if (!ability) {
         throw TypeError(`Unknown ability - ${abilityName}`);
     }
@@ -214,7 +216,7 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
     }
 
     return new AbilityProperties(
-        abilityName,
+        canonicalName,
         abilityType,
         ability.desc,
         ability.power,
@@ -469,9 +471,10 @@ export const getCreatureConfig = (
             abilityDescriptions.push(updatedDescription);
         } else if (abilityConfig.name === "Paralysis") {
             const description = abilityConfig.desc.join("\n");
+            const damageCut = abilityConfig.effect ? (getEffectConfig(abilityConfig.effect)?.power ?? 0) : 0;
             const updatedDescription = description
                 .replace("{}", Number((abilityConfig.power * 2).toFixed()).toString())
-                .replace("{}", Number(abilityConfig.power.toFixed()).toString());
+                .replace("{}", Number(damageCut.toFixed()).toString());
             abilityDescriptions.push(updatedDescription);
         } else if (abilityConfig.name === CHAKRAM_ABILITY_NAME) {
             // Creature configs are templates with the minimum stack tier. Live units rewrite this after

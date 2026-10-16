@@ -13,7 +13,7 @@ import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
-import type { IDecisionContext } from "../ai_strategy";
+import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
 import {
     enumerateCandidates,
     type ICandidateSet,
@@ -35,8 +35,9 @@ type ImmediateAttack = Extract<
 
 const LEFT = PBTypes.TeamVals.LEFT;
 
-function areaThrowGateOn(unit: Unit): boolean {
-    const gate = process.env.V06_AREA_THROW;
+/** `on` / `both` = every seat, `green` / `red` = that seat only, anything else (including unset) = off. */
+function seatGateOn(envName: string, unit: Unit): boolean {
+    const gate = process.env[envName];
     if (gate === "on" || gate === "both") {
         return true;
     }
@@ -44,6 +45,19 @@ function areaThrowGateOn(unit: Unit): boolean {
         return gate === (unit.getTeam() === LEFT ? "green" : "red");
     }
     return false;
+}
+
+function areaThrowGateOn(unit: Unit): boolean {
+    return seatGateOn("V06_AREA_THROW", unit);
+}
+
+/**
+ * The Through Shot twin of the Area Throw gate: `V06_THROUGH_SHOT` (+ `V06_THROUGH_SHOT_VERSIONS`), same
+ * values, same off-by-default reason — v0.1-v0.5 are frozen baselines. v0.8 does not need this router: its
+ * own policy already takes the best line (prioritizeV08SplashRangedDecision).
+ */
+function throughShotGateOn(unit: Unit): boolean {
+    return seatGateOn("V06_THROUGH_SHOT", unit);
 }
 
 const sameCell = (a: XY | undefined, b: XY | undefined): boolean =>
@@ -57,8 +71,8 @@ const sameCell = (a: XY | undefined, b: XY | undefined): boolean =>
  * mirror can carry the router on ONE seat while the other stays the frozen incumbent, isolating the
  * router's own effect (W16's seat-scoped battery credits the pattern; see rider_ev_router.ts).
  */
-function areaThrowScopeAllows(version: string | undefined): boolean {
-    const raw = process.env.V06_AREA_THROW_VERSIONS;
+function versionScopeAllows(envName: string, version: string | undefined): boolean {
+    const raw = process.env[envName];
     if (!raw) {
         return true;
     }
@@ -70,6 +84,14 @@ function areaThrowScopeAllows(version: string | undefined): boolean {
         .map((entry) => entry.trim())
         .filter(Boolean)
         .includes(version);
+}
+
+function areaThrowScopeAllows(version: string | undefined): boolean {
+    return versionScopeAllows("V06_AREA_THROW_VERSIONS", version);
+}
+
+function throughShotScopeAllows(version: string | undefined): boolean {
+    return versionScopeAllows("V06_THROUGH_SHOT_VERSIONS", version);
 }
 
 /** Return the turn's immediate combat action, ignoring a preceding attack-type selection or move. */
@@ -112,7 +134,9 @@ function incumbentDamage(attack: ImmediateAttack, candidates: readonly IEnumerat
                     // v0.2+ supplies bounded aim intent. For a legacy aim-less action, matching every aim at
                     // the same target and taking the maximum is conservative: Area Throw must beat even that.
                     (attack.aimCell === undefined || sameCell(candidateAttack.aimCell, attack.aimCell)) &&
-                    (attack.aimSide === undefined || candidateAttack.aimSide === attack.aimSide)
+                    (attack.aimSide === undefined || candidateAttack.aimSide === attack.aimSide) &&
+                    // A free Through Shot line is identified by its aim point (targetId is "" for all of them).
+                    sameCell(candidateAttack.targetPosition, attack.targetPosition)
                 );
             case "area_throw_attack":
                 return (
@@ -184,3 +208,102 @@ export function routeAreaThrow(
 
     return best.features.expectedDamage > incumbentExpectedDamage ? best.actions : incumbent;
 }
+
+/**
+ * Opt-in Through Shot LINE router for the frozen versions (v0.1-v0.7): the line that pierces the most
+ * valuable set of enemies, edge-aimed or aimed at a free world point. The catalog's priced shot candidates
+ * already fold in every pierced stack with its range falloff, so like routeAreaThrow this consumes that
+ * engine-mirrored score rather than re-deriving geometry. `V06_THROUGH_SHOT=on` (or `green`/`red`/`both`,
+ * plus the optional `V06_THROUGH_SHOT_VERSIONS` scope) is required; gate off returns the exact incumbent
+ * array without enumerating. A strict comparison preserves the incumbent on ties and whenever the catalog
+ * cannot price the incumbent combat action safely.
+ */
+export function routeThroughShotLine(
+    unit: Unit,
+    context: IDecisionContext,
+    incumbent: GameAction[],
+    enumerate: CandidateEnumerator = enumerateCandidates,
+    version?: string,
+): GameAction[] {
+    if (!throughShotGateOn(unit) || !throughShotScopeAllows(version) || !unit.hasAbilityActive("Through Shot")) {
+        return incumbent;
+    }
+
+    const options: IEnumerateOptions = { throughShotFreeAim: true };
+    const enumerated = enumerate(unit, context, incumbent, options);
+    const forcedTarget = context.unitsHolder.getAllUnits().get(unit.getTarget());
+    const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
+    let best: IEnumeratedCandidate | undefined;
+    for (const candidate of enumerated.candidates) {
+        if (
+            candidate.kind === "shot" &&
+            !candidate.actions.some((action) => action.type === "move_unit") &&
+            Number.isFinite(candidate.features.expectedDamage) &&
+            candidate.features.expectedDamage > 0 &&
+            (!forcedTargetId || candidate.targetId === forcedTargetId) &&
+            (!best || candidate.features.expectedDamage > best.features.expectedDamage)
+        ) {
+            best = candidate;
+        }
+    }
+    if (!best) {
+        return incumbent;
+    }
+
+    const attack = immediateAttack(incumbent);
+    let incumbentExpectedDamage = 0;
+    if (attack) {
+        const neutral: GameAction[] = [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
+        const estimatedDamage = incumbentDamage(attack, enumerate(unit, context, neutral, options).candidates);
+        if (estimatedDamage === undefined) {
+            return incumbent;
+        }
+        incumbentExpectedDamage = estimatedDamage;
+    }
+
+    return best.features.expectedDamage > incumbentExpectedDamage ? best.actions : incumbent;
+}
+
+/**
+ * Give EVERY registered version access to Area Throw — and, behind its own gate, the Through Shot line.
+ *
+ * Gargantuan's whole identity is the splash, and most versions could never fire one: only the shared
+ * candidate generator builds an `area_throw_attack`, and v0.1-v0.5 never enumerate candidates at all.
+ * routeAreaThrow is already version-agnostic — it enumerates, takes the best splash, and swaps only when
+ * it strictly beats what the version decided — so the capability belongs here, at the one point every
+ * profile passes through, rather than copied into six strategy files.
+ *
+ * It stays behind the SAME env gate it always had, off by default. v0.1-v0.5 are frozen research
+ * baselines (v0.6's fight is byte-for-byte v0.5, CEM trains against a frozen v0.4, and seeded traces are
+ * pinned to their exact decisions) — silently changing what they do would invalidate every A/B the AI
+ * program rests on. Gate off, routeAreaThrow returns the incumbent array before enumerating, so those
+ * versions stay bit-identical; gate on (V06_AREA_THROW), they can all finally use the ability.
+ *
+ * Re-routing a version that already routes internally (v0.6) is harmless: the comparison is strict, so a
+ * decision that is already the best splash is preserved rather than swapped for itself.
+ *
+ * SCOPE: this reaches the LIVE bot only — ranked_profile.createAIStrategy, which the server's
+ * ranked_ai_profile.ts calls. The simulation resolves through ai/index.ts getAIStrategy instead, whose
+ * registry is deliberately identity- and byte-pinned (rollout drivers compare strategy identity, and a
+ * profile test pins the registry bytes), so wrapping it there breaks that research infrastructure —
+ * measured, 12 failures. The consequence is real and worth stating: this behaviour cannot currently be
+ * A/B'd by the sim harness, so flipping its gate on for live play needs evidence from somewhere else.
+ */
+export const withAreaThrow = (strategy: IAIStrategy): IAIStrategy => {
+    const decideTurn = strategy.decideTurn.bind(strategy);
+    return new Proxy(strategy, {
+        get(target, property, receiver) {
+            if (property !== "decideTurn") {
+                return Reflect.get(target, property, receiver);
+            }
+            return (unit: Unit, context: IDecisionContext): GameAction[] =>
+                routeThroughShotLine(
+                    unit,
+                    context,
+                    routeAreaThrow(unit, context, decideTurn(unit, context), undefined, target.version),
+                    undefined,
+                    target.version,
+                );
+        },
+    });
+};

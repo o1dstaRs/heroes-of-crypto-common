@@ -16,6 +16,7 @@ import { StrategyV0_5 } from "../../src/ai/versions/v0_5";
 import { DEFAULT_V05_W, V05_WEIGHT_KEYS, loadV05Weights } from "../../src/ai/versions/v0_5_weights";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import type { GameAction } from "../../src/engine/actions";
+import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
 import { Spell } from "../../src/spells/spell";
@@ -233,5 +234,105 @@ describe("v0.5 — reinforcement-learned strategy", () => {
             attackFrom: dragon.getBaseCell(),
         });
         expect(attack).not.toMatchObject({ attackFrom: lavaAttackFrom });
+    });
+});
+
+describe("v0.5 Dulling Defense", () => {
+    const meleeTargetId = (actions: GameAction[]): string | undefined => {
+        const attack = actions.find((action) => action.type === "melee_attack");
+        return attack?.type === "melee_attack" ? attack.targetId : undefined;
+    };
+
+    const weigh = (index: number, value: number): number[] => {
+        const weights = new Array(DEFAULT_V05_W.length).fill(0);
+        weights[index] = value;
+        return weights;
+    };
+
+    const board = (
+        actorAbilities: string[],
+        left: { name: string; attack: number; maxHp: number; abilities?: string[] },
+        right: { name: string; attack: number; maxHp: number; abilities?: string[] },
+    ) => {
+        const combat = createCombatTestContext();
+        const actor = createTestUnit({
+            team: LEFT,
+            name: "Actor",
+            attack: 10,
+            damageMin: 1,
+            damageMax: 1,
+            maxHp: 80,
+            abilities: actorAbilities,
+        });
+        const leftUnit = createTestUnit({
+            team: RIGHT,
+            name: left.name,
+            attack: left.attack,
+            damageMin: 1,
+            damageMax: 1,
+            maxHp: left.maxHp,
+            abilities: left.abilities,
+        });
+        const rightUnit = createTestUnit({
+            team: RIGHT,
+            name: right.name,
+            attack: right.attack,
+            damageMin: 1,
+            damageMax: 1,
+            maxHp: right.maxHp,
+            abilities: right.abilities,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, actor, { x: 5, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, leftUnit, { x: 6, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, rightUnit, { x: 5, y: 6 });
+        const context: IDecisionContext = {
+            ...decisionContext(combat),
+            fightProperties: FightStateManager.getInstance().getFightProperties(),
+        };
+        const strike = (target: Unit): GameAction[] => [
+            {
+                type: "melee_attack",
+                attackerId: actor.getId(),
+                targetId: target.getId(),
+                attackFrom: actor.getBaseCell(),
+            },
+        ];
+        const choose = (weights: number[] | undefined, target: Unit): string | undefined =>
+            meleeTargetId(new StrategyV0_5(weights)["meleeByPolicy"](actor, context, strike(target)));
+        return { actor, leftUnit, rightUnit, context, choose };
+    };
+
+    it("avoids a knight only when he will answer", () => {
+        const { leftUnit, rightUnit, context, choose } = board(
+            [],
+            { name: "Knight", attack: 10, maxHp: 80, abilities: ["Dulling Defense"] },
+            { name: "Plain", attack: 10, maxHp: 80 },
+        );
+        const weights = weigh(50, -1.5113);
+        weights[19] = 0.5818;
+
+        expect(choose(weights, leftUnit)).toBe(rightUnit.getId());
+
+        context.fightProperties!.addRepliedAttack(leftUnit.getId());
+        expect(choose(weights, leftUnit)).toBe(leftUnit.getId());
+    });
+
+    it("treats the knight's own swing as a reason to hit a unit he can still dull", () => {
+        const { leftUnit, rightUnit, choose } = board(
+            ["Dulling Defense"],
+            { name: "Spent", attack: 1, maxHp: 80 },
+            { name: "Cuttable", attack: 12, maxHp: 80 },
+        );
+
+        expect(choose(weigh(0, 0), leftUnit)).toBe(rightUnit.getId());
+    });
+
+    it("still finishes a stack instead of swinging only to dull a survivor", () => {
+        const { leftUnit, rightUnit, choose } = board(
+            ["Dulling Defense"],
+            { name: "Kill", attack: 12, maxHp: 1 },
+            { name: "Survivor", attack: 12, maxHp: 80 },
+        );
+        expect(choose(weigh(15, 0.9643), rightUnit)).toBe(leftUnit.getId());
     });
 });

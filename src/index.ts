@@ -11,6 +11,7 @@
 
 export * from "./grid/grid";
 export * from "./grid/scattered_mountains";
+export * from "./grid/artifact_barrels";
 export * as GridConstants from "./grid/grid_constants";
 export * as GridMath from "./grid/grid_math";
 export * as Augment from "./augments/augment_properties";
@@ -34,6 +35,7 @@ export * from "./effects/effect_properties";
 export * from "./effects/effect_factory";
 export * from "./effects/effect";
 export * as SpellHelper from "./spells/spell_helper";
+export { CASTLING_RANGE_BONUS_CELLS } from "./spells/spell_helper";
 export * as SmokeHelper from "./spells/smoke_clouds";
 export * as FireWallHelper from "./spells/fire_walls";
 export * as VineHelper from "./spells/vines";
@@ -50,8 +52,10 @@ export * from "./engine/runtime";
 export * from "./engine/turn_engine";
 export * from "./handlers/move_handler";
 export * from "./handlers/attack_handler";
+export * from "./handlers/melee_response";
 export * from "./spells/spell_properties";
 export * from "./spells/spell_damage";
+export { rewriteCastBuffPowerText, tomeAmplifiedBuffPower } from "./spells/castable_buff";
 export * from "./spells/spell_cast_projection";
 export * from "./spells/magic_mirror_damage";
 export * from "./synergies/synergy_properties";
@@ -78,6 +82,7 @@ export * as HoCLib from "./utils/lib";
 export * as HoCMath from "./utils/math";
 export * as AI from "./ai/ai";
 export * from "./ai/tactical_split_placement";
+export * from "./ai/setup/artifact_fit";
 export {
     getAIStrategy,
     createAIStrategy,
@@ -113,12 +118,24 @@ export {
     V08_A13_SOURCE_VERSION,
     V08_A13_VALUE_LEAF,
     buildV08A19SearchEnvironment,
+    createV08A19RankedPlacementStrategy,
     createV08A19Strategy,
+    createV08A19RoleStrategy,
+    roleSearchPlan,
+    v08A19RoleSearchOverrides,
+    V08_A19_BEHAVIOR_ENVIRONMENT_SHA256,
     V08_A19_CANDIDATE_ID,
+    V08_A19_DEGRADED_BUDGET,
+    V08_A19_GENOME,
+    V08_A19_GENOME_SHA256,
+    V08_A19_PLACEMENT_POLICY,
+    V08_A19_POLICY,
     V08_A19_PRODUCTION_VERSION,
     V08_A19_PROFILE,
     V08_A19_PROFILE_SCHEMA,
-    V08_A19_PRODUCTION_ROUTING_SOURCE_LEDGER,
+    V08_A19_SEARCH,
+    V08_A19_SEARCH_RULES,
+    V08_A19_SOURCE_LEDGER,
     V09_MODEL_ARTIFACT,
     V09_MODEL_ID,
     V09_MODEL_PROMOTED,

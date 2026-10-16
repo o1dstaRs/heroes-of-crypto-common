@@ -62,6 +62,28 @@ describe("draft coherence overlay", () => {
                 tier1ArtifactId: Tier1Artifact.WOUNDING_CHARM,
             }),
         );
+        expect(
+            draftCreatureCoherenceAffinity(Creature.ORC, {
+                ...emptyRoster,
+                tier1ArtifactId: Tier1Artifact.BARREL_BARRICADE,
+            }),
+        ).toBeGreaterThan(
+            draftCreatureCoherenceAffinity(Creature.BERSERKER, {
+                ...emptyRoster,
+                tier1ArtifactId: Tier1Artifact.BARREL_BARRICADE,
+            }),
+        );
+        expect(
+            draftCreatureCoherenceAffinity(Creature.TSAR_CANNON, {
+                ...emptyRoster,
+                tier1ArtifactId: Tier1Artifact.AMULET_OF_RESOLVE,
+            }),
+        ).toBeGreaterThan(
+            draftCreatureCoherenceAffinity(Creature.ORC, {
+                ...emptyRoster,
+                tier1ArtifactId: Tier1Artifact.AMULET_OF_RESOLVE,
+            }),
+        );
     });
 
     test("keeps later picks coherent with an established own-roster role", () => {

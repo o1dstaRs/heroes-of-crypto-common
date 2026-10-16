@@ -12,7 +12,7 @@
 import { getSpellConfig } from "../configuration/config_provider";
 import { getFootprintCellsForAnchor, normalizeFootprintSide } from "../grid/grid_math";
 import type { ISceneLog } from "../scene/scene_log_interface";
-import { fireWallBurnDamage, FireWalls } from "../spells/fire_walls";
+import { fireWallBurnDamage, FireWalls, type IFireWallBurnTarget } from "../spells/fire_walls";
 import { madeOfFireBoostedMaxHp } from "../units/movement_stat_modifiers";
 import { projectStackDamage, type IStackHpState } from "../units/stack_damage";
 import type { Unit } from "../units/unit";
@@ -184,7 +184,10 @@ export function travelledMovePath(currentCell: Readonly<XY>, path: readonly Read
 }
 
 export function resolveMoveTraversal(
-    unit: Pick<Unit, "getBaseCell" | "isSmallSize" | "getFootprintWidth" | "getFootprintHeight">,
+    unit: Pick<
+        Unit,
+        "getBaseCell" | "getCells" | "isSmallSize" | "getFootprintWidth" | "getFootprintHeight" | "canFly"
+    >,
     action: MoveUnitAction,
     resolvedRoute?: IResolvedMoveRoute,
 ): IMoveTraversal {
@@ -206,23 +209,33 @@ export function resolveMoveTraversal(
     const travelledPath = pathIsFootprintOnly
         ? action.path
         : travelledMovePath(unit.getBaseCell(), resolvedRoute?.route ?? action.path);
-    const destination = travelledPath[travelledPath.length - 1];
-    // ActionEngine occupies the destination before MoveHandler applies route
-    // modifiers. MoveHandler therefore strips its new current cell if that is
-    // also route[0] (the historical one-step behavior).
-    const routeModifierPath = !pathIsFootprintOnly && destination ? travelledMovePath(destination, travelledPath) : [];
+    const routeModifierPath = resolvedRoute
+        ? travelledMovePath(unit.getBaseCell(), resolvedRoute.route)
+        : pathIsFootprintOnly
+          ? []
+          : travelledPath;
     return {
         targetCells,
         pathIsFootprintOnly,
         travelledPath,
         routeModifierPath,
-        // A footprint-only move has no ordered route. The engine treats its final
-        // footprint as the set of cells entered for Fire Wall purposes.
-        crossedCells: pathIsFootprintOnly ? targetCells : travelledPath,
+        crossedCells: fireWallCellsForTraversal(unit, unit.getCells(), travelledPath, targetCells, pathIsFootprintOnly),
     };
 }
 
-/** Ordered, de-duplicated Fire Wall cells entered by the move. */
+/** Flyers only touch fire where they land; walkers touch every cell their body enters along the route. */
+export function fireWallCellsForTraversal(
+    unit: Pick<Unit, "canFly" | "getFootprintWidth" | "getFootprintHeight">,
+    startCells: readonly XY[],
+    travelledAnchors: readonly XY[],
+    landingCells: readonly XY[],
+    pathIsFootprintOnly = false,
+): readonly XY[] {
+    return unit.canFly() || pathIsFootprintOnly
+        ? landingCells
+        : bodyCellsEnteredAlongPath(startCells, travelledAnchors, unit.getFootprintWidth(), unit.getFootprintHeight());
+}
+
 /**
  * Every cell a unit's BODY newly occupies along a walk — the cells a Fire Wall may charge it for.
  *
@@ -303,6 +316,26 @@ export interface IFireWallBurnResult {
  * a smaller maximum health for the second to take its share of. The element table is read once so every
  * cell is priced against the same resistances the rest of the game's fire uses.
  */
+/**
+ * The elements the wall prices a crosser by.
+ *
+ * Shared between the burn itself and the projection ahead of it, because they were reading different
+ * things: the fight passed these flags and the projection passed none, so it charged a Fire Element stack
+ * full price for walking through its own element (it takes nothing) and under-charged a Water Element one
+ * by a third. The AI plans from the projection, so it avoided fire that could not touch it and walked into
+ * fire that hurt more than it was told.
+ */
+export function fireWallBurnTargetOf(unit: Unit): IFireWallBurnTarget {
+    return {
+        isFireElement: unit.hasAbilityActive("Fire Element"),
+        isWaterElement: unit.hasAbilityActive("Water Element"),
+        isWindElement: unit.hasAbilityActive("Wind Element"),
+        isEarthElement: unit.hasAbilityActive("Earth Element"),
+        magicResist: unit.getMagicResist(),
+        magicDamageTakenMultiplier: unit.getMagicDamageTakenMultiplier(),
+    };
+}
+
 export function burnUnitOnFireWallCells(
     unit: Unit,
     crossedCells: readonly XY[],
@@ -321,12 +354,7 @@ export function burnUnitOnFireWallCells(
     }
 
     const amountAliveBefore = unit.getAmountAlive();
-    const burnTarget = {
-        isFireElement: unit.hasAbilityActive("Fire Element"),
-        isWaterElement: unit.hasAbilityActive("Water Element"),
-        isWindElement: unit.hasAbilityActive("Wind Element"),
-        isEarthElement: unit.hasAbilityActive("Earth Element"),
-    };
+    const burnTarget = fireWallBurnTargetOf(unit);
     let total = 0;
     for (const cell of burning) {
         const damage = fireWallBurnDamage(unit.getCumulativeMaxHp(), fireWalls.burnPercentageAt(cell), burnTarget);
@@ -384,13 +412,15 @@ export function projectPostMoveActorAvailability(
     }
 
     const burningCells = enteredFireWallCells(fireWalls, traversal.crossedCells);
+    const burnTarget = fireWallBurnTargetOf(unit);
     const fireWallHits: IFireWallHitProjection[] = [];
-    let waterShieldAvailable = unit.hasBuffActive("Water Shield");
+    // Same test the burn itself runs (Unit.applyDamage): a Broken holder's shield is off.
+    let waterShieldAvailable = unit.willWaterShieldAbsorb();
     let waterShieldConsumed = false;
     let totalAppliedDamage = 0;
     for (const cell of burningCells) {
         const burnPercentage = fireWalls!.burnPercentageAt(cell);
-        const requestedDamage = fireWallBurnDamage(stack.amountAlive * stack.maxHp, burnPercentage);
+        const requestedDamage = fireWallBurnDamage(stack.amountAlive * stack.maxHp, burnPercentage, burnTarget);
         if (requestedDamage <= 0) {
             break;
         }

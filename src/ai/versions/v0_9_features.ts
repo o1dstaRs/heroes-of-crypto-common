@@ -226,6 +226,7 @@ export function v09RangeObservation(
             shot.aimSide as RangeAttackCellSide,
             unit.getTeam(),
             through,
+            unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw"),
         );
     let firstHitTargetId = candidate.targetId;
     let rangeDivisor = 0;

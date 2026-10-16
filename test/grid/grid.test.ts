@@ -282,4 +282,24 @@ describe("Grid Aggregation Matrix Tests", () => {
         if (previousCacheFlag === undefined) delete process.env.SIM_GRID_MATRIX_CACHE;
         else process.env.SIM_GRID_MATRIX_CACHE = previousCacheFlag;
     });
+
+    test("a narrowing hole swallows the scattered stone standing on its cell", () => {
+        const board = new Grid(gridSettings, PBTypes.GridVals.BLOCK_CENTER);
+        // Seeded layouts can put a stone on the outer ring, e.g. the top row the first narrowing consumes.
+        const edgeStone = { x: 6, y: 15 };
+        const innerStone = { x: 7, y: 7 };
+        board.setScatteredMountains([edgeStone, innerStone]);
+
+        expect(board.occupyByHole({ x: 5, y: 15 })).toBe(false);
+        expect(board.occupyByHole(edgeStone)).toBe(true);
+
+        expect(board.getOccupantUnitId(edgeStone)).toBe("H");
+        expect(board.getScatteredMountainsStanding()).toEqual([innerStone]);
+        expect(board.getCenterCells()).toEqual([innerStone]);
+        // Gone for good: a later strike finds nothing, and the hole stays a hole.
+        expect(board.clearScatteredMountainAt(edgeStone.x, edgeStone.y)).toBe(false);
+        expect(board.getOccupantUnitId(edgeStone)).toBe("H");
+        expect(board.occupyByHole(edgeStone)).toBe(false);
+        expect(board.occupyByHole({ x: -1, y: -1 })).toBe(false);
+    });
 });

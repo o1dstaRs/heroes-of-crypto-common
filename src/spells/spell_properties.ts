@@ -91,11 +91,13 @@ export enum SpellMultiplierType {
     UNIT_AMOUNT = 2,
     UNIT_AMOUNT_POWER = 3,
     UNIT_CUMULATIVE_MAX_HP = 4,
-    // Damage scaled by BOTH the caster's surviving head-count and its stack power (see
-    // calculateStackPoweredSpellDamage). Used by the Magic Dragon's offensive spells: a full stack throws a
-    // real fireball, a nearly-dead one barely a spark, so the spell decays with the stack that carries it.
-    UNIT_AMOUNT_STACK_POWER = 5,
-    /** Flat damage per surviving caster — stack power deliberately not a factor (Battle Mage). */
+    // 5 was UNIT_AMOUNT_STACK_POWER, the Magic Dragon's "alive x stack power x power" shape. OWNER call
+    // 2026-09-19: magic damage is never stack-powered, only head-count-powered, so the shape is gone and the
+    // number is left unused rather than reassigned.
+    /**
+     * Flat damage per surviving caster: creatures alive x power. The ONLY offensive shape — stack power is
+     * deliberately not a factor for any damage spell (Battle Mage and Magic Dragon alike).
+     */
     UNIT_AMOUNT_DAMAGE = 6,
 }
 
@@ -104,7 +106,6 @@ export const AllSpellMultiplierTypes = [
     SpellMultiplierType.UNIT_AMOUNT,
     SpellMultiplierType.UNIT_AMOUNT_POWER,
     SpellMultiplierType.UNIT_CUMULATIVE_MAX_HP,
-    SpellMultiplierType.UNIT_AMOUNT_STACK_POWER,
     SpellMultiplierType.UNIT_AMOUNT_DAMAGE,
 ];
 
@@ -116,7 +117,6 @@ export const ToSpellMultiplierType: { [spellMultiplierTypeName: string]: SpellMu
     UNIT_AMOUNT: SpellMultiplierType.UNIT_AMOUNT,
     UNIT_AMOUNT_POWER: SpellMultiplierType.UNIT_AMOUNT_POWER,
     UNIT_CUMULATIVE_MAX_HP: SpellMultiplierType.UNIT_CUMULATIVE_MAX_HP,
-    UNIT_AMOUNT_STACK_POWER: SpellMultiplierType.UNIT_AMOUNT_STACK_POWER,
     UNIT_AMOUNT_DAMAGE: SpellMultiplierType.UNIT_AMOUNT_DAMAGE,
 };
 

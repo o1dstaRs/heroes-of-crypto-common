@@ -21,11 +21,10 @@ describe("scatteredMountainsForSeed", () => {
         expect(JSON.stringify(a1)).not.toBe(JSON.stringify(b));
     });
 
-    // The barrel count still rides the game's own seed (no wire field; every seat, the server, replays
-    // and the headless sim agree by derivation) — but the OWNER pinned it at twelve on 2026-08-28, so
-    // the roll's range is a single value.
+    // The barrel count rides the game's own seed (no wire field; every seat, the server, replays and
+    // the headless sim agree by derivation). Ranked cemetery boards roll 9-12.
     it("rolls a barrel count inside [MIN, MAX] that the band can hold", () => {
-        expect(SCATTERED_MOUNTAIN_MIN_COUNT).toBe(12);
+        expect(SCATTERED_MOUNTAIN_MIN_COUNT).toBe(9);
         expect(SCATTERED_MOUNTAIN_MAX_COUNT).toBe(12);
         expect(SCATTERED_MOUNTAIN_MAX_COUNT).toBeLessThanOrEqual(16 * SCATTERED_MOUNTAIN_BAND_ROWS);
         for (let i = 0; i < 400; i++) {
@@ -39,18 +38,16 @@ describe("scatteredMountainsForSeed", () => {
         }
     });
 
-    // The mirror of the old variety guard: that test existed so a count stuck at one end could not
-    // quietly turn "9-12 barrels" into a fixed board. The owner asked for the fixed board, so the
-    // property is inverted — every seed must carry the SAME twelve, and a stray re-widening of the
-    // range (or a drift between the count and the layout) fails here rather than reaching players.
-    it("carries exactly twelve barrels on every seed — the owner's fixed count", () => {
+    // A count stuck at one end would quietly turn "9-12 barrels" back into a fixed board.
+    it("rolls every count from 9 through 12", () => {
         const seen = new Set<number>();
         for (let i = 0; i < 400; i++) {
             const seed = `spread-${i}`;
-            seen.add(scatteredMountainCountForSeed(seed));
-            expect(scatteredMountainsForSeed(seed).length).toBe(12);
+            const count = scatteredMountainCountForSeed(seed);
+            seen.add(count);
+            expect(scatteredMountainsForSeed(seed)).toHaveLength(count);
         }
-        expect([...seen]).toEqual([12]);
+        expect([...seen].sort((a, b) => a - b)).toEqual([9, 10, 11, 12]);
     });
 
     /**
@@ -65,11 +62,14 @@ describe("scatteredMountainsForSeed", () => {
     it("keeps the first MIN cells identical no matter what the count rolls", () => {
         for (let i = 0; i < 200; i++) {
             const seed = `append-only-${i}`;
-            const layout = scatteredMountainsForSeed(seed);
-            // Re-deriving the same seed's opening cells must be stable regardless of the rolled length.
-            const prefix = layout.slice(0, SCATTERED_MOUNTAIN_MIN_COUNT).map((r) => `${r.cell.x},${r.cell.y}`);
-            expect(prefix.length).toBe(SCATTERED_MOUNTAIN_MIN_COUNT);
+            const shortest = scatteredMountainsForSeed(seed, 16, true, SCATTERED_MOUNTAIN_MIN_COUNT);
+            const longest = scatteredMountainsForSeed(seed, 16, true, SCATTERED_MOUNTAIN_MAX_COUNT);
+            const prefix = shortest.map((rock) => `${rock.cell.x},${rock.cell.y}`);
+            expect(prefix).toHaveLength(SCATTERED_MOUNTAIN_MIN_COUNT);
             expect(new Set(prefix).size).toBe(SCATTERED_MOUNTAIN_MIN_COUNT);
+            expect(
+                longest.slice(0, SCATTERED_MOUNTAIN_MIN_COUNT).map((rock) => `${rock.cell.x},${rock.cell.y}`),
+            ).toEqual(prefix);
         }
     });
 

@@ -9,8 +9,22 @@
  * -----------------------------------------------------------------------------
  */
 
+import { friendlyShotBlockingBarrels } from "../ai/artifact_barrel_tactics";
+import { reserveGravechainShortlistCandidate } from "../ai/gravechain_shortlist";
+import { includeImprovingLastFuseTrade, reserveLastFuseShortlistCandidate } from "../ai/last_fuse_tactics";
+import { canWaitOnHourglass } from "../engine/hourglass";
+import {
+    selectV08A19MaterialCandidateIndex,
+    type A19MaterialArbitrationMode,
+} from "../ai/versions/v0_8_a19_material_arbitration";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
+import { SearchSelectionBounds, type ISearchSelectionBoundPlan } from "./search_selection_bounds";
+import {
+    parseSearchRolloutAllocation,
+    selectSearchRolloutSurvivors,
+    type SearchRolloutAllocation,
+} from "./search_rollout_allocation";
 
 import {
     enumerateCandidates,
@@ -20,6 +34,7 @@ import {
     type IDecisionContext,
     type IEnumeratedCandidate,
 } from "../ai";
+import { throughShotLineEnabled } from "../ai/through_shot_line";
 import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import {
     consumeWaitReplacement,
@@ -45,6 +60,11 @@ import {
     preservesV08BacklineWardIntent,
 } from "../ai/versions/v0_8_backline_protector";
 import { v08ArmageddonPreservationOpportunity } from "../ai/versions/v0_8_armageddon_endgame";
+import {
+    selectV08A19ScoredCandidateIndex,
+    V08_A19_SCORED_ARBITRATION_POLICY,
+} from "../ai/versions/v0_8_a19_scored_arbitration";
+import { applyV08FlyerBacklinePriority } from "../ai/versions/v0_8_flyer_backline_priority";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
 import {
     reserveV08ReplayLeafChallenger,
@@ -141,6 +161,33 @@ import {
     VALUE_FEATURE_NAMES,
     VALUE_FEATURE_NAMES_V2,
 } from "./value_features";
+import { assertNoLegacySeatEnv, seatEnvName } from "../ai/seat_env";
+
+/**
+ * Search reads its switches at construction and again on a few later decisions. Node tests seal those
+ * switches by writing process.env. The browser bundle replaces process.env with a fresh empty object, so
+ * those writes never stick and production search stays off. An active overlay wins; otherwise the read
+ * falls through to process.env, which keeps every existing Node scope byte-identical.
+ */
+let searchEnvOverlay: Readonly<Record<string, string | undefined>> | null = null;
+
+function searchEnv(name: string): string | undefined {
+    if (searchEnvOverlay !== null && Object.prototype.hasOwnProperty.call(searchEnvOverlay, name)) {
+        return searchEnvOverlay[name];
+    }
+    return process.env[name];
+}
+
+/** Bind SearchDriver's env reads to `environment` for `run`, then restore the previous overlay. */
+export function withSearchEnvironment<T>(environment: Readonly<Record<string, string | undefined>>, run: () => T): T {
+    const previous = searchEnvOverlay;
+    searchEnvOverlay = environment;
+    try {
+        return run();
+    } finally {
+        searchEnvOverlay = previous;
+    }
+}
 
 export const V08_RAPID_CHARGE_RESERVATION_ENV = "SEARCH_V08_RAPID_CHARGE_RESERVATION";
 export const V08_RAPID_CHARGE_RESERVATION_VERSIONS_ENV = "SEARCH_V08_RAPID_CHARGE_RESERVATION_VERSIONS";
@@ -363,6 +410,13 @@ type WaitDeadlinePolicy = "profile" | "operation_bounded";
 /** The slice of a candidate the rollout scorer actually consumes (lets the oracle skip enumeration). */
 type ISearchCandidate = Pick<IEnumeratedCandidate, "kind" | "actions">;
 
+interface ICachedSearchRollout {
+    readonly score: number;
+    readonly material?: number;
+}
+
+type SearchRolloutCache = Map<ISearchCandidate, Map<number, ICachedSearchRollout>>;
+
 interface IIndexedCandidateScore {
     score: number;
     index: number;
@@ -434,7 +488,7 @@ function parseLearnedValue(raw: string | undefined): ILearnedValue | null {
 }
 
 const envNum = (name: string, fallback: number, min: number): number => {
-    const v = Number(process.env[name]);
+    const v = Number(searchEnv(name));
     return Number.isFinite(v) && v >= min ? v : fallback;
 };
 
@@ -454,9 +508,9 @@ function parseSearchResearchHorizon(
     mode: SearchMode,
     searchVersions: ReadonlySet<string>,
 ): ISearchResearchHorizon | null {
-    const rawHorizon = process.env[SEARCH_RESEARCH_HORIZON_ENV];
-    const rawVersions = process.env[SEARCH_RESEARCH_HORIZON_VERSIONS_ENV];
-    const rawMinRangedTypes = process.env[SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV];
+    const rawHorizon = searchEnv(SEARCH_RESEARCH_HORIZON_ENV);
+    const rawVersions = searchEnv(SEARCH_RESEARCH_HORIZON_VERSIONS_ENV);
+    const rawMinRangedTypes = searchEnv(SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV);
     if (rawHorizon === undefined && rawVersions === undefined && rawMinRangedTypes === undefined) return null;
     if (rawMinRangedTypes !== undefined && rawHorizon === undefined) {
         throw new Error(`${SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV} requires ${SEARCH_RESEARCH_HORIZON_ENV}`);
@@ -503,8 +557,8 @@ function parseSearchResearchShortlist(
     searchVersions: ReadonlySet<string>,
     baseShortlist: number | null,
 ): ISearchResearchShortlist | null {
-    const rawShortlist = process.env[SEARCH_RESEARCH_SHORTLIST_ENV];
-    const rawVersions = process.env[SEARCH_RESEARCH_SHORTLIST_VERSIONS_ENV];
+    const rawShortlist = searchEnv(SEARCH_RESEARCH_SHORTLIST_ENV);
+    const rawVersions = searchEnv(SEARCH_RESEARCH_SHORTLIST_VERSIONS_ENV);
     if (rawShortlist === undefined && rawVersions === undefined) return null;
     if (mode !== "search") {
         throw new Error(`${SEARCH_RESEARCH_SHORTLIST_ENV} requires V07_SEARCH=1`);
@@ -598,6 +652,42 @@ function isPositiveDirectCombatCandidate(candidate: Pick<IEnumeratedCandidate, "
     );
 }
 
+/** A generated obstacle hit whose target is a deployment barrel, not a map mountain. */
+function isArtifactBarrelMine(
+    barrels: readonly { cell: { x: number; y: number } }[],
+    candidate: Pick<IEnumeratedCandidate, "kind" | "targetCell">,
+): boolean {
+    const cell = candidate.targetCell;
+    return (
+        candidate.kind === "mine" &&
+        !!cell &&
+        barrels.some((barrel) => barrel.cell.x === cell.x && barrel.cell.y === cell.y)
+    );
+}
+
+function isBetween(value: number, start: number, end: number): boolean {
+    return (value - start) * (value - end) < 0;
+}
+
+/** True when the barrel sits on the orthogonal line between a shooter cell and an enemy cell. */
+function barrelBlocksShotLine(
+    barrel: { x: number; y: number },
+    origins: readonly { x: number; y: number }[],
+    targets: readonly { x: number; y: number }[],
+): boolean {
+    for (const origin of origins) {
+        for (const target of targets) {
+            if (barrel.y === origin.y && barrel.y === target.y && isBetween(barrel.x, origin.x, target.x)) {
+                return true;
+            }
+            if (barrel.x === origin.x && barrel.x === target.x && isBetween(barrel.y, origin.y, target.y)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 function isPositiveV08DamageSpellCandidate(unit: Unit, candidate: IEnumeratedCandidate): boolean {
     if (
         !candidate.actions.some((action) => action.type === "cast_spell") ||
@@ -624,9 +714,10 @@ function selectV08UrgentDamageCandidate(
     unitsHolder: ILookaheadDeps["unitsHolder"],
     candidates: readonly IEnumeratedCandidate[],
     currentLap: number,
+    fightProperties?: ILookaheadDeps["fightProperties"],
 ): IEnumeratedCandidate | undefined {
     const physical = candidates.filter(isPositiveDirectCombatCandidate);
-    const pressured = selectV08STargetPressureCandidate(unit, unitsHolder, physical, currentLap);
+    const pressured = selectV08STargetPressureCandidate(unit, unitsHolder, physical, currentLap, fightProperties);
     if (pressured) return pressured;
 
     let fallbackPhysical: IEnumeratedCandidate | undefined;
@@ -726,22 +817,34 @@ export function isEarlyIsolatingFastFlyerWaitMove(
     );
 }
 
-/** A narrow late-game state where preserving Abomination HP deserves an exact rollout comparison. */
-export function isV08ArmageddonDefendOpportunity(
+/** Opening healer safety: defer an unsupported flying resurrection carry while hourglass remains legal. */
+export function isEarlyUnsupportedHealerDive(
     unit: Unit,
     unitsHolder: ILookaheadDeps["unitsHolder"],
     currentLap: number,
+    candidate: Pick<IEnumeratedCandidate, "actions">,
 ): boolean {
-    if (unit.getName() !== "Abomination" || unit.isDead()) return false;
-    const opposingAbomination = unitsHolder
-        .getAllEnemyUnits(unit.getTeam())
-        .find((enemy) => !enemy.isDead() && enemy.getName() === "Abomination");
-    return (
-        opposingAbomination !== undefined &&
-        v08ArmageddonPreservationOpportunity(unit, opposingAbomination, currentLap) !== undefined
-    );
+    if (
+        currentLap !== 1 ||
+        !unit.canFly() ||
+        unit.getLevel() !== PBTypes.UnitLevelVals.FOURTH ||
+        !unit.getAbility("Resurrection")
+    )
+        return false;
+    if (!candidate.actions.some((action) => action.type === "melee_attack")) return false;
+    const move = candidate.actions.find((action) => action.type === "move_unit");
+    if (move?.type !== "move_unit" || !move.targetCells?.length) return false;
+    const allies = unitsHolder
+        .getAllAllies(unit.getTeam())
+        .filter((ally) => ally.getId() !== unit.getId() && !ally.isDead())
+        .map((ally) => ally.getCells());
+    if (!allies.length) return false;
+    const current = Math.min(...allies.map((cells) => footprintDistance(unit.getCells(), cells)));
+    const destination = Math.min(...allies.map((cells) => footprintDistance(move.targetCells!, cells)));
+    return current <= 3 && destination >= 4 && destination - current >= 2;
 }
 
+/** A narrow late-game state where preserving Abomination HP deserves an exact rollout comparison. */
 /**
  * Deterministic terminal policy gate: no ally or enemy besides the two original Abominations may remain.
  * Keeping this stricter than the research candidate opportunity prevents a rollout-only multi-stack defend.
@@ -870,18 +973,12 @@ interface ISearchCounters {
     scoredCandidatesTotal: number;
     /** Searches abandoned before every shortlisted candidate received a comparable full score. */
     deadlineFallbacks: number;
+    /** Decisions searched at the reduced adaptive budget (1 rollout, shortlist 2) after a breaker trip. */
+    degradedDecisions: number;
     /** H18 opening decisions where at least one move-only fast-flyer solo dive was removed from the catalog. */
     isolatingFastFlyerMoveRejects: number;
-    /** Late Abomination turns that admitted defend into exact-terminal rollout arbitration. */
-    armageddonDefendOpportunities: number;
     /** Live turns where the strict sole-Abomination terminal policy deterministically defended. */
     soleAbominationArmageddonDefends: number;
-    /** Provisional A19 overrides that reached the independent paired validation bank. */
-    nonregressiveOverrideValidationAttempts: number;
-    /** Paired validation banks whose challenger cleared the configured gate. */
-    nonregressiveOverrideValidationPasses: number;
-    /** Paired validation banks that failed closed to the incumbent. */
-    nonregressiveOverrideValidationRejects: number;
     /** Finite operation-bounded wait arbitrations entered after the per-match timing circuit has opened. */
     circuitWaitArbitrations: number;
     /** v0.8 turns that entered the fixed late two-to-one-HP finish window. */
@@ -1051,12 +1148,9 @@ const emptyCounters = (): ISearchCounters => ({
     candidatesTotal: 0,
     scoredCandidatesTotal: 0,
     deadlineFallbacks: 0,
+    degradedDecisions: 0,
     isolatingFastFlyerMoveRejects: 0,
-    armageddonDefendOpportunities: 0,
     soleAbominationArmageddonDefends: 0,
-    nonregressiveOverrideValidationAttempts: 0,
-    nonregressiveOverrideValidationPasses: 0,
-    nonregressiveOverrideValidationRejects: 0,
     circuitWaitArbitrations: 0,
     dominantFinishTurns: 0,
     dominantFinishCombatOverrides: 0,
@@ -1165,6 +1259,34 @@ const emptyCounters = (): ISearchCounters => ({
 const bump = (rec: Record<string, number>, key: string): void => {
     rec[key] = (rec[key] ?? 0) + 1;
 };
+
+/**
+ * True when every unplayed leaf in [0, 1] still leaves this candidate strictly more than `margin` below
+ * `bestFinishedMean`. The caller must record `sum / rolloutCount` (unplayed leaves count as 0). A partial
+ * average can reorder a near tie, a gate, or scored arbitration. Do not call this once any leaf was above 1.
+ */
+export function remainingRolloutsCannotWin(
+    sum: number,
+    completedRollouts: number,
+    rolloutCount: number,
+    bestFinishedMean: number,
+    margin: number,
+): boolean {
+    if (
+        !Number.isFinite(sum) ||
+        !Number.isFinite(bestFinishedMean) ||
+        !Number.isFinite(margin) ||
+        margin < 0 ||
+        completedRollouts < 1 ||
+        rolloutCount < 2 ||
+        completedRollouts >= rolloutCount
+    ) {
+        return false;
+    }
+    const remaining = rolloutCount - completedRollouts;
+    const maxMean = (sum + remaining) / rolloutCount;
+    return maxMean + margin < bestFinishedMean;
+}
 
 export interface ISearchMatchInfo {
     seed?: number;
@@ -1289,18 +1411,50 @@ export class SearchDriver {
     private readonly rapidChargeReservationVersions: ReadonlySet<string>;
     /** Explicit A19-H18-v2 policy gate; horizon alone must never opt another profile into this rule. */
     private readonly fastFlyerCohesion: boolean;
-    private readonly armageddonDefendCandidate: boolean;
     private readonly soleAbominationArmageddonDefendPolicy: boolean;
     private readonly abominationMirrorRelease: boolean;
     private readonly strictAggressiveWaitTies: boolean;
     private readonly nonregressiveProductiveOverride: boolean;
     private readonly exactTerminalResults: boolean;
-    private readonly nonregressiveOverrideValidation: boolean;
+    private readonly a19ScoredArbitration: boolean;
+    private readonly a19MaterialArbitration: A19MaterialArbitrationMode | undefined;
+    private readonly a19MaterialLowEvidenceWinningSamples: number;
+    private readonly a19ArtifactBarrelAttackCoverage: boolean;
+    private readonly a19GravechainCoverage: boolean;
+    private readonly a19LastFuseTrades: boolean;
+    private readonly a19LastFusePrimaryTrades: boolean;
+    private readonly a19ArtifactBarrelShotProjection: boolean;
+    private readonly a19ArtifactBarrelOwnShotProjectionOnly: boolean;
+    private captureA19Material = false;
+    private a19MaterialEvidence:
+        | {
+              unitId: string;
+              candidates: readonly ISearchCandidate[];
+              means: number[];
+              materials: number[];
+              rolloutCount: number;
+          }
+        | undefined;
+    /**
+     * Per-decision budget degradation instead of the match-sticky circuit breaker. Measured on the live host
+     * (2 shared vCPU): the stock breaker tripped in most games and, because `circuitOpen` never resets, the
+     * seat then played the rest of the match without any search (39% of searched turns skipped). With
+     * `SEARCH_A19_ADAPTIVE_BUDGET=1` a decision that overruns the breaker only degrades the NEXT few decisions
+     * to one rollout and a shortlist of two (no re-score bank), and a decision that finishes under the breaker
+     * counts the degradation back down. Wall-clock mode only; offline deterministic work never trips either.
+     */
+    private readonly adaptiveBudget: boolean;
+    private degradedRemaining = 0;
+    private static readonly DEGRADED_DECISIONS = 3;
+    private static readonly DEGRADED_ROLLOUTS = 1;
+    private static readonly DEGRADED_SHORTLIST = 2;
     private readonly horizon: number;
     private readonly researchHorizon: number | null;
     private readonly researchHorizonVersions: ReadonlySet<string>;
     private readonly researchHorizonMinRangedTypes: number | null;
     private readonly rollouts: number;
+    private readonly certifiedSelectionBounds: boolean;
+    private readonly rolloutAllocation: SearchRolloutAllocation;
     private readonly includeMoves: boolean;
     private readonly maxMoveShotComposites: number;
     private readonly moveShotVersions: ReadonlySet<string>;
@@ -1382,22 +1536,22 @@ export class SearchDriver {
         this.scoredDecisionObserver = scoredDecisionObserver;
         this.passiveProductiveProbeObserver = passiveProductiveProbeObserver;
         const configuredRollbackStrategy =
-            rollbackStrategy ?? resolveRollbackStrategy(process.env.SEARCH_ROLLBACK_STRATEGY);
+            rollbackStrategy ?? resolveRollbackStrategy(searchEnv("SEARCH_ROLLBACK_STRATEGY"));
         if (configuredRollbackStrategy !== "checkpoint" && configuredRollbackStrategy !== "snapshot") {
             throw new Error("Search rollback strategy must be checkpoint or snapshot");
         }
         this.rollbackStrategy = configuredRollbackStrategy;
         this.mode =
-            process.env.Q2_WAIT_ABLATION === "1"
+            searchEnv("Q2_WAIT_ABLATION") === "1"
                 ? "ablation"
-                : process.env.Q2_ORACLE === "1"
+                : searchEnv("Q2_ORACLE") === "1"
                   ? "oracle"
-                  : process.env.V07_SEARCH === "1"
+                  : searchEnv("V07_SEARCH") === "1"
                     ? "search"
                     : "off";
         this.enabled = this.mode !== "off";
         this.versions = new Set(
-            (process.env.SEARCH_VERSIONS ?? (this.mode === "ablation" ? "v0.6" : "v0.6s"))
+            (searchEnv("SEARCH_VERSIONS") ?? (this.mode === "ablation" ? "v0.6" : "v0.6s"))
                 .split(",")
                 .map((v) => v.trim())
                 .filter(Boolean),
@@ -1416,7 +1570,7 @@ export class SearchDriver {
         if (this.rankedReplayTiebreakEpsilon > 0.05) {
             throw new Error(`${V08_RANKED_REPLAY_TIEBREAK_EPSILON_ENV} must be between 0 and 0.05`);
         }
-        const rawRankedReplayTiebreakVersions = process.env[V08_RANKED_REPLAY_TIEBREAK_VERSIONS_ENV];
+        const rawRankedReplayTiebreakVersions = searchEnv(V08_RANKED_REPLAY_TIEBREAK_VERSIONS_ENV);
         this.rankedReplayTiebreakVersions =
             this.rankedReplayTiebreakEpsilon === 0 || rawRankedReplayTiebreakVersions === ""
                 ? new Set()
@@ -1426,11 +1580,11 @@ export class SearchDriver {
                           .map((version) => version.trim())
                           .filter(Boolean),
                   );
-        const rapidChargeReservation = process.env[V08_RAPID_CHARGE_RESERVATION_ENV];
+        const rapidChargeReservation = searchEnv(V08_RAPID_CHARGE_RESERVATION_ENV);
         if (rapidChargeReservation !== undefined && rapidChargeReservation !== "0" && rapidChargeReservation !== "1") {
             throw new Error(`${V08_RAPID_CHARGE_RESERVATION_ENV} must be 0 or 1`);
         }
-        const rawRapidChargeVersions = process.env[V08_RAPID_CHARGE_RESERVATION_VERSIONS_ENV];
+        const rawRapidChargeVersions = searchEnv(V08_RAPID_CHARGE_RESERVATION_VERSIONS_ENV);
         this.rapidChargeReservationVersions =
             rapidChargeReservation !== "1" || rawRapidChargeVersions === ""
                 ? new Set()
@@ -1440,7 +1594,7 @@ export class SearchDriver {
                           .map((version) => version.trim())
                           .filter(Boolean),
                   );
-        const rawFastFlyerCohesion = process.env.SEARCH_A19_FAST_FLYER_COHESION;
+        const rawFastFlyerCohesion = searchEnv("SEARCH_A19_FAST_FLYER_COHESION");
         if (
             rawFastFlyerCohesion !== undefined &&
             rawFastFlyerCohesion !== "" &&
@@ -1450,18 +1604,9 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_FAST_FLYER_COHESION must be 0 or 1");
         }
         this.fastFlyerCohesion = this.mode === "search" && rawFastFlyerCohesion === "1";
-        const rawArmageddonDefendCandidate = process.env.SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE;
-        if (
-            rawArmageddonDefendCandidate !== undefined &&
-            rawArmageddonDefendCandidate !== "" &&
-            rawArmageddonDefendCandidate !== "0" &&
-            rawArmageddonDefendCandidate !== "1"
-        ) {
-            throw new Error("SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE must be 0 or 1");
-        }
-        this.armageddonDefendCandidate = this.mode === "search" && rawArmageddonDefendCandidate === "1";
-        const rawSoleAbominationArmageddonDefendPolicy =
-            process.env[SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV];
+        const rawSoleAbominationArmageddonDefendPolicy = searchEnv(
+            SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV,
+        );
         if (
             rawSoleAbominationArmageddonDefendPolicy !== undefined &&
             rawSoleAbominationArmageddonDefendPolicy !== "" &&
@@ -1472,7 +1617,7 @@ export class SearchDriver {
         }
         this.soleAbominationArmageddonDefendPolicy =
             this.mode === "search" && rawSoleAbominationArmageddonDefendPolicy === "1";
-        const rawAbominationMirrorRelease = process.env.SEARCH_A19_ABOMINATION_MIRROR_RELEASE;
+        const rawAbominationMirrorRelease = searchEnv("SEARCH_A19_ABOMINATION_MIRROR_RELEASE");
         if (
             rawAbominationMirrorRelease !== undefined &&
             rawAbominationMirrorRelease !== "" &&
@@ -1482,7 +1627,7 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_ABOMINATION_MIRROR_RELEASE must be 0 or 1");
         }
         this.abominationMirrorRelease = this.mode === "search" && rawAbominationMirrorRelease === "1";
-        const rawStrictAggressiveWaitTies = process.env.SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES;
+        const rawStrictAggressiveWaitTies = searchEnv("SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES");
         if (
             rawStrictAggressiveWaitTies !== undefined &&
             rawStrictAggressiveWaitTies !== "" &&
@@ -1492,7 +1637,7 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES must be 0 or 1");
         }
         this.strictAggressiveWaitTies = this.mode === "search" && rawStrictAggressiveWaitTies === "1";
-        const rawNonregressiveProductiveOverride = process.env.SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE;
+        const rawNonregressiveProductiveOverride = searchEnv("SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE");
         if (
             rawNonregressiveProductiveOverride !== undefined &&
             rawNonregressiveProductiveOverride !== "" &&
@@ -1502,7 +1647,7 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE must be 0 or 1");
         }
         this.nonregressiveProductiveOverride = this.mode === "search" && rawNonregressiveProductiveOverride === "1";
-        const rawExactTerminalResults = process.env.SEARCH_A19_EXACT_TERMINAL_RESULTS;
+        const rawExactTerminalResults = searchEnv("SEARCH_A19_EXACT_TERMINAL_RESULTS");
         if (
             rawExactTerminalResults !== undefined &&
             rawExactTerminalResults !== "" &&
@@ -1512,24 +1657,116 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_EXACT_TERMINAL_RESULTS must be 0 or 1");
         }
         this.exactTerminalResults = this.mode === "search" && rawExactTerminalResults === "1";
-        const rawNonregressiveOverrideValidation = process.env.SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION;
+        const rawScoredArbitration = searchEnv("SEARCH_A19_SCORED_ARBITRATION");
         if (
-            rawNonregressiveOverrideValidation !== undefined &&
-            rawNonregressiveOverrideValidation !== "" &&
-            rawNonregressiveOverrideValidation !== "0" &&
-            rawNonregressiveOverrideValidation !== "1"
+            rawScoredArbitration !== undefined &&
+            rawScoredArbitration !== "" &&
+            rawScoredArbitration !== "0" &&
+            rawScoredArbitration !== "1"
         ) {
-            throw new Error("SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION must be 0 or 1");
+            throw new Error("SEARCH_A19_SCORED_ARBITRATION must be 0 or 1");
         }
-        this.nonregressiveOverrideValidation = this.mode === "search" && rawNonregressiveOverrideValidation === "1";
+        this.a19ScoredArbitration = this.mode === "search" && rawScoredArbitration === "1";
+        const materialMode = searchEnv("SEARCH_A19_MATERIAL_ARBITRATION");
+        if (
+            materialMode !== undefined &&
+            materialMode !== "" &&
+            materialMode !== "off" &&
+            materialMode !== "ties" &&
+            materialMode !== "loss-edge" &&
+            materialMode !== "both-edges" &&
+            materialMode !== "sample-ties" &&
+            materialMode !== "sample-relative"
+        ) {
+            throw new Error(
+                "SEARCH_A19_MATERIAL_ARBITRATION must be off, ties, loss-edge, both-edges, sample-ties, or sample-relative",
+            );
+        }
+        this.a19MaterialArbitration =
+            this.mode === "search" &&
+            (materialMode === "ties" ||
+                materialMode === "loss-edge" ||
+                materialMode === "both-edges" ||
+                materialMode === "sample-ties" ||
+                materialMode === "sample-relative")
+                ? materialMode
+                : undefined;
+        const lowEvidenceWinningSamples = Number(searchEnv("SEARCH_A19_MATERIAL_LOW_EVIDENCE_WINS") ?? "1");
+        if (
+            !Number.isInteger(lowEvidenceWinningSamples) ||
+            lowEvidenceWinningSamples < 1 ||
+            lowEvidenceWinningSamples > 8
+        ) {
+            throw new Error("SEARCH_A19_MATERIAL_LOW_EVIDENCE_WINS must be an integer from 1 to 8");
+        }
+        this.a19MaterialLowEvidenceWinningSamples = lowEvidenceWinningSamples;
+        const barrelCoverage = searchEnv("SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE");
+        if (barrelCoverage !== undefined && barrelCoverage !== "" && barrelCoverage !== "0" && barrelCoverage !== "1") {
+            throw new Error("SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE must be 0 or 1");
+        }
+        this.a19ArtifactBarrelAttackCoverage = this.mode === "search" && barrelCoverage === "1";
+        const gravechainCoverage = searchEnv("SEARCH_A19_GRAVECHAIN_COVERAGE");
+        if (
+            gravechainCoverage !== undefined &&
+            gravechainCoverage !== "" &&
+            gravechainCoverage !== "0" &&
+            gravechainCoverage !== "1"
+        ) {
+            throw new Error("SEARCH_A19_GRAVECHAIN_COVERAGE must be 0 or 1");
+        }
+        this.a19GravechainCoverage = this.mode === "search" && gravechainCoverage === "1";
+        const lastFuseTrades = searchEnv("SEARCH_A19_LAST_FUSE_TRADES");
+        if (lastFuseTrades !== undefined && lastFuseTrades !== "" && lastFuseTrades !== "0" && lastFuseTrades !== "1") {
+            throw new Error("SEARCH_A19_LAST_FUSE_TRADES must be 0 or 1");
+        }
+        this.a19LastFuseTrades = this.mode === "search" && lastFuseTrades === "1";
+        const lastFusePrimaryTrades = searchEnv("SEARCH_A19_LAST_FUSE_PRIMARY_TRADES");
+        if (
+            lastFusePrimaryTrades !== undefined &&
+            lastFusePrimaryTrades !== "" &&
+            lastFusePrimaryTrades !== "0" &&
+            lastFusePrimaryTrades !== "1"
+        ) {
+            throw new Error("SEARCH_A19_LAST_FUSE_PRIMARY_TRADES must be 0 or 1");
+        }
+        this.a19LastFusePrimaryTrades = this.mode === "search" && lastFusePrimaryTrades === "1";
+        const barrelProjection = searchEnv("SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION");
+        if (
+            barrelProjection !== undefined &&
+            barrelProjection !== "" &&
+            barrelProjection !== "0" &&
+            barrelProjection !== "1" &&
+            barrelProjection !== "own"
+        ) {
+            throw new Error("SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION must be 0, 1 or own");
+        }
+        this.a19ArtifactBarrelShotProjection =
+            this.a19ArtifactBarrelAttackCoverage && (barrelProjection === "1" || barrelProjection === "own");
+        this.a19ArtifactBarrelOwnShotProjectionOnly = barrelProjection === "own";
+        const rawAdaptiveBudget = searchEnv("SEARCH_A19_ADAPTIVE_BUDGET");
+        if (
+            rawAdaptiveBudget !== undefined &&
+            rawAdaptiveBudget !== "" &&
+            rawAdaptiveBudget !== "0" &&
+            rawAdaptiveBudget !== "1"
+        ) {
+            throw new Error("SEARCH_A19_ADAPTIVE_BUDGET must be 0 or 1");
+        }
+        this.adaptiveBudget = this.mode === "search" && rawAdaptiveBudget === "1";
         this.horizon = Math.floor(envNum("SEARCH_HORIZON", 12, 1));
         const researchHorizon = parseSearchResearchHorizon(this.mode, this.versions);
         this.researchHorizon = researchHorizon?.horizon ?? null;
         this.researchHorizonVersions = researchHorizon?.versions ?? new Set();
         this.researchHorizonMinRangedTypes = researchHorizon?.minRangedTypes ?? null;
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
-        this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
-        const rawMaxMoveShots = process.env.SEARCH_MAX_MOVE_SHOTS;
+        const rawCertifiedBounds = searchEnv("SEARCH_A19_CERTIFIED_SELECTION_BOUNDS");
+        if (rawCertifiedBounds !== undefined && rawCertifiedBounds !== "0" && rawCertifiedBounds !== "1") {
+            throw new Error("SEARCH_A19_CERTIFIED_SELECTION_BOUNDS must be 0 or 1");
+        }
+        this.certifiedSelectionBounds = rawCertifiedBounds === "1";
+        this.rolloutAllocation = parseSearchRolloutAllocation(searchEnv("SEARCH_A19_ROLLOUT_ALLOCATION"));
+        this.includeMoves = searchEnv("SEARCH_INCLUDE_MOVES") === "1";
+        const rawMaxMoveShots = searchEnv("SEARCH_MAX_MOVE_SHOTS");
         if (this.mode !== "search" || rawMaxMoveShots === undefined || rawMaxMoveShots === "") {
             this.maxMoveShotComposites = 0;
         } else {
@@ -1539,7 +1776,7 @@ export class SearchDriver {
             }
             this.maxMoveShotComposites = maxMoveShots;
         }
-        const rawMoveShotVersions = process.env.SEARCH_MOVE_SHOT_VERSIONS;
+        const rawMoveShotVersions = searchEnv("SEARCH_MOVE_SHOT_VERSIONS");
         if (this.maxMoveShotComposites === 0) {
             this.moveShotVersions = new Set();
         } else if (rawMoveShotVersions === undefined) {
@@ -1555,24 +1792,24 @@ export class SearchDriver {
             }
             this.moveShotVersions = new Set(moveShotVersions);
         }
-        this.activeChallengers = this.mode === "search" && process.env.SEARCH_ACTIVE_CHALLENGERS === "1";
-        this.aggressiveV08 = this.mode === "search" && process.env.V08_AGGRESSIVE === "1";
-        const rawObserveOnly = process.env.SEARCH_OBSERVE_ONLY;
+        this.activeChallengers = this.mode === "search" && searchEnv("SEARCH_ACTIVE_CHALLENGERS") === "1";
+        this.aggressiveV08 = this.mode === "search" && searchEnv("V08_AGGRESSIVE") === "1";
+        const rawObserveOnly = searchEnv("SEARCH_OBSERVE_ONLY");
         if (rawObserveOnly !== undefined && rawObserveOnly !== "" && rawObserveOnly !== "0" && rawObserveOnly !== "1") {
             throw new Error("SEARCH_OBSERVE_ONLY must be 0 or 1");
         }
         this.observeOnly = rawObserveOnly === "1";
         this.incumbentKinds = parseKindFilter<IncumbentKind>(
             "SEARCH_INCUMBENT_KINDS",
-            process.env.SEARCH_INCUMBENT_KINDS,
+            searchEnv("SEARCH_INCUMBENT_KINDS"),
             INCUMBENT_KINDS,
         );
         this.challengerKinds = parseKindFilter<CandidateKind>(
             "SEARCH_CHALLENGER_KINDS",
-            process.env.SEARCH_CHALLENGER_KINDS,
+            searchEnv("SEARCH_CHALLENGER_KINDS"),
             CHALLENGER_KINDS,
         );
-        const rawValidationRollouts = process.env.SEARCH_VALIDATION_ROLLOUTS;
+        const rawValidationRollouts = searchEnv("SEARCH_VALIDATION_ROLLOUTS");
         if (rawValidationRollouts === undefined || rawValidationRollouts === "") {
             this.validationRollouts = null;
         } else {
@@ -1590,12 +1827,12 @@ export class SearchDriver {
                 "SEARCH_INCUMBENT_KINDS, SEARCH_CHALLENGER_KINDS, and SEARCH_VALIDATION_ROLLOUTS require SEARCH_OBSERVE_ONLY=1",
             );
         }
-        if (this.validationRollouts !== null && process.env.SEARCH_IL_DATASET) {
+        if (this.validationRollouts !== null && searchEnv("SEARCH_IL_DATASET")) {
             throw new Error(
                 "SEARCH_VALIDATION_ROLLOUTS cannot be combined with SEARCH_IL_DATASET; use SEARCH_AUDIT_TURNS",
             );
         }
-        const rawShortlist = process.env.SEARCH_SHORTLIST;
+        const rawShortlist = searchEnv("SEARCH_SHORTLIST");
         if (this.mode !== "search" || rawShortlist === undefined || rawShortlist === "") {
             this.shortlist = null;
         } else {
@@ -1608,7 +1845,7 @@ export class SearchDriver {
         const researchShortlist = parseSearchResearchShortlist(this.mode, this.versions, this.shortlist);
         this.researchShortlist = researchShortlist?.shortlist ?? null;
         this.researchShortlistVersions = researchShortlist?.versions ?? new Set();
-        const rawDecisionDeadline = process.env.SEARCH_DECISION_DEADLINE_MS;
+        const rawDecisionDeadline = searchEnv("SEARCH_DECISION_DEADLINE_MS");
         if (this.mode !== "search" || rawDecisionDeadline === undefined || rawDecisionDeadline === "") {
             this.decisionDeadlineMs = null;
         } else {
@@ -1619,12 +1856,12 @@ export class SearchDriver {
             this.decisionDeadlineMs = decisionDeadlineMs;
         }
         const rawWaitDeadlinePolicy =
-            this.mode === "search" ? process.env.SEARCH_WAIT_DEADLINE_POLICY?.trim() || "profile" : "profile";
+            this.mode === "search" ? searchEnv("SEARCH_WAIT_DEADLINE_POLICY")?.trim() || "profile" : "profile";
         if (rawWaitDeadlinePolicy !== "profile" && rawWaitDeadlinePolicy !== "operation_bounded") {
             throw new Error("SEARCH_WAIT_DEADLINE_POLICY must be profile or operation_bounded");
         }
         this.waitDeadlinePolicy = rawWaitDeadlinePolicy;
-        const circuitBreakerMs = Number(process.env.SEARCH_CIRCUIT_BREAKER_MS);
+        const circuitBreakerMs = Number(searchEnv("SEARCH_CIRCUIT_BREAKER_MS"));
         this.circuitBreakerMs =
             this.mode === "search" && Number.isFinite(circuitBreakerMs) && circuitBreakerMs > 0
                 ? circuitBreakerMs
@@ -1636,7 +1873,7 @@ export class SearchDriver {
         ) {
             throw new Error("SEARCH_DECISION_DEADLINE_MS must be below SEARCH_CIRCUIT_BREAKER_MS");
         }
-        const rawFinishWeight = process.env.SEARCH_LATE_RANGED_FINISH_WEIGHT;
+        const rawFinishWeight = searchEnv("SEARCH_LATE_RANGED_FINISH_WEIGHT");
         if (this.mode !== "search" || rawFinishWeight === undefined || rawFinishWeight === "") {
             this.lateRangedFinishWeight = 0;
         } else {
@@ -1646,7 +1883,7 @@ export class SearchDriver {
             }
             this.lateRangedFinishWeight = finishWeight;
         }
-        const rawPureRangedTerminalWeight = process.env.SEARCH_PURE_RANGED_TERMINAL_WEIGHT;
+        const rawPureRangedTerminalWeight = searchEnv("SEARCH_PURE_RANGED_TERMINAL_WEIGHT");
         if (this.mode !== "search" || rawPureRangedTerminalWeight === undefined || rawPureRangedTerminalWeight === "") {
             this.pureRangedTerminalWeight = 0;
         } else {
@@ -1656,7 +1893,7 @@ export class SearchDriver {
             }
             this.pureRangedTerminalWeight = terminalWeight;
         }
-        const rawPureRangedNoMeleePressure = process.env.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE;
+        const rawPureRangedNoMeleePressure = searchEnv("SEARCH_PURE_RANGED_NO_MELEE_PRESSURE");
         if (
             this.mode === "search" &&
             rawPureRangedNoMeleePressure !== undefined &&
@@ -1667,7 +1904,7 @@ export class SearchDriver {
             throw new Error("SEARCH_PURE_RANGED_NO_MELEE_PRESSURE must be 0 or 1");
         }
         this.pureRangedNoMeleePressure = this.mode === "search" && rawPureRangedNoMeleePressure === "1";
-        const rawPureRangedNoMeleePressureVersions = process.env.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS;
+        const rawPureRangedNoMeleePressureVersions = searchEnv("SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS");
         if (!this.pureRangedNoMeleePressure) {
             this.pureRangedNoMeleePressureVersions = new Set();
         } else if (rawPureRangedNoMeleePressureVersions === undefined) {
@@ -1685,7 +1922,7 @@ export class SearchDriver {
             }
             this.pureRangedNoMeleePressureVersions = new Set(versions);
         }
-        const rawPureRangedDeadlineFinisher = process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER;
+        const rawPureRangedDeadlineFinisher = searchEnv("SEARCH_PURE_RANGED_DEADLINE_FINISHER");
         if (
             this.mode === "search" &&
             rawPureRangedDeadlineFinisher !== undefined &&
@@ -1696,7 +1933,7 @@ export class SearchDriver {
             throw new Error("SEARCH_PURE_RANGED_DEADLINE_FINISHER must be 0 or 1");
         }
         this.pureRangedDeadlineFinisher = this.mode === "search" && rawPureRangedDeadlineFinisher === "1";
-        const rawPureRangedDeadlineFinisherVersions = process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS;
+        const rawPureRangedDeadlineFinisherVersions = searchEnv("SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS");
         if (!this.pureRangedDeadlineFinisher) {
             this.pureRangedDeadlineFinisherVersions = new Set();
         } else if (rawPureRangedDeadlineFinisherVersions === undefined) {
@@ -1714,7 +1951,7 @@ export class SearchDriver {
             }
             this.pureRangedDeadlineFinisherVersions = new Set(versions);
         }
-        const rawPureRangedParetoNoMeleeFocus = process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS;
+        const rawPureRangedParetoNoMeleeFocus = searchEnv("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS");
         if (
             this.mode === "search" &&
             rawPureRangedParetoNoMeleeFocus !== undefined &&
@@ -1725,7 +1962,7 @@ export class SearchDriver {
             throw new Error("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS must be 0 or 1");
         }
         this.pureRangedParetoNoMeleeFocus = this.mode === "search" && rawPureRangedParetoNoMeleeFocus === "1";
-        const rawPureRangedParetoNoMeleeFocusScope = process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE;
+        const rawPureRangedParetoNoMeleeFocusScope = searchEnv("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE");
         if (
             !this.pureRangedParetoNoMeleeFocus ||
             rawPureRangedParetoNoMeleeFocusScope === undefined ||
@@ -1743,7 +1980,7 @@ export class SearchDriver {
                 "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE must be pure_ranged, any_board, or mixed_supported",
             );
         }
-        const rawPureRangedParetoNoMeleeFocusVersions = process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS;
+        const rawPureRangedParetoNoMeleeFocusVersions = searchEnv("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS");
         if (!this.pureRangedParetoNoMeleeFocus) {
             this.pureRangedParetoNoMeleeFocusVersions = new Set();
         } else if (rawPureRangedParetoNoMeleeFocusVersions === undefined) {
@@ -1761,8 +1998,9 @@ export class SearchDriver {
             }
             this.pureRangedParetoNoMeleeFocusVersions = new Set(versions);
         }
-        const rawPureRangedParetoNoMeleeFocusDamageFloor =
-            process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR;
+        const rawPureRangedParetoNoMeleeFocusDamageFloor = searchEnv(
+            "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR",
+        );
         if (!this.pureRangedParetoNoMeleeFocus) {
             this.pureRangedParetoNoMeleeFocusDamageFloor = 1;
         } else if (
@@ -1786,7 +2024,7 @@ export class SearchDriver {
                     "requires damage floor 1",
             );
         }
-        const rawPureRangedJitNoMeleeFocus = process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS;
+        const rawPureRangedJitNoMeleeFocus = searchEnv("SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS");
         if (
             this.mode === "search" &&
             rawPureRangedJitNoMeleeFocus !== undefined &&
@@ -1797,7 +2035,7 @@ export class SearchDriver {
             throw new Error("SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS must be 0 or 1");
         }
         this.pureRangedJitNoMeleeFocus = this.mode === "search" && rawPureRangedJitNoMeleeFocus === "1";
-        const rawPureRangedJitNoMeleeFocusVersions = process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS;
+        const rawPureRangedJitNoMeleeFocusVersions = searchEnv("SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS");
         if (!this.pureRangedJitNoMeleeFocus) {
             this.pureRangedJitNoMeleeFocusVersions = new Set();
         } else if (rawPureRangedJitNoMeleeFocusVersions === undefined) {
@@ -1829,7 +2067,7 @@ export class SearchDriver {
                     "are mutually exclusive",
             );
         }
-        const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
+        const rawValueWeights = searchEnv("V07_VALUE_WEIGHTS");
         this.learned =
             rawValueWeights === "material"
                 ? null
@@ -1838,7 +2076,7 @@ export class SearchDriver {
                   : { b: DEFAULT_V07_VALUE_WEIGHTS.b, w: [...DEFAULT_V07_VALUE_WEIGHTS.w] };
         // V2 leaf candidate: absent, malformed, or all-zero falls back to the prior leaf. Two explicit leaf
         // selectors are ambiguous experiment provenance, so reject the combination instead of guessing.
-        const parsedV2 = parseLearnedValueWidth(process.env.V07_VALUE_WEIGHTS_V2, VALUE_FEATURE_NAMES_V2.length);
+        const parsedV2 = parseLearnedValueWidth(searchEnv("V07_VALUE_WEIGHTS_V2"), VALUE_FEATURE_NAMES_V2.length);
         this.learnedV2 = parsedV2 && (parsedV2.b !== 0 || parsedV2.w.some((weight) => weight !== 0)) ? parsedV2 : null;
         if (this.learnedV2 && rawValueWeights !== undefined) {
             throw new Error("V07_VALUE_WEIGHTS_V2 cannot be combined with explicit V07_VALUE_WEIGHTS");
@@ -1851,24 +2089,26 @@ export class SearchDriver {
             const parsed = parseLearnedValueWidth(raw, VALUE_FEATURE_NAMES_V2.length);
             return parsed && (parsed.b !== 0 || parsed.w.some((weight) => weight !== 0)) ? parsed : null;
         };
-        this.learnedV2ByTeam.set(PBTypes.TeamVals.LEFT, parseTeamLeaf(process.env.V07_VALUE_WEIGHTS_V2_LOWER));
-        this.learnedV2ByTeam.set(PBTypes.TeamVals.RIGHT, parseTeamLeaf(process.env.V07_VALUE_WEIGHTS_V2_UPPER));
-        const rawOppModel = this.enabled ? process.env.SEARCH_OPP_MODEL?.trim() : undefined;
+        assertNoLegacySeatEnv("V07_VALUE_WEIGHTS_V2");
+        for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
+            this.learnedV2ByTeam.set(team, parseTeamLeaf(searchEnv(seatEnvName("V07_VALUE_WEIGHTS_V2", team))));
+        }
+        const rawOppModel = this.enabled ? searchEnv("SEARCH_OPP_MODEL")?.trim() : undefined;
         this.oppModel = rawOppModel ? getAIStrategy(rawOppModel) : null; // throws on an unknown version
-        const rawAudit = process.env.SEARCH_AUDIT;
+        const rawAudit = searchEnv("SEARCH_AUDIT");
         this.auditPath =
             !rawAudit || rawAudit === "0"
                 ? undefined
                 : rawAudit === "1"
                   ? join(process.cwd(), "search_audit.jsonl")
                   : rawAudit;
-        this.auditTurns = process.env.SEARCH_AUDIT_TURNS === "1";
-        this.datasetPath = this.mode === "oracle" ? process.env.Q2_DATASET || undefined : undefined;
-        this.datasetV2 = process.env.Q2_DATASET_V2 === "1";
-        this.ilPath = this.mode === "search" ? process.env.SEARCH_IL_DATASET || undefined : undefined;
+        this.auditTurns = searchEnv("SEARCH_AUDIT_TURNS") === "1";
+        this.datasetPath = this.mode === "oracle" ? searchEnv("Q2_DATASET") || undefined : undefined;
+        this.datasetV2 = searchEnv("Q2_DATASET_V2") === "1";
+        this.ilPath = this.mode === "search" ? searchEnv("SEARCH_IL_DATASET") || undefined : undefined;
         if (this.ilPath) {
-            this.ilRunFingerprint = requireIlRunFingerprint(process.env.SEARCH_IL_RUN_FINGERPRINT);
-            this.ilCohort = process.env.SEARCH_IL_COHORT?.trim() || null;
+            this.ilRunFingerprint = requireIlRunFingerprint(searchEnv("SEARCH_IL_RUN_FINGERPRINT"));
+            this.ilCohort = searchEnv("SEARCH_IL_COHORT")?.trim() || null;
             if (!this.ilCohort) {
                 throw new Error("SEARCH_IL_COHORT is required with SEARCH_IL_DATASET");
             }
@@ -1887,7 +2127,7 @@ export class SearchDriver {
             this.ilCohort = null;
         }
         if (this.datasetPath && this.datasetV2) {
-            this.datasetFingerprint = requirePhaseBRunFingerprint(process.env.PHASE_B_RUN_FINGERPRINT);
+            this.datasetFingerprint = requirePhaseBRunFingerprint(searchEnv("PHASE_B_RUN_FINGERPRINT"));
             this.datasetSeed = canonicalPhaseBSeed(this.match.seed, "Q2 dataset seed");
             if (!this.match.greenVersion || !this.match.redVersion) {
                 throw new Error("Phase-B Q2 dataset rows require green and red strategy versions");
@@ -1936,6 +2176,24 @@ export class SearchDriver {
         return this.researchShortlist !== null && this.researchShortlistVersions.has(version)
             ? this.researchShortlist
             : this.shortlist;
+    }
+    /** True while the adaptive budget is degraded after a breaker overrun (see `adaptiveBudget`). */
+    private isDegraded(): boolean {
+        return this.adaptiveBudget && this.degradedRemaining > 0;
+    }
+    /** Full-horizon rollouts per shortlisted candidate for this decision. */
+    private effectiveRollouts(): number {
+        return this.isDegraded() ? SearchDriver.DEGRADED_ROLLOUTS : this.rollouts;
+    }
+    /** Shortlist size for this decision; a degraded decision compares the incumbent with one challenger. */
+    private effectiveShortlist(version: string): number | null {
+        const shortlist = this.shortlistForVersion(version);
+        if (!this.isDegraded()) {
+            return shortlist;
+        }
+        return shortlist === null
+            ? SearchDriver.DEGRADED_SHORTLIST
+            : Math.min(shortlist, SearchDriver.DEGRADED_SHORTLIST);
     }
     /** Normal-turn rollout cap for one acting seat; fixed leaf/lap/reply modes do not consult this value. */
     private turnHorizonForVersion(version: string, actingTeam: TeamType): number {
@@ -1995,6 +2253,70 @@ export class SearchDriver {
         incumbent: GameAction[],
         rootDecisionContext?: IDecisionContext,
     ): GameAction[] {
+        const healerWaitGuard =
+            searchEnv("SEARCH_A19_HEALER_OPENING_COHESION") === "1" &&
+            this.enabled &&
+            version === "v0.8" &&
+            this.versions.has(version) &&
+            !this.observeOnly &&
+            (this.teamScope === null || this.teamScope.has(unit.getTeam())) &&
+            !!rootDecisionContext?.fightProperties &&
+            canWaitOnHourglass(unit, rootDecisionContext.fightProperties, this.deps.unitsHolder.getAllUnits());
+        if (
+            healerWaitGuard &&
+            isEarlyUnsupportedHealerDive(unit, this.deps.unitsHolder, this.deps.fightProperties.getCurrentLap(), {
+                actions: incumbent,
+            })
+        ) {
+            incumbent = [{ type: "wait_turn", unitId: unit.getId() }];
+        }
+        this.resetA19MaterialEvidence();
+        this.captureA19Material =
+            this.a19MaterialArbitration !== undefined &&
+            this.enabled &&
+            this.versions.has(version) &&
+            version === "v0.8" &&
+            !this.observeOnly &&
+            (this.teamScope === null || this.teamScope.has(unit.getTeam())) &&
+            this.deps.fightProperties.getCurrentLap() < V08S_URGENT_FINISH_START_LAP;
+        let chosen: GameAction[];
+        try {
+            chosen = this.chooseSearchDecision(unit, version, incumbent, rootDecisionContext);
+        } finally {
+            this.captureA19Material = false;
+        }
+        // Research seam (off by default): the one decision step the simulator and the ranked server share.
+        if (!this.enabled || !this.versions.has(version)) return chosen;
+        chosen = applyV08FlyerBacklinePriority(unit, rootDecisionContext, chosen);
+        const evidence = this.a19MaterialEvidence;
+        if (!this.a19MaterialArbitration || !evidence || evidence.unitId !== unit.getId() || !rootDecisionContext)
+            return chosen;
+        const signature = JSON.stringify(chosen);
+        const selected = evidence.candidates.findIndex((candidate) => JSON.stringify(candidate.actions) === signature);
+        if (selected < 0) return chosen;
+        const scored = this.a19ScoredArbitration
+            ? selectV08A19ScoredCandidateIndex(evidence.candidates, evidence.means, selected, incumbent)
+            : selected;
+        const material = selectV08A19MaterialCandidateIndex(
+            evidence.candidates,
+            evidence.means,
+            evidence.materials,
+            scored,
+            evidence.rolloutCount,
+            this.a19MaterialArbitration,
+            this.a19MaterialLowEvidenceWinningSamples,
+        );
+        return material === selected ? chosen : [...evidence.candidates[material].actions];
+    }
+    private resetA19MaterialEvidence(): void {
+        this.a19MaterialEvidence = undefined;
+    }
+    private chooseSearchDecision(
+        unit: Unit,
+        version: string,
+        incumbent: GameAction[],
+        rootDecisionContext?: IDecisionContext,
+    ): GameAction[] {
         // Preserve the historical version-only fast path: an unscoped driver must not
         // inspect the unit at all when this strategy version is excluded. Team lookup
         // is necessary only for the explicit entrant-team research scope.
@@ -2028,10 +2350,6 @@ export class SearchDriver {
             return incumbent;
         }
         const currentLap = this.deps.fightProperties.getCurrentLap();
-        const armageddonDefendOpportunity =
-            !this.soleAbominationArmageddonDefendPolicy &&
-            this.armageddonDefendCandidate &&
-            isV08ArmageddonDefendOpportunity(unit, this.deps.unitsHolder, currentLap);
         const isV08TargetPressurePolicy = isV08Search && V08_TARGET_PRESSURE_VERSIONS.has(version);
         const pureRangedNoMeleePressureSeat =
             this.pureRangedNoMeleePressure && this.pureRangedNoMeleePressureVersions.has(version);
@@ -2283,6 +2601,7 @@ export class SearchDriver {
                           },
                       }
                     : undefined;
+            let rootBarrelShotBlockers: ReadonlySet<string> | undefined;
             const preservesBacklineIntent = (candidate: Pick<IEnumeratedCandidate, "actions">): boolean =>
                 (!backlineProtectorIntent ||
                     (preservesV08BacklineProtectorIntent(backlineProtectorIntent, unit, context, candidate.actions) &&
@@ -2315,6 +2634,12 @@ export class SearchDriver {
                 ...this.caps,
                 maxMoveShotComposites: this.moveShotCapForVersion(version),
                 includeMountainAttacks: isV08Search,
+                includeArtifactBarrelAttackCoverage: isV08Search && this.a19ArtifactBarrelAttackCoverage,
+                includeLastFuseCounterTrades: isV08Search && this.a19LastFuseTrades,
+                includeLastFusePrimaryTrades: isV08Search && this.a19LastFusePrimaryTrades,
+                // v0.8 search rolls out the free Through Shot lines its native policy can take (V08_THROUGH_SHOT_LINE
+                // scopes both together, so a seat A/B compares whole seats); older versions keep their exact catalog.
+                throughShotFreeAim: isV08Search && throughShotLineEnabled(unit),
                 enrichIncumbentMetadata:
                     isV08Search || this.ilPath !== undefined || this.scoredDecisionObserver !== undefined,
                 retainMoveCandidateBeforeCap:
@@ -2335,6 +2660,18 @@ export class SearchDriver {
             let rejectedIsolatingFastFlyerMove = false;
             const keepCandidate = (candidate: IEnumeratedCandidate): boolean => {
                 if (candidate.kind === "incumbent") return true;
+                if (
+                    searchEnv("SEARCH_A19_HEALER_OPENING_COHESION") === "1" &&
+                    isV08Search &&
+                    rootDecisionContext?.fightProperties &&
+                    canWaitOnHourglass(
+                        unit,
+                        rootDecisionContext.fightProperties,
+                        this.deps.unitsHolder.getAllUnits(),
+                    ) &&
+                    isEarlyUnsupportedHealerDive(unit, this.deps.unitsHolder, currentLap, candidate)
+                )
+                    return false;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
                 if (
                     this.fastFlyerCohesion &&
@@ -2365,10 +2702,24 @@ export class SearchDriver {
                     return false;
                 }
                 // Search may compare a strategic wait, but it must never introduce a new Luck Shield or mountain
-                // hit. Retaining candidate zero above still permits either action as a fail-closed/true fallback.
+                // hit. Deployment barrels are the exception: they are one-hit screens, and a shot or advance
+                // that they block is otherwise invisible. Retaining candidate zero above still permits a
+                // mountain or Luck Shield as a fail-closed fallback.
                 if (
                     isV08Search &&
-                    (candidate.kind === "mine" || (candidate.kind === "defend" && !armageddonDefendOpportunity))
+                    (candidate.kind === "mine" || candidate.kind === "defend") &&
+                    !this.keepsArtifactBarrelMine(
+                        unit,
+                        candidate,
+                        this.a19ArtifactBarrelShotProjection
+                            ? (rootBarrelShotBlockers ??= friendlyShotBlockingBarrels(
+                                  unit.getTeam(),
+                                  this.deps.grid,
+                                  this.deps.unitsHolder,
+                                  this.deps.attackHandler,
+                              ))
+                            : undefined,
+                    )
                 ) {
                     return false;
                 }
@@ -2379,21 +2730,9 @@ export class SearchDriver {
                 if (!this.includeMoves && candidate.kind === "move" && !isV08Search) {
                     return false;
                 }
-                if (armageddonDefendOpportunity && candidate.kind === "defend") return true;
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             };
             const enumeratedCandidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates;
-            if (
-                armageddonDefendOpportunity &&
-                enumeratedCandidates.some(
-                    (candidate) =>
-                        candidate.kind === "defend" ||
-                        (candidate.kind === "incumbent" &&
-                            candidate.actions.some((action) => action.type === "defend_turn")),
-                )
-            ) {
-                this.counters.armageddonDefendOpportunities += 1;
-            }
             let candidates = enumeratedCandidates.filter(keepCandidate);
             const urgentMoveShotFallback =
                 prioritizeV08SUrgency &&
@@ -2486,6 +2825,9 @@ export class SearchDriver {
                     const expandedCandidates = enumerateCandidates(unit, context, incumbent, {
                         maxMoveShotComposites: this.moveShotCapForVersion(version),
                         includeMountainAttacks: isV08Search,
+                        includeArtifactBarrelAttackCoverage: isV08Search && this.a19ArtifactBarrelAttackCoverage,
+                        includeLastFuseCounterTrades: isV08Search && this.a19LastFuseTrades,
+                        includeLastFusePrimaryTrades: isV08Search && this.a19LastFusePrimaryTrades,
                         enrichIncumbentMetadata:
                             isV08Search || this.ilPath !== undefined || this.scoredDecisionObserver !== undefined,
                         preserveMovePostureDiversity:
@@ -2979,9 +3321,7 @@ export class SearchDriver {
                 if (isDominantFinishCombatReplacement(prioritizeDominantFinish, productiveFallback, incumbent)) {
                     this.counters.dominantFinishCombatFallbacks += 1;
                 }
-                const fallbackActions = this.nonregressiveOverrideValidation
-                    ? incumbent
-                    : (productiveFallback?.actions ?? incumbent);
+                const fallbackActions = productiveFallback?.actions ?? incumbent;
                 const counterfactual = this.scorePassiveCounterfactual(
                     passiveAudit,
                     unit,
@@ -3009,10 +3349,16 @@ export class SearchDriver {
             // already-probed action avoids spending the deadline on an inevitable screen-preserving move and
             // materially lowers protector decision latency without changing candidate identity or posture.
             if (
-                !this.nonregressiveOverrideValidation &&
                 prioritizeProductiveActions &&
                 productiveFallback &&
-                candidates.filter(isForceTierProductiveCandidate).length === 1
+                candidates.filter(isForceTierProductiveCandidate).length === 1 &&
+                !(
+                    this.a19LastFusePrimaryTrades &&
+                    candidates.some(
+                        (candidate) =>
+                            candidate.lastFuseCounterTradeReserved && !isForceTierProductiveCandidate(candidate),
+                    )
+                )
             ) {
                 this.counters.decisions += 1;
                 this.counters.singleForceTierFastPaths += 1;
@@ -3039,9 +3385,7 @@ export class SearchDriver {
             }
             if (candidates.length <= 1) {
                 this.counters.singleCandidate += 1;
-                const fallbackActions = this.nonregressiveOverrideValidation
-                    ? incumbent
-                    : (productiveFallback?.actions ?? incumbent);
+                const fallbackActions = productiveFallback?.actions ?? incumbent;
                 this.capturePassiveProductiveProbe(
                     passiveAudit,
                     unit,
@@ -3075,7 +3419,13 @@ export class SearchDriver {
                 this.circuitBreakerMs !== null &&
                 (behaviorElapsedMs ?? performance.now() - t0) > this.circuitBreakerMs
             ) {
-                this.circuitOpen = true;
+                if (this.adaptiveBudget) {
+                    this.degradedRemaining = SearchDriver.DEGRADED_DECISIONS;
+                } else {
+                    this.circuitOpen = true;
+                }
+            } else if (this.isDegraded() && !this.match.offlineDeterministicWork) {
+                this.degradedRemaining -= 1;
             }
             const cleanupErrors: unknown[] = [];
             try {
@@ -3204,15 +3554,12 @@ export class SearchDriver {
             shortlist: this.shortlist,
             decisionDeadlineMs: this.decisionDeadlineMs,
             deadlineFallbacks: c.deadlineFallbacks,
+            degradedDecisions: c.degradedDecisions,
+            adaptiveBudget: this.adaptiveBudget,
             offlineDeterministicWork: this.match.offlineDeterministicWork === true,
             isolatingFastFlyerMoveRejects: c.isolatingFastFlyerMoveRejects,
-            armageddonDefendOpportunities: c.armageddonDefendOpportunities,
             soleAbominationArmageddonDefendPolicy: this.soleAbominationArmageddonDefendPolicy,
             soleAbominationArmageddonDefends: c.soleAbominationArmageddonDefends,
-            nonregressiveOverrideValidation: this.nonregressiveOverrideValidation,
-            nonregressiveOverrideValidationAttempts: c.nonregressiveOverrideValidationAttempts,
-            nonregressiveOverrideValidationPasses: c.nonregressiveOverrideValidationPasses,
-            nonregressiveOverrideValidationRejects: c.nonregressiveOverrideValidationRejects,
             waitDeadlinePolicy: this.waitDeadlinePolicy,
             circuitWaitArbitrations: c.circuitWaitArbitrations,
             passiveCatalogExpansions: c.passiveCatalogExpansions,
@@ -3585,12 +3932,12 @@ export class SearchDriver {
         let bestIdx = 0;
         let bestChallengerIdx = -1;
         let hasPreferredV08STarget = false;
-        let armageddonDefendArbitration = false;
         let provisionalWouldOverride = false;
-        let nonregressiveOverrideValidationPass = true;
-        let nonregressiveOverrideValidationDelta: number | null = null;
         let validationMeans: number[] | null = null;
         const turnHorizon = this.turnHorizonForVersion(version, unit.getTeam());
+        if (this.isDegraded()) {
+            this.counters.degradedDecisions += 1;
+        }
         try {
             scoredCandidates = this.shortlistCandidates(
                 unit,
@@ -3603,29 +3950,34 @@ export class SearchDriver {
                 prioritizeV08STargetPressure,
                 prioritizeV08SUrgency,
             );
-            means = this.scoreCandidates(
+            means = this.scoreSearchCandidates(
                 unit,
                 scoredCandidates,
                 seedBase,
                 "turns",
-                this.rollouts,
+                this.effectiveRollouts(),
                 deadlineAt,
                 turnHorizon,
-            );
-            armageddonDefendArbitration =
-                !this.soleAbominationArmageddonDefendPolicy &&
-                this.armageddonDefendCandidate &&
-                isV08ArmageddonDefendOpportunity(
+                this.certifiedSelectionBoundPlan(
                     unit,
-                    this.deps.unitsHolder,
-                    this.deps.fightProperties.getCurrentLap(),
-                ) &&
-                scoredCandidates.some(
-                    (candidate) =>
-                        candidate.kind === "defend" ||
-                        (candidate.kind === "incumbent" &&
-                            candidate.actions.some((action) => action.type === "defend_turn")),
-                );
+                    scoredCandidates,
+                    version,
+                    prioritizeProductiveActions,
+                    prioritizeDominantFinish,
+                    prioritizeV08STargetPressure,
+                    prioritizeV08SUrgency,
+                    aggressiveWaitComparison,
+                ) ||
+                    this.canBoundHopelessSearchTails(
+                        deadlineAt,
+                        prioritizeProductiveActions,
+                        prioritizeDominantFinish,
+                        prioritizeV08STargetPressure,
+                        prioritizeV08SUrgency,
+                        aggressiveWaitComparison,
+                    ),
+                version,
+            );
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
             const legalProductiveIndices = scoredCandidates
                 .map((candidate, index) => ({ candidate, index }))
@@ -3656,6 +4008,7 @@ export class SearchDriver {
                 this.deps.unitsHolder,
                 legalDirectCombatIndices.map((index) => scoredCandidates[index]),
                 this.deps.fightProperties.getCurrentLap(),
+                this.deps.fightProperties,
             );
             const preferredV08STargetIndex = preferredV08STarget ? scoredCandidates.indexOf(preferredV08STarget) : -1;
             hasPreferredV08STarget = preferredV08STargetIndex >= 0;
@@ -3665,6 +4018,7 @@ export class SearchDriver {
                       this.deps.unitsHolder,
                       legalUrgentDamageIndices.map((index) => scoredCandidates[index]),
                       this.deps.fightProperties.getCurrentLap(),
+                      this.deps.fightProperties,
                   )
                 : undefined;
             const preferredUrgentDamageIndex = preferredUrgentDamage
@@ -3701,22 +4055,21 @@ export class SearchDriver {
             // In this one environmental-preservation state, ordinary rollout value must arbitrate. The late
             // productive/urgent layers were designed to prevent passive draws and would otherwise discard the
             // very defend action whose H64 terminal result distinguishes a draw from a surviving win.
-            const selectionIndices = armageddonDefendArbitration
-                ? scoredCandidates.map((_candidate, index) => index)
-                : policySelectionIndices;
+            const selectionIndices =
+                this.a19LastFusePrimaryTrades && V08_AGGRESSIVE_VERSIONS.has(version)
+                    ? includeImprovingLastFuseTrade(scoredCandidates, means, policySelectionIndices)
+                    : policySelectionIndices;
             bestIdx = selectionIndices[0];
             for (const index of selectionIndices) {
                 if (
                     means[index] > means[bestIdx] ||
-                    (!armageddonDefendArbitration &&
-                        prioritizeV08STargetPressure &&
+                    (prioritizeV08STargetPressure &&
                         !prioritizeV08SUrgency &&
                         bestIdx === 0 &&
                         index > 0 &&
                         means[index] !== -Infinity &&
                         means[index] === means[bestIdx]) ||
-                    (!armageddonDefendArbitration &&
-                        !this.strictAggressiveWaitTies &&
+                    (!this.strictAggressiveWaitTies &&
                         aggressiveWaitComparison &&
                         bestIdx === 0 &&
                         index > 0 &&
@@ -3786,45 +4139,16 @@ export class SearchDriver {
                 bestIdx !== 0 &&
                 means[bestIdx] !== -Infinity &&
                 (means[0] === -Infinity ||
-                    (!armageddonDefendArbitration &&
-                        ((prioritizeProductiveActions &&
-                            isProductiveCandidate(scoredCandidates[bestIdx]) &&
-                            !isProductiveCandidate(scoredCandidates[0])) ||
-                            (prioritizeV08STargetPressure && hasPreferredV08STarget) ||
-                            (prioritizeV08SUrgency && isProductiveCandidate(scoredCandidates[bestIdx])) ||
-                            (prioritizeDominantFinish && isProductiveCandidate(scoredCandidates[bestIdx])) ||
-                            (aggressiveWaitComparison &&
-                                isProductiveCandidate(scoredCandidates[bestIdx]) &&
-                                (this.strictAggressiveWaitTies
-                                    ? means[bestIdx] > means[0]
-                                    : means[bestIdx] >= means[0])))) ||
+                    (prioritizeProductiveActions &&
+                        isProductiveCandidate(scoredCandidates[bestIdx]) &&
+                        !isProductiveCandidate(scoredCandidates[0])) ||
+                    (prioritizeV08STargetPressure && hasPreferredV08STarget) ||
+                    (prioritizeV08SUrgency && isProductiveCandidate(scoredCandidates[bestIdx])) ||
+                    (prioritizeDominantFinish && isProductiveCandidate(scoredCandidates[bestIdx])) ||
+                    (aggressiveWaitComparison &&
+                        isProductiveCandidate(scoredCandidates[bestIdx]) &&
+                        (this.strictAggressiveWaitTies ? means[bestIdx] > means[0] : means[bestIdx] >= means[0])) ||
                     means[bestIdx] - means[0] >= this.gate);
-            if (this.nonregressiveOverrideValidation && provisionalWouldOverride && means[0] !== -Infinity) {
-                this.counters.nonregressiveOverrideValidationAttempts += 1;
-                const pairedMeans = this.scoreCandidates(
-                    unit,
-                    [scoredCandidates[0], scoredCandidates[bestIdx]],
-                    hashSimulationParts("a19-nonregressive-override-validation-v2", seedBase),
-                    "turns",
-                    2,
-                    deadlineAt,
-                    turnHorizon,
-                );
-                nonregressiveOverrideValidationDelta =
-                    pairedMeans[0] === -Infinity || pairedMeans[1] === -Infinity
-                        ? null
-                        : pairedMeans[1] - pairedMeans[0];
-                if (
-                    pairedMeans[0] === -Infinity ||
-                    pairedMeans[1] === -Infinity ||
-                    pairedMeans[1] - pairedMeans[0] < this.gate
-                ) {
-                    nonregressiveOverrideValidationPass = false;
-                    this.counters.nonregressiveOverrideValidationRejects += 1;
-                } else {
-                    this.counters.nonregressiveOverrideValidationPasses += 1;
-                }
-            }
             if (this.validationRollouts !== null && bestChallengerIdx !== -1) {
                 const validationSeedBase = hashSimulationParts("search-validation-v1", seedBase);
                 validationMeans = this.scoreCandidates(
@@ -3836,6 +4160,24 @@ export class SearchDriver {
                     deadlineAt,
                     turnHorizon,
                 );
+            }
+            if (
+                this.a19ScoredArbitration &&
+                version === "v0.8" &&
+                this.deps.fightProperties.getCurrentLap() < V08S_URGENT_FINISH_START_LAP
+            ) {
+                const selectedIndex = provisionalWouldOverride ? bestIdx : 0;
+                const arbitratedIndex = selectV08A19ScoredCandidateIndex(
+                    scoredCandidates,
+                    means,
+                    selectedIndex,
+                    incumbent,
+                );
+                if (arbitratedIndex !== selectedIndex) {
+                    bestIdx = arbitratedIndex;
+                    bestChallengerIdx = arbitratedIndex > 0 ? arbitratedIndex : bestChallengerIdx;
+                    provisionalWouldOverride = arbitratedIndex !== 0;
+                }
             }
         } catch (error) {
             if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
@@ -3856,11 +4198,8 @@ export class SearchDriver {
             // may force the valid fallback. Qualification scores the wait/action pair after behavior is frozen.
             const forceProductiveFallback =
                 prioritizeProductiveActions || prioritizeDominantFinish || prioritizeV08SUrgency;
-            const selectedFallback = this.nonregressiveOverrideValidation
-                ? undefined
-                : aggressiveWaitComparison && !forceProductiveFallback
-                  ? undefined
-                  : productiveFallback;
+            const selectedFallback =
+                aggressiveWaitComparison && !forceProductiveFallback ? undefined : productiveFallback;
             const fallbackActions = selectedFallback?.actions ?? incumbent;
             if (isDominantFinishCombatReplacement(prioritizeDominantFinish, selectedFallback, incumbent)) {
                 this.counters.dominantFinishCombatFallbacks += 1;
@@ -3888,17 +4227,6 @@ export class SearchDriver {
                         ms: Math.round(ms * 10) / 10,
                         deadlineFallback: 1,
                         productiveFallback: Number(selectedFallback !== undefined),
-                        ...(this.nonregressiveOverrideValidation
-                            ? {
-                                  provisionalWouldOverride: provisionalWouldOverride ? 1 : 0,
-                                  nonregressiveOverrideValidationRollouts: provisionalWouldOverride ? 2 : 0,
-                                  nonregressiveOverrideValidationDelta:
-                                      nonregressiveOverrideValidationDelta === null
-                                          ? null
-                                          : Number(nonregressiveOverrideValidationDelta.toFixed(4)),
-                                  nonregressiveOverrideValidationPass: 0,
-                              }
-                            : {}),
                         ...(this.observeOnly
                             ? {
                                   observeOnly: 1,
@@ -3928,7 +4256,7 @@ export class SearchDriver {
         }
         // The GATE: trust the policy unless a challenger clearly beats it on mean rollout value. An
         // incumbent that is illegal in sim is always replaced by the best legal candidate.
-        const wouldOverride = provisionalWouldOverride && nonregressiveOverrideValidationPass;
+        const wouldOverride = provisionalWouldOverride;
         const overridden = wouldOverride && !this.observeOnly;
         if (wouldOverride && this.observeOnly) {
             this.counters.shadowRecommendations += 1;
@@ -4032,19 +4360,6 @@ export class SearchDriver {
                             ? null
                             : Number((means[bestIdx] - means[0]).toFixed(4)),
                     ms: Math.round(ms * 10) / 10,
-                    ...(this.nonregressiveOverrideValidation
-                        ? {
-                              provisionalWouldOverride: provisionalWouldOverride ? 1 : 0,
-                              nonregressiveOverrideValidationRollouts:
-                                  provisionalWouldOverride && !incumbentIllegal ? 2 : 0,
-                              nonregressiveOverrideValidationDelta:
-                                  nonregressiveOverrideValidationDelta === null
-                                      ? null
-                                      : Number(nonregressiveOverrideValidationDelta.toFixed(4)),
-                              nonregressiveOverrideValidationPass:
-                                  provisionalWouldOverride && nonregressiveOverrideValidationPass ? 1 : 0,
-                          }
-                        : {}),
                     ...(this.observeOnly
                         ? {
                               observeOnly: 1,
@@ -4101,6 +4416,7 @@ export class SearchDriver {
                   this.deps.unitsHolder,
                   urgentDamageCandidates,
                   this.deps.fightProperties.getCurrentLap(),
+                  this.deps.fightProperties,
               )
             : undefined;
         const orderedUrgentDamage = preferredUrgentDamage
@@ -4114,6 +4430,7 @@ export class SearchDriver {
             this.deps.unitsHolder,
             forceTierDirectCombatCandidates,
             this.deps.fightProperties.getCurrentLap(),
+            this.deps.fightProperties,
         );
         const preferredFinishingAttack = selectV08DirectCombatCandidate(forceTierDirectCombatCandidates);
         const orderedDirectCombat = preferredFinishingAttack
@@ -4202,6 +4519,7 @@ export class SearchDriver {
             this.deps.unitsHolder,
             damageCandidates,
             this.deps.fightProperties.getCurrentLap(),
+            this.deps.fightProperties,
         );
         const orderedDamage = preferredDamage
             ? [preferredDamage, ...damageCandidates.filter((candidate) => candidate !== preferredDamage)]
@@ -4230,6 +4548,122 @@ export class SearchDriver {
 
         return this.firstEngineValidCandidate(unit, [stationaryMountain], seedBase);
     }
+    /**
+     * Cells a barrel can sit on and still stop a shot: this unit, plus every ally who can fire right now.
+     * A pinned or empty-quiver shooter is omitted — clearing the barrel would not give them a shot.
+     */
+    private friendlyShotOrigins(unit: Unit): { x: number; y: number }[] {
+        const origins = unit.getCells().map((cell) => ({ x: cell.x, y: cell.y }));
+        const seen = new Set(origins.map((cell) => `${cell.x},${cell.y}`));
+        for (const ally of this.deps.unitsHolder.getAllAllies(unit.getTeam())) {
+            if (ally.getId() === unit.getId() || ally.isDead()) continue;
+            if (
+                !this.deps.attackHandler.canLandRangeAttack(
+                    ally,
+                    this.deps.grid.getEnemyAggrMatrixByUnitId(ally.getId()),
+                )
+            ) {
+                continue;
+            }
+            for (const cell of ally.getCells()) {
+                const key = `${cell.x},${cell.y}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                origins.push({ x: cell.x, y: cell.y });
+            }
+        }
+        return origins;
+    }
+    /**
+     * Enemy barrels are legal challengers. A friendly barrel is legal only when it stands on a friendly
+     * shot, because deleting the screen is otherwise a wasted turn.
+     */
+    private keepsArtifactBarrelMine(
+        unit: Unit,
+        candidate: Pick<IEnumeratedCandidate, "kind" | "targetCell">,
+        projectedBlockers?: ReadonlySet<string>,
+    ): boolean {
+        if (!this.a19ArtifactBarrelAttackCoverage) return false;
+        const barrels = this.deps.grid.getArtifactBarrels();
+        if (!isArtifactBarrelMine(barrels, candidate) || !candidate.targetCell) return false;
+        const barrel = barrels.find(
+            (entry) => entry.cell.x === candidate.targetCell?.x && entry.cell.y === candidate.targetCell?.y,
+        );
+        if (!barrel || barrel.team !== unit.getTeam()) return true;
+        if (this.a19ArtifactBarrelShotProjection) {
+            return (
+                projectedBlockers ??
+                friendlyShotBlockingBarrels(
+                    unit.getTeam(),
+                    this.deps.grid,
+                    this.deps.unitsHolder,
+                    this.deps.attackHandler,
+                )
+            ).has(`${barrel.cell.x},${barrel.cell.y}`);
+        }
+        const enemies = this.deps.unitsHolder
+            .getAllEnemyUnits(unit.getTeam())
+            .filter((enemy) => !enemy.isDead())
+            .flatMap((enemy) => enemy.getCells());
+        return barrelBlocksShotLine(barrel.cell, this.friendlyShotOrigins(unit), enemies);
+    }
+    /**
+     * A barrel on a friendly shot scores no damage on the immediate leaf, so the top-K drops it. Keep one
+     * horizon comparison for the blocking barrel (an enemy screen before our own). With no damaging attack
+     * at all, the nearest enemy barrel is the fallback. An own barrel that blocks nobody is never reserved.
+     */
+    private reservedArtifactBarrelMine(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        allowNearestWhenIdle: boolean,
+    ): IEnumeratedCandidate | undefined {
+        const barrels = this.deps.grid.getArtifactBarrels();
+        const enemies = this.deps.unitsHolder
+            .getAllEnemyUnits(unit.getTeam())
+            .filter((enemy) => !enemy.isDead())
+            .flatMap((enemy) => enemy.getCells());
+        const origins = this.friendlyShotOrigins(unit);
+        const projectedBlockers = this.a19ArtifactBarrelShotProjection
+            ? friendlyShotBlockingBarrels(
+                  unit.getTeam(),
+                  this.deps.grid,
+                  this.deps.unitsHolder,
+                  this.deps.attackHandler,
+              )
+            : undefined;
+        const base = unit.getBaseCell();
+        let blocking: IEnumeratedCandidate | undefined;
+        let nearestEnemy: IEnumeratedCandidate | undefined;
+        let blockingDistance = Number.POSITIVE_INFINITY;
+        let blockingIsEnemy = false;
+        let nearestDistance = Number.POSITIVE_INFINITY;
+        for (const candidate of candidates) {
+            if (!isArtifactBarrelMine(barrels, candidate) || !candidate.targetCell) continue;
+            const barrel = barrels.find(
+                (entry) => entry.cell.x === candidate.targetCell?.x && entry.cell.y === candidate.targetCell?.y,
+            );
+            if (!barrel) continue;
+            const isEnemy = barrel.team !== unit.getTeam();
+            const distance = Math.abs(candidate.targetCell.x - base.x) + Math.abs(candidate.targetCell.y - base.y);
+            if (isEnemy && distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestEnemy = candidate;
+            }
+            if (
+                projectedBlockers && (!this.a19ArtifactBarrelOwnShotProjectionOnly || !isEnemy)
+                    ? !projectedBlockers.has(`${candidate.targetCell.x},${candidate.targetCell.y}`)
+                    : !barrelBlocksShotLine(candidate.targetCell, origins, enemies)
+            )
+                continue;
+            const closer = distance < blockingDistance;
+            if (blocking === undefined || (isEnemy && !blockingIsEnemy) || (isEnemy === blockingIsEnemy && closer)) {
+                blocking = candidate;
+                blockingDistance = distance;
+                blockingIsEnemy = isEnemy;
+            }
+        }
+        return blocking ?? (allowNearestWhenIdle ? nearestEnemy : undefined);
+    }
     /** Immediate-leaf pre-pass used only when SEARCH_SHORTLIST is explicitly configured. */
     private shortlistCandidates(
         unit: Unit,
@@ -4242,7 +4676,7 @@ export class SearchDriver {
         prioritizeV08STargetPressure = false,
         prioritizeV08SUrgency = false,
     ): readonly IEnumeratedCandidate[] {
-        const shortlist = this.shortlistForVersion(version);
+        const shortlist = this.effectiveShortlist(version);
         if (shortlist === null || candidates.length <= shortlist) {
             return candidates;
         }
@@ -4280,6 +4714,7 @@ export class SearchDriver {
                   this.deps.unitsHolder,
                   v08sUrgentDamage.map(({ index }) => candidates[index]),
                   this.deps.fightProperties.getCurrentLap(),
+                  this.deps.fightProperties,
               )
             : undefined;
         if (preferredUrgentDamage) {
@@ -4294,6 +4729,7 @@ export class SearchDriver {
             this.deps.unitsHolder,
             v08sDirectCombat.map(({ index }) => candidates[index]),
             this.deps.fightProperties.getCurrentLap(),
+            this.deps.fightProperties,
         );
         if (preferredV08STarget) {
             v08sDirectCombat.sort((left, right) => {
@@ -4398,16 +4834,26 @@ export class SearchDriver {
         if (reservedVine && !challengers.includes(reservedVine)) {
             challengers = [...challengers, reservedVine];
         }
-        const reservedArmageddonDefend =
-            !this.soleAbominationArmageddonDefendPolicy &&
-            this.armageddonDefendCandidate &&
-            isV08ArmageddonDefendOpportunity(unit, this.deps.unitsHolder, this.deps.fightProperties.getCurrentLap())
-                ? candidates.find((candidate) => candidate.kind === "defend")
-                : undefined;
-        if (reservedArmageddonDefend && !challengers.includes(reservedArmageddonDefend)) {
-            challengers = [...challengers, reservedArmageddonDefend];
+        // An immediate leaf scores a barrel hit as zero damage, so the top-K drops it under any real attack.
+        // A barrel on a friendly shot is still worth one horizon comparison. With no damaging attack at
+        // all, the nearest enemy barrel is the fallback.
+        if (this.a19ArtifactBarrelAttackCoverage) {
+            const reservedBarrel = this.reservedArtifactBarrelMine(
+                unit,
+                candidates,
+                !candidates.some((candidate) => isPositiveDirectCombatCandidate(candidate)),
+            );
+            if (reservedBarrel && !challengers.includes(reservedBarrel)) {
+                challengers = [...challengers, reservedBarrel];
+            }
         }
         challengers = reserveResearchRapidChargeShortlist(candidates, challengers);
+        if (this.a19GravechainCoverage && V08_AGGRESSIVE_VERSIONS.has(version)) {
+            challengers = reserveGravechainShortlistCandidate(unit, this.deps, candidates, challengers);
+        }
+        if (this.a19LastFuseTrades && V08_AGGRESSIVE_VERSIONS.has(version)) {
+            challengers = reserveLastFuseShortlistCandidate(candidates, challengers);
+        }
         return [candidates[0], ...challengers];
     }
     // ---- Q2 gate-0 ablation ---------------------------------------------------------------------
@@ -4599,7 +5045,7 @@ export class SearchDriver {
             // channel carries the exact action it replaced — score {wait, replaced} to the same
             // end-of-lap horizon and label whether keeping the wait was right. Collection-only: the
             // live decision is never changed here, so trajectories stay on-policy.
-            const replaced = process.env.B2_ORACLE === "1" ? consumeWaitReplacement(unit.getId()) : undefined;
+            const replaced = searchEnv("B2_ORACLE") === "1" ? consumeWaitReplacement(unit.getId()) : undefined;
             if (replaced && !replaced.some((a) => a.type === "wait_turn")) {
                 c.q2oPoints += 1;
                 c.q2oIncumbentWait += 1;
@@ -4716,6 +5162,182 @@ export class SearchDriver {
         return overridden ? candidates[1].actions : incumbent;
     }
     // ---- rollout scoring --------------------------------------------------------------------------
+    /**
+     * Offline research only. Maxima in all active selection pools remain exact; native and deterministic
+     * preferred actions remain exact. Keeping a preference's entire combat fallback set unbounded until
+     * that preference finishes legally prevents a stochastic rejection from changing the policy tier.
+     * Full-score observers and material gates wider than exact primary ties retain every sample.
+     */
+    private certifiedSelectionBoundPlan(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        version: string,
+        productive: boolean,
+        dominant: boolean,
+        targetPressure: boolean,
+        urgent: boolean,
+        aggressiveWait: boolean,
+    ): ISearchSelectionBoundPlan | false {
+        if (
+            !this.certifiedSelectionBounds ||
+            version !== "v0.8" ||
+            this.match.offlineDeterministicWork !== true ||
+            (this.captureA19Material && this.a19MaterialArbitration !== "ties") ||
+            this.ilPath !== undefined ||
+            this.auditPath !== undefined ||
+            this.scoredDecisionObserver !== undefined ||
+            this.passiveProductiveProbeObserver !== undefined
+        ) {
+            return false;
+        }
+        const combat = candidates.filter(isDirectCombatCandidate);
+        const preferred = new Set(
+            [
+                dominant ? selectV08DirectCombatCandidate(combat) : undefined,
+                targetPressure
+                    ? selectV08STargetPressureCandidate(
+                          unit,
+                          this.deps.unitsHolder,
+                          combat,
+                          this.deps.fightProperties.getCurrentLap(),
+                          this.deps.fightProperties,
+                      )
+                    : undefined,
+            ]
+                .filter((candidate): candidate is IEnumeratedCandidate => candidate !== undefined)
+                .map((candidate) => candidates.indexOf(candidate)),
+        );
+        const protectedIndices = new Set([0, ...preferred]);
+        if (urgent) {
+            candidates.forEach((candidate, index) => {
+                if (
+                    isDirectCombatCandidate(candidate) ||
+                    candidate.actions.some((action) => action.type === "cast_spell")
+                ) {
+                    protectedIndices.add(index);
+                }
+            });
+        }
+        return {
+            pools: candidates.map(
+                (candidate) =>
+                    Number((productive || dominant || urgent) && isForceTierProductiveCandidate(candidate)) |
+                    (Number((dominant || urgent) && isPureMoveCandidate(candidate)) << 1) |
+                    (Number(aggressiveWait && isProductiveCandidate(candidate)) << 2),
+            ),
+            directCombat: candidates.map(isDirectCombatCandidate),
+            protectedIndices,
+            preferredIndices: preferred,
+        };
+    }
+    /**
+     * Offline unrestricted search may skip a hopeless tail. Restricted selection (productive repair, dominant
+     * finish, target pressure, urgency, aggressive wait) can keep an action that is not the raw best mean, so
+     * those decisions stay fully scored. Live and ranked deadlines never take this path.
+     */
+    private canBoundHopelessSearchTails(
+        deadlineAt: number | null,
+        prioritizeProductiveActions: boolean,
+        prioritizeDominantFinish: boolean,
+        prioritizeV08STargetPressure: boolean,
+        prioritizeV08SUrgency: boolean,
+        aggressiveWaitComparison: boolean,
+    ): boolean {
+        return (
+            this.match.offlineDeterministicWork === true &&
+            deadlineAt === null &&
+            !this.captureA19Material &&
+            this.ilPath === undefined &&
+            this.scoredDecisionObserver === undefined &&
+            !prioritizeProductiveActions &&
+            !prioritizeDominantFinish &&
+            !prioritizeV08STargetPressure &&
+            !prioritizeV08SUrgency &&
+            !aggressiveWaitComparison
+        );
+    }
+    /** Gate, replay near-tie, and scored-arbitration gaps. A lower bound inside this margin can still win. */
+    private hopelessTailMargin(): number {
+        return Math.max(
+            this.gate,
+            this.rankedReplayTiebreakEpsilon,
+            this.a19ScoredArbitration ? V08_A19_SCORED_ARBITRATION_POLICY.valueGain : 0,
+        );
+    }
+    /**
+     * Offline root research only. The 2K pilot plus 4 floor(K/2) continuation samples fit the 4K budget.
+     * Halving reuses all six samples; validation judges survivors using only the four fresh samples.
+     * Full-score observers, alternate material gates, deadlines and historical versions keep uniform work.
+     */
+    private scoreSearchCandidates(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        seedBase: number,
+        horizonMode: HorizonMode,
+        rolloutCount: number,
+        deadlineAt: number | null,
+        turnHorizon: number,
+        boundHopelessTails: boolean | ISearchSelectionBoundPlan,
+        version: string,
+    ): number[] {
+        if (
+            this.rolloutAllocation === "uniform" ||
+            version !== "v0.8" ||
+            this.match.offlineDeterministicWork !== true ||
+            (this.rolloutAllocation === "block-halving" &&
+                this.deps.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER) ||
+            horizonMode !== "turns" ||
+            rolloutCount !== 4 ||
+            candidates.length < 6 ||
+            deadlineAt !== null ||
+            this.observeOnly ||
+            this.validationRollouts !== null ||
+            this.ilPath !== undefined ||
+            this.auditPath !== undefined ||
+            this.scoredDecisionObserver !== undefined ||
+            this.passiveProductiveProbeObserver !== undefined ||
+            (this.captureA19Material && this.a19MaterialArbitration !== "ties")
+        ) {
+            return this.scoreCandidates(
+                unit,
+                candidates,
+                seedBase,
+                horizonMode,
+                rolloutCount,
+                deadlineAt,
+                turnHorizon,
+                boundHopelessTails,
+            );
+        }
+        const cache: SearchRolloutCache = new Map();
+        const pilot = this.scoreCandidates(unit, candidates, seedBase, horizonMode, 2, null, turnHorizon, false, cache);
+        const pilotMaterial = this.captureA19Material ? this.a19MaterialEvidence?.materials : undefined;
+        const indices = selectSearchRolloutSurvivors(pilot, pilotMaterial);
+        const survivors = indices.map((index) => candidates[index]);
+        const final = this.scoreCandidates(unit, survivors, seedBase, horizonMode, 6, null, turnHorizon, false, cache);
+        const means = candidates.map(() => Number.NEGATIVE_INFINITY);
+        const materials = candidates.map(() => Number.NEGATIVE_INFINITY);
+        const start = this.rolloutAllocation === "validation" ? 2 : 0;
+        const samples = 6 - start;
+        for (let index = 0; index < indices.length; index += 1) {
+            const originalIndex = indices[index];
+            if (!Number.isFinite(final[index])) continue;
+            const row = cache.get(candidates[originalIndex])!;
+            let sum = 0,
+                materialSum = 0;
+            for (let r = start; r < 6; r += 1) {
+                const sample = row.get(r)!;
+                sum += sample.score;
+                if (this.captureA19Material) materialSum += sample.material!;
+            }
+            means[originalIndex] = sum / samples;
+            if (this.captureA19Material) materials[originalIndex] = materialSum / samples;
+        }
+        if (this.captureA19Material) {
+            this.a19MaterialEvidence = { unitId: unit.getId(), candidates, means, materials, rolloutCount: samples };
+        }
+        return means;
+    }
     /** Mean leaf value per candidate over SEARCH_ROLLOUTS paired-seed rollouts (-Infinity = illegal). */
     private scoreCandidates(
         unit: Unit,
@@ -4725,6 +5347,8 @@ export class SearchDriver {
         rolloutCount = this.rollouts,
         deadlineAt: number | null = null,
         turnHorizon = this.horizon,
+        boundHopelessTails: boolean | ISearchSelectionBoundPlan = false,
+        rolloutCache?: SearchRolloutCache,
     ): number[] {
         this.assertBeforeDecisionDeadline(deadlineAt);
         const journal =
@@ -4735,19 +5359,69 @@ export class SearchDriver {
             ? undefined
             : snapshotBattle(this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
         const savedStats = this.deps.captureDamageStats();
+        const restoreAuxiliaryState = this.deps.captureAuxiliaryState?.();
         this.assertBeforeDecisionDeadline(deadlineAt);
         const means: number[] = [];
-        for (const cand of candidates) {
+        const captureMaterial = this.captureA19Material && horizonMode === "turns";
+        // Partial material totals are ineligible evidence. Exact-primary-tie arbitration cannot select a
+        // certified primary loser, so it may omit that loser's material tail. Wider material gates stay full.
+        const boundTails =
+            boundHopelessTails &&
+            (!captureMaterial || (typeof boundHopelessTails === "object" && this.a19MaterialArbitration === "ties"));
+        const selectionBounds =
+            boundTails && typeof boundHopelessTails === "object"
+                ? new SearchSelectionBounds(boundHopelessTails)
+                : undefined;
+        let leafOutsideUnitInterval = false;
+        let bestFinishedMean = Number.NEGATIVE_INFINITY;
+        const margin = boundTails ? this.hopelessTailMargin() : 0;
+        const materials: number[] = [];
+        const actingTeam = captureMaterial ? unit.getTeam() : undefined;
+        for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+            const cand = candidates[candidateIndex];
+            const referenceMean = selectionBounds?.referenceMean(candidateIndex);
             this.assertBeforeDecisionDeadline(deadlineAt);
             let sum = 0;
+            let completed = 0;
+            let materialSum = 0;
+            let materialCount = 0;
             let illegal = false;
             for (let r = 0; r < rolloutCount; r += 1) {
                 this.assertBeforeDecisionDeadline(deadlineAt);
+                const cached = rolloutCache?.get(cand)?.get(r);
+                if (cached !== undefined) {
+                    if (cached.score === -Infinity) {
+                        illegal = true;
+                        break;
+                    }
+                    sum += cached.score;
+                    completed += 1;
+                    if (captureMaterial && cached.material !== undefined) {
+                        materialSum += cached.material;
+                        materialCount += 1;
+                    }
+                    continue;
+                }
                 let score: number;
+                let material: number | undefined;
                 let checkpoint;
                 try {
                     checkpoint = journal?.checkpoint();
                     score = this.rollout(unit, cand, seedBase, r, horizonMode, deadlineAt, turnHorizon);
+                    if (captureMaterial && Number.isFinite(score)) {
+                        let ours = 0,
+                            enemy = 0;
+                        for (const remaining of this.deps.unitsHolder.getAllUnits().values()) {
+                            if (remaining.isDead()) continue;
+                            const strength =
+                                (remaining.getExp() * remaining.getCumulativeHp()) / Math.max(1, remaining.getMaxHp());
+                            if (remaining.getTeam() === actingTeam) ours += strength;
+                            else enemy += strength;
+                        }
+                        material = 0.5 * (1 + (ours - enemy) / (ours + enemy + 1000));
+                        materialSum += material;
+                        materialCount += 1;
+                    }
                 } finally {
                     const cleanupErrors: unknown[] = [];
                     try {
@@ -4764,16 +5438,52 @@ export class SearchDriver {
                     } catch (error) {
                         cleanupErrors.push(error);
                     }
+                    try {
+                        restoreAuxiliaryState?.();
+                    } catch (error) {
+                        cleanupErrors.push(error);
+                    }
                     if (cleanupErrors.length) throw new SearchRollbackError(cleanupErrors);
+                }
+                if (rolloutCache) {
+                    let row = rolloutCache.get(cand);
+                    if (!row) rolloutCache.set(cand, (row = new Map()));
+                    row.set(r, { score, material });
                 }
                 if (score === -Infinity) {
                     illegal = true;
                     break;
                 }
                 sum += score;
+                completed += 1;
+                if (!Number.isFinite(score) || score > 1) {
+                    leafOutsideUnitInterval = true;
+                } else if (
+                    boundTails &&
+                    !leafOutsideUnitInterval &&
+                    remainingRolloutsCannotWin(sum, completed, rolloutCount, referenceMean ?? bestFinishedMean, margin)
+                ) {
+                    break;
+                }
             }
             means.push(illegal ? -Infinity : sum / rolloutCount);
+            if (selectionBounds && !illegal && completed === rolloutCount) {
+                selectionBounds.recordFinished(candidateIndex, sum / rolloutCount);
+            }
+            if (
+                boundTails &&
+                !leafOutsideUnitInterval &&
+                !illegal &&
+                completed === rolloutCount &&
+                sum / rolloutCount > bestFinishedMean
+            ) {
+                bestFinishedMean = sum / rolloutCount;
+            }
+            if (captureMaterial)
+                materials.push(!illegal && materialCount === rolloutCount ? materialSum / rolloutCount : -Infinity);
         }
+        if (captureMaterial)
+            this.a19MaterialEvidence = { unitId: unit.getId(), candidates, means, materials, rolloutCount };
         return means;
     }
     private assertBeforeDecisionDeadline(deadlineAt: number | null): void {
@@ -4996,34 +5706,25 @@ export class SearchDriver {
             const matrix = this.deps.grid.getMatrix();
             // Search itself is intentionally non-recursive, so future same-team turns normally use the native
             // strategy. Stateful Armageddon policies must therefore recur here exactly as they do in live play.
-            // The strict policy reuses one shared gate; the earlier broad research arm remains isolated behind its
-            // own flag and is suppressed whenever strict mode is selected. The opponent keeps its configured model.
-            decided =
-                this.shouldUseSoleAbominationArmageddonDefend(unit) ||
-                (!this.soleAbominationArmageddonDefendPolicy &&
-                    this.armageddonDefendCandidate &&
-                    unit.getTeam() !== this.rolloutEnemyTeam &&
-                    isV08ArmageddonDefendOpportunity(
-                        unit,
-                        this.deps.unitsHolder,
-                        this.deps.fightProperties.getCurrentLap(),
-                    ))
-                    ? [{ type: "defend_turn", unitId: id }]
-                    : strat.decideTurn(unit, {
-                          grid: this.deps.grid,
+            // The strict sole-Abomination policy is the only defend policy left; the opponent keeps its configured
+            // model.
+            decided = this.shouldUseSoleAbominationArmageddonDefend(unit)
+                ? [{ type: "defend_turn", unitId: id }]
+                : strat.decideTurn(unit, {
+                      grid: this.deps.grid,
+                      matrix,
+                      unitsHolder: this.deps.unitsHolder,
+                      pathHelper: this.deps.pathHelper,
+                      decisionPathCatalog: createDecisionPathCatalog(
+                          this.deps.grid,
+                          this.deps.pathHelper,
+                          unit,
                           matrix,
-                          unitsHolder: this.deps.unitsHolder,
-                          pathHelper: this.deps.pathHelper,
-                          decisionPathCatalog: createDecisionPathCatalog(
-                              this.deps.grid,
-                              this.deps.pathHelper,
-                              unit,
-                              matrix,
-                          ),
-                          attackHandler: this.deps.attackHandler,
-                          fightProperties: this.deps.fightProperties,
-                          decisionOrigin: "rollout",
-                      });
+                      ),
+                      attackHandler: this.deps.attackHandler,
+                      fightProperties: this.deps.fightProperties,
+                      decisionOrigin: "rollout",
+                  });
         } catch {
             decided = [];
         }

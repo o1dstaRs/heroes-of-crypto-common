@@ -118,11 +118,8 @@ export function processPetrifyingGazeAbility(
         const amountAliveBefore = toUnit.getAmountAlive();
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
-            damage: toUnit.applyDamage(
-                damageFromAbility,
-                FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
-                sceneLog,
-            ),
+            // 0 break chance: the hit that triggered the gaze already rolled Break on this target.
+            damage: toUnit.applyDamage(damageFromAbility, 0, sceneLog),
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });

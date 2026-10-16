@@ -103,12 +103,14 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_AUDIT_TURNS",
     "SEARCH_ACTIVE_CHALLENGERS",
     "SEARCH_A19_ABOMINATION_MIRROR_RELEASE",
-    "SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE",
     "SEARCH_A19_EXACT_TERMINAL_RESULTS",
-    "SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION",
+    "SEARCH_A19_ADAPTIVE_BUDGET",
     "SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE",
+    "SEARCH_A19_SCORED_ARBITRATION",
     "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY",
     "SEARCH_A19_FAST_FLYER_COHESION",
+    "SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE",
+    "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
     "SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES",
     "V08_AGGRESSIVE",
     "SEARCH_OBSERVE_ONLY",
@@ -877,68 +879,157 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true)).toBe(spell);
     });
 
-    it("A19 validates only a provisional override and requires the full gate in an independent paired bank", () => {
+    it("A19 scored arbitration clears its value gate only before urgency and within v0.8", () => {
         setEnv({
             V07_SEARCH: "1",
             SEARCH_VERSIONS: "v0.8",
             SEARCH_GATE: "0.03",
-            SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "1",
+            SEARCH_A19_SCORED_ARBITRATION: "1",
+        });
+        const harness = buildBattle(91, "v0.8");
+        const unit = harness.activeUnit()!;
+        const incumbent: GameAction[] = [{ type: "defend_turn", unitId: unit.getId() }];
+        const challenger: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "wait", actions: challenger },
+        ] as IEnumeratedCandidate[];
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates(): number[];
+            search(...args: unknown[]): GameAction[];
+        };
+        driver.scoreCandidates = () => [0.4, 0.42];
+        const search = (version: string): GameAction[] =>
+            driver.search(
+                unit,
+                candidates,
+                incumbent,
+                123,
+                performance.now(),
+                false,
+                undefined,
+                false,
+                false,
+                false,
+                false,
+                undefined,
+                "profile",
+                version,
+            );
+
+        expect(search("v0.8")).toBe(challenger);
+        expect(search("v0.7")).toBe(incumbent);
+        harness.fightProperties.getCurrentLap = () => V08S_URGENT_FINISH_START_LAP;
+        expect(search("v0.8")).toBe(incumbent);
+    });
+
+    it("A19 scored arbitration validates its explicit environment switch", () => {
+        const harness = buildBattle(91, "v0.8");
+        setEnv({ V07_SEARCH: "1", SEARCH_A19_SCORED_ARBITRATION: "invalid" });
+        expect(() => harness.makeDriver()).toThrow("SEARCH_A19_SCORED_ARBITRATION must be 0 or 1");
+    });
+
+    it("A19 adaptive budget degrades the next decisions after a breaker overrun instead of opening the circuit", () => {
+        // A breaker of 0.001 ms makes every decision an overrun. Stock: the first overrun opens the circuit for
+        // the rest of the match and every later decision skips search. Adaptive: the next decisions still search,
+        // with one rollout and a shortlist of two.
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "0.03",
+            SEARCH_ROLLOUTS: "3",
+            SEARCH_SHORTLIST: "3",
+            SEARCH_DECISION_DEADLINE_MS: undefined,
+            SEARCH_CIRCUIT_BREAKER_MS: "0.001",
+            SEARCH_A19_ADAPTIVE_BUDGET: "1",
         });
         const harness = buildBattle(92, "v0.8");
         const unit = harness.activeUnit()!;
         const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
-        const attack: GameAction[] = [
-            { type: "melee_attack", attackerId: unit.getId(), targetId: "enemy", attackFrom: { x: 4, y: 4 } },
-        ];
-        const candidates = [
-            { kind: "incumbent", actions: incumbent },
-            { kind: "melee", actions: attack },
-        ] as unknown as IEnumeratedCandidate[];
-        const driver = harness.makeDriver() as unknown as {
+        type Driver = {
+            circuitOpen: boolean;
+            degradedRemaining: number;
             counters: {
+                degradedDecisions: number;
+                circuitSkipped: number;
                 nonregressiveOverrideValidationAttempts: number;
-                nonregressiveOverrideValidationPasses: number;
-                nonregressiveOverrideValidationRejects: number;
             };
-            scoreCandidates(): number[];
-            search(
+            scoreCandidates(
                 unit: Unit,
-                candidates: IEnumeratedCandidate[],
-                incumbent: GameAction[],
-                seed: number,
-                t0: number,
-            ): GameAction[];
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                horizonMode: string,
+                rolloutCount?: number,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        const driver = harness.makeDriver() as unknown as Driver;
+        const rolloutCounts: number[] = [];
+        driver.scoreCandidates = (_unit, scored, _seed, mode, rolloutCount) => {
+            if (mode === "turns") rolloutCounts.push(rolloutCount ?? -1);
+            return scored.map((_candidate, index) => (index === 0 ? 0.4 : 0.8));
         };
 
-        let call = 0;
-        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.42] : [0, 1]);
-        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(incumbent);
-        expect(call).toBe(1);
-        expect(driver.counters).toMatchObject({
-            nonregressiveOverrideValidationAttempts: 0,
-            nonregressiveOverrideValidationPasses: 0,
-            nonregressiveOverrideValidationRejects: 0,
-        });
+        // Decision 1 runs at the full budget (3 rollouts) and overruns the breaker.
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).not.toBe(incumbent);
+        expect(driver.circuitOpen).toBe(false);
+        expect(driver.degradedRemaining).toBe(3);
+        expect(rolloutCounts).toEqual([3]);
 
-        call = 0;
-        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.8] : [0.7, 0.72]);
-        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(incumbent);
-        expect(call).toBe(2);
-        expect(driver.counters).toMatchObject({
-            nonregressiveOverrideValidationAttempts: 1,
-            nonregressiveOverrideValidationPasses: 0,
-            nonregressiveOverrideValidationRejects: 1,
-        });
+        // Decision 2 is degraded: one rollout, no re-score bank — and it still searches rather than skipping.
+        rolloutCounts.length = 0;
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).not.toBe(incumbent);
+        expect(rolloutCounts).toEqual([1]);
+        expect(driver.counters.degradedDecisions).toBe(1);
+        expect(driver.counters.circuitSkipped).toBe(0);
+        // Every decision overruns this breaker, so the degradation is re-armed rather than counted down.
+        expect(driver.degradedRemaining).toBe(3);
+    });
 
-        call = 0;
-        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.8] : [0.5, 0.54]);
-        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(attack);
-        expect(call).toBe(2);
-        expect(driver.counters).toMatchObject({
-            nonregressiveOverrideValidationAttempts: 2,
-            nonregressiveOverrideValidationPasses: 1,
-            nonregressiveOverrideValidationRejects: 1,
+    it("A19 adaptive budget counts the degradation down and restores the full budget", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "0.03",
+            SEARCH_ROLLOUTS: "3",
+            SEARCH_DECISION_DEADLINE_MS: "100000",
+            SEARCH_CIRCUIT_BREAKER_MS: "200000",
+            SEARCH_A19_ADAPTIVE_BUDGET: "1",
         });
+        const harness = buildBattle(92, "v0.8");
+        const unit = harness.activeUnit()!;
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        type Driver = {
+            degradedRemaining: number;
+            counters: { degradedDecisions: number };
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                horizonMode: string,
+                rolloutCount?: number,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        const driver = harness.makeDriver() as unknown as Driver;
+        const rolloutCounts: number[] = [];
+        driver.scoreCandidates = (_unit, scored, _seed, mode, rolloutCount) => {
+            if (mode === "turns") rolloutCounts.push(rolloutCount ?? -1);
+            return scored.map((_candidate, index) => (index === 0 ? 0.4 : 0.8));
+        };
+
+        driver.degradedRemaining = 2;
+        driver.chooseDecision(unit, "v0.8", incumbent);
+        driver.chooseDecision(unit, "v0.8", incumbent);
+        expect(rolloutCounts).toEqual([1, 1]);
+        expect(driver.degradedRemaining).toBe(0);
+        expect(driver.counters.degradedDecisions).toBe(2);
+
+        driver.chooseDecision(unit, "v0.8", incumbent);
+        expect(rolloutCounts).toEqual([1, 1, 3]);
+
+        setEnv({ SEARCH_A19_ADAPTIVE_BUDGET: "2" });
+        expect(() => harness.makeDriver()).toThrow("SEARCH_A19_ADAPTIVE_BUDGET must be 0 or 1");
     });
 
     it("does not treat a move-then-mountain incumbent as productive", () => {
@@ -5047,16 +5138,27 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(unit).toBeDefined();
         const incumbent = h.decideActive();
         const before = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
+        const driver = h.makeDriver();
+        let auxiliarySequence = 17;
+        const internals = driver as unknown as { deps: ILookaheadDeps };
+        internals.deps.captureAuxiliaryState = () => {
+            const saved = auxiliarySequence;
+            return () => {
+                auxiliarySequence = saved;
+            };
+        };
         const originalApply = h.engine.apply.bind(h.engine);
         h.engine.apply = ((action: GameAction) => {
             const result = originalApply(action);
             if (action.type !== "select_attack_type") {
+                auxiliarySequence += 1;
                 throw new Error("injected rollout failure");
             }
             return result;
         }) as GameActionEngine["apply"];
 
-        expect(() => h.makeDriver().chooseDecision(unit!, "v0.6", incumbent)).toThrow("injected rollout failure");
+        expect(() => driver.chooseDecision(unit!, "v0.6", incumbent)).toThrow("injected rollout failure");
+        expect(auxiliarySequence).toBe(17);
         expect(JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)))).toBe(before);
     });
 
@@ -5712,6 +5814,332 @@ describe("Q2 gate-2 — deployed wait-scorer wiring (v0.6 decideTurn, live battl
         findEligibleActPoint(b);
         setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: armedBias(0) });
         expect(JSON.stringify(b.decideActive())).toBe(offDecision);
+    });
+});
+
+describe("a19 artifact barrel attacks", () => {
+    const barrelSearchEnv = (coverage: boolean): Record<string, string> => ({
+        V07_SEARCH: "1",
+        SEARCH_VERSIONS: "v0.8",
+        ...(coverage ? { SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: "1" } : {}),
+    });
+    const offeredMines = (coverage: boolean): IEnumeratedCandidate[] => {
+        setEnv(barrelSearchEnv(coverage));
+        const harness = buildBattle(7, "v0.8");
+        const unit = harness.activeUnit();
+        expect(unit).toBeDefined();
+        if (!unit) return [];
+        const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
+        const base = unit.getBaseCell();
+        let barrelCell: { x: number; y: number } | undefined;
+        for (const cell of [
+            { x: base.x + 1, y: base.y },
+            { x: base.x - 1, y: base.y },
+            { x: base.x, y: base.y + 1 },
+            { x: base.x, y: base.y - 1 },
+            { x: base.x + 1, y: base.y + 1 },
+            { x: base.x - 1, y: base.y + 1 },
+        ]) {
+            if (harness.grid.placeArtifactBarrel(enemyTeam, 0, cell)) {
+                barrelCell = cell;
+                break;
+            }
+        }
+        expect(barrelCell).toBeDefined();
+        const driver = harness.makeDriver();
+        const seen: IEnumeratedCandidate[][] = [];
+        (
+            driver as unknown as {
+                search(unit: Unit, candidates: IEnumeratedCandidate[], incumbent: GameAction[]): GameAction[];
+            }
+        ).search = (_unit, candidates, incumbent) => {
+            seen.push(candidates);
+            return incumbent;
+        };
+        driver.chooseDecision(unit, "v0.8", [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }]);
+        expect(seen.length).toBeGreaterThan(0);
+        return seen[0].filter(
+            (candidate) =>
+                candidate.kind === "mine" &&
+                candidate.targetCell?.x === barrelCell?.x &&
+                candidate.targetCell?.y === barrelCell?.y,
+        );
+    };
+
+    it("offers an enemy barrel strike to v0.8 search when coverage is on", () => {
+        expect(offeredMines(true).length).toBeGreaterThan(0);
+    });
+
+    it("does not offer a barrel strike when coverage is off", () => {
+        expect(offeredMines(false)).toEqual([]);
+    });
+
+    it("does not offer a strike on the army's own barrel unless that barrel blocks a shot", () => {
+        setEnv(barrelSearchEnv(true));
+        const harness = buildBattle(7, "v0.8");
+        const unit = harness.activeUnit();
+        expect(unit).toBeDefined();
+        if (!unit) return;
+        const enemies = harness.unitsHolder
+            .getAllEnemyUnits(unit.getTeam())
+            .filter((enemy) => !enemy.isDead())
+            .flatMap((enemy) => enemy.getCells());
+        const origins = unit.getCells();
+        const base = unit.getBaseCell();
+        let ownCell: { x: number; y: number } | undefined;
+        for (const cell of [
+            { x: base.x + 1, y: base.y + 1 },
+            { x: base.x - 1, y: base.y + 1 },
+            { x: base.x + 1, y: base.y - 1 },
+            { x: base.x - 1, y: base.y - 1 },
+            { x: base.x, y: base.y + 1 },
+            { x: base.x, y: base.y - 1 },
+            { x: base.x + 1, y: base.y },
+            { x: base.x - 1, y: base.y },
+        ]) {
+            const blocks = origins.some((origin) =>
+                enemies.some(
+                    (enemy) =>
+                        (cell.y === origin.y && cell.y === enemy.y && (cell.x - origin.x) * (cell.x - enemy.x) < 0) ||
+                        (cell.x === origin.x && cell.x === enemy.x && (cell.y - origin.y) * (cell.y - enemy.y) < 0),
+                ),
+            );
+            if (!blocks && harness.grid.placeArtifactBarrel(unit.getTeam(), 0, cell)) {
+                ownCell = cell;
+                break;
+            }
+        }
+        expect(ownCell).toBeDefined();
+        const driver = harness.makeDriver();
+        const seen: IEnumeratedCandidate[][] = [];
+        (
+            driver as unknown as {
+                search(unit: Unit, candidates: IEnumeratedCandidate[], incumbent: GameAction[]): GameAction[];
+            }
+        ).search = (_unit, candidates, incumbent) => {
+            seen.push(candidates);
+            return incumbent;
+        };
+        driver.chooseDecision(unit, "v0.8", [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }]);
+        expect(
+            seen[0]?.some(
+                (candidate) =>
+                    candidate.kind === "mine" &&
+                    candidate.targetCell?.x === ownCell?.x &&
+                    candidate.targetCell?.y === ownCell?.y,
+            ),
+        ).toBe(false);
+    });
+
+    const barrelScreenRoster: readonly IArmyUnitSpec[] = [
+        { faction: "Chaos", creatureName: "Orc", level: 1, size: 1, amount: 40 },
+        { faction: "Might", creatureName: "Berserker", level: 1, size: 1, amount: 40 },
+    ];
+    const standOn = (unit: Unit, cell: { x: number; y: number }): void => {
+        const settings = simulationGridSettings();
+        const position = getPositionForCell(cell, settings.getMinX(), settings.getStep(), settings.getHalfStep());
+        unit.setPosition(position.x, position.y);
+    };
+    const insideBoard = (cell: { x: number; y: number }): boolean =>
+        cell.x >= 0 && cell.y >= 0 && cell.x < 16 && cell.y < 16;
+    const blocksLine = (
+        barrel: { x: number; y: number },
+        origins: readonly { x: number; y: number }[],
+        targets: readonly { x: number; y: number }[],
+    ): boolean =>
+        origins.some((origin) =>
+            targets.some(
+                (target) =>
+                    (barrel.y === origin.y &&
+                        barrel.y === target.y &&
+                        (barrel.x - origin.x) * (barrel.x - target.x) < 0) ||
+                    (barrel.x === origin.x &&
+                        barrel.x === target.x &&
+                        (barrel.y - origin.y) * (barrel.y - target.y) < 0),
+            ),
+        );
+
+    /**
+     * Diagonal barrel next to the berserker, with the orc and one enemy stood so only the orc's shot
+     * crosses it. The berserker's own cells stay off that line.
+     */
+    const teammateScreen = (
+        harness: Harness,
+    ): { melee: Unit; shooter: Unit; barrel: { x: number; y: number } } | undefined => {
+        const melee = [...harness.unitsHolder.getAllUnits().values()].find(
+            (unit) => unit.getTeam() === GREEN_TEAM && unit.getName() === "Berserker",
+        );
+        const shooter = [...harness.unitsHolder.getAllUnits().values()].find(
+            (unit) => unit.getTeam() === GREEN_TEAM && unit.getName() === "Orc",
+        );
+        const reds = [...harness.unitsHolder.getAllUnits().values()].filter((unit) => unit.getTeam() === RED_TEAM);
+        if (!melee || !shooter || reds.length < 2) return undefined;
+        const base = melee.getBaseCell();
+        const diagonals = [
+            { x: base.x + 1, y: base.y + 1 },
+            { x: base.x - 1, y: base.y + 1 },
+            { x: base.x + 1, y: base.y - 1 },
+            { x: base.x - 1, y: base.y - 1 },
+        ];
+        const directions = [
+            { x: 1, y: 0 },
+            { x: -1, y: 0 },
+            { x: 0, y: 1 },
+            { x: 0, y: -1 },
+        ];
+        for (const barrel of diagonals) {
+            if (!insideBoard(barrel)) continue;
+            for (const direction of directions) {
+                const shooterCell = { x: barrel.x - direction.x * 2, y: barrel.y - direction.y * 2 };
+                const enemyCell = { x: barrel.x + direction.x * 4, y: barrel.y + direction.y * 4 };
+                const parkedCell =
+                    direction.y === 0 ? { x: enemyCell.x, y: enemyCell.y + 3 } : { x: enemyCell.x + 3, y: enemyCell.y };
+                if (![shooterCell, enemyCell, parkedCell].every(insideBoard)) continue;
+                standOn(shooter, shooterCell);
+                standOn(reds[0], enemyCell);
+                standOn(reds[1], parkedCell);
+                const targets = reds.flatMap((unit) => unit.getCells());
+                if (blocksLine(barrel, melee.getCells(), targets)) continue;
+                if (!blocksLine(barrel, shooter.getCells(), targets)) continue;
+                if (
+                    !harness.attackHandler.canLandRangeAttack(
+                        shooter,
+                        harness.grid.getEnemyAggrMatrixByUnitId(shooter.getId()),
+                    )
+                ) {
+                    continue;
+                }
+                return { melee, shooter, barrel };
+            }
+        }
+        return undefined;
+    };
+
+    it("routes exact diagonal shot projection only through its research flag", () => {
+        const run = (projection: "0" | "1" | "own", owner: TeamType = GREEN_TEAM) => {
+            setEnv({ ...barrelSearchEnv(true), SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: projection });
+            const harness = buildBattle(7, "v0.8", undefined, barrelScreenRoster);
+            const allies = harness.unitsHolder.getAllAllies(GREEN_TEAM);
+            const shooter = allies.find((unit) => unit.getName() === "Orc")!;
+            const melee = allies.find((unit) => unit.getName() === "Berserker")!;
+            const enemies = harness.unitsHolder.getAllEnemyUnits(GREEN_TEAM);
+            for (const unit of harness.unitsHolder.getAllUnits().values())
+                harness.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
+            standOn(shooter, { x: 3, y: 3 });
+            standOn(melee, { x: 2, y: 5 });
+            standOn(enemies[0], { x: 9, y: 9 });
+            standOn(enemies[1], { x: 13, y: 12 });
+            const barrel = { x: 5, y: 5 };
+            expect(harness.grid.placeArtifactBarrel(owner, 0, barrel)).toBe(true);
+            const driver = harness.makeDriver() as unknown as {
+                keepsArtifactBarrelMine(
+                    unit: Unit,
+                    candidate: Pick<IEnumeratedCandidate, "kind" | "targetCell">,
+                ): boolean;
+                reservedArtifactBarrelMine(
+                    unit: Unit,
+                    candidates: IEnumeratedCandidate[],
+                    idle: boolean,
+                ): IEnumeratedCandidate | undefined;
+            };
+            return {
+                keeps: driver.keepsArtifactBarrelMine(melee, { kind: "mine", targetCell: barrel }),
+                reserves: !!driver.reservedArtifactBarrelMine(
+                    melee,
+                    [{ kind: "mine", targetCell: barrel } as IEnumeratedCandidate],
+                    false,
+                ),
+            };
+        };
+        expect(run("0")).toEqual({ keeps: false, reserves: false });
+        expect(run("1")).toEqual({ keeps: true, reserves: true });
+        expect(run("own")).toEqual({ keeps: true, reserves: true });
+        expect(run("0", RED_TEAM)).toEqual({ keeps: true, reserves: false });
+        expect(run("1", RED_TEAM)).toEqual({ keeps: true, reserves: true });
+        expect(run("own", RED_TEAM)).toEqual({ keeps: true, reserves: false });
+    });
+
+    it("offers a strike on the army's own barrel when that barrel blocks a teammate's shot", () => {
+        setEnv(barrelSearchEnv(true));
+        const harness = buildBattle(7, "v0.8", undefined, barrelScreenRoster);
+        const layout = teammateScreen(harness);
+        expect(layout).toBeDefined();
+        if (!layout) return;
+        expect(harness.grid.placeArtifactBarrel(layout.melee.getTeam(), 0, layout.barrel)).toBe(true);
+        harness.setActiveUnitId(layout.melee.getId());
+        const seen: IEnumeratedCandidate[][] = [];
+        const driver = harness.makeDriver();
+        (
+            driver as unknown as {
+                search(unit: Unit, candidates: IEnumeratedCandidate[], incumbent: GameAction[]): GameAction[];
+            }
+        ).search = (_unit, candidates, incumbent) => {
+            seen.push(candidates);
+            return incumbent;
+        };
+        const targetsBarrel = (candidates: readonly IEnumeratedCandidate[] | undefined): boolean =>
+            !!candidates?.some(
+                (candidate) =>
+                    candidate.kind === "mine" &&
+                    candidate.targetCell?.x === layout.barrel.x &&
+                    candidate.targetCell?.y === layout.barrel.y,
+            );
+        driver.chooseDecision(layout.melee, "v0.8", [
+            { type: "end_turn", unitId: layout.melee.getId(), reason: "manual" },
+        ]);
+        expect(targetsBarrel(seen[0])).toBe(true);
+
+        standOn(layout.shooter, { x: layout.barrel.x + 1, y: layout.barrel.y + 2 });
+        driver.chooseDecision(layout.melee, "v0.8", [
+            { type: "end_turn", unitId: layout.melee.getId(), reason: "manual" },
+        ]);
+        expect(targetsBarrel(seen[1])).toBe(false);
+    });
+
+    it("reserves an enemy barrel that blocks a teammate's shot even when another attack deals damage", () => {
+        setEnv(barrelSearchEnv(true));
+        const harness = buildBattle(7, "v0.8", undefined, barrelScreenRoster);
+        const layout = teammateScreen(harness);
+        expect(layout).toBeDefined();
+        if (!layout) return;
+        const enemyTeam =
+            layout.melee.getTeam() === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
+        expect(harness.grid.placeArtifactBarrel(enemyTeam, 0, layout.barrel)).toBe(true);
+        const driver = harness.makeDriver();
+        const mine = {
+            kind: "mine",
+            actions: [],
+            targetCell: layout.barrel,
+            features: { expectedDamage: 0 },
+        } as IEnumeratedCandidate;
+        const damaging = {
+            kind: "melee",
+            actions: [],
+            features: { expectedDamage: 4 },
+        } as IEnumeratedCandidate;
+        const reserve = (
+            driver as unknown as {
+                reservedArtifactBarrelMine(
+                    unit: Unit,
+                    candidates: readonly IEnumeratedCandidate[],
+                    allowNearestWhenIdle: boolean,
+                ): IEnumeratedCandidate | undefined;
+            }
+        ).reservedArtifactBarrelMine(layout.melee, [damaging, mine], false);
+        expect(reserve?.targetCell).toEqual(layout.barrel);
+
+        standOn(layout.shooter, { x: layout.barrel.x + 1, y: layout.barrel.y + 2 });
+        expect(
+            (
+                driver as unknown as {
+                    reservedArtifactBarrelMine(
+                        unit: Unit,
+                        candidates: readonly IEnumeratedCandidate[],
+                        allowNearestWhenIdle: boolean,
+                    ): IEnumeratedCandidate | undefined;
+                }
+            ).reservedArtifactBarrelMine(layout.melee, [damaging, mine], false),
+        ).toBeUndefined();
     });
 });
 

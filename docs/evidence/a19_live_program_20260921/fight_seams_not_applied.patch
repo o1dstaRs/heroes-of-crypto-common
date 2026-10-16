@@ -1,0 +1,471 @@
+diff --git a/src/ai/candidates.ts b/src/ai/candidates.ts
+index b15d94c..b6aa596 100644
+--- a/src/ai/candidates.ts
++++ b/src/ai/candidates.ts
+@@ -704,12 +704,27 @@ export interface IEnumeratedCandidate {
+     shotFeatures?: IShotCandidateFeatures;
+     /** Research-only marker for the one exact Rapid Charge challenger retained across a capped melee catalog. */
+     researchRapidChargeDifferentTargetReserved?: true;
++    /**
++     * Marker for the one edge-of-reach advance retained beside the nearest move (IEnumerateOptions.
++     * retainEdgeOfReachMove): the closest destination no enemy melee stack can move to and strike next turn.
++     */
++    edgeOfReachReserved?: true;
+     features: ICandidateFeatures;
+ }
+ 
+ export interface IEnumerateOptions {
+     /** Cap on move destinations, kept nearest-to-enemy first (0/undefined = all reachable). */
+     maxMoveDestinations?: number;
++    /**
++     * Opt-in "receive the charge" posture for melee units. Besides the capped nearest-to-enemy moves, retain the one
++     * ADVANCING destination whose body no enemy melee stack can reach and strike on its next turn (each enemy's
++     * current cells plus every cell it can move to, widened by its attack range). Test-server replays of human play
++     * showed humans strike in place on ~85-90% of their melee attacks while a19 charges on ~63%; the search could not
++     * even compare the human posture because its move catalog only ever held the nearest advance. The retained move is
++     * marked `edgeOfReachReserved` so a shortlist pre-pass can keep it for full rollouts. Default false: every
++     * existing consumer keeps a byte-identical catalog.
++     */
++    retainEdgeOfReachMove?: boolean;
+     /**
+      * Optional consumer-specific move gate applied before maxMoveDestinations. This lets a role-aware caller
+      * retain the nearest move satisfying a hard geometry contract instead of capping first and accidentally
+@@ -1230,16 +1245,19 @@ class CandidateGenerator {
+         }
+         const cap = this.options.maxMoveDestinations ?? 0;
+         let kept = routes;
++        // Nearest-to-an-enemy metric (v0.1 fallbackTurn's advance metric), shared by the cap ranking below and by
++        // the opt-in edge-of-reach retention.
++        const dist = (cell: XY): number =>
++            this.enemies.length
++                ? this.enemies.reduce((best, enemy) => {
++                      const enemyCell = enemy.getBaseCell();
++                      return Math.min(best, Math.abs(cell.x - enemyCell.x) + Math.abs(cell.y - enemyCell.y));
++                  }, Number.POSITIVE_INFINITY)
++                : 0;
++        const edgeOfReach =
++            this.options.retainEdgeOfReachMove === true ? this.edgeOfReachRoute(routes, dist, dist(base)) : undefined;
+         if (cap > 0 && routes.length > cap) {
+-            // Principled top-K: nearest-to-an-enemy destinations first (v0.1 fallbackTurn's advance metric);
+-            // stable sort keeps enumeration order on ties -> deterministic.
+-            const dist = (cell: XY): number =>
+-                this.enemies.length
+-                    ? this.enemies.reduce((best, enemy) => {
+-                          const enemyCell = enemy.getBaseCell();
+-                          return Math.min(best, Math.abs(cell.x - enemyCell.x) + Math.abs(cell.y - enemyCell.y));
+-                      }, Number.POSITIVE_INFINITY)
+-                    : 0;
++            // Principled top-K: stable sort keeps enumeration order on ties -> deterministic.
+             const ranked = routes
+                 .map((route, index) => ({ route, index, distance: dist(route.cell) }))
+                 .sort((a, b) => a.distance - b.distance || a.index - b.index);
+@@ -1261,12 +1279,81 @@ class CandidateGenerator {
+             }
+             if (kept.length < routes.length) this.truncated.push("move");
+         }
++        if (edgeOfReach && !kept.includes(edgeOfReach)) {
++            // Retained beside the cap, never instead of it: the nearest advance stays exactly where it was.
++            kept = [...kept, edgeOfReach];
++        }
+         if (this.options.enrichIncumbentMetadata) {
+             for (const route of routes) this.enrichIncumbentCandidate(candidateOf(route));
+         }
+         for (const route of kept) {
+-            this.push(candidateOf(route));
++            const candidate = candidateOf(route);
++            if (route === edgeOfReach) candidate.edgeOfReachReserved = true;
++            this.push(candidate);
++        }
++    }
++    /**
++     * The nearest ADVANCING destination whose body stands outside every enemy melee stack's strike reach. A shooter
++     * with live ammunition keeps its own posture logic and gets none; so does a unit that cannot advance at all
++     * without entering reach (the wait/defend incumbent already covers "hold").
++     */
++    private edgeOfReachRoute(
++        routes: readonly IReadonlyWeightedRoute[],
++        dist: (cell: XY) => number,
++        currentDistance: number,
++    ): IReadonlyWeightedRoute | undefined {
++        if (!this.enemies.length || !routes.length) return undefined;
++        if (this.unit.isRangeCapable() && this.unit.getRangeShots() > 0) return undefined;
++        const danger = this.enemyMeleeReach();
++        let best: { route: IReadonlyWeightedRoute; distance: number } | undefined;
++        for (const route of routes) {
++            const distance = dist(route.cell);
++            if (distance >= currentDistance) continue;
++            if (best && distance >= best.distance) continue;
++            if (this.footprintForCell(route.cell).some((cell) => danger.has(`${cell.x},${cell.y}`))) continue;
++            best = { route, distance };
++        }
++        return best?.route;
++    }
++    /**
++     * Every cell some enemy melee stack could strike on its next turn: its present body plus every anchor it can
++     * move to (through the real path helper on the current board, honouring our aggro locks), each body widened by
++     * that stack's attack range. Shooters count too when they can melee; only No Melee stacks are ignored.
++     */
++    private enemyMeleeReach(): Set<string> {
++        const danger = new Set<string>();
++        const ourAggro = this.context.grid.getAggrMatrixByTeam(this.unit.getTeam());
++        for (const enemy of this.enemies) {
++            if (enemy.hasAbilityActive("No Melee")) continue;
++            const anchors: XY[] = [enemy.getBaseCell()];
++            if (enemy.canMove()) {
++                anchors.push(
++                    ...this.context.pathHelper.getMovePath(
++                        enemy.getBaseCell(),
++                        this.context.matrix,
++                        enemy.getSteps(),
++                        ourAggro,
++                        enemy.canFly(),
++                        enemy.isSmallSize(),
++                        enemy.canTraverseLava(),
++                        enemy.hasAbilityActive("In Its Own World"),
++                        enemy.getFootprintWidth(),
++                        enemy.getFootprintHeight(),
++                    ).cells,
++                );
++            }
++            const radius = Math.max(1, Math.floor(enemy.getAttackRange()));
++            for (const anchor of anchors) {
++                for (const cell of enemy.getFootprintCellsForBase(anchor)) {
++                    for (let dy = -radius; dy <= radius; dy += 1) {
++                        for (let dx = -radius; dx <= radius; dx += 1) {
++                            danger.add(`${cell.x + dx},${cell.y + dy}`);
++                        }
++                    }
++                }
++            }
+         }
++        return danger;
+     }
+     // ---- melee -------------------------------------------------------------------------------------
+     private canMelee(): boolean {
+diff --git a/src/simulation/search_driver.ts b/src/simulation/search_driver.ts
+index e471762..3822551 100644
+--- a/src/simulation/search_driver.ts
++++ b/src/simulation/search_driver.ts
+@@ -155,6 +155,39 @@ export const SEARCH_RESEARCH_SHORTLIST_VERSIONS_ENV = "SEARCH_RESEARCH_SHORTLIST
+ export const SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV =
+     "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY";
+ 
++export const SEARCH_A19_EDGE_OF_REACH_MOVE_ENV = "SEARCH_A19_EDGE_OF_REACH_MOVE";
++/** Process-wide research counters for the edge-of-reach seam (never read by any decision). */
++export const EDGE_OF_REACH_STATS = { searchedDecisions: 0, retained: 0, chosen: 0 };
++/**
++ * SEARCH_A19_WAIT_CHALLENGER: let a19 search score the hourglass WAIT as a challenger to a productive incumbent
++ * ("receive the charge" instead of walking into it). "1" = whenever a wait is legal; "2" = only when the incumbent
++ * moves the unit (a reposition or a charge). Production a13/a19 exclude every generated passive challenger.
++ */
++export const SEARCH_A19_WAIT_CHALLENGER_ENV = "SEARCH_A19_WAIT_CHALLENGER";
++/** Process-wide research counters for the wait-challenger seam (never read by any decision). */
++export const WAIT_CHALLENGER_STATS = { searchedDecisions: 0, offered: 0, chosen: 0 };
++
++/** Keep the offered wait challenger beside the leaf winners so full rollouts, not the immediate leaf, judge it. */
++export function reserveWaitChallengerShortlist(
++    candidates: readonly IEnumeratedCandidate[],
++    challengers: readonly IEnumeratedCandidate[],
++): readonly IEnumeratedCandidate[] {
++    const wait = candidates.find((candidate) => candidate.kind === "wait");
++    return wait && !challengers.includes(wait) ? [...challengers, wait] : challengers;
++}
++
++/**
++ * Keep the marked edge-of-reach advance beside the ordinary leaf winners so the full rollouts, not the immediate
++ * leaf, judge the receiving posture; without the marked candidate this is an exact identity.
++ */
++export function reserveEdgeOfReachShortlist(
++    candidates: readonly IEnumeratedCandidate[],
++    challengers: readonly IEnumeratedCandidate[],
++): readonly IEnumeratedCandidate[] {
++    const reserved = candidates.find((candidate) => candidate.edgeOfReachReserved === true);
++    return reserved && !challengers.includes(reserved) ? [...challengers, reserved] : challengers;
++}
++
+ /** Keep one marked charger alternative beside the ordinary leaf winner; option-off is an exact identity. */
+ export function reserveResearchRapidChargeShortlist(
+     candidates: readonly IEnumeratedCandidate[],
+@@ -1268,6 +1301,14 @@ export class SearchDriver {
+     private readonly rapidChargeReservationVersions: ReadonlySet<string>;
+     /** Explicit A19-H18-v2 policy gate; horizon alone must never opt another profile into this rule. */
+     private readonly fastFlyerCohesion: boolean;
++    /** SEARCH_A19_EDGE_OF_REACH_MOVE: retain and roll out the edge-of-reach advance beside the nearest move. */
++    private readonly edgeOfReachMove: boolean;
++    /** Research counter plumbing: the reserved edge-of-reach actions of the decision being searched, if any. */
++    private pendingEdgeOfReachActions: GameAction[] | undefined;
++    /** SEARCH_A19_WAIT_CHALLENGER mode (0 = off). */
++    private readonly waitChallengerMode: 0 | 1 | 2;
++    /** Research counter plumbing: the offered wait challenger's actions for the decision being searched, if any. */
++    private pendingWaitChallengerActions: GameAction[] | undefined;
+     private readonly soleAbominationArmageddonDefendPolicy: boolean;
+     private readonly abominationMirrorRelease: boolean;
+     private readonly strictAggressiveWaitTies: boolean;
+@@ -1440,6 +1481,28 @@ export class SearchDriver {
+             throw new Error("SEARCH_A19_FAST_FLYER_COHESION must be 0 or 1");
+         }
+         this.fastFlyerCohesion = this.mode === "search" && rawFastFlyerCohesion === "1";
++        const rawEdgeOfReachMove = process.env[SEARCH_A19_EDGE_OF_REACH_MOVE_ENV];
++        if (
++            rawEdgeOfReachMove !== undefined &&
++            rawEdgeOfReachMove !== "" &&
++            rawEdgeOfReachMove !== "0" &&
++            rawEdgeOfReachMove !== "1"
++        ) {
++            throw new Error(`${SEARCH_A19_EDGE_OF_REACH_MOVE_ENV} must be 0 or 1`);
++        }
++        this.edgeOfReachMove = this.mode === "search" && rawEdgeOfReachMove === "1";
++        const rawWaitChallenger = process.env[SEARCH_A19_WAIT_CHALLENGER_ENV];
++        if (
++            rawWaitChallenger !== undefined &&
++            rawWaitChallenger !== "" &&
++            rawWaitChallenger !== "0" &&
++            rawWaitChallenger !== "1" &&
++            rawWaitChallenger !== "2"
++        ) {
++            throw new Error(`${SEARCH_A19_WAIT_CHALLENGER_ENV} must be 0, 1 or 2`);
++        }
++        this.waitChallengerMode =
++            this.mode !== "search" ? 0 : rawWaitChallenger === "1" ? 1 : rawWaitChallenger === "2" ? 2 : 0;
+         const rawSoleAbominationArmageddonDefendPolicy =
+             process.env[SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV];
+         if (
+@@ -1998,6 +2061,23 @@ export class SearchDriver {
+         const chosen = this.chooseSearchDecision(unit, version, incumbent, rootDecisionContext);
+         // Research seam (off by default): the one decision step the simulator and the ranked server share.
+         if (!this.enabled || !this.versions.has(version)) return chosen;
++        if (this.pendingWaitChallengerActions !== undefined) {
++            if (chosen === this.pendingWaitChallengerActions) WAIT_CHALLENGER_STATS.chosen += 1;
++            this.pendingWaitChallengerActions = undefined;
++        }
++        if (this.pendingEdgeOfReachActions !== undefined) {
++            if (chosen === this.pendingEdgeOfReachActions) {
++                EDGE_OF_REACH_STATS.chosen += 1;
++                if (process.env.SEARCH_A19_EDGE_OF_REACH_DEBUG === "1") {
++                    const move = chosen.find((action) => action.type === "move_unit");
++                    console.error(
++                        `[edge-of-reach] lap ${this.deps.fightProperties.getCurrentLap()} ${unit.getName()} ` +
++                            `${JSON.stringify(unit.getBaseCell())} -> ${JSON.stringify(move && "path" in move ? move.path.at(-1) : null)}`,
++                    );
++                }
++            }
++            this.pendingEdgeOfReachActions = undefined;
++        }
+         return applyV08FlyerBacklinePriority(unit, rootDecisionContext, chosen);
+     }
+     private chooseSearchDecision(
+@@ -2322,6 +2402,7 @@ export class SearchDriver {
+                 ...this.caps,
+                 maxMoveShotComposites: this.moveShotCapForVersion(version),
+                 includeMountainAttacks: isV08Search,
++                retainEdgeOfReachMove: this.edgeOfReachMove && isV08Search,
+                 // v0.8 search rolls out the free Through Shot lines its native policy can take (V08_THROUGH_SHOT_LINE
+                 // scopes both together, so a seat A/B compares whole seats); older versions keep their exact catalog.
+                 throughShotFreeAim: isV08Search && throughShotLineEnabled(unit),
+@@ -2343,6 +2424,15 @@ export class SearchDriver {
+                     !this.observeOnly && this.rapidChargeReservationVersions.has(version),
+             };
+             let rejectedIsolatingFastFlyerMove = false;
++            // Wait challenger (research): a19 only, never against an incumbent that already waits or defends, and in
++            // mode 2 only when the policy's own action moves the unit.
++            const offerWaitChallenger =
++                this.waitChallengerMode !== 0 &&
++                isV08Search &&
++                incumbentKind !== "wait" &&
++                incumbentKind !== "defend" &&
++                incumbentKind !== "idle" &&
++                (this.waitChallengerMode === 1 || incumbent.some((action) => action.type === "move_unit"));
+             const keepCandidate = (candidate: IEnumeratedCandidate): boolean => {
+                 if (candidate.kind === "incumbent") return true;
+                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
+@@ -2386,10 +2476,23 @@ export class SearchDriver {
+                 if (!this.includeMoves && candidate.kind === "move" && !isV08Search) {
+                     return false;
+                 }
++                if (offerWaitChallenger && candidate.kind === "wait") return true;
+                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
+             };
+             const enumeratedCandidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates;
+             let candidates = enumeratedCandidates.filter(keepCandidate);
++            if (this.waitChallengerMode !== 0 && isV08Search) {
++                WAIT_CHALLENGER_STATS.searchedDecisions += 1;
++                const wait = offerWaitChallenger ? candidates.find((candidate) => candidate.kind === "wait") : undefined;
++                this.pendingWaitChallengerActions = wait?.actions;
++                if (wait) WAIT_CHALLENGER_STATS.offered += 1;
++            }
++            if (this.edgeOfReachMove && isV08Search) {
++                EDGE_OF_REACH_STATS.searchedDecisions += 1;
++                const reserved = candidates.find((candidate) => candidate.edgeOfReachReserved === true);
++                this.pendingEdgeOfReachActions = reserved?.actions;
++                if (reserved) EDGE_OF_REACH_STATS.retained += 1;
++            }
+             const urgentMoveShotFallback =
+                 prioritizeV08SUrgency &&
+                 !this.observeOnly &&
+@@ -4318,6 +4421,10 @@ export class SearchDriver {
+             challengers = [...challengers, reservedVine];
+         }
+         challengers = reserveResearchRapidChargeShortlist(candidates, challengers);
++        challengers = reserveEdgeOfReachShortlist(candidates, challengers);
++        if (this.waitChallengerMode !== 0 && this.pendingWaitChallengerActions !== undefined) {
++            challengers = reserveWaitChallengerShortlist(candidates, challengers);
++        }
+         return [candidates[0], ...challengers];
+     }
+     // ---- Q2 gate-0 ablation ---------------------------------------------------------------------
+diff --git a/test/ai/candidates_edge_of_reach.test.ts b/test/ai/candidates_edge_of_reach.test.ts
+new file mode 100644
+index 0000000..550b5d4
+--- /dev/null
++++ b/test/ai/candidates_edge_of_reach.test.ts
+@@ -0,0 +1,150 @@
++import { describe, expect, it } from "bun:test";
++import type { IDecisionContext } from "../../src/ai";
++import { enumerateCandidates, type IEnumeratedCandidate } from "../../src/ai/candidates";
++import type { GameAction } from "../../src/engine/actions";
++import { PBTypes } from "../../src/generated/protobuf/v1/types";
++import { PathHelper } from "../../src/grid/path_helper";
++import { reserveEdgeOfReachShortlist } from "../../src/simulation/search_driver";
++import type { Unit } from "../../src/units/unit";
++import type { XY } from "../../src/utils/math";
++import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings, type CombatTestContext } from "../helpers/combat";
++
++const LEFT = PBTypes.TeamVals.LEFT;
++const RIGHT = PBTypes.TeamVals.RIGHT;
++const MELEE = PBTypes.AttackVals.MELEE;
++const RANGE = PBTypes.AttackVals.RANGE;
++
++function ctxFor(c: CombatTestContext): IDecisionContext {
++    return {
++        grid: c.grid,
++        matrix: c.grid.getMatrix(),
++        unitsHolder: c.unitsHolder,
++        pathHelper: new PathHelper(testGridSettings),
++        attackHandler: c.attackHandler,
++        fightProperties: undefined,
++    };
++}
++const endTurn = (unit: Unit): GameAction[] => [{ type: "end_turn", unitId: unit.getId() }];
++const moves = (candidates: readonly IEnumeratedCandidate[]): IEnumeratedCandidate[] =>
++    candidates.filter((candidate) => candidate.kind === "move");
++const manhattan = (a: XY, b: XY): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
++/** Cells the enemy can strike next turn on this board: every reachable anchor plus its own, widened by one. */
++function enemyStrikeCells(c: CombatTestContext, enemy: Unit, ourTeam: number): Set<string> {
++    const anchors = [
++        enemy.getBaseCell(),
++        ...new PathHelper(testGridSettings).getMovePath(
++            enemy.getBaseCell(),
++            c.grid.getMatrix(),
++            enemy.getSteps(),
++            c.grid.getAggrMatrixByTeam(ourTeam),
++            enemy.canFly(),
++            enemy.isSmallSize(),
++            enemy.canTraverseLava(),
++            false,
++            enemy.getFootprintWidth(),
++            enemy.getFootprintHeight(),
++        ).cells,
++    ];
++    const out = new Set<string>();
++    for (const anchor of anchors) {
++        for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) out.add(`${anchor.x + dx},${anchor.y + dy}`);
++    }
++    return out;
++}
++
++describe("candidates — opt-in edge-of-reach advance (SEARCH_A19_EDGE_OF_REACH_MOVE)", () => {
++    it("is an exact identity when the option is off or false", () => {
++        const c = createCombatTestContext();
++        const unit = createTestUnit({ team: LEFT, name: "Line", attackType: MELEE, initiative: 4 });
++        const enemy = createTestUnit({ team: RIGHT, name: "E", attackType: MELEE, initiative: 3 });
++        placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 3 });
++        placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 13 });
++        const off = enumerateCandidates(unit, ctxFor(c), endTurn(unit), { maxMoveDestinations: 1 });
++        const explicitOff = enumerateCandidates(unit, ctxFor(c), endTurn(unit), {
++            maxMoveDestinations: 1,
++            retainEdgeOfReachMove: false,
++        });
++        expect(explicitOff.candidates.map((x) => x.actions)).toEqual(off.candidates.map((x) => x.actions));
++        expect(off.candidates.some((x) => x.edgeOfReachReserved)).toBe(false);
++        expect(moves(off.candidates)).toHaveLength(1);
++    });
++
++    it("retains one marked ADVANCING destination outside every enemy melee stack's reach beside the nearest move", () => {
++        const c = createCombatTestContext();
++        // Test units walk 3 steps. From y=6 the nearest advance (8,9) is one cell short of an enemy that can step to
++        // (8,10) and strike; (8,8) still advances and stays out of that reach.
++        const unit = createTestUnit({ team: LEFT, name: "Line", attackType: MELEE, initiative: 4 });
++        const enemy = createTestUnit({ team: RIGHT, name: "E", attackType: MELEE, initiative: 3 });
++        placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 6 });
++        placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 13 });
++        const currentDistance = manhattan(unit.getBaseCell(), enemy.getBaseCell());
++        const withEdge = enumerateCandidates(unit, ctxFor(c), endTurn(unit), {
++            maxMoveDestinations: 1,
++            retainEdgeOfReachMove: true,
++        });
++        const kept = moves(withEdge.candidates);
++        expect(kept).toHaveLength(2);
++        const nearest = kept[0];
++        const edge = kept[1];
++        expect(nearest.edgeOfReachReserved).toBeUndefined();
++        expect(edge.edgeOfReachReserved).toBe(true);
++        // Both advance; the nearest move is strictly nearer than the edge move.
++        expect(manhattan(nearest.targetCell!, enemy.getBaseCell())).toBeLessThan(currentDistance);
++        expect(manhattan(edge.targetCell!, enemy.getBaseCell())).toBeLessThan(currentDistance);
++        expect(manhattan(nearest.targetCell!, enemy.getBaseCell())).toBeLessThan(manhattan(edge.targetCell!, enemy.getBaseCell()));
++        // The edge cell is outside the enemy's strike set; the nearest one is inside it.
++        const strike = enemyStrikeCells(c, enemy, LEFT);
++        expect(strike.has(`${edge.targetCell!.x},${edge.targetCell!.y}`)).toBe(false);
++        expect(strike.has(`${nearest.targetCell!.x},${nearest.targetCell!.y}`)).toBe(true);
++        // And it is the NEAREST such cell: no unmarked reachable destination outside reach is closer.
++        const all = moves(enumerateCandidates(unit, ctxFor(c), endTurn(unit)).candidates);
++        const safeCloser = all.filter(
++            (m) =>
++                !strike.has(`${m.targetCell!.x},${m.targetCell!.y}`) &&
++                manhattan(m.targetCell!, enemy.getBaseCell()) < manhattan(edge.targetCell!, enemy.getBaseCell()),
++        );
++        expect(safeCloser).toHaveLength(0);
++    });
++
++    it("adds nothing when every advance is inside reach, for a shooter with ammunition, or with no enemies", () => {
++        const c = createCombatTestContext();
++        const unit = createTestUnit({ team: LEFT, name: "Line", attackType: MELEE, initiative: 2 });
++        const fast = createTestUnit({ team: RIGHT, name: "Fast", attackType: MELEE, initiative: 12 });
++        placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 6 });
++        placeUnit(c.grid, c.unitsHolder, fast, { x: 8, y: 9 });
++        const covered = enumerateCandidates(unit, ctxFor(c), endTurn(unit), { maxMoveDestinations: 1, retainEdgeOfReachMove: true });
++        expect(moves(covered.candidates)).toHaveLength(1);
++        expect(covered.candidates.some((x) => x.edgeOfReachReserved)).toBe(false);
++
++        const c2 = createCombatTestContext();
++        const shooter = createTestUnit({ team: LEFT, name: "Bow", attackType: RANGE, rangeShots: 5, initiative: 4 });
++        const enemy = createTestUnit({ team: RIGHT, name: "E", attackType: MELEE, initiative: 3 });
++        placeUnit(c2.grid, c2.unitsHolder, shooter, { x: 8, y: 3 });
++        placeUnit(c2.grid, c2.unitsHolder, enemy, { x: 8, y: 13 });
++        const shooterSet = enumerateCandidates(shooter, ctxFor(c2), endTurn(shooter), { maxMoveDestinations: 1, retainEdgeOfReachMove: true });
++        expect(shooterSet.candidates.some((x) => x.edgeOfReachReserved)).toBe(false);
++
++        const c3 = createCombatTestContext();
++        const alone = createTestUnit({ team: LEFT, name: "Alone", attackType: MELEE, initiative: 4 });
++        placeUnit(c3.grid, c3.unitsHolder, alone, { x: 8, y: 3 });
++        const aloneSet = enumerateCandidates(alone, ctxFor(c3), endTurn(alone), { maxMoveDestinations: 1, retainEdgeOfReachMove: true });
++        expect(aloneSet.candidates.some((x) => x.edgeOfReachReserved)).toBe(false);
++    });
++
++    it("the shortlist reservation appends the marked candidate only when the leaf pre-pass dropped it", () => {
++        const mk = (kind: IEnumeratedCandidate["kind"], reserved = false): IEnumeratedCandidate => ({
++            kind,
++            actions: [],
++            features: {} as IEnumeratedCandidate["features"],
++            ...(reserved ? { edgeOfReachReserved: true as const } : {}),
++        });
++        const edge = mk("move", true);
++        const melee = mk("melee");
++        const move = mk("move");
++        expect(reserveEdgeOfReachShortlist([mk("incumbent"), melee, move, edge], [melee, move])).toEqual([melee, move, edge]);
++        const already = [melee, edge];
++        expect(reserveEdgeOfReachShortlist([mk("incumbent"), melee, edge], already)).toBe(already);
++        const none = [melee, move];
++        expect(reserveEdgeOfReachShortlist([mk("incumbent"), melee, move], none)).toBe(none);
++    });
++});

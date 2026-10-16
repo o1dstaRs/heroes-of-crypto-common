@@ -25,6 +25,7 @@ import {
     getPositionForCells,
     getRangeAttackSideCenter,
     isCellWithinGrid,
+    isPositionWithinGrid,
     isRangeAttackSideObservable,
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
@@ -34,9 +35,13 @@ import { ToFactionName } from "../factions/faction_type";
 import { AttackHandler, type IPreparedRangeAttackEvaluation } from "../handlers/attack_handler";
 import {
     canCastSpell,
+    cellTargetedSpellBlockCells,
     firstSummonableAnchor,
     canMassCastSpell,
     thrownSpellReachesAimedTarget,
+    CASTLING_RANGE_BONUS_CELLS,
+    hasSwappableFootprint,
+    isInterceptedThrownSpell,
     isSpellUsableByCaster,
 } from "../spells/spell_helper";
 import type { Spell } from "../spells/spell";
@@ -58,6 +63,12 @@ import { decisionFireWalls } from "./decision_fight_state";
 import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
+import { lastFuseCounterTradePotential } from "./last_fuse_tactics";
+import {
+    estimateLastFuseMeleeDamage,
+    estimateLastFuseRangedDamage,
+    type ILastFuseMeleeEstimate,
+} from "./last_fuse_estimate";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -78,6 +89,14 @@ const haveAdjacentCells = (left: readonly XY[], right: readonly XY[]): boolean =
     return false;
 };
 const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbilityActive("Hidden");
+/** (divisor, stack ids) per pierced group in ray order: the identity of a shot line however it was aimed. */
+const lineSignatureOf = (evaluation: { affectedUnits: Array<Unit[]>; rangeAttackDivisors: number[] }): string =>
+    evaluation.affectedUnits
+        .map(
+            (group, index) =>
+                `${evaluation.rangeAttackDivisors[index] ?? 1}:${group.map((unit) => unit.getId()).join(",")}`,
+        )
+        .join(";");
 
 /**
  * F4 — THE shared enumerated candidate generator (v0.7 roadmap).
@@ -146,7 +165,7 @@ export interface ICandidateFeatures {
      * The opportunity cost of casting Resurrection on an ally is losing the Angel's own auto-res.
      */
     burnsResurrectionCharge: 0 | 1;
-    /** Hit-weighted damage estimate using engine miss/AOE modifiers; splash friendly-fire subtracts. */
+    /** Damage estimate using engine modifiers; friendly splash and supported Last Fuse blasts subtract. */
     expectedDamage: number;
     /** 1 when the estimate kills the primary target stack outright. */
     expectedKill: 0 | 1;
@@ -203,6 +222,8 @@ interface IPreparedRangeCandidateDamage {
     reducesBrokenAegis: boolean;
     secondVolleyMultiplier: number;
     sharedAbilityMultiplier: number;
+    bonusVolleyChance: number;
+    shotCostOnHitOnly: boolean;
 }
 
 /** Attacker-only terms shared by every aim considered during one immutable decision. */
@@ -230,9 +251,10 @@ function prepareRangeCandidateDamage(
     }
     const giantsMaul = isPhysicalAoe ? unit.getBuff("Giants Maul") : undefined;
     const doubleShotAbility = shots > 1 ? getDoubleShotAbility(unit) : undefined;
+    // An area second volley repeats the first at full power, with the Dual Strike Charm on top as the engine applies it.
     const secondVolleyMultiplier = doubleShotAbility
         ? aoeAbility
-            ? 1
+            ? withDualStrikeCharm(1, unit)
             : withDualStrikeCharm(unit.calculateAbilityMultiplier(doubleShotAbility, attackerAbilityPower), unit)
         : 0;
     return {
@@ -247,6 +269,8 @@ function prepareRangeCandidateDamage(
         reducesBrokenAegis: !!aoeAbility,
         secondVolleyMultiplier,
         sharedAbilityMultiplier,
+        bonusVolleyChance: unit.getBonusRangedAttackChance() / 100,
+        shotCostOnHitOnly: !isPhysicalAoe && !unit.hasAbilityActive("Chakram"),
     };
 }
 
@@ -254,6 +278,7 @@ function prepareRangeCandidateDamage(
  * Deterministic expected net damage for one authoritative ranged-ray evaluation. Candidate enumeration and
  * independent action qualification share this exact calculation so an engine-valid AOE with greater allied
  * splash is never mislabeled as productive merely because its primary enemy takes damage.
+ * An explicit stack-size override describes a hypothetical origin; its Last Fuse geometry stays with search.
  */
 export function evaluateRangeCandidateDamage(
     unit: Unit,
@@ -263,16 +288,17 @@ export function evaluateRangeCandidateDamage(
     shots: number,
     isAOE: boolean,
     aimTargetId = primaryTargetId,
-    attackerAmountAlive = unit.getAmountAlive(),
+    attackerAmountAlive?: number,
 ): IRangeCandidateDamage {
     return evaluatePreparedRangeCandidateDamage(
         unit,
         context,
         evaluation,
         primaryTargetId,
-        attackerAmountAlive,
+        attackerAmountAlive ?? unit.getAmountAlive(),
         aimTargetId,
         prepareRangeCandidateDamage(unit, context, shots, isAOE),
+        attackerAmountAlive === undefined,
     );
 }
 
@@ -284,7 +310,27 @@ function evaluatePreparedRangeCandidateDamage(
     attackerAmountAlive: number,
     aimTargetId: string | undefined,
     prepared: IPreparedRangeCandidateDamage,
+    stationary: boolean,
 ): IRangeCandidateDamage {
+    const onlyTarget =
+        evaluation.affectedUnits.length === 1 && evaluation.affectedUnits[0]?.length === 1
+            ? evaluation.affectedUnits[0][0]
+            : undefined;
+    const fuse =
+        stationary && !prepared.isPhysicalAoe && onlyTarget?.getTeam() === prepared.enemyTeam
+            ? estimateLastFuseRangedDamage(unit, onlyTarget, context, evaluation.rangeAttackDivisors[0] ?? 1)
+            : undefined;
+    if (onlyTarget && fuse) {
+        const directDamage = fuse.expectedNetDamage + fuse.expectedFriendlyDamage;
+        return {
+            value: fuse.expectedNetDamage,
+            kill: onlyTarget.getId() === primaryTargetId && fuse.secureKill ? 1 : 0,
+            enemyDamage: directDamage,
+            friendlyFireDamage: fuse.expectedFriendlyDamage,
+            primaryTargetDamage: onlyTarget.getId() === primaryTargetId ? directDamage : 0,
+            aimTargetDamage: onlyTarget.getId() === aimTargetId ? directDamage : 0,
+        };
+    }
     let value = 0;
     let kill: 0 | 1 = 0;
     let enemyDamage = 0;
@@ -293,6 +339,13 @@ function evaluatePreparedRangeCandidateDamage(
     let aimTargetDamage = 0;
     const counted = new Set<string>();
     const fightProperties = context.fightProperties;
+    // The action spends arrows against its first impact, not independently against every splash victim.
+    // Through Shot spends one arrow for the whole line; its native follow-up does not spend another.
+    const ammunitionTarget = prepared.isThroughShot ? undefined : evaluation.affectedUnits[0]?.[0];
+    const secondVolleyAvailable = unit.projectRangeShotsAfterVolleys(ammunitionTarget) > 0;
+    const secondVolleyMultiplier = secondVolleyAvailable ? prepared.secondVolleyMultiplier : 0;
+    const spentVolleys = prepared.isThroughShot || !secondVolleyMultiplier ? 1 : 2;
+    const bonusVolleyAvailable = unit.projectRangeShotsAfterVolleys(ammunitionTarget, spentVolleys) > 0;
     // Through Shot owns the ranged attack outright when active; Large Caliber / Area Throw use the
     // separate splash tail. Both are physical AOE for damage purposes, but only the latter applies
     // Broken Aegis' incoming-damage reduction. Keep this order identical to the authoritative handlers:
@@ -368,12 +421,66 @@ function evaluatePreparedRangeCandidateDamage(
             const hitChance =
                 1 - Math.min(100, Math.max(0, unit.calculateMissChance(target, defenderAbilityPower))) / 100;
             const missChance = 1 - hitChance;
-            const effective =
-                prepared.secondVolleyMultiplier > 0
+            let effective =
+                secondVolleyMultiplier > 0
                     ? hitChance * missChance * Math.min(firstConditionalDamage, hp) +
                       missChance * hitChance * Math.min(secondConditionalDamage, hp) +
                       hitChance * hitChance * Math.min(firstConditionalDamage + secondConditionalDamage, hp)
                     : hitChance * Math.min(firstConditionalDamage, hp);
+            if (prepared.shotCostOnHitOnly && (prepared.secondVolleyMultiplier > 0 || prepared.bonusVolleyChance > 0)) {
+                // Ordinary missed arrows do not spend ammunition in the resolver. Keep each native outcome's
+                // budget so a miss can leave enough for a second shot or Echo, while a hit can use the last arrow.
+                effective = 0;
+                for (const [first, firstProbability, firstSpent] of [
+                    [0, missChance, 0],
+                    [firstConditionalDamage, hitChance, 1],
+                ]) {
+                    if (!firstProbability) continue;
+                    const canFollow =
+                        prepared.secondVolleyMultiplier > 0 &&
+                        unit.projectRangeShotsAfterVolleys(ammunitionTarget, firstSpent) > 0;
+                    const secondOutcomes = canFollow
+                        ? [
+                              [0, missChance, firstSpent],
+                              [secondConditionalDamage, hitChance, firstSpent + 1],
+                          ]
+                        : [[0, 1, firstSpent]];
+                    for (const [second, secondProbability, spent] of secondOutcomes) {
+                        if (!secondProbability) continue;
+                        const nativeDamage = Math.min(first + second, hp);
+                        const echoDamage =
+                            prepared.bonusVolleyChance > 0 &&
+                            unit.projectRangeShotsAfterVolleys(ammunitionTarget, spent) > 0
+                                ? prepared.bonusVolleyChance *
+                                  hitChance *
+                                  (Math.min(first + second + firstConditionalDamage, hp) - nativeDamage)
+                                : 0;
+                        effective += firstProbability * secondProbability * (nativeDamage + echoDamage);
+                    }
+                }
+            } else if (prepared.bonusVolleyChance > 0 && bonusVolleyAvailable) {
+                const firstOutcomes = [
+                    [0, missChance],
+                    [firstConditionalDamage, hitChance],
+                ];
+                const secondOutcomes =
+                    secondVolleyMultiplier > 0
+                        ? [
+                              [0, missChance],
+                              [secondConditionalDamage, hitChance],
+                          ]
+                        : [[0, 1]];
+                for (const [first, firstProbability] of firstOutcomes) {
+                    for (const [second, secondProbability] of secondOutcomes) {
+                        effective +=
+                            firstProbability *
+                            secondProbability *
+                            prepared.bonusVolleyChance *
+                            hitChance *
+                            (Math.min(first + second + firstConditionalDamage, hp) - Math.min(first + second, hp));
+                    }
+                }
+            }
             if (targetTeam === prepared.enemyTeam) {
                 value += effective;
                 enemyDamage += effective;
@@ -476,7 +583,7 @@ function prepareStationaryRangeAttackSearch(
         if (isHidden(aimTarget) || shooter.cannotAttackUnitId(aimTargetId)) continue;
         for (const aimCell of aimTarget.getCells()) {
             for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
-                if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot)) continue;
+                if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot, isAOE)) continue;
                 const toPosition = getRangeAttackSideCenter(gridSettings, aimCell, aimSide, shooterPosition);
                 probes.push({
                     aimTargetId,
@@ -555,6 +662,7 @@ function findBestPreparedStationaryRangeAttack(
             search.attackerAmountAlive,
             probe.aimTargetId,
             search.preparedDamage,
+            true,
         ).value;
         if (damage > 0 && (!best || damage > best.expectedDamage)) {
             best = {
@@ -617,7 +725,7 @@ export function findBestLegalStationaryRangeAttack(
         if (isHidden(aimTarget) || shooter.cannotAttackUnitId(aimTargetId)) continue;
         for (const aimCell of aimTarget.getCells()) {
             for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
-                if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot)) continue;
+                if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot, isAOE)) continue;
                 const to = getRangeAttackSideCenter(gridSettings, aimCell, aimSide, shooterPosition);
                 const evaluation = attackHandler.evaluateRangeAttack(
                     allUnits,
@@ -657,6 +765,7 @@ export function findBestLegalStationaryRangeAttack(
                     attackerAmountAlive,
                     aimTargetId,
                     preparedDamage,
+                    true,
                 ).value;
                 if (damage > 0 && (!best || damage > best.expectedDamage)) {
                     best = {
@@ -693,10 +802,15 @@ export interface IEnumeratedCandidate {
     shotFeatures?: IShotCandidateFeatures;
     /** Research-only marker for the one exact Rapid Charge challenger retained across a capped melee catalog. */
     researchRapidChargeDifferentTargetReserved?: true;
+    /** One profitable-looking own-Last-Fuse stand retained for authoritative rollout comparison. */
+    lastFuseCounterTradeReserved?: true;
     features: ICandidateFeatures;
 }
 
 export interface IEnumerateOptions {
+    /** Preserve one supported own-Last-Fuse counter trade across the melee cap; off for historical catalogs. */
+    includeLastFuseCounterTrades?: boolean;
+    includeLastFusePrimaryTrades?: boolean;
     /** Cap on move destinations, kept nearest-to-enemy first (0/undefined = all reachable). */
     maxMoveDestinations?: number;
     /**
@@ -723,8 +837,9 @@ export interface IEnumerateOptions {
     /** Cap on ranged aims, kept by expected damage (0/undefined = all distinct hit sets). */
     maxShotAims?: number;
     /**
-     * Experimental move-then-shot challengers. Values above two are clamped to two; 0/undefined disables the
-     * class completely so every existing consumer retains byte-identical actions and candidate ordering.
+     * Retired: move-then-shot challengers. Only melee may follow a move in the same turn, so the engine rejects a shot
+     * from a unit that has moved (GameActionEngine, MOVED_THIS_TURN_MELEE_ONLY_MESSAGE) and the class is never generated,
+     * whatever this asks for. Kept so existing callers and research configs still type-check.
      */
     maxMoveShotComposites?: number;
     /**
@@ -742,12 +857,20 @@ export interface IEnumerateOptions {
     preserveAttackTargetCoverage?: boolean;
     /** Opt in to deterministic BLOCK_CENTER melee-mining challengers (v0.8 search only). */
     includeMountainAttacks?: boolean;
+    /** Research-only: retain distinct one-hit obstacle targets when public deployment barrels are present. */
+    includeArtifactBarrelAttackCoverage?: boolean;
     /**
      * Metadata enrichment for candidate 0. When its exact action is rediscovered by the generator (or is an
      * exact legal move-shot handled by the bounded incumbent probe), copy those observations onto the anchor.
      * Default false; actions, ordering, deduplication, and challenger caps are unchanged.
      */
     enrichIncumbentMetadata?: boolean;
+    /**
+     * Through Shot free aim: also enumerate `range_attack` candidates aimed at a free world point (targetId
+     * "" + targetPosition), one per line whose pierced set no visible-edge aim already reaches. Opt-in so the
+     * catalog every historical consumer sees stays byte-identical; v0.8's line policy and the v0.8 search opt in.
+     */
+    throughShotFreeAim?: boolean;
 }
 
 interface IAttackCapView<T> {
@@ -816,10 +939,18 @@ export interface ICandidateSet {
 }
 
 /**
- * Base cells of SMALL living enemies standing within the unit's movement range — the legality input for
+ * Base cells of the living enemies this unit could SWAP with — the legality input for
  * ENEMY_WITHIN_MOVEMENT_RANGE spells (Harpy's Castling). Mirrors the client's arming path
  * (Sandbox.currentEnemiesCellsWithinMovementRange): pathing runs on grid.getMatrixNoUnits() (enemy-occupied
  * cells must be REACHABLE-through, not blocked), no aggro board, small/fly/lava flags from the unit.
+ * The budget is the unit's movement PLUS CASTLING_RANGE_BONUS_CELLS (owner call 2026-10-02): the swap
+ * reaches one cell farther than the caster can walk.
+ *
+ * Two conditions, and both are about the ANCHOR. An enemy qualifies only if its footprint matches the
+ * caster's (hasSwappableFootprint) and its own anchor is a cell this body could stand on — not merely a cell
+ * the body could touch. That distinction is invisible at 1x1, where a unit's only cell IS its anchor, but it
+ * decides the multi-cell case: a 2x1 that can reach a 2x1 enemy's far cell but not its anchor would land on
+ * cells the enemy never held.
  *
  * Exported for consumers to wire into IGameActionEngineContext.getCurrentEnemiesCellsWithinMovementRange —
  * the engine's castSpell re-validates against that context callback, so the SAME list must be visible on
@@ -836,7 +967,8 @@ export function getEnemiesCellsWithinMovementRange(unit: Unit, context: IDecisio
     const moveCells = context.pathHelper.getMovePath(
         unit.getBaseCell(),
         context.grid.getMatrixNoUnits(),
-        unit.getSteps(),
+        // One cell farther than the unit's own movement: the swap's reach (owner call 2026-10-02).
+        unit.getSteps() + CASTLING_RANGE_BONUS_CELLS,
         undefined,
         unit.canFly(),
         unit.isSmallSize(),
@@ -846,16 +978,30 @@ export function getEnemiesCellsWithinMovementRange(unit: Unit, context: IDecisio
         unit.getFootprintHeight(),
     ).cells;
     const out: XY[] = [];
+    const seen = new Set<string>();
     for (const c of moveCells) {
         const enemyId = context.grid.getOccupantUnitId(c);
         if (!enemyId) {
             continue;
         }
         const enemy = context.unitsHolder.getAllUnits().get(enemyId);
-        if (!enemy || enemy.isDead() || enemy.getTeam() === unit.getTeam() || !enemy.isSmallSize()) {
+        if (!enemy || enemy.isDead() || enemy.getTeam() === unit.getTeam()) {
             continue;
         }
-        out.push(enemy.getBaseCell());
+        // The reachable cell has to be the enemy's own anchor: that is where this body would come to rest.
+        const anchor = enemy.getBaseCell();
+        if (anchor.x !== c.x || anchor.y !== c.y) {
+            continue;
+        }
+        if (!hasSwappableFootprint(unit, enemy)) {
+            continue;
+        }
+        const key = `${anchor.x},${anchor.y}`;
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        out.push(anchor);
     }
     return out;
 }
@@ -911,6 +1057,7 @@ class CandidateGenerator {
         this.addDefend();
         this.addMelee();
         this.addMountainAttack();
+        this.addArtifactBarrelAttackCoverage();
         this.addShots();
         this.addAreaThrows();
         this.addSpells();
@@ -998,6 +1145,10 @@ class CandidateGenerator {
                     break;
                 case "range_attack":
                     part = `rg:${action.targetId}@${cell(action.aimCell)}/${action.aimSide ?? "-"}`;
+                    // A free Through Shot line is identified by its aim point; edge aims keep their exact key.
+                    if (action.targetPosition) {
+                        part += `~${action.targetPosition.x},${action.targetPosition.y}`;
+                    }
                     break;
                 case "area_throw_attack":
                     part = `at:${cell(action.targetCell)}`;
@@ -1317,6 +1468,7 @@ class CandidateGenerator {
             unit: Unit;
             cells: XY[];
             damage?: { effective: number; kill: 0 | 1 };
+            fuseByMove?: Map<boolean, ILastFuseMeleeEstimate | undefined>;
         }
         interface IMeleePair {
             target: Unit;
@@ -1328,13 +1480,51 @@ class CandidateGenerator {
         }
         const targetViews: IMeleeTarget[] = targets.map((target) => ({ unit: target, cells: target.getCells() }));
         const pairs: IMeleePair[] = [];
+        // All legal melee stands touch the same corpse. Without these position/distance modifiers, the
+        // supported projection is identical within stationary or moving attacks against one target.
+        const invariantFuseDamage =
+            !this.unit.getAbility("Rapid Charge") &&
+            !this.unit.getAbility("Backstab") &&
+            !this.unit.getAuraEffect("War Anger");
+        const actionsFor = (target: Unit, cell: XY, route?: IReadonlyWeightedRoute): GameAction[] => {
+            const actions: GameAction[] = [...prefix];
+            // Keep the measured separate move-and-strike encoding for both valuation and execution.
+            if (route && (cell.x !== base.x || cell.y !== base.y)) actions.push(this.moveAction(route));
+            actions.push({
+                type: "melee_attack",
+                attackerId: this.unit.getId(),
+                targetId: target.getId(),
+                attackFrom: { x: cell.x, y: cell.y },
+            });
+            return actions;
+        };
         const pair = (target: IMeleeTarget, cell: XY, route?: IReadonlyWeightedRoute): IMeleePair => {
             target.damage ??= this.meleeDamage(target.unit);
+            let fuse: ILastFuseMeleeEstimate | undefined;
+            if (target.unit.hasBuffActive("Last Fuse")) {
+                const moved = !!route && (cell.x !== base.x || cell.y !== base.y);
+                const cacheable = invariantFuseDamage && !route?.hasLavaCell && !route?.hasWaterCell;
+                if (cacheable && target.fuseByMove?.has(moved)) fuse = target.fuseByMove.get(moved);
+                else {
+                    fuse = estimateLastFuseMeleeDamage(
+                        this.unit,
+                        target.unit,
+                        this.context,
+                        cell,
+                        actionsFor(target.unit, cell, route),
+                    );
+                    if (cacheable) {
+                        target.fuseByMove ??= new Map();
+                        target.fuseByMove.set(moved, fuse);
+                    }
+                }
+            }
             return {
                 target: target.unit,
                 cell,
                 route,
-                ...target.damage,
+                effective: fuse?.expectedNetDamage ?? target.damage.effective,
+                kill: fuse ? (fuse.secureKill ? 1 : 0) : target.damage.kill,
                 sourceIndex: pairs.length,
             };
         };
@@ -1371,22 +1561,44 @@ class CandidateGenerator {
             }
         }
 
-        const actionsOf = (p: IMeleePair): GameAction[] => {
-            const actions: GameAction[] = [...prefix];
-            // Move-and-strike is emitted as a SEPARATE move_unit + stationary melee_attack — the pattern
-            // v0.5 measured ~+2.5pp over folding the path into the melee_attack (the standalone move runs
-            // the full move handler). The ranked client folds the pair back for transport.
-            if (p.route && (p.cell.x !== base.x || p.cell.y !== base.y)) {
-                actions.push(this.moveAction(p.route));
+        const actionsOf = (p: IMeleePair): GameAction[] => actionsFor(p.target, p.cell, p.route);
+
+        let reservedLastFusePair: IMeleePair | undefined;
+        if (this.options.includeLastFuseCounterTrades && this.unit.hasBuffActive("Last Fuse")) {
+            let bestPotential = 0;
+            const fatalChanceByTarget = new Map<string, number>();
+            for (const candidate of pairs) {
+                const potential = lastFuseCounterTradePotential(
+                    this.unit,
+                    candidate.target,
+                    this.context,
+                    candidate.cell,
+                    actionsOf(candidate),
+                    { fatalChanceByTarget },
+                );
+                if (potential > bestPotential) {
+                    bestPotential = potential;
+                    reservedLastFusePair = candidate;
+                }
             }
-            actions.push({
-                type: "melee_attack",
-                attackerId: this.unit.getId(),
-                targetId: p.target.getId(),
-                attackFrom: { x: p.cell.x, y: p.cell.y },
-            });
-            return actions;
-        };
+            if (!reservedLastFusePair && this.options.includeLastFusePrimaryTrades) {
+                const primaryBlastByTarget = new Map<string, number>();
+                for (const candidate of pairs) {
+                    const potential = lastFuseCounterTradePotential(
+                        this.unit,
+                        candidate.target,
+                        this.context,
+                        candidate.cell,
+                        actionsOf(candidate),
+                        { includePrimaryTarget: true, fatalChanceByTarget, primaryBlastByTarget },
+                    );
+                    if (potential > bestPotential) {
+                        bestPotential = potential;
+                        reservedLastFusePair = candidate;
+                    }
+                }
+            }
+        }
 
         let reservedRapidChargePair: IMeleePair | undefined;
         if (
@@ -1463,6 +1675,9 @@ class CandidateGenerator {
             if (reservedRapidChargePair && !kept.includes(reservedRapidChargePair)) {
                 kept = [...kept, reservedRapidChargePair];
             }
+            if (reservedLastFusePair && !kept.includes(reservedLastFusePair)) {
+                kept = [...kept, reservedLastFusePair];
+            }
         }
         const candidateOf = (p: IMeleePair): IEnumeratedCandidate => {
             return {
@@ -1471,6 +1686,7 @@ class CandidateGenerator {
                 targetId: p.target.getId(),
                 standCell: { x: p.cell.x, y: p.cell.y },
                 ...(p === reservedRapidChargePair ? { researchRapidChargeDifferentTargetReserved: true as const } : {}),
+                ...(p === reservedLastFusePair ? { lastFuseCounterTradeReserved: true as const } : {}),
                 features: this.features({ expectedDamage: p.effective, expectedKill: p.kill }),
             };
         };
@@ -1560,12 +1776,13 @@ class CandidateGenerator {
         }
         const { attackHandler, fightProperties, grid, unitsHolder } = this.context;
         const scattered = grid.hasScatteredMountains();
-        const standingScattered = scattered ? grid.getScatteredMountainsStanding() : [];
+        const standingScattered = scattered ? grid.getCenterCells() : [];
         if (
             !attackHandler ||
             !fightProperties ||
-            grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
-            fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+            (!scattered &&
+                (grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+                    fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER)) ||
             (scattered ? standingScattered.length <= 0 : fightProperties.getObstacleHitsLeft() <= 0) ||
             this.unit.isDead() ||
             (!scattered &&
@@ -1666,6 +1883,68 @@ class CandidateGenerator {
             standCell: { x: strike.attackFrom.x, y: strike.attackFrom.y },
             features: this.features(),
         });
+    }
+    private addArtifactBarrelAttackCoverage(): void {
+        const { attackHandler, fightProperties, grid, unitsHolder } = this.context;
+        if (
+            !this.options.includeArtifactBarrelAttackCoverage ||
+            !attackHandler ||
+            !fightProperties ||
+            this.unit.isDead() ||
+            grid.getArtifactBarrels().length === 0
+        )
+            return;
+        const forced = unitsHolder.getAllUnits().get(this.unit.getTarget());
+        if (forced && !forced.isDead()) return;
+        const targets = [...grid.getScatteredMountainsStanding()].sort((a, b) => a.x - b.x || a.y - b.y);
+        const settings = grid.getSettings(),
+            base = this.unit.getBaseCell();
+        const shoots = this.canShoot(attackHandler);
+        if (!shoots && (!this.unit.canMove() || this.unit.getAttackTypeSelection() === RANGE || !this.canMelee()))
+            return;
+        for (const targetCell of targets) {
+            const targetPosition = getPositionForCell(
+                targetCell,
+                settings.getMinX(),
+                settings.getStep(),
+                settings.getHalfStep(),
+            );
+            if (shoots) {
+                this.push({
+                    kind: "mine",
+                    actions: [
+                        ...this.rangePrefix(),
+                        { type: "obstacle_attack", attackerId: this.unit.getId(), targetPosition },
+                    ],
+                    targetCell: { ...targetCell },
+                    standCell: { ...base },
+                    features: this.features({ spendsRangeShot: 1 }),
+                });
+                continue;
+            }
+            const strike = this.mountainMeleeStrike([targetCell]);
+            if (!strike) continue;
+            const inPlace = strike.attackFrom.x === base.x && strike.attackFrom.y === base.y;
+            const route = inPlace ? undefined : strike.route;
+            if (!inPlace && !route?.route.length) continue;
+            this.push({
+                kind: "mine",
+                actions: [
+                    {
+                        type: "obstacle_attack",
+                        attackerId: this.unit.getId(),
+                        targetPosition,
+                        attackFrom: { ...strike.attackFrom },
+                        path: route?.route.map((cell) => ({ ...cell })),
+                        hasLavaCell: route?.hasLavaCell,
+                        hasWaterCell: route?.hasWaterCell,
+                    },
+                ],
+                targetCell: { ...targetCell },
+                standCell: { ...strike.attackFrom },
+                features: this.features(),
+            });
+        }
     }
     // ---- ranged shots --------------------------------------------------------------------------------
     private canShoot(attackHandler: AttackHandler): boolean {
@@ -1793,6 +2072,7 @@ class CandidateGenerator {
                 shot.aimSide as RangeAttackCellSide,
                 this.unit.getTeam(),
                 isThroughShot,
+                isLargeCaliber,
             )
         ) {
             return;
@@ -1882,7 +2162,7 @@ class CandidateGenerator {
         shots: number,
         isAOE: boolean,
         aimTargetId = primaryTargetId,
-        attackerAmountAlive = this.unit.getAmountAlive(),
+        attackerAmountAlive?: number,
     ): IRangeCandidateDamage {
         if (
             !this.preparedRangeDamage ||
@@ -1900,9 +2180,10 @@ class CandidateGenerator {
             this.context,
             evaluation,
             primaryTargetId,
-            attackerAmountAlive,
+            attackerAmountAlive ?? this.unit.getAmountAlive(),
             aimTargetId,
             this.preparedRangeDamage.value,
+            attackerAmountAlive === undefined,
         );
     }
     /** Target-local signals already used by v0.5's shot scorer, exposed without changing that scorer. */
@@ -1960,12 +2241,17 @@ class CandidateGenerator {
             targetId: string;
             /** Unit whose visible cell edge anchors the exact trajectory sent to the action engine. */
             aimTargetId: string;
-            aimCell: XY;
-            aimSide: RangeAttackCellSide;
+            /** Visible-edge aim; absent for a free Through Shot line. */
+            aimCell?: XY;
+            aimSide?: RangeAttackCellSide;
+            /** Free world point a Through Shot line is aimed at (targetId "" on the wire). */
+            freeAimPosition?: XY;
             value: number;
             kill: 0 | 1;
             shotFeatures: IShotCandidateFeatures;
             hitUnitSignature: string;
+            /** The line's identity regardless of which edge or point produced it (see lineSignatureOf). */
+            lineSignature: string;
         }
         const found: IShot[] = [];
         const hitSetSeen = new Set<string>();
@@ -1978,7 +2264,7 @@ class CandidateGenerator {
             }
             for (const cell of enemy.getCells()) {
                 for (const side of RANGE_ATTACK_CELL_SIDES) {
-                    if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot)) {
+                    if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot, isAOE)) {
                         continue;
                     }
                     const to = getRangeAttackSideCenter(gs, cell, side, from);
@@ -2024,15 +2310,8 @@ class CandidateGenerator {
                     }
                     // Alternative aims are only interesting when they change WHAT the shot hits: dedupe
                     // aims resolving to the identical (unit set, divisors) outcome per target.
-                    const hitSig =
-                        enemy.getId() +
-                        "#" +
-                        evaluation.affectedUnits
-                            .map(
-                                (g, i) =>
-                                    `${evaluation.rangeAttackDivisors[i] ?? 1}:${g.map((u) => u.getId()).join(",")}`,
-                            )
-                            .join(";");
+                    const line = lineSignatureOf(evaluation);
+                    const hitSig = enemy.getId() + "#" + line;
                     if (hitSetSeen.has(hitSig)) {
                         continue;
                     }
@@ -2050,7 +2329,79 @@ class CandidateGenerator {
                         hitUnitSignature: evaluation.affectedUnits
                             .map((group) => group.map((unit) => unit.getId()).join(","))
                             .join(";"),
+                        lineSignature: line,
                     });
+                }
+            }
+        }
+        // ---- Through Shot free aim -------------------------------------------------------------
+        // A Through Shot may be aimed at any world point (engine: targetId "" + targetPosition), and its ray
+        // is projected to the field edge, so only the DIRECTION matters: the shot pierces every enemy on the
+        // line and passes through allies. The edge aims above give one direction per visible side; the
+        // grazing lines that cross two bodies through their corners are not among them. Sample a 3x3
+        // sub-grid inside every enemy cell (centre, corners, edge midpoints — a 5x5 finds nothing more on 600
+        // random boards) and keep only the lines whose pierced set no edge aim already reaches, so the catalog
+        // grows by the genuinely new geometry only (+0.5 lines per board; a strictly better line on ~3% of
+        // boards). Opt-in: the catalog every historical consumer sees stays byte-identical.
+        if (isThroughShot && this.options.throughShotFreeAim) {
+            const lineSeen = new Set(found.map((shot) => shot.lineSignature));
+            const inset = gs.getHalfStep() - 1;
+            for (const enemy of this.enemies) {
+                if (isHidden(enemy) || this.unit.cannotAttackUnitId(enemy.getId())) {
+                    continue;
+                }
+                for (const cell of enemy.getCells()) {
+                    const centre = getPositionForCell(cell, gs.getMinX(), gs.getStep(), gs.getHalfStep());
+                    for (const dx of [-inset, 0, inset]) {
+                        for (const dy of [-inset, 0, inset]) {
+                            const to = { x: Math.round(centre.x + dx), y: Math.round(centre.y + dy) };
+                            if (!isPositionWithinGrid(gs, to)) {
+                                continue;
+                            }
+                            const evaluation = attackHandler.evaluateRangeAttack(
+                                allUnits,
+                                this.unit,
+                                from,
+                                to,
+                                true,
+                                false,
+                                isAOE,
+                            );
+                            const primaryHit = evaluation.affectedUnits[0]?.[0];
+                            // The same legality mirror as the edge aims: the engine judges a free line by the
+                            // first stack its ray actually crosses.
+                            if (
+                                !primaryHit ||
+                                evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length ||
+                                primaryHit.isDead() ||
+                                primaryHit.getTeam() !== this.enemyTeam ||
+                                isHidden(primaryHit) ||
+                                this.unit.cannotAttackUnitId(primaryHit.getId()) ||
+                                (forcedTargetId !== undefined && primaryHit.getId() !== forcedTargetId)
+                            ) {
+                                continue;
+                            }
+                            const line = lineSignatureOf(evaluation);
+                            if (lineSeen.has(line)) {
+                                continue;
+                            }
+                            lineSeen.add(line);
+                            const damage = this.shotDamage(evaluation, primaryHit.getId(), shots, isAOE);
+                            found.push({
+                                target: primaryHit,
+                                targetId: primaryHit.getId(),
+                                aimTargetId: primaryHit.getId(),
+                                freeAimPosition: to,
+                                value: damage.value,
+                                kill: damage.kill,
+                                shotFeatures: this.shotFeatures(primaryHit, damage),
+                                hitUnitSignature: evaluation.affectedUnits
+                                    .map((group) => group.map((unit) => unit.getId()).join(","))
+                                    .join(";"),
+                                lineSignature: line,
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -2072,13 +2423,21 @@ class CandidateGenerator {
             kind: "shot",
             actions: [
                 ...prefix,
-                {
-                    type: "range_attack",
-                    attackerId: this.unit.getId(),
-                    targetId: s.aimTargetId,
-                    aimCell: s.aimCell,
-                    aimSide: s.aimSide,
-                },
+                s.freeAimPosition
+                    ? {
+                          type: "range_attack",
+                          attackerId: this.unit.getId(),
+                          // A free line names no stack: the engine resolves its victims from the ray itself.
+                          targetId: "",
+                          targetPosition: { x: s.freeAimPosition.x, y: s.freeAimPosition.y },
+                      }
+                    : {
+                          type: "range_attack",
+                          attackerId: this.unit.getId(),
+                          targetId: s.aimTargetId,
+                          aimCell: s.aimCell,
+                          aimSide: s.aimSide,
+                      },
             ],
             targetId: s.targetId,
             shotFeatures: s.shotFeatures,
@@ -2094,7 +2453,9 @@ class CandidateGenerator {
             this.push(candidateOf(s));
         }
 
-        const moveShotCap = Math.min(2, Math.max(0, Math.floor(this.options.maxMoveShotComposites ?? 0)));
+        // Move-then-shot is not a legal turn (only melee may follow a move), so no composite is ever built; the requested
+        // cap is ignored. See maxMoveShotComposites.
+        const moveShotCap = 0;
         const moveShotDiscoveryRequested = this.options.discoverMoveShotTargetsAfterMove === true;
         // A missing origin is a direct/live library call. Only explicit hypothetical rollout contexts suppress
         // this terminal root escape hatch.
@@ -2176,7 +2537,8 @@ class CandidateGenerator {
                     if (isHidden(enemy) || this.unit.cannotAttackUnitId(enemy.getId())) continue;
                     for (const cell of enemy.getCells()) {
                         for (const side of RANGE_ATTACK_CELL_SIDES) {
-                            if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot)) continue;
+                            if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot, isAOE))
+                                continue;
                             const to = getRangeAttackSideCenter(gs, cell, side, origin);
                             const evaluation = attackHandler.evaluateRangeAttack(
                                 allUnits,
@@ -2229,6 +2591,7 @@ class CandidateGenerator {
                                     kill: 0,
                                     shotFeatures: this.shotFeatures(primaryHit, damage),
                                     hitUnitSignature,
+                                    lineSignature: lineSignatureOf(evaluation),
                                 },
                                 route,
                                 value: damage.value,
@@ -2248,6 +2611,9 @@ class CandidateGenerator {
                     (this.unit.hasStatusApplied("Cowardice") && postMoveCumulativeHp < shot.target.getCumulativeHp())
                 ) {
                     continue;
+                }
+                if (!shot.aimCell || shot.aimSide === undefined) {
+                    continue; // a free line has no edge to re-aim from a new origin
                 }
                 const to = getRangeAttackSideCenter(gs, shot.aimCell, shot.aimSide, origin);
                 const evaluation = attackHandler.evaluateRangeAttack(
@@ -2510,7 +2876,7 @@ class CandidateGenerator {
      *   ANY_ALLY (Heal/buffs/Resurrection)         -> per-ally canCastSpell
      *   ANY_ENEMY (debuffs)                        -> per-enemy canCastSpell
      *   ALLIES_AREA (Blacksmith Craft)             -> every useful in-grid 2x2 ally footprint
-     *   ENEMY_WITHIN_MOVEMENT_RANGE (Castling)     -> small enemies on getEnemiesCellsWithinMovementRange
+     *   ENEMY_WITHIN_MOVEMENT_RANGE (Castling)     -> same-footprint enemies on getEnemiesCellsWithinMovementRange
      *   ALL_ALLIES / ALL_ENEMIES / ALL_FLYING      -> single mass candidate via canMassCastSpell
      *   RANDOM_CLOSE_TO_CASTER summons             -> deterministic first empty adjacent cell
      * AUTO-targeted entries (system effects like Morale) are not player-castable and are skipped.
@@ -2531,7 +2897,7 @@ class CandidateGenerator {
             for (let y = 0; y < gridSize - 1; y += 1) {
                 const anchor = { x, y };
                 const cells = [anchor, { x: x + 1, y }, { x, y: y + 1 }, { x: x + 1, y: y + 1 }];
-                const affected = evaluateAffectedUnits(cells, unitsHolder, grid)?.[0] ?? [];
+                const affected = evaluateAffectedUnits(cells, unitsHolder, grid, false)?.[0] ?? [];
                 const recipientIds = affected
                     .filter((unit) => unit.getTeam() === team && !unit.isDead())
                     .map((unit) => unit.getId())
@@ -2549,7 +2915,7 @@ class CandidateGenerator {
         }
     }
     /**
-     * Smoke spell candidate selection. Smoke is a defensive tool: it halves ranged damage that crosses a 2x2
+     * Smoke spell candidate selection. Smoke is a defensive tool: it halves ranged damage that crosses a 3x3
      * cloud, so the AI wants it on the line of fire BETWEEN enemy ranged units and its own army. There is no
      * cast-range gate, so we search a bounded set of engine-legal cells sampled between each enemy shooter and
      * our army. Every sample is scored by the authoritative best legal shot before versus after the cloud:
@@ -2557,7 +2923,7 @@ class CandidateGenerator {
      *     AttackHandler, with the proposed cells passed as a pure hypothetical;
      *   - the shooter may retarget after Smoke, so a bypassable cloud receives no imaginary protection value;
      *   - enemy damage prevented adds value and friendly damage prevented subtracts it;
-     *   - all 4 footprint cells must pass the engine's exact smoke-placement oracle.
+     *   - all 9 footprint cells must pass the engine's exact smoke-placement oracle.
      * Determinism: ties broken by grid order (no RNG), so the lookahead is reproducible.
      */
     private addSmokeCastCandidates(spell: Spell): void {
@@ -2625,14 +2991,16 @@ class CandidateGenerator {
                     x: Math.round(ec.x + (ax - ec.x) * frac),
                     y: Math.round(ec.y + (ay - ec.y) * frac),
                 };
-                // The 2x2 expands +x/+y from the anchor; slide a little to fit if the anchor is at the edge.
-                for (const ox of [0, -1]) {
-                    for (const oy of [0, -1]) {
+                // The 3x3 is CENTRED on the anchor, so the sample itself is the natural placement; the
+                // neighbours are probed either way, because one blocked cell fails the whole all-or-nothing
+                // block and a cloud one cell over usually still covers the same lane.
+                for (const ox of [0, -1, 1]) {
+                    for (const oy of [0, -1, 1]) {
                         const c = { x: anchor.x + ox, y: anchor.y + oy };
                         const anchorKey = (c.x << 8) | (c.y & 0xff);
                         if (seenAnchors.has(anchorKey)) continue;
                         seenAnchors.add(anchorKey);
-                        const cells = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
+                        const cells = cellTargetedSpellBlockCells(spell.getName(), c);
                         if (!cells.every((cell) => isSmokeableCell(grid, isCellWithinGrid(gs, cell), cell))) {
                             continue;
                         }
@@ -2687,8 +3055,28 @@ class CandidateGenerator {
             samples: Array<{ cell: XY; frac: number }>;
         }> = [];
         let best: { cell: XY; orientation: number; score: number } | undefined;
-        const isLegalWall = (cell: XY, orientation: number): boolean =>
-            fireWallCells(cell, orientation).every((c) => isFireWallableCell(grid, isCellWithinGrid(gs, c), c));
+        // The engine lights whatever part of the line is free and refuses only a line that lights nothing
+        // (fireWallLitCells). A roadblock is worth its charge only when it has no GAP, though: a cell left
+        // unlit because a creature stands there is exactly where the enemy walks round. The board edge, the
+        // mountain and a narrowed-away cell are walls already, so a line cut short by one of those still
+        // seals the approach — which is why an edge-hugging wall is legal here and a wall through a body is
+        // not, whatever the engine would accept.
+        const units = this.context.unitsHolder.getAllUnits();
+        const isLegalWall = (cell: XY, orientation: number): boolean => {
+            let lit = 0;
+            for (const c of fireWallCells(cell, orientation)) {
+                const withinGrid = isCellWithinGrid(gs, c);
+                if (isFireWallableCell(grid, withinGrid, c)) {
+                    lit += 1;
+                    continue;
+                }
+                const occupant = withinGrid ? grid.getOccupantUnitId(c) : undefined;
+                if (occupant && units.has(occupant)) {
+                    return false;
+                }
+            }
+            return lit > 0;
+        };
         for (const e of blockable) {
             const ec = e.getBaseCell();
             const dx = ax - ec.x;
@@ -2735,9 +3123,9 @@ class CandidateGenerator {
             }
         }
 
-        // At a field edge every sampled centre can be invalid even though shifting the wall one cell sideways
-        // still blocks the same approach. Only pay for this bounded full-grid fallback when all exact samples
-        // failed. Score by proximity to the sampled approach cells; stable plan/x/y/orientation order resolves
+        // On a crowded approach every sampled anchor can be invalid (a body under the line) even though
+        // shifting the wall one cell sideways still blocks the same approach. Only pay for this bounded
+        // full-grid fallback when all exact samples failed. Score by proximity to the sampled approach cells; stable plan/x/y/orientation order resolves
         // ties deterministically.
         if (!best) {
             for (const { threat, orientations, samples } of plans) {
@@ -2786,9 +3174,9 @@ class CandidateGenerator {
             this.context.grid.getSettings(),
             target.isSmallSize() ? [target.getBaseCell()] : target.getCells(),
         );
-        const caught = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
-            (unit) => !unit.isDead() && unit.getId() !== this.unit.getId() && unit.getId() !== target.getId(),
-        );
+        const caught = (
+            evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? []
+        ).filter((unit) => !unit.isDead() && unit.getId() !== this.unit.getId() && unit.getId() !== target.getId());
         if (!caught.length) {
             return undefined;
         }
@@ -2796,6 +3184,40 @@ class CandidateGenerator {
         let value = 0;
         let kill: 0 | 1 = 0;
         for (const victim of caught) {
+            const damage = this.offensiveSpellDamage(spell, victim);
+            if (victim.getTeam() === this.enemyTeam) {
+                value += damage.value;
+                if (damage.kill) {
+                    kill = 1;
+                }
+            } else {
+                value -= damage.value;
+            }
+        }
+        return { value, kill };
+    }
+    /**
+     * Fireball's worth: the aim point PLUS everything the blast catches beside it, allies subtracted.
+     *
+     * Ring of Fire's valuation next door spares the target and refuses an empty ring, because a ring around
+     * a lone creature burns nobody. A fireball always has at least one victim — the one it is thrown at —
+     * so there is nothing to refuse, and the target's own damage is the floor of the score rather than an
+     * exclusion. Allies caught in the blast count AGAINST the throw for the same reason they do there: this
+     * spell does not care whose side a body is on.
+     */
+    private fireballDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
+        const cells = getCellsAroundFootprint(
+            this.context.grid.getSettings(),
+            target.isSmallSize() ? [target.getBaseCell()] : target.getCells(),
+        );
+        const splashed = (
+            evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? []
+        ).filter((unit) => !unit.isDead() && unit.getId() !== this.unit.getId() && unit.getId() !== target.getId());
+
+        const aimed = this.offensiveSpellDamage(spell, target);
+        let value = aimed.value;
+        let kill: 0 | 1 = aimed.kill ? 1 : 0;
+        for (const victim of splashed) {
             const damage = this.offensiveSpellDamage(spell, victim);
             if (victim.getTeam() === this.enemyTeam) {
                 value += damage.value;
@@ -2825,7 +3247,8 @@ class CandidateGenerator {
             (cell) => isCellWithinGrid(gs, cell),
             this.unit.getBaseCell(),
             target.getBaseCell(),
-            spell.getName() === "Fire Strike"
+            // The intercepted throws (Fire Strike, Fireball) arc over the caster's own troops, as in the engine.
+            isInterceptedThrownSpell(spell.getName())
                 ? (unitId) => allUnits.get(unitId)?.getTeam() === this.unit.getTeam()
                 : undefined,
             target.getCells(),
@@ -2879,7 +3302,7 @@ class CandidateGenerator {
                         if (cells.some((c) => !isCellWithinGrid(gs, c))) {
                             continue;
                         }
-                        const caught = evaluateAffectedUnits(cells, unitsHolder, grid)?.[0] ?? [];
+                        const caught = evaluateAffectedUnits(cells, unitsHolder, grid, false)?.[0] ?? [];
                         let value = 0;
                         let kill: 0 | 1 = 0;
                         for (const unit of caught) {
@@ -3042,6 +3465,14 @@ class CandidateGenerator {
                                 });
                                 continue;
                             }
+                            if (spell.getName() === "Fireball") {
+                                const damage = this.fireballDamage(spell, enemy);
+                                this.pushSpell(spell, enemy.getId(), undefined, {
+                                    expectedDamage: damage.value,
+                                    expectedKill: damage.kill,
+                                });
+                                continue;
+                            }
                             const damage = this.offensiveSpellDamage(spell, enemy);
                             this.pushSpell(spell, enemy.getId(), undefined, {
                                 expectedDamage: damage.value,
@@ -3079,11 +3510,9 @@ class CandidateGenerator {
             }
 
             if (targetType === SpellTargetType.ENEMY_WITHIN_MOVEMENT_RANGE) {
-                // Castling swaps two SMALL units. Predatory Assimilation can install the spell on a large
-                // Arachna Queen, but that inherited cast is not engine-legal and must never be enumerated.
-                if (!this.unit.isSmallSize()) {
-                    continue;
-                }
+                // Castling exchanges anchors, so it is legal only between two bodies of the same footprint —
+                // a 1x1 with a 1x1, and the 2x2 Arachna Queen that stole the spell through Predatory
+                // Assimilation with another 2x2.
                 // The legality list is computed once per decision; the engine must see the same list through
                 // its own context callback (see getEnemiesCellsWithinMovementRange docs).
                 castlingCells ??= getEnemiesCellsWithinMovementRange(this.unit, this.context);
@@ -3091,7 +3520,7 @@ class CandidateGenerator {
                     continue;
                 }
                 for (const enemy of this.enemies) {
-                    if (isHidden(enemy) || !enemy.isSmallSize()) {
+                    if (isHidden(enemy) || !hasSwappableFootprint(this.unit, enemy)) {
                         continue;
                     }
                     const bc = enemy.getBaseCell();

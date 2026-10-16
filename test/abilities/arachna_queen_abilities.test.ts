@@ -6,9 +6,14 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-import { processPredatoryAssimilationAbility } from "../../src/abilities/predatory_assimilation_ability";
+import { processPoisonAuraAbility } from "../../src/abilities/poison_aura_ability";
+import {
+    PREDATORY_ASSIMILATION_POISON_PERCENT,
+    processPredatoryAssimilationAbility,
+    processPredatoryAssimilationPoison,
+} from "../../src/abilities/predatory_assimilation_ability";
 import { AbilityFactory } from "../../src/abilities/ability_factory";
-import { getCreatureConfig } from "../../src/configuration/config_provider";
+import { getAbilityConfig, getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameEvent } from "../../src/engine/events";
@@ -21,7 +26,13 @@ import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Unit } from "../../src/units/unit";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import type { XY } from "../../src/utils/math";
-import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
+import {
+    createCombatTestContext,
+    createTestUnit,
+    createVisibleDamage,
+    placeUnit,
+    testGridSettings,
+} from "../helpers/combat";
 
 beforeEach(() => FightStateManager.getInstance().reset());
 afterEach(() => setDeterministicRandomSource(undefined));
@@ -396,26 +407,26 @@ describe("Predatory Assimilation", () => {
         // part, but its Arrows Wingshield is a board-wide blessing now and owns no aura slot to restore.
         const carrier = createTestUnit({
             name: "Elf",
-            abilities: ["Resurrection", "Rallying Volley Aura"],
-            auraEffects: ["Rallying Volley"],
+            abilities: ["Resurrection", "Guiding Winds Aura"],
+            auraEffects: ["Guiding Winds"],
             auraRanges: [0, 2],
             auraIsBuff: [true, true],
             spells: [":Resurrection"],
         });
 
-        expect(carrier.disableAbilityAsStolen("Rallying Volley Aura")).toBeDefined();
-        expect(carrier.getAllProperties().abilities).toEqual(["Resurrection", "Rallying Volley Aura"]);
+        expect(carrier.disableAbilityAsStolen("Guiding Winds Aura")).toBeDefined();
+        expect(carrier.getAllProperties().abilities).toEqual(["Resurrection", "Guiding Winds Aura"]);
         expect(carrier.getAllProperties().aura_ranges).toEqual([0, 0]);
         expect(carrier.getAuraEffects()).toHaveLength(0);
 
-        carrier.grantAbility("Rallying Volley Aura");
-        expect(carrier.hasAbilityActive("Rallying Volley Aura")).toBe(false);
+        carrier.grantAbility("Guiding Winds Aura");
+        expect(carrier.hasAbilityActive("Guiding Winds Aura")).toBe(false);
         expect(carrier.getAllProperties().aura_ranges).toEqual([0, 0]);
 
-        carrier.grantStolenAbility("Rallying Volley Aura");
-        expect(carrier.hasAbilityActive("Rallying Volley Aura")).toBe(true);
+        carrier.grantStolenAbility("Guiding Winds Aura");
+        expect(carrier.hasAbilityActive("Guiding Winds Aura")).toBe(true);
         expect(carrier.getAllProperties().aura_ranges).toEqual([0, 2]);
-        expect(carrier.getAuraEffects().map((aura) => aura.getName())).toEqual(["Rallying Volley"]);
+        expect(carrier.getAuraEffects().map((aura) => aura.getName())).toEqual(["Guiding Winds"]);
     });
 });
 
@@ -659,5 +670,292 @@ describe("Stolen Endless Quiver", () => {
         expect(melee.getPossibleAttackTypes()).toEqual([PBTypes.AttackVals.MELEE]);
         expect(melee.selectAttackType(PBTypes.AttackVals.RANGE)).toBe(false);
         expect(melee.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
+    });
+});
+
+describe("Predatory Assimilation poison", () => {
+    const queen = (luck = 0) =>
+        createTestUnit({
+            name: "Arachna Queen",
+            team: PBTypes.TeamVals.LEFT,
+            abilities: ["Predatory Assimilation"],
+            luck,
+        });
+    const enemy = () => createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, maxHp: 2000 });
+    const log = () => new SceneLogMock();
+
+    it("is a fixed 25% of the damage, five points over Venom Cloud, and the card states that number once", () => {
+        const card = getAbilityConfig("Predatory Assimilation").desc.join(" ");
+        expect(PREDATORY_ASSIMILATION_POISON_PERCENT).toBe(25);
+        expect(PREDATORY_ASSIMILATION_POISON_PERCENT).toBeGreaterThan(getAbilityConfig("Venom Cloud Aura").power);
+        expect(card).toContain("25% of the damage dealt");
+        // The only {} is the steal chance. A second one would be filled with that chance, not the poison.
+        expect(card.match(/\{\}/g)).toHaveLength(1);
+
+        const target = enemy();
+        processPredatoryAssimilationPoison(queen(), target, 100, log());
+        expect(target.getEffect("Poison")?.getPower()).toBe(25);
+        expect(target.getEffect("Poison")?.getStacks()).toBe(1);
+    });
+
+    it("adds the attacker's luck and applies nothing when that share rounds to zero", () => {
+        const lucky = enemy();
+        processPredatoryAssimilationPoison(queen(10), lucky, 100, log());
+        expect(lucky.getEffect("Poison")?.getPower()).toBe(35);
+
+        const unlucky = enemy();
+        processPredatoryAssimilationPoison(queen(-10), unlucky, 100, log());
+        expect(unlucky.getEffect("Poison")?.getPower()).toBe(15);
+
+        // Luck stops at -10, so 25 + luck never reaches 0. A hit whose share floors to 0 still applies nothing.
+        const none = enemy();
+        processPredatoryAssimilationPoison(queen(), none, 3, log());
+        expect(none.getEffect("Poison")).toBeUndefined();
+        processPredatoryAssimilationPoison(queen(), none, 0, log());
+        expect(none.getEffect("Poison")).toBeUndefined();
+    });
+
+    it("does not poison without the active ability, under Break, or against a Mechanism", () => {
+        const plain = createTestUnit({ name: "Plain", team: PBTypes.TeamVals.LEFT });
+        const target = enemy();
+        processPredatoryAssimilationPoison(plain, target, 100, log());
+        expect(target.getEffect("Poison")).toBeUndefined();
+
+        const broken = queen();
+        broken.applyEffect(new EffectFactory().makeEffect("Break")!);
+        processPredatoryAssimilationPoison(broken, target, 100, log());
+        expect(target.getEffect("Poison")).toBeUndefined();
+
+        const cannon = createTestUnit({
+            name: "Tsar Cannon",
+            team: PBTypes.TeamVals.RIGHT,
+            abilities: ["Mechanism"],
+            maxHp: 2000,
+        });
+        processPredatoryAssimilationPoison(queen(), cannon, 100, log());
+        expect(cannon.getEffect("Poison")).toBeUndefined();
+    });
+
+    it("stacks with Venom Cloud in either order, and does not spread to a neighbour", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const wyvern = createTestUnit({
+            name: "Wyvern",
+            team: PBTypes.TeamVals.LEFT,
+            abilities: ["Venom Cloud Aura"],
+            auraEffects: ["Venom Cloud"],
+            auraRanges: [2],
+            auraIsBuff: [true],
+        });
+        const attacker = queen();
+        const neighbour = createTestUnit({ name: "Neighbour", team: PBTypes.TeamVals.LEFT });
+        const cloudFirst = enemy();
+        const queenFirst = enemy();
+        placeUnit(grid, unitsHolder, wyvern, { x: 3, y: 3 });
+        placeUnit(grid, unitsHolder, attacker, { x: 4, y: 3 });
+        // Three cells from the Wyvern, so this is outside Venom Cloud. The Queen projects no aura of her own.
+        placeUnit(grid, unitsHolder, neighbour, { x: 8, y: 8 });
+        unitsHolder.refreshAuraEffectsForAllUnits();
+        expect(attacker.getBuff("Venom Cloud Aura")?.getPower()).toBe(20);
+        expect(neighbour.getBuff("Venom Cloud Aura")).toBeUndefined();
+
+        // Venom 20 then Queen 25: max(25, 20 + round(25 * 0.5)) = 33.
+        processPoisonAuraAbility(attacker, cloudFirst, 100, log());
+        processPredatoryAssimilationPoison(attacker, cloudFirst, 100, log());
+        expect(cloudFirst.getEffect("Poison")?.getPower()).toBe(33);
+        expect(cloudFirst.getEffect("Poison")?.getStacks()).toBe(2);
+
+        // Queen 25 then Venom 20: max(20, 25 + round(20 * 0.5)) = 35.
+        processPredatoryAssimilationPoison(attacker, queenFirst, 100, log());
+        processPoisonAuraAbility(attacker, queenFirst, 100, log());
+        expect(queenFirst.getEffect("Poison")?.getPower()).toBe(35);
+        expect(queenFirst.getEffect("Poison")?.getStacks()).toBe(2);
+
+        const bystander = enemy();
+        processPredatoryAssimilationPoison(neighbour, bystander, 100, log());
+        processPoisonAuraAbility(neighbour, bystander, 100, log());
+        expect(bystander.getEffect("Poison")).toBeUndefined();
+    });
+
+    const strike = (attackerAbilities: string[]) => {
+        setDeterministicRandomSource(() => 0);
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+        const attacker = createTestUnit({
+            name: "Arachna Queen",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.MELEE,
+            attack: 10,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 3,
+            abilities: attackerAbilities,
+        });
+        const victim = createTestUnit({
+            name: "Victim",
+            team: PBTypes.TeamVals.RIGHT,
+            attackType: PBTypes.AttackVals.MELEE,
+            maxHp: 400,
+            armor: 30,
+            amountAlive: 5,
+        });
+        placeUnit(grid, unitsHolder, victim, { x: 4, y: 3 });
+        placeUnit(grid, unitsHolder, attacker, { x: 5, y: 3 });
+        const result = attackHandler.handleMeleeAttack(
+            unitsHolder,
+            moveHandler,
+            createVisibleDamage(victim),
+            undefined,
+            attacker,
+            victim,
+            { x: 5, y: 3 },
+        );
+        return { result, victim };
+    };
+
+    it("poisons the unit a melee attack lands on, and a second punch does not add another stack", () => {
+        const once = strike(["Predatory Assimilation"]);
+        expect(once.result.completed).toBe(true);
+        expect(once.victim.getEffect("Poison")?.getStacks()).toBe(1);
+        expect(once.victim.getEffect("Poison")?.getPower()).toBeGreaterThan(0);
+
+        const twice = strike(["Predatory Assimilation", "Double Punch"]);
+        expect(twice.result.completed).toBe(true);
+        expect(twice.victim.getHp()).toBeLessThan(once.victim.getHp());
+        expect(twice.victim.getEffect("Poison")?.getStacks()).toBe(1);
+    });
+
+    it("poisons the attacker a retaliation lands on", () => {
+        setDeterministicRandomSource(() => 0);
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+        const aggressor = createTestUnit({
+            name: "Aggressor",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.MELEE,
+            attack: 10,
+            damageMin: 10,
+            damageMax: 10,
+            maxHp: 400,
+            armor: 30,
+            amountAlive: 5,
+        });
+        const defender = createTestUnit({
+            name: "Arachna Queen",
+            team: PBTypes.TeamVals.RIGHT,
+            attackType: PBTypes.AttackVals.MELEE,
+            attack: 10,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 3,
+            abilities: ["Predatory Assimilation"],
+        });
+        placeUnit(grid, unitsHolder, defender, { x: 4, y: 3 });
+        placeUnit(grid, unitsHolder, aggressor, { x: 5, y: 3 });
+        const result = attackHandler.handleMeleeAttack(
+            unitsHolder,
+            moveHandler,
+            createVisibleDamage(defender),
+            undefined,
+            aggressor,
+            defender,
+            { x: 5, y: 3 },
+        );
+        expect(result.completed).toBe(true);
+        expect(aggressor.getEffect("Poison")?.getPower()).toBeGreaterThan(0);
+        expect(defender.getEffect("Poison")).toBeUndefined();
+    });
+
+    it("poisons a shot but not the second shot", () => {
+        const shoot = (abilities: string[]) => {
+            setDeterministicRandomSource(() => 0);
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const shooter = createTestUnit({
+                name: "Arachna Queen",
+                team: PBTypes.TeamVals.LEFT,
+                attackType: PBTypes.AttackVals.RANGE,
+                attack: 10,
+                damageMin: 10,
+                damageMax: 10,
+                rangeShots: 5,
+                amountAlive: 3,
+                abilities,
+            });
+            const target = createTestUnit({
+                name: "Target",
+                team: PBTypes.TeamVals.RIGHT,
+                attackType: PBTypes.AttackVals.MELEE,
+                maxHp: 4000,
+                armor: 0,
+                amountAlive: 10,
+            });
+            placeUnit(grid, unitsHolder, shooter, { x: 3, y: 3 });
+            placeUnit(grid, unitsHolder, target, { x: 9, y: 9 });
+            const result = attackHandler.handleRangeAttack(
+                unitsHolder,
+                [1],
+                1,
+                createVisibleDamage(target),
+                shooter,
+                [[target]],
+                [shooter],
+                target.getPosition(),
+            );
+            return { result, target };
+        };
+
+        const once = shoot(["Predatory Assimilation"]);
+        expect(once.result.completed).toBe(true);
+        expect(once.target.getEffect("Poison")?.getStacks()).toBe(1);
+
+        const twice = shoot(["Predatory Assimilation", "Double Shot"]);
+        expect(twice.result.completed).toBe(true);
+        expect(twice.target.getHp()).toBeLessThan(once.target.getHp());
+        expect(twice.target.getEffect("Poison")?.getStacks()).toBe(1);
+    });
+
+    it("poisons the shooter a counter-shot lands on", () => {
+        setDeterministicRandomSource(() => 0);
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const queenShooter = createTestUnit({
+            name: "Arachna Queen",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.RANGE,
+            attack: 10,
+            armor: 30,
+            damageMin: 10,
+            damageMax: 10,
+            rangeShots: 5,
+            amountAlive: 3,
+            abilities: ["Predatory Assimilation"],
+        });
+        const shooter = createTestUnit({
+            name: "Enemy Shooter",
+            team: PBTypes.TeamVals.RIGHT,
+            attackType: PBTypes.AttackVals.RANGE,
+            attack: 10,
+            armor: 30,
+            damageMin: 10,
+            damageMax: 10,
+            rangeShots: 5,
+            maxHp: 400,
+            amountAlive: 3,
+        });
+        placeUnit(grid, unitsHolder, queenShooter, { x: 4, y: 3 });
+        placeUnit(grid, unitsHolder, shooter, { x: 9, y: 9 });
+
+        const result = attackHandler.handleRangeAttack(
+            unitsHolder,
+            [1],
+            1,
+            createVisibleDamage(queenShooter),
+            shooter,
+            [[queenShooter]],
+            [shooter],
+            queenShooter.getPosition(),
+        );
+
+        expect(result.completed).toBe(true);
+        expect(shooter.getEffect("Poison")?.getPower()).toBeGreaterThan(0);
+        expect(queenShooter.getEffect("Poison")).toBeUndefined();
     });
 });

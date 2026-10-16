@@ -23,9 +23,15 @@ import type { IVisibleDamage } from "../scene/animations";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 import { getDoubleShotAbility, withDualStrikeCharm } from "./ability_helper";
-import { processRangeAOEAbility } from "./aoe_range_ability";
+import { type IAOERangeAttackResult, processRangeAOEAbility } from "./aoe_range_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
+import {
+    CHAKRAM_ABILITY_NAME,
+    recordChakramFlight,
+    resolveChakramFlightMisses,
+    resolveChakramTrajectory,
+} from "./chakram_ability";
 
 export interface IDoubleShotResult {
     applied: boolean;
@@ -39,6 +45,8 @@ export interface IDoubleShotResult {
     animationData: IAnimationData[];
     moraleIncrease: number;
     moraleDecreaseForTheUnitTeam: Record<string, number>;
+    /** What an area second volley did to each unit it caught (empty for a single-target second shot). */
+    perUnitDamage: IAOERangeAttackResult["perUnitDamage"];
 }
 
 export function processDoubleShotAbility(
@@ -53,12 +61,15 @@ export function processDoubleShotAbility(
     damageForAnimation: IVisibleDamage,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     isAOE: boolean,
+    // Legacy area-wave factors. A second Chakram resolves its own current-board victims and factors below.
+    perUnitDamageFactors?: Readonly<Record<string, number>>,
 ): IDoubleShotResult {
     const animationData: IAnimationData[] = [];
     // Crafted Double Shot (granted by the Blacksmith's Craft) and Gargantuan's Double Throw run this exact
     // path; what separates them is the ability's own stack_powered flag, which calculateAbilityMultiplier
     // reads below — the throw is stack-independent, so both boulders land full damage plus luck.
     const doubleShotAbility = getDoubleShotAbility(fromUnit);
+    const hasChakram = !!fromUnit.getAbility(CHAKRAM_ABILITY_NAME);
     const unitIdsDied: string[] = [];
 
     let damageFromAttack = 0;
@@ -69,7 +80,10 @@ export function processDoubleShotAbility(
 
     if (
         !doubleShotAbility ||
-        (!isAOE &&
+        // The initiating volley may have used the last arrow (or Dense Flesh's entire surcharge).
+        // No second disc actually leaves the hand when the quiver cannot fund another volley.
+        (hasChakram && fromUnit.getRangeShots() <= 0) ||
+        ((!isAOE || hasChakram) &&
             (fromUnit.isDead() ||
                 toUnit.isDead() ||
                 fromUnit.isSkippingThisTurn() ||
@@ -85,6 +99,7 @@ export function processDoubleShotAbility(
             animationData,
             moraleIncrease,
             moraleDecreaseForTheUnitTeam,
+            perUnitDamage: [],
         };
     }
 
@@ -105,7 +120,22 @@ export function processDoubleShotAbility(
             toUnit,
             FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(toUnit.getTeam()),
         );
-    if (isSecondAttackMissed) {
+    const chakramFlight = hasChakram
+        ? resolveChakramFlightMisses(
+              resolveChakramTrajectory(fromUnit, toUnit, unitsHolder, grid),
+              toUnit,
+              isSecondAttackMissed,
+              (victim) =>
+                  HoCLib.getRandomInt(0, 100) <
+                  fromUnit.calculateMissChance(
+                      victim,
+                      FightStateManager.getInstance()
+                          .getFightProperties()
+                          .getAdditionalAbilityPowerPerTeam(victim.getTeam()),
+                  ),
+          )
+        : undefined;
+    if (isSecondAttackMissed && !chakramFlight) {
         sceneLog.updateLog(`${fromUnit.getName()} misses 🏹 on ${toUnit.getName()}`);
         return {
             applied: false,
@@ -117,11 +147,36 @@ export function processDoubleShotAbility(
             animationData,
             moraleIncrease,
             moraleDecreaseForTheUnitTeam,
+            perUnitDamage: [],
         };
+    }
+    // Dual Strike Charm amplifies the area second volley (Gargantuan's Double Throw, a Crafted Double Shot on
+    // an area shooter) on every unit it catches, as it does a single second arrow.
+    const charmFactor = withDualStrikeCharm(1, fromUnit);
+    const secondAffectedUnits = chakramFlight ? [toUnit, ...chakramFlight.trajectory.hitUnits] : affectedUnits;
+    // A crafted extra disc is priced by its own live stack tier. The AOE tail already applies the
+    // Chakram multiplier and Paralysis; this factor adds only the bonus ability and its charm.
+    const bonusMultiplier = chakramFlight
+        ? fromUnit.calculateAbilityMultiplier(
+              doubleShotAbility,
+              FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
+          )
+        : 1;
+    const secondVolleyFactors: Record<string, number> = {};
+    for (const unit of secondAffectedUnits) {
+        const factor =
+            (chakramFlight
+                ? (chakramFlight.trajectory.damageFactorByUnitId[unit.getId()] ?? 1)
+                : (perUnitDamageFactors?.[unit.getId()] ?? 1)) *
+            bonusMultiplier *
+            charmFactor;
+        if (factor !== 1) {
+            secondVolleyFactors[unit.getId()] = factor;
+        }
     }
     let aoeRangeAttackResult = processRangeAOEAbility(
         fromUnit,
-        affectedUnits,
+        secondAffectedUnits,
         fromUnit,
         hoverRangeAttackDivisor,
         unitsHolder,
@@ -130,7 +185,25 @@ export function processDoubleShotAbility(
         damageStatisticHolder,
         true,
         (damageForAnimation.secondary ??= []),
+        Object.keys(secondVolleyFactors).length ? secondVolleyFactors : undefined,
+        chakramFlight?.missByUnitId,
+        damageForAnimation,
+        1,
     );
+    if (chakramFlight) {
+        recordChakramFlight(
+            damageForAnimation,
+            {
+                attackerId: fromUnit.getId(),
+                primaryTargetId: toUnit.getId(),
+                response: false,
+                hitIndex: 1,
+                missed: isSecondAttackMissed,
+            },
+            chakramFlight.trajectory,
+            aoeRangeAttackResult.perUnitDamage,
+        );
+    }
     if (aoeRangeAttackResult.landed) {
         damageFromAttack = processLuckyStrikeAbility(fromUnit, aoeRangeAttackResult.maxDamage, sceneLog);
         for (const uId of aoeRangeAttackResult.unitIdsDied) {
@@ -230,7 +303,7 @@ export function processDoubleShotAbility(
     }
 
     return {
-        applied: true,
+        applied: !isSecondAttackMissed,
         aoeRangeAttackLanded: aoeRangeAttackResult.landed,
         damage: damageFromAttack,
         petrifyingGazeDamage,
@@ -239,5 +312,6 @@ export function processDoubleShotAbility(
         animationData,
         moraleIncrease,
         moraleDecreaseForTheUnitTeam,
+        perUnitDamage: aoeRangeAttackResult.landed ? aoeRangeAttackResult.perUnitDamage : [],
     };
 }

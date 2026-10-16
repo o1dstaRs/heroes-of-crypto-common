@@ -15,6 +15,7 @@ import { ArmorAugment, MightAugment, MovementAugment, SniperAugment } from "../.
 import {
     ArtifactTier,
     formatArtifactDescription,
+    getTier1ArtifactProperties,
     getTier2ArtifactProperties,
     Tier1Artifact,
     Tier2Artifact,
@@ -351,20 +352,25 @@ describe("UnitsHolder", () => {
         ranged.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
 
         expect(melee.hasBuffActive("Tome of Amplification")).toBe(true);
+        expect(melee.getBuff("Tome of Amplification")?.getPower()).toBe(35);
         expect(melee.getBaseArmor()).toBeCloseTo(10.6);
         expect(melee.getBaseAttack()).toBeCloseTo(11.5);
         expect(melee.getSteps()).toBe(4);
         expect(ranged.getBaseArmor()).toBeCloseTo(10.6);
-        // Sniper L1 attack rose 7% -> 8%, reaching parity with Might L1 — the ranged and melee
-        // augmented attacks now match exactly.
-        expect(ranged.getBaseAttack()).toBeCloseTo(11.5);
+        expect(ranged.getBaseAttack()).toBeCloseTo(11.8);
         expect(ranged.getUnitProperties().shot_distance).toBeCloseTo(19.2);
         expect(ranged.getSteps()).toBe(4);
     });
 
     it("describes Tome as affecting only allied unit-cast buffs", () => {
+        const description =
+            "Increases the power of non-healing castable buffs allied units apply to allies by 35%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.";
+        expect(formatArtifactDescription(getTier1ArtifactProperties(Tier1Artifact.TOME_OF_AMPLIFICATION))).toBe(
+            description,
+        );
+        // A saved Tier-2 pick still names the same artifact, at the current power.
         expect(formatArtifactDescription(getTier2ArtifactProperties(Tier2Artifact.TOME_OF_AMPLIFICATION))).toBe(
-            "Increases the power of non-healing castable buffs allied units apply to allies by 50%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.",
+            description,
         );
     });
 
@@ -417,6 +423,7 @@ describe("UnitsHolder", () => {
             team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
+            shotDistance: 4,
         });
         const melee = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         const fightProperties = FightStateManager.getInstance().getFightProperties();
@@ -431,8 +438,13 @@ describe("UnitsHolder", () => {
         // Swift Boots grants movement to melee units only.
         expect(melee.hasBuffActive("Swift Boots")).toBe(true);
         expect(ranged.hasBuffActive("Swift Boots")).toBe(false);
-        // Farsight Quiver is applied to every unit as a marker (read at range-attack time).
+        // Farsight Quiver is a marker read at range-attack time. It does not extend shot distance.
         expect(ranged.hasBuffActive("Farsight Quiver")).toBe(true);
+        ranged.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+        expect(ranged.getRangeShotDistance()).toBe(4);
+        expect(formatArtifactDescription(getTier2ArtifactProperties(Tier2Artifact.FARSIGHT_QUIVER))).toBe(
+            "Allied archers ignore the range penalty and always deal full damage (1/1). A shot through Smoke is still halved (1/2).",
+        );
     });
 
     it("clears artifact buffs when the selection is reset", () => {

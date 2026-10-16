@@ -9,7 +9,7 @@ import {
     type V08A19F184LowerHumanOpeningId,
     type V08A19F184LowerHumanPlacementFallbackReason,
 } from "../../src/ai/versions/v0_8_a19_f184_lower_human_placement";
-import { createV08A19H18F184LowerHumanRankedFallbackStrategy } from "../../src/ai/versions/v0_8_a19_h18_f184_lower_human_placement_profile";
+import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { V08A19RankedPlacementStrategy } from "../../src/ai/versions/v0_8_a19_ranked_placement";
 import { layoutRevealPlacement } from "../../src/ai/versions/v0_7_placement_reveal";
 import type { GameAction } from "../../src/engine/actions";
@@ -240,7 +240,9 @@ describe("v0.8 A19 exact f184 LEFT-only human-opening placement policy", () => {
 
     test("keeps the exact f184 opening above a generic ranked-placement correction", () => {
         const fixture = scenario(RIGHT_ROSTER, LEFT_IDS);
-        const strategy = createV08A19H18F184LowerHumanRankedFallbackStrategy();
+        const strategy = new V08A19F184LowerHumanPlacementStrategy(
+            new V08A19RankedPlacementStrategy(new StrategyV0_8()),
+        );
         const generic = (strategy as unknown as { base: V08A19RankedPlacementStrategy }).base;
         const selected = strategy.placeArmy(fixture.units, fixture.context);
 
@@ -264,7 +266,9 @@ describe("v0.8 A19 exact f184 LEFT-only human-opening placement policy", () => {
 
     test("uses the generic correction when a LEFT public roster does not match f184", () => {
         const fixture = scenario(RIGHT_ROSTER, [PBTypes.CreatureVals.BLACK_DRAGON, PBTypes.CreatureVals.GRIFFIN]);
-        const strategy = createV08A19H18F184LowerHumanRankedFallbackStrategy();
+        const strategy = new V08A19F184LowerHumanPlacementStrategy(
+            new V08A19RankedPlacementStrategy(new StrategyV0_8()),
+        );
         const generic = (strategy as unknown as { base: V08A19RankedPlacementStrategy }).base;
         const selected = strategy.placeArmy(fixture.units, fixture.context);
         const valkyrie = fixture.units.find((unit) => unit.getName() === "Valkyrie")!;

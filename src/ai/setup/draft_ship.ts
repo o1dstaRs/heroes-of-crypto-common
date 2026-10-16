@@ -27,10 +27,28 @@ import {
 import {
     DRAFT_FEATURE_DIM,
     applyCreatureRoleFitMultiplier,
+    creatureInfo,
     creatureRoleFitMultiplier,
     eligibleBacklineProtectorChoices,
 } from "./creature_score";
-import { pickCoherentDraftCreature } from "./draft_coherence";
+import { pickCoherentDraftBundle, pickCoherentDraftCreature, type DraftBundle } from "./draft_coherence";
+import {
+    tier1ArtifactFitScore,
+    tier1ArtifactFitScoreV2,
+    tier1ArtifactFitScoreV3,
+    tier1ArtifactFitScoreV4,
+    type ArtifactFitVersion,
+} from "./artifact_fit";
+import {
+    applyRankedDraftRangedFloor,
+    isRankedDraftStrengthPolicy,
+    RANKED_DRAFT_RELAXED_FACTION_TAX_FREE_STACKS,
+    rankedDraftStrengthRelaxesFactionTax,
+    rankedDraftUsesCorrectedTier1Table,
+    type RankedDraftStrengthPolicyId,
+} from "./draft_strength_prior";
+import { TIER1_ARTIFACT_WINRATE, TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED } from "./setup_strategy";
+import type { RankedDraftSynergyVariants } from "./draft_synergy_variants";
 import {
     isRankedDraftInteractionPrior,
     RANKED_DRAFT_INTERACTION_PRIOR_ID,
@@ -115,6 +133,7 @@ const genomeFromParsedJson = (parsed: unknown, id: string, options: ILeagueGenom
             draftInteractionPrior?: unknown;
             draftVarietyPolicy?: unknown;
             draftSpellRangedPolicy?: unknown;
+            draftStrengthPolicy?: unknown;
             weights?: unknown;
         };
         if (value.schemaVersion !== undefined && value.schemaVersion !== LEAGUE_SCHEMA_VERSION) {
@@ -138,6 +157,9 @@ const genomeFromParsedJson = (parsed: unknown, id: string, options: ILeagueGenom
         ) {
             throw new TypeError(`Unsupported ranked spell-ranged draft policy ${String(value.draftSpellRangedPolicy)}`);
         }
+        if (value.draftStrengthPolicy !== undefined && !isRankedDraftStrengthPolicy(value.draftStrengthPolicy)) {
+            throw new TypeError(`Unsupported ranked draft strength policy ${String(value.draftStrengthPolicy)}`);
+        }
         if (Array.isArray(value.weights)) {
             return genomeFromParsedJson(value.weights, typeof value.id === "string" ? value.id : id, {
                 ...options,
@@ -148,6 +170,9 @@ const genomeFromParsedJson = (parsed: unknown, id: string, options: ILeagueGenom
                     ? { draftVarietyPolicy: value.draftVarietyPolicy as RankedDraftVarietyPolicyId }
                     : {}),
                 ...(value.draftSpellRangedPolicy ? { draftSpellRangedPolicy: value.draftSpellRangedPolicy } : {}),
+                ...(value.draftStrengthPolicy
+                    ? { draftStrengthPolicy: value.draftStrengthPolicy as RankedDraftStrengthPolicyId }
+                    : {}),
             });
         }
     }
@@ -164,6 +189,7 @@ const genomeFromParsedJson = (parsed: unknown, id: string, options: ILeagueGenom
  * - "v07-nonfight-draft-48d23ac4461": the fresh overnight non-fight candidate;
  * - "ranked-interactions-a19-ranked-draft-10008-v1": incumbent plus a confidence-gated live-ranked prior;
  * - "ranked-versatile-a19-v1": co-play/counters plus score-bounded public-context variety;
+ * - "ranked-unit-strength-a19-side-v1-w<N>": the versatile draft plus battle-fitted unit strength at weight N;
  * - inline JSON array of 11 legacy or 15 full intrinsic weights (embedded into the anchor genome);
  * - inline JSON array of 95 league-genome weights, or an object with { id?, weights } of any accepted length;
  * - anything else: path to a JSON file containing one of the above (a league champion artifact).
@@ -213,6 +239,18 @@ export function parseDraftGenome(
             RANKED_VERSATILE_DRAFT_SPEC,
         );
     }
+    if (isRankedDraftStrengthPolicy(trimmed)) {
+        return genomeFromParsedJson(
+            {
+                ...leagueRound1CandidateGenome,
+                id: trimmed,
+                draftInteractionPrior: RANKED_DRAFT_INTERACTION_PRIOR_ID,
+                draftVarietyPolicy: RANKED_DRAFT_VARIETY_POLICY_ID,
+                draftStrengthPolicy: trimmed,
+            },
+            trimmed,
+        );
+    }
     const raw =
         trimmed.startsWith("[") || trimmed.startsWith("{") ? trimmed : readFileSync(resolve(cwd, trimmed), "utf8");
     return genomeFromParsedJson(JSON.parse(raw) as unknown, id);
@@ -228,6 +266,7 @@ export function projectDraftGenomeForShipping(genome: ILeagueGenome): ILeagueGen
         ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
         ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
         ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
+        ...(genome.draftStrengthPolicy ? { draftStrengthPolicy: genome.draftStrengthPolicy } : {}),
     });
     if (validated.omniscientDraft) {
         throw new TypeError("A deployable draft genome cannot use omniscientDraft");
@@ -239,6 +278,7 @@ export function projectDraftGenomeForShipping(genome: ILeagueGenome): ILeagueGen
         ...(validated.draftInteractionPrior ? { draftInteractionPrior: validated.draftInteractionPrior } : {}),
         ...(validated.draftVarietyPolicy ? { draftVarietyPolicy: validated.draftVarietyPolicy } : {}),
         ...(validated.draftSpellRangedPolicy ? { draftSpellRangedPolicy: validated.draftSpellRangedPolicy } : {}),
+        ...(validated.draftStrengthPolicy ? { draftStrengthPolicy: validated.draftStrengthPolicy } : {}),
     });
 }
 
@@ -261,6 +301,7 @@ export function pickDraftGenomeCreature(
     ownCreatureIds: readonly number[],
     knownOpponentCreatureIds: readonly number[],
     tier1ArtifactId?: number,
+    revealedGridType?: number,
 ): number | undefined {
     const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
     return pickCoherentDraftCreature(
@@ -274,9 +315,132 @@ export function pickDraftGenomeCreature(
             ownCreatureIds,
             tier1ArtifactId,
             knownOpponentCreatureIds,
+            ...(revealedGridType === undefined ? {} : { revealedGridType }),
             ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
             ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
             ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
+            ...(genome.draftStrengthPolicy ? { draftStrengthPolicy: genome.draftStrengthPolicy } : {}),
+        },
+    );
+}
+
+/**
+ * Faction-diversity tax, per already-drafted same-faction stack, in the offer's own base-score scale. The ranked
+ * counter-draft interaction prior sums anti-opponent lift across every revealed enemy with no own-roster
+ * diversity term, so against a ubiquitous opponent every level's argmax used to be dragged onto the same counter
+ * faction until the army was mono-faction. The tax grows with same-faction stacks already on the roster, so a
+ * strong counter still wins the first pick or two while a runaway monoculture is stopped.
+ *
+ * It lived only in the server's draft_policy.ts, which left every simulated "live" draft one rule short of the
+ * bot. Both now share this definition.
+ */
+export const RANKED_FACTION_DIVERSITY_PENALTY = 0.16;
+export const RANKED_FACTION_DIVERSITY_MAX_STACKS = 3;
+/** A single same-faction pairing is legitimate coherence (e.g. an ELF ward for an anti-flyer Arachna Queen). */
+export const RANKED_FACTION_DIVERSITY_FREE_STACKS = 1;
+
+/** Tax units a pick pays: same-faction stacks already drafted, less the free ones, capped. */
+export function rankedFactionDiversityTaxUnits(
+    creatureId: number,
+    ownCreatureIds: readonly number[],
+    freeStacks: number = RANKED_FACTION_DIVERSITY_FREE_STACKS,
+): number {
+    const faction = creatureInfo(creatureId)?.faction ?? 0;
+    if (!faction) {
+        return 0;
+    }
+    const sameFaction = ownCreatureIds.reduce(
+        (count, ownCreatureId) => count + (creatureInfo(ownCreatureId)?.faction === faction ? 1 : 0),
+        0,
+    );
+    return Math.min(RANKED_FACTION_DIVERSITY_MAX_STACKS, Math.max(0, sameFaction - freeStacks));
+}
+
+/**
+ * The live ranked bot's creature pick: the role-safety gate and role-fit multiplier of pickDraftGenomeCreature,
+ * then the faction-diversity tax scaled to the eligible offer's largest role-fit score, then the coherence,
+ * interaction and variety overlays the genome carries.
+ */
+export function pickRankedLiveDraftCreature(
+    genome: ILeagueGenome,
+    available: readonly number[],
+    ownCreatureIds: readonly number[],
+    knownOpponentCreatureIds: readonly number[],
+    tier1ArtifactId?: number,
+    revealedGridType?: number,
+    synergyVariants?: RankedDraftSynergyVariants,
+    tier2ArtifactId?: number,
+    artifactFitVersion: ArtifactFitVersion = 5,
+): number | undefined {
+    const eligible = applyRankedDraftRangedFloor(
+        genome.draftStrengthPolicy,
+        eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds),
+        ownCreatureIds,
+    );
+    const roleFitScore = (creatureId: number): number =>
+        applyCreatureRoleFitMultiplier(
+            draftGenomeCreatureScore(genome, creatureId),
+            creatureRoleFitMultiplier(creatureId, ownCreatureIds, knownOpponentCreatureIds),
+        );
+    const baseScoreScale = Math.max(1, ...eligible.map((creatureId) => Math.abs(roleFitScore(creatureId))));
+    const freeStacks = rankedDraftStrengthRelaxesFactionTax(genome.draftStrengthPolicy)
+        ? RANKED_DRAFT_RELAXED_FACTION_TAX_FREE_STACKS
+        : RANKED_FACTION_DIVERSITY_FREE_STACKS;
+    return pickCoherentDraftCreature(
+        eligible,
+        (creatureId) =>
+            roleFitScore(creatureId) -
+            RANKED_FACTION_DIVERSITY_PENALTY *
+                rankedFactionDiversityTaxUnits(creatureId, ownCreatureIds, freeStacks) *
+                baseScoreScale,
+        {
+            ownCreatureIds,
+            tier1ArtifactId,
+            artifactFitVersion,
+            ...(tier2ArtifactId === undefined ? {} : { tier2ArtifactId }),
+            knownOpponentCreatureIds,
+            ...(revealedGridType === undefined ? {} : { revealedGridType }),
+            ...(synergyVariants === undefined ? {} : { synergyVariants }),
+            ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
+            ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
+            ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
+            ...(genome.draftStrengthPolicy ? { draftStrengthPolicy: genome.draftStrengthPolicy } : {}),
+        },
+    );
+}
+
+/**
+ * The live ranked bot's opening bundle pick: both creatures' genome scores plus the Tier-1 artifact's measured
+ * win rate, then the bundle coherence overlay and whichever per-creature overlays the genome carries.
+ */
+export function pickRankedLiveDraftBundle(
+    genome: ILeagueGenome,
+    bundles: readonly DraftBundle[],
+    synergyVariants?: RankedDraftSynergyVariants,
+    artifactFitVersion: ArtifactFitVersion = 5,
+): number {
+    return pickCoherentDraftBundle(
+        bundles,
+        (creatureId) => draftGenomeCreatureScore(genome, creatureId),
+        (artifactId, ownCreatureIds) =>
+            (artifactFitVersion === 1
+                ? tier1ArtifactFitScore
+                : artifactFitVersion === 2
+                  ? tier1ArtifactFitScoreV2
+                  : artifactFitVersion === 3
+                    ? tier1ArtifactFitScoreV3
+                    : tier1ArtifactFitScoreV4)(
+                artifactId,
+                ownCreatureIds,
+                (rankedDraftUsesCorrectedTier1Table(genome.draftStrengthPolicy)
+                    ? TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED
+                    : TIER1_ARTIFACT_WINRATE)[artifactId] ?? 50,
+            ),
+        {
+            artifactFitVersion,
+            ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
+            ...(genome.draftStrengthPolicy ? { draftStrengthPolicy: genome.draftStrengthPolicy } : {}),
+            ...(synergyVariants === undefined ? {} : { synergyVariants }),
         },
     );
 }

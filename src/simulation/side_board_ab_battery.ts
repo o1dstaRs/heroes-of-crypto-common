@@ -20,7 +20,7 @@
 // FightProperties.legacyAxisPolicyTeams, which keeps every shipped raw-Y heuristic (value features,
 // Backstab preference, Castling gate, placement frontness) byte-faithful for that seat while the
 // BOARD RULES (zones, engine Backstab geometry) stay side-oriented for both. --leaf-file injects a
-// refit 60-dim value leaf for the CANDIDATE seat only (per-team seam V07_VALUE_WEIGHTS_V2_LOWER/_RIGHT);
+// refit 60-dim value leaf for the CANDIDATE seat only (per-team seam V07_VALUE_WEIGHTS_V2_<LEFT|RIGHT>);
 // the control always runs the shipped V08_A13_VALUE_LEAF.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -32,6 +32,7 @@ import { Doctrine } from "../doctrines/doctrine_properties";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { buildRoster } from "./army";
 import { runMatch, type IMatchResult } from "./battle_engine";
+import { seatEnvName } from "../ai/seat_env";
 
 const LIVE_MAPS = [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER, PBTypes.GridVals.BLOCK_CENTER] as const;
 
@@ -64,6 +65,10 @@ interface ISideAbGameSpec {
     candidatePolicy: string | null;
     /** Candidate seat's strategy version (default v0.8; "v0.8s" = the measurement alias for scoped envs). */
     candidateVersion: string;
+    /** Opponent seat version (default v0.8). */
+    controlVersion: string;
+    /** Put the control seat on the legacy raw-Y policy axis (the original pre-remediation stand-in). Default true. */
+    legacyControlAxis: boolean;
     /** Classic bottom/top board instead of the side board (sanity baseline). */
     classic: boolean;
 }
@@ -97,36 +102,38 @@ function mulberry(seedValue: number): () => number {
 function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
     const controlTeam = spec.candidateTeam === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     // Per-team candidate leaf (per-game env; the SearchDriver is constructed per match).
-    delete process.env.V07_VALUE_WEIGHTS_V2_LOWER;
-    delete process.env.V07_VALUE_WEIGHTS_V2_UPPER;
-    delete process.env.V07_WAIT_WEIGHTS_LOWER;
-    delete process.env.V07_WAIT_WEIGHTS_UPPER;
-    delete process.env.V08_WAIT_CANCEL_LOWER;
-    delete process.env.V08_WAIT_CANCEL_UPPER;
-    const candidateSeatKey = spec.candidateTeam === PBTypes.TeamVals.LEFT ? "LEFT" : "RIGHT";
-    const controlSeatKey = spec.candidateTeam === PBTypes.TeamVals.LEFT ? "RIGHT" : "LEFT";
+    for (const base of ["V07_VALUE_WEIGHTS_V2", "V07_WAIT_WEIGHTS", "V08_WAIT_CANCEL"]) {
+        for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
+            delete process.env[seatEnvName(base, team)];
+        }
+    }
+    // Writes go through seatEnvName, the same builder the readers use, so the seat namespace cannot drift again.
+    const candidateSeat = spec.candidateTeam;
+    const controlSeat = spec.candidateTeam === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     if (spec.candidateLeaf) {
-        process.env[`V07_VALUE_WEIGHTS_V2_${candidateSeatKey}`] = JSON.stringify(spec.candidateLeaf);
+        process.env[seatEnvName("V07_VALUE_WEIGHTS_V2", candidateSeat)] = JSON.stringify(spec.candidateLeaf);
     }
     if (spec.candidateWait) {
-        process.env[`V07_WAIT_WEIGHTS_${candidateSeatKey}`] = JSON.stringify(spec.candidateWait);
+        process.env[seatEnvName("V07_WAIT_WEIGHTS", candidateSeat)] = JSON.stringify(spec.candidateWait);
     }
     if (spec.controlWait) {
-        process.env[`V07_WAIT_WEIGHTS_${controlSeatKey}`] = JSON.stringify(spec.controlWait);
+        process.env[seatEnvName("V07_WAIT_WEIGHTS", controlSeat)] = JSON.stringify(spec.controlWait);
     }
     if (spec.candidateCancel) {
-        process.env[`V08_WAIT_CANCEL_${candidateSeatKey}`] = JSON.stringify(spec.candidateCancel);
+        process.env[seatEnvName("V08_WAIT_CANCEL", candidateSeat)] = JSON.stringify(spec.candidateCancel);
     }
     const roster = buildRoster(mulberry(spec.seed ^ 0x5f356495), undefined, undefined, undefined, "expBudget");
     const setup = { doctrine: Doctrine.SEE_NONE, augments: SETUP_POLICY_V0.pickAugments(7) };
     const result = runMatch({
-        greenVersion: spec.candidateTeam === PBTypes.TeamVals.LEFT ? spec.candidateVersion : "v0.8",
-        redVersion: spec.candidateTeam === PBTypes.TeamVals.LEFT ? "v0.8" : spec.candidateVersion,
+        greenVersion: spec.candidateTeam === PBTypes.TeamVals.LEFT ? spec.candidateVersion : spec.controlVersion,
+        redVersion: spec.candidateTeam === PBTypes.TeamVals.LEFT ? spec.controlVersion : spec.candidateVersion,
         roster,
         seed: spec.seed,
         gridType: spec.gridType,
         sideOrientedPlacement: !spec.classic,
-        legacyAxisPolicyTeams: [controlTeam],
+        // Opt out with --no-legacy-control to measure two CURRENT policies on the side board fairly: the legacy
+        // raw-Y axis stood in for pre-remediation v0.8 and would handicap any modern control seat.
+        ...(spec.legacyControlAxis ? { legacyAxisPolicyTeams: [controlTeam] } : {}),
         placementAugmentTiming: "setup-before-placement",
         greenDoctrine: setup.doctrine,
         redDoctrine: setup.doctrine,
@@ -216,6 +223,11 @@ async function main(): Promise<void> {
     // otherwise-idle host; per-seat testing of version-scoped env levers needs a per-team env seam
     // instead (the wait/leaf seam pattern).
     const candidateVersion = readArg("--candidate-version") ?? "v0.8";
+    const controlVersion = readArg("--control-version") ?? "v0.8";
+    const legacyControlAxis = !args.includes("--no-legacy-control");
+    console.log(
+        `SIDE_AB candidate=${candidateVersion} control=${controlVersion} legacyControlAxis=${legacyControlAxis}`,
+    );
     const classic = args.includes("--classic");
     // --maps 4 or --maps 3,4 focuses the rotation on a subset of the live maps (grid type ints),
     // for per-map diagnostics; the default stays the full live rotation.
@@ -256,6 +268,8 @@ async function main(): Promise<void> {
                 deterministicSearch,
                 candidatePolicy,
                 candidateVersion,
+                controlVersion,
+                legacyControlAxis,
                 candidateWait,
                 classic,
             });
@@ -361,6 +375,8 @@ async function main(): Promise<void> {
         deterministicSearch,
         candidatePolicy: candidatePolicy ?? "none",
         candidateVersion,
+        controlVersion,
+        legacyControlAxis,
         wallSeconds: Math.round((Date.now() - startedAt) / 1000),
         errorSamples: errors.slice(0, 5),
     };

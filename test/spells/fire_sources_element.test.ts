@@ -69,6 +69,21 @@ describe("fire sources all answer to the fire element", () => {
                 targetIsEarthElement: !!target.isEarthElement,
             });
 
+        it("is declared FIRE in the spell book, like every other source of fire", () => {
+            const sword = (spellsJson as unknown as Record<string, Record<string, { element: string }>>).Chaos?.[
+                "Fireforged Sword"
+            ];
+            expect(sword?.element).toBe("FIRE");
+        });
+
+        it("stays castable on an ally that IS fire — the element gate only guards enemy targets", () => {
+            const sword = (
+                spellsJson as unknown as Record<string, Record<string, { target: string; is_buff: boolean }>>
+            ).Chaos?.["Fireforged Sword"];
+            expect(sword?.target).toBe("ANY_ALLY");
+            expect(sword?.is_buff).toBeTrue();
+        });
+
         it("cannot burn a creature made of fire", () => {
             expect(burn({ isFireElement: true })).toBe(0);
         });

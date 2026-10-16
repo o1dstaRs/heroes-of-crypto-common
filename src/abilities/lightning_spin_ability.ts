@@ -11,6 +11,7 @@
 
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { Grid } from "../grid/grid";
+import { isCellWithinGrid } from "../grid/grid_math";
 import * as HoCLib from "../utils/lib";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
@@ -20,12 +21,13 @@ import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
-import type { ISecondaryDamage } from "../scene/animations";
+import type { ISecondaryDamage, IVisibleDamage } from "../scene/animations";
 
 import { processFireShieldAbility } from "./fire_shield_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processOneInTheFieldAbility } from "./one_in_the_field_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
+import { processGravechainAbility } from "./gravechain_ability";
 import { processStunAbility } from "./stun_ability";
 import { processFreezeAbility } from "./freeze_ability";
 import { processBlindnessAbility } from "./blindness_ability";
@@ -48,6 +50,28 @@ export interface ILightningSpinResult {
     unitIdsDied: string[];
 }
 
+/**
+ * The cemetery barrels a Lightning Spin knocks down: every standing scattered stone in the ring the spin sweeps
+ * for enemies (UnitsHolder.cellsAroundUnit, attack geometry), in ring order. The spin is one radial impact, so a
+ * barrel beside the attacker breaks whether the blow itself was aimed at a unit or at a barrel — the aimed
+ * barrel is in the ring too, the caller decides what to report it as. Classic 2x2 mountains keep their own hit
+ * counters and are never swept.
+ */
+export function lightningSpinObstacleCells(
+    fromUnit: Unit,
+    unitsHolder: UnitsHolder,
+    grid: Grid,
+    attackFromCell: HoCMath.XY,
+): HoCMath.XY[] {
+    if (!grid.hasScatteredMountains() || !fromUnit.hasAbilityActive("Lightning Spin")) {
+        return [];
+    }
+    const settings = grid.getSettings();
+    return unitsHolder
+        .cellsAroundUnit(fromUnit, true, attackFromCell)
+        .filter((cell) => isCellWithinGrid(settings, cell) && grid.getOccupantUnitId(cell) === "B");
+}
+
 export function processLightningSpinAbility(
     fromUnit: Unit,
     sceneLog: ISceneLog,
@@ -58,6 +82,12 @@ export function processLightningSpinAbility(
     isAttack = true,
     secondaryDamage?: ISecondaryDamage[],
     grid?: Grid,
+    // The unit whose turn it is. A retaliating spin also strikes the attacker, and a Stun, Freeze or Rime Charm
+    // landed on it then gets the extra lap every effect landed mid-turn gets.
+    currentActiveUnit: Unit = fromUnit,
+    gravechainTargets = new Set<string>(),
+    visibleDamage?: IVisibleDamage,
+    hitIndex = 0,
 ): ILightningSpinResult {
     const unitIdsDied: string[] = [];
     let lightningSpinLanded = false;
@@ -66,7 +96,10 @@ export function processLightningSpinAbility(
     if (lightningSpinAbility) {
         const unitsDead: Unit[] = [];
         const wasDead: Unit[] = [];
-        const nearbyEnemies = unitsHolder.allEnemiesAroundUnit(fromUnit, isAttack, attackFromCell);
+        // A unit Terrifying Gaze forbids this one to attack is left out of the spin as well.
+        const nearbyEnemies = unitsHolder
+            .allEnemiesAroundUnit(fromUnit, isAttack, attackFromCell)
+            .filter((enemy) => !fromUnit.cannotAttackUnitId(enemy.getId()));
         // Lightning Spin is one radial impact. As with range splash, resolve any Flesh Shield owners
         // caught in it before their protected allies so the owner's direct hit reserves HP and cannot
         // disappear merely because grid-neighbour iteration returned an ally first.
@@ -133,7 +166,17 @@ export function processLightningSpinAbility(
             let damageFromAttack =
                 processLuckyStrikeAbility(
                     fromUnit,
-                    fromUnit.calculateAttackDamage(enemy, PBTypes.AttackVals.MELEE, 1, abilityMultiplier),
+                    // (target, attack type, the team's ability power, divisor 1, the spin's multiplier): the multiplier
+                    // used to land in the DIVISOR slot, so a weak stack spun harder than a full one.
+                    fromUnit.calculateAttackDamage(
+                        enemy,
+                        PBTypes.AttackVals.MELEE,
+                        FightStateManager.getInstance()
+                            .getFightProperties()
+                            .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
+                        1,
+                        abilityMultiplier,
+                    ),
                     sceneLog,
                 ) + processPenetratingBiteAbility(fromUnit, enemy);
 
@@ -224,16 +267,29 @@ export function processLightningSpinAbility(
                     HoCLib.killTag(unitsKilled),
             );
 
+            if (grid && !waterShieldAbsorbed) {
+                processGravechainAbility(
+                    fromUnit,
+                    enemy,
+                    grid,
+                    unitsHolder,
+                    sceneLog,
+                    currentActiveUnit,
+                    gravechainTargets,
+                    visibleDamage,
+                    hitIndex,
+                );
+            }
             if (enemy.isDead()) {
                 unitsDead.push(enemy);
             } else if (!waterShieldAbsorbed) {
                 // check all the possible modificators here
                 // just in case if we have more inherited/stolen abilities
                 processMinerAbility(fromUnit, enemy, sceneLog);
-                processStunAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processFreezeAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processRimeCharmAbility(fromUnit, enemy, sceneLog);
-                processDullingDefenseAblity(enemy, fromUnit, sceneLog);
+                processStunAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processFreezeAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processRimeCharmAbility(fromUnit, enemy, sceneLog, currentActiveUnit);
+                processDullingDefenseAblity(fromUnit, enemy, sceneLog);
                 processPetrifyingGazeAbility(
                     fromUnit,
                     enemy,
@@ -242,15 +298,15 @@ export function processLightningSpinAbility(
                     damageStatisticHolder,
                     secondaryDamage,
                 );
-                processBoarSalivaAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processAggrAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processDeepWoundsAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processPegasusLightAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processParalysisAbility(fromUnit, enemy, fromUnit, sceneLog);
+                processBoarSalivaAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processAggrAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processDeepWoundsAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processPegasusLightAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processParalysisAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
                 if (isAttack) {
-                    processShatterArmorAbility(fromUnit, enemy, fromUnit, sceneLog);
+                    processShatterArmorAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
                 } else {
-                    processBlindnessAbility(fromUnit, enemy, fromUnit, sceneLog);
+                    processBlindnessAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
                 }
             }
             // Gaze resolves after the base hit. If it petrified the last creature, include that death in
@@ -289,7 +345,7 @@ export function processLightningSpinAbility(
                             (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
                     }
 
-                    for (const uId in fireShieldResult.unitIdsDied) {
+                    for (const uId of fireShieldResult.unitIdsDied) {
                         if (!unitIdsDied.includes(uId)) {
                             unitIdsDied.push(uId);
                         }

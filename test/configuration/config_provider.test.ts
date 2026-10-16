@@ -110,6 +110,7 @@ describe("config_provider", () => {
 
         expect(creature.hp).toBe(55);
         expect(creature.base_armor).toBe(17);
+        expect(creature.shot_distance).toBe(6);
 
         const handymanIndex = creature.abilities.indexOf("Handyman");
         expect(handymanIndex).toBeGreaterThanOrEqual(0);
@@ -124,10 +125,10 @@ describe("config_provider", () => {
         expect(creature.abilities_descriptions[chakramIndex]).not.toContain("100 targets");
     });
 
-    it("loads Hydra's reduced durability", () => {
+    it("loads Hydra's durability", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Hydra", "hydra_512", 0, 500);
 
-        expect(creature.hp).toBe(185);
+        expect(creature.hp).toBe(190);
         expect(creature.base_armor).toBe(33);
     });
 
@@ -144,14 +145,15 @@ describe("config_provider", () => {
         expect(creature.attack_damage_max).toBe(20);
     });
 
-    it("loads Tsar Cannon's improved ranged profile", () => {
+    // Shot distance walked back 9.5 -> 6.5. Armor, attack, and the damage range stay at the earlier buff.
+    it("loads Tsar Cannon's ranged profile", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Life", "Tsar Cannon", "tsar_cannon_512", 0, 500);
 
         expect(creature.base_armor).toBe(32);
         expect(creature.base_attack).toBe(46);
         expect(creature.attack_damage_min).toBe(40);
         expect(creature.attack_damage_max).toBe(55);
-        expect(creature.shot_distance).toBe(9.5);
+        expect(creature.shot_distance).toBe(6.5);
     });
 
     it("loads Dryad's improved attack profile", () => {
@@ -170,13 +172,24 @@ describe("config_provider", () => {
         expect(creature.attack_damage_max).toBe(11);
     });
 
-    it("loads Nightmare's improved durability and damage range", () => {
+    // Re-pinned 2026-09-20: the owner traded a tenth of the Nightmare's body and swing for an extra one in
+    // the stack (hp 65 -> 59, attack 23 -> 21, exp 102 -> 91.8, so 1000 XP now buys 11 instead of 10). Its
+    // armour and damage range are untouched.
+    it("loads Nightmare's durability and damage range", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Nightmare", "nightmare_512", 1);
 
-        expect(creature.hp).toBe(65);
+        expect(creature.hp).toBe(59);
+        expect(creature.base_attack).toBe(21);
         expect(creature.base_armor).toBe(21);
         expect(creature.attack_damage_min).toBe(15);
         expect(creature.attack_damage_max).toBe(20);
+    });
+
+    // The whole point of the exp change: 1000 XP fields one more Nightmare than it used to.
+    it("fields eleven Nightmares for the 1000 XP stack budget", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Nightmare", "nightmare_512", 0, 1000);
+
+        expect(creature.amount_alive).toBe(11);
     });
 
     it("loads the reduced caster initiatives without rounding away tenths", () => {
@@ -185,6 +198,21 @@ describe("config_provider", () => {
 
         expect(battleMage.initiative).toBe(2.1);
         expect(magicDragon.initiative).toBe(2.4);
+    });
+
+    it("loads Wandering Mage's walking movement and reduced initiative", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Wandering Mage", "wandering_mage_512", 1);
+
+        expect(creature.steps).toBe(4.2);
+        expect(creature.initiative).toBe(2.3);
+        expect(creature.movement_type).toBe(PBTypes.MovementVals.WALK);
+    });
+
+    it("preserves Battle Mage's walking movement", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Life", "Battle Mage", "battle_mage_512", 1);
+
+        expect(creature.steps).toBe(3.4);
+        expect(creature.movement_type).toBe(PBTypes.MovementVals.WALK);
     });
 
     it("derives creature amount from total experience when amount is not positive", () => {
@@ -196,11 +224,13 @@ describe("config_provider", () => {
     it("loads the one-unit Abomination balance and stack-powered Flesh Shield metadata", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Abomination", "abomination_512", 0, 1000);
 
-        // The requested one-unit tank profile: a 1,000-XP stack is exactly one 550-HP creature.
-        expect(creature.max_hp).toBe(550);
+        // The requested one-unit tank profile: a 1,000-XP stack is exactly one 500-HP creature
+        // (owner balance pass 2026-09-13: 550 -> 500).
+        expect(creature.max_hp).toBe(500);
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(3.3);
-        expect(creature.base_armor).toBe(49);
+        // Owner balance pass 2026-09-13: armor 49 -> 45.
+        expect(creature.base_armor).toBe(45);
         expect(creature.base_attack).toBe(22);
         expect(creature.exp).toBe(1000);
         expect(creature.amount_alive).toBe(1);

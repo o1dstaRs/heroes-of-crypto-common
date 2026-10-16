@@ -10,7 +10,7 @@
  */
 
 import { getAbilitiesWithPosisionCoefficient } from "../abilities/ability_helper";
-import { hasAnyDeepWoundsAbility } from "../abilities/deep_wounds_ability";
+import { applyAttackDamageChain, resolveAttackDamageChain } from "../damage/damage_projection";
 import type { GameAction } from "../engine/actions";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { Unit } from "../units/unit";
@@ -102,20 +102,6 @@ export function estimatePrimaryMeleeDamage(
         unit.getAttack() - unit.getCurrentAttackModIncrease(),
     );
     const attackRate = attackWithoutCurrentAura + futureAuraAttack;
-    const minimum = unit.calculateAttackDamageMin(attackRate, target, false, attackerAbilityPower, 1);
-    const maximum = unit.calculateAttackDamageMax(attackRate, target, false, attackerAbilityPower, 1);
-    if (!Number.isSafeInteger(minimum) || !Number.isSafeInteger(maximum) || maximum < minimum) {
-        return undefined;
-    }
-
-    // Avoid making candidate generation unexpectedly expensive for a malformed/modded damage range.
-    const rollCount = maximum === minimum ? 1 : maximum - minimum;
-    if (rollCount > 10_000) {
-        return undefined;
-    }
-
-    const nativeMeleeMultiplier =
-        unit.getAttackType() === PBTypes.AttackVals.RANGE && !unit.hasAbilityActive("Handyman") ? 0.5 : 1;
     let handlerMultiplier = 1;
     const rapidCharge = unit.getAbility("Rapid Charge");
     if (rapidCharge) {
@@ -146,17 +132,26 @@ export function estimatePrimaryMeleeDamage(
         handlerMultiplier *= unit.calculateAbilityMultiplier(ability, attackerAbilityPower);
     }
 
-    // Deep Wounds is applied ONCE, by Unit.calculateAttackDamage — it is a term of the engine's product
-    // (roll * attackTypeMultiplier * abilityMultiplier * deepWoundsMultiplier * ...), not part of the
-    // multiplier AttackHandler supplies. It used to be folded into handlerMultiplier as well, mirroring a
-    // handler-side duplicate that squared the bonus; both the duplicate and this mirror are gone.
-    const deepWoundsMultiplier = hasAnyDeepWoundsAbility(unit)
-        ? 1 + (target.getEffect("Deep Wounds")?.getPower() ?? 0) / 100
-        : 1;
+    // Unit.calculateAttackDamage uses this same chain: the ranged melee penalty, Deep Wounds and
+    // elemental affinity belong under one final floor, after the handler's position/charge modifiers.
+    const chain = resolveAttackDamageChain({
+        attacker: unit,
+        target,
+        attackType: PBTypes.AttackVals.MELEE,
+        synergyAbilityPowerIncrease: attackerAbilityPower,
+        abilityMultiplier: handlerMultiplier,
+        attackRate,
+    });
+    const minimum = chain.rollMin;
+    const maximum = chain.rollMaxExclusive;
+    if (!Number.isSafeInteger(minimum) || !Number.isSafeInteger(maximum) || maximum < minimum) return undefined;
+    // Avoid making candidate generation unexpectedly expensive for a malformed/modded damage range.
+    const rollCount = Math.max(1, maximum - minimum);
+    if (!Number.isSafeInteger(rollCount) || rollCount > 10_000) return undefined;
 
     const luckyStrike = unit.getAbility("Lucky Strike");
     const luckyChance = luckyStrike
-        ? clampChance(unit.calculateAbilityApplyChance(luckyStrike, attackerAbilityPower))
+        ? clampChance(Math.ceil(unit.calculateAbilityApplyChance(luckyStrike, attackerAbilityPower)))
         : 0;
     const luckyMultiplier = luckyStrike ? unit.calculateAbilityMultiplier(luckyStrike, attackerAbilityPower) : 1;
     const penetratingBite = unit.getAbility("Penetrating Bite");
@@ -167,7 +162,7 @@ export function estimatePrimaryMeleeDamage(
     const outcomes = new Map<number, number>();
     const rawEnd = maximum === minimum ? minimum + 1 : maximum;
     for (let raw = minimum; raw < rawEnd; raw += 1) {
-        const ordinary = Math.floor(raw * nativeMeleeMultiplier * handlerMultiplier * deepWoundsMultiplier);
+        const ordinary = applyAttackDamageChain(chain, raw);
         const rawProbability = 1 / rollCount;
         if (luckyChance > 0) {
             addOutcome(outcomes, ordinary + biteDamage, rawProbability * (1 - luckyChance));

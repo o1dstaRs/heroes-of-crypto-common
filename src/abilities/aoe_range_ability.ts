@@ -19,17 +19,19 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { UnitsHolder } from "../units/units_holder";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
-import type { ISecondaryDamage } from "../scene/animations";
+import type { ISecondaryDamage, IVisibleDamage } from "../scene/animations";
 
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
+import { processGravechainAbility } from "./gravechain_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
 import { processFreezeAbility } from "./freeze_ability";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { processPoisonAuraAbility } from "./poison_aura_ability";
+import { processBorrowedGraceAbility } from "./borrowed_grace_ability";
 
 export interface IAOERangeAttackResult {
     landed: boolean;
@@ -62,6 +64,8 @@ export function processRangeAOEAbility(
     // (chakram_ability.resolveChakramFlightMisses). Those verdicts are reused here rather than rolled
     // again: a second roll could hand a hit to a victim the disc already stopped short of.
     preRolledMissByUnitId?: Readonly<Record<string, boolean>>,
+    visibleDamage?: IVisibleDamage,
+    hitIndex = 0,
 ): IAOERangeAttackResult {
     const unitIdsDied: string[] = [];
     const perUnitDamage: IAOERangeAttackResult["perUnitDamage"] = [];
@@ -263,7 +267,21 @@ export function processRangeAOEAbility(
             }
         }
 
+        const gravechainTargets = new Set<string>();
         for (const unit of affectedUnits) {
+            if (landedHitUnitIds.has(unit.getId())) {
+                processGravechainAbility(
+                    attackerUnit,
+                    unit,
+                    grid,
+                    unitsHolder,
+                    sceneLog,
+                    currentActiveUnit,
+                    gravechainTargets,
+                    visibleDamage,
+                    hitIndex,
+                );
+            }
             if (unit.isDead()) {
                 if (!wasDead.includes(unit)) {
                     if (!unitIdsDied.includes(unit.getId())) {
@@ -281,10 +299,12 @@ export function processRangeAOEAbility(
             if (!landedHitUnitIds.has(unit.getId())) {
                 continue;
             }
-            processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
-            processFreezeAbility(attackerUnit, unit, attackerUnit, sceneLog);
-            processRimeCharmAbility(attackerUnit, unit, sceneLog);
+            // The unit whose turn it is — the attacker even when this is a counter-volley — gets the extra lap.
+            processStunAbility(attackerUnit, unit, currentActiveUnit, sceneLog);
+            processFreezeAbility(attackerUnit, unit, currentActiveUnit, sceneLog);
+            processRimeCharmAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
             processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
+            processBorrowedGraceAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
         }
         attackerUnit.increaseMorale(
             increaseMoraleTotal,
@@ -321,6 +341,9 @@ export function evaluateAffectedUnits(
     affectedCells: HoCMath.XY[],
     unitsHolder: UnitsHolder,
     grid: Grid,
+    // The Angel's Arrows Wingshield soaks ranged area ATTACKS (Area Throw, Large Caliber). Spells and Craft
+    // aimed at a block pass false: an Angel in the block doesn't shield the units beside it from them.
+    rangedAreaAttack = true,
 ): Array<Unit[]> | undefined {
     const cellKeys: number[] = [];
     const unitIds: string[] = [];
@@ -356,7 +379,9 @@ export function evaluateAffectedUnits(
     // Applied HERE rather than in processRangeAOEAbility because the client's hover preview calls this
     // same function to outline and price the victims, so what is highlighted is what actually gets hit.
     // Two Angels in one blast both soak it; neither passes it on.
-    const shieldBearers = affectedUnits.filter((unit) => unit.hasAbilityActive("Arrows Wingshield Blessing"));
+    const shieldBearers = rangedAreaAttack
+        ? affectedUnits.filter((unit) => unit.hasAbilityActive("Arrows Wingshield Blessing"))
+        : [];
     if (shieldBearers.length) {
         return [shieldBearers, shieldBearers];
     }

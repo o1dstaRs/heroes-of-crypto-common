@@ -10,6 +10,7 @@
  */
 
 import { MAX_UNIT_STACK_POWER } from "../constants";
+import { getSpellConfig } from "../configuration/config_provider";
 import { FightStateManager } from "../fights/fight_state_manager";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import type { AppliedSpell } from "../spells/applied_spell";
@@ -21,7 +22,7 @@ import { isEquipmentOrMarkerSpellName } from "./ability_helper";
 export const BORROWED_GRACE_NAME = "Borrowed Grace";
 
 /**
- * The chance a single-stack Monk lands the theft. The ability's own power is the chance at
+ * The chance a single-stack Monk lands the copy. The ability's own power is the chance at
  * MAX_UNIT_STACK_POWER, and the stacks in between interpolate — 20 / 32.5 / 45 / 57.5 / 70.
  *
  * This is deliberately NOT Unit.calculateAbilityApplyChance (power/5 * stack, i.e. 14 at one stack): the
@@ -36,7 +37,7 @@ export interface IBuffStolen {
     buffName: string;
 }
 
-/** The theft chance at this Monk's current stack, with luck and the team's ability power folded in. */
+/** The current stack's base theft chance, boosted by Made of Fire, then luck and the team's ability power. */
 export function borrowedGraceChance(thief: Unit, synergyAbilityPowerIncrease: number): number {
     const ability = thief.getAbility(BORROWED_GRACE_NAME);
     if (!ability) {
@@ -45,17 +46,21 @@ export function borrowedGraceChance(thief: Unit, synergyAbilityPowerIncrease: nu
 
     const stackPower = Math.max(1, Math.min(MAX_UNIT_STACK_POWER, thief.getStackPower()));
     const perStack = (ability.getPower() - BORROWED_GRACE_MIN_CHANCE) / (MAX_UNIT_STACK_POWER - 1);
-    const chance =
-        BORROWED_GRACE_MIN_CHANCE + perStack * (stackPower - 1) + thief.getLuck() + synergyAbilityPowerIncrease;
+    const baseChance = BORROWED_GRACE_MIN_CHANCE + perStack * (stackPower - 1);
+    const storedFirePower = thief.getBuffPower("Made of Fire");
+    const firePower =
+        storedFirePower === 0 && !thief.getBuff("Made of Fire")
+            ? getSpellConfig("System", "Made of Fire").power
+            : (storedFirePower ?? 0);
+    const chance = baseChance * (1 + firePower / 100) + thief.getLuck() + synergyAbilityPowerIncrease;
 
-    return Math.max(0, Math.min(100, chance));
+    return Number(Math.max(0, Math.min(100, chance)).toFixed(2));
 }
 
 /**
- * Whether one applied buff can be taken off its owner: a cast blessing can, worn equipment and engine
- * markers cannot (isEquipmentOrMarkerSpellName), and neither can an aura's grant — an aura is re-applied
- * on the very next refresh with Number.MAX_SAFE_INTEGER laps, so "stealing" it would be a no-op that
- * still burned the roll.
+ * Whether one applied buff can be copied: a cast blessing can, worn equipment and engine markers cannot
+ * (isEquipmentOrMarkerSpellName), and neither can an aura's grant — an aura is re-applied on the very
+ * next refresh with Number.MAX_SAFE_INTEGER laps, so copying it would be a no-op that still burned the roll.
  */
 export function isTakeableBuff(buff: AppliedSpell): boolean {
     if (buff.getLaps() <= 0 || buff.getLaps() === Number.MAX_SAFE_INTEGER) {
@@ -66,12 +71,18 @@ export function isTakeableBuff(buff: AppliedSpell): boolean {
 }
 
 /**
- * Resolves the theft for ONE landed shot: with the stack-scaled chance above, one random active buff is
- * taken off the target and worn by the Monk for whatever duration the buff had left. Nothing happens when
- * the target carries no takeable buff — the shot is not "wasted", it simply had nothing to take.
+ * Resolves the copy for ONE landed shot: with the stack-scaled chance above, one random active buff is
+ * worn by the Monk for whatever duration the buff had left. The target keeps the original. The active
+ * copier's end-of-turn tick is compensated; a counter-shot does not extend the duration. Nothing happens
+ * when the target carries no copyable buff — the shot is not "wasted", it simply had nothing to copy.
  */
-export function processBorrowedGraceAbility(thief: Unit, target: Unit, sceneLog: ISceneLog): IBuffStolen | undefined {
-    if (!thief.getAbility(BORROWED_GRACE_NAME)) {
+export function processBorrowedGraceAbility(
+    thief: Unit,
+    target: Unit,
+    sceneLog: ISceneLog,
+    currentActiveUnit?: Unit,
+): IBuffStolen | undefined {
+    if (thief.isDead() || target.isDead() || !thief.getAbility(BORROWED_GRACE_NAME)) {
         return undefined;
     }
 
@@ -84,16 +95,16 @@ export function processBorrowedGraceAbility(thief: Unit, target: Unit, sceneLog:
         thief,
         FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(thief.getTeam()),
     );
-    if (getRandomInt(0, 100) >= chance) {
+    if (getRandomInt(0, 10_000) / 100 >= chance) {
         return undefined;
     }
 
     const selected = candidates[getRandomInt(0, candidates.length)];
-    if (!selected || !thief.takeBuffFrom(target, selected.getName())) {
+    if (!selected || !thief.takeBuffFrom(target, selected.getName(), thief.getId() === currentActiveUnit?.getId())) {
         return undefined;
     }
 
-    sceneLog.updateLog(`${thief.getName()} took ${selected.getName()} from ${target.getName()}`);
+    sceneLog.updateLog(`${thief.getName()} copied ${selected.getName()} from ${target.getName()}`);
 
     return { thiefId: thief.getId(), targetId: target.getId(), buffName: selected.getName() };
 }

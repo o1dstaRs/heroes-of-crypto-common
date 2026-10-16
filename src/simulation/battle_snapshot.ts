@@ -105,10 +105,13 @@ const UNIT_FIELDS = [
     "maxRangeShots",
     "responded",
     "waterShieldSpent",
+    "lastFuseFatalHit",
     "onHourglass",
     "movedThisTurn",
     "movedRouteCellsThisTurn",
     "currentAttackModIncrease",
+    "warlordsEdgeAttackBase",
+    "warlordsEdgeAppliedAttackBonus",
     "adjustedBaseStatsLaps",
     "luckPerTurn",
 ] as const;
@@ -140,6 +143,8 @@ const GRID_FIELDS = [
     // Set, so listing them here is all the capture needs.
     "scatteredMountainLayout",
     "scatteredMountainsStanding",
+    "artifactBarrels",
+    "artifactBarrelLayoutActive",
 ] as const;
 
 // matrixCache is derived exclusively from the captured authoritative fields. Copying it would add a full
@@ -314,6 +319,13 @@ const UNIT_MUTATION_METHODS = [
 ] as const;
 
 const GRID_MUTATION_METHODS = [
+    "placeArtifactBarrel",
+    "unplaceArtifactBarrel",
+    "clearArtifactBarrels",
+    "restoreArtifactBarrels",
+    "setScatteredMountains",
+    "clearScatteredMountainAt",
+    "clearScatteredMountainsInCells",
     "cleanupCenterObstacle",
     "clearMountainSide",
     "refreshWithNewType",

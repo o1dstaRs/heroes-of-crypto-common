@@ -50,6 +50,10 @@ export function registerV08ProtectorStressRegression(
                 if (savedNoActions === undefined) delete process.env.SIM_NO_ACTIONS;
                 else process.env.SIM_NO_ACTIONS = savedNoActions;
             }
-        }, 30_000);
+        }, 60_000);
+        // 60s, up from 30s: Castling's swap reach grew one cell past the caster's movement (owner call
+        // 2026-10-02), and every candidate enumeration pathfinds that wider budget — game 72 crossed the
+        // old limit on the CI runner (34.5s) while staying at ~7s locally. The fixture guards behavior,
+        // not speed.
     });
 }

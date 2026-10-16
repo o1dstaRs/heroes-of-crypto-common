@@ -15,11 +15,16 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { Spell } from "../spells/spell";
 import { getSpellConfig } from "../configuration/config_provider";
 
-// ARTIFACT Rime Charm: any attack from a unit carrying the Rime Charm buff has a chance (buff power, e.g.
-// 60%) to chill the target — applying a Quagmire slow (movement reduction) for a number of laps stored as
-// the buff's second property (e.g. 3). Reuses the existing "Quagmire" spell debuff so no new effect config
-// is required.
-export function processRimeCharmAbility(fromUnit: Unit, targetUnit: Unit, sceneLog: ISceneLog): void {
+// ARTIFACT Rime Charm: any attack from a unit carrying the Rime Charm buff has a chance — the buff's base
+// power plus that unit's current luck — to chill the target. The slow is Quagmire for the number of laps
+// stored as the buff's second property (e.g. 3). Reuses the existing "Quagmire" spell debuff so no new
+// effect config is required.
+export function processRimeCharmAbility(
+    fromUnit: Unit,
+    targetUnit: Unit,
+    sceneLog: ISceneLog,
+    currentActiveUnit?: Unit,
+): void {
     if (targetUnit.isDead()) {
         return;
     }
@@ -28,8 +33,12 @@ export function processRimeCharmAbility(fromUnit: Unit, targetUnit: Unit, sceneL
     if (!rimeCharmBuff) {
         return;
     }
+    // Quagmire is a spell debuff, and 100% magic resistance (Enchanted Skin) blocks every spell debuff.
+    if (targetUnit.getMagicResist() >= 100) {
+        return;
+    }
 
-    if (HoCLib.getRandomInt(0, 100) >= rimeCharmBuff.getPower()) {
+    if (HoCLib.getRandomInt(0, 100) >= fromUnit.getRimeCharmChance()) {
         return;
     }
 
@@ -42,6 +51,13 @@ export function processRimeCharmAbility(fromUnit: Unit, targetUnit: Unit, sceneL
         spellProperties: getSpellConfig("Death", "Quagmire", laps),
         amount: 1,
     });
-    targetUnit.applyDebuff(quagmire);
+    // Chilling the unit whose turn it is (a retaliation or counter-shot on the attacker) gets the extra lap every
+    // effect landed mid-turn gets — Spit Ball's Quagmire included — or it lasted a turn less.
+    targetUnit.applyDebuff(
+        quagmire,
+        undefined,
+        undefined,
+        currentActiveUnit !== undefined && targetUnit.getId() === currentActiveUnit.getId(),
+    );
     sceneLog.updateLog(`${fromUnit.getName()} chilled ${targetUnit.getName()} for ${HoCLib.getLapString(laps)}`);
 }

@@ -30,7 +30,7 @@ import {
     V08_A19_PRODUCTION_VERSION,
 } from "../ai/versions/v0_8_a19_profile";
 import type { GameAction } from "../engine/actions";
-import { GameActionEngine } from "../engine/action_engine";
+import { GameActionEngine, type IGameActionEngineContext } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
 import { createDefaultGameRuntime, type IGameRuntime } from "../engine/runtime";
 import { TurnEngine } from "../engine/turn_engine";
@@ -96,6 +96,7 @@ import { createV08A13SearchDriver, shouldUseDefaultV08A13Search, withScopedAIEnv
 import { createV08A19SearchDriver, shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
 import { footprintCellsForAnchor, footprintLabel } from "./footprint";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
+import { observeCommittedHealth, type IPremiumHealthObservation } from "./ai_meta_health_ledger";
 import { extractValueFeatures, extractValueFeaturesV2Raw } from "./value_features";
 
 // Learned-value data capture (gated by VALUE_DATA=<jsonl path>). When set, every acting turn snapshots the
@@ -167,7 +168,14 @@ function resolveRangeAttackPrimary(
 
     const throughShot = attacker.hasAbilityActive("Through Shot");
     const observableSides = RANGE_ATTACK_CELL_SIDES.filter((side) =>
-        isRangeAttackSideObservable(grid.getMatrix(), cell, side, attacker.getTeam(), throughShot),
+        isRangeAttackSideObservable(
+            grid.getMatrix(),
+            cell,
+            side,
+            attacker.getTeam(),
+            throughShot,
+            attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
+        ),
     );
     let targetPosition = target.getPosition();
     if (observableSides.length) {
@@ -308,6 +316,11 @@ export interface IMatchConfig {
      * env being set.
      */
     searchEnvOverrideTeams?: readonly TeamType[];
+    /**
+     * Research: narrows `searchEnvOverrideTeams` to the units this returns true for; that team's other units
+     * keep the stock driver. Omitted routes every unit of a listed team, as before.
+     */
+    searchEnvOverrideUnitFilter?: (unit: Unit) => boolean;
     /** Emit only lifecycle/destruction events required to drive an in-process simulation. */
     headlessEvents?: boolean;
     /** Board layout for this match. Defaults to NORMAL (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER). */
@@ -376,12 +389,20 @@ export interface IMatchConfig {
     redSetupPlacementPolicy?: PlacementPolicyVariant;
     /** Optional simulation instrumentation. Unset by default; observers must not mutate the live unit/context. */
     decisionObserver?: (observation: IDecisionObservation) => void;
+    /** Research-only deployment intervention after normal setup, before the authoritative start action. */
+    beforeFightStart?: (
+        context: Pick<IGameActionEngineContext, "grid" | "fightProperties" | "unitsHolder" | "attackHandler">,
+    ) => void;
     /** Optional pre-search strategy-policy proposals. Unset in live and ordinary simulation calls. */
     policyProposalObserver?: (event: IAIPolicyEvent) => void;
     /** Optional strategy-policy events retained after search arbitration. Unset in live and ordinary calls. */
     policyEventObserver?: (event: IAIPolicyEvent) => void;
     /** Optional post-execution instrumentation. The observation is detached from engine-owned values. */
     turnExecutionObserver?: (observation: ITurnExecutionObservation) => void;
+    /** Detached committed fight events, including start and turn activation. Never includes search/probe rollouts. */
+    committedEventsObserver?: (observation: { lap: number; events: readonly GameEvent[] }) => void;
+    /** Offline health instrumentation around committed execution only; never strategy/search/probe calls. */
+    committedHealthObserver?: (observation: IPremiumHealthObservation) => void;
     /**
      * Optional detached turn-activation events emitted before strategy selection. Diagnostics need this narrow
      * seam to distinguish an hourglass unit legitimately skipped by Stun/Freeze/Blindness from a living waiter
@@ -487,7 +508,19 @@ export interface IRecordedAction {
     /** Legacy single-target visible amount; zero for Through Shot/AOE even when splash dealt damage. */
     damage?: number;
     unitIdsDied?: string[];
+    /**
+     * Only with SIM_RECORD_SPELL_EFFECTS=1, and only on casts: the spell and what it did, read from its spell_cast
+     * event — damage dealt to others (rebounds off a Magic Mirror excluded), HP healed, HP raised. Off by default
+     * so every existing action log and behavior-trace digest stays byte-identical.
+     */
+    spellName?: string;
+    spellDamage?: number;
+    spellHealed?: number;
+    spellResurrectedHp?: number;
 }
+
+/** Env switch for the spell fields of IRecordedAction (measurement runs only). */
+export const SIM_RECORD_SPELL_EFFECTS_ENV = "SIM_RECORD_SPELL_EFFECTS";
 
 export interface ISideOutcome {
     version: string;
@@ -960,6 +993,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 damageStatisticHolder.add(v);
             }
         },
+        captureAuxiliaryState: () => {
+            const savedSummonedUnitSequence = summonedUnitSequence;
+            return () => {
+                summonedUnitSequence = savedSummonedUnitSequence;
+            };
+        },
     };
     const lookahead = new LookaheadDriver(driverDeps);
     // B2/RAWS wide-candidate rollout SEARCH driver. Plain v0.8 uses promoted A19; explicit A19/a13 switches
@@ -1228,7 +1267,28 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         unitsKilledByNarrowing: 0,
         decidedByArmageddon: false,
     };
+    const applyWithHealth = <T extends { events: GameEvent[]; completed?: boolean }>(
+        operation: string,
+        apply: () => T,
+    ): T => {
+        if (!config.committedHealthObserver) return apply();
+        const captured = observeCommittedHealth(
+            () => unitsHolder.getAllUnits(),
+            () => fightProperties.getCurrentLap(),
+            operation,
+            apply,
+        );
+        config.committedHealthObserver(captured.observation);
+        return captured.value;
+    };
+    const applyCommittedAction = (action: GameAction) => applyWithHealth(action.type, () => engine.apply(action));
     const applyEvents = (events: GameEvent[]): void => {
+        if (config.committedEventsObserver && events.length) {
+            config.committedEventsObserver({
+                lap: fightProperties.getCurrentLap(),
+                events: structuredClone(events),
+            });
+        }
         for (const event of events) {
             if (event.type === "turn_completed") {
                 if (currentActiveUnitId === event.unitId) {
@@ -1258,7 +1318,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         }
     };
 
-    const startResult = engine.apply({ type: "start_fight" });
+    config.beforeFightStart?.(engineContext);
+    const startResult = applyCommittedAction({ type: "start_fight" });
     applyEvents(startResult.events);
     search.onFightReady();
     v08A13TrajectorySearch?.onFightReady();
@@ -1266,9 +1327,11 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const advance = (): void => {
         const maxAttempts = unitsHolder.getAllUnits().size + 2;
         for (let i = 0; i < maxAttempts && !finished && !currentActiveUnitId; i += 1) {
-            const result = turnEngine.advanceAfterNoActiveUnit({
-                damageDealtThisLap: damageStatisticHolder.has(fightProperties.getCurrentLap()),
-            });
+            const result = applyWithHealth("advance", () =>
+                turnEngine.advanceAfterNoActiveUnit({
+                    damageDealtThisLap: damageStatisticHolder.has(fightProperties.getCurrentLap()),
+                }),
+            );
             if (config.turnActivationObserver) {
                 const skipped = result.events.filter((event) => event.type === "unit_skipped");
                 if (skipped.length) config.turnActivationObserver(structuredClone(skipped));
@@ -1352,6 +1415,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const envOverrideSearchApplies =
             !mindlessUnit &&
             searchEnvOverrideTeams.has(unit.getTeam()) &&
+            (config.searchEnvOverrideUnitFilter?.(unit) ?? true) &&
             searchEnvOverrideSearch?.appliesTo(strategy.version, unit.getTeam()) === true;
         const searchApplies =
             !mindlessUnit && !envOverrideSearchApplies && search.appliesTo(strategy.version, unit.getTeam());
@@ -1524,7 +1588,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         for (let actionIndex = 0; actionIndex < decided.length; actionIndex += 1) {
             const action = decided[actionIndex];
             const fromCell = { ...unit.getBaseCell() };
-            const result = engine.apply(action);
+            const result = applyCommittedAction(action);
             if (turnExecutionObserver) {
                 const observedEvents = structuredClone(result.events);
                 strategyActionsForObservation!.push({
@@ -1668,7 +1732,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     return false;
                 }
                 const fromCell = { ...unit.getBaseCell() };
-                const r = engine.apply(action);
+                const r = applyCommittedAction(action);
                 if (!r.completed && source === "v0.1_retry") {
                     if (unit.getTeam() === GREEN_TEAM) {
                         rejectedGreen += 1;
@@ -1749,7 +1813,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             }
         }
         if (!finished && currentActiveUnitId === actingUnitId) {
-            const endResult = engine.apply({ type: "end_turn", unitId: actingUnitId, reason: "manual" });
+            const endResult = applyCommittedAction({ type: "end_turn", unitId: actingUnitId, reason: "manual" });
             if (turnExecutionObserver) {
                 turnEventsForObservation!.push(...structuredClone(endResult.events));
             }
@@ -1823,6 +1887,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // SEARCH_AUDIT: flush the per-game search/ablation counters (no-op unless the driver is enabled).
     search.onMatchEnd(matchResult.winner, matchResult.endReason);
     v08A13TrajectorySearch?.onMatchEnd(matchResult.winner, matchResult.endReason);
+    // The env-override research arm buffers its audit / IL rows per game and appends them ONLY here.
+    // Until this call existed the arm ran every decision and then discarded every row at match end, so a
+    // SEARCH_AUDIT or SEARCH_IL_DATASET aimed at it produced nothing at all — silently.
+    searchEnvOverrideSearch?.onMatchEnd(matchResult.winner, matchResult.endReason);
     return matchResult;
 }
 
@@ -1958,6 +2026,10 @@ function recordAction(
         return; // the engine declined this proposal — it isn't an action the unit took, so don't log it
     }
     const attackEvent = result.events.find((e) => e.type === "unit_attacked");
+    const spellEvent =
+        action.type === "cast_spell" && process.env[SIM_RECORD_SPELL_EFFECTS_ENV] === "1"
+            ? result.events.find((e): e is Extract<GameEvent, { type: "spell_cast" }> => e.type === "spell_cast")
+            : undefined;
     let targetId: string | undefined;
     let toCell: XY | undefined;
     if (action.type === "melee_attack" || action.type === "range_attack") {
@@ -1999,6 +2071,16 @@ function recordAction(
             attackEvent?.type === "unit_attacked"
                 ? (attackEvent.damage.secondary?.length ?? 0) + (attackEvent.damage.splash?.length ?? 0)
                 : undefined,
+        ...(spellEvent
+            ? {
+                  spellName: spellEvent.spellName,
+                  spellDamage: (spellEvent.damaged ?? [])
+                      .filter((hit) => !hit.rebounded)
+                      .reduce((total, hit) => total + hit.amount, 0),
+                  spellHealed: (spellEvent.healed ?? []).reduce((total, heal) => total + heal.amount, 0),
+                  spellResurrectedHp: (spellEvent.resurrected ?? []).reduce((total, raised) => total + raised.hp, 0),
+              }
+            : {}),
     });
 }
 

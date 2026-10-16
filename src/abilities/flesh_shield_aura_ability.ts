@@ -10,8 +10,10 @@
  */
 
 import * as HoCConstants from "../constants";
+import { getAuraCellKeyMembershipForBody } from "../effects/effect_helper";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
+import { isFootprintWithinGrid } from "../grid/grid_math";
 import type { ISecondaryDamage } from "../scene/animations";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
@@ -33,13 +35,92 @@ export interface IFleshShieldResult {
  * stack-ability modifiers at aura-refresh time by calculateAuraPower). The absorbed portion is
  * recalculated against the owner's own armor — scaled by the ratio of the protected unit's effective
  * armor to the owner's effective armor as seen by this attacker — and dealt to the owner instead. The
- * protected unit only receives the remainder. If the owner cannot survive the full recalculated
+ * protected unit only receives the remainder. Its remaining cumulative HP caps both the redirected
+ * share and the recalculated damage to the owner. If the owner's remaining HP further limits the
  * transfer, only the affordable portion is redirected and the overflow remains on the protected unit.
  * Applies to direct hits, responses, multi-hits, and every unit struck by an AOE or pass-through attack.
  *
  * PHYSICAL ONLY: the aura is flesh, not a ward. Magical damage — cast spells, Fire Breath, Chain Lightning
  * and every other magic-resist-reduced hit — lands on the protected unit in full and is never routed here.
+ *
+ * Coverage is where the bodies stand NOW, not the buff stamped at the last aura refresh. A fly-attack
+ * lands the attacker before retaliation, and the refresh that would move the buff does not run until the
+ * swing is over — so the takeoff-cell buff would shield a unit that has already left the aura, and would
+ * miss one that landed inside it. Same rule as War Anger, which recounts enemies from the landing cells.
+ * The strongest covering Abomination wins; the owner's own aura never absorbs for the owner.
  */
+function coveringFleshShield(
+    targetUnit: Unit,
+    grid: Grid,
+    unitsHolder: UnitsHolder,
+): { absorber: Unit; absorbPercentage: number } | undefined {
+    const targetCells = targetUnit.getCells();
+    if (!targetCells.length) {
+        return undefined;
+    }
+
+    const gridSettings = grid.getSettings();
+    const additionalAuraRange = FightStateManager.getInstance()
+        .getFightProperties()
+        .getAdditionalAuraRangePerTeam(targetUnit.getTeam());
+    let best: { absorber: Unit; absorbPercentage: number } | undefined;
+    for (const source of unitsHolder.getAllUnitsIterator()) {
+        if (
+            source.isDead() ||
+            source.getTeam() !== targetUnit.getTeam() ||
+            !source.hasAbilityActive("Flesh Shield Aura")
+        ) {
+            continue;
+        }
+        if (
+            !isFootprintWithinGrid(
+                gridSettings,
+                source.getBaseCell(),
+                source.getFootprintWidth(),
+                source.getFootprintHeight(),
+            )
+        ) {
+            continue;
+        }
+
+        const aura = source.getAuraEffects().find((effect) => effect.getName() === "Flesh Shield");
+        if (!aura) {
+            continue;
+        }
+        const range = aura.getRange() + additionalAuraRange;
+        if (range < 0) {
+            continue;
+        }
+        const sourceCells = source.getCells();
+        if (!sourceCells.length) {
+            continue;
+        }
+
+        const covered = getAuraCellKeyMembershipForBody(gridSettings, sourceCells, range);
+        let reachesTarget = false;
+        for (const cell of targetCells) {
+            if (covered.has((cell.x << 4) | cell.y)) {
+                reachesTarget = true;
+                break;
+            }
+        }
+        if (!reachesTarget) {
+            continue;
+        }
+
+        // Strictly greater, matching the aura refresh: equal powers keep the first source.
+        const absorbPercentage = Math.min(100, Math.max(0, Number(aura.getPower().toFixed(1))));
+        if (!best || absorbPercentage > best.absorbPercentage) {
+            best = { absorber: source, absorbPercentage };
+        }
+    }
+
+    if (!best || best.absorber.getId() === targetUnit.getId()) {
+        return undefined;
+    }
+    return best;
+}
+
 export function processFleshShieldAura(
     attackerUnit: Unit,
     targetUnit: Unit,
@@ -62,35 +143,19 @@ export function processFleshShieldAura(
     if (damage <= 0 || targetUnit.isDead()) {
         return result;
     }
-
-    const fleshShieldBuff = targetUnit.getBuff("Flesh Shield Aura");
-    if (!fleshShieldBuff) {
+    // The protected unit's own Water Shield answers first: a hit it absorbs whole never reaches the aura.
+    if (targetUnit.willWaterShieldAbsorb(attackerUnit)) {
         return result;
     }
 
-    const x = fleshShieldBuff.getFirstSpellProperty();
-    const y = fleshShieldBuff.getSecondSpellProperty();
-    if (x === undefined || y === undefined) {
+    const covering = coveringFleshShield(targetUnit, grid, unitsHolder);
+    if (!covering) {
         return result;
     }
-
-    const auraSourceUnitId = grid.getOccupantUnitId({ x: x, y: y });
-    if (!auraSourceUnitId || auraSourceUnitId === targetUnit.getId()) {
-        return result;
-    }
-
-    const absorberUnit = unitsHolder.getAllUnits().get(auraSourceUnitId);
-    if (
-        !absorberUnit ||
-        absorberUnit.isDead() ||
-        absorberUnit.getTeam() !== targetUnit.getTeam() ||
-        !absorberUnit.hasAbilityActive("Flesh Shield Aura")
-    ) {
-        return result;
-    }
-
-    const absorbPercentage = Math.min(100, Math.max(0, fleshShieldBuff.getPower()));
-    const requestedAbsorbedBase = Math.floor((damage * absorbPercentage) / 100);
+    const absorberUnit = covering.absorber;
+    const absorbPercentage = covering.absorbPercentage;
+    const targetHpCapacity = targetUnit.getCumulativeHp();
+    const requestedAbsorbedBase = Math.min(Math.floor(targetHpCapacity), Math.floor((damage * absorbPercentage) / 100));
     if (requestedAbsorbedBase <= 0) {
         return result;
     }
@@ -115,8 +180,8 @@ export function processFleshShieldAura(
 
     // Work in the protected target's damage space. The absorber's armor can make one redirected point
     // cost more or less than one HP, so simply min(requested, owner HP) would still lose or invent damage.
-    // Find the largest integer share whose recalculated cost fits the owner's remaining cumulative HP.
-    const absorberHpCapacity = absorberUnit.getCumulativeHp();
+    // Find the largest integer share whose recalculated cost fits both stacks' remaining cumulative HP.
+    const absorberHpCapacity = Math.min(targetHpCapacity, absorberUnit.getCumulativeHp());
     let low = 0;
     let high = requestedAbsorbedBase;
     while (low < high) {
@@ -137,11 +202,8 @@ export function processFleshShieldAura(
 
     const positionAtImpact = { ...absorberUnit.getPosition() };
     const amountAliveBefore = absorberUnit.getAmountAlive();
-    const damageDealt = absorberUnit.applyDamage(
-        absorbedRecalculated,
-        FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
-        sceneLog,
-    );
+    // 0 break chance: this is a share of one hit, and that hit already rolled Break on the unit it struck.
+    const damageDealt = absorberUnit.applyDamage(absorbedRecalculated, 0, sceneLog);
     result.absorbedDamage = damageDealt;
     damageStatisticHolder.add({
         unitName: attackerUnit.getName(),

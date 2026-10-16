@@ -308,6 +308,9 @@ export function projectDoubleShotSecondVolley(input: IDoubleShotProjectionInput)
 }
 
 export interface IDoubleShotProjection {
+    /** Possible artifact volley; its minimum contribution is zero because the proc can fail. */
+    bonus?: IAttackDamageProjection;
+    bonusChance?: number;
     /** The ordinary shot: abilityMultiplier 1, exactly as the attack handler fires it. */
     first: IAttackDamageProjection;
     /** The Double Shot volley, 0 when the quiver ran dry on the first one. */
@@ -327,11 +330,18 @@ export function projectDoubleShotAttack(input: IDoubleShotProjectionInput): IDou
     // The attack handler fires the FIRST volley at a hard abilityMultiplier of 1, cut only by Paralysis.
     const first = projectVolley(input, attackerParalysisMultiplier(input.attacker));
     const second = projectDoubleShotSecondVolley(input);
+    const bonusChance = input.attacker.getBonusRangedAttackChance();
+    const spentVolleys = doubleShotAbility(input.attacker) ? 2 : 1;
+    const bonus =
+        bonusChance > 0 && input.attacker.projectRangeShotsAfterVolleys(input.target, spentVolleys) > 0
+            ? first
+            : undefined;
 
     return {
         first,
         second,
-        total: projectKillBand(input.target, first.min + second.min, first.max + second.max),
+        ...(bonus ? { bonus, bonusChance } : {}),
+        total: projectKillBand(input.target, first.min + second.min, first.max + second.max + (bonus?.max ?? 0)),
     };
 }
 

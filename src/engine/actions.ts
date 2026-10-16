@@ -60,7 +60,7 @@ export type GameAction =
       }
     | { type: "area_throw_attack"; attackerId: string; targetCell: XY }
     // `targetOrientation` only means anything to a spell whose footprint can be turned — today just Fire
-    // Wall, whose 3-cell line the player rotates with Shift while aiming (see FireWallOrientation). Omitted
+    // Wall, whose 4-cell line the player rotates with Shift while aiming (see FireWallOrientation). Omitted
     // by every other cast, and normalized engine-side, so an absent or malformed value falls back to the
     // default horizontal lay rather than rejecting the action.
     | {
@@ -71,6 +71,8 @@ export type GameAction =
           targetCell?: XY;
           targetOrientation?: number;
       }
+    | { type: "place_barrel"; team: TeamType; barrelIndex: number; cell: XY }
+    | { type: "unplace_barrel"; team: TeamType; barrelIndex: number }
     | { type: "place_unit"; unitId: string; team: TeamType; unitName: string; cells: XY[]; amount?: number }
     // `cells` places the peeled-off stack in the SAME action. Omit it (the sidebar's "Split Selected"
     // button) and the new stack is created unplaced, for the player to position separately. Supplying it
@@ -82,7 +84,7 @@ export type GameAction =
     // FightProperties.requestAdditionalTurnTime). Carries the requesting team; the engine only
     // honours it while that team's unit is active and it hasn't already been used this lap.
     | { type: "request_additional_time"; team: TeamType }
-    // During placement, a team spends its doctrine's upgrade-point budget on an army augment. `augmentKind`
+    // During placement, a team spends its perk's upgrade-point budget on an army augment. `augmentKind`
     // is the augment category and `augmentValue` its level (see FightProperties.setAugmentPerTeam /
     // canAugment). Applied pre-fight to the army; not a turn action.
     | { type: "augment"; team: TeamType; augmentKind: AugmentKind; augmentValue: number }

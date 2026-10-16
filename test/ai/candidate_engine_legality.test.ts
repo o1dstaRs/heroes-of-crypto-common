@@ -579,6 +579,27 @@ describe("enumerated candidate engine legality", () => {
         expect(castling[0].targetId).toBe(nearEnemy.getId());
         expectCandidatesToApply(castlingHarness, castling);
 
+        // Owner call 2026-10-02: the swap reaches ONE cell beyond the caster's own movement. Harpy flies
+        // 7.1 steps, so a straight-line enemy at 8 cells is a legal swap target and one at 9 is not.
+        const reachCombat = createCombatTestContext();
+        const reachHarpy = makeReal(LEFT, "Might", "Harpy");
+        reachHarpy.setStackPower(5);
+        const edgeEnemy = createTestUnit({ team: RIGHT, name: "Edge", attackType: MELEE, amountAlive: 5 });
+        const beyondEnemy = createTestUnit({ team: RIGHT, name: "Beyond", attackType: MELEE, amountAlive: 5 });
+        placeUnit(reachCombat.grid, reachCombat.unitsHolder, reachHarpy, { x: 2, y: 2 });
+        placeUnit(reachCombat.grid, reachCombat.unitsHolder, edgeEnemy, { x: 10, y: 2 }); // 8 straight cells
+        placeUnit(reachCombat.grid, reachCombat.unitsHolder, beyondEnemy, { x: 11, y: 2 }); // 9 straight cells
+        const reachHarness = activate(reachCombat, reachHarpy);
+        const reachCastling = enumerateCandidates(
+            reachHarpy,
+            reachHarness.context,
+            incumbentFor(reachHarpy),
+        ).candidates.filter((candidate) => candidate.kind === "spell" && candidate.spellName === "Castling");
+
+        expect(reachCastling).toHaveLength(1);
+        expect(reachCastling[0].targetId).toBe(edgeEnemy.getId());
+        expectCandidatesToApply(reachHarness, reachCastling);
+
         const resurrectionCombat = createCombatTestContext();
         const angel = makeReal(LEFT, "Life", "Angel");
         angel.setStackPower(5);

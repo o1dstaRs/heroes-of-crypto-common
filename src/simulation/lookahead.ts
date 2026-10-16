@@ -113,6 +113,9 @@ export interface ILookaheadDeps {
      *  simulated attack appends to it, which would perturb the real narrowing decision if left. */
     captureDamageStats: () => IDamageStatistic[];
     restoreDamageStats: (saved: IDamageStatistic[]) => void;
+    /** Capture mutable engine-closure state outside the battle snapshot (e.g. summon identity counters).
+     * The returned rollback is idempotent and restores the same pre-simulation state on every call. */
+    captureAuxiliaryState?: () => () => void;
 }
 
 interface ICandidate {
@@ -154,6 +157,7 @@ export class LookaheadDriver {
         const seed = this.simSeed(unit);
         const savedRandomState = captureDeterministicRandomState();
         const savedActive = this.deps.getActiveUnitId();
+        const restoreAuxiliaryState = this.deps.captureAuxiliaryState?.();
 
         // Swap the tournament's seeded RNG to a PRIVATE stream around the WHOLE search (candidate building
         // included) so NOTHING here — path enumeration, snapshotting, simulated applies — draws from (and
@@ -177,6 +181,7 @@ export class LookaheadDriver {
                 // Restore to the frozen pre-decision state before the next candidate.
                 restoreBattle(snapshot, this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
                 this.deps.restoreDamageStats(savedStats);
+                restoreAuxiliaryState?.();
                 if (cand.kind === "base") {
                     baseScore = score;
                 }
@@ -193,6 +198,7 @@ export class LookaheadDriver {
             }
             return best;
         } finally {
+            restoreAuxiliaryState?.();
             // Restore the tournament's exact RNG + UUID state and the engine's active-unit pointer.
             // Speculative summons must not perturb the IDs (or subsequent rollout seeds) of live units.
             restoreDeterministicRandomState(savedRandomState);

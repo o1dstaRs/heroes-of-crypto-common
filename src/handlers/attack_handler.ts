@@ -22,18 +22,24 @@ import * as SpellHelper from "../spells/spell_helper";
 import { SpellPowerType } from "../spells/spell_properties";
 import type { IWeightedRoute } from "../grid/path_definitions";
 import { Spell } from "../spells/spell";
-import { SmokeClouds } from "../spells/smoke_clouds";
+import { dispelSmokeOnOccupiedCells, SmokeClouds } from "../spells/smoke_clouds";
 import * as HoCConstants from "../constants";
 import * as AbilityHelper from "../abilities/ability_helper";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import type { IAbilityTransfer } from "../engine/events";
+import {
+    burnUnitOnFireWallCells,
+    fireWallCellsForTraversal,
+    travelledMovePath,
+} from "../engine/post_move_actor_availability";
 import { Unit } from "../units/unit";
+import type { IFireforgedSwordResult } from "../abilities/fireforged_sword_ability";
 import { recordEffectApplication } from "../units/effect_application_capture";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
 import * as EffectHelper from "../effects/effect_helper";
 import { MoveHandler } from "./move_handler";
-import type { IAnimationData } from "../scene/animations";
+import type { IAnimationData, ISecondaryDamage, SecondaryDamageSource } from "../scene/animations";
 import type { IBoardObj } from "../units/unit";
 import type { IVisibleDamage } from "../scene/animations";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
@@ -107,6 +113,30 @@ export interface IAttackResult {
     resurrected?: { unitId: string; amount: number; hp: number; position: HoCMath.XY }[];
     /** Ability cards a giftable cast actually delivered, for authoritative replay/log/VFX. */
     abilityTransfers?: IAbilityTransfer[];
+    /** Cemetery barrels a Lightning Spin knocked down in this strike, beyond the one a blow was aimed at. */
+    spunObstacleCells?: HoCMath.XY[];
+    /** Cemetery barrels a unit strike's piercing passive ran on into behind its target, tagged with that passive. */
+    piercedObstacles?: IPiercedObstacle[];
+    /** Fire Wall damage the attacker took walking into the flames on its way in, before it could strike. */
+    fireWallBurn?: IFireWallBurnReport;
+    /** The attacker died in those flames on arrival, so its blow never landed. */
+    strikeSkipped?: boolean;
+    /** Smoke cleared by a successfully occupied arrival footprint, before its burn or strike. */
+    dispelledSmokeCells?: HoCMath.XY[];
+}
+
+/** One attacker's Fire Wall burn, in the shape the action engine puts on a `fire_wall_burned` event. */
+export interface IFireWallBurnReport {
+    unitId: string;
+    cells: HoCMath.XY[];
+    position: HoCMath.XY;
+    amount: number;
+    unitsDied: number;
+}
+
+export interface IPiercedObstacle {
+    cell: HoCMath.XY;
+    source: "fire_breath" | "skewer_strike";
 }
 
 export interface IAttackObstacle {
@@ -175,9 +205,9 @@ export class AttackHandler {
         // whole cells, not circles — the board floors the fractional shot_distance stat (which the unit card
         // and the left sidebar keep showing unrounded) and measures in king moves, so a 6.5 archer deals a
         // full 1/1 to every cell inside the 6-cell square around it, 1/2 out to 12 cells, and so on.
-        // Only the Sniper ability negates falloff entirely. Farsight Quiver no longer removes falloff —
-        // instead it extends the archer's basic shot_distance (adjustBaseStats), pushing these bands out.
-        if (!attackerUnit.hasAbilityActive("Sniper")) {
+        // Sniper and Farsight Quiver both skip these bands, so the shot stays 1/1 at any distance.
+        // Smoke is applied later, on the ray, and still doubles this divisor once.
+        if (!attackerUnit.hasAbilityActive("Sniper") && !attackerUnit.hasBuffActive("Farsight Quiver")) {
             const bandCells = GridMath.getWholeCellShotDistance(attackerUnit.getRangeShotDistance());
             if (bandCells > 0) {
                 let cellsAway = GridMath.getShotCellDistance(
@@ -521,6 +551,7 @@ export class AttackHandler {
         // WHEN the transfer happened (or distinguish Holy Cross copy from a pre-existing caster card), so
         // ranked needs the exact outcome on the spell event just like heals and resurrection do.
         const abilityTransfers: IAbilityTransfer[] = [];
+        const dispelledSmokeCells: HoCMath.XY[] = [];
         if (!currentActiveSpell || !attackerUnit) {
             return { completed: false, unitIdsDied, animationData };
         }
@@ -627,10 +658,16 @@ export class AttackHandler {
                     unitsHolder.refreshStackPowerForAllUnits();
                 } else {
                     const appliedBuff = amplifyCastBuffForTarget(currentActiveSpell, attackerUnit, targetUnit);
+                    // Helping Hand is the only cast buff whose effect IS the caster's body: its gift is a
+                    // share of that max HP and base armor, so those two numbers have to ride the buff.
+                    // Every other buff's `{}` is its own power. Passing HP here made the client print that
+                    // HP in the placeholder — a Wandering Mage (6 HP) set its ally "alight for 6%" instead
+                    // of Fireforged Sword's stable 20% of the damage that landed.
+                    const carriesCasterBody = appliedBuff.getName() === "Helping Hand";
                     targetUnit.applyBuff(
                         appliedBuff,
-                        attackerUnit.getMaxHp(),
-                        attackerUnit.getBaseArmor(),
+                        carriesCasterBody ? attackerUnit.getMaxHp() : undefined,
+                        carriesCasterBody ? attackerUnit.getBaseArmor() : undefined,
                         attackerUnit.getId() === targetUnit.getId(),
                     );
                 }
@@ -658,12 +695,13 @@ export class AttackHandler {
                 if (!(
                     currentActiveSpell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance()
                 )) {
-                    // Castling's one-cell swap is only defined for two small units. Re-check the effective
-                    // target after Absorb Penalties redirection so an aura cannot collapse a large unit's
-                    // 2x2 footprint into a single occupied cell.
+                    // A swap exchanges anchors, so it is only well defined between two bodies of the SAME
+                    // footprint. Re-check the EFFECTIVE target after Absorb Penalties redirection: the aura
+                    // can hand the swap to a body of another shape, which would land one unit on cells the
+                    // other never held.
                     if (
                         currentActiveSpell.getPowerType() === SpellPowerType.POSITION_CHANGE &&
-                        (!attackerUnit.isSmallSize() || !debuffTarget.isSmallSize())
+                        !SpellHelper.hasSwappableFootprint(attackerUnit, debuffTarget)
                     ) {
                         applied = false;
                     } else if (currentActiveSpell.getPowerType() === SpellPowerType.POSITION_CHANGE) {
@@ -686,15 +724,28 @@ export class AttackHandler {
                                 debuffTarget.isSmallSize(),
                             );
 
-                            const newAttackerPosition = GridMath.getPositionForCell(
+                            // Both bodies are the same shape (guarded above), so each one landing on the
+                            // other's ANCHOR lands on exactly the cells the other just vacated. Anchor and
+                            // position are not interchangeable: `position` is the footprint's CENTRE, which
+                            // only coincides with the anchor cell's centre for a 1x1 — so the move has to go
+                            // through getPositionForFootprintAnchor, and the whole body has to be
+                            // re-registered with occupyCells, not one cell with occupyCell.
+                            const footprintWidth = attackerUnit.getFootprintWidth();
+                            const footprintHeight = attackerUnit.getFootprintHeight();
+
+                            const newAttackerPosition = GridMath.getPositionForFootprintAnchor(
+                                this.gridSettings,
                                 initialTargetUnitCell,
-                                this.gridSettings.getMinX(),
-                                this.gridSettings.getStep(),
-                                this.gridSettings.getHalfStep(),
+                                footprintWidth,
+                                footprintHeight,
                             );
                             attackerUnit.setPosition(newAttackerPosition.x, newAttackerPosition.y, false);
-                            this.grid.occupyCell(
-                                initialTargetUnitCell,
+                            this.grid.occupyCells(
+                                GridMath.getFootprintCellsForAnchor(
+                                    initialTargetUnitCell,
+                                    footprintWidth,
+                                    footprintHeight,
+                                ),
                                 attackerUnit.getId(),
                                 attackerUnit.getTeam(),
                                 attackerUnit.getAttackRange(),
@@ -702,21 +753,37 @@ export class AttackHandler {
                                 attackerUnit.hasAbilityActive("Made of Water"),
                             );
 
-                            const newTargetUnitPosition = GridMath.getPositionForCell(
+                            const newTargetUnitPosition = GridMath.getPositionForFootprintAnchor(
+                                this.gridSettings,
                                 initialAttackerCell,
-                                this.gridSettings.getMinX(),
-                                this.gridSettings.getStep(),
-                                this.gridSettings.getHalfStep(),
+                                footprintWidth,
+                                footprintHeight,
                             );
                             debuffTarget.setPosition(newTargetUnitPosition.x, newTargetUnitPosition.y, false);
-                            this.grid.occupyCell(
-                                initialAttackerCell,
+                            this.grid.occupyCells(
+                                GridMath.getFootprintCellsForAnchor(
+                                    initialAttackerCell,
+                                    footprintWidth,
+                                    footprintHeight,
+                                ),
                                 debuffTarget.getId(),
                                 debuffTarget.getTeam(),
                                 debuffTarget.getAttackRange(),
                                 debuffTarget.canTraverseLava(),
                                 debuffTarget.hasAbilityActive("Made of Water"),
                             );
+
+                            const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
+                            for (const unit of [attackerUnit, debuffTarget]) {
+                                dispelledSmokeCells.push(
+                                    ...dispelSmokeOnOccupiedCells(
+                                        smokeClouds,
+                                        this.grid,
+                                        unit.getId(),
+                                        unit.getCells(),
+                                    ),
+                                );
+                            }
 
                             animationData.push(
                                 {
@@ -821,12 +888,149 @@ export class AttackHandler {
                 healed: healedUnits,
                 resurrected: resurrectedUnits,
                 abilityTransfers,
+                ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
             };
         }
 
         return { completed: false, unitIdsDied, animationData };
     }
     public handleRangeAttack(
+        unitsHolder: UnitsHolder,
+        hoverRangeAttackDivisors: number[],
+        rangeResponseAttackDivisor: number,
+        damageForAnimation: IVisibleDamage,
+        attackerUnit?: Unit,
+        targetUnits?: Array<Unit[]>,
+        rangeResponseUnits?: Unit[],
+        hoverRangeAttackPosition?: HoCMath.XY,
+        isAOE = false,
+        decreaseNumberOfShots = true,
+        suppressDoubleShot = false,
+    ): IAttackResult {
+        const chance = attackerUnit?.getBonusRangedAttackChance() ?? 0;
+        const result = this.resolveRangeAttack(
+            unitsHolder,
+            hoverRangeAttackDivisors,
+            rangeResponseAttackDivisor,
+            damageForAnimation,
+            attackerUnit,
+            targetUnits,
+            rangeResponseUnits,
+            hoverRangeAttackPosition,
+            isAOE,
+            decreaseNumberOfShots,
+            suppressDoubleShot,
+        );
+        if (
+            !result.completed ||
+            !attackerUnit ||
+            chance <= 0 ||
+            attackerUnit.isDead() ||
+            attackerUnit.isSkippingThisTurn() ||
+            attackerUnit.getRangeShots() <= 0
+        )
+            return result;
+        const liveGroups = (targetUnits ?? [])
+            .map((units, index) => ({
+                units: units.filter((unit) => !unit.isDead()),
+                divisor: hoverRangeAttackDivisors[index],
+            }))
+            .filter((group) => group.units.length > 0);
+        if (!liveGroups.length || !hoverRangeAttackPosition || HoCLib.getRandomInt(0, 100) >= chance) return result;
+        const outgoingCount = (animations: IAnimationData[] = []): number =>
+            animations.filter(
+                (animation) =>
+                    animation.fromPosition?.x === attackerUnit.getPosition().x &&
+                    animation.fromPosition?.y === attackerUnit.getPosition().y,
+            ).length;
+        const initialVolleys = Math.max(1, outgoingCount(result.animationData));
+        const bonus: IVisibleDamage = {
+            amount: 0,
+            render: false,
+            unitPosition: { ...hoverRangeAttackPosition },
+            unitIsSmall: true,
+            hits: [],
+        };
+        // Exactly one ordinary volley: no native second volley, extra retaliation or recursive artifact roll.
+        const extra = this.resolveRangeAttack(
+            unitsHolder,
+            liveGroups.map((group) => group.divisor),
+            1,
+            bonus,
+            attackerUnit,
+            liveGroups.map((group) => group.units),
+            undefined,
+            hoverRangeAttackPosition,
+            isAOE,
+            true,
+            true,
+        );
+        if (!extra.completed || !outgoingCount(extra.animationData)) return result;
+        this.sceneLog.updateLog(
+            `${attackerUnit.getName()} fires an extra attack with Quiver of Echoes (${chance}% chance)`,
+        );
+        damageForAnimation.rangedVolleyCount = initialVolleys + outgoingCount(extra.animationData);
+        damageForAnimation.extraRangedAttackChance = chance;
+        // Preserve every impact, including a missed volley, in firing order.
+        while ((damageForAnimation.hits?.length ?? 0) < initialVolleys) {
+            (damageForAnimation.hits ??= []).push({ amount: 0, unitsDied: 0, missed: damageForAnimation.missed });
+        }
+        (damageForAnimation.hits ??= []).push(
+            ...(bonus.hits?.length ? bonus.hits : [{ amount: bonus.amount, unitsDied: 0, missed: bonus.missed }]),
+        );
+        for (const key of ["splash", "secondary", "deepWounds", "luckyStrikeBy", "chakramArcs"] as const) {
+            const entries = bonus[key];
+            if (entries?.length)
+                (damageForAnimation as unknown as Record<string, unknown[]>)[key] = [
+                    ...(damageForAnimation[key] ?? []),
+                    ...entries,
+                ];
+        }
+        if (bonus.chakramFlights?.length)
+            (damageForAnimation.chakramFlights ??= []).push(
+                ...bonus.chakramFlights.map((flight) => ({ ...flight, hitIndex: flight.hitIndex + initialVolleys })),
+            );
+        if (bonus.gravechains?.length)
+            (damageForAnimation.gravechains ??= []).push(
+                ...bonus.gravechains.map((wave) => ({ ...wave, hitIndex: wave.hitIndex + initialVolleys })),
+            );
+        if (bonus.absolutions?.length)
+            (damageForAnimation.absolutions ??= []).push(
+                ...bonus.absolutions.map((entry) => ({ ...entry, hitIndex: entry.hitIndex + initialVolleys })),
+            );
+        result.animationData = [...(result.animationData ?? []), ...(extra.animationData ?? [])];
+        result.unitIdsDied = [...new Set([...result.unitIdsDied, ...extra.unitIdsDied])];
+        result.abilityStolen = [...(result.abilityStolen ?? []), ...(extra.abilityStolen ?? [])];
+        return result;
+    }
+    private recordAbsolvingArrow(
+        shooter: Unit,
+        targetPosition: HoCMath.XY,
+        unitsHolder: UnitsHolder,
+        damage: IVisibleDamage,
+        response: boolean,
+    ): void {
+        const lifted = AllAbilities.processAbsolvingArrowAbility(
+            shooter,
+            targetPosition,
+            unitsHolder.getAllUnits(),
+            this.grid,
+            this.gridSettings,
+            this.sceneLog,
+        );
+        for (const entry of lifted) {
+            const ally = unitsHolder.getAllUnits().get(entry.unitId);
+            if (!ally) continue;
+            (damage.absolutions ??= []).push({
+                ...entry,
+                sourceUnitId: shooter.getId(),
+                position: { ...ally.getPosition() },
+                response,
+                hitIndex: 0,
+            });
+        }
+    }
+    private resolveRangeAttack(
         unitsHolder: UnitsHolder,
         hoverRangeAttackDivisors: number[],
         rangeResponseAttackDivisor: number,
@@ -866,6 +1070,11 @@ export class AttackHandler {
             return { completed: false, unitIdsDied, animationData };
         }
 
+        // Declared up here rather than beside the response block below: the Fireforged Sword burns that
+        // ride the through-shot, AOE and double-shot paths all fold their kill morale into these, and
+        // those paths resolve earlier in the function than the response does.
+        let attackerUnitPlusMorale = 0;
+        const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         let targetUnitUndex = 0;
         let affectedUnits = targetUnits.at(targetUnitUndex);
         if (!affectedUnits?.length) {
@@ -882,12 +1091,27 @@ export class AttackHandler {
         const initialTargetUnit = targetUnit;
         let primaryAssimilationLanded = false;
         let responseAssimilationTarget: Unit | undefined;
-        let assimilationResolved = false;
-        const resolveAssimilation = (): void => {
-            if (assimilationResolved) {
+        const initiatingSingleHits: NonNullable<IVisibleDamage["splash"]> = [];
+        let chakramResponseHits: NonNullable<IVisibleDamage["splash"]> | undefined;
+        let rangeAttackFinalized = false;
+        const finalizeRangeAttack = (): void => {
+            if (rangeAttackFinalized) {
                 return;
             }
-            assimilationResolved = true;
+            rangeAttackFinalized = true;
+            // Splash replaces the client's single-target numbers. A counter-Chakram must therefore carry
+            // both sides of the exchange, including each initiating arrow's own hit/miss and casualties.
+            // Finalize after the last arrow (or a lethal early return), so no later single hit is lost.
+            if (chakramResponseHits?.length) {
+                (damageForAnimation.splash ??= []).push(...initiatingSingleHits, ...chakramResponseHits);
+            } else if (
+                attackerUnit.getBonusRangedAttackChance() > 0 &&
+                !damageForAnimation.splash?.length &&
+                initiatingSingleHits.length
+            ) {
+                // Explicit per-volley misses keep an echo after a dodged native shot in the right slot.
+                damageForAnimation.splash = [...initiatingSingleHits];
+            }
             if (responseAssimilationTarget) {
                 const responseStolen = AllAbilities.processPredatoryAssimilationAbility(
                     initialTargetUnit,
@@ -918,19 +1142,31 @@ export class AttackHandler {
         // if so, check if the forced target is still alive
         const forcedTargetUnitId = attackerUnit.getTarget();
         const forcedTargetUnit = unitsHolder.getAllUnits().get(forcedTargetUnitId);
-        if (
-            forcedTargetUnit &&
-            !forcedTargetUnit.isDead() &&
-            forcedTargetUnitId &&
-            forcedTargetUnitId !== targetUnit.getId()
-        ) {
-            return { completed: false, unitIdsDied, animationData };
+        if (forcedTargetUnit && !forcedTargetUnit.isDead() && forcedTargetUnitId) {
+            // A single shot strikes one stack, so the provoker must BE that stack. A splash strikes its whole
+            // 3x3 at once and has no "the" target, so the lock asks the only question that means anything
+            // there: does the blast actually catch the provoker? The ordered first entry cannot answer it —
+            // the aimed cell is enumerated LAST (cellsAround + target), so targetUnits[0][0] is whichever
+            // stack happens to stand in the ring. Reading it refused a Gargantuan aiming squarely at its
+            // provoker whenever anyone else stood beside it, the AI's own throws included: its area router
+            // only ever aims at the provoker (area_throw_router), so those rejections were unreachable
+            // by any legal play and simply lost the turn.
+            const landsOnForcedTarget = isAOE
+                ? targetUnits.some((group) => group.some((unit) => unit.getId() === forcedTargetUnitId))
+                : targetUnit.getId() === forcedTargetUnitId;
+            if (!landsOnForcedTarget) {
+                return { completed: false, unitIdsDied, animationData };
+            }
         }
 
         // ...and the inverse: Terrifying Gaze bars this one enemy while leaving every other target open.
         if (attackerUnit.cannotAttackUnitId(targetUnit.getId())) {
             return { completed: false, unitIdsDied, animationData };
         }
+
+        // Presence marks an authoritative flight list. Through Shot can take precedence over a
+        // coexisting Chakram, and an empty list prevents clients from inventing a disc for that ray.
+        damageForAnimation.chakramFlights ??= [];
 
         // Track initial amount for kill counting
         // let initialAmountAlive = targetUnit.getAmountAlive();
@@ -947,6 +1183,8 @@ export class AttackHandler {
             this.damageStatisticHolder,
             decreaseNumberOfShots,
             (damageForAnimation.secondary ??= []),
+            1,
+            damageForAnimation,
         );
         for (const uId of throughShotResult.unitIdsDied) {
             unitIdsDied.push(uId);
@@ -966,7 +1204,9 @@ export class AttackHandler {
 
         if (throughShotResult.landed) {
             primaryAssimilationLanded = true;
-            resolveAssimilation();
+            finalizeRangeAttack();
+            // Both volleys' pierced units, gathered for the one sword pass at the end of this branch.
+            const throughShotSwordVictims = [...throughShotResult.perUnitDamage];
 
             // Double Shot (incl. Crafted Double Shot) on a Through-Shot attacker fires a SECOND piercing
             // volley down the same lane. The generic double-shot path (processDoubleShotAbility, reached only
@@ -1005,6 +1245,8 @@ export class AttackHandler {
                         false, // bonus volley — do not consume another range shot
                         (damageForAnimation.secondary ??= []),
                         secondVolleyMultiplier,
+                        damageForAnimation,
+                        1,
                     );
                     for (const uId of secondThroughShot.unitIdsDied) {
                         if (!unitIdsDied.includes(uId)) {
@@ -1024,6 +1266,25 @@ export class AttackHandler {
                             })),
                         );
                     }
+                    throughShotSwordVictims.push(...secondThroughShot.perUnitDamage);
+                }
+            }
+
+            // Every unit the volley pierced burns for its own share. Through Shot returns straight out of
+            // handleRangeAttack, so the single-target sword pass further down is never reached on this
+            // path — a Fireforged Tsar Cannon set nothing alight at all before this (owner report
+            // 2026-09-20). Both volleys of a Double Shot are included, each priced on its own damage.
+            const throughShotSwordResult = AllAbilities.processFireforgedSwordOnVictims(
+                attackerUnit,
+                throughShotSwordVictims,
+                unitsHolder,
+                this.sceneLog,
+                this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
+            );
+            for (const uId of throughShotSwordResult.unitIdsDied) {
+                if (!unitIdsDied.includes(uId)) {
+                    unitIdsDied.push(uId);
                 }
             }
 
@@ -1053,14 +1314,7 @@ export class AttackHandler {
         // target. Resolved here — after every gate that can still cancel the shot (Hidden, a forced or
         // forbidden target, Cowardice, a missing divisor), so a rejected action cannot hand out free
         // cleanses — but before the miss roll, because the arrow crosses its own line either way.
-        AllAbilities.processAbsolvingArrowAbility(
-            attackerUnit,
-            hoverRangeAttackPosition,
-            unitsHolder.getAllUnits(),
-            this.grid,
-            this.gridSettings,
-            this.sceneLog,
-        );
+        this.recordAbsolvingArrow(attackerUnit, hoverRangeAttackPosition, unitsHolder, damageForAnimation, false);
 
         animationData.push({
             fromPosition: attackerUnit.getPosition(),
@@ -1085,6 +1339,7 @@ export class AttackHandler {
         let damageFromResponse = 0;
         let petrifyingGazeResponseDamage = 0;
         let isResponseMissed = false;
+        let responseChakramResolved = false;
         // Water Shield on the RESPONDER's victim (the original attacker): captured before the counter-shot's
         // damage lands so its on-hit riders are skipped like a missed counter when the hit is absorbed.
         let rangeResponseAbsorbed = false;
@@ -1109,21 +1364,6 @@ export class AttackHandler {
                         .getFightProperties()
                         .getAdditionalAbilityPowerPerTeam(rangeResponseUnit.getTeam()),
                 );
-            // The counter-shot is its own arrow down its own line, so a responding Monk cleanses the allies
-            // IT flies past (same rule as the initiating shot above).
-            AllAbilities.processAbsolvingArrowAbility(
-                targetUnit,
-                attackerUnit.getPosition(),
-                unitsHolder.getAllUnits(),
-                this.grid,
-                this.gridSettings,
-                this.sceneLog,
-            );
-            animationData.push({
-                fromPosition: targetUnit.getPosition(),
-                toPosition: attackerUnit.getPosition(),
-                affectedUnit: rangeResponseUnit,
-            });
         } else {
             rangeResponseUnit = undefined;
         }
@@ -1145,9 +1385,10 @@ export class AttackHandler {
         // A dodge ENDS the throw: the disc never touched that victim, so it never left it either and the
         // enemy behind is never reached. The rolls happen here, in flight order, because
         // resolveChakramTrajectory has to stay pure geometry for the hover preview. The primary reuses
-        // the shot's own miss roll above instead of rolling a second time against the same pair — which
+        // the shot's own miss roll above even when there are no eligible bounces. Rerolling that packed
+        // army's primary in the AOE tail could turn a dodge into a hit (or a hit into a dodge). This
         // also puts its damage and its on-hit riders on one verdict rather than two.
-        const chakramFlight = plannedChakramFlight.hitUnits.length
+        const chakramFlight = attackerUnit.getAbility(AllAbilities.CHAKRAM_ABILITY_NAME)
             ? AllAbilities.resolveChakramFlightMisses(
                   plannedChakramFlight,
                   targetUnit,
@@ -1178,17 +1419,6 @@ export class AttackHandler {
                     .join(", ")}`,
             );
         }
-        if (chakramTrajectory.steps.length) {
-            // Hand the client the exact circles + per-leg hits so it flies the disc and lands each hit as the
-            // disc reaches it (see IVisibleDamage.chakramArcs).
-            damageForAnimation.chakramArcs = chakramTrajectory.steps.map((step) => ({
-                targetUnitId: step.hitUnitIds[0] ?? "",
-                cells: step.circleCells.map((cell) => ({ x: cell.x, y: cell.y })),
-                hitUnitIds: [...step.hitUnitIds],
-                mountainCells: step.mountainCells.map((cell) => ({ x: cell.x, y: cell.y })),
-            }));
-        }
-
         // handle attack damage
         let aoeRangeAttackResult = AllAbilities.processRangeAOEAbility(
             attackerUnit,
@@ -1203,7 +1433,22 @@ export class AttackHandler {
             (damageForAnimation.secondary ??= []),
             chakramTrajectory.damageFactorByUnitId,
             chakramFlight?.missByUnitId,
+            damageForAnimation,
         );
+        if (chakramFlight) {
+            AllAbilities.recordChakramFlight(
+                damageForAnimation,
+                {
+                    attackerId: attackerUnit.getId(),
+                    primaryTargetId: targetUnit.getId(),
+                    response: false,
+                    hitIndex: 0,
+                    missed: isAttackMissed,
+                },
+                chakramTrajectory,
+                aoeRangeAttackResult.perUnitDamage,
+            );
+        }
         let attackDamageApplied = true;
         if (aoeRangeAttackResult.landed) {
             damageFromAttack = AllAbilities.processLuckyStrikeAbility(
@@ -1226,6 +1471,31 @@ export class AttackHandler {
                     position: { ...entry.position },
                 }));
             }
+            // The blade over the whole splash: an Area Throw is still "the ally's attack", so every unit
+            // it damaged burns for its OWN share. Before this the sword sat behind a gate that skipped a
+            // landed AOE entirely, so a Fireforged Gargantuan set nobody alight at all — not even the unit
+            // it aimed at (owner report 2026-09-20).
+            //
+            // This pass owns the burn for every landed splash, aimed at a unit or not; the single-target pass
+            // further down skips its sword whenever the splash landed, so no unit burns twice.
+            const aoeSwordResult = AllAbilities.processFireforgedSwordOnVictims(
+                attackerUnit,
+                aoeRangeAttackResult.perUnitDamage.filter((entry) => !entry.missed),
+                unitsHolder,
+                this.sceneLog,
+                this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
+            );
+            attackerUnitPlusMorale += aoeSwordResult.increaseMorale;
+            for (const uId of aoeSwordResult.unitIdsDied) {
+                if (!unitIdsDied.includes(uId)) {
+                    unitIdsDied.push(uId);
+                }
+            }
+            this.updateMoraleDecreaseForTheUnitTeam(
+                moraleDecreaseForTheUnitTeam,
+                aoeSwordResult.moraleDecreaseForTheUnitTeam,
+            );
         } else if (isAttackMissed) {
             this.sceneLog.updateLog(`${attackerUnit.getName()} misses 🏹 on ${targetUnit.getName()}`);
             // Dodged ranged shot (Dodge / Small Specie / Boar Saliva / Broken Aegis): flag it so the
@@ -1234,6 +1504,13 @@ export class AttackHandler {
             damageForAnimation.unitId = targetUnit.getId();
             damageForAnimation.unitPosition = targetUnit.getPosition();
             damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
+            initiatingSingleHits.push({
+                unitId: targetUnit.getId(),
+                position: { ...targetUnit.getPosition() },
+                amount: 0,
+                unitsDied: 0,
+                missed: true,
+            });
         } else {
             let abilityMultiplier = 1;
             const paralysisAttackerEffect = attackerUnit.getEffect("Paralysis");
@@ -1280,6 +1557,22 @@ export class AttackHandler {
             );
         };
 
+        // An area volley (Area Throw, Large Caliber, Chakram) has already landed on the target: a stack it wiped
+        // out has nobody left to shoot back. (A single shot's damage lands after the counter-shot.)
+        if (rangeResponseUnit && targetUnit.isDead()) {
+            rangeResponseUnit = undefined;
+        }
+        if (rangeResponseUnit) {
+            // The counter-shot is its own arrow down its own line, so a responding Monk cleanses the allies
+            // IT flies past (same rule as the initiating shot above).
+            this.recordAbsolvingArrow(targetUnit, attackerUnit.getPosition(), unitsHolder, damageForAnimation, true);
+            animationData.push({
+                fromPosition: targetUnit.getPosition(),
+                toPosition: attackerUnit.getPosition(),
+                affectedUnit: rangeResponseUnit,
+            });
+        }
+
         if (rangeResponseUnit && rangeResponseUnits) {
             // ABILITY Chakram (Zena) on the RESPONSE: a counter-throw behaves EXACTLY like the initiating one —
             // same stack-power total-target cap, separation chain, ally exclusion and Angel stop, with the
@@ -1291,8 +1584,8 @@ export class AttackHandler {
                 this.grid,
             );
             // Dodges end the counter-throw exactly as they end the initiating one, and its primary
-            // likewise reuses the counter-shot's own miss roll rather than rolling again.
-            const responseChakramFlight = plannedResponseChakramFlight.hitUnits.length
+            // likewise reuses the counter-shot's own miss roll, including when no bounce is eligible.
+            const responseChakramFlight = targetUnit.getAbility(AllAbilities.CHAKRAM_ABILITY_NAME)
                 ? AllAbilities.resolveChakramFlightMisses(
                       plannedResponseChakramFlight,
                       rangeResponseUnit,
@@ -1307,6 +1600,7 @@ export class AttackHandler {
                           ),
                   )
                 : undefined;
+            responseChakramResolved = !!responseChakramFlight;
             const responseChakramTrajectory = responseChakramFlight?.trajectory ?? plannedResponseChakramFlight;
             if (responseChakramTrajectory.hitUnits.length) {
                 for (const hitUnit of responseChakramTrajectory.hitUnits) {
@@ -1325,22 +1619,11 @@ export class AttackHandler {
                         .join(", ")}`,
                 );
             }
-            if (responseChakramTrajectory.steps.length) {
-                damageForAnimation.chakramArcs = [
-                    ...(damageForAnimation.chakramArcs ?? []),
-                    ...responseChakramTrajectory.steps.map((step) => ({
-                        targetUnitId: step.hitUnitIds[0] ?? "",
-                        cells: step.circleCells.map((cell) => ({ x: cell.x, y: cell.y })),
-                        hitUnitIds: [...step.hitUnitIds],
-                        mountainCells: step.mountainCells.map((cell) => ({ x: cell.x, y: cell.y })),
-                    })),
-                ];
-            }
-
             aoeRangeResponseResult = AllAbilities.processRangeAOEAbility(
                 targetUnit,
                 rangeResponseUnits,
-                targetUnit,
+                // The unit whose turn it is: a counter-volley's effects on the attacker get the extra lap.
+                attackerUnit,
                 rangeResponseAttackDivisor,
                 unitsHolder,
                 this.grid,
@@ -1350,8 +1633,29 @@ export class AttackHandler {
                 (damageForAnimation.secondary ??= []),
                 responseChakramTrajectory.damageFactorByUnitId,
                 responseChakramFlight?.missByUnitId,
+                damageForAnimation,
             );
+            if (responseChakramFlight) {
+                AllAbilities.recordChakramFlight(
+                    damageForAnimation,
+                    {
+                        attackerId: targetUnit.getId(),
+                        primaryTargetId: rangeResponseUnit.getId(),
+                        response: true,
+                        hitIndex: 0,
+                        missed: isResponseMissed,
+                    },
+                    responseChakramTrajectory,
+                    aoeRangeResponseResult.perUnitDamage,
+                );
+            }
             if (aoeRangeResponseResult.landed) {
+                if (responseChakramFlight) {
+                    chakramResponseHits = aoeRangeResponseResult.perUnitDamage.map((entry) => ({
+                        ...entry,
+                        position: { ...entry.position },
+                    }));
+                }
                 damageFromResponse = AllAbilities.processLuckyStrikeAbility(
                     targetUnit,
                     aoeRangeResponseResult.maxDamage,
@@ -1362,6 +1666,26 @@ export class AttackHandler {
                 for (const uId of aoeRangeResponseResult.unitIdsDied) {
                     unitIdsDied.push(uId);
                 }
+                // The responder's own blade over its counter-volley's splash, for the same reason the
+                // attacking volley burns: the card says "the ally's attacks", and this is one.
+                const aoeResponseSwordResult = AllAbilities.processFireforgedSwordOnVictims(
+                    targetUnit,
+                    aoeRangeResponseResult.perUnitDamage.filter((entry) => !entry.missed),
+                    unitsHolder,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                targetUnitPlusMorale += aoeResponseSwordResult.increaseMorale;
+                for (const uId of aoeResponseSwordResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(uId)) {
+                        unitIdsDied.push(uId);
+                    }
+                }
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    aoeResponseSwordResult.moraleDecreaseForTheUnitTeam,
+                );
             } else if (isResponseMissed) {
                 this.sceneLog.updateLog(`${targetUnit.getName()} misses 🏹 resp on ${rangeResponseUnit.getName()}`);
             } else {
@@ -1422,7 +1746,9 @@ export class AttackHandler {
                             .getFightProperties()
                             .getBreakChancePerTeam(targetUnit.getTeam()),
                         this.sceneLog,
-                        true,
+                        // Extending (and re-rolling an active Break) is for the unit whose turn it is, like a
+                        // Stun; a counter-shot that hits a bystander on the return line breaks it normally.
+                        rangeResponseUnit.getId() === attackerUnit.getId(),
                         targetUnit,
                     ),
                     team: targetUnit.getTeam(),
@@ -1441,18 +1767,44 @@ export class AttackHandler {
                         damageFromResponse,
                         this.sceneLog,
                     );
+                    AllAbilities.processPredatoryAssimilationPoison(
+                        targetUnit,
+                        rangeResponseUnit,
+                        damageFromResponse,
+                        this.sceneLog,
+                    );
+                    // ...and so does the responder's Fireforged Sword, for the same reason: the card says
+                    // "the ally's attacks", and a counter-shot is one of them.
+                    const rangeResponseSwordResult = AllAbilities.processFireforgedSwordAbility(
+                        targetUnit,
+                        rangeResponseUnit,
+                        damageFromResponse,
+                        this.sceneLog,
+                        this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
+                    );
+                    targetUnitPlusMorale += rangeResponseSwordResult.increaseMorale;
+                    for (const uId of rangeResponseSwordResult.unitIdsDied) {
+                        if (!unitIdsDied.includes(uId)) {
+                            unitIdsDied.push(uId);
+                        }
+                    }
+                    this.updateMoraleDecreaseForTheUnitTeam(
+                        moraleDecreaseForTheUnitTeam,
+                        rangeResponseSwordResult.moraleDecreaseForTheUnitTeam,
+                    );
                 }
             }
 
             AllAbilities.processOneInTheFieldAbility(targetUnit);
         }
 
-        if (rangeResponseUnit && (aoeRangeResponseResult?.landed || !isResponseMissed)) {
+        // AOE `landed` means the routing tail handled the volley, including an all-MISS Chakram.
+        // Assimilation belongs to the direct primary hit, never a missed disc or its bounce victims.
+        if (rangeResponseUnit && (!isResponseMissed || (!responseChakramResolved && aoeRangeResponseResult?.landed))) {
             responseAssimilationTarget = rangeResponseUnit;
         }
 
-        let attackerUnitPlusMorale = 0;
-        const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         if (rangeResponseFleshShieldAbsorb) {
             this.updateMoraleDecreaseForTheUnitTeam(
                 moraleDecreaseForTheUnitTeam,
@@ -1524,6 +1876,12 @@ export class AttackHandler {
                     amount: damageDealt,
                     unitsDied: Math.max(0, initialAmountAlive - currentAmount),
                 }); // Initialize hits with first shot
+                initiatingSingleHits.push({
+                    unitId: targetUnit.getId(),
+                    position: { ...targetUnit.getPosition() },
+                    amount: damageDealt,
+                    unitsDied: Math.max(0, initialAmountAlive - currentAmount),
+                });
                 damageForAnimation.unitPosition = targetUnit.getPosition();
                 damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
                 damageForAnimation.unitId = targetUnit.getId();
@@ -1542,32 +1900,53 @@ export class AttackHandler {
                 }
             }
 
+            if (!isAttackMissed && !rangeAttackAbsorbed && !aoeRangeAttackResult?.landed) {
+                AllAbilities.processGravechainAbility(
+                    attackerUnit,
+                    targetUnit,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    attackerUnit,
+                    undefined,
+                    damageForAnimation,
+                );
+            }
             if (!targetUnit.isDead() && !isAttackMissed && !rangeAttackAbsorbed) {
                 // On-hit effects only land when the shot itself did: a dodged/missed shot (Dodge /
                 // Small Specie / Boar Saliva) must not stun/petrify/etc. — mirrors the melee path,
                 // which gates this same block on !isAttackMissed (bug: an Orc could miss a Scavenger
                 // and still Stun it). A Water-Shield-absorbed shot is treated the same as a miss.
-                const rangedFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
-                    attackerUnit,
-                    targetUnit,
-                    damageFromAttack,
-                    this.sceneLog,
-                    this.damageStatisticHolder,
-                    (damageForAnimation.secondary ??= []),
-                );
-                for (const uId of rangedFireforgedSwordResult.unitIdsDied) {
-                    if (!unitIdsDied.includes(uId)) {
-                        unitIdsDied.push(uId);
+                //
+                // A landed splash (an Area Throw / Large Caliber / Chakram aimed at this unit) already burned
+                // every unit it damaged and rolled Stun, Freeze, Rime Charm and Spit Ball on each of them, the
+                // aimed unit included — rolling them here too gave the aimed unit a second chance at each.
+                const splashLanded = !!aoeRangeAttackResult?.landed;
+                if (!splashLanded) {
+                    const rangedFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
+                        attackerUnit,
+                        targetUnit,
+                        damageFromAttack,
+                        this.sceneLog,
+                        this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
+                    );
+                    for (const uId of rangedFireforgedSwordResult.unitIdsDied) {
+                        if (!unitIdsDied.includes(uId)) {
+                            unitIdsDied.push(uId);
+                        }
                     }
+                    this.updateMoraleDecreaseForTheUnitTeam(
+                        moraleDecreaseForTheUnitTeam,
+                        rangedFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
+                    );
+                    AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 }
-                this.updateMoraleDecreaseForTheUnitTeam(
-                    moraleDecreaseForTheUnitTeam,
-                    rangedFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
-                );
-                AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-                AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
+                if (!splashLanded) {
+                    AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                    AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                }
                 // Area Throw / Large Caliber already resolved Gaze for every struck unit in the AOE
                 // processor. Keep the outer primary on-hit pass for its other effects, but do not petrify
                 // the unit-targeted primary a second time.
@@ -1582,14 +1961,16 @@ export class AttackHandler {
                         hoverRangeAttackDivisor,
                     );
                 }
-                AllAbilities.processSpitBallAbility(
-                    attackerUnit,
-                    targetUnit,
-                    attackerUnit,
-                    unitsHolder,
-                    this.grid,
-                    this.sceneLog,
-                );
+                if (!splashLanded) {
+                    AllAbilities.processSpitBallAbility(
+                        attackerUnit,
+                        targetUnit,
+                        attackerUnit,
+                        unitsHolder,
+                        this.grid,
+                        this.sceneLog,
+                    );
+                }
                 AllAbilities.processHamstringAbility(
                     attackerUnit,
                     targetUnit,
@@ -1599,27 +1980,47 @@ export class AttackHandler {
                     this.sceneLog,
                 );
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
-                // ABILITY Borrowed Grace (Monk): a landed shot takes one active buff off the target and
-                // wears it. An on-hit rider like the ones above — a missed or lethal shot takes nothing.
-                AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog);
+                AllAbilities.processPredatoryAssimilationPoison(
+                    attackerUnit,
+                    targetUnit,
+                    damageFromAttack,
+                    this.sceneLog,
+                );
+                // ABILITY Borrowed Grace (Monk): a landed shot copies one active buff from the target and
+                // wears the copy. The target keeps the original. A missed or lethal shot copies nothing.
+                if (!splashLanded) {
+                    AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                }
             }
             if (recordPrimaryTargetDeath()) {
                 switchTargetUnit = true;
             }
         }
 
-        if (aoeRangeAttackResult?.landed || !isAttackMissed) {
+        if (!isAttackMissed || (!chakramFlight && aoeRangeAttackResult?.landed)) {
             primaryAssimilationLanded = true;
         }
 
         if (rangeResponseUnit) {
+            if (!aoeRangeResponseResult?.landed && !isResponseMissed && !rangeResponseAbsorbed) {
+                AllAbilities.processGravechainAbility(
+                    targetUnit,
+                    rangeResponseUnit,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    attackerUnit,
+                    undefined,
+                    damageForAnimation,
+                );
+            }
             if (aoeRangeResponseResult?.landed) {
                 if (rangeResponseUnit.isDead() && attackerUnit.getId() === rangeResponseUnit.getId()) {
                     unitIdsDied.push(rangeResponseUnit.getId());
                     increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                     increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                     unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                    resolveAssimilation();
+                    finalizeRangeAttack();
                     return { completed: true, unitIdsDied, animationData, abilityStolen };
                 }
             } else {
@@ -1640,7 +2041,7 @@ export class AttackHandler {
                         increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                         increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                         unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                        resolveAssimilation();
+                        finalizeRangeAttack();
                         return { completed: true, unitIdsDied, animationData, abilityStolen };
                     }
                 } else if (!isResponseMissed && !rangeResponseAbsorbed) {
@@ -1650,7 +2051,7 @@ export class AttackHandler {
                     AllAbilities.processStunAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processStunAuraOnHit(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processFreezeAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
-                    AllAbilities.processRimeCharmAbility(targetUnit, rangeResponseUnit, this.sceneLog);
+                    AllAbilities.processRimeCharmAbility(targetUnit, rangeResponseUnit, this.sceneLog, attackerUnit);
                     AllAbilities.processPetrifyingGazeAbility(
                         targetUnit,
                         rangeResponseUnit,
@@ -1668,9 +2069,14 @@ export class AttackHandler {
                         this.grid,
                         this.sceneLog,
                     );
-                    // A Monk that shoots BACK steals just the same — the theft rides the landed shot, not
+                    // A Monk that shoots BACK copies just the same — the copy rides the landed shot, not
                     // the initiative (mirrors Predatory Assimilation's response branch).
-                    AllAbilities.processBorrowedGraceAbility(targetUnit, rangeResponseUnit, this.sceneLog);
+                    AllAbilities.processBorrowedGraceAbility(
+                        targetUnit,
+                        rangeResponseUnit,
+                        this.sceneLog,
+                        attackerUnit,
+                    );
                     if (rangeResponseUnit.isDead()) {
                         if (!unitIdsDied.includes(rangeResponseUnit.getId())) {
                             this.sceneLog.updateLog(`${rangeResponseUnit.getName()} died`);
@@ -1687,7 +2093,7 @@ export class AttackHandler {
                             increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                             increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                             unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                            resolveAssimilation();
+                            finalizeRangeAttack();
                             return { completed: true, unitIdsDied, animationData, abilityStolen };
                         }
                     }
@@ -1721,7 +2127,7 @@ export class AttackHandler {
                 increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                 increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                 unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                resolveAssimilation();
+                finalizeRangeAttack();
                 return { completed: true, unitIdsDied, animationData, abilityStolen };
             }
 
@@ -1745,14 +2151,14 @@ export class AttackHandler {
                 }
                 increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                 unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                resolveAssimilation();
+                finalizeRangeAttack();
                 return { completed: true, unitIdsDied, animationData, abilityStolen };
             }
             hoverRangeAttackDivisor = hoverRangeAttackDivisors.at(targetUnitUndex);
             if (!hoverRangeAttackDivisor) {
                 increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                 unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                resolveAssimilation();
+                finalizeRangeAttack();
                 return { completed: true, unitIdsDied, animationData, abilityStolen };
             }
         }
@@ -1760,6 +2166,8 @@ export class AttackHandler {
         // Second attack (Double Shot)
         // Capture health state before second shot to calculate units died
         const preSecondShotAmount = targetUnit.getAmountAlive();
+        const preSecondShotHp = targetUnit.getCumulativeHp();
+        const secondShotPosition = { ...targetUnit.getPosition() };
 
         const secondShotResult = suppressDoubleShot
             ? {
@@ -1772,6 +2180,7 @@ export class AttackHandler {
                   waterShieldAbsorbed: false,
                   petrifyingGazeDamage: 0,
                   moraleIncrease: 0,
+                  perUnitDamage: [],
               }
             : AllAbilities.processDoubleShotAbility(
                   attackerUnit,
@@ -1785,11 +2194,22 @@ export class AttackHandler {
                   damageForAnimation,
                   this.damageStatisticHolder,
                   isAOE,
+                  chakramTrajectory.damageFactorByUnitId,
               );
         this.updateMoraleDecreaseForTheUnitTeam(
             moraleDecreaseForTheUnitTeam,
             secondShotResult.moraleDecreaseForTheUnitTeam,
         );
+
+        if (!secondShotResult.aoeRangeAttackLanded && secondShotResult.animationData.length) {
+            initiatingSingleHits.push({
+                unitId: targetUnit.getId(),
+                position: secondShotPosition,
+                amount: Math.max(0, preSecondShotHp - targetUnit.getCumulativeHp()),
+                unitsDied: Math.max(0, preSecondShotAmount - targetUnit.getAmountAlive()),
+                ...(!secondShotResult.applied ? { missed: true } : {}),
+            });
+        }
 
         if (secondShotResult.applied && secondShotResult.damage > 0 && damageForAnimation.hits) {
             const currentAmount = targetUnit.getAmountAlive();
@@ -1810,11 +2230,70 @@ export class AttackHandler {
             unitIdsDied.push(uId);
         }
 
+        // An area second volley (Double Throw, a Crafted Double Shot on an area shooter) is a second attack on
+        // everything it caught, so the blade burns each of those units again on this volley's own damage — as
+        // it does the first volley's splash and a single-target second shot. Nothing burned on it before.
+        if (secondShotResult.aoeRangeAttackLanded) {
+            const secondVolleySwordResult = AllAbilities.processFireforgedSwordOnVictims(
+                attackerUnit,
+                secondShotResult.perUnitDamage.filter((entry) => !entry.missed),
+                unitsHolder,
+                this.sceneLog,
+                this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
+            );
+            attackerUnitPlusMorale += secondVolleySwordResult.increaseMorale;
+            for (const uId of secondVolleySwordResult.unitIdsDied) {
+                if (!unitIdsDied.includes(uId)) {
+                    unitIdsDied.push(uId);
+                }
+            }
+            this.updateMoraleDecreaseForTheUnitTeam(
+                moraleDecreaseForTheUnitTeam,
+                secondVolleySwordResult.moraleDecreaseForTheUnitTeam,
+            );
+        }
+
         if (!secondShotResult.aoeRangeAttackLanded) {
+            if (secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
+                AllAbilities.processGravechainAbility(
+                    attackerUnit,
+                    targetUnit,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    attackerUnit,
+                    undefined,
+                    damageForAnimation,
+                    1,
+                );
+            }
             if (!targetUnit.isDead() && secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
+                // The second shot is a second attack, so it sets the target alight again on its own
+                // damage. It rides with the other on-hit riders here and under the same gate.
+                const secondShotSwordResult = AllAbilities.processFireforgedSwordAbility(
+                    attackerUnit,
+                    targetUnit,
+                    secondShotResult.damage,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                attackerUnitPlusMorale += secondShotSwordResult.increaseMorale;
+                for (const uId of secondShotSwordResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(uId)) {
+                        unitIdsDied.push(uId);
+                    }
+                }
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    secondShotSwordResult.moraleDecreaseForTheUnitTeam,
+                );
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                // Rime Charm rolls on every hit your units land — the second arrow included.
+                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
@@ -1833,6 +2312,8 @@ export class AttackHandler {
                     this.sceneLog,
                 );
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, secondShotResult.damage, this.sceneLog);
+                // A second shot is an extra hit. Venom Cloud poisons it; Predatory Assimilation does not.
+                AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
             }
             recordPrimaryTargetDeath();
         }
@@ -1843,7 +2324,7 @@ export class AttackHandler {
         );
         unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
 
-        resolveAssimilation();
+        finalizeRangeAttack();
         unitsHolder.refreshStackPowerForAllUnits();
 
         return { completed: true, unitIdsDied, animationData, abilityStolen };
@@ -1934,6 +2415,11 @@ export class AttackHandler {
         let targetUnitPlusMorale = 0;
         const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
 
+        // Captured BEFORE the attack's own move below: the wall charges the body cells this walk ENTERS, and
+        // neither the starting body nor its anchor can be read back once the attacker has been relocated.
+        const startCellsBeforeAttackMove = attackerUnit.getCells();
+        const startBaseCellBeforeAttackMove = attackerUnit.getBaseCell();
+
         if (attackerUnit.isSmallSize()) {
             const attackFromCells = [attackFromCell];
             if (
@@ -1970,15 +2456,20 @@ export class AttackHandler {
                     return { completed: false, unitIdsDied, animationData };
                 }
 
+                const occupied =
+                    stationaryAttack ||
+                    this.grid.occupyCell(
+                        attackFromCell,
+                        attackerUnit.getId(),
+                        attackerUnit.getTeam(),
+                        attackerUnit.getAttackRange(),
+                        attackerUnit.canTraverseLava(),
+                        attackerUnit.hasAbilityActive("Made of Water"),
+                    );
+                if (!occupied) {
+                    return { completed: false, unitIdsDied, animationData };
+                }
                 attackerUnit.setPosition(position.x, position.y, false);
-                this.grid.occupyCell(
-                    attackFromCell,
-                    attackerUnit.getId(),
-                    attackerUnit.getTeam(),
-                    attackerUnit.getAttackRange(),
-                    attackerUnit.canTraverseLava(),
-                    attackerUnit.hasAbilityActive("Made of Water"),
-                );
 
                 animationData.push({
                     toPosition: attackerUnit.getPosition(),
@@ -2037,16 +2528,20 @@ export class AttackHandler {
                     return { completed: false, unitIdsDied, animationData };
                 }
 
+                const occupied =
+                    stationaryAttack ||
+                    this.grid.occupyCells(
+                        cells,
+                        attackerUnit.getId(),
+                        attackerUnit.getTeam(),
+                        attackerUnit.getAttackRange(),
+                        attackerUnit.canTraverseLava(),
+                        attackerUnit.hasAbilityActive("Made of Water"),
+                    );
+                if (!occupied) {
+                    return { completed: false, unitIdsDied, animationData };
+                }
                 attackerUnit.setPosition(position.x, position.y, false);
-
-                this.grid.occupyCells(
-                    cells,
-                    attackerUnit.getId(),
-                    attackerUnit.getTeam(),
-                    attackerUnit.getAttackRange(),
-                    attackerUnit.canTraverseLava(),
-                    attackerUnit.hasAbilityActive("Made of Water"),
-                );
 
                 animationData.push({
                     toPosition: attackerUnit.getPosition(),
@@ -2058,27 +2553,44 @@ export class AttackHandler {
             }
         }
 
-        let abilityMultiplier = 1;
-        let rapidChargeCellsNumber = 1;
-        let hasRapidChargePath = false;
-        const movedRouteCells =
-            stationaryAttack && attackerUnit.hasMovedThisTurn() ? attackerUnit.getMovedRouteCellsThisTurn() : 0;
-        if (movedRouteCells > 0) {
-            // An explicit move followed by a stationary strike must use the route that the authoritative move
-            // actually resolved. Ranked recomputes currentActiveKnownPaths after the move, where the attacker's
-            // current cell is represented by a one-cell route; preferring that map would silently erase Rapid
-            // Charge distance. The recorded value was populated only after move validation and is reset with
-            // movedThisTurn, so clients cannot use this precedence to spoof a longer charge.
-            hasRapidChargePath = true;
-            rapidChargeCellsNumber = movedRouteCells;
-        } else if (currentActiveKnownPaths) {
-            hasRapidChargePath = true;
-            const paths = currentActiveKnownPaths.get((attackFromCell.x << 4) | attackFromCell.y);
-            if (paths?.length) {
-                rapidChargeCellsNumber = paths[0].route.length;
-            }
+        const dispelledSmokeCells = dispelSmokeOnOccupiedCells(
+            FightStateManager.getInstance().getFightProperties().getSmokeClouds(),
+            this.grid,
+            attackerUnit.getId(),
+            attackFromCells,
+        );
+
+        // The walk in burns before the blow: a stack that dies in the flames never gets to strike.
+        const fireWallBurn = stationaryAttack
+            ? undefined
+            : this.burnAttackerOnFireWalls(
+                  attackerUnit,
+                  attackFromCell,
+                  startCellsBeforeAttackMove,
+                  startBaseCellBeforeAttackMove,
+                  currentActiveKnownPaths,
+              );
+        if (fireWallBurn && attackerUnit.isDead()) {
+            updateUnitsDied([attackerUnit.getId()]);
+            return {
+                completed: true,
+                unitIdsDied,
+                animationData,
+                fireWallBurn,
+                strikeSkipped: true,
+                ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
+            };
         }
-        if (hasRapidChargePath) {
+
+        let abilityMultiplier = 1;
+        const chargedRouteCells = this.chargedRouteCells(
+            attackerUnit,
+            attackFromCell,
+            stationaryAttack,
+            currentActiveKnownPaths,
+        );
+        const rapidChargeCellsNumber = chargedRouteCells ?? 1;
+        if (chargedRouteCells !== undefined) {
             abilityMultiplier = AllAbilities.processRapidChargeAbility(attackerUnit, rapidChargeCellsNumber);
         }
 
@@ -2148,6 +2660,10 @@ export class AttackHandler {
 
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
+        // Everything the three sweeping abilities below damage gets the blade afterwards; remember where
+        // their entries start so the burn only reads this exchange's victims.
+        const gravechainAttackTargets = new Set<string>();
+        const sweepSecondaryFromIndex = (damageForAnimation.secondary ??= []).length;
         const lightningSpinAttackResult = AllAbilities.processLightningSpinAbility(
             attackerUnit,
             this.sceneLog,
@@ -2158,9 +2674,14 @@ export class AttackHandler {
             true,
             (damageForAnimation.secondary ??= []),
             this.grid,
+            attackerUnit,
+            gravechainAttackTargets,
+            damageForAnimation,
         );
         const hasLightningSpinAttackLanded = lightningSpinAttackResult.landed;
         updateUnitsDied(lightningSpinAttackResult.unitIdsDied);
+        // The same radial impact knocks down every cemetery barrel standing in the spin's ring.
+        const spunObstacleCells = this.spinScatteredObstaclesAround(attackerUnit, unitsHolder, attackFromCell);
 
         const fireBreathAttackResult = AllAbilities.processFireBreathAbility(
             attackerUnit,
@@ -2179,6 +2700,12 @@ export class AttackHandler {
             fireBreathAttackResult.moraleDecreaseForTheUnitTeam,
         );
         attackerUnitPlusMorale += fireBreathAttackResult.increaseMorale;
+        // The breath burns the cemetery barrels standing in its band behind the target just as the units there.
+        const piercedObstacles = this.spendPiercedObstacles(
+            attackerUnit,
+            AllAbilities.fireBreathObstacleCells(attackerUnit, this.grid, attackFromCell, targetUnit),
+            "fire_breath",
+        );
 
         const skewerStrikeAttackResult = AllAbilities.processSkewerStrikeAbility(
             attackerUnit,
@@ -2190,6 +2717,9 @@ export class AttackHandler {
             attackFromCell,
             true,
             (damageForAnimation.secondary ??= []),
+            attackerUnit,
+            gravechainAttackTargets,
+            damageForAnimation,
         );
         updateUnitsDied(skewerStrikeAttackResult.unitIdsDied);
         this.updateMoraleDecreaseForTheUnitTeam(
@@ -2206,6 +2736,36 @@ export class AttackHandler {
                 unitsDied: sd.unitsDied,
             });
         }
+        // The blade over everything the sweeps hit: a Fireforged breath, spin or skewer sets every unit it
+        // caught alight, each for its own damage. Only the single primary victim burned before this.
+        const sweepSwordResult = this.burnSweptUnitsWithFireforgedSword(
+            attackerUnit,
+            (damageForAnimation.secondary ??= []),
+            sweepSecondaryFromIndex,
+            ["fire_breath", "lightning_spin", "skewer_strike"],
+            unitsHolder,
+        );
+        updateUnitsDied(sweepSwordResult.unitIdsDied);
+        attackerUnitPlusMorale += sweepSwordResult.increaseMorale;
+        this.updateMoraleDecreaseForTheUnitTeam(
+            moraleDecreaseForTheUnitTeam,
+            sweepSwordResult.moraleDecreaseForTheUnitTeam,
+        );
+
+        // Past a small target the skewer runs on into a cemetery barrel standing behind it just as into a unit.
+        const skeweredObstacleCell = AllAbilities.skewerStrikeObstacleCell(
+            attackerUnit,
+            this.grid,
+            attackFromCell,
+            targetUnit,
+        );
+        piercedObstacles.push(
+            ...this.spendPiercedObstacles(
+                attackerUnit,
+                skeweredObstacleCell ? [skeweredObstacleCell] : [],
+                "skewer_strike",
+            ),
+        );
 
         // Petrifying Gaze is resolved from the landed melee impact before Flesh Shield redirects any of
         // its base damage. The effect remains on target even when the aura absorbs the whole base hit.
@@ -2278,6 +2838,9 @@ export class AttackHandler {
                             .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),
                     );
 
+                // Same as the attack side: mark where the response sweeps' victims begin.
+                const gravechainResponseTargets = new Set<string>();
+                const responseSweepSecondaryFromIndex = (damageForAnimation.secondary ??= []).length;
                 const fireBreathResponseResult = AllAbilities.processFireBreathAbility(
                     targetUnit,
                     attackerUnit,
@@ -2306,6 +2869,9 @@ export class AttackHandler {
                     targetUnit.getBaseCell(),
                     false,
                     (damageForAnimation.secondary ??= []),
+                    attackerUnit,
+                    gravechainResponseTargets,
+                    damageForAnimation,
                 );
                 updateUnitsDied(skewerStrikeResponseResult.unitIdsDied);
                 this.updateMoraleDecreaseForTheUnitTeam(
@@ -2333,9 +2899,27 @@ export class AttackHandler {
                     false,
                     (damageForAnimation.secondary ??= []),
                     this.grid,
+                    attackerUnit,
+                    gravechainResponseTargets,
+                    damageForAnimation,
                 );
                 hasLightningSpinResponseLanded = lightningSpinResponseResult.landed;
                 updateUnitsDied(lightningSpinResponseResult.unitIdsDied);
+
+                // The RESPONDER's blade over everything its own sweeps caught.
+                const responseSweepSwordResult = this.burnSweptUnitsWithFireforgedSword(
+                    targetUnit,
+                    (damageForAnimation.secondary ??= []),
+                    responseSweepSecondaryFromIndex,
+                    ["fire_breath", "lightning_spin", "skewer_strike"],
+                    unitsHolder,
+                );
+                updateUnitsDied(responseSweepSwordResult.unitIdsDied);
+                targetUnitPlusMorale += responseSweepSwordResult.increaseMorale;
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    responseSweepSwordResult.moraleDecreaseForTheUnitTeam,
+                );
 
                 if (!isResponseMissed && !assimilationResponseProcessed) {
                     assimilationResponseProcessed = true;
@@ -2460,10 +3044,29 @@ export class AttackHandler {
                             moraleDecreaseForTheUnitTeam,
                             fireShieldFromAttackerResult.moraleDecreaseForTheUnitTeam,
                         );
+                        // The RESPONDER's own Fireforged Sword. A retaliation is one of "the ally's
+                        // attacks" the card promises, and the mirror-image Fire Shield already fires on
+                        // this exact path — the blade simply never did, so a buffed defender struck back
+                        // with cold steel (owner report 2026-09-20).
+                        const responseFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
+                            targetUnit,
+                            attackerUnit,
+                            damageFromResponse,
+                            this.sceneLog,
+                            this.damageStatisticHolder,
+                            (damageForAnimation.secondary ??= []),
+                        );
+                        updateUnitsDied(responseFireforgedSwordResult.unitIdsDied);
+                        targetUnitPlusMorale += responseFireforgedSwordResult.increaseMorale;
+                        this.updateMoraleDecreaseForTheUnitTeam(
+                            moraleDecreaseForTheUnitTeam,
+                            responseFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
+                        );
                         AllAbilities.processStunAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processStunAuraOnHit(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processFreezeAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                        AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
+                        // The responder's own blow. Being hit is not enough: the knight dulls only when he answers.
+                        AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processPetrifyingGazeAbility(
                             targetUnit,
                             attackerUnit,
@@ -2497,9 +3100,25 @@ export class AttackHandler {
                             damageFromResponse,
                             this.sceneLog,
                         );
+                        AllAbilities.processPredatoryAssimilationPoison(
+                            targetUnit,
+                            attackerUnit,
+                            damageFromResponse,
+                            this.sceneLog,
+                        );
                         AllAbilities.processPegasusLightAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processParalysisAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                        AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog);
+                        AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog, attackerUnit);
+                        AllAbilities.processGravechainAbility(
+                            targetUnit,
+                            attackerUnit,
+                            this.grid,
+                            unitsHolder,
+                            this.sceneLog,
+                            attackerUnit,
+                            gravechainResponseTargets,
+                            damageForAnimation,
+                        );
                         AllAbilities.processBlindnessAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         updateUnitsDied(
                             AllAbilities.processChainLightningAbility(
@@ -2592,7 +3211,8 @@ export class AttackHandler {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-                AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
+                // The attacker's own blow. A hit on a knight who does not strike back does not dull.
+                AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
@@ -2630,7 +3250,26 @@ export class AttackHandler {
                     this.sceneLog,
                 );
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
-                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
+                AllAbilities.processPredatoryAssimilationPoison(
+                    attackerUnit,
+                    targetUnit,
+                    damageFromAttack,
+                    this.sceneLog,
+                );
+                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                AllAbilities.processGravechainAbility(
+                    attackerUnit,
+                    targetUnit,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    attackerUnit,
+                    gravechainAttackTargets,
+                    damageForAnimation,
+                );
+                // Blindness rides the blow the Unicorn strikes as well as the one it answers — it used to
+                // fire only from the response path, so a Unicorn that opened the exchange blinded nobody.
+                AllAbilities.processBlindnessAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 updateUnitsDied(
                     AllAbilities.processChainLightningAbility(
                         attackerUnit,
@@ -2773,7 +3412,20 @@ export class AttackHandler {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-                AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
+                // Rime Charm rolls on every hit your units land — the second punch included.
+                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                AllAbilities.processGravechainAbility(
+                    attackerUnit,
+                    targetUnit,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    attackerUnit,
+                    undefined,
+                    damageForAnimation,
+                    1,
+                );
+                AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
@@ -2808,6 +3460,8 @@ export class AttackHandler {
                     secondPunchResult.damage,
                     this.sceneLog,
                 );
+                // A second punch is an extra hit. Venom Cloud poisons it; Predatory Assimilation does not.
+                AllAbilities.processBlindnessAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             }
 
             if (
@@ -2882,7 +3536,87 @@ export class AttackHandler {
             (damageForAnimation.secondary ??= []),
         );
 
-        return { completed: true, unitIdsDied, animationData, abilityStolen };
+        return {
+            completed: true,
+            unitIdsDied,
+            animationData,
+            abilityStolen,
+            spunObstacleCells,
+            piercedObstacles,
+            fireWallBurn,
+            ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
+        };
+    }
+    /**
+     * Fire Wall: an attack that walks into the flames pays for them ON ARRIVAL, before its blow lands (owner
+     * call 2026-09-18) — a stack that dies crossing the wall never strikes. A standalone move charges this in
+     * the action engine, which is why an attack's own move went uncharged: it moves in here instead, so it
+     * burns here, off the very route the move modifiers walked.
+     */
+    private burnAttackerOnFireWalls(
+        attackerUnit: Unit,
+        attackFromCell: HoCMath.XY,
+        startCells: HoCMath.XY[],
+        startBaseCell: HoCMath.XY,
+        currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+    ): IFireWallBurnReport | undefined {
+        const fireWalls = FightStateManager.getInstance().getFightProperties().getFireWalls();
+        if (!fireWalls?.size()) {
+            return undefined;
+        }
+        // Use the same flight/landing rule as standalone moves and their AI projection, including every
+        // cell under a large body's landing footprint.
+        const route = currentActiveKnownPaths?.get((attackFromCell.x << 4) | attackFromCell.y)?.[0]?.route;
+        const entered = fireWallCellsForTraversal(
+            attackerUnit,
+            startCells,
+            travelledMovePath(startBaseCell, route ?? [attackFromCell]),
+            attackerUnit.getCells(),
+        );
+        const position = { ...attackerUnit.getPosition() };
+        const { burning, total, unitsDied } = burnUnitOnFireWallCells(attackerUnit, entered, fireWalls, this.sceneLog);
+        if (total <= 0) {
+            return undefined;
+        }
+        return { unitId: attackerUnit.getId(), cells: burning, position, amount: total, unitsDied };
+    }
+    /** Break the barrels a unit strike's piercing passive ran on into, and report them tagged with that passive. */
+    private spendPiercedObstacles(
+        attackerUnit: Unit,
+        cells: readonly HoCMath.XY[],
+        source: IPiercedObstacle["source"],
+    ): IPiercedObstacle[] {
+        return cells.map((cell) => {
+            this.spendObstacleHit(cell, cell.x >= this.gridSettings.getGridSize() >> 1);
+            this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+            return { cell, source };
+        });
+    }
+    /**
+     * How far a melee charge ran to reach `attackFromCell`, for Rapid Charge — undefined when the strike carries
+     * no route to measure at all.
+     *
+     * An explicit move followed by a stationary strike must use the route that the authoritative move actually
+     * resolved. Ranked recomputes currentActiveKnownPaths after the move, where the attacker's current cell is
+     * represented by a one-cell route; preferring that map would silently erase Rapid Charge distance. The
+     * recorded value was populated only after move validation and is reset with movedThisTurn, so clients cannot
+     * use this precedence to spoof a longer charge.
+     */
+    private chargedRouteCells(
+        attackerUnit: Unit,
+        attackFromCell: HoCMath.XY,
+        stationaryAttack: boolean,
+        currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+    ): number | undefined {
+        const movedRouteCells =
+            stationaryAttack && attackerUnit.hasMovedThisTurn() ? attackerUnit.getMovedRouteCellsThisTurn() : 0;
+        if (movedRouteCells > 0) {
+            return movedRouteCells;
+        }
+        if (!currentActiveKnownPaths) {
+            return undefined;
+        }
+        return currentActiveKnownPaths.get((attackFromCell.x << 4) | attackFromCell.y)?.[0]?.route.length ?? 1;
     }
     /**
      * Does anything still stand to be hit?
@@ -2892,7 +3626,7 @@ export class AttackHandler {
      * question has to be asked of the grid instead.
      */
     private obstacleStillStands(): boolean {
-        if (this.grid.hasScatteredMountains()) {
+        if (this.grid.hasScatteredMountains() && !this.grid.hasClassicMountains()) {
             return this.grid.getScatteredMountainsStanding().length > 0;
         }
         return FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() > 0;
@@ -2905,11 +3639,164 @@ export class AttackHandler {
      * the two models from drifting: there are six of them (range, double-shot, and the melee variants).
      */
     private spendObstacleHit(targetCell: HoCMath.XY, isRightMountain: boolean): void {
-        if (this.grid.hasScatteredMountains()) {
+        if (this.grid.isScatteredMountainCell(targetCell)) {
             this.grid.clearScatteredMountainAt(targetCell.x, targetCell.y);
             return;
         }
         FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
+    }
+    /**
+     * A piercing melee passive runs on THROUGH a cemetery barrel. Skewer Strike (Pikeman) and Fire Breath
+     * (Black Dragon) both strike the cell behind a one-cell target, so the barrel standing directly behind the
+     * struck one — straight or diagonal along the attacker→barrel line — goes down with it. A unit standing there
+     * is hit exactly as it would be past a small unit: the skewer runs on into an enemy
+     * (skewerStrikeUnitBehindObstacle), the breath burns anyone not fire-immune (fireBreathUnitBehindObstacle).
+     * Scattered layouts only: the classic 2x2 mountains absorb the whole strike in their own hit counters. An empty
+     * cell or the board edge behind the barrel gives the sweep nothing. Returns the stacks the pierce killed.
+     */
+    private pierceScatteredObstacleBehind(
+        attackerUnit: Unit,
+        unitsHolder: UnitsHolder,
+        attackFromCell: HoCMath.XY,
+        targetCell: HoCMath.XY,
+        damageForAnimation?: IVisibleDamage,
+    ): string[] {
+        if (
+            !this.grid.isScatteredMountainCell(targetCell) ||
+            (!attackerUnit.hasAbilityActive("Skewer Strike") && !attackerUnit.hasAbilityActive("Fire Breath"))
+        ) {
+            return [];
+        }
+        const behindCell = AbilityHelper.pierceCellBehind(attackerUnit, attackFromCell, targetCell);
+        if (!behindCell || !GridMath.isCellWithinGrid(this.gridSettings, behindCell)) {
+            return [];
+        }
+        if (this.grid.getOccupantUnitId(behindCell) === "B") {
+            this.spendObstacleHit(behindCell, behindCell.x >= this.gridSettings.getGridSize() >> 1);
+            this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+            return [];
+        }
+        const unitIdsDied: string[] = [];
+        const secondaryDamage = damageForAnimation ? (damageForAnimation.secondary ??= []) : [];
+        const settleMorale = (result: {
+            increaseMorale: number;
+            moraleDecreaseForTheUnitTeam: Record<string, number>;
+        }): void => {
+            if (!attackerUnit.isDead()) {
+                attackerUnit.increaseMorale(
+                    result.increaseMorale,
+                    FightStateManager.getInstance()
+                        .getFightProperties()
+                        .getAdditionalMoralePerTeam(attackerUnit.getTeam()),
+                );
+            }
+            unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(result.moraleDecreaseForTheUnitTeam);
+        };
+
+        const skewered = AllAbilities.skewerStrikeUnitBehindObstacle(
+            attackerUnit,
+            this.grid,
+            unitsHolder,
+            attackFromCell,
+            targetCell,
+        );
+        if (skewered) {
+            const skewerResult = AllAbilities.strikeSkewerTargets(
+                attackerUnit,
+                [skewered],
+                this.sceneLog,
+                unitsHolder,
+                this.grid,
+                this.damageStatisticHolder,
+                true,
+                secondaryDamage,
+                attackerUnit,
+                undefined,
+                damageForAnimation,
+            );
+            for (const sd of skewerResult.secondaryDamages) {
+                secondaryDamage.push({
+                    source: "skewer_strike",
+                    unitId: sd.unitId,
+                    position: sd.unitPosition,
+                    amount: sd.damage,
+                    unitsDied: sd.unitsDied,
+                });
+            }
+            settleMorale(skewerResult);
+            unitIdsDied.push(...skewerResult.unitIdsDied);
+        }
+
+        const burned = AllAbilities.fireBreathUnitBehindObstacle(
+            attackerUnit,
+            this.grid,
+            unitsHolder,
+            attackFromCell,
+            targetCell,
+        );
+        if (burned) {
+            const breathResult = AllAbilities.breatheFireOnTargets(
+                attackerUnit,
+                [burned],
+                this.sceneLog,
+                "attk",
+                this.damageStatisticHolder,
+                secondaryDamage,
+            );
+            settleMorale(breathResult);
+            unitIdsDied.push(...breathResult.unitIdsDied.filter((unitId) => !unitIdsDied.includes(unitId)));
+        }
+        return unitIdsDied;
+    }
+    /**
+     * Hydra's Lightning Spin is one radial impact, so the cemetery barrels standing around her go down with it
+     * exactly like the enemies do — see lightningSpinObstacleCells for the ring. Returns the barrels it broke.
+     */
+    private spinScatteredObstaclesAround(
+        attackerUnit: Unit,
+        unitsHolder: UnitsHolder,
+        attackFromCell: HoCMath.XY,
+    ): HoCMath.XY[] {
+        const cells = AllAbilities.lightningSpinObstacleCells(attackerUnit, unitsHolder, this.grid, attackFromCell);
+        for (const cell of cells) {
+            this.spendObstacleHit(cell, cell.x >= this.gridSettings.getGridSize() >> 1);
+            this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+        }
+        return cells;
+    }
+    /**
+     * Lightning Spin off a blow aimed at an obstacle. The spin does not care what the blow was aimed at: it
+     * lands exactly as it does off a unit strike, hitting every enemy around the attacker's body and breaking
+     * every barrel in the same ring.
+     */
+    private spinAroundObstacleStrike(
+        attackerUnit: Unit,
+        unitsHolder: UnitsHolder,
+        attackFromCell: HoCMath.XY,
+        stationaryAttack: boolean,
+        currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+        damageForAnimation?: IVisibleDamage,
+    ): { unitIdsDied: string[]; spunObstacleCells: HoCMath.XY[] } {
+        if (!attackerUnit.hasAbilityActive("Lightning Spin")) {
+            return { unitIdsDied: [], spunObstacleCells: [] };
+        }
+        const secondaryDamage = damageForAnimation ? (damageForAnimation.secondary ??= []) : [];
+        const spinResult = AllAbilities.processLightningSpinAbility(
+            attackerUnit,
+            this.sceneLog,
+            unitsHolder,
+            this.chargedRouteCells(attackerUnit, attackFromCell, stationaryAttack, currentActiveKnownPaths) ?? 1,
+            this.damageStatisticHolder,
+            attackFromCell,
+            true,
+            secondaryDamage,
+            this.grid,
+            attackerUnit,
+            undefined,
+            damageForAnimation,
+        );
+        const spunObstacleCells = this.spinScatteredObstaclesAround(attackerUnit, unitsHolder, attackFromCell);
+        return { unitIdsDied: spinResult.unitIdsDied, spunObstacleCells };
     }
     public handleObstacleAttack(
         targetPosition: HoCMath.XY,
@@ -2918,15 +3805,19 @@ export class AttackHandler {
         attackerUnit?: Unit,
         attackFromCell?: HoCMath.XY,
         currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+        damageForAnimation?: IVisibleDamage,
     ): IAttackResult {
         const targetCell = GridMath.getCellForPosition(this.gridSettings, targetPosition);
         // Which of the two 2x2 mountains was struck (left columns vs right columns), so only its own hit
         // points are spent. Corridor cells are never targeted, so the midpoint split is unambiguous.
         const isRightMountain = targetCell.x >= this.gridSettings.getGridSize() >> 1;
         const animationData: IAnimationData[] = [];
+        const dispelledSmokeCells: HoCMath.XY[] = [];
         if (
-            this.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
-            FightStateManager.getInstance().getFightProperties().getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+            (!this.grid.hasScatteredMountains() &&
+                (this.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+                    FightStateManager.getInstance().getFightProperties().getGridType() !==
+                        PBTypes.GridVals.BLOCK_CENTER)) ||
             !this.obstacleStillStands() ||
             !attackerUnit ||
             attackerUnit.isDead() ||
@@ -2982,6 +3873,43 @@ export class AttackHandler {
             }
             attackerUnit.decreaseNumberOfShots();
             rangeLanded = trajectoryTargets.length > 0;
+            const echoChance = attackerUnit.getBonusRangedAttackChance();
+            const echoPosition = this.grid.hasScatteredMountains()
+                ? this.getObstacleIntersections(attackerUnit.getPosition(), targetPosition)[0]?.position
+                : this.obstacleStillStands()
+                  ? targetPosition
+                  : undefined;
+            if (
+                rangeLanded &&
+                echoPosition &&
+                echoChance > 0 &&
+                attackerUnit.getRangeShots() > 0 &&
+                HoCLib.getRandomInt(0, 100) < echoChance
+            ) {
+                const cell = GridMath.getCellForPosition(this.gridSettings, echoPosition);
+                const right = cell.x >= this.gridSettings.getGridSize() >> 1;
+                const remaining =
+                    this.grid.hasScatteredMountains() ||
+                    (right
+                        ? FightStateManager.getInstance().getFightProperties().getObstacleHitsLeftRight()
+                        : FightStateManager.getInstance().getFightProperties().getObstacleHitsLeftLeft()) > 0;
+                if (remaining) {
+                    animationData.push({
+                        fromPosition: attackerUnit.getPosition(),
+                        toPosition: echoPosition,
+                        affectedUnit: new AttackTarget(echoPosition, 1),
+                    });
+                    this.spendObstacleHit(cell, right);
+                    attackerUnit.decreaseNumberOfShots();
+                    this.sceneLog.updateLog(
+                        `${attackerUnit.getName()} fires an extra attack with Quiver of Echoes (${echoChance}% chance)`,
+                    );
+                    if (damageForAnimation) {
+                        damageForAnimation.rangedVolleyCount = trajectoryTargets.length + 1;
+                        damageForAnimation.extraRangedAttackChance = echoChance;
+                    }
+                }
+            }
         }
 
         // land melee attack
@@ -3020,6 +3948,12 @@ export class AttackHandler {
             }
 
             const stationaryAttack = currentCell.x === attackFromCell.x && currentCell.y === attackFromCell.y;
+            // Stacks a Skewer Strike killed running on through the struck barrel.
+            let piercedUnitIdsDied: string[] = [];
+            // Captured BEFORE either branch below relocates the attacker — see burnAttackerOnFireWalls.
+            const startCellsBeforeObstacleMove = attackerUnit.getCells();
+            const startBaseCellBeforeObstacleMove = attackerUnit.getBaseCell();
+            let fireWallBurn: IFireWallBurnReport | undefined;
 
             if (attackerUnit.isSmallSize()) {
                 if (
@@ -3057,14 +3991,27 @@ export class AttackHandler {
                         return { completed: rangeLanded, unitIdsDied: [], animationData };
                     }
 
+                    const occupied =
+                        stationaryAttack ||
+                        this.grid.occupyCell(
+                            attackFromCell,
+                            attackerUnit.getId(),
+                            attackerUnit.getTeam(),
+                            attackerUnit.getAttackRange(),
+                            attackerUnit.canTraverseLava(),
+                            attackerUnit.hasAbilityActive("Made of Water"),
+                        );
+                    if (!occupied) {
+                        return { completed: rangeLanded, unitIdsDied: [], animationData };
+                    }
                     attackerUnit.setPosition(position.x, position.y, false);
-                    this.grid.occupyCell(
-                        attackFromCell,
-                        attackerUnit.getId(),
-                        attackerUnit.getTeam(),
-                        attackerUnit.getAttackRange(),
-                        attackerUnit.canTraverseLava(),
-                        attackerUnit.hasAbilityActive("Made of Water"),
+                    dispelledSmokeCells.push(
+                        ...dispelSmokeOnOccupiedCells(
+                            FightStateManager.getInstance().getFightProperties().getSmokeClouds(),
+                            this.grid,
+                            attackerUnit.getId(),
+                            attackFromCells,
+                        ),
                     );
 
                     animationData.push({
@@ -3073,8 +4020,37 @@ export class AttackHandler {
                         bodyUnit: attackerUnit,
                     });
 
+                    // Same arrival rule as a melee attack: the walk in burns before the barrel is struck, and
+                    // a stack that dies in the flames never swings.
+                    fireWallBurn = stationaryAttack
+                        ? undefined
+                        : this.burnAttackerOnFireWalls(
+                              attackerUnit,
+                              attackFromCell,
+                              startCellsBeforeObstacleMove,
+                              startBaseCellBeforeObstacleMove,
+                              currentActiveKnownPaths,
+                          );
+                    if (fireWallBurn && attackerUnit.isDead()) {
+                        return {
+                            completed: true,
+                            unitIdsDied: [attackerUnit.getId()],
+                            animationData,
+                            fireWallBurn,
+                            strikeSkipped: true,
+                            ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
+                        };
+                    }
+
                     this.spendObstacleHit(targetCell, isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+                    piercedUnitIdsDied = this.pierceScatteredObstacleBehind(
+                        attackerUnit,
+                        unitsHolder,
+                        attackFromCell,
+                        targetCell,
+                        damageForAnimation,
+                    );
                     if (
                         this.obstacleStillStands() &&
                         (attackerUnit.getAbility("Double Punch") ?? attackerUnit.getAbility("Crafted Double Punch"))
@@ -3132,15 +4108,27 @@ export class AttackHandler {
                         return { completed: rangeLanded, unitIdsDied: [], animationData };
                     }
 
+                    const occupied =
+                        stationaryAttack ||
+                        this.grid.occupyCells(
+                            cells,
+                            attackerUnit.getId(),
+                            attackerUnit.getTeam(),
+                            attackerUnit.getAttackRange(),
+                            attackerUnit.canTraverseLava(),
+                            attackerUnit.hasAbilityActive("Made of Water"),
+                        );
+                    if (!occupied) {
+                        return { completed: rangeLanded, unitIdsDied: [], animationData };
+                    }
                     attackerUnit.setPosition(position.x, position.y, false);
-
-                    this.grid.occupyCells(
-                        cells,
-                        attackerUnit.getId(),
-                        attackerUnit.getTeam(),
-                        attackerUnit.getAttackRange(),
-                        attackerUnit.canTraverseLava(),
-                        attackerUnit.hasAbilityActive("Made of Water"),
+                    dispelledSmokeCells.push(
+                        ...dispelSmokeOnOccupiedCells(
+                            FightStateManager.getInstance().getFightProperties().getSmokeClouds(),
+                            this.grid,
+                            attackerUnit.getId(),
+                            cells,
+                        ),
                     );
 
                     animationData.push({
@@ -3149,8 +4137,37 @@ export class AttackHandler {
                         bodyUnit: attackerUnit,
                     });
 
+                    // Same arrival rule as a melee attack: the walk in burns before the barrel is struck, and
+                    // a stack that dies in the flames never swings.
+                    fireWallBurn = stationaryAttack
+                        ? undefined
+                        : this.burnAttackerOnFireWalls(
+                              attackerUnit,
+                              attackFromCell,
+                              startCellsBeforeObstacleMove,
+                              startBaseCellBeforeObstacleMove,
+                              currentActiveKnownPaths,
+                          );
+                    if (fireWallBurn && attackerUnit.isDead()) {
+                        return {
+                            completed: true,
+                            unitIdsDied: [attackerUnit.getId()],
+                            animationData,
+                            fireWallBurn,
+                            strikeSkipped: true,
+                            ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
+                        };
+                    }
+
                     this.spendObstacleHit(targetCell, isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+                    piercedUnitIdsDied = this.pierceScatteredObstacleBehind(
+                        attackerUnit,
+                        unitsHolder,
+                        attackFromCell,
+                        targetCell,
+                        damageForAnimation,
+                    );
 
                     if (
                         this.obstacleStillStands() &&
@@ -3163,6 +4180,36 @@ export class AttackHandler {
                     return { completed: rangeLanded, unitIdsDied: [], animationData };
                 }
             }
+
+            // Both body-size branches above either landed the melee blow or returned, so the spin goes off here.
+            const spin = this.spinAroundObstacleStrike(
+                attackerUnit,
+                unitsHolder,
+                attackFromCell,
+                stationaryAttack,
+                currentActiveKnownPaths,
+                damageForAnimation,
+            );
+            const unitIdsDied = [...piercedUnitIdsDied, ...spin.unitIdsDied];
+            // Kills off an obstacle strike feed Devour Essence the way a unit strike's do.
+            if (unitIdsDied.length) {
+                unitsHolder.refreshStackPowerForAllUnits();
+                AllAbilities.processDevourEssenceAbility(
+                    attackerUnit,
+                    unitIdsDied,
+                    unitsHolder,
+                    this.sceneLog,
+                    damageForAnimation ? (damageForAnimation.secondary ??= []) : [],
+                );
+            }
+            return {
+                completed: true,
+                unitIdsDied,
+                animationData,
+                spunObstacleCells: spin.spunObstacleCells,
+                fireWallBurn,
+                ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
+            };
         }
 
         return { completed: true, unitIdsDied: [], animationData };
@@ -3187,8 +4234,9 @@ export class AttackHandler {
         // Smoke (Smoke spell): once the ray has crossed ANY smoked cell, every subsequent target on this shot
         // takes half damage. The cloud is neutral — applies to ranged attacks of BOTH teams. We track the flag
         // across the whole trajectory (not per-cell) so a single arrow piercing multiple targets after the
-        // smoke stays halved for all of them, matching the user's "arrow becomes 1/2, then 1/4..." intent: the
-        // existing range-falloff divisor already doubles per shot-distance, and smoke doubles it once more.
+        // smoke stays halved for all of them. Falloff has already doubled per band, and smoke doubles that
+        // once more (1/1 becomes 1/2, 1/2 becomes 1/4). Farsight Quiver skips the bands, so smoke alone
+        // makes its shot 1/2.
         const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
         // AI planning can project a not-yet-cast cloud without touching FightProperties. Hypothetical cells
         // supplement (rather than replace) live smoke, so the same evaluator is truthful in later laps too.
@@ -3324,6 +4372,40 @@ export class AttackHandler {
             affectedCells,
             attackObstacle,
         };
+    }
+    /**
+     * Run the attacker's Fireforged Sword over every unit a SWEEPING melee ability just damaged.
+     *
+     * Fire Breath, Lightning Spin and Skewer Strike hit several units in one blow and report each one as
+     * its own secondary-damage entry. Those entries are the only per-victim damage breakdown they produce,
+     * so the blade reads them: everything appended to `secondary` since `fromIndex` whose source is one of
+     * `sources` is a unit this attack hurt, and each burns for its own damage.
+     *
+     * Taking the index BEFORE the sweep matters — the burn pushes its own `fireforged_sword` entries onto
+     * the same array, and re-reading from the start would set the same unit alight from its own fire.
+     */
+    private burnSweptUnitsWithFireforgedSword(
+        fromUnit: Unit,
+        secondary: ISecondaryDamage[],
+        fromIndex: number,
+        sources: readonly SecondaryDamageSource[],
+        unitsHolder: UnitsHolder,
+    ): IFireforgedSwordResult {
+        if (!fromUnit.getBuff("Fireforged Sword")) {
+            return { increaseMorale: 0, unitIdsDied: [], moraleDecreaseForTheUnitTeam: {} };
+        }
+        const victims = secondary
+            .slice(fromIndex)
+            .filter((entry) => sources.includes(entry.source))
+            .map((entry) => ({ unitId: entry.unitId, amount: entry.amount }));
+        return AllAbilities.processFireforgedSwordOnVictims(
+            fromUnit,
+            victims,
+            unitsHolder,
+            this.sceneLog,
+            this.damageStatisticHolder,
+            secondary,
+        );
     }
     private updateMoraleDecreaseForTheUnitTeam(
         initialRecord: Record<string, number>,

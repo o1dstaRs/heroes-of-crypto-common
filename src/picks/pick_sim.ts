@@ -30,8 +30,8 @@ export type PickRandomInt = (maxExclusive: number) => number;
  * agree and refuses to build a pick if they drift, so these move together or not at all.
  */
 export const LIVE_AUTO_BANS_BY_LEVEL = [6, 6, 3, 5] as const;
-export const LIVE_TIER1_ARTIFACT_COUNT = 13;
-export const LIVE_TIER2_ARTIFACT_COUNT = 13;
+export const LIVE_TIER1_ARTIFACT_COUNT = 15;
+export const LIVE_TIER2_ARTIFACT_COUNT = 17;
 export const LIVE_TIER1_ARTIFACT_IDS = TIER1_ARTIFACT_LIST.map((artifact) => artifact.id);
 export const LIVE_TIER2_ARTIFACT_IDS = TIER2_ARTIFACT_LIST.map((artifact) => artifact.id);
 export const LIVE_TIER2_OFFER_SIZE = 3;
@@ -466,13 +466,20 @@ const applyDoctrine = (
     // The fixed six-slot creature layout by level is [L1@0, L1@1, L2@2, L2@3, L3@4, L4@5]
     // (CreaturePoolByLevel = [2, 2, 1, 1]). The "random3" doctrine reveals ONE slot per tier block rather than
     // drawing three uniformly: one of the two L1 slots, one of the two L2 slots, and either the L3 or L4 slot.
-    // This mirrors the ranked server's legacy seeding in arango_hoc.ts (pickPhaseLogic slotsSeen seeding).
+    // When the opponent makes the draft's final creature pick, watch L3 instead: their L4 arrives too late
+    // to inform another draft choice. The ranked server persists these exact slots from this reducer.
     const totalSlots = CreaturePoolByLevel.reduce((total, count) => total + count, 0);
     const revealMode = getDoctrineRevealMode(action.doctrine);
     if (revealMode === "all") {
         nextOwn.revealedOpponentSlots = Array.from({ length: totalSlots }, (_, index) => index);
     } else if (revealMode === "random3") {
         const slots = [draw(rng, 2), 2 + draw(rng, 2), draw(rng, 2) ? 4 : 5];
+        const opponentTeam = action.team === LEFT ? RIGHT : LEFT;
+        const finalCreaturePick = LIVE_PICK_PHASES.filter(({ phase }) => phase === PBTypes.PickPhaseVals.PICK).at(-1);
+        if (finalCreaturePick?.actors.includes(opponentTeam)) {
+            // Still consume the third draw so later seeded draft decisions retain their RNG sequence.
+            slots[2] = 4;
+        }
         slots.sort((a, b) => a - b);
         nextOwn.revealedOpponentSlots = slots;
     }
@@ -522,11 +529,35 @@ const applyBundle = (
     return accepted(next, event);
 };
 
+/**
+ * A roster laid out on the fixed six-slot board [L1@0, L1@1, L2@2, L2@3, L3@4, L4@5]: each level's creatures
+ * fill that level's slots in the order they arrived, and a slot stays empty until one is picked into it.
+ * `creatures` only lists what was picked so far, so indexing it by slot would surface the wrong creature
+ * mid-draft — right after the bundle it is [L1, L2], and slot 1 (the second L1) would read the L2.
+ */
+const creaturesBySlot = (creatures: readonly number[]): (number | undefined)[] => {
+    const totalSlots = CreaturePoolByLevel.reduce((total, count) => total + count, 0);
+    const layout: (number | undefined)[] = new Array(totalSlots).fill(undefined);
+    const filledByLevel = [0, 0, 0, 0];
+    for (const creatureId of creatures) {
+        const level = CreatureLevelMap[creatureId];
+        if (!level || level < 1 || level > CreaturePoolByLevel.length) {
+            continue;
+        }
+        const base = CreaturePoolByLevel.slice(0, level - 1).reduce((total, count) => total + count, 0);
+        if (filledByLevel[level - 1] < CreaturePoolByLevel[level - 1]) {
+            layout[base + filledByLevel[level - 1]] = creatureId;
+            filledByLevel[level - 1] += 1;
+        }
+    }
+    return layout;
+};
+
 const opponentSlotsForCreature = (state: IPickSimState, team: PickTeam, creatureId: number): number[] => {
     const slots: number[] = [];
-    opponentState(state, team).creatures.forEach((picked, index) => {
+    creaturesBySlot(opponentState(state, team).creatures).forEach((picked, slot) => {
         if (picked === creatureId) {
-            slots.push(index);
+            slots.push(slot);
         }
     });
     return slots;
@@ -686,9 +717,9 @@ export function transitionServerPersistedPickSim(
 
 export function getKnownOpponentCreatures(state: IPickSimState, team: PickTeam): number[] {
     const known: number[] = [];
-    const opponent = opponentState(state, team);
+    const opponentBySlot = creaturesBySlot(opponentState(state, team).creatures);
     for (const slot of teamState(state, team).revealedOpponentSlots) {
-        const creatureId = opponent.creatures[slot];
+        const creatureId = opponentBySlot[slot];
         if (creatureId !== undefined && !known.includes(creatureId)) {
             known.push(creatureId);
         }

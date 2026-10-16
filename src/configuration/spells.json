@@ -165,7 +165,7 @@
         "Castling": {
             "name": "Castling",
             "level": 0,
-            "desc": ["Swaps with small opponent within caster's movement range."],
+            "desc": ["Swaps with an opponent of the same size within caster's movement range."],
             "target": "ENEMY_WITHIN_MOVEMENT_RANGE",
             "power": 0,
             "power_type": "POSITION_CHANGE",
@@ -183,7 +183,9 @@
         "Resurrection": {
             "name": "Resurrection",
             "level": 0,
-            "desc": ["Resurrect fallen ally units on the battlefield. Up to {} total hit points."],
+            "desc": [
+                "Resurrect fallen ally units on the battlefield (never a Mechanism unit). Up to {} total hit points."
+            ],
             "target": "ANY_ALLY",
             "power": 0,
             "power_type": "RESURRECT",
@@ -245,7 +247,7 @@
             "level": 0,
             "desc": [
                 "Level []. Augment increases all magic damage dealt by the entire team by {}%.",
-                "Spells, Fire Wall, Fireforged Sword, Chain Lightning, Fire Breath and Fire Shield.",
+                "Spells, Fire Wall, Chain Lightning, Fire Breath and Fire Shield.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",
@@ -325,7 +327,7 @@
         "Keen Blade": {
             "name": "Keen Blade",
             "level": 0,
-            "desc": ["Artifact. Increases the army's attack by {}.", "Lasts till the end of the fight."],
+            "desc": ["Artifact. Increases this unit's base attack by {}.", "Lasts till the end of the fight."],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",
@@ -436,6 +438,27 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Rallying Volley Blessing": {
+            "name": "Rallying Volley Blessing",
+            "level": 0,
+            "desc": [
+                "Rallying Volley Blessing grants +{} ranged shots once, anywhere on the battlefield.",
+                "Does not stack or refill spent shots."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 2,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Arrows Wingshield Blessing": {
             "name": "Arrows Wingshield Blessing",
             "level": 0,
@@ -514,28 +537,10 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
-        "Helm of Focus": {
-            "name": "Helm of Focus",
-            "level": 0,
-            "desc": ["Artifact. Increases mind resistance by {}%.", "Lasts till the end of the fight."],
-            "target": "ALL_ALLIES",
-            "power": 0,
-            "power_type": "COMMON",
-            "element": "",
-            "multiplier_type": "NO_MULTIPLIER",
-            "laps": 15,
-            "is_buff": true,
-            "self_cast_allowed": false,
-            "self_debuff_applies": false,
-            "minimal_caster_stack_power": 1,
-            "conflicts_with": [],
-            "is_giftable": false,
-            "maximum_gift_level": 0
-        },
         "Amulet of Resolve": {
             "name": "Amulet of Resolve",
             "level": 0,
-            "desc": ["Artifact. Increases status resistance by {}%.", "Lasts till the end of the fight."],
+            "desc": ["Artifact. Grants your army +{}% status and mind resistance.", "Lasts till the end of the fight."],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",
@@ -553,7 +558,10 @@
         "Warlords Edge": {
             "name": "Warlords Edge",
             "level": 0,
-            "desc": ["Artifact. Grants the whole army an additional {}% attack.", "Lasts till the end of the fight."],
+            "desc": [
+                "Artifact. Grants your army +{}% ranged attack and +[]% melee attack.",
+                "Lasts till the end of the fight."
+            ],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",
@@ -767,7 +775,7 @@
             "name": "Farsight Quiver",
             "level": 0,
             "desc": [
-                "Artifact. Extends allied archers' basic shot range by an additional {}%.",
+                "Artifact. Allied archers ignore the range penalty and always deal full damage (1/1). A shot through Smoke is still halved (1/2).",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",
@@ -830,7 +838,7 @@
             "name": "Lava Striders",
             "level": 0,
             "desc": [
-                "Artifact. All army units may move over and stand in lava; on central lava they gain Made of Fire (+10% to all stats and abilities).",
+                "Artifact. All army units can cross and stand in lava. Moving through or flying over lava grants Made of Fire (+10% to stats and ability power) for 2 laps, even when landing on dry ground.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",
@@ -984,7 +992,91 @@
             "level": 0,
             "desc": [
                 "Artifact. Increases all magic damage dealt by the entire army by {}%.",
-                "Spells, Fire Wall, Fireforged Sword, Chain Lightning, Fire Breath and Fire Shield.",
+                "Spells, Fire Wall, Chain Lightning, Fire Breath and Fire Shield.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Last Fuse": {
+            "name": "Last Fuse",
+            "level": 0,
+            "desc": [
+                "Artifact. When this stack is destroyed, it explodes. Adjacent enemies take {}% of the killing blow's actual damage, with a minimum of [] damage per stack power.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Gravechain": {
+            "name": "Gravechain",
+            "level": 0,
+            "desc": [
+                "Artifact. Attacks have a {}% chance per enemy to inflict Gravebound, chaining through connected enemies up to 3 links away: −25% movement for [] laps. Failed rolls do not stop the chain.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Quiver of Echoes": {
+            "name": "Quiver of Echoes",
+            "level": 0,
+            "desc": [
+                "Artifact. Ranged attacks have a {}% chance to make one extra attack.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Aegis of the Arcane": {
+            "name": "Aegis of the Arcane",
+            "level": 0,
+            "desc": [
+                "Artifact. Grants the whole army an extra {}% magic defense roll, combined with each unit's own defense instead of added to it.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",
@@ -1006,7 +1098,7 @@
             "level": 0,
             "desc": [
                 "Artifact. Increases all magic damage dealt by the entire army by {}%.",
-                "Spells, Fire Wall, Fireforged Sword, Chain Lightning, Fire Breath and Fire Shield.",
+                "Spells, Fire Wall, Chain Lightning, Fire Breath and Fire Shield.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",
@@ -1158,8 +1250,8 @@
             "level": 1,
             "desc": [
                 "Opens a churning vortex under an enemy and chains it to the spot.",
-                "The creature skips its next turn while trapped in the vortex.",
-                "Lasts 1 lap.",
+                "The creature skips its next turn — exactly one activation, no more.",
+                "Lasts 1 lap; when the vortex ends the creature acts normally again.",
                 "Water magic: a Water Element cannot be chained by it."
             ],
             "target": "ANY_ENEMY",
@@ -1185,10 +1277,10 @@
                 "Air magic: it passes straight through a Wind Element."
             ],
             "target": "ANY_ENEMY",
-            "power": 30,
+            "power": 150,
             "power_type": "COMMON",
             "element": "AIR",
-            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
             "laps": 1,
             "is_buff": false,
             "self_cast_allowed": false,
@@ -1207,10 +1299,10 @@
                 "Fire magic: a Fire Element is untouched, a Water Element burns half again as hard."
             ],
             "target": "ANY_ENEMY",
-            "power": 24,
+            "power": 120,
             "power_type": "COMMON",
             "element": "FIRE",
-            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
             "laps": 1,
             "is_buff": false,
             "self_cast_allowed": false,
@@ -1229,10 +1321,10 @@
                 "Earth magic: a Wind Element is struck half again as hard."
             ],
             "target": "FREE_CELL",
-            "power": 21.6,
+            "power": 108,
             "power_type": "COMMON",
             "element": "EARTH",
-            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
             "laps": 1,
             "is_buff": false,
             "self_cast_allowed": false,
@@ -1346,7 +1438,7 @@
             "name": "Smoke",
             "level": 2,
             "desc": [
-                "Throws a 2x2 smoke cloud onto free cells anywhere on the battlefield.",
+                "Throws a 3x3 smoke cloud onto free cells anywhere on the battlefield.",
                 "Any ranged attack (either side) whose arrow path crosses a smoked cell deals HALF damage (its range divisor doubles: full -> 1/2, 1/2 -> 1/4).",
                 "A creature stepping onto a smoked cell disperses the smoke from that cell.",
                 "Lasts 3 laps."
@@ -1369,15 +1461,16 @@
             "name": "Fireforged Sword",
             "level": 1,
             "desc": [
-                "The ally's attacks set the target alight for {}% of the damage dealt.",
-                "The fire is magic damage: armor does not stop it, magic resistance does.",
+                "Melee and ranged attacks, retaliations included, set every unit they damage alight for {}% of the damage that landed.",
+                "Area attacks count too: a pierce, a splash, a spin or a bounce burns each creature for its own share.",
+                "It is fire damage: armor does not stop it, magic resistance does.",
                 "Deals 50% more to water creatures. Fire creatures are immune.",
                 "Lasts 3 laps."
             ],
             "target": "ANY_ALLY",
-            "power": 10,
+            "power": 20,
             "power_type": "COMMON",
-            "element": "",
+            "element": "FIRE",
             "multiplier_type": "NO_MULTIPLIER",
             "laps": 3,
             "is_buff": true,
@@ -1413,10 +1506,12 @@
             "name": "Fire Wall",
             "level": 2,
             "desc": [
-                "Lays a burning wall across 3 cells in a straight line, in any of the four orientations.",
-                "Hold Shift while aiming to rotate it.",
+                "Lays a burning wall across 4 cells in a straight line, anywhere on the field, in any of the four orientations.",
+                "Hold Shift while aiming to rotate it. Only free cells catch fire: a creature, the mountain or a",
+                "narrowed-away cell under the line is skipped and the rest of the line still burns.",
                 "Entering a burning cell costs any creature 1 extra step (double the usual cost)",
-                "and sears it for {}% of its maximum health, friend or foe alike.",
+                "and sears it for {}% of its maximum health, friend or foe alike. A flying creature",
+                "clears the flames in flight and is only seared for the burning cells it lands on.",
                 "Lasts 3 laps."
             ],
             "target": "FREE_CELL",
@@ -1451,6 +1546,29 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Fireball": {
+            "name": "Fireball",
+            "level": 1,
+            "desc": [
+                "Hurls a fireball at an enemy in line of sight, dealing {} damage.",
+                "Everything on a cell touching it — friend or foe — is caught in the blast for the same.",
+                "Magical: it ignores armor, but magic resistance cuts it down.",
+                "Fire magic: a Fire Element is untouched, a Water Element burns half again as hard."
+            ],
+            "target": "ANY_ENEMY",
+            "power": 2,
+            "power_type": "COMMON",
+            "element": "FIRE",
+            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 3,
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
@@ -1533,10 +1651,28 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Gravebound": {
+            "name": "Gravebound",
+            "level": 1,
+            "desc": ["Spectral chains reduce the unit's movement range by 25%.", "Lasts 3 laps."],
+            "target": "ANY_ENEMY",
+            "power": 25,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 3,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Hamstrung": {
             "name": "Hamstrung",
             "level": 1,
-            "desc": ["The unit's movement range is reduced by 30%.", "Lasts 3 laps."],
+            "desc": ["A flying unit's movement range is reduced by 30%.", "Lasts 3 laps."],
             "target": "ANY_ENEMY",
             "power": 30,
             "power_type": "COMMON",

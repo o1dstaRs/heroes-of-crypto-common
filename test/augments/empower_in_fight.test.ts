@@ -10,7 +10,8 @@
  */
 
 import { beforeEach, describe, expect, it } from "bun:test";
-import { fireforgedSwordDamage, fireforgedSwordPower } from "../../src/spells/spell_damage";
+import { processFireforgedSwordAbility } from "../../src/abilities/fireforged_sword_ability";
+import { SceneLogMock } from "../../src/scene/scene_log_mock";
 
 import { EmpowerAugment, DefaultPlacementLevel1 } from "../../src/augments/augment_properties";
 import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
@@ -19,8 +20,8 @@ import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { Doctrine } from "../../src/doctrines/doctrine_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Spell } from "../../src/spells/spell";
-import { getEmpowerPercentage } from "../../src/spells/spell_damage";
-import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
+import { fireforgedSwordDamage, getEmpowerPercentage } from "../../src/spells/spell_damage";
+import { createCombatTestContext, createTestUnit, DamageStatisticHolder, placeUnit } from "../helpers/combat";
 
 /**
  * End-to-end checks that the Empower Augment reaches the places that DEAL magic damage — not just the pure
@@ -137,10 +138,18 @@ describe("Empower augment in a live fight", () => {
         expect(descriptions).toContain("107");
     });
 
-    it("sharpens a Fireforged Sword's bonus damage on the unit that holds it", () => {
+    it("leaves a Fireforged Sword at its own percentage when the team bought Empower", () => {
         const { context, fightProperties } = setupTeam(EmpowerAugment.LEVEL_3);
         const swordsman = createTestUnit({ name: "Swordsman", team: PBTypes.TeamVals.LEFT, initiative: 5 });
+        const target = createTestUnit({
+            name: "Target",
+            team: PBTypes.TeamVals.RIGHT,
+            magicResist: 0,
+            maxHp: 500,
+            amountAlive: 5,
+        });
         placeUnit(context.grid, context.unitsHolder, swordsman, { x: 3, y: 3 });
+        placeUnit(context.grid, context.unitsHolder, target, { x: 4, y: 3 });
 
         context.unitsHolder.applyAugments(fightProperties);
         swordsman.applyBuff(
@@ -151,19 +160,29 @@ describe("Empower augment in a live fight", () => {
         );
         swordsman.adjustBaseStats(false, 0, PBTypes.GridVals.NORMAL, 0, [], 0, 0, false);
 
-        // The blade burns as a MAGIC rider on the swing, not as attack_mod: the sword must leave the
-        // holder's physical attack alone, and Empower must raise the fire instead. The configured 10%
-        // becomes 12.4% at Empower level 3.
+        // Empower is on the team, and it must not touch the blade. The sword stays a magic rider — it
+        // does not fold into attack — and a 100-damage hit still burns for the buff's own 20.
+        expect(swordsman.getEmpowerPercentage()).toBe(24);
         expect(swordsman.getUnitProperties().attack_mod).toBe(0);
-        expect(fireforgedSwordPower(10, swordsman.getEmpowerPercentage())).toBeCloseTo(12.4, 6);
+        expect(swordsman.getBuff("Fireforged Sword")?.getPower()).toBe(20);
+        const secondary: { source: string; amount: number }[] = [];
+        processFireforgedSwordAbility(
+            swordsman,
+            target,
+            100,
+            new SceneLogMock(),
+            new DamageStatisticHolder(),
+            secondary,
+        );
+        expect(secondary).toEqual([expect.objectContaining({ source: "fireforged_sword", amount: 20 })]);
         expect(
             fireforgedSwordDamage({
                 damageDealt: 100,
-                swordPercentage: fireforgedSwordPower(10, swordsman.getEmpowerPercentage()),
+                swordPercentage: swordsman.getBuff("Fireforged Sword")?.getPower() ?? 0,
                 targetMagicResist: 0,
                 targetIsFireElement: false,
                 targetIsWaterElement: false,
             }),
-        ).toBe(12);
+        ).toBe(20);
     });
 });

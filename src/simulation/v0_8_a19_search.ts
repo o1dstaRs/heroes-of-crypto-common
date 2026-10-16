@@ -11,7 +11,12 @@
 
 import { buildV08A19SearchEnvironment, V08_A19_PRODUCTION_VERSION } from "../ai/versions/v0_8_a19_profile";
 import type { ILookaheadDeps } from "./lookahead";
-import { SearchDriver, type ISearchMatchInfo, type SearchPassiveProductiveProbeObserver } from "./search_driver";
+import {
+    SearchDriver,
+    withSearchEnvironment,
+    type ISearchMatchInfo,
+    type SearchPassiveProductiveProbeObserver,
+} from "./search_driver";
 import { V08_A13_SEARCH_OVERRIDE_ENV, withScopedAIEnvironment } from "./v0_8_a13_search";
 
 export const V08_A19_SEARCH_OVERRIDE_ENV = "V08_A19_SEARCH" as const;
@@ -48,8 +53,13 @@ export function createV08A19SearchDriver(
     match: ISearchMatchInfo,
     passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver,
 ): SearchDriver {
-    return withScopedAIEnvironment(
-        buildV08A19SearchEnvironment(),
-        () => new SearchDriver(deps, match, undefined, passiveProductiveProbeObserver),
+    const environment = buildV08A19SearchEnvironment();
+    // The overlay is what the browser can actually see. The process.env scope stays so Node, which has no
+    // overlay, constructs the same driver it did before.
+    return withSearchEnvironment(environment, () =>
+        withScopedAIEnvironment(
+            environment,
+            () => new SearchDriver(deps, match, undefined, passiveProductiveProbeObserver),
+        ),
     );
 }

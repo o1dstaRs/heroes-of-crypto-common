@@ -17,8 +17,7 @@ import { SearchDriver } from "../../src/simulation/search_driver";
 import {
     playGame,
     TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
-    TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6,
-    TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED,
+    TOURNAMENT_RESEARCH_A19,
     type IGameRecord,
     type ITournamentOptions,
 } from "../../src/simulation/tournament";
@@ -30,6 +29,9 @@ const baseOptions = (): ITournamentOptions => ({
     games: 2,
     baseSeed: BOAR_ROSTER_SEED,
     maxLaps: 1,
+    // These assertions compare exact seeded records. Use the simulator's operation-bounded search so
+    // host load cannot make one run hit the live wall-clock deadline before the other.
+    searchOfflineDeterministicWork: true,
 });
 
 const cellFor = (record: IGameRecord, side: "green" | "red", creatureName: string) =>
@@ -47,7 +49,7 @@ describe("tournament entrant-A research strategy profile", () => {
     test("survives worker structured cloning and follows entrant A across the mirrored side swap", async () => {
         const options: ITournamentOptions = {
             ...baseOptions(),
-            researchEntrantAStrategyProfile: TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6,
+            researchEntrantAStrategyProfile: TOURNAMENT_RESEARCH_A19,
         };
         expect(structuredClone(options)).toEqual(options);
 
@@ -58,19 +60,29 @@ describe("tournament entrant-A research strategy profile", () => {
         expect(records.map((record) => record.greenEntrant)).toEqual(["a", "b"]);
         expect(summary.entrantAResearchProfile).toEqual(records[0].entrantAResearchProfile);
         expect(records[0].entrantAResearchProfile).toMatchObject({
-            selector: TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6,
-            schema: "hoc.v0_8_a19_h64_paired_safe_compact_terminal_flank_research_profile.v6",
-            candidateId: "a19-h64-paired-safe-compact-sole-abom-boar-flank-v6-research",
+            selector: TOURNAMENT_RESEARCH_A19,
+            schema: "hoc.v0_8_a19_production_profile.v3",
+            candidateId: "a19",
             searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
         });
         expect(records[1].entrantAResearchProfile).toEqual(records[0].entrantAResearchProfile);
         expect(records[0].entrantAResearchProfile?.runtimeSourceLedger?.map(({ role }) => role)).toEqual([
             "search-driver",
+            "gravechain-coverage",
+            "last-fuse-trades",
+            "last-fuse-catalog",
+            "selection-bounds",
+            "rollout-allocation",
+            "scored-arbitration",
+            "material-arbitration",
             "armageddon-endgame",
+            "f184-lower-placement",
             "boar-battle-mage-flank-placement",
             "compact-placement",
-            "tournament-entrant-a-router",
-            "battle-engine-search-team-scope",
+            "ranked-placement",
+            "ai-registry-promotion",
+            "default-search-factory",
+            "default-search-routing",
         ]);
 
         // Game 0: entrant A owns GREEN and receives the scoped compact placement; B remains native v0.8.
@@ -96,7 +108,7 @@ describe("tournament entrant-A research strategy profile", () => {
         try {
             const options: ITournamentOptions = {
                 ...baseOptions(),
-                researchEntrantAStrategyProfile: TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6,
+                researchEntrantAStrategyProfile: TOURNAMENT_RESEARCH_A19,
             };
             playGame(options, 0);
             expect(searchedTeams.length).toBeGreaterThan(0);
@@ -117,7 +129,7 @@ describe("tournament entrant-A research strategy profile", () => {
                 {
                     ...baseOptions(),
                     versionA: "v0.1",
-                    researchEntrantAStrategyProfile: TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6,
+                    researchEntrantAStrategyProfile: TOURNAMENT_RESEARCH_A19,
                 },
                 0,
             ),
@@ -130,25 +142,10 @@ describe("tournament entrant-A research strategy profile", () => {
                 {
                     ...baseOptions(),
                     versionB: "v0.1",
-                    researchEntrantAStrategyProfile: TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6,
+                    researchEntrantAStrategyProfile: TOURNAMENT_RESEARCH_A19,
                 },
                 0,
             ),
         ).toThrow("requires entrant B version v0.8");
-    });
-
-    test("reports the exact historical v5 qualification hashes", () => {
-        const record = playGame(
-            {
-                ...baseOptions(),
-                researchEntrantAStrategyProfile:
-                    TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED,
-            },
-            0,
-        );
-        expect(record.entrantAResearchProfile).toMatchObject({
-            placementImplementationSha256: "b75fef5f755154f6e645126206cedb37cee849741ebb453c8e250db2999e2be0",
-            searchImplementationSha256: "00b1fe13e651ce82b309754993c5dcae4038ad7558092a5edd0fb47a63e85e16",
-        });
     });
 });

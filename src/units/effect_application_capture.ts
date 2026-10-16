@@ -24,21 +24,19 @@ export interface IEffectApplicationRecord {
     name: string;
     kind: "buff" | "debuff" | "effect";
     laps?: number;
+    /** Previous owner of a transferred buff, rather than the caster of a new buff. */
+    sourceUnitId?: string;
     /** A debuff that ROLLED but was resisted — recorded so the log can say the target shrugged it off. */
     resisted?: boolean;
 }
 
 // System/marker state the seeding and refresh machinery re-applies over and over — never player-visible
 // "something landed on you" news. Mirrors ability_helper's ENGINE_MARKER_SPELL_NAMES (kept local: this
-// module must stay a leaf importable from unit.ts, and ability_helper imports Unit).
-const MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
-    "Morale",
-    "Dismorale",
-    "Hidden",
-    "Visible",
-    "Angelic Host Blessing",
-    "Water Shield",
-]);
+// module must stay a leaf importable from unit.ts, and ability_helper imports Unit). The blessing family
+// (" Blessing" army passives: Angelic Host, Arcane Ward, Warding Mane, Arrows Wingshield) is matched by
+// suffix below — UnitsHolder re-seeds every one of them on each stack-power refresh, so naming them
+// filled the fight log with "gains Arcane Ward Blessing" for the whole army after every single action.
+const MARKER_SPELL_NAMES: ReadonlySet<string> = new Set(["Morale", "Dismorale", "Hidden", "Visible", "Water Shield"]);
 
 const ARTIFACT_BUFF_NAMES: ReadonlySet<string> = new Set(
     [...TIER1_ARTIFACT_LIST, ...TIER2_ARTIFACT_LIST].map((artifact) => artifact.buffName).filter((name) => !!name),
@@ -53,7 +51,8 @@ export const isEffectApplicationNoise = (name: string): boolean =>
     MARKER_SPELL_NAMES.has(name) ||
     ARTIFACT_BUFF_NAMES.has(name) ||
     name.endsWith(" Aura") ||
-    name.endsWith(" Augment");
+    name.endsWith(" Augment") ||
+    name.endsWith(" Blessing");
 
 /**
  * One Water Shield absorb observed while an action was applied: the shield ate the whole hit and broke.

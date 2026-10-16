@@ -25,6 +25,7 @@ import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { createGunzip } from "node:zlib";
 
 import { PBTypes } from "../generated/protobuf/v1/types";
+import { validateAiMetaEvidence } from "./ai_meta_evidence";
 import {
     AI_META_COHORTS,
     AI_META_GAMES_PER_MATCHUP,
@@ -218,6 +219,8 @@ function validateArmy(value: unknown, context: string): asserts value is IAiMeta
     ) {
         throw new Error(`${context}.augment is invalid`);
     }
+    if (augment.plan.empower !== undefined && !safeInteger(augment.plan.empower))
+        throw new Error(`${context}.augment.plan.empower is invalid`);
     for (const key of ["placement", "armor", "might", "sniper", "movement"]) {
         if (!safeInteger(augment.plan[key])) throw new Error(`${context}.augment.plan.${key} is invalid`);
     }
@@ -241,7 +244,7 @@ function validateOutcome(value: unknown, context: string): asserts value is IAiM
     }
 }
 
-function parsePairRecord(
+export function parsePairRecord(
     value: unknown,
     cohort: AiMetaCohort,
     declaredMaps: readonly AiMetaRecordedMap[],
@@ -260,6 +263,7 @@ function parsePairRecord(
         throw new Error(`${context}.games must contain the seat-swapped pair`);
     }
     value.games.forEach((game, index) => validateOutcome(game, `${context}.games[${index}]`));
+    if (value.evidence !== undefined) validateAiMetaEvidence(value as unknown as IAiMetaPairRecord);
     return value as unknown as IAiMetaPairRecord;
 }
 
@@ -373,6 +377,7 @@ async function readRawCohort(
     quality: ICohortQuality,
     declaredMaps: readonly AiMetaRecordedMap[],
     aggregation: AiMetaAggregation,
+    evidenceRequired: boolean,
 ): Promise<void> {
     const rawPath = resolve(summaryDirectory, quality.rawPath);
     const relativePath = relative(summaryDirectory, rawPath);
@@ -412,6 +417,9 @@ async function readRawCohort(
                 declaredMaps,
                 `${quality.rawPath}:${lineNumber}`,
             );
+            if (evidenceRequired && !record.evidence) {
+                throw new Error(`${quality.rawPath}:${lineNumber} is missing declared evidence`);
+            }
             if (record.pair >= quality.pairs || pairs.has(record.pair)) {
                 throw new Error(`${quality.rawPath}:${lineNumber} has duplicate or out-of-range pair ${record.pair}`);
             }
@@ -496,7 +504,13 @@ export async function reaggregateAiMetaSummary(
     const aggregation = new AiMetaAggregation();
     const summaryDirectory = dirname(summaryPath);
     for (const quality of qualities) {
-        await readRawCohort(summaryDirectory, quality, declaredMaps, aggregation);
+        await readRawCohort(
+            summaryDirectory,
+            quality,
+            declaredMaps,
+            aggregation,
+            Boolean(parsed.provenance.evidenceCollection),
+        );
         const accumulator = aggregation.get(quality.cohort, "all");
         if (!accumulator) throw new Error(`No aggregate was produced for ${quality.cohort}`);
         assertQualityMatchesRaw(quality, accumulator);

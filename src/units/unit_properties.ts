@@ -71,9 +71,8 @@ export class UnitProperties {
     public range_shots: number;
     public range_shots_mod: number;
     /**
-     * Extra ranged shots this unit has ALREADY been handed by a Rallying Volley Aura (Zena). The grant is
-     * one-off: standing in the aura tops the quiver up once, and firing those shots spends them for good —
-     * stepping out and back in, or a second Zena, tops up nothing (the aura does not stack).
+     * Extra ranged shots already handed to this unit by Rallying Volley Blessing (Zena). A once-only
+     * army-wide top-up: spent arrows stay spent, and another bearer or refresh grants nothing again.
      */
     public rallying_volley_granted: number;
     public shot_distance: number;
@@ -201,6 +200,15 @@ export class UnitProperties {
     // Left undefined for locally-simulated units (sandbox), which own the whole derivation.
     public base_armor_authoritative?: boolean;
     public base_attack_authoritative?: boolean;
+    // The shots twin. A ranked snapshot's range_shots is the server's REMAINING count, with the Limited
+    // Supply cap and the Rallying Volley top-up already applied. A client rebuilt from it seeds maxRangeShots
+    // with that remaining count, so re-running the cap compounds it: a 10-quiver Arbalester at stack power
+    // 1 arrived as 4 (2 capped + Zena's 2) and adjustBaseStats cut it to floor(4 × 0.2) + 2 = 2 — the base
+    // cap, which reads as "Zena gives nothing". Re-running the blessing top-up double-granted plain archers
+    // instead (a 20-quiver Elf the server had at 22 showed 24 until the next snapshot). When set, both
+    // passes keep the snapshot's count verbatim. Left undefined for locally-simulated units (sandbox),
+    // which own the whole derivation.
+    public range_shots_authoritative?: boolean;
     public constructor(
         faction: FactionType,
         name: string,
