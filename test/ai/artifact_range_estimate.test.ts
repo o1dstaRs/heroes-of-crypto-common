@@ -5,7 +5,8 @@ import type { IDecisionContext } from "../../src/ai/ai_strategy";
 import { enumerateCandidates, evaluateRangeCandidateDamage } from "../../src/ai/candidates";
 import { selectV08SplashRangedCandidate } from "../../src/ai/versions/v0_8";
 import { Tier2Artifact } from "../../src/artifacts/artifact_properties";
-import { getSpellConfig } from "../../src/configuration/config_provider";
+import { getEffectConfig, getSpellConfig } from "../../src/configuration/config_provider";
+import { Effect } from "../../src/effects/effect";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
@@ -87,9 +88,8 @@ function scenario(
     }
     if (options.endless) combat.unitsHolder.refreshStackPowerForAllUnits();
     if (rolls) {
-        primary.applyBuff(
-            new Spell({ spellProperties: { ...getSpellConfig("System", "Broken Aegis"), power: 50 }, amount: 1 }),
-        );
+        shooter.applyEffect(new Effect({ ...getEffectConfig("Boar Saliva"), power: 50 }));
+        expect(shooter.calculateMissChance(primary, 0)).toBe(50);
         if (echo) {
             shooter.deleteBuff("Quiver of Echoes");
             shooter.applyBuff(

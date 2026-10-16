@@ -33,6 +33,7 @@ function board(
         remainingHp?: number;
         fuse?: boolean;
         attackerCell?: XY;
+        neighborCell?: XY;
     } = {},
 ) {
     setDeterministicRandomSource(undefined);
@@ -71,10 +72,15 @@ function board(
                   ? targetCell.y - target.getFootprintHeight()
                   : targetCell.y,
     };
-    placeUnit(combat.grid, combat.unitsHolder, neighbor, {
-        x: forward.x - direction.y,
-        y: forward.y + direction.x,
-    });
+    placeUnit(
+        combat.grid,
+        combat.unitsHolder,
+        neighbor,
+        options.neighborCell ?? {
+            x: forward.x - direction.y,
+            y: forward.y + direction.x,
+        },
+    );
     placeUnit(combat.grid, combat.unitsHolder, far, { x: 2, y: 2 });
     placeUnit(combat.grid, combat.unitsHolder, sameTeam, {
         x: forward.x,
@@ -207,7 +213,7 @@ describe("Last Fuse melee estimates", () => {
     });
 
     test.each(["attacker", "neighbor"] as const)(
-        "Water Shield protects the %s without being spent by the preview",
+        "accounts for Water Shield on the %s without spending it in the preview",
         (protectedUnit) => {
             const f = board({ [protectedUnit]: { abilities: ["Water Shield"] }, remainingHp: 10 });
             const estimate = f.project()!;
@@ -301,6 +307,29 @@ describe("Last Fuse melee estimates", () => {
         expect(f.target.isDead()).toBe(false);
     });
 
+    test("a spent Resurrection charge no longer prevents the explosion", () => {
+        const f = board({ target: { abilities: ["Resurrection"], spells: ["System:Resurrection"] }, remainingHp: 10 });
+        f.target.useSpell("Resurrection");
+        expect(f.target.canSelfResurrect()).toBe(false);
+        expect(f.project()!.fatalChance).toBe(1);
+        expect(f.fire().friendlyDamage).toBe(40);
+    });
+
+    test("counts a large allied body once across all touching cells", () => {
+        const f = board({
+            neighbor: { size: PBTypes.UnitSizeVals.LARGE },
+            neighborCell: { x: 11, y: 10 },
+            remainingHp: 10,
+        });
+        expect(f.project()!.expectedFriendlyDamage).toBe(40);
+        expect(f.fire().friendlyDamage).toBe(40);
+    });
+
+    test("a potentially lethal counter is evaluated by engine search", () => {
+        const f = board({ attacker: { maxHp: 1 }, remainingHp: 10 });
+        expect(f.project()).toBeUndefined();
+    });
+
     test("a living stack has no explosion cost", () => {
         const f = board({ remainingHp: 100 });
         expect(f.project()).toMatchObject({ expectedFriendlyDamage: 0, fatalChance: 0, secureKill: false });
@@ -345,6 +374,7 @@ describe("Last Fuse melee estimates", () => {
         f.fight.setArtifactPerTeam(LEFT, 2, Tier2Artifact.LAST_FUSE);
         f.unitsHolder.applyArtifacts(f.fight);
         expect(f.project()).toBeUndefined();
+        expect(f.fire().blasts.length).toBeGreaterThan(1);
         const double = board({ attacker: { abilities: ["Double Punch"] }, remainingHp: 10 });
         expect(double.project()).toBeUndefined();
     });
