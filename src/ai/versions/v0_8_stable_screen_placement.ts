@@ -24,6 +24,7 @@ export function stabilizeV08RangedScreen(
     units: readonly Unit[],
     context: IPlacementContext,
     incumbent: Map<string, XY>,
+    mindlessRelocation: "forward" | "nearest" = "forward",
 ): Map<string, XY> {
     if (context.grid.getSettings().getGridSize() !== 16 || incumbent.size !== units.length) return incumbent;
     const mindless = units.filter(isMindlessAiUnit);
@@ -97,11 +98,13 @@ export function stabilizeV08RangedScreen(
         const choices = bases.filter((base) =>
             footprintCellsForAnchor(unit, base).every((c) => legal.has(key(c)) && !taken.has(key(c))),
         );
-        choices.sort(
-            (a, b) =>
-                forward(b) - forward(a) ||
-                distance(a, incumbent.get(unit.getId())!) - distance(b, incumbent.get(unit.getId())!),
-        );
+        // Isolate screen repair from an unrelated forced-charge advance. The nearest research variant
+        // preserves a still-legal incumbent and otherwise makes the smallest necessary displacement.
+        choices.sort((a, b) => {
+            const travel = distance(a, incumbent.get(unit.getId())!) - distance(b, incumbent.get(unit.getId())!);
+            const advance = forward(b) - forward(a);
+            return mindlessRelocation === "nearest" ? travel || advance : advance || travel;
+        });
         if (!choices.length) return incumbent;
         selected.set(unit.getId(), choices[0]);
         footprintCellsForAnchor(unit, choices[0]).forEach((c) => taken.add(key(c)));

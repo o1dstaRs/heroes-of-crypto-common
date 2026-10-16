@@ -92,6 +92,49 @@ function openLandings(f: ReturnType<typeof fixture>, p: Map<string, { x: number;
     return count;
 }
 describe("experimental mindless-aware ranged screen placement", () => {
+    test("nearest relocation leaves a still-legal mindless body in place while repairing the screen", () => {
+        const f = fixture();
+        const boar = f.units[2];
+        f.incumbent.set(boar.getId(), { x: 2, y: 14 });
+        const result = stabilizeV08RangedScreen(f.units, f.context, f.incumbent, "nearest");
+        expect(result).not.toBe(f.incumbent);
+        expect(result.get(boar.getId())).toEqual(f.incumbent.get(boar.getId()));
+        expect(openLandings(f, result)).toBeLessThan(openLandings(f, f.incumbent));
+    });
+    test("nearest relocation displaces an obstructing mindless body only as far as necessary on either side", () => {
+        for (const mirror of [false, true]) {
+            const f = fixture(mirror),
+                boar = f.units[2];
+            const result = stabilizeV08RangedScreen(f.units, f.context, f.incumbent, "nearest");
+            const original = f.incumbent.get(boar.getId())!;
+            const travel = (c: { x: number; y: number }) =>
+                Math.max(Math.abs(c.x - original.x), Math.abs(c.y - original.y));
+            const legal = f.context.placement.possibleCellHashes();
+            const taken = new Set(
+                f.units
+                    .filter((u) => u !== boar)
+                    .flatMap((u) => footprintCellsForAnchor(u, result.get(u.getId())!).map((c) => (c.x << 4) | c.y)),
+            );
+            const available = [...legal]
+                .map((h) => ({ x: h >> 4, y: h & 15 }))
+                .filter((base) =>
+                    footprintCellsForAnchor(boar, base).every(
+                        (c) => legal.has((c.x << 4) | c.y) && !taken.has((c.x << 4) | c.y),
+                    ),
+                );
+            expect(result.get(boar.getId())).not.toEqual(original);
+            expect(travel(result.get(boar.getId())!)).toBe(Math.min(...available.map(travel)));
+            expect(openLandings(f, result)).toBeLessThan(openLandings(f, f.incumbent));
+            for (const ward of f.units.slice(0, 2))
+                expect(result.get(ward.getId())).toEqual(f.incumbent.get(ward.getId()));
+        }
+    });
+    test("the original forward research variant remains the default for reproducible comparisons", () => {
+        const f = fixture();
+        expect(stabilizeV08RangedScreen(f.units, f.context, f.incumbent)).toEqual(
+            stabilizeV08RangedScreen(f.units, f.context, f.incumbent, "forward"),
+        );
+    });
     test("improves protection after the mindless body leaves while preserving shooters and legal footprints", () => {
         const f = fixture(),
             before = JSON.stringify([...f.incumbent]),
