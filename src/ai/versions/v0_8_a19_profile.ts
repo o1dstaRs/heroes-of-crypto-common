@@ -140,7 +140,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for offline selector-aware bounds; the released flag remains off.
-        sha256: "c5044b6cfa54666a7cbd12d2c11eff68c0d4d3be313ddc37bac696d0ddccb97b" as const,
+        sha256: "80f28d63231883c9fb2d3fbf567bff4600cac6724d197eed559233f5586e69f1" as const,
     }),
     Object.freeze({
         role: "selection-bounds" as const,
@@ -201,7 +201,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
         // Re-pinned for an explicit research deployment intervention; absent hook preserves routing.
-        sha256: "c574631ad6275e2abdb8c87fa733a72aee9d056c045c936165818e1cd415c8a5" as const,
+        sha256: "1b8b5374e2d3bf73258e0be37a7921c47d05796276502a066b4c607412680a6e" as const,
     }),
 ] as const);
 

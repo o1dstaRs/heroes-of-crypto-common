@@ -993,6 +993,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 damageStatisticHolder.add(v);
             }
         },
+        captureAuxiliaryState: () => {
+            const savedSummonedUnitSequence = summonedUnitSequence;
+            return () => {
+                summonedUnitSequence = savedSummonedUnitSequence;
+            };
+        },
     };
     const lookahead = new LookaheadDriver(driverDeps);
     // B2/RAWS wide-candidate rollout SEARCH driver. Plain v0.8 uses promoted A19; explicit A19/a13 switches

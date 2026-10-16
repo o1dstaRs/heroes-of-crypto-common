@@ -5309,6 +5309,7 @@ export class SearchDriver {
             ? undefined
             : snapshotBattle(this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
         const savedStats = this.deps.captureDamageStats();
+        const restoreAuxiliaryState = this.deps.captureAuxiliaryState?.();
         this.assertBeforeDecisionDeadline(deadlineAt);
         const means: number[] = [];
         const captureMaterial = this.captureA19Material && horizonMode === "turns";
@@ -5384,6 +5385,11 @@ export class SearchDriver {
                     }
                     try {
                         this.deps.restoreDamageStats(savedStats);
+                    } catch (error) {
+                        cleanupErrors.push(error);
+                    }
+                    try {
+                        restoreAuxiliaryState?.();
                     } catch (error) {
                         cleanupErrors.push(error);
                     }

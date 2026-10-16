@@ -5138,16 +5138,27 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(unit).toBeDefined();
         const incumbent = h.decideActive();
         const before = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
+        const driver = h.makeDriver();
+        let auxiliarySequence = 17;
+        const internals = driver as unknown as { deps: ILookaheadDeps };
+        internals.deps.captureAuxiliaryState = () => {
+            const saved = auxiliarySequence;
+            return () => {
+                auxiliarySequence = saved;
+            };
+        };
         const originalApply = h.engine.apply.bind(h.engine);
         h.engine.apply = ((action: GameAction) => {
             const result = originalApply(action);
             if (action.type !== "select_attack_type") {
+                auxiliarySequence += 1;
                 throw new Error("injected rollout failure");
             }
             return result;
         }) as GameActionEngine["apply"];
 
-        expect(() => h.makeDriver().chooseDecision(unit!, "v0.6", incumbent)).toThrow("injected rollout failure");
+        expect(() => driver.chooseDecision(unit!, "v0.6", incumbent)).toThrow("injected rollout failure");
+        expect(auxiliarySequence).toBe(17);
         expect(JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)))).toBe(before);
     });
 
