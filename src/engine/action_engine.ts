@@ -1332,10 +1332,8 @@ export class GameActionEngine {
         if (!this.context.attackHandler) {
             return this.reject("attack_handler_missing");
         }
-        // Project the throw onto the first enemy standing on the trajectory between the attacker and
-        // the aimed (empty) cell. A unit on the line intercepts the throw instead of it passing
-        // through to the cell behind — matching legacy test_heroes.ts. With a clear path the aimed
-        // cell is used unchanged.
+        // Land on the first contacted footprint cell, never a large interceptor's far anchor.
+        // A clear trajectory retains the aimed cell.
         const targetCell = this.context.attackHandler.projectAreaThrowTargetCell(
             this.context.unitsHolder.getAllUnits(),
             attacker,

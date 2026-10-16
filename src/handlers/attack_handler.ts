@@ -447,10 +447,10 @@ export class AttackHandler {
     }
     /**
      * Area Throw projection (e.g. Gargantuan): a thrown AOE shot is intercepted by the first enemy
-     * unit standing on the straight line between the attacker and the aimed cell. Returns that
-     * unit's base cell so the splash "projects to it" instead of the throw passing through to the
-     * empty cell behind. When the path is clear, the aimed cell is returned unchanged. Mirrors the
-     * original Area Throw behaviour, where a unit on the trajectory intercepts the throw.
+     * unit standing on the straight line between the attacker and the aimed cell. The splash is
+     * centered on the footprint cell the ray first hits, just like an occupied-target ranged shot.
+     * A rectangle's base can lie behind that contact and must not pull the blast through its body.
+     * When the path is clear, the aimed cell is returned unchanged.
      */
     public projectAreaThrowTargetCell(
         allUnits: ReadonlyMap<string, Unit>,
@@ -472,8 +472,17 @@ export class AttackHandler {
             false, // isSelection
             true, // isAOEShot (Area Throw splash semantics)
         );
-        const interceptingUnit = evaluation.affectedUnits?.[0]?.[0];
-        const interceptedCell = interceptingUnit?.getBaseCell();
+        const interceptingId = evaluation.affectedUnits[0]?.[0]?.getId();
+        // Lava/water entries can precede the unit groups. Match the center of the hit group by its
+        // occupant instead of assuming affectedCells[0] belongs to affectedUnits[0].
+        const interceptedCell = interceptingId
+            ? evaluation.affectedCells
+                  .find((cells) => {
+                      const center = cells.at(-1);
+                      return center && this.grid.getOccupantUnitId(center) === interceptingId;
+                  })
+                  ?.at(-1)
+            : undefined;
         if (interceptedCell) {
             return { x: interceptedCell.x, y: interceptedCell.y };
         }
