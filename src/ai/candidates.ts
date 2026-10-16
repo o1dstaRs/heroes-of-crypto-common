@@ -63,7 +63,7 @@ import { decisionFireWalls } from "./decision_fight_state";
 import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
-import { estimateLastFuseMeleeDamage } from "./last_fuse_estimate";
+import { estimateLastFuseMeleeDamage, type ILastFuseMeleeEstimate } from "./last_fuse_estimate";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -1434,6 +1434,7 @@ class CandidateGenerator {
             unit: Unit;
             cells: XY[];
             damage?: { effective: number; kill: 0 | 1 };
+            fuseByMove?: Map<boolean, ILastFuseMeleeEstimate | undefined>;
         }
         interface IMeleePair {
             target: Unit;
@@ -1445,6 +1446,12 @@ class CandidateGenerator {
         }
         const targetViews: IMeleeTarget[] = targets.map((target) => ({ unit: target, cells: target.getCells() }));
         const pairs: IMeleePair[] = [];
+        // All legal melee stands touch the same corpse. Without these position/distance modifiers, the
+        // supported projection is identical within stationary or moving attacks against one target.
+        const invariantFuseDamage =
+            !this.unit.getAbility("Rapid Charge") &&
+            !this.unit.getAbility("Backstab") &&
+            !this.unit.getAuraEffect("War Anger");
         const actionsFor = (target: Unit, cell: XY, route?: IReadonlyWeightedRoute): GameAction[] => {
             const actions: GameAction[] = [...prefix];
             // Keep the measured separate move-and-strike encoding for both valuation and execution.
@@ -1459,15 +1466,25 @@ class CandidateGenerator {
         };
         const pair = (target: IMeleeTarget, cell: XY, route?: IReadonlyWeightedRoute): IMeleePair => {
             target.damage ??= this.meleeDamage(target.unit);
-            const fuse = target.unit.hasBuffActive("Last Fuse")
-                ? estimateLastFuseMeleeDamage(
-                      this.unit,
-                      target.unit,
-                      this.context,
-                      cell,
-                      actionsFor(target.unit, cell, route),
-                  )
-                : undefined;
+            let fuse: ILastFuseMeleeEstimate | undefined;
+            if (target.unit.hasBuffActive("Last Fuse")) {
+                const moved = !!route && (cell.x !== base.x || cell.y !== base.y);
+                const cacheable = invariantFuseDamage && !route?.hasLavaCell && !route?.hasWaterCell;
+                if (cacheable && target.fuseByMove?.has(moved)) fuse = target.fuseByMove.get(moved);
+                else {
+                    fuse = estimateLastFuseMeleeDamage(
+                        this.unit,
+                        target.unit,
+                        this.context,
+                        cell,
+                        actionsFor(target.unit, cell, route),
+                    );
+                    if (cacheable) {
+                        target.fuseByMove ??= new Map();
+                        target.fuseByMove.set(moved, fuse);
+                    }
+                }
+            }
             return {
                 target: target.unit,
                 cell,

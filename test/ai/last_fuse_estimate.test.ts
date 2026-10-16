@@ -396,4 +396,22 @@ describe("Last Fuse melee estimates", () => {
         expect(incumbent.features.expectedDamage).toBeLessThan(0);
         expect(selectV08DirectCombatCandidate(candidates)?.targetId).toBe(safe.getId());
     });
+
+    test.each(["Rapid Charge", "Backstab"])("keeps position-dependent %s valuations separate", (ability) => {
+        const f = board({
+            attacker: { abilities: [ability], damageMin: 10, damageMax: 10, stackPower: 5 },
+            remainingHp: 15,
+        });
+        const candidates = enumerateCandidates(f.attacker, f.context, [
+            { type: "end_turn", unitId: f.attacker.getId(), reason: "manual" },
+        ]).candidates.filter((c) => c.kind === "melee" && c.targetId === f.target.getId());
+        const values = new Set<number>();
+        for (const candidate of candidates) {
+            const estimate = f.project(candidate.standCell!, candidate.actions);
+            if (!estimate) continue;
+            expect(candidate.features.expectedDamage).toBe(estimate.expectedNetDamage);
+            values.add(candidate.features.expectedDamage);
+        }
+        expect(values.size).toBeGreaterThan(1);
+    });
 });
