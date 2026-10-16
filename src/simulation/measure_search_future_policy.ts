@@ -33,6 +33,7 @@ import type { ILookaheadDeps } from "./lookahead";
 import { PersistentWorkerPool, startPersistentWorker } from "./persistent_worker_pool";
 import { SearchDriver } from "./search_driver";
 import { createV08A19SearchDriver } from "./v0_8_a19_search";
+import { REPLY_RESIDUAL_FEATURE_NAMES, replyResidualFeatures } from "./search_reply_residual";
 
 type Horizon = "leaf" | "turns" | "reply" | "lap";
 interface IDriver {
@@ -89,9 +90,22 @@ interface IFrame {
     samples?: number[][];
     seed?: number;
     horizon?: number;
+    leafScores?: Map<string, number>;
+}
+interface IProbe {
+    policy: Policy;
+    means: number[];
+    materials: number[];
+    selected: number;
+    samples: number[][];
+    nestedChoices: number;
+    changedNestedChoices: number;
+    changedExamples: unknown[];
+    ms: number;
 }
 type Task = { seed: number; grid: number; output: string; rollouts: number };
-type Policy = "native" | "search-two";
+type Policy = "native-four" | "native" | "search-two";
+const replyDataset = process.env.FUTURE_POLICY_REPLY_DATASET === "1";
 const signature = (value: unknown) => JSON.stringify(value);
 const digest = (value: unknown) =>
     createHash("sha256")
@@ -117,6 +131,7 @@ let trajectory: unknown[] = [];
 let nestedChoices = 0,
     changedNestedChoices = 0;
 let changedExamples: unknown[] = [];
+let sampledTeams = new Set<TeamType>();
 
 function install(): void {
     p.shortlistCandidates = function (this: IDriver, ...args: Parameters<IDriver["shortlistCandidates"]>) {
@@ -128,11 +143,17 @@ function install(): void {
         const recording = frame && (!probeDriver || this === probeDriver) && args[3] === "turns";
         if (this === probeDriver && policy && args[3] === "turns") {
             args[2] = worldSeed;
-            args[4] = task.rollouts;
+            args[4] = policy === "native-four" ? 4 : task.rollouts;
             args[7] = false;
             if (frame) frame.samples = args[1].map(() => []);
         }
         const values = originalScore.apply(this, args);
+        if (replyDataset && frame && (!probeDriver || this === probeDriver) && args[3] === "leaf") {
+            frame.leafScores ??= new Map();
+            args[1].forEach((candidate, i) => {
+                if (Number.isFinite(values[i])) frame!.leafScores!.set(signature(candidate.actions), values[i]);
+            });
+        }
         if (recording && frame) {
             frame.means = [...values];
             frame.seed = args[2];
@@ -176,7 +197,17 @@ function observe(this: IDriver, ...args: Parameters<IDriver["chooseDecision"]>):
     if (!base.catalog || base.catalog.length < 2 || !base.means || !(base.means[0] > 0 && base.means[0] < 1))
         return baseline;
     eligible++;
-    if (eligible > 1 || process.env.FUTURE_POLICY_DISABLED === "1") return baseline;
+    if (process.env.FUTURE_POLICY_DISABLED === "1") return baseline;
+    if (replyDataset) {
+        if (
+            this.deps.fightProperties.getCurrentLap() > 2 ||
+            sampledTeams.has(unit.getTeam()) ||
+            !args[3] ||
+            !base.catalog.some((c) => signature(c.actions) === signature(baseline))
+        )
+            return baseline;
+        sampledTeams.add(unit.getTeam());
+    } else if (eligible > 1) return baseline;
     const deps = this.deps,
         snap = snapshotBattle(deps.unitsHolder, deps.grid, deps.fightProperties);
     const stateDigest = digest({ ...snap, unitRefs: undefined });
@@ -191,7 +222,10 @@ function observe(this: IDriver, ...args: Parameters<IDriver["chooseDecision"]>):
     const strategyForTeam = deps.strategyForTeam;
     const catalog = base.catalog;
     if (base.seed === undefined) throw new Error("Missing baseline seed");
-    worldSeed = hashSimulationParts("a19-future-policy-world-v1", base.seed);
+    const referenceSeed = hashSimulationParts(
+        replyDataset ? "a19-reply-residual-reference-v1" : "a19-future-policy-world-v1",
+        base.seed,
+    );
     const child = createV08A19SearchDriver(deps, {
         seed: task.seed,
         greenVersion: "v0.8",
@@ -253,20 +287,25 @@ function observe(this: IDriver, ...args: Parameters<IDriver["chooseDecision"]>):
         }
         return wrapper;
     };
-    const probes: unknown[] = [];
+    const probes: IProbe[] = [];
     const started = performance.now();
     try {
         // The prototype hooks identify this outer scorer; the separate child keeps its native rollouts.
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         probeDriver = this;
         this.rollbackStrategy = "snapshot";
-        for (const selectedPolicy of ["native", "search-two"] as const) {
+        const policies: readonly Policy[] = replyDataset
+            ? ["native-four", "native", "search-two"]
+            : ["native", "search-two"];
+        for (const selectedPolicy of policies) {
             restoreDeterministicRandomState(rng);
             deps.setActiveUnitId(active);
             this.finishedSim = false;
             this.finishedWinningTeam = null;
             frame = {};
             policy = selectedPolicy;
+            worldSeed = selectedPolicy === "native-four" ? base.seed : referenceSeed;
+            const rolloutCount = selectedPolicy === "native-four" ? 4 : task.rollouts;
             nestedChoices = 0;
             changedNestedChoices = 0;
             changedExamples = [];
@@ -285,9 +324,9 @@ function observe(this: IDriver, ...args: Parameters<IDriver["chooseDecision"]>):
             for (let i = 0; i < catalog.length; i++) {
                 const samples = measured.samples[i];
                 if (
-                    samples.length !== task.rollouts ||
+                    samples.length !== rolloutCount ||
                     samples.some((v) => !Number.isFinite(v)) ||
-                    Math.abs(samples.reduce((sum, v) => sum + v, 0) / task.rollouts - measured.means[i]) > 1e-12
+                    Math.abs(samples.reduce((sum, v) => sum + v, 0) / rolloutCount - measured.means[i]) > 1e-12
                 )
                     throw new Error("Incomplete or rejected rollout samples");
             }
@@ -309,24 +348,36 @@ function observe(this: IDriver, ...args: Parameters<IDriver["chooseDecision"]>):
                 changedExamples,
                 ms: performance.now() - start,
             });
+            if (selectedPolicy === "native-four" && signature(chosen) !== signature(baseline))
+                throw new Error("Unbounded native R4 changed the certified baseline selector");
+        }
+        let features: number[][] | undefined, featureMs: number | undefined;
+        if (replyDataset) {
+            const nativeFour = probes[0],
+                start = performance.now();
+            features = replyResidualFeatures(unit, args[3]!, catalog, { ...nativeFour, leafScores: base.leafScores });
+            featureMs = performance.now() - start;
         }
         positions++;
         appendFileSync(
             task.output + ".positions.jsonl",
             JSON.stringify({
-                schema: "hoc.a19-future-policy-position.v1",
+                schema: replyDataset ? "hoc.a19-reply-residual-position.v1" : "hoc.a19-future-policy-position.v1",
                 seed: task.seed,
                 grid: task.grid,
                 ordinal,
                 unit: unit.getName(),
                 lap: deps.fightProperties.getCurrentLap(),
                 stateDigest,
-                worldSeed,
+                worldSeed: referenceSeed,
+                nativeFourSeed: replyDataset ? base.seed : undefined,
                 rollouts: task.rollouts,
                 searchedFutureTurns: 2,
                 horizon: base.horizon,
                 catalog: catalog.map((c) => ({ kind: c.kind, actions: c.actions })),
                 probes,
+                features,
+                featureMs,
                 ms: performance.now() - started,
             }) + "\n",
         );
@@ -357,6 +408,7 @@ function oneGame(input: Task) {
     ordinal = 0;
     eligible = 0;
     positions = 0;
+    sampledTeams = new Set();
     trajectory = [];
     const rng = makeRng(hashSimulationParts("a19-intellect-roster-v1", input.seed));
     const roster = buildRoster(rng, undefined, undefined, undefined, "expBudget");
@@ -450,6 +502,11 @@ if (!isMainThread && workerData?.futurePolicyDiagnostic === true) {
                         .update(readFileSync(new URL(import.meta.url)))
                         .digest("hex"),
                     disabled: process.env.FUTURE_POLICY_DISABLED === "1",
+                    replyDataset,
+                    featureNames: replyDataset ? REPLY_RESIDUAL_FEATURE_NAMES : undefined,
+                    featureNamesSha256: replyDataset
+                        ? createHash("sha256").update(JSON.stringify(REPLY_RESIDUAL_FEATURE_NAMES)).digest("hex")
+                        : undefined,
                     searchedFutureTurns: 2,
                     rollouts,
                     games: results,
