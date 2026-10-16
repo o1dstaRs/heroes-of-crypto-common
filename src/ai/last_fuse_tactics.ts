@@ -114,7 +114,11 @@ export function lastFuseCounterTradePotential(
             additionalDamage += Math.min(blast, enemy.getCumulativeHp());
         }
     }
-    if (additionalDamage <= hp && !options.includePrimaryTarget) return 0;
+    if (
+        additionalDamage <= hp &&
+        (!options.includePrimaryTarget || additionalDamage + Math.min(blast, target.getCumulativeHp()) <= hp)
+    )
+        return 0;
     let fatalChance = options.fatalChanceByTarget?.get(target.getId());
     if (fatalChance === undefined) {
         const response = estimatePrimaryMeleeDamage(target, unit, context, target.getBaseCell(), [

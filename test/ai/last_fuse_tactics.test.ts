@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { getAIStrategy } from "../../src/ai";
 import type { IDecisionContext } from "../../src/ai/ai_strategy";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../../src/ai/candidates";
@@ -192,6 +192,30 @@ describe("own Last Fuse combat trades", () => {
         const h = fixture();
         expect(h.catalog(true, 1, true)).toEqual(h.catalog());
         expect(h.catalog(false, 1, true)).toEqual(h.catalog(false));
+    });
+
+    test("does not forecast retaliation when even the whole remaining target cannot repay the holder's health", () => {
+        const h = fixture({
+            hp: 100,
+            primary: { maxHp: 70, armor: 100 },
+            neighborCells: [
+                { x: 3, y: 7 },
+                { x: 3, y: 8 },
+            ],
+        });
+        const trade = h.catalog(false, 0).candidates.find((candidate) => candidate.targetId === h.primary.getId())!;
+        expect(trade).toBeDefined();
+        const forecast = spyOn(h.primary, "calculateAttackDamageMin");
+        try {
+            expect(
+                lastFuseCounterTradePotential(h.actor, h.primary, h.context, trade.standCell!, trade.actions, {
+                    includePrimaryTarget: true,
+                }),
+            ).toBe(0);
+            expect(forecast).not.toHaveBeenCalled();
+        } finally {
+            forecast.mockRestore();
+        }
     });
 
     test("spends a primary Water Shield on a certain positive opening before the blast", () => {
