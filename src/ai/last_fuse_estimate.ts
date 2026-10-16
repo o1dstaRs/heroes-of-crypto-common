@@ -1,4 +1,7 @@
+import { getDoubleShotAbility } from "../abilities/ability_helper";
+import { applyAttackDamageChain, resolveAttackDamageChain } from "../damage/damage_projection";
 import type { GameAction } from "../engine/actions";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { canUnitRespondToMelee } from "../handlers/melee_response";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
@@ -6,12 +9,14 @@ import type { IDecisionContext } from "./ai_strategy";
 import { decisionFireWalls } from "./decision_fight_state";
 import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
 
-export interface ILastFuseMeleeEstimate {
+export interface ILastFuseDamageEstimate {
     expectedNetDamage: number;
     expectedFriendlyDamage: number;
     fatalChance: number;
     secureKill: boolean;
 }
+
+export type ILastFuseMeleeEstimate = ILastFuseDamageEstimate;
 
 const touches = (left: readonly XY[], right: readonly XY[]): boolean =>
     left.some((a) => right.some((b) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1));
@@ -86,7 +91,7 @@ export function estimateLastFuseMeleeDamage(
     context: IDecisionContext,
     standCell: XY,
     actions: readonly GameAction[],
-): ILastFuseMeleeEstimate | undefined {
+): ILastFuseDamageEstimate | undefined {
     if (!target.hasBuffActive("Last Fuse")) return undefined;
     if (
         target.hasBuffActive("Flesh Shield Aura") ||
@@ -141,5 +146,112 @@ export function estimateLastFuseMeleeDamage(
         expectedFriendlyDamage,
         fatalChance,
         secureKill: damage.secureKill && !resurrects,
+    };
+}
+
+/**
+ * A stationary, ordinary shot with one possible impact. Native/Echo volleys are supported only when the
+ * first hit certainly destroys the only stack on the ray, or a certain hit spends the last ammunition.
+ * Otherwise later hits can change the fatal-hit basis, stack power, auras and shield state; leave that
+ * sequence to engine search rather than substituting the stack's original HP for its final blow.
+ */
+export function estimateLastFuseRangedDamage(
+    unit: Unit,
+    target: Unit,
+    context: IDecisionContext,
+    divisor: number,
+): ILastFuseDamageEstimate | undefined {
+    const fight = context.fightProperties;
+    if (!fight || target.isDead() || !target.hasBuffActive("Last Fuse") || unit.getRangeShots() <= 0) return undefined;
+    if (
+        target.hasBuffActive("Flesh Shield Aura") ||
+        unit.hasBuffActive("Fireforged Sword") ||
+        [...SECONDARY_RIDERS, "Through Shot", "Area Throw", "Large Caliber", "Chakram", "Absolving Arrow"].some(
+            (name) => unit.hasAbilityActive(name),
+        )
+    )
+        return undefined;
+    // A possible counter can change the shooter's health, shield, stats or ability to finish the shot.
+    // This conservative gate intentionally does not try to reconstruct its response trajectory.
+    if (
+        target.isRangeCapable() &&
+        target.getRangeShots() > 0 &&
+        !unit.canSkipResponse() &&
+        !fight.hasAlreadyRepliedAttack(target.getId()) &&
+        target.canRespond(PBTypes.AttackVals.RANGE)
+    )
+        return undefined;
+    const resurrects = target.canSelfResurrect();
+    if (resurrects && fight.getBreakChancePerTeam(unit.getTeam()) > 0) return undefined;
+
+    const abilityPower = fight.getAdditionalAbilityPowerPerTeam(unit.getTeam());
+    const chain = resolveAttackDamageChain({
+        attacker: unit,
+        target,
+        attackType: PBTypes.AttackVals.RANGE,
+        synergyAbilityPowerIncrease: abilityPower,
+        divisor,
+        abilityMultiplier: (100 - (unit.getEffect("Paralysis")?.getPower() ?? 0)) / 100,
+    });
+    if (
+        !Number.isSafeInteger(chain.rollMin) ||
+        !Number.isSafeInteger(chain.rollMaxExclusive) ||
+        chain.rollMaxExclusive < chain.rollMin
+    )
+        return undefined;
+    const rollCount = Math.max(1, chain.rollMaxExclusive - chain.rollMin);
+    if (!Number.isSafeInteger(rollCount) || rollCount > 10_000) return undefined;
+    const lucky = unit.getAbility("Lucky Strike");
+    // The resolver compares an integer [0, 100) roll with the chance, so 8.8% procs on nine outcomes.
+    const luckyChance = lucky
+        ? Math.min(100, Math.max(0, Math.ceil(unit.calculateAbilityApplyChance(lucky, abilityPower)))) / 100
+        : 0;
+    const luckyMultiplier = lucky ? unit.calculateAbilityMultiplier(lucky, abilityPower) : 1;
+    const hitChance =
+        1 -
+        Math.min(
+            100,
+            Math.max(0, unit.calculateMissChance(target, fight.getAdditionalAbilityPowerPerTeam(target.getTeam()))),
+        ) /
+            100;
+    const hp = target.getCumulativeHp();
+    let conditionalDamage = 0;
+    let conditionalFatalChance = 0;
+    let minimum = Number.POSITIVE_INFINITY;
+    for (let raw = chain.rollMin; raw < chain.rollMin + rollCount; raw++) {
+        const ordinary = applyAttackDamageChain(chain, raw);
+        for (const [damage, probability] of [
+            [ordinary, (1 - luckyChance) / rollCount],
+            [Math.floor(ordinary * luckyMultiplier), luckyChance / rollCount],
+        ]) {
+            if (probability <= 0) continue;
+            minimum = Math.min(minimum, damage);
+            conditionalDamage += probability * Math.min(hp, Math.max(0, damage));
+            if (damage >= hp) conditionalFatalChance += probability;
+        }
+    }
+    const absorbed = target.willWaterShieldAbsorb(unit);
+    const firstKills = hitChance === 1 && minimum >= hp && !absorbed;
+    const mayFollow = !!getDoubleShotAbility(unit) || unit.getBonusRangedAttackChance() > 0;
+    if (mayFollow && !firstKills && !(hitChance === 1 && unit.projectRangeShotsAfterVolleys(target) <= 0))
+        return undefined;
+
+    const fatalChance = resurrects || absorbed ? 0 : hitChance * conditionalFatalChance;
+    let friendlyDamage = 0;
+    if (fatalChance > 0) {
+        const blast = target.getLastFuseDamage();
+        for (const ally of context.unitsHolder.getAllAllies(unit.getTeam())) {
+            if (ally.isDead() || ally.willWaterShieldAbsorb() || !touches(target.getCells(), ally.getCells())) continue;
+            if (blast >= ally.getCumulativeHp() && ally.hasBuffActive("Last Fuse") && !ally.canSelfResurrect())
+                return undefined;
+            friendlyDamage += Math.min(blast, ally.getCumulativeHp());
+        }
+    }
+    const expectedFriendlyDamage = fatalChance * friendlyDamage;
+    return {
+        expectedNetDamage: (absorbed ? 0 : hitChance * conditionalDamage) - expectedFriendlyDamage,
+        expectedFriendlyDamage,
+        fatalChance,
+        secureKill: firstKills && !resurrects,
     };
 }

@@ -63,7 +63,11 @@ import { decisionFireWalls } from "./decision_fight_state";
 import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
-import { estimateLastFuseMeleeDamage, type ILastFuseMeleeEstimate } from "./last_fuse_estimate";
+import {
+    estimateLastFuseMeleeDamage,
+    estimateLastFuseRangedDamage,
+    type ILastFuseMeleeEstimate,
+} from "./last_fuse_estimate";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -273,6 +277,7 @@ function prepareRangeCandidateDamage(
  * Deterministic expected net damage for one authoritative ranged-ray evaluation. Candidate enumeration and
  * independent action qualification share this exact calculation so an engine-valid AOE with greater allied
  * splash is never mislabeled as productive merely because its primary enemy takes damage.
+ * An explicit stack-size override describes a hypothetical origin; its Last Fuse geometry stays with search.
  */
 export function evaluateRangeCandidateDamage(
     unit: Unit,
@@ -282,16 +287,17 @@ export function evaluateRangeCandidateDamage(
     shots: number,
     isAOE: boolean,
     aimTargetId = primaryTargetId,
-    attackerAmountAlive = unit.getAmountAlive(),
+    attackerAmountAlive?: number,
 ): IRangeCandidateDamage {
     return evaluatePreparedRangeCandidateDamage(
         unit,
         context,
         evaluation,
         primaryTargetId,
-        attackerAmountAlive,
+        attackerAmountAlive ?? unit.getAmountAlive(),
         aimTargetId,
         prepareRangeCandidateDamage(unit, context, shots, isAOE),
+        attackerAmountAlive === undefined,
     );
 }
 
@@ -303,7 +309,27 @@ function evaluatePreparedRangeCandidateDamage(
     attackerAmountAlive: number,
     aimTargetId: string | undefined,
     prepared: IPreparedRangeCandidateDamage,
+    stationary: boolean,
 ): IRangeCandidateDamage {
+    const onlyTarget =
+        evaluation.affectedUnits.length === 1 && evaluation.affectedUnits[0]?.length === 1
+            ? evaluation.affectedUnits[0][0]
+            : undefined;
+    const fuse =
+        stationary && !prepared.isPhysicalAoe && onlyTarget?.getTeam() === prepared.enemyTeam
+            ? estimateLastFuseRangedDamage(unit, onlyTarget, context, evaluation.rangeAttackDivisors[0] ?? 1)
+            : undefined;
+    if (onlyTarget && fuse) {
+        const directDamage = fuse.expectedNetDamage + fuse.expectedFriendlyDamage;
+        return {
+            value: fuse.expectedNetDamage,
+            kill: onlyTarget.getId() === primaryTargetId && fuse.secureKill ? 1 : 0,
+            enemyDamage: directDamage,
+            friendlyFireDamage: fuse.expectedFriendlyDamage,
+            primaryTargetDamage: onlyTarget.getId() === primaryTargetId ? directDamage : 0,
+            aimTargetDamage: onlyTarget.getId() === aimTargetId ? directDamage : 0,
+        };
+    }
     let value = 0;
     let kill: 0 | 1 = 0;
     let enemyDamage = 0;
@@ -635,6 +661,7 @@ function findBestPreparedStationaryRangeAttack(
             search.attackerAmountAlive,
             probe.aimTargetId,
             search.preparedDamage,
+            true,
         ).value;
         if (damage > 0 && (!best || damage > best.expectedDamage)) {
             best = {
@@ -737,6 +764,7 @@ export function findBestLegalStationaryRangeAttack(
                     attackerAmountAlive,
                     aimTargetId,
                     preparedDamage,
+                    true,
                 ).value;
                 if (damage > 0 && (!best || damage > best.expectedDamage)) {
                     best = {
@@ -2087,7 +2115,7 @@ class CandidateGenerator {
         shots: number,
         isAOE: boolean,
         aimTargetId = primaryTargetId,
-        attackerAmountAlive = this.unit.getAmountAlive(),
+        attackerAmountAlive?: number,
     ): IRangeCandidateDamage {
         if (
             !this.preparedRangeDamage ||
@@ -2105,9 +2133,10 @@ class CandidateGenerator {
             this.context,
             evaluation,
             primaryTargetId,
-            attackerAmountAlive,
+            attackerAmountAlive ?? this.unit.getAmountAlive(),
             aimTargetId,
             this.preparedRangeDamage.value,
+            attackerAmountAlive === undefined,
         );
     }
     /** Target-local signals already used by v0.5's shot scorer, exposed without changing that scorer. */
