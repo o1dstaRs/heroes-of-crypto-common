@@ -1650,6 +1650,7 @@ export class PathHelper {
                     continue;
                 }
                 const el1 = matrixElementOrDefault(matrix, n.x, n.y, 0);
+                let crossesLava = el1 === ObstacleType.LAVA;
                 if (isSmallFootprint) {
                     if (
                         ((el1 && !canFly && !(isMadeOfFire && el1 === ObstacleType.LAVA)) ||
@@ -1667,6 +1668,7 @@ export class PathHelper {
                     const el2 = matrixElementOrDefault(matrix, n.x - 1, n.y, 0);
                     const el3 = matrixElementOrDefault(matrix, n.x - 1, n.y - 1, 0);
                     const el4 = matrixElementOrDefault(matrix, n.x, n.y - 1, 0);
+                    crossesLava ||= el2 === ObstacleType.LAVA || el3 === ObstacleType.LAVA || el4 === ObstacleType.LAVA;
                     if (
                         (((el1 && !canFly && !(isMadeOfFire && el1 === ObstacleType.LAVA)) ||
                             (canFly && el1 && el1 !== ObstacleType.LAVA && el1 !== ObstacleType.WATER)) &&
@@ -1692,6 +1694,7 @@ export class PathHelper {
                         const fx = n.x - footprintOffsetsX[i];
                         const fy = n.y - footprintOffsetsY[i];
                         const el = i === 0 ? el1 : matrixElementOrDefault(matrix, fx, fy, 0);
+                        crossesLava ||= el === ObstacleType.LAVA;
                         if (blocksBody(el) && !initialCellKeys.has((fx << 4) | fy)) {
                             footprintBlocked = true;
                             break;
@@ -1800,7 +1803,7 @@ export class PathHelper {
                             route: [...curWeightedRoute.route, n],
                             weight: curWeightedRoute.weight + moveCost,
                             firstAggrMet: curWeightedRoute.firstAggrMet,
-                            hasLavaCell: curWeightedRoute.hasLavaCell || el1 === ObstacleType.LAVA,
+                            hasLavaCell: curWeightedRoute.hasLavaCell || crossesLava,
                             hasWaterCell: curWeightedRoute.hasWaterCell || el1 === ObstacleType.WATER,
                         };
                         if (relaxesVisited && isVisited(keyNeighbor)) {
@@ -1875,7 +1878,7 @@ export class PathHelper {
                             route: [...curWeightedRoute.route, n],
                             weight: curWeightedRoute.weight + moveCost,
                             firstAggrMet: curWeightedRoute.firstAggrMet,
-                            hasLavaCell: curWeightedRoute.hasLavaCell || el1 === ObstacleType.LAVA,
+                            hasLavaCell: curWeightedRoute.hasLavaCell || crossesLava,
                             hasWaterCell: curWeightedRoute.hasWaterCell || el1 === ObstacleType.WATER,
                         };
 

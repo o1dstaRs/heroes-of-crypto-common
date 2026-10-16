@@ -838,7 +838,7 @@
             "name": "Lava Striders",
             "level": 0,
             "desc": [
-                "Artifact. All army units may move over and stand in lava; on central lava they gain Made of Fire (+10% to all stats and abilities).",
+                "Artifact. All army units can cross and stand in lava. Moving through or flying over lava grants Made of Fire (+10% to stats and ability power) for 2 laps, even when landing on dry ground.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",

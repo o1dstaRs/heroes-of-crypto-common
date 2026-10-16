@@ -8,9 +8,16 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-function setup(width = 1, height = 1, innate = false, artifact = true) {
+function setup(
+    width = 1,
+    height = 1,
+    innate = false,
+    artifact = true,
+    movement: { flying?: boolean; origin?: XY } = {},
+) {
     const { grid, unitsHolder, attackHandler } = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
     const fight = FightStateManager.getInstance().getFightProperties();
     const unit = createTestUnit({
@@ -22,9 +29,10 @@ function setup(width = 1, height = 1, innate = false, artifact = true) {
         attack: 20,
         armor: 10,
         maxHp: 100,
+        movementType: movement.flying ? PBTypes.MovementVals.FLY : PBTypes.MovementVals.WALK,
         abilities: innate ? ["Made of Fire"] : [],
     });
-    placeUnit(grid, unitsHolder, unit, { x: 5, y: 7 });
+    placeUnit(grid, unitsHolder, unit, movement.origin ?? { x: 5, y: 7 });
     const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
     placeUnit(grid, unitsHolder, enemy, { x: 14, y: 14 });
     if (artifact) fight.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 2, Tier2Artifact.LAVA_STRIDERS);
@@ -58,10 +66,66 @@ function setup(width = 1, height = 1, innate = false, artifact = true) {
         getCurrentActiveUnitId: () => unit.getId(),
         getCurrentActiveKnownPaths: () => knownPaths,
     });
-    return { engine, fight, unit, unitsHolder, knownPaths };
+    return { engine, fight, grid, unit, unitsHolder, knownPaths };
 }
 
 describe("Lava Striders movement bonuses", () => {
+    for (const [width, height] of [
+        [1, 1],
+        [2, 2],
+        [1, 2],
+        [2, 1],
+    ]) {
+        for (const artifact of [true, false]) {
+            it(`a ${width}x${height} flyer crossing lava and landing on dry ground ${artifact ? "earns the artifact buff" : "gets no buff without the artifact"}`, () => {
+                const { engine, grid, unit, knownPaths } = setup(width, height, false, artifact, { flying: true });
+                const target = { x: 7, y: 5 };
+                const targetCells = unit.getFootprintCellsForAnchor(target);
+                const route = knownPaths.get((target.x << 4) | target.y)![0];
+                expect(unit.canFly()).toBe(true);
+                expect(route.hasLavaCell).toBe(true);
+                expect(targetCells.every((cell) => grid.getOccupantUnitId(cell) !== "L")).toBe(true);
+                const result = engine.apply({
+                    type: "move_unit",
+                    unitId: unit.getId(),
+                    path: route.route,
+                    targetCells,
+                    hasLavaCell: false,
+                });
+                expect(result.completed).toBe(true);
+                expect(unit.getBaseCell()).toEqual(target);
+                expect(unit.hasBuffActive("Made of Fire")).toBe(artifact);
+            });
+        }
+    }
+
+    for (const [width, height] of [
+        [2, 2],
+        [1, 2],
+        [2, 1],
+    ]) {
+        it(`counts lava beneath the ${width}x${height} flying body when its anchor and landing stay dry`, () => {
+            const origin = height > 1 ? { x: 5, y: 9 } : { x: 9, y: 5 };
+            const target = height > 1 ? { x: 7, y: 11 } : { x: 11, y: 7 };
+            const { engine, fight, grid, unit, knownPaths } = setup(width, height, false, true, {
+                flying: true,
+                origin,
+            });
+            const targetCells = unit.getFootprintCellsForAnchor(target);
+            const route = knownPaths.get((target.x << 4) | target.y)![0];
+            expect(route.route.every((cell) => grid.getOccupantUnitId(cell) !== "L")).toBe(true);
+            expect(unit.getCells().every((cell) => grid.getOccupantUnitId(cell) !== "L")).toBe(true);
+            expect(targetCells.every((cell) => grid.getOccupantUnitId(cell) !== "L")).toBe(true);
+            expect(route.hasLavaCell).toBe(true);
+            const action = { type: "move_unit" as const, unitId: unit.getId(), path: route.route, targetCells };
+            const projected = projectPostMoveActorAvailability(unit, fight.getFireWalls(), action, route);
+            expect(engine.apply(action).completed).toBe(true);
+            expect(unit.hasBuffActive("Made of Fire")).toBe(true);
+            expect(projected.madeOfFireApplied).toBe(true);
+            expect(projected.stack.maxHp).toBe(unit.getMaxHp());
+        });
+    }
+
     for (const [width, height, footprintOnly] of [
         [1, 1, false],
         [2, 2, false],

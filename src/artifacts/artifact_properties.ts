@@ -433,7 +433,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "lava_striders",
         "Lava Striders",
         "Lava Striders",
-        "All army units may move over and stand in lava; while on central lava they gain Made of Fire (+10% to all stats and abilities).",
+        "All army units can cross and stand in lava. Moving through or flying over lava grants Made of Fire (+10% to stats and ability power) for 2 laps, even when landing on dry ground.",
     ),
     [Tier2Artifact.QUIVER_OF_ECHOES]: t2(
         Tier2Artifact.QUIVER_OF_ECHOES,
