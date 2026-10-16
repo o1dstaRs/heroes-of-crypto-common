@@ -121,4 +121,13 @@ export interface IVisibleDamage {
     // wounds on both hits produces TWO entries, hence two claws. `power` is the effect's total power at
     // that application (scales the claw). Empty/undefined when no Deep Wounds landed.
     deepWounds?: { unitId: string; power: number }[];
+    /** Actual Absolving Arrow cleanses, owned by the shot that passed through the ally. */
+    absolutions?: {
+        sourceUnitId: string;
+        unitId: string;
+        position: XY;
+        liftedNames: string[];
+        response: boolean;
+        hitIndex: number;
+    }[];
 }

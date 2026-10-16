@@ -3566,6 +3566,11 @@ export class GameActionEngine {
                 splash: flight.splash.map((entry) => ({ ...entry, position: { ...entry.position } })),
             })),
             secondary: damage.secondary?.map((entry) => ({ ...entry, position: { ...entry.position } })),
+            absolutions: damage.absolutions?.map((entry) => ({
+                ...entry,
+                position: { ...entry.position },
+                liftedNames: [...entry.liftedNames],
+            })),
         };
     }
     private serializeAnimations(animationData: IAnimationData[]): IGameAnimationEvent[] {

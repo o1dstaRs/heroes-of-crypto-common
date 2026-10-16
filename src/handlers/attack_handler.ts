@@ -990,10 +990,41 @@ export class AttackHandler {
             (damageForAnimation.chakramFlights ??= []).push(
                 ...bonus.chakramFlights.map((flight) => ({ ...flight, hitIndex: flight.hitIndex + initialVolleys })),
             );
+        if (bonus.absolutions?.length)
+            (damageForAnimation.absolutions ??= []).push(
+                ...bonus.absolutions.map((entry) => ({ ...entry, hitIndex: entry.hitIndex + initialVolleys })),
+            );
         result.animationData = [...(result.animationData ?? []), ...(extra.animationData ?? [])];
         result.unitIdsDied = [...new Set([...result.unitIdsDied, ...extra.unitIdsDied])];
         result.abilityStolen = [...(result.abilityStolen ?? []), ...(extra.abilityStolen ?? [])];
         return result;
+    }
+    private recordAbsolvingArrow(
+        shooter: Unit,
+        targetPosition: HoCMath.XY,
+        unitsHolder: UnitsHolder,
+        damage: IVisibleDamage,
+        response: boolean,
+    ): void {
+        const lifted = AllAbilities.processAbsolvingArrowAbility(
+            shooter,
+            targetPosition,
+            unitsHolder.getAllUnits(),
+            this.grid,
+            this.gridSettings,
+            this.sceneLog,
+        );
+        for (const entry of lifted) {
+            const ally = unitsHolder.getAllUnits().get(entry.unitId);
+            if (!ally) continue;
+            (damage.absolutions ??= []).push({
+                ...entry,
+                sourceUnitId: shooter.getId(),
+                position: { ...ally.getPosition() },
+                response,
+                hitIndex: 0,
+            });
+        }
     }
     private resolveRangeAttack(
         unitsHolder: UnitsHolder,
@@ -1275,14 +1306,7 @@ export class AttackHandler {
         // target. Resolved here — after every gate that can still cancel the shot (Hidden, a forced or
         // forbidden target, Cowardice, a missing divisor), so a rejected action cannot hand out free
         // cleanses — but before the miss roll, because the arrow crosses its own line either way.
-        AllAbilities.processAbsolvingArrowAbility(
-            attackerUnit,
-            hoverRangeAttackPosition,
-            unitsHolder.getAllUnits(),
-            this.grid,
-            this.gridSettings,
-            this.sceneLog,
-        );
+        this.recordAbsolvingArrow(attackerUnit, hoverRangeAttackPosition, unitsHolder, damageForAnimation, false);
 
         animationData.push({
             fromPosition: attackerUnit.getPosition(),
@@ -1532,14 +1556,7 @@ export class AttackHandler {
         if (rangeResponseUnit) {
             // The counter-shot is its own arrow down its own line, so a responding Monk cleanses the allies
             // IT flies past (same rule as the initiating shot above).
-            AllAbilities.processAbsolvingArrowAbility(
-                targetUnit,
-                attackerUnit.getPosition(),
-                unitsHolder.getAllUnits(),
-                this.grid,
-                this.gridSettings,
-                this.sceneLog,
-            );
+            this.recordAbsolvingArrow(targetUnit, attackerUnit.getPosition(), unitsHolder, damageForAnimation, true);
             animationData.push({
                 fromPosition: targetUnit.getPosition(),
                 toPosition: attackerUnit.getPosition(),
