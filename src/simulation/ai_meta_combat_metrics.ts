@@ -373,7 +373,13 @@ export function summarizePremiumCombatMetrics(fight: Input): IPremiumCombatMetri
                     break;
                 case "pyre_exploded":
                     for (const blast of event.hits) {
-                        hit(blast.unitId, blast.amount, blast.unitsDied, "environment:last_fuse", event.unitId);
+                        hit(
+                            blast.unitId,
+                            blast.amount,
+                            blast.unitsDied,
+                            "environment:last_fuse",
+                            event.sourceUnitId ?? event.unitId,
+                        );
                     }
                     break;
             }

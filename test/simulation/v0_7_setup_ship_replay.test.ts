@@ -149,7 +149,7 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Last Fuse joins the live Tier-2 pool (2026-10-14), changing seeded draft offers and combat.
 // Two runs produce identical traces; excluding only Last Fuse from the live pool restores the previous digest.
 // Previous digest: ece87aaa802fd7e723474b9b7e2836b72681e04d8fbee8b997e774c00b834119.
-const EXPECTED_REPLAY_SHA256 = "d87e778b92b5fceb891a7d18e61c9992f95050be431dedd57f73adfab5ee2663";
+const EXPECTED_REPLAY_SHA256 = "56d0eda79d1ed104652b7255d95252c8702d4413a8883d05121addb26f5c8b0b";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

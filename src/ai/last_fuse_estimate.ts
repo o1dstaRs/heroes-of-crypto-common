@@ -11,6 +11,7 @@ import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
 
 export interface ILastFuseDamageEstimate {
     expectedNetDamage: number;
+    expectedPrimaryDamage?: number;
     expectedFriendlyDamage: number;
     fatalChance: number;
     secureKill: boolean;
@@ -21,19 +22,36 @@ export type ILastFuseMeleeEstimate = ILastFuseDamageEstimate;
 const touches = (left: readonly XY[], right: readonly XY[]): boolean =>
     left.some((a) => right.some((b) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1));
 
+function enemyBlastDamage(
+    unit: Unit,
+    target: Unit,
+    context: Pick<IDecisionContext, "unitsHolder">,
+): number | undefined {
+    const blast = target.getLastFuseDamage(unit.getBuffPower("Last Fuse"));
+    let damage = 0;
+    for (const enemy of context.unitsHolder.getAllEnemyUnits(unit.getTeam())) {
+        if (
+            enemy.getId() === target.getId() ||
+            enemy.isDead() ||
+            enemy.willWaterShieldAbsorb() ||
+            !touches(target.getCells(), enemy.getCells())
+        )
+            continue;
+        if (blast >= enemy.getCumulativeHp() && !enemy.canSelfResurrect()) return undefined;
+        damage += Math.min(blast, enemy.getCumulativeHp());
+    }
+    return damage;
+}
+
 const SECONDARY_RIDERS = ["Devour Essence", "Petrifying Gaze", "Predatory Assimilation", "Borrowed Grace"];
 
-function actorBlastDamage(
+function canProjectMeleeResponse(
     unit: Unit,
     target: Unit,
     context: IDecisionContext,
     actions: readonly GameAction[],
-    blast: number,
-): { expected: number; minimumHp: number; mayBeUnshielded: boolean } | undefined {
-    const hp = unit.getCumulativeHp();
-    const shield = unit.willWaterShieldAbsorb();
-    const ordinary = { expected: shield ? 0 : Math.min(blast, hp), minimumHp: hp, mayBeUnshielded: !shield };
-    if (!canUnitRespondToMelee(unit, target, context.fightProperties)) return ordinary;
+): boolean {
+    if (!canUnitRespondToMelee(unit, target, context.fightProperties)) return true;
     if (
         (actions.some((action) => action.type === "move_unit") && target.hasAbilityActive("Backstab")) ||
         target.hasAbilityActive("Rapid Charge") ||
@@ -43,7 +61,7 @@ function actorBlastDamage(
         SECONDARY_RIDERS.some((name) => target.hasAbilityActive(name)) ||
         (context.fightProperties?.getBreakChancePerTeam(target.getTeam()) ?? 0) > 0
     )
-        return undefined;
+        return false;
     const response = estimatePrimaryMeleeDamage(target, unit, context, target.getBaseCell(), [
         {
             type: "melee_attack",
@@ -52,32 +70,9 @@ function actorBlastDamage(
             attackFrom: target.getBaseCell(),
         },
     ]);
-    if (!response) return undefined;
-    if (response.hitChance <= 0) return ordinary;
-    // The ordinary counter lands before the fatal strike is applied. It may spend Water Shield or
-    // leave fewer HP for the blast; a fire counter bypasses the shield without spending it.
-    if (unit.willWaterShieldAbsorb(target)) {
-        const positive = response.landedOutcomes.reduce(
-            (sum, outcome) => sum + (outcome.damage > 0 ? outcome.probability : 0),
-            0,
-        );
-        return {
-            expected: response.hitChance * positive * Math.min(blast, hp),
-            minimumHp: hp,
-            mayBeUnshielded: positive > 0,
-        };
-    }
-    const minimumHp = hp - Math.max(...response.landedOutcomes.map((outcome) => Math.max(0, outcome.damage)));
-    if (minimumHp <= 0) return undefined;
-    const expected = shield
-        ? 0
-        : (1 - response.hitChance) * Math.min(blast, hp) +
-          response.hitChance *
-              response.landedOutcomes.reduce(
-                  (sum, outcome) => sum + outcome.probability * Math.min(blast, hp - Math.max(0, outcome.damage)),
-                  0,
-              );
-    return { expected, minimumHp, mayBeUnshielded: !shield };
+    if (!response) return false;
+    if (response.hitChance <= 0 || unit.willWaterShieldAbsorb(target)) return true;
+    return response.landedOutcomes.every((outcome) => outcome.damage < unit.getCumulativeHp());
 }
 
 /**
@@ -93,7 +88,7 @@ export function estimateLastFuseMeleeDamage(
     standCell: XY,
     actions: readonly GameAction[],
 ): ILastFuseDamageEstimate | undefined {
-    if (!target.hasBuffActive("Last Fuse")) return undefined;
+    if (!unit.hasBuffActive("Last Fuse") || target.isDead() || target.getTeam() === unit.getTeam()) return undefined;
     if (
         target.hasBuffActive("Flesh Shield Aura") ||
         target.hasAbilityActive("Fire Shield") ||
@@ -118,33 +113,13 @@ export function estimateLastFuseMeleeDamage(
               (sum, outcome) => sum + (outcome.damage >= target.getCumulativeHp() ? outcome.probability : 0),
               0,
           );
-    let friendlyDamage = 0;
-    if (fatalChance > 0) {
-        const blastDamage = target.getLastFuseDamage();
-        const actorBlast = actorBlastDamage(unit, target, context, actions, blastDamage);
-        if (!actorBlast) return undefined;
-        const corpseCells = target.getCells();
-        for (const ally of context.unitsHolder.getAllAllies(unit.getTeam())) {
-            const actor = ally.getId() === unit.getId();
-            if (ally.isDead() || (!actor && ally.willWaterShieldAbsorb())) continue;
-            const cells = actor ? ally.getFootprintCellsForAnchor(standCell) : ally.getCells();
-            if (!touches(corpseCells, cells)) continue;
-            if (
-                (actor
-                    ? actorBlast.mayBeUnshielded && blastDamage >= actorBlast.minimumHp
-                    : blastDamage >= ally.getCumulativeHp()) &&
-                ally.hasBuffActive("Last Fuse") &&
-                !ally.canSelfResurrect()
-            ) {
-                return undefined;
-            }
-            friendlyDamage += actor ? actorBlast.expected : Math.min(blastDamage, ally.getCumulativeHp());
-        }
-    }
-    const expectedFriendlyDamage = fatalChance * friendlyDamage;
+    if (fatalChance > 0 && !canProjectMeleeResponse(unit, target, context, actions)) return undefined;
+    const splash = fatalChance > 0 ? enemyBlastDamage(unit, target, context) : 0;
+    if (splash === undefined) return undefined;
     return {
-        expectedNetDamage: damage.expectedEffectiveDamage - expectedFriendlyDamage,
-        expectedFriendlyDamage,
+        expectedNetDamage: damage.expectedEffectiveDamage + fatalChance * splash,
+        expectedPrimaryDamage: damage.expectedEffectiveDamage,
+        expectedFriendlyDamage: 0,
         fatalChance,
         secureKill: damage.secureKill && !resurrects,
     };
@@ -163,7 +138,14 @@ export function estimateLastFuseRangedDamage(
     divisor: number,
 ): ILastFuseDamageEstimate | undefined {
     const fight = context.fightProperties;
-    if (!fight || target.isDead() || !target.hasBuffActive("Last Fuse") || unit.getRangeShots() <= 0) return undefined;
+    if (
+        !fight ||
+        target.isDead() ||
+        !unit.hasBuffActive("Last Fuse") ||
+        target.getTeam() === unit.getTeam() ||
+        unit.getRangeShots() <= 0
+    )
+        return undefined;
     if (
         target.hasBuffActive("Flesh Shield Aura") ||
         unit.hasBuffActive("Fireforged Sword") ||
@@ -238,20 +220,12 @@ export function estimateLastFuseRangedDamage(
         return undefined;
 
     const fatalChance = resurrects || absorbed ? 0 : hitChance * conditionalFatalChance;
-    let friendlyDamage = 0;
-    if (fatalChance > 0) {
-        const blast = target.getLastFuseDamage();
-        for (const ally of context.unitsHolder.getAllAllies(unit.getTeam())) {
-            if (ally.isDead() || ally.willWaterShieldAbsorb() || !touches(target.getCells(), ally.getCells())) continue;
-            if (blast >= ally.getCumulativeHp() && ally.hasBuffActive("Last Fuse") && !ally.canSelfResurrect())
-                return undefined;
-            friendlyDamage += Math.min(blast, ally.getCumulativeHp());
-        }
-    }
-    const expectedFriendlyDamage = fatalChance * friendlyDamage;
+    const splash = fatalChance > 0 ? enemyBlastDamage(unit, target, context) : 0;
+    if (splash === undefined) return undefined;
     return {
-        expectedNetDamage: (absorbed ? 0 : hitChance * conditionalDamage) - expectedFriendlyDamage,
-        expectedFriendlyDamage,
+        expectedNetDamage: (absorbed ? 0 : hitChance * conditionalDamage) + fatalChance * splash,
+        expectedPrimaryDamage: absorbed ? 0 : hitChance * conditionalDamage,
+        expectedFriendlyDamage: 0,
         fatalChance,
         secureKill: firstKills && !resurrects,
     };

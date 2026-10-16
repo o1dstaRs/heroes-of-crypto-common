@@ -17,6 +17,7 @@ import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 import type { ISecondaryDamage } from "../scene/animations";
 import { FightStateManager } from "../fights/fight_state_manager";
+import { lastFuseSourceFor } from "./last_fuse_ability";
 
 // Petrify (instant-kill) chance climbs with the TARGET's level, so Petrifying Gaze is at its most dangerous
 // against big level-3/4 units — its whole point — instead of only mowing down cheap level-1 stacks. Kept
@@ -119,7 +120,7 @@ export function processPetrifyingGazeAbility(
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             // 0 break chance: the hit that triggered the gaze already rolled Break on this target.
-            damage: toUnit.applyDamage(damageFromAbility, 0, sceneLog),
+            damage: toUnit.applyDamage(damageFromAbility, 0, sceneLog, false, undefined, lastFuseSourceFor(fromUnit)),
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });

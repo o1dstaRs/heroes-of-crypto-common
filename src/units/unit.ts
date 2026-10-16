@@ -20,7 +20,7 @@ import { BORROWED_GRACE_NAME, borrowedGraceChance } from "../abilities/borrowed_
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
 import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/double_shot_names";
 import { getCraftChances } from "../abilities/craft_ability";
-import { lastFuseDamage } from "../abilities/last_fuse_ability";
+import { lastFuseDamage, lastFuseSourceFor, type ILastFuseSource } from "../abilities/last_fuse_ability";
 import { ARTIFACT_POWER, BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { empowerMultiplier } from "../augments/augment_properties";
 import { getAbilityConfig, getSpellConfig } from "../configuration/config_provider";
@@ -302,7 +302,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // Water Shield: set once this unit's one-per-battle absorb shield has been consumed, so the seeding
     // refresh (UnitsHolder.refreshWaterShieldForAllUnits) never re-grants it after it breaks.
     protected waterShieldSpent = false;
-    protected lastFuseFatalHit: { damage: number; stackPower: number } | undefined = undefined;
+    protected lastFuseFatalHit: { damage: number; stackPower: number; source?: ILastFuseSource } | undefined =
+        undefined;
     protected onHourglass = false;
     // True once this unit has moved during its current turn. Reset when its turn completes. Lets the
     // engine tell a real "manual" end-of-turn (it moved, then finished) from a do-nothing turn (e.g. an
@@ -1414,8 +1415,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const power = this.getBuffPower("Gravechain") ?? ARTIFACT_POWER.GRAVECHAIN_CHANCE;
         return Math.max(0, Math.min(100, power + this.getLuck()));
     }
-    public getLastFuseDamage(): number {
-        const percent = this.getBuffPower("Last Fuse");
+    public getLastFuseKillSource(): Readonly<ILastFuseSource> | undefined {
+        return this.isDead() ? this.lastFuseFatalHit?.source : undefined;
+    }
+    public getLastFuseDamage(percent = this.lastFuseFatalHit?.source?.percent): number {
         if (percent === undefined) return 0;
         return lastFuseDamage(
             this.isDead() ? (this.lastFuseFatalHit?.damage ?? 0) : this.getCumulativeHp(),
@@ -1428,7 +1431,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (index < 0) return;
         const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
         this.unitProperties.applied_buffs_descriptions[index] =
-            `Artifact. When this stack is destroyed, it explodes. Every adjacent enemy takes ${this.getLastFuseDamage()} damage.;${properties.join(";")}`;
+            `Artifact. Enemy stacks this unit destroys explode, damaging other enemies next to them for ${this.getBuffPower("Last Fuse") ?? ARTIFACT_POWER.LAST_FUSE_PERCENT}% of the killing blow's actual damage, with a minimum of ${ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER} damage per destroyed stack power. Your allies are not damaged.;${properties.join(";")}`;
     }
     private refreshQuiverOfEchoesDescription(): void {
         const index = this.unitProperties.applied_buffs.indexOf("Quiver of Echoes");
@@ -1870,6 +1873,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         sceneLog: ISceneLog,
         extendBreak = false,
         attacker?: Unit,
+        lastFuseSource?: Readonly<ILastFuseSource>,
     ): number {
         const observed = observeUnitHpChange(this, "damage", minusHp, attacker);
         try {
@@ -1949,7 +1953,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.amount_alive = damage.state.amountAlive;
             this.unitProperties.amount_died = damage.state.amountDied;
             if (damage.dead && damage.unitsDied > 0) {
-                this.lastFuseFatalHit = { damage: damage.appliedDamage, stackPower: this.getStackPower() };
+                const source = lastFuseSource ?? lastFuseSourceFor(attacker);
+                this.lastFuseFatalHit = {
+                    damage: damage.appliedDamage,
+                    stackPower: this.getStackPower(),
+                    source: source && source.team !== this.getTeam() ? { ...source } : undefined,
+                };
             }
             this.handleDamageAnimation(damage.animationDeaths);
 

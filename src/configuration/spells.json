@@ -1013,7 +1013,7 @@
             "name": "Last Fuse",
             "level": 0,
             "desc": [
-                "Artifact. When this stack is destroyed, it explodes. Adjacent enemies take {}% of the killing blow's actual damage, with a minimum of [] damage per stack power.",
+                "Artifact. Enemy stacks this unit destroys explode, damaging other enemies next to them for {}% of the killing blow's actual damage, with a minimum of [] damage per destroyed stack power. Your allies are not damaged.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",

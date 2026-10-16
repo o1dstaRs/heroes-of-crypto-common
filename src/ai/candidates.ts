@@ -321,11 +321,11 @@ function evaluatePreparedRangeCandidateDamage(
             ? estimateLastFuseRangedDamage(unit, onlyTarget, context, evaluation.rangeAttackDivisors[0] ?? 1)
             : undefined;
     if (onlyTarget && fuse) {
-        const directDamage = fuse.expectedNetDamage + fuse.expectedFriendlyDamage;
+        const directDamage = fuse.expectedPrimaryDamage ?? fuse.expectedNetDamage + fuse.expectedFriendlyDamage;
         return {
             value: fuse.expectedNetDamage,
             kill: onlyTarget.getId() === primaryTargetId && fuse.secureKill ? 1 : 0,
-            enemyDamage: directDamage,
+            enemyDamage: fuse.expectedNetDamage + fuse.expectedFriendlyDamage,
             friendlyFireDamage: fuse.expectedFriendlyDamage,
             primaryTargetDamage: onlyTarget.getId() === primaryTargetId ? directDamage : 0,
             aimTargetDamage: onlyTarget.getId() === aimTargetId ? directDamage : 0,
@@ -1501,7 +1501,7 @@ class CandidateGenerator {
         const pair = (target: IMeleeTarget, cell: XY, route?: IReadonlyWeightedRoute): IMeleePair => {
             target.damage ??= this.meleeDamage(target.unit);
             let fuse: ILastFuseMeleeEstimate | undefined;
-            if (target.unit.hasBuffActive("Last Fuse")) {
+            if (this.unit.hasBuffActive("Last Fuse")) {
                 const moved = !!route && (cell.x !== base.x || cell.y !== base.y);
                 const cacheable = invariantFuseDamage && !route?.hasLavaCell && !route?.hasWaterCell;
                 if (cacheable && target.fuseByMove?.has(moved)) fuse = target.fuseByMove.get(moved);

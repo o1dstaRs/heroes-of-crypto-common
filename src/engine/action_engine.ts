@@ -3623,6 +3623,7 @@ export class GameActionEngine {
         events.push({
             type: "pyre_exploded",
             unitId: explosion.unitId,
+            sourceUnitId: explosion.sourceUnitId,
             position: explosion.position,
             hits: explosion.hits,
         });
