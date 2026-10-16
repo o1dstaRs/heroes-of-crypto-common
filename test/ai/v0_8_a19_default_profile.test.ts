@@ -188,6 +188,7 @@ describe("v0.8+A19 production profile", () => {
         expect(V08_A19_PROFILE.sourceLedger).toBe(V08_A19_SOURCE_LEDGER);
         expect(V08_A19_SOURCE_LEDGER.map(({ role }) => role)).toEqual([
             "search-driver",
+            "gravechain-coverage",
             "selection-bounds",
             "rollout-allocation",
             "scored-arbitration",

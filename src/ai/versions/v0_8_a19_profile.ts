@@ -79,6 +79,8 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     // One-hit deployment barrels. Search compares a barrel that blocks a friendly shot, and otherwise
     // the nearest enemy barrel only when nothing else deals damage. Classic mountain mining stays banned.
     SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: "1",
+    // Keep one broader single-target Gravechain attack for the horizon to price its movement denial.
+    SEARCH_A19_GRAVECHAIN_COVERAGE: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -107,7 +109,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "7737af84baf69db913af2227a68244b6102868702c7689bc902501ec6345cf1f" as const;
+    "03b2ecef10d73bb68be60930be0a7424bd1c101977d2dfaeae0ac24acb44cd8c" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -139,8 +141,13 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for offline selector-aware bounds; the released flag remains off.
-        sha256: "80f28d63231883c9fb2d3fbf567bff4600cac6724d197eed559233f5586e69f1" as const,
+        // Re-pinned for bounded Gravechain control coverage in the production shortlist.
+        sha256: "a911b6b0fe4186787fb095b2fa47bd504d983275dab83b1c2c1b4f084ab82181" as const,
+    }),
+    Object.freeze({
+        role: "gravechain-coverage" as const,
+        source: "src/ai/gravechain_shortlist.ts" as const,
+        sha256: "35368d573587aaa1d3d058438740c69db654bf0c9859f71ba7ca10d284cc89de" as const,
     }),
     Object.freeze({
         role: "selection-bounds" as const,

@@ -10,6 +10,7 @@
  */
 
 import { friendlyShotBlockingBarrels } from "../ai/artifact_barrel_tactics";
+import { reserveGravechainShortlistCandidate } from "../ai/gravechain_shortlist";
 import { canWaitOnHourglass } from "../engine/hourglass";
 import {
     selectV08A19MaterialCandidateIndex,
@@ -1418,6 +1419,7 @@ export class SearchDriver {
     private readonly a19MaterialArbitration: A19MaterialArbitrationMode | undefined;
     private readonly a19MaterialLowEvidenceWinningSamples: number;
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
+    private readonly a19GravechainCoverage: boolean;
     private readonly a19ArtifactBarrelShotProjection: boolean;
     private readonly a19ArtifactBarrelOwnShotProjectionOnly: boolean;
     private captureA19Material = false;
@@ -1700,6 +1702,16 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE must be 0 or 1");
         }
         this.a19ArtifactBarrelAttackCoverage = this.mode === "search" && barrelCoverage === "1";
+        const gravechainCoverage = searchEnv("SEARCH_A19_GRAVECHAIN_COVERAGE");
+        if (
+            gravechainCoverage !== undefined &&
+            gravechainCoverage !== "" &&
+            gravechainCoverage !== "0" &&
+            gravechainCoverage !== "1"
+        ) {
+            throw new Error("SEARCH_A19_GRAVECHAIN_COVERAGE must be 0 or 1");
+        }
+        this.a19GravechainCoverage = this.mode === "search" && gravechainCoverage === "1";
         const barrelProjection = searchEnv("SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION");
         if (
             barrelProjection !== undefined &&
@@ -4804,6 +4816,9 @@ export class SearchDriver {
             }
         }
         challengers = reserveResearchRapidChargeShortlist(candidates, challengers);
+        if (this.a19GravechainCoverage && V08_AGGRESSIVE_VERSIONS.has(version)) {
+            challengers = reserveGravechainShortlistCandidate(unit, this.deps, candidates, challengers);
+        }
         return [candidates[0], ...challengers];
     }
     // ---- Q2 gate-0 ablation ---------------------------------------------------------------------
