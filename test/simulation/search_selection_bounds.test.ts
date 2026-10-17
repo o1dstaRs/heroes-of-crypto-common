@@ -145,6 +145,48 @@ describe("selection-aware rollout bounds", () => {
             } else expect(plan).toBe(false);
         }
     });
+    it("retains the historical margin when the optional flyer postprocessor is active", () => {
+        const driver = withSearchEnvironment(
+            {
+                V07_SEARCH: "1",
+                SEARCH_VERSIONS: "v0.8",
+                SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1",
+                SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: "1",
+                V08_FLYER_BACKLINE_PRIORITY_LEFT: "1",
+            },
+            () => new SearchDriver({} as ILookaheadDeps, { offlineDeterministicWork: true }),
+        ) as unknown as {
+            certifiedSelectionBoundPlan: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                version: string,
+                ...flags: boolean[]
+            ) => ISearchSelectionBoundPlan;
+        };
+        const candidates = [
+            { kind: "incumbent", actions: [], features: {} },
+            { kind: "move", actions: [], features: {} },
+        ] as unknown as readonly IEnumeratedCandidate[];
+        const key = "V08_FLYER_BACKLINE_PRIORITY_LEFT";
+        const previous = process.env[key];
+        try {
+            process.env[key] = "1";
+            const plan = driver.certifiedSelectionBoundPlan(
+                {} as Unit,
+                candidates,
+                "v0.8",
+                false,
+                false,
+                false,
+                false,
+                false,
+            );
+            expect(plan.tailMargin).toBeUndefined();
+        } finally {
+            if (previous === undefined) delete process.env[key];
+            else process.env[key] = previous;
+        }
+    });
     it("never uses a different selection pool to eliminate an action", () => {
         const bounds = new SearchSelectionBounds({
             pools: [0, 1, 1],

@@ -68,7 +68,10 @@ import {
     selectV08A19ScoredCandidateIndex,
     V08_A19_SCORED_ARBITRATION_POLICY,
 } from "../ai/versions/v0_8_a19_scored_arbitration";
-import { applyV08FlyerBacklinePriority } from "../ai/versions/v0_8_flyer_backline_priority";
+import {
+    applyV08FlyerBacklinePriority,
+    isV08FlyerBacklinePriorityOn,
+} from "../ai/versions/v0_8_flyer_backline_priority";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
 import {
     reserveV08ReplayLeafChallenger,
@@ -5232,14 +5235,17 @@ export class SearchDriver {
             // All pool maxima, native/preferred actions and exact material ties remain complete. Their
             // gates/arbitration therefore need no loser-margin allowance. Replay near-ties still do.
             // Reserved Last Fuse trades can be conditionally added outside these pools; keep that path
-            // on its historical margin until it has a separate exact-selection proof.
+            // on its historical margin. The flyer postprocessor can also choose a non-maximal score
+            // before final arbitration, so any enabled seat retains the historical margin globally.
             tailMargin:
                 this.certifiedTightBounds &&
+                !isV08FlyerBacklinePriorityOn(PBTypes.TeamVals.LEFT) &&
+                !isV08FlyerBacklinePriorityOn(PBTypes.TeamVals.RIGHT) &&
                 !(
                     this.a19LastFusePrimaryTrades &&
                     candidates.some((candidate) => candidate.lastFuseCounterTradeReserved)
                 )
-                    ? this.rankedReplayTiebreakEpsilon
+                    ? Math.min(1, this.rankedReplayTiebreakEpsilon)
                     : undefined,
             pools: candidates.map(
                 (candidate) =>

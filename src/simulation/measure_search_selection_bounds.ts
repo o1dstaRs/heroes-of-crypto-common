@@ -39,6 +39,7 @@ interface IMeasure {
     leaf: number;
     boundPlans: number;
     tightPlans: number;
+    tailWindows: Record<string, number>;
 }
 type Task = { seed: number; grid: number; output: string };
 const p = SearchDriver.prototype as unknown as IResearchDriver;
@@ -81,7 +82,11 @@ function install(): void {
         const result = plan.apply(this, args);
         if (active && result) {
             active.boundPlans++;
-            if (result.tailMargin !== undefined) active.tightPlans++;
+            if (result.tailMargin !== undefined) {
+                active.tightPlans++;
+                const key = String(result.tailMargin);
+                active.tailWindows[key] = (active.tailWindows[key] ?? 0) + 1;
+            }
         }
         return result;
     };
@@ -98,8 +103,11 @@ function oneGame(task: Task, tight: boolean) {
         SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1",
         SEARCH_A19_ROLLOUT_ALLOCATION: "uniform",
         SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: tight ? "1" : "0",
+        SEARCH_V08_RANKED_REPLAY_TIEBREAK_EPSILON: "0",
     });
-    active = { choices: [], choiceMs: 0, turns: 0, leaf: 0, boundPlans: 0, tightPlans: 0 };
+    process.env.V08_FLYER_BACKLINE_PRIORITY_LEFT = "0";
+    process.env.V08_FLYER_BACKLINE_PRIORITY_RIGHT = "0";
+    active = { choices: [], choiceMs: 0, turns: 0, leaf: 0, boundPlans: 0, tightPlans: 0, tailWindows: {} };
     const start = performance.now(),
         cpuStart = threadCpuUsage();
     const result = runMatch({
@@ -136,6 +144,7 @@ function oneGame(task: Task, tight: boolean) {
         leafRollouts: measure.leaf,
         boundPlans: measure.boundPlans,
         tightPlans: measure.tightPlans,
+        tailWindows: measure.tailWindows,
         trajectory: measure.choices,
     };
 }
@@ -168,6 +177,8 @@ function onePair(task: Task) {
     appendFileSync(task.output + ".pairs.jsonl", JSON.stringify(row) + "\n");
     if (!exact) throw new Error("Certified tight bounds changed the complete trajectory for seed " + task.seed);
     if (control.rejected || tight.rejected) throw new Error("Rejected actions in bound comparison");
+    if (control.tightPlans !== 0 || Object.keys(tight.tailWindows).some((key) => key !== "0"))
+        throw new Error("Bound mode or tie window differs from the frozen experiment");
     if (control.leafRollouts !== tight.leafRollouts || row.savedTurnRollouts < 0)
         throw new Error("Bounds unexpectedly changed leaf work or increased turn-rollout count");
     return row;
