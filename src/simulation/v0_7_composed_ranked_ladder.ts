@@ -1638,6 +1638,18 @@ export function validateV07ComposedManifest(manifest: IV07ComposedManifest): voi
     const searchGames = manifest.cells
         .filter((cell) => manifest.searchProfiles[cell.profile].search)
         .reduce((sum, cell) => sum + cell.games, 0);
+    // Reject mismatched audit declarations before expanding the million-slot seed envelope and corpora.
+    if (
+        JSON.stringify(manifest.seedAudit.excludedRelativePaths) !==
+            JSON.stringify(V07_COMPOSED_SEED_SCAN_EXCLUDED_RELATIVE_PATHS) ||
+        JSON.stringify(manifest.seedAudit.knownReservedSeedsVerified) !== JSON.stringify([386585164, 1955955948]) ||
+        JSON.stringify(manifest.seedAudit.local.excludedPathPrefixes) !== "[]" ||
+        JSON.stringify(manifest.seedAudit.zinc.excludedPathPrefixes) !==
+            JSON.stringify(V07_COMPOSED_ZINC_GENERATED_PATH_PREFIX_EXCLUSIONS) ||
+        JSON.stringify(manifest.seedAudit.zinc.excluded) !== JSON.stringify(V07_COMPOSED_ZINC_CORPUS_EXCLUSIONS)
+    ) {
+        throw new Error("Manifest execution or seed-audit totals are inconsistent");
+    }
     const reservedEnvelope = v07ComposedReservedSeedEnvelope(manifest);
     if (
         manifest.execution.pairScenarios !== pairScenarios ||
@@ -1662,9 +1674,6 @@ export function validateV07ComposedManifest(manifest: IV07ComposedManifest): voi
         manifest.seedAudit.permutationNonce !== V07_COMPOSED_PERMUTATION_NONCE ||
         manifest.seedAudit.externalFreshnessScope !== "all_registered_scenario_setup_and_combat_seeds" ||
         manifest.seedAudit.scanPolicy !== V07_COMPOSED_SEED_SCAN_POLICY ||
-        JSON.stringify(manifest.seedAudit.excludedRelativePaths) !==
-            JSON.stringify(V07_COMPOSED_SEED_SCAN_EXCLUDED_RELATIVE_PATHS) ||
-        JSON.stringify(manifest.seedAudit.knownReservedSeedsVerified) !== JSON.stringify([386585164, 1955955948]) ||
         manifest.seedAudit.local.collisionsAfterRemap !== 0 ||
         manifest.seedAudit.zinc.collisionsAfterRemap !== 0 ||
         !Number.isFinite(Date.parse(manifest.seedAudit.local.cutoff)) ||
@@ -1750,10 +1759,6 @@ export function validateV07ComposedManifest(manifest: IV07ComposedManifest): voi
                 !/^[0-9a-f]{64}$/.test(corpus.corpusSeedSetSha256) ||
                 !/^[0-9a-f]{64}$/.test(corpus.scannerSummarySha256),
         ) ||
-        JSON.stringify(manifest.seedAudit.local.excludedPathPrefixes) !== "[]" ||
-        JSON.stringify(manifest.seedAudit.zinc.excludedPathPrefixes) !==
-            JSON.stringify(V07_COMPOSED_ZINC_GENERATED_PATH_PREFIX_EXCLUSIONS) ||
-        JSON.stringify(manifest.seedAudit.zinc.excluded) !== JSON.stringify(V07_COMPOSED_ZINC_CORPUS_EXCLUSIONS) ||
         manifest.seedAudit.local.scannerSourceSha256 !== manifest.seedAudit.zinc.scannerSourceSha256 ||
         manifest.seedAudit.local.scannerSourceSha256 !==
             manifest.sourceProvenance.requiredSha256["src/simulation/v0_7_composed_seed_scan.ts"] ||

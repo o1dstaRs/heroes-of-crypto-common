@@ -295,14 +295,16 @@ describe("composed-ranked preregistration", () => {
     it("requires the exact sorted Zinc corpus exclusion set", () => {
         expect(frozen.seedAudit.zinc.excluded).toEqual([...V07_COMPOSED_ZINC_CORPUS_EXCLUSIONS]);
 
-        const missing = structuredClone(frozen);
-        missing.seedAudit.zinc.excluded.pop();
-        expect(() => validateV07ComposedManifest(missing)).toThrow("seed-audit totals are inconsistent");
-
-        const injected = structuredClone(frozen);
-        injected.seedAudit.zinc.excluded.push("/home/agent-zinc/hoc-common/sim-out/cem/unbound.json");
-        expect(() => validateV07ComposedManifest(injected)).toThrow("seed-audit totals are inconsistent");
-        // 15s was not enough on CI's 2-core runner (15.15s observed); raise to match the heavy-test convention.
+        for (const excluded of [
+            frozen.seedAudit.zinc.excluded.slice(0, -1),
+            [...frozen.seedAudit.zinc.excluded, `${frozen.seedAudit.zinc.excluded[0]}.unbound`],
+            [...frozen.seedAudit.zinc.excluded].reverse(),
+            [...frozen.seedAudit.zinc.excluded, frozen.seedAudit.zinc.excluded[0]],
+        ]) {
+            const invalid = structuredClone(frozen);
+            invalid.seedAudit.zinc.excluded = excluded;
+            expect(() => validateV07ComposedManifest(invalid)).toThrow("seed-audit totals are inconsistent");
+        }
     }, 60_000);
 
     it("separates setup and combat while retaining shared seeds only for fixed side swaps", () => {
