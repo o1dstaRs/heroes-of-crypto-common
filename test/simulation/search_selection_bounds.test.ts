@@ -7,9 +7,61 @@ import { remainingRolloutsCannotWin, SearchDriver, withSearchEnvironment } from 
 import type { IEnumeratedCandidate } from "../../src/ai/candidates";
 import type { ILookaheadDeps } from "../../src/simulation/lookahead";
 import type { Unit } from "../../src/units/unit";
-import { SearchSelectionBounds, type ISearchSelectionBoundPlan } from "../../src/simulation/search_selection_bounds";
+import {
+    exactSelectionTailMargin,
+    SearchSelectionBounds,
+    type ISearchSelectionBoundPlan,
+} from "../../src/simulation/search_selection_bounds";
 
 describe("selection-aware rollout bounds", () => {
+    it("keeps exact-primary ties and the replay near-tie window while removing redundant gate headroom", () => {
+        const margin = exactSelectionTailMargin(4, 0);
+        expect(margin).toBeGreaterThan(0);
+        expect(margin).toBeLessThan(1e-12);
+        expect(exactSelectionTailMargin(4, 0.02)).toBe(0.02);
+        expect(remainingRolloutsCannotWin(0.99999, 1, 4, 1, margin)).toBe(true);
+        expect(remainingRolloutsCannotWin(0.99999, 1, 4, 1, 0.03)).toBe(false);
+        expect(remainingRolloutsCannotWin(1, 1, 4, 1, margin)).toBe(false);
+        expect(remainingRolloutsCannotWin(1 - Number.EPSILON, 1, 4, 1, margin)).toBe(false);
+        expect(() => exactSelectionTailMargin(0, 0)).toThrow();
+        expect(() => exactSelectionTailMargin(4, NaN)).toThrow();
+    });
+
+    it("enables tighter margins only in the explicit certified offline plan", () => {
+        const candidates = [
+            { kind: "incumbent", actions: [{ type: "wait_turn", unitId: "actor" }], features: { expectedDamage: 0 } },
+            { kind: "spell", actions: [], features: { expectedDamage: 0 } },
+        ] as unknown as readonly IEnumeratedCandidate[];
+        for (const enabled of [false, true]) {
+            const driver = withSearchEnvironment(
+                {
+                    V07_SEARCH: "1",
+                    SEARCH_VERSIONS: "v0.8",
+                    SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1",
+                    SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: enabled ? "1" : "0",
+                },
+                () => new SearchDriver({} as ILookaheadDeps, { offlineDeterministicWork: true }),
+            ) as unknown as {
+                certifiedSelectionBoundPlan: (
+                    unit: Unit,
+                    candidates: readonly IEnumeratedCandidate[],
+                    version: string,
+                    ...flags: boolean[]
+                ) => ISearchSelectionBoundPlan;
+            };
+            const plan = driver.certifiedSelectionBoundPlan(
+                {} as Unit,
+                candidates,
+                "v0.8",
+                false,
+                false,
+                false,
+                false,
+                false,
+            );
+            expect(plan.tailMargin).toBe(enabled ? 0 : undefined);
+        }
+    });
     it("separates forced-finish productive fallback from a passive incumbent without ordinary repair", () => {
         const driver = withSearchEnvironment(
             { V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8", SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1" },
@@ -42,6 +94,47 @@ describe("selection-aware rollout bounds", () => {
         const bounds = new SearchSelectionBounds(plan);
         bounds.recordFinished(0, 1);
         expect(bounds.referenceMean(1)).toBe(-Infinity);
+    });
+    it("retains the historical margin for conditional Last Fuse trades and never enables tight bounds live", () => {
+        const env = {
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1",
+            SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: "1",
+            SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "1",
+        };
+        const candidates = [
+            { kind: "incumbent", actions: [], features: {} },
+            { kind: "move", actions: [], features: {}, lastFuseCounterTradeReserved: true },
+        ] as unknown as readonly IEnumeratedCandidate[];
+        for (const offline of [false, true]) {
+            const driver = withSearchEnvironment(
+                env,
+                () => new SearchDriver({} as ILookaheadDeps, { offlineDeterministicWork: offline }),
+            ) as unknown as {
+                certifiedSelectionBoundPlan: (
+                    unit: Unit,
+                    candidates: readonly IEnumeratedCandidate[],
+                    version: string,
+                    ...flags: boolean[]
+                ) => ISearchSelectionBoundPlan | false;
+            };
+            const plan = driver.certifiedSelectionBoundPlan(
+                {} as Unit,
+                candidates,
+                "v0.8",
+                false,
+                false,
+                false,
+                false,
+                false,
+            );
+            if (offline) {
+                expect(plan).not.toBe(false);
+                if (!plan) throw new Error("Missing offline plan");
+                expect(plan.tailMargin).toBeUndefined();
+            } else expect(plan).toBe(false);
+        }
     });
     it("never uses a different selection pool to eliminate an action", () => {
         const bounds = new SearchSelectionBounds({
@@ -84,6 +177,7 @@ describe("selection-aware rollout bounds", () => {
         expect(() => new SearchSelectionBounds({ ...plan, pools: [0] })).toThrow();
         expect(() => new SearchSelectionBounds({ ...plan, pools: [0, 8] })).toThrow();
         expect(() => new SearchSelectionBounds({ ...plan, protectedIndices: new Set([2]) })).toThrow();
+        expect(() => new SearchSelectionBounds({ ...plan, tailMargin: -1 })).toThrow();
         const bounds = new SearchSelectionBounds(plan);
         for (const value of [NaN, Infinity, -Infinity, -0.1, 1.1]) bounds.recordFinished(0, value);
         expect(bounds.referenceMean(1)).toBe(-Infinity);
@@ -100,8 +194,17 @@ describe("selection-aware rollout bounds", () => {
             const preferredIndices = new Set<number>(rng() < 0.5 ? [Math.floor(rng() * count)] : []);
             const protectedIndices = new Set([0, Math.floor(rng() * count), ...preferredIndices]);
             const samples = Array.from({ length: count }, () =>
-                Array.from({ length: rollouts }, () => (rng() < 0.02 ? -Infinity : Math.floor(rng() * 5) / 4)),
+                Array.from({ length: rollouts }, () =>
+                    rng() < 0.02
+                        ? -Infinity
+                        : rng() < 0.5
+                          ? Math.floor(rng() * 5) / 4
+                          : rng() < 0.5
+                            ? rng()
+                            : 1 - 1e-6 * rng(),
+                ),
             );
+            const nearTieMargin = rng() < 0.5 ? 0.02 : 0;
             const full = samples.map((row) =>
                 row.includes(-Infinity) ? -Infinity : row.reduce((a, b) => a + b, 0) / rollouts,
             );
@@ -115,7 +218,16 @@ describe("selection-aware rollout bounds", () => {
                     if (value === -Infinity) return -Infinity;
                     sum += value;
                     completed += 1;
-                    if (remainingRolloutsCannotWin(sum, completed, rollouts, reference, 0.03)) break;
+                    if (
+                        remainingRolloutsCannotWin(
+                            sum,
+                            completed,
+                            rollouts,
+                            reference,
+                            exactSelectionTailMargin(rollouts, nearTieMargin),
+                        )
+                    )
+                        break;
                 }
                 if (completed === rollouts) bounds.recordFinished(index, sum / rollouts);
                 complete[index] = completed === rollouts;
@@ -132,6 +244,10 @@ describe("selection-aware rollout bounds", () => {
                 const members = pools.flatMap((value, index) => (value === pool ? [index] : []));
                 const selected = winner(full, members);
                 expect(winner(bounded, members)).toBe(selected);
+                for (const index of members) {
+                    if (Number.isFinite(full[index]) && full[index] >= full[selected] - nearTieMargin)
+                        expect(bounded[index]).toBe(full[index]);
+                }
                 selections.push(selected);
             }
             for (const index of protectedIndices) expect(bounded[index]).toBe(full[index]);
