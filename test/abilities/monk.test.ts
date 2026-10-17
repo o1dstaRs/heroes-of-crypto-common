@@ -138,6 +138,50 @@ describe("Borrowed Grace", () => {
     const makeMonk = (stackPower: number, luck = 0) =>
         createTestUnit({ name: "Monk", abilities: ["Borrowed Grace"], stackPower, luck });
 
+    it("records each real shot's exact transfer, including the responding monk", () => {
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const stats = {
+            name: "Monk",
+            attackType: PBTypes.AttackVals.RANGE,
+            abilities: ["Borrowed Grace"],
+            attack: 10,
+            damageMin: 5,
+            damageMax: 5,
+            rangeShots: 5,
+            stackPower: 5,
+            maxHp: 500,
+            amountAlive: 5,
+            shotDistance: 20,
+        };
+        const first = createTestUnit({ ...stats, team: PBTypes.TeamVals.LEFT });
+        const responder = createTestUnit({ ...stats, team: PBTypes.TeamVals.RIGHT });
+        placeUnit(grid, unitsHolder, first, { x: 5, y: 2 });
+        placeUnit(grid, unitsHolder, responder, { x: 5, y: 8 });
+        castBuff(first, "Life", "Spiritual Armor");
+        castBuff(responder, "Life", "Blessing");
+        setDeterministicRandomSource(() => 0);
+        const damage = createVisibleDamage(responder);
+        const result = attackHandler.handleRangeAttack(
+            unitsHolder,
+            [1],
+            1,
+            damage,
+            first,
+            [[responder]],
+            [first],
+            responder.getPosition(),
+        );
+        expect(result.completed).toBe(true);
+        expect(damage.buffsStolen).toEqual([
+            { thiefId: first.getId(), targetId: responder.getId(), buffName: "Blessing" },
+            { thiefId: responder.getId(), targetId: first.getId(), buffName: "Spiritual Armor" },
+        ]);
+        expect(first.getBuff("Blessing")).toBeDefined();
+        expect(responder.getBuff("Spiritual Armor")).toBeDefined();
+        expect(first.getBuff("Spiritual Armor")).toBeDefined();
+        expect(responder.getBuff("Blessing")).toBeDefined();
+    });
+
     it("runs from 20% at one stack to the card's power at five", () => {
         expect(borrowedGraceChance(makeMonk(1), 0)).toBe(BORROWED_GRACE_MIN_CHANCE);
         expect(borrowedGraceChance(makeMonk(2), 0)).toBe(32.5);
@@ -371,11 +415,12 @@ describe("Absolving Arrow", () => {
 
         // Every roll returns its minimum: the shot cannot miss, the theft cannot fail, the cleanse lands.
         setDeterministicRandomSource(() => 0);
+        const damage = createVisibleDamage(enemy);
         const result = attackHandler.handleRangeAttack(
             unitsHolder,
             [1],
             1,
-            createVisibleDamage(enemy),
+            damage,
             monk,
             [[enemy]],
             undefined,
@@ -383,6 +428,17 @@ describe("Absolving Arrow", () => {
         );
 
         expect(result.completed).toBe(true);
+        expect(damage.buffsStolen).toEqual([{ thiefId: monk.getId(), targetId: enemy.getId(), buffName: "Blessing" }]);
+        expect(damage.absolutions).toEqual([
+            {
+                sourceUnitId: monk.getId(),
+                unitId: ally.getId(),
+                liftedNames: ["Stun"],
+                position: ally.getPosition(),
+                response: false,
+                hitIndex: 0,
+            },
+        ]);
         expect(enemy.isDead()).toBe(false);
         // Absolving Arrow cleansed the ally the arrow crossed...
         expect(ally.hasEffectActive("Stun")).toBe(false);

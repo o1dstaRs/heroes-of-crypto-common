@@ -73,10 +73,6 @@ export function ilCandidateFeatureVector(features: ICandidateFeatures): number[]
 const sha256 = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const fingerprintNames = (key: string, names: readonly string[]): string => sha256({ key, names });
 
-const wfFingerprint = fingerprintNames("ild-v3-wf", WAIT_FEATURE_NAMES);
-const vfFingerprint = fingerprintNames("ild-v3-vf", VALUE_FEATURE_NAMES_V2);
-const cfFingerprint = fingerprintNames("ild-v3-cf", IL_CANDIDATE_FEATURE_NAMES);
-const afFingerprint = fingerprintNames("ild-v3-af", IL_ACTION_FEATURE_NAMES);
 const IL_CANDIDATE_ROW_FIELDS = ["kind", "ck", "sig", "act", "cf", "am", "af", "m"] as const;
 const IL_ACTION_METADATA_FIELDS = [
     "family",
@@ -171,36 +167,70 @@ export const IL_MODEL_INPUT_CONTRACT = Object.freeze({
     labelsAndProvenance: Object.freeze(["chosen", "targetSig", "cands[].sig", "m"]),
 });
 
-/** Feature-order provenance repeated on every decision/footer so shards cannot be mixed silently. */
-export const IL_FEATURE_FINGERPRINTS = Object.freeze({
-    wf: wfFingerprint,
-    vf: vfFingerprint,
-    cf: cfFingerprint,
-    af: afFingerprint,
-    schema: sha256({
-        rowType: IL_ROW_TYPE,
-        gameRowType: IL_GAME_ROW_TYPE,
-        version: IL_DATASET_VERSION,
+export interface IIlFeatureFingerprints {
+    readonly wf: string;
+    readonly vf: string;
+    readonly cf: string;
+    readonly af: string;
+    readonly schema: string;
+}
+
+let featureFingerprints: IIlFeatureFingerprints | undefined;
+
+function getFeatureFingerprints(): IIlFeatureFingerprints {
+    if (featureFingerprints) return featureFingerprints;
+    const wfFingerprint = fingerprintNames("ild-v3-wf", WAIT_FEATURE_NAMES);
+    const vfFingerprint = fingerprintNames("ild-v3-vf", VALUE_FEATURE_NAMES_V2);
+    const cfFingerprint = fingerprintNames("ild-v3-cf", IL_CANDIDATE_FEATURE_NAMES);
+    const afFingerprint = fingerprintNames("ild-v3-af", IL_ACTION_FEATURE_NAMES);
+    featureFingerprints = Object.freeze({
         wf: wfFingerprint,
         vf: vfFingerprint,
         cf: cfFingerprint,
         af: afFingerprint,
-        actionFamilies: IL_ACTION_FAMILIES,
-        candidateFields: IL_CANDIDATE_ROW_FIELDS,
-        decisionFields: IL_DECISION_ROW_FIELDS,
-        gameFields: IL_GAME_ROW_FIELDS,
-        actionMetadataFields: IL_ACTION_METADATA_FIELDS,
-        moveMetadataFields: IL_MOVE_METADATA_FIELDS,
-        spellMetadataFields: IL_SPELL_METADATA_FIELDS,
-        shotFields: IL_SHOT_FEATURE_NAMES,
-        actionFields: IL_ACTION_FIELDS,
-        searchConfigFields: IL_SEARCH_CONFIG_FIELDS,
-        searchCapFields: IL_SEARCH_CAP_FIELDS,
-        modelInputContract: IL_MODEL_INPUT_CONTRACT,
-    }),
-});
+        schema: sha256({
+            rowType: IL_ROW_TYPE,
+            gameRowType: IL_GAME_ROW_TYPE,
+            version: IL_DATASET_VERSION,
+            wf: wfFingerprint,
+            vf: vfFingerprint,
+            cf: cfFingerprint,
+            af: afFingerprint,
+            actionFamilies: IL_ACTION_FAMILIES,
+            candidateFields: IL_CANDIDATE_ROW_FIELDS,
+            decisionFields: IL_DECISION_ROW_FIELDS,
+            gameFields: IL_GAME_ROW_FIELDS,
+            actionMetadataFields: IL_ACTION_METADATA_FIELDS,
+            moveMetadataFields: IL_MOVE_METADATA_FIELDS,
+            spellMetadataFields: IL_SPELL_METADATA_FIELDS,
+            shotFields: IL_SHOT_FEATURE_NAMES,
+            actionFields: IL_ACTION_FIELDS,
+            searchConfigFields: IL_SEARCH_CONFIG_FIELDS,
+            searchCapFields: IL_SEARCH_CAP_FIELDS,
+            modelInputContract: IL_MODEL_INPUT_CONTRACT,
+        }),
+    });
+    return featureFingerprints;
+}
 
-export type IIlFeatureFingerprints = typeof IL_FEATURE_FINGERPRINTS;
+/** Offline dataset provenance is lazy: browser search imports action encoders without Node crypto. */
+export const IL_FEATURE_FINGERPRINTS: IIlFeatureFingerprints = Object.freeze({
+    get wf() {
+        return getFeatureFingerprints().wf;
+    },
+    get vf() {
+        return getFeatureFingerprints().vf;
+    },
+    get cf() {
+        return getFeatureFingerprints().cf;
+    },
+    get af() {
+        return getFeatureFingerprints().af;
+    },
+    get schema() {
+        return getFeatureFingerprints().schema;
+    },
+});
 
 /** Canonical action identity used by the IL target and its semantic-group evaluator. */
 export function ilActionSignature(actions: readonly GameAction[]): string {
