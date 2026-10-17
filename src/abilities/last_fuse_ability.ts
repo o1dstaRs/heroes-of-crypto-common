@@ -11,6 +11,7 @@ export interface ILastFuseSource {
     unitId: string;
     team: TeamType;
     percent: number;
+    stackPower: number;
 }
 
 export function lastFuseSourceFor(unit: Unit | undefined): ILastFuseSource | undefined {
@@ -19,6 +20,7 @@ export function lastFuseSourceFor(unit: Unit | undefined): ILastFuseSource | und
         unitId: unit.getId(),
         team: unit.getTeam(),
         percent: unit.getBuffPower(LAST_FUSE_BUFF) ?? ARTIFACT_POWER.LAST_FUSE_PERCENT,
+        stackPower: unit.getStackPower(),
     };
 }
 
@@ -39,11 +41,11 @@ export interface IPyreExplosion {
 
 export function lastFuseDamage(
     damageDealt: number,
-    stackPower: number,
+    attackerStackPower: number,
     percent: number = ARTIFACT_POWER.LAST_FUSE_PERCENT,
 ): number {
     return Math.max(
-        Math.max(0, stackPower) * ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER,
+        Math.max(0, attackerStackPower) * ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER,
         Math.round((Math.max(0, damageDealt) * percent) / 100),
     );
 }
@@ -53,7 +55,7 @@ export function explodeLastFuse(unit: Unit, unitsHolder: UnitsHolder, sceneLog: 
     if (!unit.isDead() || !source || unit.getTeam() === source.team) {
         return undefined;
     }
-    const damage = unit.getLastFuseDamage(source.percent);
+    const damage = unit.getLastFuseDamage();
     if (damage <= 0) {
         return undefined;
     }

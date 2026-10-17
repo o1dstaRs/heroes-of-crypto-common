@@ -18,7 +18,7 @@ for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
             const f = lastFuseBoard({ team, direction });
             const estimate = estimateLastFuseMeleeDamage(f.attacker, f.target, f.context, f.stand, f.actions)!;
             const actual = f.fire();
-            expect(estimate.expectedNetDamage).toBe(120);
+            expect(estimate.expectedNetDamage).toBe(125);
             expect(estimate.expectedNetDamage).toBe(actual.enemyDamage);
             expect(estimate.expectedFriendlyDamage).toBe(0);
             expect(actual.friendlyDamage).toBe(0);
@@ -28,10 +28,10 @@ for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
 }
 
 for (const stackPower of [1, 2, 3, 4, 5]) {
-    test(`melee projection uses the destroyed stack power ${stackPower}`, () => {
-        const f = lastFuseBoard({ target: { stackPower }, remainingHp: 1 });
+    test(`melee projection uses the attacker stack power ${stackPower}`, () => {
+        const f = lastFuseBoard({ attacker: { stackPower }, target: { stackPower: 6 - stackPower }, remainingHp: 1 });
         const estimate = estimateLastFuseMeleeDamage(f.attacker, f.target, f.context, f.stand, f.actions)!;
-        expect(estimate.expectedNetDamage).toBe(1 + 20 * stackPower);
+        expect(estimate.expectedNetDamage).toBe(1 + 25 * stackPower);
         expect(f.fire().enemyDamage).toBe(estimate.expectedNetDamage);
     });
 }
@@ -43,11 +43,11 @@ test("the projection uses remaining HP rather than overkill and does not consume
         throw new Error("projection consumed combat RNG");
     });
     const estimate = estimateLastFuseMeleeDamage(f.attacker, f.target, f.context, f.stand, f.actions)!;
-    expect(estimate.expectedNetDamage).toBe(720);
+    expect(estimate.expectedNetDamage).toBe(750);
     expect(JSON.stringify([...f.unitsHolder.getAllUnits().values()].map((unit) => unit.getUnitProperties()))).toBe(
         before,
     );
-    expect(f.fire().enemyDamage).toBe(720);
+    expect(f.fire().enemyDamage).toBe(750);
 });
 
 test("an enemy owning Last Fuse does not make it explode when the attacker has no artifact", () => {

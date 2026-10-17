@@ -30,7 +30,7 @@ function enemyBlastDamage(
     target: Unit,
     context: Pick<IDecisionContext, "unitsHolder">,
 ): number | undefined {
-    const blast = target.getLastFuseDamage(unit.getBuffPower("Last Fuse"));
+    const blast = target.getLastFuseDamage(unit.getBuffPower("Last Fuse"), unit.getStackPower());
     let damage = 0;
     for (const enemy of context.unitsHolder.getAllEnemyUnits(unit.getTeam())) {
         if (

@@ -13,7 +13,7 @@ afterEach(() => setDeterministicRandomSource(undefined));
 
 test("Last Fuse reserves the extra enemy damage earned by a kill", () => {
     const f = lastFuseBoard();
-    expect(lastFuseCounterTradePotential(f.attacker, f.target, f.context, f.stand, f.actions)).toBe(20);
+    expect(lastFuseCounterTradePotential(f.attacker, f.target, f.context, f.stand, f.actions)).toBe(25);
     const candidates = enumerateCandidates(
         f.attacker,
         f.context,

@@ -182,8 +182,8 @@ export const ARTIFACT_POWER = {
     GRAVECHAIN_SLOW_LAPS: 3,
     GRAVECHAIN_CONNECTIONS: 3,
     GRAVECHAIN_STEPS_PENALTY: 1,
-    LAST_FUSE_PERCENT: 20,
-    LAST_FUSE_MIN_DAMAGE_PER_POWER: 20,
+    LAST_FUSE_PERCENT: 25,
+    LAST_FUSE_MIN_DAMAGE_PER_POWER: 25,
 } as const;
 
 export interface ArtifactProperties {
@@ -468,7 +468,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "last_fuse",
         "Last Fuse",
         "Last Fuse",
-        "Enemy stacks your army destroys explode, damaging other enemies next to them for {}% of the killing blow's actual damage, with a minimum of [] damage per destroyed stack power. Your allies are not damaged.",
+        "Enemy stacks your army destroys explode, damaging other enemies next to them for {}% of the killing blow's actual damage, with a minimum of [] damage per attacker stack power. Your allies are not damaged.",
     ),
 };
 

@@ -95,12 +95,12 @@ test("Tier-2 id 17 is draftable and describes enemy kills without friendly damag
     expect(ToTier2Artifact["17"]).toBe(Tier2Artifact.LAST_FUSE);
     expect(LIVE_TIER2_ARTIFACT_IDS).toContain(Tier2Artifact.LAST_FUSE);
     expect(TIER2_ARTIFACT_LIST.find((artifact) => artifact.id === 17)?.imageKey).toBe("artifact_t2_last_fuse_256");
-    expect(lastFuseDamage(500, 1)).toBe(100);
-    expect(lastFuseDamage(1, 1)).toBe(20);
+    expect(lastFuseDamage(500, 1)).toBe(125);
+    expect(lastFuseDamage(1, 1)).toBe(25);
     const description = formatArtifactDescription(getArtifactProperties(ArtifactTier.TIER_2, Tier2Artifact.LAST_FUSE));
     expect(description).toContain("Enemy stacks your army destroys");
-    expect(description).toContain("20%");
-    expect(description).toContain("20 damage per destroyed stack power");
+    expect(description).toContain("25%");
+    expect(description).toContain("25 damage per attacker stack power");
     expect(description).toContain("Your allies are not damaged");
     expect(description).not.toMatch(/\{\}|\[\]|<>/);
     expect(getSpellConfig("System", "Last Fuse").name).toBe("Last Fuse");
@@ -138,9 +138,9 @@ for (const team of [LEFT, RIGHT]) {
         expect(events).toHaveLength(1);
         expect(events[0].unitId).toBe(victim.getId());
         expect(events[0].position).toEqual(victim.getPosition());
-        expect(events[0].hits).toEqual([expect.objectContaining({ unitId: diagonal.getId(), amount: 100 })]);
+        expect(events[0].hits).toEqual([expect.objectContaining({ unitId: diagonal.getId(), amount: 125 })]);
         expect([killer, ally, far].map((unit) => unit.getCumulativeHp())).toEqual([500, 500, 500]);
-        expect(diagonal.getCumulativeHp()).toBe(400);
+        expect(diagonal.getCumulativeHp()).toBe(375);
         expect(killer.hasBuffActive("Fireforged Sword")).toBe(false);
     });
 }
@@ -177,18 +177,21 @@ test("the fatal blow uses actual remaining HP after attrition, without armor or 
     expect(f.victim.isDead()).toBe(false);
     expect(f.victim.applyDamage(99999, 0, new SceneLogMock(), false, f.killer)).toBe(250);
     const blast = pyres(f.cleanup([f.victim.getId()]))[0];
-    expect(blast.hits.map((hit) => hit.amount)).toEqual([50, 50]);
-    expect(f.neighbor.getCumulativeHp()).toBe(950);
-    expect(warded.getCumulativeHp()).toBe(450);
+    expect(blast.hits.map((hit) => hit.amount)).toEqual([63, 63]);
+    expect(f.neighbor.getCumulativeHp()).toBe(937);
+    expect(warded.getCumulativeHp()).toBe(437);
 });
 
 for (const power of [1, 2, 3, 4, 5]) {
-    test(`the destroyed stack's power ${power} sets the ${power * 20} damage floor`, () => {
+    test(`the attacker's captured power ${power} sets the ${power * 25} damage floor`, () => {
         const f = cluster();
         f.victim.applyDamage(499, 0, new SceneLogMock(), false);
-        f.victim.setStackPower(power);
+        f.killer.setStackPower(power);
+        f.victim.setStackPower(6 - power);
         expect(f.victim.applyDamage(99999, 0, new SceneLogMock(), false, f.killer)).toBe(1);
-        expect(pyres(f.cleanup([f.victim.getId()]))[0].hits[0].amount).toBe(power * 20);
+        expect(f.victim.getLastFuseKillSource()?.stackPower).toBe(power);
+        f.killer.setStackPower(6 - power);
+        expect(pyres(f.cleanup([f.victim.getId()]))[0].hits[0].amount).toBe(power * 25);
     });
 }
 
@@ -217,7 +220,7 @@ for (const [width, height] of [
         const blasts = pyres(f.cleanup([victim.getId(), victim.getId()]));
         expect(blasts).toHaveLength(1);
         expect(new Set(blasts[0].hits.map((hit) => hit.unitId)).size).toBe(neighbors.length);
-        expect(neighbors.every((enemy) => enemy.getCumulativeHp() === 400)).toBe(true);
+        expect(neighbors.every((enemy) => enemy.getCumulativeHp() === 375)).toBe(true);
     });
 }
 
@@ -229,9 +232,9 @@ test("a multi-cell enemy receives one blast and an edge corpse hits its diagonal
     f.arm(LEFT);
     kill(victim, killer);
     expect(pyres(f.cleanup([victim.getId()]))[0].hits).toEqual([
-        expect.objectContaining({ unitId: enemy.getId(), amount: 100 }),
+        expect.objectContaining({ unitId: enemy.getId(), amount: 125 }),
     ]);
-    expect(enemy.getCumulativeHp()).toBe(400);
+    expect(enemy.getCumulativeHp()).toBe(375);
 });
 
 test("Water Shield absorbs the untyped blast even when the killer is Fire Element", () => {
@@ -248,16 +251,16 @@ test("Water Shield absorbs the untyped blast even when the killer is Fire Elemen
     expect(shielded.getCumulativeHp()).toBe(1000);
     kill(second, killer);
     expect(pyres(f.cleanup([second.getId()]))[0].hits).toEqual([
-        expect.objectContaining({ unitId: shielded.getId(), amount: 100 }),
+        expect.objectContaining({ unitId: shielded.getId(), amount: 125 }),
     ]);
 });
 
 for (const bothArmed of [false, true]) {
     test(`chain explosions retain the original killer's side with both armies armed: ${bothArmed}`, () => {
         const f = board();
-        const killer = f.add("Killer", { x: 3, y: 4 }, { team: LEFT, maxHp: 500 });
-        const victim = f.add("Victim", { x: 4, y: 4 }, { amountAlive: 5 });
-        const chain = f.add("Chain", { x: 5, y: 4 }, { maxHp: 10 });
+        const killer = f.add("Killer", { x: 3, y: 4 }, { team: LEFT, maxHp: 500, stackPower: 3 });
+        const victim = f.add("Victim", { x: 4, y: 4 }, { amountAlive: 5, stackPower: 1 });
+        const chain = f.add("Chain", { x: 5, y: 4 }, { maxHp: 10, stackPower: 5 });
         const witness = f.add("Witness", { x: 6, y: 4 }, { maxHp: 500 });
         const ally = f.add("Ally", { x: 5, y: 3 }, { team: LEFT, maxHp: 500 });
         f.arm(...(bothArmed ? [LEFT, RIGHT] : [LEFT]));
@@ -267,7 +270,8 @@ for (const bothArmed of [false, true]) {
         expect(died).toEqual([victim.getId()]);
         expect(pyres(events).map((event) => event.unitId)).toEqual([victim.getId(), chain.getId()]);
         expect(f.unitsHolder.getAllUnits().has(chain.getId())).toBe(false);
-        expect(witness.getCumulativeHp()).toBe(480);
+        expect(witness.getCumulativeHp()).toBe(425);
+        expect(pyres(events).every((event) => event.sourceUnitId === killer.getId())).toBe(true);
         expect([killer, ally].map((unit) => unit.getCumulativeHp())).toEqual([500, 500]);
     });
 }
@@ -355,7 +359,7 @@ test("headless fights apply the blast without rendering events", () => {
     const f = cluster("headless");
     kill(f.victim, f.killer);
     expect(pyres(f.cleanup([f.victim.getId()]))).toEqual([]);
-    expect(f.neighbor.getCumulativeHp()).toBe(900);
+    expect(f.neighbor.getCumulativeHp()).toBe(875);
 });
 
 test("the closing board does not turn environmental destruction into an attributed kill", () => {
@@ -399,10 +403,13 @@ test("the on-kill description stays correct after attrition and stack-power chan
     };
     const before = description();
     expect(before).toContain("Enemy stacks this unit destroys");
-    expect(before).toContain("20 damage per destroyed stack power");
+    expect(before).toContain("minimum of 25 damage");
+    expect(before).toContain("25 per attacker stack power");
     f.killer.applyDamage(999, 0, new SceneLogMock(), false);
     f.killer.setStackPower(5);
-    expect(description()).toBe(before);
+    expect(description()).toContain("minimum of 125 damage");
+    f.killer.setStackPower(2);
+    expect(description()).toContain("minimum of 50 damage");
 });
 
 test("snapshot rollback restores fatal damage and killer ownership, while resurrection clears them", () => {
@@ -416,8 +423,8 @@ test("snapshot rollback restores fatal damage and killer ownership, while resurr
     expect(f.victim.getLastFuseKillSource()).toBeUndefined();
     restoreBattle(snapshot, f.unitsHolder, f.grid, f.fight);
     expect(f.victim.getLastFuseKillSource()?.team).toBe(LEFT);
-    expect(f.victim.getLastFuseDamage()).toBe(50);
-    expect(pyres(f.cleanup([f.victim.getId()]))[0].hits[0].amount).toBe(50);
+    expect(f.victim.getLastFuseDamage()).toBe(63);
+    expect(pyres(f.cleanup([f.victim.getId()]))[0].hits[0].amount).toBe(63);
 });
 
 test("a Last Fuse holder's lethal retaliation detonates the attacking enemy", () => {
@@ -446,8 +453,8 @@ test("a Last Fuse holder's lethal retaliation detonates the attacking enemy", ()
         expect.objectContaining({
             unitId: attacker.getId(),
             sourceUnitId: defender.getId(),
-            hits: [expect.objectContaining({ unitId: neighbor.getId(), amount: 20 })],
+            hits: [expect.objectContaining({ unitId: neighbor.getId(), amount: 25 })],
         }),
     ]);
-    expect(neighbor.getCumulativeHp()).toBe(980);
+    expect(neighbor.getCumulativeHp()).toBe(975);
 });

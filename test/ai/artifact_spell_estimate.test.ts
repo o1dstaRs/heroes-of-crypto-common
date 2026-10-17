@@ -111,6 +111,20 @@ function fixture(
 afterEach(() => setDeterministicRandomSource(undefined));
 
 describe("artifact spell decisions", () => {
+    test.each([1, 2, 3, 4, 5])("Last Fuse spells use caster power %s independently of target power", (stackPower) => {
+        const h = fixture({
+            expose: true,
+            caster: { stackPower },
+            target: { maxHp: 1, stackPower: 6 - stackPower },
+            neighbor: { maxHp: 1000 },
+        });
+        const cast = h
+            .catalog()
+            .find((candidate) => candidate.kind === "spell" && candidate.targetId === h.target.getId())!;
+        expect(cast.features.expectedDamage).toBe(1 + 25 * stackPower);
+        expect(h.fire(cast).enemyLoss).toBe(1 + 25 * stackPower);
+    });
+
     test.each([undefined, "mage", "archmage"] as const)(
         "%s ring does not turn an absorbed spell into damage or a kill",
         (ring) => {
@@ -131,7 +145,7 @@ describe("artifact spell decisions", () => {
             const cast = candidates.find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
             const blast = lastFuseDamage(
                 h.target.getCumulativeHp(),
-                h.target.getStackPower(),
+                h.caster.getStackPower(),
                 h.caster.getBuffPower("Last Fuse"),
             );
             const priced = h.target.getCumulativeHp() + blast;
@@ -161,14 +175,14 @@ describe("artifact spell decisions", () => {
                 target: { maxHp: 600 },
             });
             const fatalHp = h.target.getCumulativeHp();
-            const blast = lastFuseDamage(fatalHp, h.target.getStackPower(), h.caster.getBuffPower("Last Fuse"));
+            const blast = lastFuseDamage(fatalHp, h.caster.getStackPower(), h.caster.getBuffPower("Last Fuse"));
             const castSpell = h.caster.getSpells().find((entry) => entry.getName() === spell.split(":")[1]);
             expect(castSpell).toBeDefined();
             expect(
                 projectSpellDamageAgainstUnit({ spell: castSpell!, caster: h.caster, target: h.target }).damage,
             ).toBeGreaterThan(fatalHp);
             const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
-            expect(blast).toBe(Math.max(h.target.getStackPower() * 20, Math.round((fatalHp * 20) / 100)));
+            expect(blast).toBe(Math.max(h.caster.getStackPower() * 25, Math.round((fatalHp * 25) / 100)));
             expect(cast.features.expectedDamage).toBe(fatalHp + blast);
             const result = h.fire(cast);
             expect(result.friendlyLoss).toBe(0);

@@ -302,8 +302,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // Water Shield: set once this unit's one-per-battle absorb shield has been consumed, so the seeding
     // refresh (UnitsHolder.refreshWaterShieldForAllUnits) never re-grants it after it breaks.
     protected waterShieldSpent = false;
-    protected lastFuseFatalHit: { damage: number; stackPower: number; source?: ILastFuseSource } | undefined =
-        undefined;
+    protected lastFuseFatalHit: { damage: number; source?: ILastFuseSource } | undefined = undefined;
     protected onHourglass = false;
     // True once this unit has moved during its current turn. Reset when its turn completes. Lets the
     // engine tell a real "manual" end-of-turn (it moved, then finished) from a do-nothing turn (e.g. an
@@ -1418,11 +1417,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public getLastFuseKillSource(): Readonly<ILastFuseSource> | undefined {
         return this.isDead() ? this.lastFuseFatalHit?.source : undefined;
     }
-    public getLastFuseDamage(percent = this.lastFuseFatalHit?.source?.percent): number {
-        if (percent === undefined) return 0;
+    public getLastFuseDamage(
+        percent = this.lastFuseFatalHit?.source?.percent,
+        attackerStackPower = this.lastFuseFatalHit?.source?.stackPower,
+    ): number {
+        if (percent === undefined || attackerStackPower === undefined) return 0;
         return lastFuseDamage(
             this.isDead() ? (this.lastFuseFatalHit?.damage ?? 0) : this.getCumulativeHp(),
-            this.isDead() ? (this.lastFuseFatalHit?.stackPower ?? this.getStackPower()) : this.getStackPower(),
+            attackerStackPower,
             percent,
         );
     }
@@ -1430,8 +1432,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const index = this.unitProperties.applied_buffs.indexOf("Last Fuse");
         if (index < 0) return;
         const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        const minimumDamage = Math.max(0, this.getStackPower()) * ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER;
         this.unitProperties.applied_buffs_descriptions[index] =
-            `Artifact. Enemy stacks this unit destroys explode, damaging other enemies next to them for ${this.getBuffPower("Last Fuse") ?? ARTIFACT_POWER.LAST_FUSE_PERCENT}% of the killing blow's actual damage, with a minimum of ${ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER} damage per destroyed stack power. Your allies are not damaged.;${properties.join(";")}`;
+            `Artifact. Enemy stacks this unit destroys explode, damaging other enemies next to them for ${this.getBuffPower("Last Fuse") ?? ARTIFACT_POWER.LAST_FUSE_PERCENT}% of the killing blow's actual damage, with a minimum of ${minimumDamage} damage at this unit's current stack power (${ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER} per attacker stack power). Your allies are not damaged.;${properties.join(";")}`;
     }
     private refreshQuiverOfEchoesDescription(): void {
         const index = this.unitProperties.applied_buffs.indexOf("Quiver of Echoes");
@@ -1956,7 +1959,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 const source = lastFuseSource ?? lastFuseSourceFor(attacker);
                 this.lastFuseFatalHit = {
                     damage: damage.appliedDamage,
-                    stackPower: this.getStackPower(),
                     source: source && source.team !== this.getTeam() ? { ...source } : undefined,
                 };
             }

@@ -18,7 +18,7 @@ for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
             const f = lastFuseBoard({ ranged: true, team, direction });
             const estimate = estimateLastFuseRangedDamage(f.attacker, f.target, f.context, 1)!;
             const actual = f.fire();
-            expect(estimate.expectedNetDamage).toBe(120);
+            expect(estimate.expectedNetDamage).toBe(125);
             expect(actual.enemyDamage).toBe(estimate.expectedNetDamage);
             expect(estimate.expectedFriendlyDamage).toBe(0);
             expect(actual.friendlyDamage).toBe(0);
@@ -28,10 +28,15 @@ for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
 }
 
 for (const stackPower of [1, 2, 3, 4, 5]) {
-    test(`ranged projection uses destroyed power ${stackPower} and actual fatal HP`, () => {
-        const f = lastFuseBoard({ ranged: true, target: { stackPower }, remainingHp: 1 });
+    test(`ranged projection uses attacker power ${stackPower} and actual fatal HP`, () => {
+        const f = lastFuseBoard({
+            ranged: true,
+            attacker: { stackPower },
+            target: { stackPower: 6 - stackPower },
+            remainingHp: 1,
+        });
         const estimate = estimateLastFuseRangedDamage(f.attacker, f.target, f.context, 1)!;
-        expect(estimate.expectedNetDamage).toBe(1 + 20 * stackPower);
+        expect(estimate.expectedNetDamage).toBe(1 + 25 * stackPower);
         expect(f.fire().enemyDamage).toBe(estimate.expectedNetDamage);
     });
 }
