@@ -147,4 +147,6 @@ export interface IVisibleDamage {
         response: boolean;
         hitIndex: number;
     }[];
+    /** Successful Borrowed Grace copies; exact copied buff, including counter-shots. */
+    buffsStolen?: { thiefId: string; targetId: string; buffName: string }[];
 }

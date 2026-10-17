@@ -1995,10 +1995,10 @@ export class AttackHandler {
                     damageFromAttack,
                     this.sceneLog,
                 );
-                // ABILITY Borrowed Grace (Monk): a landed shot copies one active buff from the target and
-                // wears the copy. The target keeps the original. A missed or lethal shot copies nothing.
+                // A landed shot copies one active buff; the target keeps the original.
                 if (!splashLanded) {
-                    AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                    const stolenBuff = AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                    if (stolenBuff) (damageForAnimation.buffsStolen ??= []).push(stolenBuff);
                 }
             }
             if (recordPrimaryTargetDeath()) {
@@ -2080,12 +2080,13 @@ export class AttackHandler {
                     );
                     // A Monk that shoots BACK copies just the same — the copy rides the landed shot, not
                     // the initiative (mirrors Predatory Assimilation's response branch).
-                    AllAbilities.processBorrowedGraceAbility(
+                    const stolenBuff = AllAbilities.processBorrowedGraceAbility(
                         targetUnit,
                         rangeResponseUnit,
                         this.sceneLog,
                         attackerUnit,
                     );
+                    if (stolenBuff) (damageForAnimation.buffsStolen ??= []).push(stolenBuff);
                     if (rangeResponseUnit.isDead()) {
                         if (!unitIdsDied.includes(rangeResponseUnit.getId())) {
                             this.sceneLog.updateLog(`${rangeResponseUnit.getName()} died`);
