@@ -170,3 +170,31 @@ export function predictReplyResidual(
         return Math.max(0, Math.min(1, nativeMeans[i] + model.alpha * input[0]));
     });
 }
+
+/** Optional research abstention rule. An estimated gain is not a statistical or game-theoretic bound. */
+export function selectReplyResidualSwitch(
+    proposedIndex: number,
+    baselineIndex: number,
+    correctedMeans: readonly number[],
+    minimumSwitchGain?: number,
+): number {
+    if (minimumSwitchGain === undefined) return proposedIndex;
+    if (
+        !Number.isFinite(minimumSwitchGain) ||
+        minimumSwitchGain < 0 ||
+        minimumSwitchGain > 1 ||
+        !Number.isInteger(baselineIndex) ||
+        baselineIndex < 0 ||
+        baselineIndex >= correctedMeans.length ||
+        !Number.isInteger(proposedIndex) ||
+        proposedIndex < -1 ||
+        proposedIndex >= correctedMeans.length ||
+        correctedMeans.some((value) => !Number.isFinite(value) || value < 0 || value > 1)
+    )
+        throw new Error("Invalid reply residual switch evidence");
+    // Preserve uncovered proposals so the experiment's coverage gate can reject them.
+    if (proposedIndex < 0 || proposedIndex === baselineIndex) return proposedIndex;
+    return correctedMeans[proposedIndex] - correctedMeans[baselineIndex] >= minimumSwitchGain
+        ? proposedIndex
+        : baselineIndex;
+}

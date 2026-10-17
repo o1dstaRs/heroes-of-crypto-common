@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
     REPLY_RESIDUAL_FEATURE_NAMES,
     predictReplyResidual,
+    selectReplyResidualSwitch,
     validateReplyResidualModel,
     type IReplyResidualModel,
 } from "../../src/simulation/search_reply_residual";
@@ -18,6 +19,20 @@ function model(): IReplyResidualModel {
     };
 }
 describe("offline searched-reply correction", () => {
+    it("abstains from weak switches while preserving uncovered proposals for the coverage gate", () => {
+        expect(selectReplyResidualSwitch(1, 0, [0.5, 0.53], 0.05)).toBe(0);
+        expect(selectReplyResidualSwitch(1, 0, [0.5, 0.625], 0.125)).toBe(1);
+        expect(selectReplyResidualSwitch(1, 0, [0.5, 0.7], 0.05)).toBe(1);
+        expect(selectReplyResidualSwitch(0, 0, [0.5, 0.9], 0.05)).toBe(0);
+        expect(selectReplyResidualSwitch(-1, 0, [0.5, 0.9], 0.05)).toBe(-1);
+        // Manifests from earlier studies have no switch rule and retain their original chooser semantics.
+        expect(selectReplyResidualSwitch(1, 0, [0.9, 0.1])).toBe(1);
+        expect(selectReplyResidualSwitch(-1, 0, [0.9, 0.1])).toBe(-1);
+        expect(() => selectReplyResidualSwitch(1, 0, [0.5, 0.7], NaN)).toThrow();
+        expect(() => selectReplyResidualSwitch(1, 0, [0.5, 0.7], -0.1)).toThrow();
+        expect(() => selectReplyResidualSwitch(1, 0, [0.5, Infinity], 0.05)).toThrow();
+        expect(() => selectReplyResidualSwitch(2, 0, [0.5, 0.7], 0.05)).toThrow();
+    });
     it("keeps zero corrections and alpha-zero controls exact", () => {
         const m = model(),
             rows = Array.from({ length: 3 }, () => Array(width).fill(0)),

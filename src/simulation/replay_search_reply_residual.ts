@@ -19,6 +19,7 @@ import { SearchDriver } from "./search_driver";
 import {
     predictReplyResidual,
     replyResidualFeatures,
+    selectReplyResidualSwitch,
     validateReplyResidualModel,
     type IReplyResidualModel,
 } from "./search_reply_residual";
@@ -69,6 +70,7 @@ interface IVariant {
     id: string;
     file: string;
     model: IReplyResidualModel;
+    minimumSwitchGain?: number;
 }
 type Task = { seed: number; grid: number; output: string };
 const digest = (value: unknown) =>
@@ -170,7 +172,13 @@ function install(): void {
                     scope = active;
                 if (!scope.used || !scope.corrected)
                     throw new Error("Replay did not reach the intended scored selector");
-                const selected = row.catalog.findIndex((c) => signature(c.actions) === signature(result));
+                const proposedSelected = row.catalog.findIndex((c) => signature(c.actions) === signature(result));
+                const selected = selectReplyResidualSwitch(
+                    proposedSelected,
+                    native.selected,
+                    scope.corrected,
+                    variant.minimumSwitchGain,
+                );
                 const differenceMse =
                     teacher.means
                         .slice(1)
@@ -188,6 +196,8 @@ function install(): void {
                         ordinal,
                         variant: variant.id,
                         selected,
+                        proposedSelected,
+                        abstained: selected !== proposedSelected,
                         nativeSelected: native.selected,
                         nativeDifferenceMse,
                         differenceMse,
@@ -278,12 +288,19 @@ function loadInputs(dataset: string, manifest: string): void {
         if (byOrdinal.has(row.ordinal)) throw new Error("Duplicate dataset root");
         byOrdinal.set(row.ordinal, row);
     }
-    const list = JSON.parse(readFileSync(manifest, "utf8")) as { variants: { id: string; file: string }[] };
+    const list = JSON.parse(readFileSync(manifest, "utf8")) as {
+        variants: { id: string; file: string; minimumSwitchGain?: number }[];
+    };
     const summary = JSON.parse(readFileSync(dataset + ".summary.json", "utf8")) as { sourceCommit: string };
     variants = list.variants.map((item) => {
         const model = JSON.parse(readFileSync(resolve(dirname(manifest), item.file), "utf8")) as IReplyResidualModel;
         validateReplyResidualModel(model);
         if (model.sourceCommit !== summary.sourceCommit) throw new Error("Model and dataset source differ");
+        if (
+            item.minimumSwitchGain !== undefined &&
+            (!Number.isFinite(item.minimumSwitchGain) || item.minimumSwitchGain < 0 || item.minimumSwitchGain > 1)
+        )
+            throw new Error("Invalid reply residual minimum switch gain");
         return { ...item, model };
     });
     if (!variants.length || new Set(variants.map((x) => x.id)).size !== variants.length)
