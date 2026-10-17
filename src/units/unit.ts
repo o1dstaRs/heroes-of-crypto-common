@@ -56,6 +56,7 @@ import type { IWeightedRoute } from "../grid/path_definitions";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { fillEffectPowerPlaceholders, positionalPropertyCount } from "../spells/effect_description";
+import { notifyHelpingHandChange } from "../spells/helping_hand";
 import { Spell } from "../spells/spell";
 import { isMagicDamageAbility } from "../spells/spell_damage";
 import { recordEffectApplication, recordWaterShieldAbsorb } from "./effect_application_capture";
@@ -1021,6 +1022,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
+    public setHelpingHandLink(casterId: string, penaltyId: string): void {
+        this.unitProperties.helping_hand_caster_id = casterId;
+        this.unitProperties.helping_hand_penalty_id = penaltyId;
+    }
+    public clearHelpingHandLink(): void {
+        delete this.unitProperties.helping_hand_caster_id;
+        delete this.unitProperties.helping_hand_penalty_id;
+    }
     public deleteBuff(buffName: string): void {
         // Global aura refreshes probe several blessing names on every unit. Most are absent; avoid allocating
         // and filtering a replacement array for that no-op case. Do not return early: ranked mirrors may carry
@@ -1051,8 +1060,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
             }
         }
+        if (buffName === "Helping Hand") notifyHelpingHandChange(this);
     }
     public deleteAllBuffs(): void {
+        const hadHelpingHand = this.unitProperties.applied_buffs.includes("Helping Hand");
         this.buffs = [];
 
         if (
@@ -1070,6 +1081,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
             }
         }
+        if (hadHelpingHand) notifyHelpingHandChange(this);
     }
     public deleteDebuff(debuffName: string): void {
         this.debuffs = this.debuffs.filter((d) => d.getName() !== debuffName);
@@ -1088,8 +1100,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
             }
         }
+        if (debuffName === "Helping Hand") notifyHelpingHandChange(this);
     }
     public deleteAllDebuffs(): void {
+        const hadHelpingHand = this.unitProperties.applied_debuffs.includes("Helping Hand");
         this.debuffs = [];
 
         if (
@@ -1104,6 +1118,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.applied_debuffs_powers.splice(i, 1);
             }
         }
+        if (hadHelpingHand) notifyHelpingHandChange(this);
     }
     public minusLap(): void {
         const dismoraleDebuff = this.getDebuff("Dismorale");
@@ -1961,6 +1976,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     damage: damage.appliedDamage,
                     source: source && source.team !== this.getTeam() ? { ...source } : undefined,
                 };
+                notifyHelpingHandChange(this);
             }
             this.handleDamageAnimation(damage.animationDeaths);
 
@@ -3135,6 +3151,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.applied_buffs_laps.push(laps);
         this.unitProperties.applied_buffs_descriptions.push(description);
         this.unitProperties.applied_buffs_powers.push(power);
+        if (buffName === "Helping Hand") {
+            const { helping_hand_caster_id: casterId, helping_hand_penalty_id: penaltyId } = from.unitProperties;
+            if (casterId && penaltyId) this.setHelpingHandLink(casterId, penaltyId);
+        }
         recordEffectApplication({
             unitId: this.getId(),
             name: buffName,

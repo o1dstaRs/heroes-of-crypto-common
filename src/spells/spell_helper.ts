@@ -924,8 +924,8 @@ export function calculateBuffsDebuffsEffect(
             // Older snapshots stored Helping Hand with power 0 because its 30% lived only in this helper.
             // New casts carry the real (and possibly Tome-amplified) power on AppliedSpell.
             const powerMultiplier = (b.getPower() || 30) / 100;
-            baseStats.hp = Math.ceil(maxHp * powerMultiplier);
-            baseStats.armor = Math.ceil(baseArmor * powerMultiplier);
+            baseStats.hp += Math.ceil(maxHp * powerMultiplier);
+            baseStats.armor += Math.ceil(baseArmor * powerMultiplier);
             alreadyAppliedBuffs.push(b.getName());
         }
         if (b.getName() === "Luck Aura") {
@@ -954,8 +954,8 @@ export function calculateBuffsDebuffsEffect(
             }
 
             const powerMultiplier = (db.getPower() || 30) / 100;
-            baseStats.hp = -Math.ceil(maxHp * powerMultiplier);
-            baseStats.armor = -Math.ceil(baseArmor * powerMultiplier);
+            baseStats.hp -= Math.ceil(maxHp * powerMultiplier);
+            baseStats.armor -= Math.ceil(baseArmor * powerMultiplier);
             alreadyAppliedDebuffs.push(db.getName());
         }
     }

@@ -843,6 +843,7 @@ export class AttackHandler {
             }
 
             if (currentActiveSpell.isSelfDebuffApplicable()) {
+                const isHelpingHand = currentActiveSpell.getName() === "Helping Hand";
                 // effect can be absorbed
                 let debuffTarget = attackerUnit;
                 const absorptionTarget = EffectHelper.getAbsorptionTarget(
@@ -856,7 +857,9 @@ export class AttackHandler {
                 }
 
                 if (
-                    !SpellHelper.hasAlreadyAppliedSpell(debuffTarget, currentActiveSpell) &&
+                    !(isHelpingHand
+                        ? debuffTarget.hasDebuffActive("Helping Hand")
+                        : SpellHelper.hasAlreadyAppliedSpell(debuffTarget, currentActiveSpell)) &&
                     !(
                         currentActiveSpell.getPowerType() === SpellPowerType.MIND &&
                         debuffTarget.hasMindAttackResistance()
@@ -868,6 +871,9 @@ export class AttackHandler {
                         attackerUnit.getBaseArmor(),
                         true,
                     );
+                }
+                if (isHelpingHand && applied && targetUnit.hasBuffActive("Helping Hand")) {
+                    targetUnit.setHelpingHandLink(attackerUnit.getId(), debuffTarget.getId());
                 }
             }
 

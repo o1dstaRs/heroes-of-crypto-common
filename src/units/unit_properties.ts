@@ -118,6 +118,8 @@ export class UnitProperties {
     public applied_effects_stacks: number[];
     public applied_buffs_powers: number[];
     public applied_debuffs_powers: number[];
+    public helping_hand_caster_id?: string;
+    public helping_hand_penalty_id?: string;
     public aura_effects: string[];
     public aura_ranges: number[];
     public aura_is_buff: boolean[];

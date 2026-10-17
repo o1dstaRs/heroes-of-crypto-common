@@ -42,6 +42,7 @@ import {
 } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
+import { reconcileHelpingHandLinks, registerHelpingHandOwner } from "../spells/helping_hand";
 import { getDistance, type XY } from "../utils/math";
 import { type IUnitAIRepr, Unit } from "./unit";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -841,6 +842,7 @@ export class UnitsHolder {
         }
 
         const unitToDelete = this.allUnits.get(unitId);
+        this.refreshHelpingHandLinks(unitId);
         let considerResurrection = checkForResurrection && unitToDelete?.canSelfResurrect();
 
         if (considerResurrection) {
@@ -1170,7 +1172,28 @@ export class UnitsHolder {
             unit.trySeedWaterShield();
         }
     }
+    public refreshHelpingHandLinks(removedUnitId?: string): void {
+        const affected = reconcileHelpingHandLinks(this, removedUnitId);
+        if (!affected.length) return;
+        const fight = FightStateManager.getInstance().getFightProperties();
+        for (const unit of affected) {
+            if (unit.isDead()) continue;
+            const team = unit.getTeam();
+            unit.adjustBaseStats(
+                fight.hasFightStarted(),
+                fight.getCurrentLap(),
+                fight.getAdditionalAbilityPowerPerTeam(team),
+                fight.getAdditionalMovementStepsPerTeam(team),
+                fight.getAdditionalFlyArmorPerTeam(team),
+                fight.getAdditionalMoralePerTeam(team),
+                fight.getAdditionalLuckPerTeam(team),
+                fight.getStepsMoraleMultiplier(),
+            );
+            unit.increaseAttackMod(this.getUnitAuraAttackMod(unit));
+        }
+    }
     public refreshStackPowerForAllUnits(): void {
+        reconcileHelpingHandLinks(this);
         FightStateManager.getInstance()
             .getFightProperties()
             .setUnitsCalculatedStacksPower(this.gridSettings, this.allUnits);
@@ -1850,6 +1873,7 @@ export class UnitsHolder {
     }
     public addUnit(unit: Unit): void {
         this.allUnits.set(unit.getId(), unit);
+        registerHelpingHandOwner(unit, this);
     }
     public decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam: Record<string, number>): void {
         for (const unitNameKey of Object.keys(moraleDecreaseForTheUnitTeam)) {

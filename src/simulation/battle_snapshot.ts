@@ -257,6 +257,8 @@ const UNIT_MUTATION_METHODS = [
     "resetTarget",
     "setForbiddenTarget",
     "resetForbiddenTarget",
+    "setHelpingHandLink",
+    "clearHelpingHandLink",
     "applyEffect",
     "refreshPreTurnState",
     "deleteEffect",
