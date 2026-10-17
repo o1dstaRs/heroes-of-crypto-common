@@ -1,5 +1,17 @@
 import type { ICreatureInfo } from "./creature_score";
 
+export function lastFuseExecutionAccess(unit: ICreatureInfo): number {
+    if ((unit.ranged && unit.shots > 0) || unit.rangedSpellDamage) return 1;
+    if (!unit.melee || unit.maxDamage <= 0) return 0;
+    return Math.min(1, Math.max(0, unit.movementSteps ?? 4) / 6);
+}
+
+export function lastFuseVictimAvailability(enemies: readonly ICreatureInfo[]): number {
+    const slots = Math.max(5, enemies.length);
+    const available = enemies.reduce((sum, unit) => sum + (unit.abilities.includes("Resurrection") ? 0.5 : 1), 0);
+    return (available + slots - enemies.length) / slots;
+}
+
 /** Public identities only. Unrevealed slots retain the same neutral contact forecast as v2-v4. */
 export const lastFuseIncomingMeleeShare = (enemy: readonly ICreatureInfo[]): number => {
     const slots = Math.max(5, enemy.length);

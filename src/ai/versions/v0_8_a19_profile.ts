@@ -165,7 +165,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-estimates" as const,
         source: "src/ai/last_fuse_estimate.ts" as const,
-        sha256: "ea4cb6f02139d8d5416c0ed90a68427fab5b489d36e84180949817ee3100561d" as const,
+        sha256: "313d634f553880bb67cdea18f092c918eb72ce045e495c2822355f3c627f958b" as const,
     }),
     Object.freeze({
         role: "ranged-shields" as const,

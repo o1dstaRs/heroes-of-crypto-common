@@ -9,25 +9,33 @@ import {
 } from "./setup_conditional";
 import { TIER2_ARTIFACT_WINRATE, type ITier2ArtifactDecisionContext } from "./setup_strategy";
 import type { IResolvedSetupPolicy } from "./setup_ship";
-import { lastFuseDraftContact, lastFuseIncomingMeleeShare } from "./last_fuse_fit";
+import {
+    lastFuseDraftContact,
+    lastFuseIncomingMeleeShare,
+    lastFuseExecutionAccess,
+    lastFuseVictimAvailability,
+} from "./last_fuse_fit";
 
 export const ARTIFACT_FIT_SETUP_PREFIX = "artifact-fit-v1:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V2 = "artifact-fit-v2:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V3 = "artifact-fit-v3:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V4 = "artifact-fit-v4:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V5 = "artifact-fit-v5:";
-export type ArtifactFitVersion = 1 | 2 | 3 | 4 | 5;
+export const ARTIFACT_FIT_SETUP_PREFIX_V6 = "artifact-fit-v6:";
+export type ArtifactFitVersion = 1 | 2 | 3 | 4 | 5 | 6;
 
 export const artifactFitVersionForSetupSpec = (spec: string): ArtifactFitVersion =>
-    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V5)
-        ? 5
-        : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V4)
-          ? 4
-          : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3)
-            ? 3
-            : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
-              ? 2
-              : 1;
+    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V6)
+        ? 6
+        : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V5)
+          ? 5
+          : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V4)
+            ? 4
+            : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3)
+              ? 3
+              : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
+                ? 2
+                : 1;
 
 const roster = (ids: readonly number[]): ICreatureInfo[] =>
     [...new Set(ids)].flatMap((id) => {
@@ -234,6 +242,22 @@ export function tier2ArtifactFitScoreV5(
     );
 }
 
+export function tier2ArtifactFitScoreV6(
+    id: number,
+    ownIds: readonly number[],
+    context?: Readonly<ITier2ArtifactDecisionContext>,
+): number {
+    if (id !== Tier2Artifact.LAST_FUSE) return tier2ArtifactFitScoreV5(id, ownIds, context);
+    const own = roster(ownIds);
+    if (!own.length) return 50;
+    return (
+        40 +
+        ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER *
+            average(own, lastFuseExecutionAccess) *
+            lastFuseVictimAvailability(roster(context?.publicOpponentCreatureIds ?? []))
+    );
+}
+
 function tier2ArtifactFitScoreWithMagicPressure(
     id: number,
     ownIds: readonly number[],
@@ -344,15 +368,17 @@ export function withArtifactFitSetupPolicy(
     version: ArtifactFitVersion = 1,
 ): IResolvedSetupPolicy {
     const prefix =
-        version === 5
-            ? ARTIFACT_FIT_SETUP_PREFIX_V5
-            : version === 4
-              ? ARTIFACT_FIT_SETUP_PREFIX_V4
-              : version === 1
-                ? ARTIFACT_FIT_SETUP_PREFIX
-                : version === 2
-                  ? ARTIFACT_FIT_SETUP_PREFIX_V2
-                  : ARTIFACT_FIT_SETUP_PREFIX_V3;
+        version === 6
+            ? ARTIFACT_FIT_SETUP_PREFIX_V6
+            : version === 5
+              ? ARTIFACT_FIT_SETUP_PREFIX_V5
+              : version === 4
+                ? ARTIFACT_FIT_SETUP_PREFIX_V4
+                : version === 1
+                  ? ARTIFACT_FIT_SETUP_PREFIX
+                  : version === 2
+                    ? ARTIFACT_FIT_SETUP_PREFIX_V2
+                    : ARTIFACT_FIT_SETUP_PREFIX_V3;
     if (base.spec.startsWith(prefix)) return base;
     return Object.freeze({
         ...base,
@@ -392,7 +418,9 @@ export function withArtifactFitSetupPolicy(
                             ? tier2ArtifactFitScoreV3
                             : version === 4
                               ? tier2ArtifactFitScoreV4
-                              : tier2ArtifactFitScoreV5
+                              : version === 5
+                                ? tier2ArtifactFitScoreV5
+                                : tier2ArtifactFitScoreV6
                 )(id, ownIds, context);
                 if (score > bestScore) {
                     best = id;

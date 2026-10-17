@@ -224,7 +224,10 @@ export function prioritizeV08SplashRangedDecision(
 ): GameAction[] {
     const throughShotLine = unit.hasAbilityActive("Through Shot") && throughShotLineEnabled(unit);
     if (
-        (!unit.hasAbilityActive("Area Throw") && !unit.hasAbilityActive("Large Caliber") && !throughShotLine) ||
+        (!unit.hasAbilityActive("Area Throw") &&
+            !unit.hasAbilityActive("Large Caliber") &&
+            !throughShotLine &&
+            !unit.hasBuffActive("Last Fuse")) ||
         !isV08SplashRangedDecision(decision)
     ) {
         return decision;

@@ -11,7 +11,7 @@
 
 import { Tier1Artifact, Tier2Artifact } from "../../artifacts/artifact_properties";
 import type { ArtifactFitVersion } from "./artifact_fit";
-import { lastFuseDraftContact, lastFuseIncomingMeleeShare } from "./last_fuse_fit";
+import { lastFuseDraftContact, lastFuseIncomingMeleeShare, lastFuseExecutionAccess } from "./last_fuse_fit";
 import {
     backlineProtectionBeneficiaryCount,
     creatureInfo,
@@ -139,6 +139,10 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
             else if (info.melee && (info.movementSteps ?? 4) >= 6) affinity += 0.15;
             break;
         case Tier2Artifact.LAST_FUSE:
+            if ((context.artifactFitVersion ?? 1) >= 6) {
+                affinity += 0.35 * lastFuseExecutionAccess(info);
+                break;
+            }
             if ((context.artifactFitVersion ?? 1) >= 5) {
                 const enemies = [...new Set(context.knownOpponentCreatureIds ?? [])].flatMap((id) => {
                     const enemy = creatureInfo(id);

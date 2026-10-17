@@ -72,7 +72,7 @@ for (const shield of ["target", "neighbor"] as const) {
     });
 }
 
-test("resurrection prevents the explosion and chains are left to engine search", () => {
+test("resurrection prevents the explosion while ordinary chains are projected", () => {
     const resurrected = lastFuseBoard({
         target: { amountAlive: 2, abilities: ["Resurrection"], spells: [":Resurrection"] },
     });
@@ -87,8 +87,9 @@ test("resurrection prevents the explosion and chains are left to engine search",
     ).toBe(0);
     const chain = lastFuseBoard({ neighbor: { maxHp: 10 } });
     expect(
-        estimateLastFuseMeleeDamage(chain.attacker, chain.target, chain.context, chain.stand, chain.actions),
-    ).toBeUndefined();
+        estimateLastFuseMeleeDamage(chain.attacker, chain.target, chain.context, chain.stand, chain.actions)
+            ?.expectedNetDamage,
+    ).toBe(110);
     expect(chain.fire().result.events.filter((event) => event.type === "pyre_exploded")).toHaveLength(2);
 });
 
