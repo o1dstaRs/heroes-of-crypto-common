@@ -21,15 +21,33 @@ Multiple agents run on this repo **at the same time**. Rules:
   peer's in-progress tsc errors) rather than blocking on a shared `tsc`.
 
 ## Sync with the remote before pushing, opening a PR, or deploying
-Bring the branch you are standing on up to date with its remote **first** — `git fetch <remote> && git pull
---rebase <remote> <branch>` — before pushing, before opening or updating a PR, and before any deploy. Peers
-push continuously, so "it was current when I started" is never true by the time you finish.
 
-- **Resolve conflicts per HUNK, not per file.** `git checkout --theirs <file>` replaces the *entire* file and
-  silently drops your unrelated edits elsewhere in it. Prefer `git merge -X theirs` / `-X ours`, which decide
-  only the *conflicting* hunks and keep both sides' untouched work, or edit the markers by hand. Then verify
-  both sides survived by grepping for a symbol from each — do not assume the merge kept them.
-- **This package is consumed by pinned commit.** After pushing here, the client's submodule pointer and the
-  server's `package.json` + `bun.lock` pins must be advanced to match, or those repos keep building against
-  the old engine while their code expects the new one — which compiles and type-checks, then fails at runtime
-  on a name the pinned engine does not have.
+Before you push, before you open **or update** a PR, and before **any** deploy, bring the branch you are
+standing on up to date with its remote:
+
+```bash
+git fetch <remote>                       # check `git remote -v`; normally origin
+git -c rebase.autoStash=false pull --rebase -X ours <remote> <branch> # the branch you are ON, not always main
+```
+
+Peers push continuously, so "it was current when I started" is never true by the time you finish.
+
+**Remote changes take precedence in conflicting hunks.** During a rebase, `ours` is the upstream-based
+history and `theirs` is the local commit being replayed, so use `--rebase -X ours`. For an ordinary merge
+of the remote branch, the corresponding option is `-X theirs`. Preserve nonconflicting local work; never
+replace whole files with `git checkout --ours/--theirs`, or use the whole-tree `-s ours` strategy. Resolve
+any remaining conflicts per hunk with the remote intent taking precedence, then verify both the remote
+change and unrelated local changes survived. Never stash a peer's edits to make the pull succeed.
+
+**Deployment must enforce freshness across common, client, and server.** Sync before validation and
+building. Record the branches and commits being built; fetch those same remote branches again immediately
+before each upload. If a checkout, upstream, or remote commit changed, stop and rebuild from newly synced
+checkouts. Never rebase after a build and upload the older output. Deploy only clean, published commits
+through the guarded client/server deploy commands; manual rsync must not bypass them.
+
+**This package is consumed by pinned commit.** After pushing here, the client's submodule pointer and the
+server's `package.json` + `bun.lock` pins must be advanced to match, or those repos keep building against
+the old engine while their code expects the new one. Re-check all three pins after every rebase or merge,
+including the actual common checkout: the client's `ignore = all` submodule setting hides pin drift from
+normal `git status`. Commit the server manifest and regenerated lockfile together, reinstall its dependency,
+then rerun the affected checks before deploying.
