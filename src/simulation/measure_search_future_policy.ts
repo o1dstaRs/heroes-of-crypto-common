@@ -11,6 +11,8 @@
  *
  * bun src/simulation/measure_search_future_policy.ts [games=8] [seed=14440000] [workers=8] [rollouts=16] [output]
  * FUTURE_POLICY_DISABLED=1 records control trajectories without counterfactual scoring.
+ * FUTURE_POLICY_REPLY_DATASET=1 adds independent live-seed native R4 inputs and public features,
+ * sampling the first covered contested root per team within laps 1-2 (at most two positions/game).
  * Imports are inert; instrumentation is confined to this CLI's dedicated diagnostic workers.
  */
 import { createHash } from "node:crypto";
