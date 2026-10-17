@@ -145,7 +145,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for primary-only Last Fuse trades and their complete score comparison.
-        sha256: "b17dd60c3a1de2144c66590ec12ce4bbbe0df5705a751aa2435b3e24f7187934" as const,
+        sha256: "dd6a61936b2377278f6dad3d5d46dd36a55270ece4213aff16ffff90fb49c727" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
@@ -175,7 +175,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "selection-bounds" as const,
         source: "src/simulation/search_selection_bounds.ts" as const,
-        sha256: "74943cac7cc84fc3d7736805bad4fb621b73b9e00ebd0e4906f093a7c541794c" as const,
+        sha256: "fadc8e59acdacd3d2cd9d4ea81d8a443d704dbfaa9c0fafed1f684a00d3a2d26" as const,
     }),
     Object.freeze({
         role: "rollout-allocation" as const,
