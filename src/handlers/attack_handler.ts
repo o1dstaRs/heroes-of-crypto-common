@@ -1997,7 +1997,12 @@ export class AttackHandler {
                 );
                 // A landed shot copies one active buff; the target keeps the original.
                 if (!splashLanded) {
-                    const stolenBuff = AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                    const stolenBuff = AllAbilities.processBorrowedGraceAbility(
+                        attackerUnit,
+                        targetUnit,
+                        this.sceneLog,
+                        attackerUnit,
+                    );
                     if (stolenBuff) (damageForAnimation.buffsStolen ??= []).push(stolenBuff);
                 }
             }

@@ -430,7 +430,14 @@ describe("Absolving Arrow", () => {
         expect(result.completed).toBe(true);
         expect(damage.buffsStolen).toEqual([{ thiefId: monk.getId(), targetId: enemy.getId(), buffName: "Blessing" }]);
         expect(damage.absolutions).toEqual([
-            { sourceUnitId: monk.getId(), unitId: ally.getId(), liftedNames: ["Stun"], position: ally.getPosition(), response: false, hitIndex: 0 },
+            {
+                sourceUnitId: monk.getId(),
+                unitId: ally.getId(),
+                liftedNames: ["Stun"],
+                position: ally.getPosition(),
+                response: false,
+                hitIndex: 0,
+            },
         ]);
         expect(enemy.isDead()).toBe(false);
         // Absolving Arrow cleansed the ally the arrow crossed...
