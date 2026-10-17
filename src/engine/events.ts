@@ -276,6 +276,7 @@ export type GameEvent =
     | {
           type: "pyre_exploded";
           unitId: string;
+          sourceUnitId?: string;
           position: XY;
           hits: { unitId: string; position: XY; amount: number; unitsDied: number }[];
       }

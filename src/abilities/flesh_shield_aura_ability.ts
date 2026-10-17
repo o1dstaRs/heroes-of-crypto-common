@@ -21,6 +21,8 @@ import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 
+import { lastFuseSourceFor } from "./last_fuse_ability";
+
 export interface IFleshShieldResult {
     remainingDamage: number;
     absorbedDamage: number;
@@ -203,7 +205,14 @@ export function processFleshShieldAura(
     const positionAtImpact = { ...absorberUnit.getPosition() };
     const amountAliveBefore = absorberUnit.getAmountAlive();
     // 0 break chance: this is a share of one hit, and that hit already rolled Break on the unit it struck.
-    const damageDealt = absorberUnit.applyDamage(absorbedRecalculated, 0, sceneLog);
+    const damageDealt = absorberUnit.applyDamage(
+        absorbedRecalculated,
+        0,
+        sceneLog,
+        false,
+        undefined,
+        lastFuseSourceFor(attackerUnit),
+    );
     result.absorbedDamage = damageDealt;
     damageStatisticHolder.add({
         unitName: attackerUnit.getName(),

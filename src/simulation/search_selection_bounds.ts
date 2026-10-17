@@ -14,6 +14,21 @@ export interface ISearchSelectionBoundPlan {
     readonly protectedIndices: ReadonlySet<number>;
     /** Until these preferences are proven legal, an unscored combat action might become their fallback. */
     readonly preferredIndices: ReadonlySet<number>;
+    /** Optional exact-selector window. Absent plans retain the historical gate/arbitration margin. */
+    readonly tailMargin?: number;
+}
+
+/** Nonnegative leaves have at most O(R epsilon) accumulation error; never prune a floating-point tie. */
+export function exactSelectionTailMargin(rolloutCount: number, nearTieMargin: number): number {
+    if (
+        !Number.isSafeInteger(rolloutCount) ||
+        rolloutCount < 1 ||
+        !Number.isFinite(nearTieMargin) ||
+        nearTieMargin < 0 ||
+        nearTieMargin > 1
+    )
+        throw new Error("Invalid exact selection margin");
+    return nearTieMargin + 4 * rolloutCount * Number.EPSILON;
 }
 
 /** Decision-local proof state. It never changes candidate order, seeds, or a completed candidate's mean. */
@@ -26,6 +41,12 @@ export class SearchSelectionBounds {
         }
         if (plan.pools.some((pool) => !Number.isSafeInteger(pool) || pool < 0 || pool > 7)) {
             throw new Error("Search selection bound pools must be integers from 0 to 7");
+        }
+        if (
+            plan.tailMargin !== undefined &&
+            (!Number.isFinite(plan.tailMargin) || plan.tailMargin < 0 || plan.tailMargin > 1)
+        ) {
+            throw new Error("Search selection bound plan has an invalid tail margin");
         }
         for (const index of [...plan.protectedIndices, ...plan.preferredIndices]) {
             if (!Number.isSafeInteger(index) || index < 0 || index >= plan.pools.length) {

@@ -45,7 +45,7 @@ import {
     isSpellUsableByCaster,
 } from "../spells/spell_helper";
 import type { Spell } from "../spells/spell";
-import { spellDamageAgainstUnit, spellRawDamage } from "../spells/spell_cast_projection";
+import { projectSpellDamageAgainstUnit, spellRawDamage } from "../spells/spell_cast_projection";
 import { isOffensiveSpellMultiplier } from "../spells/spell_damage";
 import {
     FIRE_WALL_ORIENTATIONS,
@@ -62,11 +62,13 @@ import type { IDecisionContext } from "./ai_strategy";
 import { decisionFireWalls } from "./decision_fight_state";
 import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
+import { estimateShieldedRangedDamage } from "./ranged_shield_estimate";
 import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
 import { lastFuseCounterTradePotential } from "./last_fuse_tactics";
 import {
     estimateLastFuseMeleeDamage,
     estimateLastFuseRangedDamage,
+    estimateLastFuseSpellDamage,
     type ILastFuseMeleeEstimate,
 } from "./last_fuse_estimate";
 
@@ -321,11 +323,11 @@ function evaluatePreparedRangeCandidateDamage(
             ? estimateLastFuseRangedDamage(unit, onlyTarget, context, evaluation.rangeAttackDivisors[0] ?? 1)
             : undefined;
     if (onlyTarget && fuse) {
-        const directDamage = fuse.expectedNetDamage + fuse.expectedFriendlyDamage;
+        const directDamage = fuse.expectedPrimaryDamage ?? fuse.expectedNetDamage + fuse.expectedFriendlyDamage;
         return {
             value: fuse.expectedNetDamage,
             kill: onlyTarget.getId() === primaryTargetId && fuse.secureKill ? 1 : 0,
-            enemyDamage: directDamage,
+            enemyDamage: fuse.expectedNetDamage + fuse.expectedFriendlyDamage,
             friendlyFireDamage: fuse.expectedFriendlyDamage,
             primaryTargetDamage: onlyTarget.getId() === primaryTargetId ? directDamage : 0,
             aimTargetDamage: onlyTarget.getId() === aimTargetId ? directDamage : 0,
@@ -480,6 +482,18 @@ function evaluatePreparedRangeCandidateDamage(
                             (Math.min(first + second + firstConditionalDamage, hp) - Math.min(first + second, hp));
                     }
                 }
+            }
+            if (target.willWaterShieldAbsorb(unit)) {
+                effective = estimateShieldedRangedDamage(unit, ammunitionTarget, {
+                    hp,
+                    hitChance,
+                    firstDamage: firstConditionalDamage,
+                    secondDamage: secondConditionalDamage,
+                    nativeSecondVolley: prepared.secondVolleyMultiplier > 0,
+                    echoChance: prepared.bonusVolleyChance,
+                    spendsOnHitOnly: prepared.shotCostOnHitOnly,
+                    throughShot: prepared.isThroughShot,
+                });
             }
             if (targetTeam === prepared.enemyTeam) {
                 value += effective;
@@ -1501,7 +1515,7 @@ class CandidateGenerator {
         const pair = (target: IMeleeTarget, cell: XY, route?: IReadonlyWeightedRoute): IMeleePair => {
             target.damage ??= this.meleeDamage(target.unit);
             let fuse: ILastFuseMeleeEstimate | undefined;
-            if (target.unit.hasBuffActive("Last Fuse")) {
+            if (this.unit.hasBuffActive("Last Fuse")) {
                 const moved = !!route && (cell.x !== base.x || cell.y !== base.y);
                 const cacheable = invariantFuseDamage && !route?.hasLavaCell && !route?.hasWaterCell;
                 if (cacheable && target.fuseByMove?.has(moved)) fuse = target.fuseByMove.get(moved);
@@ -3160,9 +3174,9 @@ class CandidateGenerator {
      * stack-powered Magic Dragon damage.
      */
     private offensiveSpellDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
-        const rawDamage = spellDamageAgainstUnit(spell, spellRawDamage(spell, this.unit), target);
+        const damage = projectSpellDamageAgainstUnit({ spell, caster: this.unit, target }).damage;
         const targetHp = target.getCumulativeHp();
-        return { value: Math.min(rawDamage, targetHp), kill: rawDamage >= targetHp ? 1 : 0 };
+        return { value: Math.min(damage, targetHp), kill: damage >= targetHp ? 1 : 0 };
     }
     /**
      * Ring of Fire spares the enemy it is aimed at and burns every other living stack touching that enemy's
@@ -3309,7 +3323,12 @@ class CandidateGenerator {
                             if (unit.getTeam() === this.unit.getTeam() || unit.isDead()) {
                                 continue;
                             }
-                            const dealt = spellDamageAgainstUnit(spell, rawDamage, unit);
+                            const dealt = projectSpellDamageAgainstUnit({
+                                spell,
+                                caster: this.unit,
+                                target: unit,
+                                rawDamage,
+                            }).damage;
                             const hp = unit.getCumulativeHp();
                             value += Math.min(dealt, hp);
                             if (dealt >= hp) {
@@ -3473,7 +3492,10 @@ class CandidateGenerator {
                                 });
                                 continue;
                             }
-                            const damage = this.offensiveSpellDamage(spell, enemy);
+                            const fuse = estimateLastFuseSpellDamage(this.unit, enemy, spell, this.context);
+                            const damage = fuse
+                                ? { value: fuse.expectedNetDamage, kill: Number(fuse.secureKill) as 0 | 1 }
+                                : this.offensiveSpellDamage(spell, enemy);
                             this.pushSpell(spell, enemy.getId(), undefined, {
                                 expectedDamage: damage.value,
                                 expectedKill: damage.kill,

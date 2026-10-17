@@ -25,6 +25,7 @@ import type { ISecondaryDamage } from "../scene/animations";
 import { applyMagicMirrorDamage } from "../spells/magic_mirror_damage";
 import { elementalSpellMultiplier } from "../spells/spell_damage";
 import { SpellElement } from "../spells/spell_properties";
+import { lastFuseSourceFor } from "./last_fuse_ability";
 
 interface ILayerImpact {
     cells: HoCMath.XY[];
@@ -135,7 +136,14 @@ function attackEnemiesAndGetLayerImpact(
             // every arc of Chain Lightning is magical, so a protected bounce target keeps the whole jolt.
             const e1AmountBefore = e1.getAmountAlive();
             const positionAtImpact = { ...e1.getPosition() };
-            const damageDealt = e1.applyDamage(targetEnemyLightningDamage, 0 /* magic attack */, sceneLog);
+            const damageDealt = e1.applyDamage(
+                targetEnemyLightningDamage,
+                0,
+                sceneLog,
+                false,
+                undefined,
+                lastFuseSourceFor(fromUnit),
+            );
             damageStatisticHolder.add({
                 unitName: fromUnit.getName(),
                 damage: damageDealt,
@@ -233,7 +241,14 @@ export function processChainLightningAbility(
         // Flesh Shield is physical-only, so this magical jolt is never redirected to a nearby Abomination.
         const targetAmountBefore = targetUnit.getAmountAlive();
         const targetPositionAtImpact = { ...targetUnit.getPosition() };
-        const damageDealt = targetUnit.applyDamage(targetEnemyLightningDamage, 0 /* magic attack */, sceneLog);
+        const damageDealt = targetUnit.applyDamage(
+            targetEnemyLightningDamage,
+            0,
+            sceneLog,
+            false,
+            undefined,
+            lastFuseSourceFor(fromUnit),
+        );
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             damage: damageDealt,

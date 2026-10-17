@@ -19,7 +19,11 @@ import {
 } from "../ai/versions/v0_8_a19_material_arbitration";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
-import { SearchSelectionBounds, type ISearchSelectionBoundPlan } from "./search_selection_bounds";
+import {
+    exactSelectionTailMargin,
+    SearchSelectionBounds,
+    type ISearchSelectionBoundPlan,
+} from "./search_selection_bounds";
 import {
     parseSearchRolloutAllocation,
     selectSearchRolloutSurvivors,
@@ -64,7 +68,10 @@ import {
     selectV08A19ScoredCandidateIndex,
     V08_A19_SCORED_ARBITRATION_POLICY,
 } from "../ai/versions/v0_8_a19_scored_arbitration";
-import { applyV08FlyerBacklinePriority } from "../ai/versions/v0_8_flyer_backline_priority";
+import {
+    applyV08FlyerBacklinePriority,
+    isV08FlyerBacklinePriorityOn,
+} from "../ai/versions/v0_8_flyer_backline_priority";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
 import {
     reserveV08ReplayLeafChallenger,
@@ -1454,6 +1461,7 @@ export class SearchDriver {
     private readonly researchHorizonMinRangedTypes: number | null;
     private readonly rollouts: number;
     private readonly certifiedSelectionBounds: boolean;
+    private readonly certifiedTightBounds: boolean;
     private readonly rolloutAllocation: SearchRolloutAllocation;
     private readonly includeMoves: boolean;
     private readonly maxMoveShotComposites: number;
@@ -1764,6 +1772,11 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_CERTIFIED_SELECTION_BOUNDS must be 0 or 1");
         }
         this.certifiedSelectionBounds = rawCertifiedBounds === "1";
+        const rawTightBounds = searchEnv("SEARCH_A19_CERTIFIED_TIGHT_BOUNDS");
+        if (rawTightBounds !== undefined && rawTightBounds !== "0" && rawTightBounds !== "1") {
+            throw new Error("SEARCH_A19_CERTIFIED_TIGHT_BOUNDS must be 0 or 1");
+        }
+        this.certifiedTightBounds = rawTightBounds === "1";
         this.rolloutAllocation = parseSearchRolloutAllocation(searchEnv("SEARCH_A19_ROLLOUT_ALLOCATION"));
         this.includeMoves = searchEnv("SEARCH_INCLUDE_MOVES") === "1";
         const rawMaxMoveShots = searchEnv("SEARCH_MAX_MOVE_SHOTS");
@@ -5219,6 +5232,21 @@ export class SearchDriver {
             });
         }
         return {
+            // All pool maxima, native/preferred actions and exact material ties remain complete. Their
+            // gates/arbitration therefore need no loser-margin allowance. Replay near-ties still do.
+            // Reserved Last Fuse trades can be conditionally added outside these pools; keep that path
+            // on its historical margin. The flyer postprocessor can also choose a non-maximal score
+            // before final arbitration, so any enabled seat retains the historical margin globally.
+            tailMargin:
+                this.certifiedTightBounds &&
+                !isV08FlyerBacklinePriorityOn(PBTypes.TeamVals.LEFT) &&
+                !isV08FlyerBacklinePriorityOn(PBTypes.TeamVals.RIGHT) &&
+                !(
+                    this.a19LastFusePrimaryTrades &&
+                    candidates.some((candidate) => candidate.lastFuseCounterTradeReserved)
+                )
+                    ? Math.min(1, this.rankedReplayTiebreakEpsilon)
+                    : undefined,
             pools: candidates.map(
                 (candidate) =>
                     Number((productive || dominant || urgent) && isForceTierProductiveCandidate(candidate)) |
@@ -5374,7 +5402,11 @@ export class SearchDriver {
                 : undefined;
         let leafOutsideUnitInterval = false;
         let bestFinishedMean = Number.NEGATIVE_INFINITY;
-        const margin = boundTails ? this.hopelessTailMargin() : 0;
+        const margin = boundTails
+            ? typeof boundHopelessTails === "object" && boundHopelessTails.tailMargin !== undefined
+                ? exactSelectionTailMargin(rolloutCount, boundHopelessTails.tailMargin)
+                : this.hopelessTailMargin()
+            : 0;
         const materials: number[] = [];
         const actingTeam = captureMaterial ? unit.getTeam() : undefined;
         for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {

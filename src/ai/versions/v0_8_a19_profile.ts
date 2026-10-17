@@ -145,7 +145,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for primary-only Last Fuse trades and their complete score comparison.
-        sha256: "b17dd60c3a1de2144c66590ec12ce4bbbe0df5705a751aa2435b3e24f7187934" as const,
+        sha256: "dd6a61936b2377278f6dad3d5d46dd36a55270ece4213aff16ffff90fb49c727" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
@@ -155,17 +155,27 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-trades" as const,
         source: "src/ai/last_fuse_tactics.ts" as const,
-        sha256: "2fce3ba10254c33c02dd74830ca481f4426d71ee889c0a449cf02bdd5ead51e8" as const,
+        sha256: "26439e470c9e119220dc75654127097abda530772a2147eb98cea6727152cd09" as const,
     }),
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        sha256: "9e2475d100f3278cb0ca56733668477969c69f461976fc8a5719b53e1ad204c1" as const,
+        sha256: "2a44b767828ff6aecab76247eae9ddd93e72025d4bbee250f1ebfa542bbf3dfd" as const,
+    }),
+    Object.freeze({
+        role: "last-fuse-estimates" as const,
+        source: "src/ai/last_fuse_estimate.ts" as const,
+        sha256: "ea4cb6f02139d8d5416c0ed90a68427fab5b489d36e84180949817ee3100561d" as const,
+    }),
+    Object.freeze({
+        role: "ranged-shields" as const,
+        source: "src/ai/ranged_shield_estimate.ts" as const,
+        sha256: "2c7b63f0ba3460fd4a877bdc9144878539884a18ae007e9e085cb98b5b8ade0d" as const,
     }),
     Object.freeze({
         role: "selection-bounds" as const,
         source: "src/simulation/search_selection_bounds.ts" as const,
-        sha256: "74943cac7cc84fc3d7736805bad4fb621b73b9e00ebd0e4906f093a7c541794c" as const,
+        sha256: "fadc8e59acdacd3d2cd9d4ea81d8a443d704dbfaa9c0fafed1f684a00d3a2d26" as const,
     }),
     Object.freeze({
         role: "rollout-allocation" as const,

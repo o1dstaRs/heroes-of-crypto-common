@@ -1,10 +1,28 @@
 import { ARTIFACT_POWER } from "../artifacts/artifact_properties";
+import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import type { Unit } from "../units/unit";
 import type { UnitsHolder } from "../units/units_holder";
 import type { XY } from "../utils/math";
 
 export const LAST_FUSE_BUFF = "Last Fuse";
+
+export interface ILastFuseSource {
+    unitId: string;
+    team: TeamType;
+    percent: number;
+    stackPower: number;
+}
+
+export function lastFuseSourceFor(unit: Unit | undefined): ILastFuseSource | undefined {
+    if (!unit?.hasBuffActive(LAST_FUSE_BUFF)) return undefined;
+    return {
+        unitId: unit.getId(),
+        team: unit.getTeam(),
+        percent: unit.getBuffPower(LAST_FUSE_BUFF) ?? ARTIFACT_POWER.LAST_FUSE_PERCENT,
+        stackPower: unit.getStackPower(),
+    };
+}
 
 export interface IPyreHit {
     unitId: string;
@@ -15,6 +33,7 @@ export interface IPyreHit {
 
 export interface IPyreExplosion {
     unitId: string;
+    sourceUnitId: string;
     position: XY;
     hits: IPyreHit[];
     unitIdsDied: string[];
@@ -22,18 +41,18 @@ export interface IPyreExplosion {
 
 export function lastFuseDamage(
     damageDealt: number,
-    stackPower: number,
+    attackerStackPower: number,
     percent: number = ARTIFACT_POWER.LAST_FUSE_PERCENT,
 ): number {
     return Math.max(
-        Math.max(0, stackPower) * ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER,
+        Math.max(0, attackerStackPower) * ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER,
         Math.round((Math.max(0, damageDealt) * percent) / 100),
     );
 }
 
-// Call only after the stack was actually removed. A resurrection keeps the body and must not burst.
 export function explodeLastFuse(unit: Unit, unitsHolder: UnitsHolder, sceneLog: ISceneLog): IPyreExplosion | undefined {
-    if (!unit.isDead() || !unit.hasBuffActive(LAST_FUSE_BUFF)) {
+    const source = unit.getLastFuseKillSource();
+    if (!unit.isDead() || !source || unit.getTeam() === source.team) {
         return undefined;
     }
     const damage = unit.getLastFuseDamage();
@@ -43,14 +62,15 @@ export function explodeLastFuse(unit: Unit, unitsHolder: UnitsHolder, sceneLog: 
 
     const hits: IPyreHit[] = [];
     const unitIdsDied: string[] = [];
+    const blastCells = new Set(unitsHolder.cellsAroundUnit(unit, false).map(({ x, y }) => `${x}:${y}`));
     sceneLog.updateLog(`${unit.getName()} explodes`);
-    for (const enemy of unitsHolder.allEnemiesAroundUnit(unit, false)) {
-        if (enemy.isDead()) {
+    for (const enemy of unitsHolder.getAllEnemyUnits(source.team)) {
+        if (enemy.isDead() || !enemy.getCells().some(({ x, y }) => blastCells.has(`${x}:${y}`))) {
             continue;
         }
         const aliveBefore = enemy.getAmountAlive();
         const position = { ...enemy.getPosition() };
-        const dealt = enemy.applyDamage(damage, 0, sceneLog, false);
+        const dealt = enemy.applyDamage(damage, 0, sceneLog, false, undefined, source);
         if (dealt <= 0) {
             continue;
         }
@@ -64,6 +84,7 @@ export function explodeLastFuse(unit: Unit, unitsHolder: UnitsHolder, sceneLog: 
 
     return {
         unitId: unit.getId(),
+        sourceUnitId: source.unitId,
         position: { ...unit.getPosition() },
         hits,
         unitIdsDied,
