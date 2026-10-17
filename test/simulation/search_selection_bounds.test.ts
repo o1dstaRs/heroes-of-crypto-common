@@ -18,13 +18,22 @@ describe("selection-aware rollout bounds", () => {
         const margin = exactSelectionTailMargin(4, 0);
         expect(margin).toBeGreaterThan(0);
         expect(margin).toBeLessThan(1e-12);
-        expect(exactSelectionTailMargin(4, 0.02)).toBe(0.02);
+        expect(exactSelectionTailMargin(4, 0.02)).toBeGreaterThan(0.02);
         expect(remainingRolloutsCannotWin(0.99999, 1, 4, 1, margin)).toBe(true);
         expect(remainingRolloutsCannotWin(0.99999, 1, 4, 1, 0.03)).toBe(false);
         expect(remainingRolloutsCannotWin(1, 1, 4, 1, margin)).toBe(false);
         expect(remainingRolloutsCannotWin(1 - Number.EPSILON, 1, 4, 1, margin)).toBe(false);
         expect(() => exactSelectionTailMargin(0, 0)).toThrow();
         expect(() => exactSelectionTailMargin(4, NaN)).toThrow();
+    });
+    it("adds rounding headroom to a nonzero window at a double-rounding boundary", () => {
+        const sum = 0.13395542217235662;
+        const fullMean = (sum + 1 + 1) / 4;
+        const reference = fullMean + 0.125;
+        expect(reference - fullMean).toBe(0.125);
+        // Grouping the two remaining ones into one addition rounds the upper bound down by one ULP.
+        expect(remainingRolloutsCannotWin(sum, 2, 4, reference, 0.125)).toBe(true);
+        expect(remainingRolloutsCannotWin(sum, 2, 4, reference, exactSelectionTailMargin(4, 0.125))).toBe(false);
     });
 
     it("enables tighter margins only in the explicit certified offline plan", () => {

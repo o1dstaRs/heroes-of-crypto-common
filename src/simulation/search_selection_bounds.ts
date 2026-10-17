@@ -28,7 +28,7 @@ export function exactSelectionTailMargin(rolloutCount: number, nearTieMargin: nu
         nearTieMargin > 1
     )
         throw new Error("Invalid exact selection margin");
-    return Math.max(nearTieMargin, 4 * rolloutCount * Number.EPSILON);
+    return nearTieMargin + 4 * rolloutCount * Number.EPSILON;
 }
 
 /** Decision-local proof state. It never changes candidate order, seeds, or a completed candidate's mean. */
