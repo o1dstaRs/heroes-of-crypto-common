@@ -12,6 +12,7 @@ const unqualified = [
     "src/ai/versions/v0_8_screen_hold.ts",
     "src/ai/versions/v0_8_stable_screen_placement.ts",
     "src/ai/barrel_cover_guard.ts",
+    "src/ai/barrel_cemetery_guard.ts",
     "src/ai/barrel_caster_cover.ts",
     "src/ai/barrel_landing_cover.ts",
     "src/simulation/barrel_deployment_research.ts",

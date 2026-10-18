@@ -142,3 +142,85 @@ or promotion.** Both remain outside the public game API and default battle engin
 The final common verification passed 6,940 tests across 530 files, plus typecheck, owned-source lint,
 and the compiled common build. No production profile, server behavior, artifact draft score, or client
 placement behavior was changed. Confirmation seeds remain unused.
+
+## Combat follow-up: cemetery cleanup and friendly cover
+
+An opt-in `auditOwnBarrelDecision` diagnostic records the raw incumbent, final decision, legal attack,
+spell and movement alternatives, and exact stationary-shot counterfactuals. It runs after the timed
+selector and never chooses or executes an action. A repeated full fight with the audit disabled had
+the same action trace. Snapshot and detached-output tests also guard observation purity.
+
+Fourteen exploratory control fights across all seven cohorts and both seats, using separate seed
+`2026101850`, recorded 25 owned-barrel decisions. All retained the raw incumbent; 24 had no current
+friendly stationary-shot gain. None passed up an enumerated positive-damage alternative. These traces
+identify a policy boundary to investigate, rather than proving that every clear is wasteful.
+
+`prioritizeV08CemeteryObstacleAttack` runs when deployment barrels activate scattered obstacles, even
+on a non-cemetery map. After the ordinary native movement/hold policy, it can replace that decision
+with a strike on an owned barrel. The research-only `preserveOwnBarrelCemeteryFallback` candidate keeps
+the pre-cleanup decision in that case. Earlier deliberate obstacle plans, neutral cemetery stones,
+enemy barrels, direct attacks and casts retain their original handling. Search still enumerates and
+compares barrel-clearing challengers. The intervention applies consistently to the candidate team's
+root and rollout decisions; placement, funding and engine rules stay fixed.
+
+This candidate is not connected to the public API or default battle engine. Its qualification source
+uses common `fad12ce022e13433fbdfd5c07d8245c4d90ccd14`, the guard and tests, and an archived research
+adapter at the native cleanup boundary and worker team scope. Both control and treatment use that same
+frozen source. The adapter is enabled only for the treatment team. The shared production strategy
+source remains unchanged.
+
+The initial registration and 36-fight smoke are under the ignored
+`game/core/tmp/barrel-cemetery-qualification-20261018` directory. A four-worker partial screen was
+superseded when the peer node job completed. A second partial screen in
+`game/core/tmp/barrel-cemetery-qualification-8p-20261018` exposed that the worker enabled opponent
+reflection only for the old placement policies. Neither partial run received aggregate outcome
+review; their 37 and 61 completed fights are excluded. The corrected worker enables the callback for
+any requested reflection. The candidate rule is unchanged.
+
+The corrected registration and frozen source are under the ignored
+`game/core/tmp/barrel-cemetery-v2-qualification-20261018` directory. Screening uses fresh seed
+`2026101862`; confirmation reserves `2026101863`. Each stage contains 120 independent primary armies
+across three live maps, two ownership conditions and two opponent formations, plus 24 independent
+negative-control armies with no owned barrels. Control and treatment play each matchup in both seats:
+**576 fights** per stage. Selection uses fixed canonical roster quotas before combat outcomes.
+
+This is the third fully evaluated Barrel candidate in the task. Promotion requires a positive paired
+family-adjusted 98.33% interval and exact two-sided sign-flip `p < 0.05 / 3`, independently in screening
+and fresh confirmation. Armies, not mirrored fights, are the confidence unit. Rejected actions,
+incomplete games, changed negative-control traces or source drift invalidate the run. A 72-fight smoke
+checks both formations in every map and ownership category before screening, including that every
+requested reflection was applied; its scores do not tune or qualify the rule. Eight low-priority
+workers run on the 9800X3D, separate from live services.
+The default AI remains unchanged unless the full qualification requirements pass.
+
+The corrected source fingerprint is
+`877cf718d5318f64fa743ceb2d1fbcfc2a0de91146d66654da5b55bc34c9c26b`. The complete 72-fight smoke
+had zero rejected actions, identical traces in all 24 negative-control seat pairs, and all 36 requested
+reflections applied. The guard changed 57 root and 18,181 rollout decisions, with no unclassified
+decision origins. Source typecheck, owned-source lint, the compiled common build and 6,951 common tests
+passed; focused tests also retain engine-legal barrel shot and movement coverage.
+
+## Cemetery-guard result: not qualified
+
+All 576 screening fights completed by elimination without rejected actions. The primary population
+contained 120 distinct armies and matchups across all seven cohorts. All 48 negative-control seat
+pairs had identical action traces, all 288 requested opponent reflections applied, and source,
+runtime, driver, registration and request identities passed validation.
+
+Control scored 50.625%; the guard scored 53.125%. The paired difference was **+2.50 percentage
+points**, with a family-adjusted 98.33% interval of **−5.01 to +10.01 pp** and exact two-sided
+sign-flip `p = 0.466694`. The ordinary 95% interval also crossed zero (−3.65 to +8.65 pp). An
+independent Python calculation reproduced the per-army estimate, adjusted interval, exact test and
+all control checks from the raw results. Fifty-five independent army pairs had nonzero differences.
+
+The guard reduced actual owned-barrel strikes from 328 to 14, including clears with no recorded
+current shot effect from 216 to 7. It changed 671 native root choices and 227,761 rollout choices;
+these counts are not counts of final executed turns saved. Some deliberately planned barrel strikes
+remained. Reducing own-cover destruction did **not** establish a reliable battle-score improvement.
+
+**Do not enable this candidate or run its reserved confirmation as though screening passed.** The
+positive point estimate is exploratory evidence for future separately registered research, not
+permission to weaken the gate, expand this sample after inspecting results, or promote a favorable
+subgroup. No production profile, artifact draft score, client behavior or server behavior changed.
+The guard remains excluded from the public API and default engine by the isolation test. The fresh
+confirmation seed is unused.

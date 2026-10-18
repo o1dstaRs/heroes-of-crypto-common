@@ -460,6 +460,7 @@ function play(request: BarrelFightRequest): BarrelFightResult {
             ...configFor(greenArmy, redArmy),
             beforeFightStart:
                 request.deploymentOnly ||
+                experiment?.opponentCrossMirror ||
                 experiment?.policy === "placement" ||
                 experiment?.policy === "caster-cover" ||
                 experiment?.policy === "landing-cover"
