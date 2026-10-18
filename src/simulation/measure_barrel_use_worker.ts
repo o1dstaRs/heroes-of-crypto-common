@@ -43,6 +43,7 @@ import {
 } from "./ai_meta_strategy_profile";
 import { materializeReplayAbSplits } from "./ranked_replay_tactics_ab_core";
 import { mirrorBarrelStudyDeployment } from "./barrel_deployment_research";
+import { auditOwnBarrelDecision, type IBarrelDecisionAudit } from "./barrel_decision_audit";
 import { startPersistentWorker } from "./persistent_worker_pool";
 
 process.env.SIM_NO_ACTIONS = "1";
@@ -69,6 +70,8 @@ export interface BarrelFightRequest {
         study?: "artifact-value";
         competitorArtifact?: number;
         counterfactualShots?: boolean;
+        /** Bounded, observational own-barrel decision evidence, outside selector timing. */
+        auditOwnClears?: boolean;
         opponentCrossMirror?: boolean;
     };
 }
@@ -104,6 +107,7 @@ export interface BarrelFightResult {
         casterCoverEligible?: boolean;
         landingCoverEligible?: boolean;
         opponentCrossMirrored?: boolean;
+        ownClearAudit?: IBarrelDecisionAudit[];
     };
     placed: number;
     placedGreen: number;
@@ -157,6 +161,7 @@ const live: LiveBarrels = {
 let decisionTimes: Record<Side, number[]> | undefined;
 let coverGuardTeam: TeamType | undefined;
 let coverGuardSwitches: Record<Side, number> = { green: 0, red: 0 };
+let ownClearAudit: IBarrelDecisionAudit[] | undefined;
 const originalChoose = SearchDriver.prototype.chooseDecision;
 SearchDriver.prototype.chooseDecision = function (...args: Parameters<typeof originalChoose>) {
     const choose = () => {
@@ -167,13 +172,18 @@ SearchDriver.prototype.chooseDecision = function (...args: Parameters<typeof ori
         coverGuardSwitches[args[0].getTeam() === GREEN_TEAM ? "green" : "red"]++;
         return alternative;
     };
-    if (!decisionTimes) return choose();
     const start = performance.now();
+    let chosen: GameAction[];
     try {
-        return choose();
+        chosen = choose();
     } finally {
-        decisionTimes[args[0].getTeam() === GREEN_TEAM ? "green" : "red"].push(performance.now() - start);
+        decisionTimes?.[args[0].getTeam() === GREEN_TEAM ? "green" : "red"].push(performance.now() - start);
     }
+    if (ownClearAudit && ownClearAudit.length < 8 && args[3]) {
+        const audit = auditOwnBarrelDecision(args[0], args[3], args[2], chosen);
+        if (audit) ownClearAudit.push(audit);
+    }
+    return chosen;
 };
 
 const originalPlace = Grid.prototype.placeArtifactBarrel;
@@ -227,6 +237,8 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     resetLive();
     const started = performance.now();
     const experiment = request.experiment;
+    const audits: IBarrelDecisionAudit[] = [];
+    ownClearAudit = experiment?.auditOwnClears ? audits : undefined;
     const candidateSide: Side = request.greenIsArmyA ? "green" : "red";
     const candidateTeam = request.greenIsArmyA ? GREEN_TEAM : RED_TEAM;
     if (experiment?.treatment && experiment.policy === "cover") coverGuardTeam = candidateTeam;
@@ -653,6 +665,7 @@ function play(request: BarrelFightRequest): BarrelFightResult {
         });
     } finally {
         coverGuardTeam = undefined;
+        ownClearAudit = undefined;
         decisionTimes = undefined;
         if (previousOverrides === undefined) delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
         else process.env.V08_A19_SEARCH_ENV_OVERRIDES = previousOverrides;
@@ -700,6 +713,7 @@ function play(request: BarrelFightRequest): BarrelFightResult {
                       casterCoverEligible,
                       landingCoverEligible: casterCoverEligible && hasLargeFlyingEnemy,
                       opponentCrossMirrored,
+                      ...(experiment.auditOwnClears ? { ownClearAudit: audits } : {}),
                   },
               }
             : {}),
