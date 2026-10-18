@@ -53,6 +53,8 @@ export interface ICreatureInfo {
     caster: boolean;
     /** Owns at least one configured native spellbook entry; excludes direct-cast abilities. */
     nativeSpellbook: boolean;
+    /** Native Craft charge; a stochastic source of second attacks, never a guaranteed extra strike. */
+    castsCraft?: boolean;
     /** Owns a direct-damage spell that can reach an enemy or board area without a native ranged attack. */
     rangedSpellDamage: boolean;
     maxDamage: number;
@@ -293,6 +295,7 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 mage: cfg.attack_type === "MAGIC",
                 caster: spellList.length > 0 || abilityList.some(isCastableAbility),
                 nativeSpellbook: spellList.length > 0,
+                castsCraft: spellList.some((entry) => entry.endsWith(":Craft")),
                 rangedSpellDamage: spellList.some(isRangedDamageSpellbookEntry),
                 dealsMagicDamage:
                     spellList.some(isRangedDamageSpellbookEntry) || abilityList.some(isMagicDamageAbility),

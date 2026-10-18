@@ -8,11 +8,16 @@
  */
 import { createHash } from "node:crypto";
 import { friendlyShotBlockingBarrels, projectBarrelShotTradeoff } from "../ai/artifact_barrel_tactics";
+import { productiveBarrelCoverAlternative } from "../ai/barrel_cover_guard";
+import { planBarrelCasterCover } from "../ai/barrel_caster_cover";
+import { planBarrelLandingCover } from "../ai/barrel_landing_cover";
+import { creatureIdForName, creatureInfo } from "../ai/setup/creature_score";
 import { SearchDriver } from "./search_driver";
 import { parentPort } from "node:worker_threads";
 
 import { Tier1Artifact } from "../artifacts/artifact_properties";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { Grid } from "../grid/grid";
 import {
     artifactBarrelPlacementCells,
@@ -37,6 +42,7 @@ import {
     createAiMetaMatchStrategyOverrides,
 } from "./ai_meta_strategy_profile";
 import { materializeReplayAbSplits } from "./ranked_replay_tactics_ab_core";
+import { mirrorBarrelStudyDeployment } from "./barrel_deployment_research";
 import { startPersistentWorker } from "./persistent_worker_pool";
 
 process.env.SIM_NO_ACTIONS = "1";
@@ -59,10 +65,11 @@ export interface BarrelFightRequest {
         ownership: "both" | "candidate" | "opponent" | "neither" | "value-swap";
         map: 1 | 2 | 3 | 4;
         timing: "work" | "live";
-        policy?: "exact" | "own" | "placement";
+        policy?: "exact" | "own" | "placement" | "cover" | "caster-cover" | "landing-cover";
         study?: "artifact-value";
         competitorArtifact?: number;
         counterfactualShots?: boolean;
+        opponentCrossMirror?: boolean;
     };
 }
 
@@ -93,6 +100,10 @@ export interface BarrelFightResult {
                 coverLostWithoutGain: number;
             }
         >;
+        coverGuardSwitches?: Record<Side, number>;
+        casterCoverEligible?: boolean;
+        landingCoverEligible?: boolean;
+        opponentCrossMirrored?: boolean;
     };
     placed: number;
     placedGreen: number;
@@ -144,12 +155,22 @@ const live: LiveBarrels = {
 
 // Worker-local, observational timing: no callback runs inside the timed production selector.
 let decisionTimes: Record<Side, number[]> | undefined;
+let coverGuardTeam: TeamType | undefined;
+let coverGuardSwitches: Record<Side, number> = { green: 0, red: 0 };
 const originalChoose = SearchDriver.prototype.chooseDecision;
 SearchDriver.prototype.chooseDecision = function (...args: Parameters<typeof originalChoose>) {
-    if (!decisionTimes) return originalChoose.apply(this, args);
+    const choose = () => {
+        const chosen = originalChoose.apply(this, args);
+        if (coverGuardTeam !== args[0].getTeam() || !args[3]) return chosen;
+        const alternative = productiveBarrelCoverAlternative(args[0], args[3], chosen);
+        if (!alternative) return chosen;
+        coverGuardSwitches[args[0].getTeam() === GREEN_TEAM ? "green" : "red"]++;
+        return alternative;
+    };
+    if (!decisionTimes) return choose();
     const start = performance.now();
     try {
-        return originalChoose.apply(this, args);
+        return choose();
     } finally {
         decisionTimes[args[0].getTeam() === GREEN_TEAM ? "green" : "red"].push(performance.now() - start);
     }
@@ -184,6 +205,8 @@ Grid.prototype.unplaceArtifactBarrel = function (this: Grid, team: TeamType, ind
 };
 
 function resetLive(): void {
+    coverGuardTeam = undefined;
+    coverGuardSwitches = { green: 0, red: 0 };
     live.settings = undefined;
     live.cells.clear();
     live.teamByCell.clear();
@@ -206,6 +229,7 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     const experiment = request.experiment;
     const candidateSide: Side = request.greenIsArmyA ? "green" : "red";
     const candidateTeam = request.greenIsArmyA ? GREEN_TEAM : RED_TEAM;
+    if (experiment?.treatment && experiment.policy === "cover") coverGuardTeam = candidateTeam;
     const ownBarrelStrikesBySide = { green: 0, red: 0 };
     const ownClears = {
         green: { opensShot: 0, removesCover: 0, neither: 0, both: 0 },
@@ -235,6 +259,7 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     const actionHash = createHash("sha256");
     const times: Record<Side, number[]> = { green: [], red: [] };
     let deployment: NonNullable<BarrelFightResult["diagnostics"]>["deployment"];
+    let opponentCrossMirrored = false;
     decisionTimes = experiment ? times : undefined;
     const prepared = prepareMetaPair(
         { cohort: request.cohort, games: request.matchupGames, baseSeed: request.baseSeed },
@@ -244,6 +269,25 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     );
     const greenArmy = request.greenIsArmyA ? prepared.armyA : prepared.armyB;
     const redArmy = request.greenIsArmyA ? prepared.armyB : prepared.armyA;
+    const casterCoverEligible = prepared.armyA.creatureIds.some((id) => creatureInfo(id)?.rangedSpellDamage === true);
+    const publicEnemies = prepared.armyB.creatureIds.map((id) => creatureInfo(id)).filter((info) => info !== undefined);
+    const hasLargeFlyingEnemy = publicEnemies.some(
+        (info) =>
+            info.canFly &&
+            (info.footprintWidth > 1 || info.footprintHeight > 1) &&
+            !info.abilities.includes("No Melee"),
+    );
+    const landingThreats = new Map<string, { width: number; height: number; weight: number }>();
+    for (const info of publicEnemies) {
+        if (info.abilities.includes("No Melee")) continue;
+        const key = `${info.footprintWidth},${info.footprintHeight}`;
+        const previous = landingThreats.get(key);
+        landingThreats.set(key, {
+            width: info.footprintWidth,
+            height: info.footprintHeight,
+            weight: (previous?.weight ?? 0) + Math.max(1, info.exp) * (info.canFly ? 1 : 0.25),
+        });
+    }
     const barrelRejectionCounts: Record<string, number> = {};
     const otherRejectionCounts: Record<string, number> = {};
     const barrelRejectionSamples: string[] = [];
@@ -379,7 +423,9 @@ function play(request: BarrelFightRequest): BarrelFightResult {
             placementAugmentTiming: "setup-before-placement" as const,
             sideOrientedPlacement: true,
             searchOfflineDeterministicWork: experiment?.timing !== "live",
-            ...(experiment?.treatment && !experiment.study && experiment.policy !== "placement"
+            ...(experiment?.treatment &&
+            !experiment.study &&
+            (experiment.policy === "exact" || experiment.policy === "own")
                 ? { searchEnvOverrideTeams: [candidateTeam as TeamType] }
                 : {}),
             headlessEvents: true,
@@ -391,7 +437,7 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     };
 
     const previousOverrides = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
-    if (experiment?.treatment && !experiment.study && experiment.policy !== "placement")
+    if (experiment?.treatment && !experiment.study && (experiment.policy === "exact" || experiment.policy === "own"))
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({
             SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: experiment.policy === "own" ? "own" : "1",
         });
@@ -401,9 +447,17 @@ function play(request: BarrelFightRequest): BarrelFightResult {
         result = runMatch({
             ...configFor(greenArmy, redArmy),
             beforeFightStart:
-                request.deploymentOnly || experiment?.policy === "placement"
+                request.deploymentOnly ||
+                experiment?.policy === "placement" ||
+                experiment?.policy === "caster-cover" ||
+                experiment?.policy === "landing-cover"
                     ? (context) => {
                           const { grid, fightProperties: fp, unitsHolder, attackHandler } = context;
+                          if (experiment?.opponentCrossMirror)
+                              opponentCrossMirrored = mirrorBarrelStudyDeployment(
+                                  context,
+                                  candidateTeam === GREEN_TEAM ? RED_TEAM : GREEN_TEAM,
+                              );
                           if (request.deploymentOnly) {
                               const place = (policy: "legacy" | "clear-lanes") => {
                                   for (const team of [GREEN_TEAM, RED_TEAM]) grid.clearArtifactBarrels(team);
@@ -440,8 +494,65 @@ function play(request: BarrelFightRequest): BarrelFightResult {
                                   team,
                                   artifactBarrelPlacementCells(grid, fp, team),
                                   artifactBarrelShooterCells(grid, unitsHolder.getAllUnits().values(), team),
-                                  experiment!.treatment && team === candidateTeam ? "clear-lanes" : "legacy",
+                                  experiment?.policy === "caster-cover" ||
+                                      experiment?.policy === "landing-cover" ||
+                                      (experiment!.treatment && team === candidateTeam)
+                                      ? "clear-lanes"
+                                      : "legacy",
                               );
+                          }
+                          if (
+                              (experiment?.policy === "caster-cover" || experiment?.policy === "landing-cover") &&
+                              experiment.treatment &&
+                              grid.getArtifactBarrels(candidateTeam).length
+                          ) {
+                              const allowedCells = artifactBarrelPlacementCells(grid, fp, candidateTeam);
+                              const current = new Set(
+                                  grid.getArtifactBarrels(candidateTeam).map(({ cell }) => `${cell.x},${cell.y}`),
+                              );
+                              const ownContext = {
+                                  gridSize: grid.getSettings().getGridSize(),
+                                  sideOriented: fp.isSideOrientedPlacement(),
+                                  forwardSign: candidateTeam === GREEN_TEAM ? (1 as const) : (-1 as const),
+                                  allowedCells,
+                                  occupiedCells: allowedCells.filter(
+                                      (cell) => !current.has(`${cell.x},${cell.y}`) && !grid.areAllCellsEmpty([cell]),
+                                  ),
+                                  ownStacks: unitsHolder
+                                      .getAllAllies(candidateTeam)
+                                      .filter((unit) => !unit.isDead())
+                                      .map((unit) => {
+                                          const id = creatureIdForName(unit.getName());
+                                          return {
+                                              cells: unit.getCells(),
+                                              spellcaster:
+                                                  id !== undefined && creatureInfo(id)?.rangedSpellDamage === true,
+                                              blocksRangedShots:
+                                                  unit.getAttackType() === PBTypes.AttackVals.RANGE &&
+                                                  !unit.hasAbilityActive("Area Throw") &&
+                                                  !unit.hasAbilityActive("Large Caliber"),
+                                              value: Math.max(1, unit.getExp() * unit.getAmountAlive()),
+                                          };
+                                      }),
+                              };
+                              const plan =
+                                  experiment.policy === "caster-cover"
+                                      ? planBarrelCasterCover(ownContext)
+                                      : planBarrelLandingCover({
+                                            ...ownContext,
+                                            currentBarrels: grid
+                                                .getArtifactBarrels(candidateTeam)
+                                                .map((barrel) => barrel.cell),
+                                            threats: [...landingThreats.values()],
+                                            hasLargeFlyingEnemy,
+                                        });
+                              if (plan) {
+                                  grid.clearArtifactBarrels(candidateTeam);
+                                  plan.forEach((cell, index) => {
+                                      if (!grid.placeArtifactBarrel(candidateTeam, index, cell))
+                                          throw new Error("Illegal caster-cover deployment");
+                                  });
+                              }
                           }
                           deployment = Object.fromEntries(
                               (["green", "red"] as const).map((side) => {
@@ -541,6 +652,7 @@ function play(request: BarrelFightRequest): BarrelFightResult {
             },
         });
     } finally {
+        coverGuardTeam = undefined;
         decisionTimes = undefined;
         if (previousOverrides === undefined) delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
         else process.env.V08_A19_SEARCH_ENV_OVERRIDES = previousOverrides;
@@ -584,6 +696,10 @@ function play(request: BarrelFightRequest): BarrelFightResult {
                               ];
                           }),
                       ) as NonNullable<BarrelFightResult["diagnostics"]>["searchTiming"],
+                      coverGuardSwitches,
+                      casterCoverEligible,
+                      landingCoverEligible: casterCoverEligible && hasLargeFlyingEnemy,
+                      opponentCrossMirrored,
                   },
               }
             : {}),

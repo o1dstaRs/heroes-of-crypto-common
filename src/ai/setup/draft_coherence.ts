@@ -11,6 +11,7 @@
 
 import { Tier1Artifact, Tier2Artifact } from "../../artifacts/artifact_properties";
 import type { ArtifactFitVersion } from "./artifact_fit";
+import { dualStrikeDraftAffinity } from "./dual_strike_fit";
 import { lastFuseDraftContact, lastFuseIncomingMeleeShare, lastFuseExecutionAccess } from "./last_fuse_fit";
 import {
     backlineProtectionBeneficiaryCount,
@@ -100,7 +101,15 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
     let affinity = 0;
     const ringBeneficiary =
         (context.artifactFitVersion ?? 1) >= 3 ? info.dealsMagicDamage : info.rangedSpellDamage || info.magicAttack;
-    if (context.tier1ArtifactId === Tier1Artifact.HUNTERS_LONGBOW && info.ranged) {
+    if (context.tier1ArtifactId === Tier1Artifact.DUAL_STRIKE_CHARM && (context.artifactFitVersion ?? 1) >= 7) {
+        affinity += dualStrikeDraftAffinity(
+            info,
+            context.ownCreatureIds.flatMap((id) => {
+                const ally = creatureInfo(id);
+                return ally ? [ally] : [];
+            }),
+        );
+    } else if (context.tier1ArtifactId === Tier1Artifact.HUNTERS_LONGBOW && info.ranged) {
         affinity += 1.2;
     } else if (context.tier1ArtifactId === Tier1Artifact.WINGED_BOOTS && info.canFly) {
         affinity += 1.2 + (hasMobilePressure(creatureId) ? 0.15 : 0);

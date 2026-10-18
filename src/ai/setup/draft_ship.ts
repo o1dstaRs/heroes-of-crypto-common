@@ -37,6 +37,7 @@ import {
     tier1ArtifactFitScoreV2,
     tier1ArtifactFitScoreV3,
     tier1ArtifactFitScoreV4,
+    tier1ArtifactFitScoreV7,
     type ArtifactFitVersion,
 } from "./artifact_fit";
 import {
@@ -429,7 +430,9 @@ export function pickRankedLiveDraftBundle(
                   ? tier1ArtifactFitScoreV2
                   : artifactFitVersion === 3
                     ? tier1ArtifactFitScoreV3
-                    : tier1ArtifactFitScoreV4)(
+                    : artifactFitVersion >= 7
+                      ? tier1ArtifactFitScoreV7
+                      : tier1ArtifactFitScoreV4)(
                 artifactId,
                 ownCreatureIds,
                 (rankedDraftUsesCorrectedTier1Table(genome.draftStrengthPolicy)

@@ -8,13 +8,18 @@ import { resolveSetupPolicy } from "../../src/ai/setup/setup_ship";
 import { createPlacementSetupDecisionContext } from "../../src/ai/setup/setup_strategy";
 
 const root = resolve(import.meta.dir, "../..");
-const unqualified = ["v0_8_screen_hold.ts", "v0_8_stable_screen_placement.ts"].map((name) =>
-    resolve(root, "src/ai/versions", name),
-);
+const unqualified = [
+    "src/ai/versions/v0_8_screen_hold.ts",
+    "src/ai/versions/v0_8_stable_screen_placement.ts",
+    "src/ai/barrel_cover_guard.ts",
+    "src/ai/barrel_caster_cover.ts",
+    "src/ai/barrel_landing_cover.ts",
+    "src/simulation/barrel_deployment_research.ts",
+].map((source) => resolve(root, source));
 
 // Follow executable imports/re-exports, not comments or type-only references. A helper silently called
 // from an existing placement layer must fail even when the public strategy wrapper chain stays the same.
-test("unqualified screen experiments stay outside the game API and default battle engine", () => {
+test("unqualified placement and barrel experiments stay outside the game API and default battle engine", () => {
     const pending = [resolve(root, "src/index.ts"), resolve(root, "src/simulation/battle_engine.ts")];
     const visited = new Set<string>();
     const scanner = new Bun.Transpiler({ loader: "ts" });
