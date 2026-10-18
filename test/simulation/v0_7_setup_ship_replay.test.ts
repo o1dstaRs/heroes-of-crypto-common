@@ -152,7 +152,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned 2026-10-16: Last Fuse uses 25% fatal damage and a 25-per-attacker-power floor.
 // Two isolated runs agree; committed pre-change sources reproduce the previous digest.
 // Previous digest: 56d0eda79d1ed104652b7255d95252c8702d4413a8883d05121addb26f5c8b0b.
-const EXPECTED_REPLAY_SHA256 = "84304ae47731629d3ee488944fad7ff0eefb305e40f4a58f09d5af3adbbad846";
+// Re-pinned 2026-10-18: Arachna Spider attack 20 -> 31 and damage 27-39 -> 55-70 (184fed4a).
+// Restoring only that creatures.json reproduces the prior digest. Two isolated runs reproduce this
+// digest with zero rejected actions in all eight fights.
+// Previous digest: 84304ae47731629d3ee488944fad7ff0eefb305e40f4a58f09d5af3adbbad846.
+const EXPECTED_REPLAY_SHA256 = "8e856328c77432416e1e39f2257b0c544f9290bae9d143428d57cde36912d228";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
