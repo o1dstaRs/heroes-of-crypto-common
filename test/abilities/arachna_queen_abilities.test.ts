@@ -50,6 +50,9 @@ describe("Arachna Queen configuration", () => {
         expect(spider.steps).toBe(6);
         expect(spider.initiative).toBe(5.1);
         expect(spider.base_armor).toBe(20);
+        expect(spider.base_attack).toBe(31);
+        expect(spider.attack_damage_min).toBe(55);
+        expect(spider.attack_damage_max).toBe(70);
         expect(spider.magic_resist).toBe(10);
         expect(spider.size).toBe(PBTypes.UnitSizeVals.SMALL);
         expect(spider.level).toBe(PBTypes.UnitLevelVals.THIRD);
