@@ -205,7 +205,9 @@ describe("v0.8 search measurement alias", () => {
         // reproduced this digest byte-identically.
         // Re-pinned 2026-08-29 after Warding Mane became a board-wide living-source Blessing: seeded
         // Manticore fights no longer depend on a two-cell radius. Two isolated runs reproduced this digest.
-        expect(digest("v0.7")).toBe("be69b96d69ae1f4f7d1b10ff0700bda817cd0982a7ff5f94427b3760494bff48");
+        // Re-pinned 2026-10-18 for Dryad's cost and Cyclops's attack/damage tuning. The previous config
+        // reproduces the old digests; two isolated runs of this config agree with zero rejected actions.
+        expect(digest("v0.7")).toBe("aa0d5997954c4ed17e049373a2b6ca1a75e3e85826641e813faaf64eafa8b817");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -240,7 +242,8 @@ describe("v0.8 search measurement alias", () => {
         // longer steps a shooter forward and then fires (the engine now rejects that shot), so its trace moves;
         // the v0.7 control above is untouched (v0.7 never planned move-then-shoot). Two isolated runs reproduced
         // this digest, both with zero rejected actions.
-        expect(digest("v0.8")).toBe("d93b20d6acf01564891ff53d17a78ab394df99f04054583fc4d2617d3b2f3dff");
+        // The same 2026-10-18 balance tuning changes this trace too, with identical verification.
+        expect(digest("v0.8")).toBe("2d9d2fba8dbac93e8a8a59971cbf9ae4b56f46f581546538321dccb7a0a10f0d");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {
