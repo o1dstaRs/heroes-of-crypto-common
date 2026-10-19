@@ -306,7 +306,10 @@
     "Water Shield": {
         "name": "Water Shield",
         "type": "DEFENCE",
-        "desc": ["Once per battle, fully absorbs the first incoming attack (0 damage taken), then breaks"],
+        "desc": [
+            "Once per battle, fully absorbs the first incoming attack (0 damage taken), then breaks.",
+            "Fire attacks pass through without breaking it, including Fireball, Fire Breath, Fire Shield and Fireforged burns."
+        ],
         "power": 100,
         "power_type": "ABSORB_FIRST_HIT",
         "skip_reponse": false,

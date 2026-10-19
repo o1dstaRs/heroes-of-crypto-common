@@ -13,6 +13,7 @@ import { describe, expect, it } from "bun:test";
 
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { SpellElement } from "../../src/spells/spell_properties";
 import { createTestUnit } from "../helpers/combat";
 
 // Fire <-> Water and Wind <-> Earth are opposing affinities: each deals +power% (50) to the other. The
@@ -102,10 +103,16 @@ describe("Water Shield (once-per-battle absorb)", () => {
         expect(mermaid.getHp()).toBe(12 - 4);
         expect(mermaid.hasBuffActive("Water Shield")).toBe(true);
 
+        // A fire spell from a creature that is not itself a Fire Element is still a fire attack.
+        const plainFireball = mermaid.applyDamage(4, 0, log, false, plain, undefined, SpellElement.FIRE);
+        expect(plainFireball).toBe(4);
+        expect(mermaid.getHp()).toBe(12 - 8);
+        expect(mermaid.hasBuffActive("Water Shield")).toBe(true);
+
         // The still-intact shield absorbs the next NON-fire hit.
         const physHit = mermaid.applyDamage(4, 0, log, false, plain);
         expect(physHit).toBe(0);
-        expect(mermaid.getHp()).toBe(12 - 4); // unchanged
+        expect(mermaid.getHp()).toBe(12 - 8);
         expect(mermaid.hasBuffActive("Water Shield")).toBe(false);
     });
 

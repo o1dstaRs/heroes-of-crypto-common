@@ -40,7 +40,14 @@ export interface IThroughShotResult {
     // Per-affected-unit damage so the client can draw a floating number on EVERY unit the shot pierced,
     // not just the aimed target. Mirrors the AOE-range payload (Large Caliber / Area Throw); without it
     // Through Shot's secondary hits deal damage but show no animation. See IVisibleDamage.splash.
-    perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number }[];
+    perUnitDamage: {
+        unitId: string;
+        position: HoCMath.XY;
+        amount: number;
+        unitsDied: number;
+        /** Swing a Water Shield ate. The displayed amount stays 0; a Fireforged Sword burns from this. */
+        ignition?: number;
+    }[];
 }
 
 export function processThroughShotAbility(
@@ -61,7 +68,7 @@ export function processThroughShotAbility(
 ): IThroughShotResult {
     const animationData: IAnimationData[] = [];
     const unitIdsDied: string[] = [];
-    const perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number }[] = [];
+    const perUnitDamage: IThroughShotResult["perUnitDamage"] = [];
     const throughShotAbility = attackerUnit.getAbility("Through Shot");
     if (!throughShotAbility) {
         return { landed: false, unitIdsDied, animationData, perUnitDamage };
@@ -212,6 +219,8 @@ export function processThroughShotAbility(
                 position: positionAtImpact,
                 amount: damageDealt,
                 unitsDied: Math.max(0, amountAliveBeforeDamage - targetUnit.getAmountAlive()),
+                // The floater shows what landed. The sword still burns from the swing the shield ate.
+                ...(waterShieldAbsorbed && damageFromAttack > 0 ? { ignition: damageFromAttack } : {}),
             });
             if (!waterShieldAbsorbed) {
                 const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");

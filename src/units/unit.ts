@@ -58,6 +58,7 @@ import { AppliedSpell } from "../spells/applied_spell";
 import { fillEffectPowerPlaceholders, positionalPropertyCount } from "../spells/effect_description";
 import { notifyHelpingHandChange } from "../spells/helping_hand";
 import { Spell } from "../spells/spell";
+import { SpellElement } from "../spells/spell_properties";
 import { isMagicDamageAbility } from "../spells/spell_damage";
 import { recordEffectApplication, recordWaterShieldAbsorb } from "./effect_application_capture";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
@@ -1892,6 +1893,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         extendBreak = false,
         attacker?: Unit,
         lastFuseSource?: Readonly<ILastFuseSource>,
+        damageElement?: SpellElement,
     ): number {
         const observed = observeUnitHpChange(this, "damage", minusHp, attacker);
         try {
@@ -1902,9 +1904,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             // Water Shield: once per battle, the first incoming damage instance is fully absorbed (0 damage taken)
             // and the shield breaks. Sits above the Break roll and the HP subtraction so an absorbed hit lands
             // nothing at all; `waterShieldSpent` stops the seeding refresh from re-granting the buff afterwards.
-            // FIRE IGNORES IT: a Fire Element attacker (and the fire abilities they cast — Fire Breath, Fire
-            // Shield) passes straight through, dealing full damage without absorbing OR consuming the shield.
-            if (this.willWaterShieldAbsorb(attacker)) {
+            // FIRE IGNORES IT: a Fire Element attacker's hit, and any fire attack — fire spells, Fire Breath,
+            // Fire Shield, a Fireforged burn — passes straight through without absorbing OR consuming the
+            // shield. A Fire Wall burn is not an attack and does not pass an element, so it still spends it.
+            if (this.willWaterShieldAbsorb(attacker, damageElement)) {
                 this.waterShieldSpent = true;
                 this.deleteBuff("Water Shield");
                 // Name the striker when the caller passed one — "the shield broke" without a culprit reads
@@ -2196,13 +2199,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * through this same check, and attack paths call it BEFORE dealing damage to know that the strike's
      * on-hit riders (debuffs, gazes, auras) must not land: an absorbed hit applies nothing, like a miss.
      */
-    public willWaterShieldAbsorb(attacker?: Unit): boolean {
+    public willWaterShieldAbsorb(attacker?: Unit, damageElement?: SpellElement): boolean {
         // The shield is the Water Shield ability at work, so Break turns it off like every other ability: a
-        // Broken holder takes the hit and keeps the shield for when Break wears off.
+        // Broken holder takes the hit and keeps the shield for when Break wears off. Fire attacks — a Fire
+        // Element creature's own hit, or damage whose element is fire (a spell, Fire Breath, Fire Shield,
+        // a Fireforged burn) — pass through and leave it intact.
         return (
             this.hasBuffActive("Water Shield") &&
             !this.hasEffectActive("Break") &&
-            !attacker?.hasAbilityActive("Fire Element")
+            !attacker?.hasAbilityActive("Fire Element") &&
+            damageElement !== SpellElement.FIRE
         );
     }
     public calculatePossibleLosses(minusHp: number): number {

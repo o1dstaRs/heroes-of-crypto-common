@@ -118,9 +118,10 @@ export function spellRawDamage(spell: Spell, caster: Unit): number {
  *
  * The Water Shield step is the one the hover used to miss entirely: Unit.applyDamage short-circuits on
  * willWaterShieldAbsorb and deals literally nothing, so a preview that skipped it promised a full hit and a
- * pile of kills for a cast that took the target's stack from full to full. Fire ignores the shield (a Fire
- * Element caster passes straight through it without even breaking it), and the shield is only consulted at
- * all once there is damage to absorb, exactly as applyDamage orders those two checks.
+ * pile of kills for a cast that took the target's stack from full to full. Fire attacks ignore the shield
+ * without breaking it: a Fire Element attacker, or any spell whose element is fire. Other spells still
+ * spend it. The shield is only consulted once there is damage to absorb, exactly as applyDamage orders
+ * those two checks.
  *
  * `kills` is what `damage` costs the stack. Overkill is deliberately NOT trimmed to the stack's remaining hit
  * points: the number quoted is the hit the spell lands, and the kill count already says the stack dies.
@@ -132,7 +133,7 @@ export function projectSpellDamageAgainstUnit({
     rawDamage,
 }: ISpellDamageProjectionInput): ISpellDamageProjection {
     const landed = spellDamageAgainstUnit(spell, rawDamage ?? spellRawDamage(spell, caster), target);
-    const absorbedByWaterShield = landed > 0 && target.willWaterShieldAbsorb(caster);
+    const absorbedByWaterShield = landed > 0 && target.willWaterShieldAbsorb(caster, spell.getElement());
     const damage = absorbedByWaterShield ? 0 : landed;
 
     return {

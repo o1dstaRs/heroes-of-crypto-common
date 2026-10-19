@@ -134,13 +134,16 @@ export function breatheFireOnTargets(
 
         const positionAtImpact = { ...nextStandingTarget.getPosition() };
         const amountAliveBefore = nextStandingTarget.getAmountAlive();
-        // fromUnit (Fire Element) passed so a Water Shield on the target is ignored by fire.
+        // The breath is fire even when the breather is not a Fire Element (a stolen breath). A Water Shield
+        // lets it through and stays up. Passing the breather still covers a Fire Element's other hits.
         const damageDealt = nextStandingTarget.applyDamage(
             fireBreathAttackDamage,
             0 /* magic attack */,
             sceneLog,
             false,
             fromUnit,
+            undefined,
+            SpellElement.FIRE,
         );
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),

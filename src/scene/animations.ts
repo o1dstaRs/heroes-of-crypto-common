@@ -55,6 +55,11 @@ export interface ISecondaryDamage {
     position: XY;
     amount: number;
     unitsDied: number;
+    /**
+     * Swing a Water Shield ate, when this entry's `amount` is the 0 the shield left. The Fireforged Sword
+     * prices its burn from this and not from `amount`. Not a damage number to draw.
+     */
+    ignition?: number;
     /** This secondary hit absorbed a Magic Mirror rebound, so it is not offensive output by the caster. */
     rebounded?: boolean;
 }

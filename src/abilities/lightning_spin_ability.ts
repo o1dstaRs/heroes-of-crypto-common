@@ -252,6 +252,8 @@ export function processLightningSpinAbility(
                 position: positionAtImpact,
                 amount: damageDealt,
                 unitsDied: Math.max(0, amountAliveBefore - enemy.getAmountAlive()),
+                // The floater shows what landed. The sword still burns from the swing the shield ate.
+                ...(waterShieldAbsorbed && damageFromAttack > 0 ? { ignition: damageFromAttack } : {}),
             });
             const unitsKilled = Math.max(0, amountAliveBefore - enemy.getAmountAlive());
             enemyIdDamageFromAttack.set(enemy.getId(), damageFromAttack);

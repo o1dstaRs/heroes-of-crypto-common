@@ -48,7 +48,7 @@ import type { IAnimationData, ISecondaryDamage, IVisibleDamage } from "../scene/
 import { amplifyCastBuffForTarget } from "../spells/castable_buff";
 import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
-import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
+import { SpellElement, SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { dispelSmokeOnOccupiedCells, isSmokeableCell } from "../spells/smoke_clouds";
 import { projectSpellRebound, spellDamageAgainstUnit, spellRawDamage } from "../spells/spell_cast_projection";
 import { canVineTakeRoot, maxCellsForStepBudget, vinePathCells } from "../spells/vines";
@@ -1840,7 +1840,13 @@ export class GameActionEngine {
      */
     private applySpellDamageToUnits(
         caster: Unit,
-        victims: Array<{ unit: Unit; damage: number; rebounded?: boolean; reboundedFromUnitId?: string }>,
+        victims: Array<{
+            unit: Unit;
+            damage: number;
+            element?: SpellElement;
+            rebounded?: boolean;
+            reboundedFromUnitId?: string;
+        }>,
     ): {
         damaged: {
             unitId: string;
@@ -1869,7 +1875,7 @@ export class GameActionEngine {
         // ABILITY Flesh Shield Aura (Abomination) does NOT apply here: the aura absorbs physical damage
         // only, and every point a spell deals is magical. A protected ally eats a cast spell in full, so
         // there is no owner-first impact ordering to arrange — victims resolve in their natural order.
-        for (const { unit, damage, rebounded, reboundedFromUnitId } of victims) {
+        for (const { unit, damage, element, rebounded, reboundedFromUnitId } of victims) {
             // Several Magic Mirrors can enqueue the caster more than once. Once an earlier rebound has killed
             // it, do not call Unit.applyDamage on the dead stack again: that method deliberately assumes a live
             // stack and a second call can otherwise mutate a zero-sized stack or report phantom damage.
@@ -1879,7 +1885,15 @@ export class GameActionEngine {
 
             const positionAtImpact = { ...unit.getPosition() };
             const amountAliveBefore = unit.getAmountAlive();
-            const damageDealt = unit.applyDamage(damage, 0 /* magic attack */, this.context.sceneLog, false, caster);
+            const damageDealt = unit.applyDamage(
+                damage,
+                0 /* magic attack */,
+                this.context.sceneLog,
+                false,
+                caster,
+                undefined,
+                element,
+            );
             const unitsDied = Math.max(0, amountAliveBefore - unit.getAmountAlive());
 
             damaged.push({
@@ -2122,16 +2136,24 @@ export class GameActionEngine {
         spell: Spell,
         rawDamage: number,
         targets: Unit[],
-    ): Array<{ unit: Unit; damage: number; rebounded?: boolean; reboundedFromUnitId?: string }> {
+    ): Array<{
+        unit: Unit;
+        damage: number;
+        element?: SpellElement;
+        rebounded?: boolean;
+        reboundedFromUnitId?: string;
+    }> {
         const victims: Array<{
             unit: Unit;
             damage: number;
+            element?: SpellElement;
             rebounded?: boolean;
             reboundedFromUnitId?: string;
         }> = [];
+        const element = spell.getElement();
         for (const unit of targets) {
             const landedDamage = this.elementalDamageAgainst(spell, rawDamage, unit);
-            victims.push({ unit, damage: landedDamage });
+            victims.push({ unit, damage: landedDamage, element });
             // A mirror returns what it REFLECTS, not the whole spell: the caster takes the mirror's own share
             // (the percentage its card advertises) of the damage that actually landed on the holder — ALWAYS,
             // as an amount the way magic resistance cuts one, never a roll. Reflecting 100% made a 75% card a
@@ -2163,6 +2185,7 @@ export class GameActionEngine {
                 victims.push({
                     unit: caster,
                     damage: reboundDamage,
+                    element,
                     rebounded: true,
                     reboundedFromUnitId: unit.getId(),
                 });
@@ -2404,8 +2427,8 @@ export class GameActionEngine {
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, caught);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
-        // One line per victim, not one total. A blast is priced per creature — each resists separately, an
-        // element can halve or void it, and a Water Shield can eat one outright — so a single summed number
+        // One line per victim, not one total. A blast is priced per creature — each resists separately, and an
+        // element can halve or void it. Fire passes a Water Shield without breaking it — so a single summed number
         // told the player nothing about who actually took what (owner report 2026-09-20, reading
         // "burst a Fireball on Centaur, catching 2 more (984)" off the battle log). Same shape the engine
         // already uses for a splash shot and a multi-hit attack: a headline saying WHERE it burst, then the
