@@ -13,6 +13,7 @@ import { ArtifactTier, TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artif
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { getDoctrineRevealMode, DOCTRINES, Doctrine } from "../doctrines/doctrine_properties";
 import { CreatureLevelList, CreatureLevelMap, CreaturePoolByLevel } from "../units/unit_properties";
+import { getVisibleDraftBans } from "./ban_visibility";
 
 export type PickTeam = typeof PBTypes.TeamVals.LEFT | typeof PBTypes.TeamVals.RIGHT;
 export type PickBundle = readonly [level1Creature: number, level2Creature: number, tier1Artifact: number];
@@ -81,6 +82,8 @@ export const LIVE_PICK_PHASES: readonly ILivePickPhase[] = [
         creatureLevel: 0,
     },
 ] as const;
+
+const LIVE_PICK_PHASE_LEVELS = LIVE_PICK_PHASES.map(({ creatureLevel }) => creatureLevel);
 
 export interface IPickTeamState {
     doctrine: Doctrine;
@@ -765,7 +768,12 @@ export function getPickTeamView(state: IPickSimState, team: PickTeam): IPickTeam
         actors: [...current.actors],
         requiredCreatureLevel: current.creatureLevel,
         complete: isPickSimComplete(state),
-        creaturesBanned: [...state.creaturesBanned],
+        creaturesBanned: getVisibleDraftBans(
+            state.creaturesBanned,
+            LIVE_PICK_PHASE_LEVELS,
+            state.phaseSequence,
+            own.doctrine,
+        ),
         creaturesPicked: [...own.creatures],
         knownOpponentCreatures: getKnownOpponentCreatures(state, team),
         doctrine: own.doctrine,
