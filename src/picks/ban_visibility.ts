@@ -11,20 +11,20 @@ export function getVisibleDraftBans(
     if (!Number.isSafeInteger(phaseSequence) || phaseSequence < 0 || phaseSequence >= phaseLevels.length) {
         return [];
     }
-    let revealedLevel = 0;
+    const revealedLevels = new Set<number>();
     if (doctrine === Doctrine.THREE_REVEALS || doctrine === Doctrine.SEE_ALL) {
-        revealedLevel = 4;
+        for (const level of [1, 2, 3, 4]) revealedLevels.add(level);
     } else {
         // A zero-level artifact/handoff step must not hide bans from a level already opened.
         for (let index = 0; index <= phaseSequence; index++) {
             const level = phaseLevels[index];
             if (Number.isInteger(level) && level >= 1 && level <= 4) {
-                revealedLevel = Math.max(revealedLevel, level);
+                revealedLevels.add(level);
             }
         }
     }
     return banned.filter((id) => {
         const level = CreatureLevelMap[id];
-        return level >= 1 && level <= revealedLevel;
+        return revealedLevels.has(level);
     });
 }

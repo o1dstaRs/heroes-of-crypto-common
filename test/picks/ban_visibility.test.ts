@@ -36,8 +36,11 @@ describe("draft ban visibility", () => {
     test("uses actual level history rather than hard-coded phase indices", () => {
         const legacyLevels = [0, 2, 0, 4, 0];
         expect(getVisibleDraftBans(bans, legacyLevels, 0)).toEqual([]);
-        expect(getVisibleDraftBans(bans, legacyLevels, 2)).toEqual(bans.filter((id) => CreatureLevelMap[id] <= 2));
-        expect(getVisibleDraftBans(bans, legacyLevels, 4)).toEqual(bans);
+        expect(getVisibleDraftBans(bans, legacyLevels, 2)).toEqual(bans.filter((id) => CreatureLevelMap[id] === 2));
+        expect(getVisibleDraftBans(bans, legacyLevels, 4)).toEqual(
+            bans.filter((id) => [2, 4].includes(CreatureLevelMap[id])),
+        );
+        expect(getVisibleDraftBans(bans, [0, 3, 1, 4, 2], 1)).toEqual(bans.filter((id) => CreatureLevelMap[id] === 3));
     });
 
     test("malformed sequences fail closed, unknown creature ids stay out and returned arrays are independent", () => {
