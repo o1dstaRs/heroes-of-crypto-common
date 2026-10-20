@@ -56,7 +56,7 @@ A read-only audit of 163 saved test-server reports found just two current-board 
 ## Requirements for a future promotion
 
 1. Register the candidate, population, sample size, controls, seed allocation, and multiplicity correction before evaluating its outcomes. Freeze source and record configuration. A changed rule is a new candidate.
-2. Compare fully funded paid plans against **both** current behavior and a matched free formation. Keep paired opponents, artifacts, rosters, and combat seeds fixed. Account for extra splits and conserved spell resources.
+2. Compare fully funded paid plans against **both** current behavior and a matched free formation. Keep paired opponents, artifacts, rosters, and combat seeds fixed. Account for extra splits and the complete independent spellbook each caster stack receives; splitting does not divide spell charges.
 3. Use independent armies as the confidence unit; mirrored seats and repeated seeds are not extra independent army samples. Check both seats, the live maps, relevant threats, and varied opponent deployments.
 4. Require a positive adjusted confidence interval against both controls on the prespecified target population, followed by fresh held-out confirmation. Inconclusive results are not permission to promote. More early attacks, a positive point estimate, or a favorable post-hoc slice is insufficient.
 5. Verify that the intended conditions occur in actual games and can be selected from information legally available when the bot acts. Test the authoritative server path and existing controls before enabling anything.

@@ -18,7 +18,7 @@ const create = (spec: Parameters<typeof createUnitFromSpec>[0]) =>
         factories.effectFactory,
     );
 
-test("simulated split spellbooks conserve charges and rebuild the authoritative split books", () => {
+test("simulated split stacks each rebuild a full authoritative spellbook", () => {
     const roster = [
         { faction: "Nature", creatureName: "Leprechaun", level: 1, size: 1, amount: 100 },
         { faction: "Might", creatureName: "Wolf Rider", level: 1, size: 1, amount: 80 },
@@ -34,9 +34,9 @@ test("simulated split spellbooks conserve charges and rebuild the authoritative 
     for (const spec of roster) {
         const source = create(spec);
         const stacks = result.roster.filter((stack) => stack.creatureName === spec.creatureName).map(create);
-        expect(stacks.flatMap((stack) => stack.getUnitProperties().spells).sort()).toEqual(
-            [...source.getUnitProperties().spells].sort(),
-        );
+        for (const stack of stacks) {
+            expect([...stack.getUnitProperties().spells].sort()).toEqual([...source.getUnitProperties().spells].sort());
+        }
         if (stacks.length === 1) continue;
         const child = create({ ...spec, amount: 1 });
         source.shareResourcesWithSplit(child, 1);
@@ -48,7 +48,7 @@ test("simulated split spellbooks conserve charges and rebuild the authoritative 
     }
     expect(roster).toEqual(before);
     const healerChild = result.roster.find((spec, index) => index >= roster.length && spec.creatureName === "Healer")!;
-    expect(healerChild.initialSpellEntries).toEqual(["Life:Heal", "Life:Spiritual Armor"]);
+    expect(healerChild.initialSpellEntries).toEqual(create(roster[2]).getUnitProperties().spells);
     expect(create(healerChild).getUnitProperties().can_cast_spells).toBe(true);
 });
 

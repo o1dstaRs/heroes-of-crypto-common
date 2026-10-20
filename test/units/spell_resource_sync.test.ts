@@ -55,8 +55,8 @@ const amounts = (unit: Unit): Record<string, number> =>
 
 describe("spell charges restored to a reconstructed caster", () => {
     for (const [faction, name] of casters) {
-        test(`${name} can cast charges returned by a whole-stack merge`, () => {
-            // A tiny split can have no charges. Reconstructing that state removes all Spell objects.
+        test(`${name} can restore missing book entries without pooling charges or draining the donor`, () => {
+            // An authoritative empty book has no Spell objects until entries are synchronized.
             const recipient = createCaster(faction, name, 1, []);
             const donor = createCaster(faction, name, 19);
             const book = [...donor.getUnitProperties().spells];
@@ -70,9 +70,9 @@ describe("spell charges restored to a reconstructed caster", () => {
             expect(recipient.getCanCastSpells()).toBe(true);
             expect(amounts(recipient)).toEqual(expectedAmounts);
             expect(recipient.getSpells().every((spell) => isSpellUsableByCaster(recipient, spell))).toBe(true);
-            expect(donor.getSpellsCount()).toBe(0);
-            expect(donor.getCanCastSpells()).toBe(false);
-            expect(donor.getSpells().every((spell) => !spell.isRemaining())).toBe(true);
+            expect(donor.getSpellsCount()).toBe(book.length);
+            expect(donor.getCanCastSpells()).toBe(true);
+            expect(amounts(donor)).toEqual(expectedAmounts);
         });
 
         test(`${name} can cast spells added to a partial authoritative book`, () => {

@@ -3238,78 +3238,39 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
     }
-    /**
-     * A split peels `amount` creatures off this stack into `part`. Spell charges are shared, never
-     * duplicated: `part` gets its share of every charge, in proportion to the creatures it takes and
-     * rounded down, and this stack keeps the rest — a single Resurrection, Castling or Battle Roar charge
-     * always stays here. A one-creature split is the exception for every spell whose own requirement is
-     * already stack power 1 and that this stack has more than one charge of: that lone caster takes one,
-     * so it can still cast Fire Strike or Fireforged Sword. Arrows are not shared: `part` copies this
-     * stack's remaining quiver, and this stack keeps every arrow it has left. Call it before this
-     * stack's count is reduced.
-     */
+    /** Give the new stack its own complete spellbook and quiver without reducing this stack's casts. */
     public shareResourcesWithSplit(part: Unit, amount: number): void {
         const total = this.getAmountAlive();
         if (total <= 0 || amount <= 0 || amount >= total) {
             return;
         }
-        this.moveResourcesTo(part, amount / total, false, amount);
+        part.syncAuthoritativeSpellEntries([...this.unitProperties.spells]);
+        part.unitProperties.range_shots = Math.max(0, Math.floor(this.unitProperties.range_shots));
+        part.unitProperties.rallying_volley_granted = this.unitProperties.rallying_volley_granted;
     }
     /**
-     * Merging `moved` of `from`'s creatures back into this stack brings their share of `from`'s spell
-     * charges along (all of them when the whole stack merges). Arrows stay where they are: the absorbed
-     * stack's quiver is not added to this one. Call it before `from`'s count is reduced.
+     * Spellbooks belong to stacks, not individual creatures. A merge keeps the larger remaining count
+     * of each spell instead of adding the books together. A partial merge leaves the donor's book
+     * intact, and neither kind of merge combines the quivers. Call before reducing `from`'s count.
      */
     public takeResourcesFromMerge(from: Unit, moved: number): void {
-        const total = from.getAmountAlive();
-        if (total <= 0 || moved <= 0) {
+        if (from.getAmountAlive() <= 0 || moved <= 0) {
             return;
         }
-        from.moveResourcesTo(this, Math.min(1, moved / total), true);
-    }
-    private moveResourcesTo(other: Unit, share: number, addToOther: boolean, peeledCreatures = 0): void {
-        const counts = new Map<string, number>();
-        for (const rawEntry of this.unitProperties.spells) {
+        const entries = [...this.unitProperties.spells];
+        const ownCounts = new Map<string, number>();
+        for (const rawEntry of entries) {
             const entry = normalizeSpellEntry(rawEntry);
-            counts.set(entry, (counts.get(entry) ?? 0) + 1);
+            ownCounts.set(entry, (ownCounts.get(entry) ?? 0) + 1);
         }
-        // A one-creature peel of a large stack rounds every share to 0. Any spell whose own
-        // requirement is already 1 is still a cast that stack can make, so it takes one charge of
-        // each when this stack has a spare. A higher requirement, or the last charge, stays here.
-        const basicSpells = new Set(
-            this.spells.filter((spell) => spell.getMinimalCasterStackPower() <= 1).map((spell) => spell.getName()),
-        );
-        const toMove = new Map<string, number>();
-        for (const [entry, count] of counts) {
-            let moving = Math.floor(count * share);
-            const spellName = entry.substring(entry.indexOf(":") + 1);
-            if (moving === 0 && peeledCreatures === 1 && count > 1 && basicSpells.has(spellName)) {
-                moving = 1;
-            }
-            toMove.set(entry, moving);
-        }
-        const moved: string[] = [];
-        const kept: string[] = [];
-        for (const rawEntry of this.unitProperties.spells) {
+        const donorCounts = new Map<string, number>();
+        for (const rawEntry of from.unitProperties.spells) {
             const entry = normalizeSpellEntry(rawEntry);
-            const left = toMove.get(entry) ?? 0;
-            if (left > 0) {
-                moved.push(rawEntry);
-                toMove.set(entry, left - 1);
-            } else {
-                kept.push(rawEntry);
-            }
+            const count = (donorCounts.get(entry) ?? 0) + 1;
+            donorCounts.set(entry, count);
+            if (count > (ownCounts.get(entry) ?? 0)) entries.push(rawEntry);
         }
-        this.syncAuthoritativeSpellEntries(kept);
-        other.syncAuthoritativeSpellEntries(addToOther ? [...other.unitProperties.spells, ...moved] : moved);
-
-        // Arrows are not a shared pool. A split copies this stack's remaining quiver (and the blessing
-        // ledger already counted in it, so those arrows are not granted a second time) and leaves this
-        // stack's arrows untouched. A merge does not move them: absorbing a stack must not refill this one.
-        if (!addToOther) {
-            other.unitProperties.range_shots = Math.max(0, Math.floor(this.unitProperties.range_shots));
-            other.unitProperties.rallying_volley_granted = this.unitProperties.rallying_volley_granted;
-        }
+        this.syncAuthoritativeSpellEntries(entries);
     }
     public useSpell(spellName: string): void {
         for (const s of this.spells) {

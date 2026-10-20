@@ -41,24 +41,26 @@ function expectBookConsistent(unit: Unit): void {
 describe("every caster's resources across splitting, reconstruction and merging", () => {
     for (const spec of casters) {
         for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
-            test(`${spec.creatureName}, team ${team}: every split size conserves every spell`, () => {
+            test(`${spec.creatureName}, team ${team}: every split size retains two complete independent books`, () => {
                 for (let amount = 1; amount < 40; amount++) {
                     const source = create(spec, 40, team);
                     const child = create(spec, amount, team);
                     const original = entries(source);
                     source.shareResourcesWithSplit(child, amount);
                     source.setAmountAlive(40 - amount);
-                    expect(entries(source, child)).toEqual(original);
+                    expect(entries(source)).toEqual(original);
+                    expect(entries(child)).toEqual(original);
                     expectBookConsistent(source);
                     expectBookConsistent(child);
 
                     const restoredSource = rebuild(source);
                     const restoredChild = rebuild(child);
-                    expect(entries(restoredSource, restoredChild)).toEqual(original);
+                    expect(entries(restoredSource)).toEqual(original);
+                    expect(entries(restoredChild)).toEqual(original);
                     restoredSource.takeResourcesFromMerge(restoredChild, amount);
                     restoredSource.setAmountAlive(40);
                     expect(entries(restoredSource)).toEqual(original);
-                    expect(entries(restoredChild)).toEqual([]);
+                    expect(entries(restoredChild)).toEqual(original);
                     expectBookConsistent(restoredSource);
                     expectBookConsistent(restoredChild);
                 }
@@ -72,17 +74,20 @@ describe("every caster's resources across splitting, reconstruction and merging"
                 for (const spell of child.getSpells()) {
                     if (spell.isRemaining()) child.useSpell(spell.getName());
                 }
-                const remaining = entries(source, child);
+                const sourceBook = entries(source);
+                const childBook = entries(child);
                 const restoredSource = rebuild(source);
                 const restoredChild = rebuild(child);
                 restoredSource.takeResourcesFromMerge(restoredChild, 7);
                 restoredSource.setAmountAlive(27);
                 restoredChild.setAmountAlive(13);
-                expect(entries(restoredSource, restoredChild)).toEqual(remaining);
+                expect(entries(restoredSource)).toEqual(sourceBook);
+                expect(entries(restoredChild)).toEqual(childBook);
                 expectBookConsistent(restoredSource);
                 expectBookConsistent(restoredChild);
                 restoredSource.takeResourcesFromMerge(restoredChild, 13);
-                expect(entries(restoredSource)).toEqual(remaining);
+                expect(entries(restoredSource)).toEqual(sourceBook);
+                expect(entries(restoredChild)).toEqual(childBook);
                 expectBookConsistent(restoredSource);
 
                 for (const spell of restoredSource.getSpells()) {
@@ -96,7 +101,7 @@ describe("every caster's resources across splitting, reconstruction and merging"
         }
     }
 
-    test("mixed legacy/direct ability spell entries are one shared charge pool", () => {
+    test("mixed legacy/direct ability spell entries copy and merge without inflating charges", () => {
         const spec = casters.find((spec) => spec.creatureName === "Harpy")!;
         const source = create(spec, 40, PBTypes.TeamVals.LEFT);
         const child = create(spec, 20, PBTypes.TeamVals.LEFT);
@@ -107,13 +112,15 @@ describe("every caster's resources across splitting, reconstruction and merging"
                 .getSpells()
                 .find((spell) => spell.getName() === "Wind Flow")
                 ?.getAmount(),
-        ).toBe(1);
+        ).toBe(2);
         expect(
             source
                 .getSpells()
                 .find((spell) => spell.getName() === "Wind Flow")
                 ?.getAmount(),
-        ).toBe(1);
+        ).toBe(2);
+        source.takeResourcesFromMerge(child, 20);
+        expect(source.getSpellsCount()).toBe(2);
         expectBookConsistent(source);
         expectBookConsistent(child);
     });

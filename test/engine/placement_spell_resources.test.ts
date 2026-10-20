@@ -47,14 +47,15 @@ function setupHealer() {
     return { healer, split, engine, unitsHolder, fight };
 }
 
-describe("placement split removal preserves spell charges", () => {
+describe("placement splits keep full independent spellbooks", () => {
     it("lets a lone Healer cast after repeatedly undoing and retrying its split", () => {
         const { healer, split, engine, unitsHolder } = setupHealer();
         const originalBook = [...healer.getUnitProperties().spells].sort();
         for (let attempt = 0; attempt < 5; attempt++) {
             const lone = split(1);
             lone.setStackPower(1);
-            expect(lone.getUnitProperties().spells).toEqual(["Life:Heal", "Life:Spiritual Armor"]);
+            expect([...lone.getUnitProperties().spells].sort()).toEqual(originalBook);
+            expect([...healer.getUnitProperties().spells].sort()).toEqual(originalBook);
             expect(lone.getCanCastSpells()).toBe(true);
             expect(
                 lone
@@ -70,11 +71,12 @@ describe("placement split removal preserves spell charges", () => {
         }
     });
 
-    it("returns the remaining charges without restoring spent casts or duplicating the book", () => {
+    it("merges without pooling books or restoring casts spent on both stacks", () => {
         const { healer, split, engine } = setupHealer();
         const half = split(20);
         half.useSpell("Heal");
-        const expected = [...healer.getUnitProperties().spells, ...half.getUnitProperties().spells].sort();
+        healer.useSpell("Heal");
+        const expected = [...healer.getUnitProperties().spells].sort();
         expect(engine.apply({ type: "delete_unit", unitId: half.getId() }).completed).toBe(true);
         expect([...healer.getUnitProperties().spells].sort()).toEqual(expected);
         expect(

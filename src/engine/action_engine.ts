@@ -3176,10 +3176,8 @@ export class GameActionEngine {
             return this.reject(refusal ?? "invalid_placement");
         }
 
-        // The peeled stack takes its share of the spell charges; a one-per-fight cast is never duplicated.
-        // A one-creature split still receives one charge of each stack-power-1 spell the source has more than one of.
-        // Arrows are copied, not divided: the new stack gets the source's remaining quiver, and the source
-        // keeps its own.
+        // Every new stack gets a complete, independent spellbook and quiver, including a one-creature
+        // split. The source keeps its casts and arrows; stack power still gates individual spells.
         sourceUnit.shareResourcesWithSplit(splitUnit, action.amount);
         const sourceAmount = sourceUnit.getAmountAlive() - action.amount;
         sourceUnit.setAmountAlive(sourceAmount);
