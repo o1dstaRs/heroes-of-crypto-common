@@ -207,7 +207,10 @@ describe("v0.8 search measurement alias", () => {
         // Manticore fights no longer depend on a two-cell radius. Two isolated runs reproduced this digest.
         // Re-pinned 2026-10-18 for Dryad's cost and Cyclops's attack/damage tuning. The previous config
         // reproduces the old digests; two isolated runs of this config agree with zero rejected actions.
-        expect(digest("v0.7")).toBe("aa0d5997954c4ed17e049373a2b6ca1a75e3e85826641e813faaf64eafa8b817");
+        // Re-pinned 2026-10-20 for area-counter splash journaling: only impactDamage/secondaryHits on
+        // two recorded actions change. Comparing with the committed handler preserved every decision,
+        // battle outcome and other result field, with zero rejected actions. Two isolated runs agree.
+        expect(digest("v0.7")).toBe("7cf65956b787dbc67313ca1f05d8e8cc667df574c7c646582c4ffd160fbd85f1");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -243,7 +246,8 @@ describe("v0.8 search measurement alias", () => {
         // the v0.7 control above is untouched (v0.7 never planned move-then-shoot). Two isolated runs reproduced
         // this digest, both with zero rejected actions.
         // The same 2026-10-18 balance tuning changes this trace too, with identical verification.
-        expect(digest("v0.8")).toBe("2d9d2fba8dbac93e8a8a59971cbf9ae4b56f46f581546538321dccb7a0a10f0d");
+        // The same area-counter journal update changes only those observation counters here too.
+        expect(digest("v0.8")).toBe("ad13ab7449c986e8e53ceafae5af3305afce41113c39feceaafefc7f6ee29b53");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

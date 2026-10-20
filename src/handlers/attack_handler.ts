@@ -1107,18 +1107,18 @@ export class AttackHandler {
         let primaryAssimilationLanded = false;
         let responseAssimilationTarget: Unit | undefined;
         const initiatingSingleHits: NonNullable<IVisibleDamage["splash"]> = [];
-        let chakramResponseHits: NonNullable<IVisibleDamage["splash"]> | undefined;
+        let splashResponseHits: NonNullable<IVisibleDamage["splash"]> | undefined;
         let rangeAttackFinalized = false;
         const finalizeRangeAttack = (): void => {
             if (rangeAttackFinalized) {
                 return;
             }
             rangeAttackFinalized = true;
-            // Splash replaces the client's single-target numbers. A counter-Chakram must therefore carry
+            // Splash replaces the client's single-target numbers. An area counter-shot must therefore carry
             // both sides of the exchange, including each initiating arrow's own hit/miss and casualties.
             // Finalize after the last arrow (or a lethal early return), so no later single hit is lost.
-            if (chakramResponseHits?.length) {
-                (damageForAnimation.splash ??= []).push(...initiatingSingleHits, ...chakramResponseHits);
+            if (splashResponseHits?.length) {
+                (damageForAnimation.splash ??= []).push(...initiatingSingleHits, ...splashResponseHits);
             } else if (
                 attackerUnit.getBonusRangedAttackChance() > 0 &&
                 !damageForAnimation.splash?.length &&
@@ -1665,12 +1665,10 @@ export class AttackHandler {
                 );
             }
             if (aoeRangeResponseResult.landed) {
-                if (responseChakramFlight) {
-                    chakramResponseHits = aoeRangeResponseResult.perUnitDamage.map((entry) => ({
-                        ...entry,
-                        position: { ...entry.position },
-                    }));
-                }
+                splashResponseHits = aoeRangeResponseResult.perUnitDamage.map((entry) => ({
+                    ...entry,
+                    position: { ...entry.position },
+                }));
                 damageFromResponse = AllAbilities.processLuckyStrikeAbility(
                     targetUnit,
                     aoeRangeResponseResult.maxDamage,
