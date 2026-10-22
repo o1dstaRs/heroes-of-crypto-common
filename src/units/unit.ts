@@ -66,7 +66,11 @@ import { notifyHelpingHandChange } from "../spells/helping_hand";
 import { Spell } from "../spells/spell";
 import { SpellElement } from "../spells/spell_properties";
 import { isMagicDamageAbility } from "../spells/spell_damage";
-import { recordEffectApplication, recordWaterShieldAbsorb } from "./effect_application_capture";
+import {
+    recordEffectApplication,
+    recordEmberCovenantAbsorb,
+    recordWaterShieldAbsorb,
+} from "./effect_application_capture";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, type XY } from "../utils/math";
@@ -1940,6 +1944,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
 
             if (this.willEmberCovenantBlock(attacker, damageElement)) {
+                recordEmberCovenantAbsorb({ unitId: this.getId(), amount: minusHp });
                 const fireHit = isEmberCovenantFireHit(damageElement);
                 sceneLog.updateLog(
                     `${this.getName()}'s Ember Covenant blocks ${fireHit ? "the fire attack" : "the hit"}`,

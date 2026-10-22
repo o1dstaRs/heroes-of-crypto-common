@@ -58,6 +58,7 @@ import { Unit } from "../units/unit";
 import {
     beginEffectApplicationCapture,
     endEffectApplicationCapture,
+    endEmberCovenantAbsorbCapture,
     endWaterShieldAbsorbCapture,
     recordEffectApplication,
 } from "../units/effect_application_capture";
@@ -252,15 +253,20 @@ export class GameActionEngine {
                     result.events.push(effectsEvent);
                 }
             }
-            // Water Shield absorbs ride the action's damage payload as `secondary` entries (the
-            // fire_shield/flesh_shield pattern): the absorb is decided deep in Unit.applyDamage where no
-            // handler sees it, yet ranked's log — rebuilt from events, never engine text — must say the
-            // shield broke and under whose blow (the event's attacker/caster names the striker).
-            const waterShieldAbsorbs = endWaterShieldAbsorbCapture();
-            if (typeof result! !== "undefined" && result.completed && waterShieldAbsorbs.length) {
+            // Absorption is decided in Unit.applyDamage. Carry the actual blocked amount to both
+            // clients, including when Ember Covenant removes every ally's ring after just one absorb.
+            const absorbs = [
+                ...endWaterShieldAbsorbCapture().map((record) => ({ ...record, source: "water_shield" as const })),
+                ...endEmberCovenantAbsorbCapture().map((record) => ({ ...record, source: "ember_covenant" as const })),
+            ];
+            if (typeof result! !== "undefined" && result.completed && absorbs.length) {
                 const attackEvent = result.events.find(
-                    (event): event is Extract<GameEvent, { type: "unit_attacked" | "area_attacked" }> =>
-                        event.type === "unit_attacked" || event.type === "area_attacked",
+                    (
+                        event,
+                    ): event is Extract<GameEvent, { type: "unit_attacked" | "area_attacked" | "obstacle_attacked" }> =>
+                        event.type === "unit_attacked" ||
+                        event.type === "area_attacked" ||
+                        event.type === "obstacle_attacked",
                 );
                 const spellEvent = attackEvent
                     ? undefined
@@ -271,16 +277,16 @@ export class GameActionEngine {
                               secondary?: ISecondaryDamage[];
                           } => event.type === "spell_cast",
                       );
-                for (const absorb of waterShieldAbsorbs) {
+                for (const absorb of absorbs) {
                     const owner = this.context.unitsHolder.getAllUnits().get(absorb.unitId);
                     const entry: ISecondaryDamage = {
-                        source: "water_shield",
+                        source: absorb.source,
                         unitId: absorb.unitId,
                         position: owner?.getPosition() ?? { x: 0, y: 0 },
                         amount: absorb.amount,
                         unitsDied: 0,
                     };
-                    if (attackEvent) {
+                    if (attackEvent?.damage) {
                         (attackEvent.damage.secondary ??= []).push(entry);
                     } else if (spellEvent) {
                         (spellEvent.secondary ??= []).push(entry);

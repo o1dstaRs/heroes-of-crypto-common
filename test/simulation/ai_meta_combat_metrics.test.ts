@@ -76,6 +76,7 @@ describe("Premium combat metrics", () => {
                 ],
                 secondary: [
                     { source: "water_shield", unitId: "enemy", position: pos, amount: 40, unitsDied: 0 },
+                    { source: "ember_covenant", unitId: "enemy", position: pos, amount: 60, unitsDied: 0 },
                     { source: "devour_essence", unitId: "own", position: pos, amount: 7, unitsDied: 0 },
                     { source: "flesh_shield", unitId: "split", position: pos, amount: 8, unitsDied: 1 },
                 ],
