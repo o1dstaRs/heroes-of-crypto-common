@@ -935,7 +935,7 @@
             "level": 0,
             "desc": [
                 "Fire attacks are blocked without consuming the blessing.",
-                "The first non-fire hit is fully absorbed, then every allied ring dissolves.",
+                "The first other hit is fully absorbed, then every allied ring dissolves. Water Element attacks and water magic bypass absorption and dissolve every ring.",
                 "Lasts until broken."
             ],
             "target": "AUTO",

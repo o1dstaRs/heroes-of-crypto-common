@@ -14,6 +14,7 @@ import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { BattleRollbackJournal, restoreBattle, snapshotBattle } from "../../src/simulation/battle_snapshot";
 import { fireWallBurnDamage } from "../../src/spells/fire_walls";
+import { applyMagicMirrorDamage } from "../../src/spells/magic_mirror_damage";
 import { Spell } from "../../src/spells/spell";
 import { projectSpellDamageAgainstUnit } from "../../src/spells/spell_cast_projection";
 import { SpellElement } from "../../src/spells/spell_properties";
@@ -102,7 +103,9 @@ describe("Ember Covenant Blessing", () => {
             const caster = createTestUnit({
                 abilities: [element === SpellElement.FIRE ? "Water Element" : "Fire Element"],
             });
-            expect(f.ally.applyDamage(20, 0, log, false, caster, undefined, element)).toBe(0);
+            expect(f.ally.applyDamage(20, 0, log, false, caster, undefined, element)).toBe(
+                element === SpellElement.WATER ? 20 : 0,
+            );
             expect(f.ally.hasBuffActive(NAME)).toBe(element === SpellElement.FIRE);
             expect(f.hydra.hasBuffActive(NAME)).toBe(element === SpellElement.FIRE);
         }
@@ -114,7 +117,7 @@ describe("Ember Covenant Blessing", () => {
         expect(f.ally.hasBuffActive(NAME)).toBe(true);
         const hp = f.ally.getCumulativeHp();
         f.ally.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Water Shield"), amount: 1 }));
-        const spell = new Spell({ spellProperties: getSpellConfig("Nature", "Whirlpool"), amount: 1 });
+        const spell = new Spell({ spellProperties: getSpellConfig("Nature", "Lightning Strike"), amount: 1 });
         expect(projectSpellDamageAgainstUnit({ spell, caster: f.enemy, target: f.ally, rawDamage: 100 })).toMatchObject(
             {
                 damage: 0,
@@ -129,6 +132,28 @@ describe("Ember Covenant Blessing", () => {
         expect(f.ally.hasBuffActive("Water Shield")).toBe(false);
         expect(f.ally.getCumulativeHp()).toBe(hp);
     });
+
+    for (const element of [SpellElement.FIRE, SpellElement.WATER, SpellElement.WIND])
+        test(`reflected ${element} magic uses the same absorption and water bypass rules`, () => {
+            const f = battle();
+            const mirror = new Spell({ spellProperties: getSpellConfig("Chaos", "Magic Mirror"), amount: 1 });
+            mirror.setPower(100);
+            f.enemy.applyBuff(mirror);
+            const hp = f.ally.getCumulativeHp();
+            const reflected = applyMagicMirrorDamage({
+                attacker: f.ally,
+                holder: f.enemy,
+                landedOnHolder: 40,
+                element,
+                sceneLog: log,
+            });
+            const damage = element === SpellElement.WATER ? 40 : 0;
+            expect(reflected?.damage).toBe(damage);
+            expect(reflected?.appliedDamage).toBe(damage);
+            expect(f.ally.getCumulativeHp()).toBe(hp - damage);
+            expect(f.ally.hasBuffActive(NAME)).toBe(element === SpellElement.FIRE);
+            expect(f.hydra.hasBuffActive(NAME)).toBe(element === SpellElement.FIRE);
+        });
 
     test("a lethal-sized hit on Hydra is fully absorbed before any later hit resolves", () => {
         const f = battle();
