@@ -132,6 +132,14 @@ describe("config_provider", () => {
         expect(creature.base_armor).toBe(33);
     });
 
+    // Owner request 2026-10-22: damage floor 35 -> 40. The ceiling stays 60.
+    it("loads Hydra's damage range", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Hydra", "hydra_512", 1);
+
+        expect(creature.attack_damage_min).toBe(40);
+        expect(creature.attack_damage_max).toBe(60);
+    });
+
     it("loads Hyena's reduced attack", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Hyena", "hyena_512", 0, 40);
 
