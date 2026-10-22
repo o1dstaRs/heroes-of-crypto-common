@@ -317,7 +317,8 @@ function emptyBridgePath(grid: Grid, unitsHolder: UnitsHolder, a: Unit, b: Unit,
  *    WHICH of the reachable enemies comes next. Two enemies on the exact same bearing break the tie by
  *    the nearer one first, then by unit id.
  *  - Angel's "Arrows Wingshield Blessing" owner is never struck and STOPS the whole flight when it is the
- *    next bounce clockwise — the shield catches the disc.
+ *    next bounce clockwise — the shield catches the disc. If targeted directly, the owner takes the
+ *    primary hit but never relays the disc to another unit.
  */
 export function resolveChakramTrajectory(
     attackerUnit: Unit,
@@ -326,7 +327,11 @@ export function resolveChakramTrajectory(
     grid: Grid,
 ): IChakramTrajectory {
     const empty: IChakramTrajectory = { steps: [], hitUnits: [], damageFactorByUnitId: {}, mountainCells: [] };
-    if (!attackerUnit.getAbility(CHAKRAM_ABILITY_NAME) || primaryTarget.isDead()) {
+    if (
+        !attackerUnit.getAbility(CHAKRAM_ABILITY_NAME) ||
+        primaryTarget.isDead() ||
+        primaryTarget.hasAbilityActive("Arrows Wingshield Blessing")
+    ) {
         return empty;
     }
 
