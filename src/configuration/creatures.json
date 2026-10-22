@@ -1334,7 +1334,7 @@
             "initiative": 4,
             "armor": 17,
             "attack_type": "RANGE",
-            "attack": 24,
+            "attack": 23,
             "attack_damage_min": 19,
             "attack_damage_max": 24,
             "attack_range": 1,
