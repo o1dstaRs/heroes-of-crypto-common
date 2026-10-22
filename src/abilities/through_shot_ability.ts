@@ -195,7 +195,7 @@ export function processThroughShotAbility(
             const positionAtImpact = { ...targetUnit.getPosition() };
             // Water Shield: captured before this pierced unit's damage lands — an absorbed sub-hit
             // applies none of the shot's on-hit riders (same rule as a missed single-target shot).
-            const waterShieldAbsorbed = damageFromAttack > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
+            const waterShieldAbsorbed = damageFromAttack > 0 && targetUnit.willAbsorbIncomingHit(attackerUnit);
             if (waterShieldAbsorbed) {
                 absorbedUnitIds.add(targetUnit.getId());
             }

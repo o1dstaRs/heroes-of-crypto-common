@@ -483,7 +483,7 @@ function evaluatePreparedRangeCandidateDamage(
                     }
                 }
             }
-            if (target.willWaterShieldAbsorb(unit)) {
+            if (target.willAbsorbIncomingHit(unit)) {
                 effective = estimateShieldedRangedDamage(unit, ammunitionTarget, {
                     hp,
                     hitChance,

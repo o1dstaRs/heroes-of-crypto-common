@@ -267,6 +267,22 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Ember Covenant Blessing": {
+        "name": "Ember Covenant Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "At battle start, surrounds every allied stack with a shared ring of fire.",
+            "Blocks fire attacks without breaking. Water and ordinary attacks pass through normally.",
+            "The first hit that removes HP from any ally breaks every ring. Once per battle; does not stack."
+        ],
+        "power": 100,
+        "power_type": "ARMY_FIRE_COVENANT",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Water Element": {
         "name": "Water Element",
         "type": "DEFENCE",

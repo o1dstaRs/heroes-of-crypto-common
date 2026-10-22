@@ -37,7 +37,7 @@ function enemyBlastDamage(
         .map((enemy) => ({
             cells: enemy.getCells(),
             hp: enemy.getCumulativeHp(),
-            shielded: enemy.willWaterShieldAbsorb(),
+            shielded: enemy.willAbsorbIncomingHit(),
             resurrects: enemy.canSelfResurrect(),
         }));
     const power = unit.getStackPower();
@@ -127,7 +127,7 @@ function canProjectMeleeResponse(
         },
     ]);
     if (!response) return false;
-    if (response.hitChance <= 0 || unit.willWaterShieldAbsorb(target)) return true;
+    if (response.hitChance <= 0 || unit.willAbsorbIncomingHit(target)) return true;
     return response.landedOutcomes.every((outcome) => outcome.damage < unit.getCumulativeHp());
 }
 
@@ -159,7 +159,7 @@ export function estimateLastFuseMeleeDamage(
     if (resurrects && (context.fightProperties?.getBreakChancePerTeam(unit.getTeam()) ?? 0) > 0) return undefined;
     const damage = estimatePrimaryMeleeDamage(unit, target, context, standCell, actions);
     if (!damage) return undefined;
-    if (target.willWaterShieldAbsorb(unit)) {
+    if (target.willAbsorbIncomingHit(unit)) {
         return { expectedNetDamage: 0, expectedFriendlyDamage: 0, fatalChance: 0, secureKill: false };
     }
     const fatalChance = resurrects
@@ -269,7 +269,7 @@ export function estimateLastFuseRangedDamage(
             if (damage >= hp) conditionalFatalChance += probability;
         }
     }
-    const absorbed = target.willWaterShieldAbsorb(unit);
+    const absorbed = target.willAbsorbIncomingHit(unit);
     const firstKills = hitChance === 1 && minimum >= hp && !absorbed;
     const mayFollow = !!getDoubleShotAbility(unit) || unit.getBonusRangedAttackChance() > 0;
     if (mayFollow && !firstKills && !(hitChance === 1 && unit.projectRangeShotsAfterVolleys(target) <= 0))

@@ -1749,7 +1749,7 @@ export class AttackHandler {
                         HoCLib.killTag(rangeResponseUnit.calculatePossibleLosses(damageFromResponse)),
                 );
 
-                rangeResponseAbsorbed = damageFromResponse > 0 && rangeResponseUnit.willWaterShieldAbsorb(targetUnit);
+                rangeResponseAbsorbed = damageFromResponse > 0 && rangeResponseUnit.willAbsorbIncomingHit(targetUnit);
                 // response damage
                 this.damageStatisticHolder.add({
                     unitName: targetUnit.getName(),
@@ -1874,7 +1874,7 @@ export class AttackHandler {
                 damageForAnimation.amount = damageFromAttack;
                 damageForAnimation.hits = []; // Initialize hits as an array of objects
                 const initialAmountAlive = targetUnit.getAmountAlive();
-                rangeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
+                rangeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willAbsorbIncomingHit(attackerUnit);
                 // attack damage
                 const damageDealt = targetUnit.applyDamage(
                     damageFromAttack,
@@ -3033,7 +3033,7 @@ export class AttackHandler {
                     // Water Shield on the counterattacked ATTACKER: an absorbed response lands none of the
                     // responder's on-hit riders — same rule as a missed response.
                     const meleeResponseAbsorbed =
-                        damageFromResponse > 0 && attackerUnit.willWaterShieldAbsorb(targetUnit);
+                        damageFromResponse > 0 && attackerUnit.willAbsorbIncomingHit(targetUnit);
                     this.damageStatisticHolder.add({
                         unitName: targetUnit.getName(),
                         damage: attackerUnit.applyDamage(
@@ -3169,7 +3169,7 @@ export class AttackHandler {
         if (!hasLightningSpinAttackLanded && !isAttackMissed && !targetUnit.isDead()) {
             // Water Shield: captured BEFORE the blow lands (applyDamage consumes the shield). An absorbed
             // strike applies nothing — the whole on-hit rider block below is skipped like a missed blow.
-            const meleeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
+            const meleeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willAbsorbIncomingHit(attackerUnit);
             // this code has to be here to make sure that respond damage has been applied as well
             damageForAnimation.render = true;
             damageForAnimation.amount = damageFromAttack;
@@ -3339,7 +3339,7 @@ export class AttackHandler {
             captureResponse();
             // Water Shield vs the second punch: possible when the FIRST punch missed (shield intact).
             // Captured before the second punch's damage lands; an absorbed punch applies no riders.
-            const secondPunchAbsorbed = secondPunchResult.damage > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
+            const secondPunchAbsorbed = secondPunchResult.damage > 0 && targetUnit.willAbsorbIncomingHit(attackerUnit);
             if (secondPunchResult.damage > 0) {
                 const secondPunchFleshShieldAbsorb = AllAbilities.processFleshShieldAura(
                     attackerUnit,

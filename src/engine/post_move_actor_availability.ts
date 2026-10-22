@@ -13,6 +13,7 @@ import { getSpellConfig } from "../configuration/config_provider";
 import { getFootprintCellsForAnchor, normalizeFootprintSide } from "../grid/grid_math";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { fireWallBurnDamage, FireWalls, type IFireWallBurnTarget } from "../spells/fire_walls";
+import { SpellElement } from "../spells/spell_properties";
 import { madeOfFireBoostedMaxHp } from "../units/movement_stat_modifiers";
 import { projectStackDamage, type IStackHpState } from "../units/stack_damage";
 import type { Unit } from "../units/unit";
@@ -327,7 +328,8 @@ export interface IFireWallBurnResult {
  */
 export function fireWallBurnTargetOf(unit: Unit): IFireWallBurnTarget {
     return {
-        isFireElement: unit.hasAbilityActive("Fire Element"),
+        isFireElement:
+            unit.hasAbilityActive("Fire Element") || unit.willEmberCovenantBlock(undefined, SpellElement.FIRE),
         isWaterElement: unit.hasAbilityActive("Water Element"),
         isWindElement: unit.hasAbilityActive("Wind Element"),
         isEarthElement: unit.hasAbilityActive("Earth Element"),

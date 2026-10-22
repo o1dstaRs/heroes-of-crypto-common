@@ -80,7 +80,7 @@ export function projectMagicMirrorDamage(input: {
         attacker,
     );
     const absorbedByWaterShield = landed > 0 && attacker.willWaterShieldAbsorb(attacker, element);
-    const damage = absorbedByWaterShield ? 0 : landed;
+    const damage = absorbedByWaterShield || attacker.willEmberCovenantBlock(holder, element) ? 0 : landed;
 
     return {
         landed,

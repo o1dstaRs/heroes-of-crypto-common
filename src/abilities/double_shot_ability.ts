@@ -276,7 +276,7 @@ export function processDoubleShotAbility(
         // Water Shield: reachable when the FIRST shot missed (shield intact). Captured before the
         // damage lands; the caller skips this shot's on-hit riders when it absorbed. The attacker is
         // passed through so a Fire Element shooter bypasses the shield here like everywhere else.
-        waterShieldAbsorbed = damageFromAttack > 0 && toUnit.willWaterShieldAbsorb(fromUnit);
+        waterShieldAbsorbed = damageFromAttack > 0 && toUnit.willAbsorbIncomingHit(fromUnit);
         // Snapshot losses BEFORE applyDamage — calculatePossibleLosses reads current hp/amount_alive.
         const unitsKilled = toUnit.calculatePossibleLosses(damageFromAttack);
         damageStatisticHolder.add({

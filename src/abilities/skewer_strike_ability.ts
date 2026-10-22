@@ -205,7 +205,7 @@ export function strikeSkewerTargets(
         // Water Shield: captured BEFORE the damage lands (applyDamage consumes the shield). An
         // absorbed skewer hit applies no on-hit riders — same rule as the main melee path and
         // Lightning Spin's per-enemy gate.
-        const waterShieldAbsorbed = damageFromAttack > 0 && nextStandingTarget.willWaterShieldAbsorb(fromUnit);
+        const waterShieldAbsorbed = damageFromAttack > 0 && nextStandingTarget.willAbsorbIncomingHit(fromUnit);
         const amountBefore = nextStandingTarget.getAmountAlive();
         const damageDealt = nextStandingTarget.applyDamage(
             damageFromAttack,

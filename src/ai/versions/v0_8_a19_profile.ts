@@ -150,7 +150,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "gravechain-coverage" as const,
         source: "src/ai/gravechain_shortlist.ts" as const,
-        sha256: "9dc203749776483b504e3aa82fc4d4158ba5d896f1e1c5e85e228cdf1d509c76" as const,
+        sha256: "e6355ebe4367ec4218b3bd6803fe2e7e9764bf61fd1d7870fad6113d2433790f" as const,
     }),
     Object.freeze({
         role: "last-fuse-trades" as const,
@@ -160,12 +160,12 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        sha256: "2a44b767828ff6aecab76247eae9ddd93e72025d4bbee250f1ebfa542bbf3dfd" as const,
+        sha256: "9d411a010356f3cad5dbfc71ddb4eadf883e61c708ebf6687a2ce637e4608a27" as const,
     }),
     Object.freeze({
         role: "last-fuse-estimates" as const,
         source: "src/ai/last_fuse_estimate.ts" as const,
-        sha256: "313d634f553880bb67cdea18f092c918eb72ce045e495c2822355f3c627f958b" as const,
+        sha256: "c30b7fefd4174b5e9062e4fec0e608da9ef42d7e61d7f342cb651e499a8926f0" as const,
     }),
     Object.freeze({
         role: "ranged-shields" as const,

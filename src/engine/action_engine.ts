@@ -370,6 +370,7 @@ export class GameActionEngine {
         this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, leftUnitsAlive);
         this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, rightUnitsAlive);
         this.context.unitsHolder.refreshStackPowerForAllUnits();
+        this.context.unitsHolder.seedEmberCovenant();
 
         // Record each unit's starting cell so the fight log preserves the initial deployment.
         for (const unit of this.context.unitsHolder.getAllUnits().values()) {

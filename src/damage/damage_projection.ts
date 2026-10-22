@@ -190,6 +190,7 @@ export function reachableTopRoll(chain: IAttackDamageChain): number {
 
 /** Band (no kills) of the damage this attack can deal: both ends are values the engine can actually produce. */
 export function projectAttackDamageBand(input: IAttackDamageProjectionInput): { min: number; max: number } {
+    if (input.target.willEmberCovenantBlock(input.attacker)) return { min: 0, max: 0 };
     const chain = resolveAttackDamageChain(input);
     if (chain.outOfShots) {
         return { min: 0, max: 0 };

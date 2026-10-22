@@ -229,6 +229,8 @@ const HOLDER_FIELDS = [
     "distancesToClosestEnemies",
     "auraRefreshFingerprint",
     "auraRefreshKnownEmpty",
+    "emberCovenantSeeded",
+    "emberCovenantTeams",
 ] as const;
 
 const HOLDER_SHARED_FIELDS = ["grid", "allUnits", "gridSettings"] as const;
@@ -397,6 +399,8 @@ const HOLDER_MUTATION_METHODS = [
     "deleteUnitById",
     "refreshAngelicHostForAllUnits",
     "refreshWaterShieldForAllUnits",
+    "seedEmberCovenant",
+    "breakEmberCovenant",
     "refreshStackPowerForAllUnits",
     "refreshAuraEffectsIfNeeded",
     "refreshAuraEffectsForAllUnits",

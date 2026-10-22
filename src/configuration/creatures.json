@@ -916,7 +916,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["Lightning Spin", "Devour Essence"]
+            "abilities": ["Lightning Spin", "Devour Essence", "Ember Covenant Blessing"]
         },
         "Abomination": {
             "name": "Abomination",

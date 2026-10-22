@@ -19,6 +19,7 @@ import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilitie
 import { BORROWED_GRACE_NAME, borrowedGraceChance } from "../abilities/borrowed_grace_ability";
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
 import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/double_shot_names";
+import { EMBER_COVENANT_BLESSING, notifyEmberCovenantDamage } from "../abilities/ember_covenant";
 import { getCraftChances } from "../abilities/craft_ability";
 import { lastFuseDamage, lastFuseSourceFor, type ILastFuseSource } from "../abilities/last_fuse_ability";
 import { ARTIFACT_POWER, BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
@@ -1933,6 +1934,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 return 0;
             }
 
+            if (this.willEmberCovenantBlock(attacker, damageElement)) {
+                sceneLog.updateLog(`${this.getName()}'s Ember Covenant blocks the fire attack`);
+                return 0;
+            }
+
             // Water Shield: once per battle, the first incoming damage instance is fully absorbed (0 damage taken)
             // and the shield breaks. Sits above the Break roll and the HP subtraction so an absorbed hit lands
             // nothing at all; `waterShieldSpent` stops the seeding refresh from re-granting the buff afterwards.
@@ -2005,6 +2011,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.max_hp = damage.state.maxHp;
             this.unitProperties.amount_alive = damage.state.amountAlive;
             this.unitProperties.amount_died = damage.state.amountDied;
+            if (damage.appliedDamage > 0) notifyEmberCovenantDamage(this, sceneLog);
             if (damage.dead && damage.unitsDied > 0) {
                 const source = lastFuseSource ?? lastFuseSourceFor(attacker);
                 this.lastFuseFatalHit = {
@@ -2241,6 +2248,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             !this.hasEffectActive("Break") &&
             !attacker?.hasAbilityActive("Fire Element") &&
             damageElement !== SpellElement.FIRE
+        );
+    }
+    public willEmberCovenantBlock(attacker?: Unit, damageElement?: SpellElement): boolean {
+        return (
+            this.hasStatusBuffApplied(EMBER_COVENANT_BLESSING) &&
+            damageElement !== SpellElement.WATER &&
+            !attacker?.hasAbilityActive("Water Element") &&
+            (damageElement === SpellElement.FIRE || !!attacker?.hasAbilityActive("Fire Element"))
+        );
+    }
+    public willAbsorbIncomingHit(attacker?: Unit, damageElement?: SpellElement): boolean {
+        return (
+            this.willEmberCovenantBlock(attacker, damageElement) || this.willWaterShieldAbsorb(attacker, damageElement)
         );
     }
     public calculatePossibleLosses(minusHp: number): number {

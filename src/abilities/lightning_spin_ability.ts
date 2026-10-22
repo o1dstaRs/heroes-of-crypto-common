@@ -230,7 +230,7 @@ export function processLightningSpinAbility(
             const amountAliveBefore = enemy.getAmountAlive();
             // Water Shield: captured before the spin's damage lands on this enemy — an absorbed sub-hit
             // applies none of the on-hit riders below (same rule as a missed single-target blow).
-            const waterShieldAbsorbed = damageFromAttack > 0 && enemy.willWaterShieldAbsorb(fromUnit);
+            const waterShieldAbsorbed = damageFromAttack > 0 && enemy.willAbsorbIncomingHit(fromUnit);
             const damageDealt = enemy.applyDamage(
                 damageFromAttack,
                 FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),

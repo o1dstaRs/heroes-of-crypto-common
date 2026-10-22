@@ -222,7 +222,7 @@ export function processRangeAOEAbility(
                 // unit stood when hit (it may die and be removed before the visuals play).
                 const unitPositionAtImpact = { ...unit.getPosition() };
                 const amountAliveBeforeDamage = unit.getAmountAlive();
-                const waterShieldAbsorbed = damageFromAttack > 0 && unit.willWaterShieldAbsorb(attackerUnit);
+                const waterShieldAbsorbed = damageFromAttack > 0 && unit.willAbsorbIncomingHit(attackerUnit);
                 if (!waterShieldAbsorbed) {
                     landedHitUnitIds.add(unit.getId());
                 }

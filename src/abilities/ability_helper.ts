@@ -192,6 +192,7 @@ const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
     "Arrows Wingshield Blessing",
     "Rallying Volley Blessing",
     "Water Shield",
+    "Ember Covenant Blessing",
 ]);
 
 function addToTargetList(

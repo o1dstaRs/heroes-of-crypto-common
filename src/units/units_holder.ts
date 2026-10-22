@@ -27,6 +27,7 @@ import {
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
 import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES } from "../abilities/double_shot_names";
+import { EMBER_COVENANT_BLESSING, registerEmberCovenantArmy } from "../abilities/ember_covenant";
 import { getSpellConfig, POISON_ON_HIT_AURA_EFFECT_NAMES } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effects/effect_properties";
@@ -42,6 +43,7 @@ import {
 } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { reconcileHelpingHandLinks, registerHelpingHandOwner } from "../spells/helping_hand";
 import { getDistance, type XY } from "../utils/math";
 import { type IUnitAIRepr, Unit } from "./unit";
@@ -114,6 +116,8 @@ export class UnitsHolder {
     private distancesToClosestEnemies: Map<string, number> = new Map();
     private auraRefreshFingerprint: AuraRefreshFingerprintValue[] | undefined;
     private auraRefreshKnownEmpty: boolean;
+    private emberCovenantSeeded = false;
+    private readonly emberCovenantTeams = new Set<TeamType>();
     public constructor(grid: Grid) {
         this.grid = grid;
         this.gridSettings = grid.getSettings();
@@ -1186,6 +1190,39 @@ export class UnitsHolder {
             unit.trySeedWaterShield();
         }
     }
+    public seedEmberCovenant(): void {
+        if (this.emberCovenantSeeded) return;
+        this.emberCovenantSeeded = true;
+        for (const unit of this.getAllUnitsIterator()) {
+            if (
+                !unit.isDead() &&
+                isCellWithinGrid(this.gridSettings, unit.getBaseCell()) &&
+                unit.hasAbilityActive(EMBER_COVENANT_BLESSING)
+            )
+                this.emberCovenantTeams.add(unit.getTeam());
+        }
+        for (const unit of this.getAllUnitsIterator()) {
+            if (
+                !this.emberCovenantTeams.has(unit.getTeam()) ||
+                unit.isDead() ||
+                !isCellWithinGrid(this.gridSettings, unit.getBaseCell())
+            )
+                continue;
+            unit.applyBuff(
+                new Spell({ spellProperties: getSpellConfig("System", EMBER_COVENANT_BLESSING), amount: 1 }),
+            );
+        }
+    }
+    public hasEmberCovenant(team: TeamType): boolean {
+        return this.emberCovenantTeams.has(team);
+    }
+    public breakEmberCovenant(team: TeamType, victim: Unit, sceneLog: ISceneLog): void {
+        if (!this.emberCovenantTeams.delete(team)) return;
+        for (const unit of this.getAllUnitsIterator()) {
+            if (unit.getTeam() === team) unit.deleteBuff(EMBER_COVENANT_BLESSING);
+        }
+        sceneLog.updateLog(`${victim.getName()} takes damage; the army's Ember Covenant breaks`);
+    }
     public refreshHelpingHandLinks(removedUnitId?: string): void {
         const affected = reconcileHelpingHandLinks(this, removedUnitId);
         if (!affected.length) return;
@@ -1889,6 +1926,8 @@ export class UnitsHolder {
     public addUnit(unit: Unit): void {
         this.allUnits.set(unit.getId(), unit);
         registerHelpingHandOwner(unit, this);
+        registerEmberCovenantArmy(unit, this);
+        if (unit.hasStatusBuffApplied?.(EMBER_COVENANT_BLESSING)) this.emberCovenantTeams.add(unit.getTeam());
     }
     public decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam: Record<string, number>): void {
         for (const unitNameKey of Object.keys(moraleDecreaseForTheUnitTeam)) {
