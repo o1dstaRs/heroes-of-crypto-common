@@ -934,8 +934,8 @@
             "name": "Ember Covenant Blessing",
             "level": 0,
             "desc": [
-                "Fire attacks are blocked. Water and ordinary attacks pass through normally.",
-                "The first hit that removes HP from any ally breaks every allied ring.",
+                "Fire attacks are blocked without consuming the blessing.",
+                "The first non-fire hit is fully absorbed, then every allied ring dissolves.",
                 "Lasts until broken."
             ],
             "target": "AUTO",

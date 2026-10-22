@@ -4,6 +4,7 @@ import { EMBER_COVENANT_BLESSING as NAME } from "../../src/abilities/ember_coven
 import { isEquipmentOrMarkerSpellName } from "../../src/abilities/ability_helper";
 import { getCreatureConfig, getSpellConfig } from "../../src/configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
+import { projectDoubleShotAttack } from "../../src/damage/ability_damage_projection";
 import { projectAttackDamage } from "../../src/damage/damage_projection";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { fireWallBurnTargetOf } from "../../src/engine/post_move_actor_availability";
@@ -66,10 +67,17 @@ describe("Ember Covenant Blessing", () => {
         });
 
     for (const element of [SpellElement.WATER, undefined])
-        test(`the first ${element === undefined ? "ordinary" : "water"} damaging hit breaks the whole army's rings`, () => {
+        test(`the first ${element === undefined ? "ordinary hit is absorbed" : "water hit bypasses protection"} and breaks the whole army's rings`, () => {
             const f = battle(true);
             const attacker = createTestUnit({ abilities: element === SpellElement.WATER ? ["Water Element"] : [] });
-            expect(f.ally.applyDamage(9, 0, log, false, attacker, undefined, element)).toBe(9);
+            const hp = f.ally.getCumulativeHp();
+            const damage = element === SpellElement.WATER ? 9 : 0;
+            expect(f.ally.willAbsorbIncomingHit(attacker, element)).toBe(damage === 0);
+            expect(f.ally.applyDamage(9, damage === 0 ? 100 : 0, log, false, attacker, undefined, element)).toBe(
+                damage,
+            );
+            expect(f.ally.getCumulativeHp()).toBe(hp - damage);
+            expect(f.ally.hasEffectActive("Break")).toBe(false);
             expect(f.ally.hasBuffActive(NAME)).toBe(false);
             expect(f.hydra.hasBuffActive(NAME)).toBe(false);
             expect(f.enemy.hasBuffActive(NAME)).toBe(true);
@@ -80,29 +88,56 @@ describe("Ember Covenant Blessing", () => {
             expect(f.ally.hasBuffActive(NAME)).toBe(false);
         });
 
-    test("a Water Element attacker's hit passes through even if it also owns fire", () => {
+    test("a Water Element attacker's hit bypasses the covenant even if it also owns fire", () => {
         const f = battle();
         const attacker = createTestUnit({ abilities: ["Water Element", "Fire Element"] });
-        expect(f.ally.willEmberCovenantBlock(attacker)).toBe(false);
+        expect(f.ally.willAbsorbIncomingHit(attacker)).toBe(false);
         expect(f.ally.applyDamage(15, 0, log, false, attacker)).toBe(15);
         expect(f.hydra.hasBuffActive(NAME)).toBe(false);
     });
 
-    test("zero damage, healing, and another shield's absorption leave the army covenant intact", () => {
-        const f = battle();
-        f.ally.applyDamage(0, 100, log);
-        f.ally.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Water Shield"), amount: 1 }));
-        expect(f.ally.applyDamage(20, 0, log, false, f.enemy)).toBe(0);
-        expect(f.ally.hasBuffActive("Water Shield")).toBe(false);
-        expect(f.ally.hasBuffActive(NAME)).toBe(true);
-        expect(f.hydra.hasBuffActive(NAME)).toBe(true);
+    test("a spell's explicit element decides whether absorption consumes the covenant", () => {
+        for (const element of [SpellElement.FIRE, SpellElement.WATER, SpellElement.EARTH]) {
+            const f = battle();
+            const caster = createTestUnit({
+                abilities: [element === SpellElement.FIRE ? "Water Element" : "Fire Element"],
+            });
+            expect(f.ally.applyDamage(20, 0, log, false, caster, undefined, element)).toBe(0);
+            expect(f.ally.hasBuffActive(NAME)).toBe(element === SpellElement.FIRE);
+            expect(f.hydra.hasBuffActive(NAME)).toBe(element === SpellElement.FIRE);
+        }
     });
 
-    test("a lethal hit on Hydra removes the blessing before any later hit resolves", () => {
+    test("zero damage leaves the covenant intact; its absorption preserves Water Shield for a later hit", () => {
         const f = battle();
-        f.hydra.applyDamage(f.hydra.getCumulativeHp(), 0, log, false, f.enemy);
-        expect(f.hydra.isDead()).toBe(true);
+        f.ally.applyDamage(0, 100, log);
+        expect(f.ally.hasBuffActive(NAME)).toBe(true);
+        const hp = f.ally.getCumulativeHp();
+        f.ally.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Water Shield"), amount: 1 }));
+        const spell = new Spell({ spellProperties: getSpellConfig("Nature", "Whirlpool"), amount: 1 });
+        expect(projectSpellDamageAgainstUnit({ spell, caster: f.enemy, target: f.ally, rawDamage: 100 })).toMatchObject(
+            {
+                damage: 0,
+                absorbedByWaterShield: false,
+            },
+        );
+        expect(f.ally.applyDamage(20, 0, log, false, f.enemy)).toBe(0);
+        expect(f.ally.hasBuffActive("Water Shield")).toBe(true);
         expect(f.ally.hasBuffActive(NAME)).toBe(false);
+        expect(f.hydra.hasBuffActive(NAME)).toBe(false);
+        expect(f.ally.applyDamage(20, 0, log, false, f.enemy)).toBe(0);
+        expect(f.ally.hasBuffActive("Water Shield")).toBe(false);
+        expect(f.ally.getCumulativeHp()).toBe(hp);
+    });
+
+    test("a lethal-sized hit on Hydra is fully absorbed before any later hit resolves", () => {
+        const f = battle();
+        const hp = f.hydra.getCumulativeHp();
+        expect(f.hydra.applyDamage(hp, 0, log, false, f.enemy)).toBe(0);
+        expect(f.hydra.getCumulativeHp()).toBe(hp);
+        expect(f.ally.hasBuffActive(NAME)).toBe(false);
+        expect(f.hydra.applyDamage(hp, 0, log, false, f.enemy)).toBe(hp);
+        expect(f.hydra.isDead()).toBe(true);
     });
 
     test("duplicate bearers grant a single covenant and cannot restore a broken one", () => {
@@ -169,6 +204,49 @@ describe("Ember Covenant Blessing", () => {
         );
         expect(f.ally.hasBuffActive(NAME)).toBe(true);
     });
+
+    test("ordinary previews show absorption and water previews show bypass without consuming the live covenant", () => {
+        const f = battle();
+        for (const abilities of [[], ["Water Element"]]) {
+            const attacker = createTestUnit({ abilities, damageMin: 20, damageMax: 20 });
+            const input = {
+                attacker,
+                target: f.ally,
+                attackType: PBTypes.AttackVals.MELEE,
+                synergyAbilityPowerIncrease: 0,
+            };
+            if (abilities.includes("Water Element")) expect(projectAttackDamage(input).min).toBeGreaterThan(0);
+            else expect(projectAttackDamage(input)).toEqual({ min: 0, max: 0, killsMin: 0, killsMax: 0 });
+            expect(projectAttackDamage({ ...input, priorHits: 1 }).min).toBeGreaterThan(0);
+        }
+        const spell = new Spell({ spellProperties: getSpellConfig("Nature", "Whirlpool"), amount: 1 });
+        expect(
+            projectSpellDamageAgainstUnit({ spell, caster: f.enemy, target: f.ally, rawDamage: 100 }).damage,
+        ).toBeGreaterThan(0);
+        expect(f.ally.hasBuffActive(NAME)).toBe(true);
+    });
+
+    for (const fire of [false, true])
+        test(`a ${fire ? "fire" : "normal"} double-shot preview accounts for the covenant before each hit`, () => {
+            const f = battle();
+            const attacker = createTestUnit({
+                attackType: PBTypes.AttackVals.RANGE,
+                damageMin: 20,
+                damageMax: 20,
+                rangeShots: 5,
+                abilities: ["Double Shot", ...(fire ? ["Fire Element"] : [])],
+            });
+            const projection = projectDoubleShotAttack({
+                attacker,
+                target: f.ally,
+                synergyAbilityPowerIncrease: 0,
+            });
+            expect(projection.first.max).toBe(0);
+            if (fire) expect(projection.second.max).toBe(0);
+            else expect(projection.second.min).toBeGreaterThan(0);
+            expect(projection.total.min).toBe(projection.second.min);
+            expect(f.ally.hasBuffActive(NAME)).toBe(true);
+        });
 
     test("Fire Wall burn and its move projection cannot consume the covenant", () => {
         const f = battle();

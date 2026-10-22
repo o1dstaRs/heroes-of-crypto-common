@@ -19,7 +19,12 @@ import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilitie
 import { BORROWED_GRACE_NAME, borrowedGraceChance } from "../abilities/borrowed_grace_ability";
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
 import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/double_shot_names";
-import { EMBER_COVENANT_BLESSING, notifyEmberCovenantDamage } from "../abilities/ember_covenant";
+import {
+    EMBER_COVENANT_BLESSING,
+    isEmberCovenantFireHit,
+    isEmberCovenantWaterHit,
+    notifyEmberCovenantDamage,
+} from "../abilities/ember_covenant";
 import { getCraftChances } from "../abilities/craft_ability";
 import { lastFuseDamage, lastFuseSourceFor, type ILastFuseSource } from "../abilities/last_fuse_ability";
 import { ARTIFACT_POWER, BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
@@ -1935,7 +1940,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
 
             if (this.willEmberCovenantBlock(attacker, damageElement)) {
-                sceneLog.updateLog(`${this.getName()}'s Ember Covenant blocks the fire attack`);
+                const fireHit = isEmberCovenantFireHit(attacker, damageElement);
+                sceneLog.updateLog(
+                    `${this.getName()}'s Ember Covenant blocks ${fireHit ? "the fire attack" : "the hit"}`,
+                );
+                if (!fireHit) notifyEmberCovenantDamage(this, sceneLog);
                 return 0;
             }
 
@@ -2251,12 +2260,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         );
     }
     public willEmberCovenantBlock(attacker?: Unit, damageElement?: SpellElement): boolean {
-        return (
-            this.hasStatusBuffApplied(EMBER_COVENANT_BLESSING) &&
-            damageElement !== SpellElement.WATER &&
-            !attacker?.hasAbilityActive("Water Element") &&
-            (damageElement === SpellElement.FIRE || !!attacker?.hasAbilityActive("Fire Element"))
-        );
+        return this.hasStatusBuffApplied(EMBER_COVENANT_BLESSING) && !isEmberCovenantWaterHit(attacker, damageElement);
     }
     public willAbsorbIncomingHit(attacker?: Unit, damageElement?: SpellElement): boolean {
         return (

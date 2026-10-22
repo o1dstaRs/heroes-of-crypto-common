@@ -272,8 +272,8 @@
         "type": "MASS_BUFF",
         "desc": [
             "At battle start, surrounds every allied stack with a shared ring of fire.",
-            "Blocks fire attacks without breaking. Water and ordinary attacks pass through normally.",
-            "The first hit that removes HP from any ally breaks every ring. Once per battle; does not stack."
+            "Blocks fire attacks without breaking. Absorbs the first non-fire hit, including water or ordinary attacks, then every allied ring dissolves.",
+            "Later hits, including the second hit of a double attack, land normally. Once per battle; does not stack."
         ],
         "power": 100,
         "power_type": "ARMY_FIRE_COVENANT",

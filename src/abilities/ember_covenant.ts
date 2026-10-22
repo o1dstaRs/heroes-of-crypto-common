@@ -1,10 +1,21 @@
 import type { ISceneLog } from "../scene/scene_log_interface";
+import { SpellElement } from "../spells/spell_properties";
 import type { Unit } from "../units/unit";
 import type { UnitsHolder } from "../units/units_holder";
 
 export const EMBER_COVENANT_BLESSING = "Ember Covenant Blessing";
 
 const armies = new WeakMap<Unit, UnitsHolder>();
+
+export function isEmberCovenantWaterHit(attacker?: Unit, damageElement?: SpellElement): boolean {
+    if (damageElement !== undefined) return damageElement === SpellElement.WATER;
+    return !!attacker?.hasAbilityActive("Water Element");
+}
+
+export function isEmberCovenantFireHit(attacker?: Unit, damageElement?: SpellElement): boolean {
+    if (damageElement !== undefined) return damageElement === SpellElement.FIRE;
+    return !attacker?.hasAbilityActive("Water Element") && !!attacker?.hasAbilityActive("Fire Element");
+}
 
 export function registerEmberCovenantArmy(unit: Unit, army: UnitsHolder): void {
     armies.set(unit, army);

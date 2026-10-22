@@ -1548,9 +1548,10 @@ export class AttackHandler {
 
                 (damageForAnimation.luckyStrikeBy ??= []),
             );
+            const loggedDamage = targetUnit.willAbsorbIncomingHit(attackerUnit) ? 0 : damageFromAttack;
             this.sceneLog.updateLog(
-                `${attackerUnit.getName()} 🏹 ${targetUnit.getName()} (${damageFromAttack})` +
-                    HoCLib.killTag(targetUnit.calculatePossibleLosses(damageFromAttack)),
+                `${attackerUnit.getName()} 🏹 ${targetUnit.getName()} (${loggedDamage})` +
+                    HoCLib.killTag(targetUnit.calculatePossibleLosses(loggedDamage)),
             );
             attackDamageApplied = false;
         }
@@ -2238,7 +2239,7 @@ export class AttackHandler {
             const unitsDied = Math.max(0, preSecondShotAmount - currentAmount);
 
             damageForAnimation.hits.push({
-                amount: secondShotResult.damage,
+                amount: Math.max(0, preSecondShotHp - targetUnit.getCumulativeHp()),
                 unitsDied: unitsDied,
             });
             damageForAnimation.unitId = targetUnit.getId();
@@ -2824,9 +2825,10 @@ export class AttackHandler {
             );
             // just log attack here,
             // to make sure that logs are in chronological order
+            const loggedDamage = targetUnit.willAbsorbIncomingHit(attackerUnit) ? 0 : damageFromAttack;
             this.sceneLog.updateLog(
-                `${attackerUnit.getName()} ⚔️ ${targetUnit.getName()} (${damageFromAttack})` +
-                    HoCLib.killTag(targetUnit.calculatePossibleLosses(damageFromAttack)),
+                `${attackerUnit.getName()} ⚔️ ${targetUnit.getName()} (${loggedDamage})` +
+                    HoCLib.killTag(targetUnit.calculatePossibleLosses(loggedDamage)),
             );
 
             const fireShieldReflectResult = AllAbilities.processFireShieldAbility(

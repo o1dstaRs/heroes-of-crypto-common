@@ -1221,7 +1221,7 @@ export class UnitsHolder {
         for (const unit of this.getAllUnitsIterator()) {
             if (unit.getTeam() === team) unit.deleteBuff(EMBER_COVENANT_BLESSING);
         }
-        sceneLog.updateLog(`${victim.getName()} takes damage; the army's Ember Covenant breaks`);
+        sceneLog.updateLog(`${victim.getName()}'s Ember Covenant dissolves across the army`);
     }
     public refreshHelpingHandLinks(removedUnitId?: string): void {
         const affected = reconcileHelpingHandLinks(this, removedUnitId);

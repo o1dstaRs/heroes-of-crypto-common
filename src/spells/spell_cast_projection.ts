@@ -133,8 +133,10 @@ export function projectSpellDamageAgainstUnit({
     rawDamage,
 }: ISpellDamageProjectionInput): ISpellDamageProjection {
     const landed = spellDamageAgainstUnit(spell, rawDamage ?? spellRawDamage(spell, caster), target);
-    const absorbedByWaterShield = landed > 0 && target.willWaterShieldAbsorb(caster, spell.getElement());
-    const damage = absorbedByWaterShield || target.willEmberCovenantBlock(caster, spell.getElement()) ? 0 : landed;
+    const covenantBlocks = target.willEmberCovenantBlock(caster, spell.getElement());
+    const absorbedByWaterShield =
+        !covenantBlocks && landed > 0 && target.willWaterShieldAbsorb(caster, spell.getElement());
+    const damage = absorbedByWaterShield || covenantBlocks ? 0 : landed;
 
     return {
         landed,

@@ -278,7 +278,8 @@ export function processDoubleShotAbility(
         // passed through so a Fire Element shooter bypasses the shield here like everywhere else.
         waterShieldAbsorbed = damageFromAttack > 0 && toUnit.willAbsorbIncomingHit(fromUnit);
         // Snapshot losses BEFORE applyDamage — calculatePossibleLosses reads current hp/amount_alive.
-        const unitsKilled = toUnit.calculatePossibleLosses(damageFromAttack);
+        const loggedDamage = waterShieldAbsorbed ? 0 : damageFromAttack;
+        const unitsKilled = toUnit.calculatePossibleLosses(loggedDamage);
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             damage: toUnit.applyDamage(
@@ -298,7 +299,7 @@ export function processDoubleShotAbility(
             }
         }
         sceneLog.updateLog(
-            `${fromUnit.getName()} 🏹 ${toUnit.getName()} (${damageFromAttack})` + HoCLib.killTag(unitsKilled),
+            `${fromUnit.getName()} 🏹 ${toUnit.getName()} (${loggedDamage})` + HoCLib.killTag(unitsKilled),
         );
     }
 
