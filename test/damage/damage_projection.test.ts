@@ -111,8 +111,6 @@ interface UnitVariant {
     options: TestUnitOptions;
     /** "Deep Wounds" effect power to hang on the unit (targets only). */
     deepWoundsEffectPower?: number;
-    /** Leather Armor / Wingshield only take effect once the derivation chain has run. */
-    adjustStats?: boolean;
 }
 
 const withVariant = (variant: UnitVariant): Unit => {
@@ -124,9 +122,6 @@ const withVariant = (variant: UnitVariant): Unit => {
         }
         effect.setPower(variant.deepWoundsEffectPower);
         unit.applyEffect(effect);
-    }
-    if (variant.adjustStats) {
-        unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
     }
     return unit;
 };
@@ -257,18 +252,6 @@ const TARGET_VARIANTS: UnitVariant[] = [
     {
         label: "unlucky",
         options: { name: "Unlucky", team: GREEN, armor: 17, maxHp: 22, amountAlive: 15, luck: -20 },
-    },
-    {
-        label: "Leather Armor",
-        options: {
-            name: "Leathered",
-            team: GREEN,
-            armor: 20,
-            maxHp: 40,
-            amountAlive: 30,
-            abilities: ["Leather Armor"],
-        },
-        adjustStats: true,
     },
     {
         label: "Water Element",
@@ -451,7 +434,7 @@ describe("projectAttackDamage reproduces Unit.calculateAttackDamage exactly", ()
             pinnedBothEnds++;
         }
 
-        expect(pinnedBothEnds).toBeGreaterThan(4000);
+        expect(pinnedBothEnds).toBeGreaterThan(3600);
         expect(spannedBands).toBeGreaterThan(500);
         expect(outOfShotsCases).toBeGreaterThan(50);
     });
@@ -609,7 +592,7 @@ describe("the multiplier chain matches the engine term by term", () => {
         ).toBe(1);
     });
 
-    it("prices the enemy's RANGE armor for a shot and its melee armor for a swing", () => {
+    it("prices a shot and a swing against the same armor once ranged armor matches melee", () => {
         const shooter = createTestUnit({
             name: "Elf",
             team: RED,
@@ -620,36 +603,35 @@ describe("the multiplier chain matches the engine term by term", () => {
             amountAlive: 10,
             rangeShots: 20,
         });
-        const leathered = createTestUnit({
+        const arbalester = createTestUnit({
             name: "Arbalester",
             team: GREEN,
             armor: 8,
             maxHp: 100,
             amountAlive: 10,
-            abilities: ["Leather Armor"],
+            abilities: ["Sniper", "Limited Supply"],
         });
-        leathered.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
-        expect(leathered.getRangeArmor()).toBeLessThan(leathered.getArmor());
+        arbalester.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(arbalester.getArmor()).toBe(8);
+        expect(arbalester.getRangeArmor()).toBe(arbalester.getArmor());
 
         const shot = projectAttackDamage({
             attacker: shooter,
-            target: leathered,
+            target: arbalester,
             attackType: RANGE,
             synergyAbilityPowerIncrease: 0,
         });
         const swing = projectAttackDamage({
             attacker: shooter,
-            target: leathered,
+            target: arbalester,
             attackType: MELEE,
             synergyAbilityPowerIncrease: 0,
         });
 
         pinRoll(0);
-        expect(shooter.calculateAttackDamage(leathered, RANGE, 0)).toBe(shot.min);
+        expect(shooter.calculateAttackDamage(arbalester, RANGE, 0)).toBe(shot.min);
         pinRoll(0);
-        expect(shooter.calculateAttackDamage(leathered, MELEE, 0)).toBe(swing.min);
-        // Leather Armor is a RANGED-only weakness: the shot must hurt more than the (halved) melee poke.
-        expect(shot.min).toBeGreaterThan(swing.min);
+        expect(shooter.calculateAttackDamage(arbalester, MELEE, 0)).toBe(swing.min);
     });
 
     it("multiplies by the elemental affinity, both directions", () => {

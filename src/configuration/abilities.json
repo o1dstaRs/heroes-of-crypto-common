@@ -183,18 +183,6 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Leather Armor": {
-        "name": "Leather Armor",
-        "type": "DEFENCE",
-        "desc": ["This unit's ranged armor is reduced by {}%"],
-        "power": 50,
-        "power_type": "RANGE_ARMOR_MODIFIER",
-        "skip_reponse": false,
-        "stack_powered": false,
-        "effect": null,
-        "aura_effect": null,
-        "can_be_cast": false
-    },
     "Limited Supply": {
         "name": "Limited Supply",
         "type": "DEFENCE",

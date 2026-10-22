@@ -335,6 +335,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // `abilities` leaked onto every same-type unit (e.g. Craft's Crafted Frozen Bow on ALL Elves).
         this.unitProperties = structuredClone(unitProperties);
         this.normalizeLegacyRallyingVolley();
+        this.stripRetiredLeatherArmor();
         this.initialUnitProperties = structuredClone(this.unitProperties);
         this.gridSettings = gridSettings;
         this.teamType = teamType;
@@ -410,6 +411,37 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 `Rallying Volley Blessing grants +${power} ranged shots once, anywhere on the battlefield.;;`;
         }
         properties.rallying_volley_granted ??= Math.max(0, Math.floor(legacyGrant));
+    }
+    /** Drop the retired card so an old Arbalester snapshot still constructs. */
+    private stripRetiredLeatherArmor(): void {
+        const properties = this.unitProperties;
+        const retired = "Leather Armor";
+        if (
+            !properties.abilities.includes(retired) &&
+            !properties.stolen_abilities?.includes(retired) &&
+            !properties.artifact_granted_abilities?.includes(retired)
+        ) {
+            return;
+        }
+        for (let i = properties.abilities.length - 1; i >= 0; i--) {
+            if (properties.abilities[i] !== retired) {
+                continue;
+            }
+            properties.abilities.splice(i, 1);
+            properties.abilities_descriptions.splice(i, 1);
+            properties.abilities_stack_powered.splice(i, 1);
+            properties.abilities_auras.splice(i, 1);
+            properties.aura_ranges.splice(i, 1);
+            properties.aura_is_buff.splice(i, 1);
+        }
+        if (properties.stolen_abilities) {
+            properties.stolen_abilities = properties.stolen_abilities.filter((name) => name !== retired);
+        }
+        if (properties.artifact_granted_abilities) {
+            properties.artifact_granted_abilities = properties.artifact_granted_abilities.filter(
+                (name) => name !== retired,
+            );
+        }
     }
     public static createUnit(
         unitProperties: UnitProperties,
@@ -3445,7 +3477,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         let madnessAbility: Ability | undefined;
         let mechanismAbility: Ability | undefined;
         let heavyArmorAbility: Ability | undefined;
-        let leatherArmorAbility: Ability | undefined;
         let enchantedSkinAbility: Ability | undefined;
         let magicShieldAbility: Ability | undefined;
         let wardguardAbility: Ability | undefined;
@@ -3490,9 +3521,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                         break;
                     case "Heavy Armor":
                         heavyArmorAbility ??= ability;
-                        break;
-                    case "Leather Armor":
-                        leatherArmorAbility ??= ability;
                         break;
                     case "Enchanted Skin":
                         enchantedSkinAbility ??= ability;
@@ -3898,8 +3926,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // this.unitProperties.armor_mod = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
 
-        leatherArmorAbility = getStatAbility(leatherArmorAbility, "Leather Armor");
-        let rangeArmorMultiplier = leatherArmorAbility ? leatherArmorAbility.getPower() / 100 : 1;
+        let rangeArmorMultiplier = 1;
 
         // Arrows Wingshield Blessing (Angel): the strongest living allied Angel projects this board-wide. Its
         // marker carries the source's already stack- and luck-scaled percentage, so every ally reads the same

@@ -96,6 +96,25 @@ describe("Unit", () => {
             expect(noTeamUnit.getOppositeTeam()).toBe(PBTypes.TeamVals.NO_TEAM);
         });
 
+        it("drops a saved Leather Armor card and keeps ranged armor equal to melee armor", () => {
+            const unit = createTestUnit({
+                name: "Arbalester",
+                team: PBTypes.TeamVals.LEFT,
+                armor: 8,
+                abilities: ["Sniper", "Leather Armor", "Limited Supply"],
+            });
+            const properties = unit.getUnitProperties();
+
+            expect(properties.abilities).toEqual(["Sniper", "Limited Supply"]);
+            expect(properties.abilities_descriptions).toHaveLength(properties.abilities.length);
+            expect(properties.abilities_stack_powered).toHaveLength(properties.abilities.length);
+            expect(properties.abilities_auras).toHaveLength(properties.abilities.length);
+            expect(unit.getAbility("Leather Armor")).toBeUndefined();
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(unit.getArmor()).toBe(8);
+            expect(unit.getRangeArmor()).toBe(8);
+        });
+
         it("handles large-unit center and cells", () => {
             const unit = createTestUnit({ size: PBTypes.UnitSizeVals.LARGE });
 

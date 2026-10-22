@@ -95,7 +95,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": ["Sniper", "Leather Armor", "Limited Supply"]
+            "abilities": ["Sniper", "Limited Supply"]
         },
         "Pikeman": {
             "name": "Pikeman",
