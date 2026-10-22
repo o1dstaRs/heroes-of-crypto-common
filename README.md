@@ -93,18 +93,15 @@ src/
 
 ## Develop
 
-Runtime: [Bun](https://bun.sh/) 1.4 or newer.
+Runtime: [Bun](https://bun.sh/) 1.4.4 or newer. Formatting is `bun fmt`, which reads `.prettierrc.json`.
 
 ```sh
 bun install
 bun test                 # unit tests (bun:test)
-bun run lint             # eslint + sort-package-json + prettier --check
+bun run lint             # eslint + sort-package-json + bun fmt --check
 bun run lint:fix         # auto-fix the above
 bun run build            # tests + tsc (tsconfig.build.json) -> dist, copy json/generated
 ```
-
-> Prettier is pinned to an exact version so CI and local formatting always agree — run `bun install`
-> after pulling so your local Prettier matches.
 
 ## Premium evidence collection
 
