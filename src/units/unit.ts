@@ -1940,7 +1940,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
 
             if (this.willEmberCovenantBlock(attacker, damageElement)) {
-                const fireHit = isEmberCovenantFireHit(attacker, damageElement);
+                const fireHit = isEmberCovenantFireHit(damageElement);
                 sceneLog.updateLog(
                     `${this.getName()}'s Ember Covenant blocks ${fireHit ? "the fire attack" : "the hit"}`,
                 );

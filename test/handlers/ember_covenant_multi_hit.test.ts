@@ -83,14 +83,15 @@ describe("Ember Covenant absorbs individual hits of a double attack", () => {
             expect(f.hydra.hasBuffActive(NAME)).toBe(false);
         });
 
-        test(`${ability}: blocks both fire hits without dissolving`, () => {
+        test(`${ability}: Fire Element does not prevent the direct hit from dissolving the covenant`, () => {
             const f = attack(ability, true);
-            expect(f.hpLost).toBe(0);
+            expect(f.hpLost).toBeGreaterThan(0);
             expect(f.damage.hits).toHaveLength(2);
-            expect(f.damage.hits.every((hit) => hit.amount === 0)).toBe(true);
-            expect(f.target.hasBuffActive(NAME)).toBe(true);
-            expect(f.hydra.hasBuffActive(NAME)).toBe(true);
-            expect(f.target.hasEffectActive("Stun")).toBe(false);
+            expect(f.damage.hits[0].amount).toBe(0);
+            expect(f.damage.hits[1].amount).toBeGreaterThan(0);
+            expect(f.hpLost).toBe(f.damage.hits[1].amount);
+            expect(f.target.hasBuffActive(NAME)).toBe(false);
+            expect(f.hydra.hasBuffActive(NAME)).toBe(false);
         });
 
         test(`${ability}: a missed first hit leaves the covenant to absorb the second`, () => {

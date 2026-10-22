@@ -10,7 +10,6 @@
  */
 
 import { AbilityPowerType } from "../abilities/ability_properties";
-import { isEmberCovenantFireHit } from "../abilities/ember_covenant";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { AttackType } from "../generated/protobuf/v1/types_gen";
 import type { Unit } from "../units/unit";
@@ -193,11 +192,7 @@ export function reachableTopRoll(chain: IAttackDamageChain): number {
 
 /** Band (no kills) of the damage this attack can deal: both ends are values the engine can actually produce. */
 export function projectAttackDamageBand(input: IAttackDamageProjectionInput): { min: number; max: number } {
-    if (
-        input.target.willEmberCovenantBlock(input.attacker) &&
-        ((input.priorHits ?? 0) <= 0 || isEmberCovenantFireHit(input.attacker))
-    )
-        return { min: 0, max: 0 };
+    if (input.target.willEmberCovenantBlock(input.attacker) && (input.priorHits ?? 0) <= 0) return { min: 0, max: 0 };
     const chain = resolveAttackDamageChain(input);
     if (chain.outOfShots) {
         return { min: 0, max: 0 };

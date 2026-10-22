@@ -54,18 +54,19 @@ describe("Ember Covenant Blessing", () => {
         expect(f.enemy.hasBuffActive(NAME)).toBe(false);
     });
 
-    for (const element of [SpellElement.FIRE, undefined])
-        test(`fire ${element === undefined ? "elemental weapon hits" : "magic"} is blocked without breaking any ring`, () => {
-            const f = battle();
-            const attacker = createTestUnit({ abilities: element === undefined ? ["Fire Element"] : [] });
-            const hp = f.ally.getCumulativeHp();
-            expect(f.ally.willAbsorbIncomingHit(attacker, element)).toBe(true);
-            expect(f.ally.applyDamage(99, 100, log, false, attacker, undefined, element)).toBe(0);
+    test("repeated fire damage is blocked without breaking any ring", () => {
+        const f = battle();
+        const attacker = createTestUnit();
+        const hp = f.ally.getCumulativeHp();
+        for (let hit = 0; hit < 3; hit++) {
+            expect(f.ally.willAbsorbIncomingHit(attacker, SpellElement.FIRE)).toBe(true);
+            expect(f.ally.applyDamage(99, 100, log, false, attacker, undefined, SpellElement.FIRE)).toBe(0);
             expect(f.ally.getCumulativeHp()).toBe(hp);
             expect(f.ally.hasEffectActive("Break")).toBe(false);
             expect(f.hydra.hasBuffActive(NAME)).toBe(true);
             expect(f.ally.hasBuffActive(NAME)).toBe(true);
-        });
+        }
+    });
 
     for (const element of [SpellElement.WATER, undefined])
         test(`the first ${element === undefined ? "ordinary hit is absorbed" : "water hit bypasses protection"} and breaks the whole army's rings`, () => {
@@ -212,7 +213,7 @@ describe("Ember Covenant Blessing", () => {
         expect(f.ally.hasBuffActive(NAME)).toBe(false);
     });
 
-    test("fire attack and spell projections agree with the zero-damage resolution", () => {
+    test("direct attack and fire spell projections agree with the initial zero-damage resolution", () => {
         const f = battle();
         const attacker = createTestUnit({ abilities: ["Fire Element"], amountAlive: 5 });
         expect(
@@ -252,7 +253,7 @@ describe("Ember Covenant Blessing", () => {
     });
 
     for (const fire of [false, true])
-        test(`a ${fire ? "fire" : "normal"} double-shot preview accounts for the covenant before each hit`, () => {
+        test(`a ${fire ? "Fire Element" : "normal"} double-shot preview accounts for the covenant before each hit`, () => {
             const f = battle();
             const attacker = createTestUnit({
                 attackType: PBTypes.AttackVals.RANGE,
@@ -267,8 +268,7 @@ describe("Ember Covenant Blessing", () => {
                 synergyAbilityPowerIncrease: 0,
             });
             expect(projection.first.max).toBe(0);
-            if (fire) expect(projection.second.max).toBe(0);
-            else expect(projection.second.min).toBeGreaterThan(0);
+            expect(projection.second.min).toBeGreaterThan(0);
             expect(projection.total.min).toBe(projection.second.min);
             expect(f.ally.hasBuffActive(NAME)).toBe(true);
         });

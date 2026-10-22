@@ -12,9 +12,8 @@ export function isEmberCovenantWaterHit(attacker?: Unit, damageElement?: SpellEl
     return !!attacker?.hasAbilityActive("Water Element");
 }
 
-export function isEmberCovenantFireHit(attacker?: Unit, damageElement?: SpellElement): boolean {
-    if (damageElement !== undefined) return damageElement === SpellElement.FIRE;
-    return !attacker?.hasAbilityActive("Water Element") && !!attacker?.hasAbilityActive("Fire Element");
+export function isEmberCovenantFireHit(damageElement?: SpellElement): boolean {
+    return damageElement === SpellElement.FIRE;
 }
 
 export function registerEmberCovenantArmy(unit: Unit, army: UnitsHolder): void {
