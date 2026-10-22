@@ -3082,7 +3082,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.applied_buffs_powers.push(buff.getPower());
         if (buff.getName() === "Last Fuse") this.refreshLastFuseDescription();
     }
-    /** Once-only ammunition; the army marker itself may also land on allies that cannot shoot. */
+    /** Once-only ammunition for a unit that can already shoot. Callers do not apply the marker otherwise. */
     private tryGrantRallyingVolleyShots(power: number): void {
         if (
             this.unitProperties.range_shots_authoritative ||

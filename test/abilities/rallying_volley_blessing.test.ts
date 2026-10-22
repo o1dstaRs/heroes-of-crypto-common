@@ -78,11 +78,14 @@ describe(BLESSING, () => {
             expect(zena.getRangeShots()).toBe(10);
             expect(distant.getRangeShots()).toBe(7);
             expect(empty.getRangeShots()).toBe(2);
-            for (const unit of [zena, distant, empty, melee]) {
+            for (const unit of [zena, distant, empty]) {
                 expect(unit.getBuff(BLESSING)?.getPower()).toBe(2);
                 expect(unit.getAllProperties().applied_buffs.filter((name) => name === BLESSING)).toHaveLength(1);
                 expect(unit.getAuraEffects()).toHaveLength(0);
             }
+            expect(melee.getBuff(BLESSING)).toBeUndefined();
+            expect(melee.getAllProperties().applied_buffs).not.toContain(BLESSING);
+            expect(melee.getAuraEffects()).toHaveLength(0);
             expect(melee.getRangeShots()).toBe(0);
             expect(melee.isRangeCapable()).toBe(false);
             melee.refreshPossibleAttackTypes(true);
@@ -129,6 +132,8 @@ describe(BLESSING, () => {
         expect(arrival.getRangeShots()).toBe(7);
         expect(laterShooter.getUnitProperties().range_shots).toBe(2);
         expect(laterShooter.getUnitProperties().rallying_volley_granted).toBe(2);
+        expect(laterShooter.getBuff(BLESSING)?.getPower()).toBe(2);
+        expect(laterShooter.getAllProperties().applied_buffs.filter((name) => name === BLESSING)).toHaveLength(1);
         expect(laterShooter.isRangeCapable()).toBe(true);
         expect(laterShooter.getAttackType()).toBe(PBTypes.AttackVals.MELEE);
     });

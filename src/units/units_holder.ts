@@ -92,6 +92,11 @@ function blessingBit(name: string): number {
     }
 }
 
+/** A shot top-up. Native shooters qualify even with an empty quiver; a stolen Endless Quiver does too. */
+function canReceiveRallyingVolley(unit: Unit): boolean {
+    return unit.isRangeCapable() || unit.hasAbilityActive("Endless Quiver");
+}
+
 function hasPositivePower(powerPerTeam: ReadonlyMap<TeamType, number>): boolean {
     for (const power of powerPerTeam.values()) {
         if (power > 0) {
@@ -1130,12 +1135,16 @@ export class UnitsHolder {
             "Arrows Wingshield Blessing",
         );
     }
-    /** Strip `blessingName` from its carriers, then grant every living on-board unit its team's strongest power. */
+    /**
+     * Strip `blessingName` from its carriers, then grant every living on-board unit its team's strongest power.
+     * `eligible`, when set, also skips units the blessing cannot help; those units are still stripped.
+     */
     private reapplyTeamBlessing(
         census: IBlessingCensus,
         powerPerTeam: ReadonlyMap<TeamType, number>,
         bit: number,
         blessingName: string,
+        eligible?: (unit: Unit) => boolean,
     ): void {
         if (!(census.carried & bit) && !hasPositivePower(powerPerTeam)) {
             return;
@@ -1148,7 +1157,12 @@ export class UnitsHolder {
             }
 
             const power = powerPerTeam.get(unit.getTeam()) ?? 0;
-            if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
+            if (
+                power <= 0 ||
+                unit.isDead() ||
+                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
+                (eligible && !eligible(unit))
+            ) {
                 continue;
             }
 
@@ -1213,6 +1227,7 @@ export class UnitsHolder {
             blessingCensus.rallyingVolley,
             RALLYING_VOLLEY_BLESSING_BIT,
             "Rallying Volley Blessing",
+            canReceiveRallyingVolley,
         );
         this.refreshWaterShieldForAllUnits();
         // This loop runs after EVERY engine action, so a19 rollouts walk it millions of times. The fight
