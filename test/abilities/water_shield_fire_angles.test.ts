@@ -694,7 +694,7 @@ describe("Water Shield from every delivery", () => {
         expectSteelBrokeAndBurned(attacker, before, ofSource(hit.secondary, "fireforged_sword"));
     });
 
-    it("does not arc Chain Lightning off an absorbed swing, and the arc itself still spends a shield", () => {
+    it("arcs Chain Lightning after an absorbed swing, and an intact shield can still absorb the arc", () => {
         pinRng();
         const context = createCombatTestContext();
         const attacker = createTestUnit({
@@ -715,9 +715,11 @@ describe("Water Shield from every delivery", () => {
         const before = target.getCumulativeHp();
         const hit = swing(context, attacker, target, { x: 4, y: 3 });
         expect(hit.completed).toBe(true);
-        expect(target.getCumulativeHp()).toBe(before);
+        expect(target.getCumulativeHp()).toBeLessThan(before);
         expect(target.hasBuffActive("Water Shield")).toBe(false);
-        expect(ofSource(hit.secondary, "chain_lightning")).toHaveLength(0);
+        const lightning = ofSource(hit.secondary, "chain_lightning");
+        expect(lightning).toHaveLength(1);
+        expect(before - target.getCumulativeHp()).toBe(lightning[0].amount);
 
         const direct = createCombatTestContext();
         const caster = createTestUnit({

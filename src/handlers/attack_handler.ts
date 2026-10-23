@@ -3144,19 +3144,20 @@ export class AttackHandler {
                             damageForAnimation,
                         );
                         AllAbilities.processBlindnessAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                        updateUnitsDied(
-                            AllAbilities.processChainLightningAbility(
-                                targetUnit,
-                                attackerUnit,
-                                damageFromResponse,
-                                this.grid,
-                                unitsHolder,
-                                this.sceneLog,
-                                this.damageStatisticHolder,
-                                (damageForAnimation.secondary ??= []),
-                            ),
-                        );
                     }
+                    // The response's lightning is a separate magical hit after the physical shield breaks.
+                    updateUnitsDied(
+                        AllAbilities.processChainLightningAbility(
+                            targetUnit,
+                            attackerUnit,
+                            damageFromResponse,
+                            this.grid,
+                            unitsHolder,
+                            this.sceneLog,
+                            this.damageStatisticHolder,
+                            (damageForAnimation.secondary ??= []),
+                        ),
+                    );
                 }
                 AllAbilities.processOneInTheFieldAbility(targetUnit);
             }
@@ -3169,8 +3170,8 @@ export class AttackHandler {
         captureResponse();
 
         if (!hasLightningSpinAttackLanded && !isAttackMissed && !targetUnit.isDead()) {
-            // Water Shield: captured BEFORE the blow lands (applyDamage consumes the shield). An absorbed
-            // strike applies nothing — the whole on-hit rider block below is skipped like a missed blow.
+            // Capture absorption before applyDamage consumes the shield. The physical blow's on-hit
+            // debuffs are skipped; separate magical damage still resolves after the shield breaks.
             const meleeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willAbsorbIncomingHit(attackerUnit);
             // this code has to be here to make sure that respond damage has been applied as well
             damageForAnimation.render = true;
@@ -3295,18 +3296,21 @@ export class AttackHandler {
                 // Blindness rides the blow the Unicorn strikes as well as the one it answers — it used to
                 // fire only from the response path, so a Unicorn that opened the exchange blinded nobody.
                 AllAbilities.processBlindnessAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-                updateUnitsDied(
-                    AllAbilities.processChainLightningAbility(
-                        attackerUnit,
-                        targetUnit,
-                        damageFromAttack,
-                        this.grid,
-                        unitsHolder,
-                        this.sceneLog,
-                        this.damageStatisticHolder,
-                        (damageForAnimation.secondary ??= []),
-                    ),
-                );
+            }
+            // Chain Lightning uses the swing's damage even when its physical component was absorbed.
+            updateUnitsDied(
+                AllAbilities.processChainLightningAbility(
+                    attackerUnit,
+                    targetUnit,
+                    damageFromAttack,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                ),
+            );
+            if (!meleeAttackAbsorbed) {
                 const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");
                 if (pegasusLightEffect) {
                     attackerUnitPlusMorale += pegasusLightEffect.getPower();
