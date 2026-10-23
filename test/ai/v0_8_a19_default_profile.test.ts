@@ -157,6 +157,21 @@ describe("v0.8+A19 production profile", () => {
         ).toThrow("SEARCH_A19_LAST_FUSE_PRIMARY_TRADES must be 0 or 1");
     });
 
+    it("seals spin coverage into A19 while retaining a validated rollback switch", () => {
+        expect(buildV08A19SearchEnvironment().SEARCH_A19_LIGHTNING_SPIN_COVERAGE).toBe("1");
+        expect(buildV08A13SearchEnvironment("v0.8").SEARCH_A19_LIGHTNING_SPIN_COVERAGE).toBeUndefined();
+        const match = { greenVersion: "v0.8", redVersion: "v0.8" };
+        const enabled = createV08A19SearchDriver({} as ILookaheadDeps, match);
+        expect((enabled as unknown as { a19LightningSpinCoverage: boolean }).a19LightningSpinCoverage).toBe(true);
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_LIGHTNING_SPIN_COVERAGE: "0" });
+        const disabled = createV08A19SearchDriver({} as ILookaheadDeps, match);
+        expect((disabled as unknown as { a19LightningSpinCoverage: boolean }).a19LightningSpinCoverage).toBe(false);
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_LIGHTNING_SPIN_COVERAGE: "yes" });
+        expect(() => createV08A19SearchDriver({} as ILookaheadDeps, match)).toThrow(
+            "SEARCH_A19_LIGHTNING_SPIN_COVERAGE must be 0 or 1",
+        );
+    });
+
     it("seals certified selection bounds off and requires the explicit research override", () => {
         process.env.SEARCH_A19_CERTIFIED_SELECTION_BOUNDS = "1";
         const match = { greenVersion: "v0.8", redVersion: "v0.8" };
@@ -206,6 +221,7 @@ describe("v0.8+A19 production profile", () => {
             "last-fuse-trades",
             "last-fuse-catalog",
             "last-fuse-estimates",
+            "lightning-spin-tactics",
             "ranged-shields",
             "selection-bounds",
             "rollout-allocation",

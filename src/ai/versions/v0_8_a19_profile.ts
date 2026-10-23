@@ -84,6 +84,8 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     // Give a wounded Last Fuse stack one supported counter-trade stand for real-engine comparison.
     SEARCH_A19_LAST_FUSE_TRADES: "1",
     SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "1",
+    // Hydra's capped catalog prices the complete radial impact, shared shields and Devour recovery.
+    SEARCH_A19_LIGHTNING_SPIN_COVERAGE: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -112,7 +114,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "766de6b8ef722c9a8ef0bc5aaa99f2f4f61e2ccc937010369b6f24f06b883fe3" as const;
+    "851c04ca64883575b7e6a3d2747fb9938d8f42ec421a509bfa2b8227dc4423af" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -144,8 +146,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for primary-only Last Fuse trades and their complete score comparison.
-        sha256: "dd6a61936b2377278f6dad3d5d46dd36a55270ece4213aff16ffff90fb49c727" as const,
+        // Re-pinned for whole-impact Hydra catalogs in both production enumeration paths.
+        sha256: "3a7c78692eafb952a69a559895d9d71696ea36124df59fd02c915eca56388425" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
@@ -160,12 +162,17 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        sha256: "9d411a010356f3cad5dbfc71ddb4eadf883e61c708ebf6687a2ce637e4608a27" as const,
+        sha256: "c7087e83b89170255074a603ad4be74463d0087b69db8a7332e2bac38488b0e6" as const,
     }),
     Object.freeze({
         role: "last-fuse-estimates" as const,
         source: "src/ai/last_fuse_estimate.ts" as const,
         sha256: "c30b7fefd4174b5e9062e4fec0e608da9ef42d7e61d7f342cb651e499a8926f0" as const,
+    }),
+    Object.freeze({
+        role: "lightning-spin-tactics" as const,
+        source: "src/ai/lightning_spin_tactics.ts" as const,
+        sha256: "bb904e3a03b1b233865a257dd1950605d61308857a21737c9c0317bc06b792b6" as const,
     }),
     Object.freeze({
         role: "ranged-shields" as const,
