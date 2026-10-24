@@ -114,7 +114,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "a15a24581387b4f46eecd2d9764d7aa60e61ef171e83d46c25e92b3af3246236" as const;
+    "34f6b79e5726d4ddde02029a5f5b5f8d0cce5fc8d0e9b8984a36375e03bac33e" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -273,6 +273,8 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         // Research candidates require an explicit seat-scoped JSON override; never inherit a shell gate.
         SEARCH_RESEARCH_RANGED_SHIELD_SEQUENCE: "0",
         SEARCH_RESEARCH_FIRE_BREATH_VALUE: "0",
+        V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT: "0",
+        V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT: "0",
         // Only the explicit JSON research override may enable this unqualified candidate.
         SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
         // Selection-aware tail bounds are an offline, measured research arm. Production stays sealed off.

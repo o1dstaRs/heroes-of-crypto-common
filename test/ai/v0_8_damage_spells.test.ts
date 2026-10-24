@@ -12,6 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { V08_ABOMINATION_GUARD_ENV } from "../../src/ai/versions/v0_8_backline_protector";
+import { V08_MAGE_DAMAGE_KILL_PRIORITY_ENV } from "../../src/ai/versions/v0_8_support_roles";
 
 import { AbilityFactory } from "../../src/abilities/ability_factory";
 import type { IDecisionContext } from "../../src/ai";
@@ -46,6 +47,8 @@ import {
 const LEFT = PBTypes.TeamVals.LEFT;
 const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
+const priorityKeys = [`${V08_MAGE_DAMAGE_KILL_PRIORITY_ENV}_LEFT`, `${V08_MAGE_DAMAGE_KILL_PRIORITY_ENV}_RIGHT`];
+const savedPriority = new Map(priorityKeys.map((key) => [key, process.env[key]]));
 
 function makeNative(team: number, faction: string, name: string, amount: number): Unit {
     const effectFactory = new EffectFactory();
@@ -147,11 +150,17 @@ function spell(unit: Unit, name: string) {
 beforeEach(() => {
     process.env[`${V08_ABOMINATION_GUARD_ENV}_LEFT`] = "1";
     process.env[`${V08_ABOMINATION_GUARD_ENV}_RIGHT`] = "1";
+    for (const key of priorityKeys) process.env[key] = "1";
 });
 
 afterEach(() => {
     delete process.env[`${V08_ABOMINATION_GUARD_ENV}_LEFT`];
     delete process.env[`${V08_ABOMINATION_GUARD_ENV}_RIGHT`];
+    for (const key of priorityKeys) {
+        const saved = savedPriority.get(key);
+        if (saved === undefined) delete process.env[key];
+        else process.env[key] = saved;
+    }
 });
 
 describe("v0.8 damage-spell policy", () => {
@@ -257,38 +266,43 @@ describe("v0.8 damage-spell policy", () => {
         expect(allies.every((ally) => ally.getCumulativeHp() === ally.getCumulativeMaxHp())).toBe(true);
     });
 
-    it.each([false, true])("Wandering Mage keeps a lethal Fireball over Smoke (Water Shield: %s)", (waterShield) => {
-        const combat = createCombatTestContext();
-        const mage = makeNative(LEFT, "Chaos", "Wandering Mage", 100);
-        mage.setStackPower(5);
-        const screen = createTestUnit({ team: LEFT, name: "Screened ally", amountAlive: 30 });
-        const shooter = createTestUnit({
-            team: RIGHT,
-            name: "Killable shooter",
-            attackType: PBTypes.AttackVals.RANGE,
-            rangeShots: 8,
-            damageMax: 20,
-            maxHp: 5,
-            amountAlive: 20,
-            abilities: waterShield ? ["Water Shield"] : [],
-        });
-        placeCombatUnit(combat, mage, { x: 2, y: 7 });
-        placeCombatUnit(combat, screen, { x: 2, y: 9 });
-        placeCombatUnit(combat, shooter, { x: 13, y: 8 });
-        if (waterShield) shooter.trySeedWaterShield();
-        const context = decisionContext(combat);
-        const decision = new StrategyV0_8().decideTurn(mage, context);
+    it.each([false, true].flatMap((enabled) => [false, true].map((waterShield) => ({ enabled, waterShield }))))(
+        "Wandering Mage lethal Fireball priority enabled=$enabled, Water Shield=$waterShield",
+        ({ enabled, waterShield }) => {
+            if (!enabled) for (const key of priorityKeys) delete process.env[key];
+            const combat = createCombatTestContext();
+            const mage = makeNative(LEFT, "Chaos", "Wandering Mage", 100);
+            mage.setStackPower(5);
+            const screen = createTestUnit({ team: LEFT, name: "Screened ally", amountAlive: 30 });
+            const shooter = createTestUnit({
+                team: RIGHT,
+                name: "Killable shooter",
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 8,
+                damageMax: 20,
+                maxHp: 5,
+                amountAlive: 20,
+                abilities: waterShield ? ["Water Shield"] : [],
+            });
+            placeCombatUnit(combat, mage, { x: 2, y: 7 });
+            placeCombatUnit(combat, screen, { x: 2, y: 9 });
+            placeCombatUnit(combat, shooter, { x: 13, y: 8 });
+            if (waterShield) shooter.trySeedWaterShield();
+            const context = decisionContext(combat);
+            const decision = new StrategyV0_8().decideTurn(mage, context);
 
-        expect(
-            enumerateCandidates(mage, context, decision, { enrichIncumbentMetadata: true }).candidates.some(
-                (candidate) => candidate.spellName === "Smoke",
-            ),
-        ).toBe(true);
-        expect(castAction(decision)).toMatchObject({ spellName: "Fireball", targetId: shooter.getId() });
-        expect(applyCast(combat, mage, context, castAction(decision)!)).toBe(true);
-        expect(shooter.isDead()).toBe(true);
-        expect(spell(mage, "Smoke").getAmount()).toBe(1);
-    });
+            expect(
+                enumerateCandidates(mage, context, decision, { enrichIncumbentMetadata: true }).candidates.some(
+                    (candidate) => candidate.spellName === "Smoke",
+                ),
+            ).toBe(true);
+            expect(castAction(decision)?.spellName).toBe(enabled ? "Fireball" : "Smoke");
+            expect(applyCast(combat, mage, context, castAction(decision)!)).toBe(true);
+            expect(shooter.isDead()).toBe(enabled);
+            expect(spell(mage, "Fireball").getAmount()).toBe(enabled ? 0 : 1);
+            expect(spell(mage, "Smoke").getAmount()).toBe(enabled ? 1 : 0);
+        },
+    );
 
     it("Battle Mage and the v0.8s alias cast Fire Strike instead of walking when it is the best legal hit", () => {
         const combat = createCombatTestContext();

@@ -54,6 +54,8 @@ const ENV_KEYS = [
     "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
     "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
     "SEARCH_A19_ROLLOUT_ALLOCATION",
+    "V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT",
+    "V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT",
 ] as const;
 const savedEnvironment = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
 
@@ -72,6 +74,16 @@ beforeEach(() => {
 afterEach(restoreEnvironment);
 
 describe("v0.8+A19 production profile", () => {
+    it("keeps unqualified Mage kill priority off unless a research override explicitly enables it", () => {
+        process.env.V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT = "1";
+        process.env.V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT = "1";
+        expect(buildV08A19SearchEnvironment().V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT).toBe("0");
+        expect(buildV08A19SearchEnvironment().V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT).toBe("0");
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT: "1" });
+        expect(buildV08A19SearchEnvironment().V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT).toBe("1");
+        expect(buildV08A19SearchEnvironment().V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT).toBe("0");
+    });
+
     it("is one flat production identity with the deep search budget and every A19 rule on", () => {
         const environment = buildV08A19SearchEnvironment();
 

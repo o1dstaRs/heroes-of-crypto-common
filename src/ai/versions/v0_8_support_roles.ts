@@ -14,6 +14,7 @@ import { getSpellMoraleMultiplier, isOffensiveSpellMultiplier } from "../../spel
 import type { Unit } from "../../units/unit";
 import type { IDecisionContext } from "../ai_strategy";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../candidates";
+import { seatEnvName } from "../seat_env";
 import { buildV08BacklineProtectorIntent, isImmediateMeleeResponseExposed } from "./v0_8_backline_protector";
 import { isV08DirectCombatDecision } from "./v0_8_dominant_finish";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
@@ -28,6 +29,8 @@ const HEAL = "Heal";
 const MASS_HEAL = "Mass Heal";
 const SPIRITUAL_ARMOR = "Spiritual Armor";
 const BLESSING = "Blessing";
+
+export const V08_MAGE_DAMAGE_KILL_PRIORITY_ENV = "V08_MAGE_DAMAGE_KILL_PRIORITY";
 
 /**
  * These are the expensive, durable stacks for which a Healer slot has an explicit sustain job. This is
@@ -67,12 +70,14 @@ const incumbentGuaranteedKill = (
     candidates: readonly IEnumeratedCandidate[],
 ): boolean => {
     const incumbent = candidates[0];
-    const damageSpell = unit
-        .getSpells()
-        .some(
-            (spell) =>
-                spell.getName() === incumbent?.spellName && isOffensiveSpellMultiplier(spell.getMultiplierType()),
-        );
+    const damageSpell =
+        process.env[seatEnvName(V08_MAGE_DAMAGE_KILL_PRIORITY_ENV, unit.getTeam())] === "1" &&
+        unit
+            .getSpells()
+            .some(
+                (spell) =>
+                    spell.getName() === incumbent?.spellName && isOffensiveSpellMultiplier(spell.getMultiplierType()),
+            );
     const target = incumbent?.targetId ? context.unitsHolder.getAllUnits().get(incumbent.targetId) : undefined;
     const targetCanAbsorbPrimary =
         !!target &&
