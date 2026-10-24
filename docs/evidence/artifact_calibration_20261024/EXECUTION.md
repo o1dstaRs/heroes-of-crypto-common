@@ -29,4 +29,5 @@ suites passed 10 tests with 1,205 assertions. The broader workspace check encoun
 test timeout (passed in isolation), then concurrent formatting edits in two client asset-release tests;
 it has not completed green. These are separate from the frozen study and do not authorize promotion.
 
-Training outcomes and the qualification decision will be reported after both complete ranges finish.
+Both complete ranges finished. The fixed calibration failed its advance gate; see [RESULTS.md](RESULTS.md).
+No partial sample, selected subset or new fitting variant was substituted.

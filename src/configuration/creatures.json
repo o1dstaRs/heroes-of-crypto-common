@@ -201,7 +201,7 @@
             "armor": 25,
             "attack_type": "MELEE",
             "attack": 20,
-            "attack_damage_min": 12,
+            "attack_damage_min": 13,
             "attack_damage_max": 20,
             "attack_range": 1,
             "range_shots": 0,
