@@ -410,6 +410,7 @@ export interface IRankedDraftEvaluationReport {
         liveSynergyVariants?: true;
         tacticalSplits?: true;
         candidateSkipsSplits?: true;
+        researchCandidatePreferredCreature?: number;
         candidateSearchEnvOverrides?: Record<string, string>;
         draftDimensions: { offset: number; length: number };
         clusterSize: 4;
