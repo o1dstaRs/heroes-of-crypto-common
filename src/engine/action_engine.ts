@@ -842,7 +842,13 @@ export class GameActionEngine {
         if (isFreeAim && !attacker.hasAbilityActive("Through Shot")) {
             return this.reject("attack_not_available");
         }
-        if (isFreeAim && (!Number.isFinite(freeAimPosition.x) || !Number.isFinite(freeAimPosition.y) || !isPositionWithinGrid(this.context.grid.getSettings(), freeAimPosition) || (freeAimPosition.x === attacker.getPosition().x && freeAimPosition.y === attacker.getPosition().y))) {
+        if (
+            isFreeAim &&
+            (!Number.isFinite(freeAimPosition.x) ||
+                !Number.isFinite(freeAimPosition.y) ||
+                !isPositionWithinGrid(this.context.grid.getSettings(), freeAimPosition) ||
+                (freeAimPosition.x === attacker.getPosition().x && freeAimPosition.y === attacker.getPosition().y))
+        ) {
             return this.reject("attack_not_available");
         }
         const target = isFreeAim ? undefined : this.context.unitsHolder.getAllUnits().get(action.targetId);
@@ -2987,7 +2993,10 @@ export class GameActionEngine {
             }
             // Shrugging off a MIND spell is a resist and reads as one; say so. An already-applied spell is
             // not a resist — it stays silent, as the "suffers" line for it was already written.
-            if (spell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance()) {
+            if (
+                spell.getPowerType() === SpellPowerType.MIND &&
+                debuffTarget.hasMindAttackResistance(spell.getName(), "debuff")
+            ) {
                 this.context.sceneLog.updateLog(`${debuffTarget.getName()} resisted from ${spell.getName()}`);
                 recordEffectApplication({
                     unitId: debuffTarget.getId(),
@@ -3014,7 +3023,10 @@ export class GameActionEngine {
             if (
                 SpellHelper.isMirrored(debuffTarget) &&
                 !SpellHelper.hasAlreadyAppliedSpell(caster, spell) &&
-                !(spell.getPowerType() === SpellPowerType.MIND && caster.hasMindAttackResistance())
+                !(
+                    spell.getPowerType() === SpellPowerType.MIND &&
+                    caster.hasMindAttackResistance(spell.getName(), "debuff")
+                )
             ) {
                 caster.applyDebuff(spell, undefined, undefined, true);
                 this.context.sceneLog.updateLog(

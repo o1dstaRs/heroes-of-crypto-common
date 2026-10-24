@@ -682,7 +682,8 @@ export class AttackHandler {
                 }
             } else if (
                 HoCLib.getRandomInt(0, 100) < Math.floor(targetUnit.getMagicResist()) ||
-                (currentActiveSpell.getPowerType() === SpellPowerType.MIND && targetUnit.hasMindAttackResistance())
+                (currentActiveSpell.getPowerType() === SpellPowerType.MIND &&
+                    targetUnit.hasMindAttackResistance(currentActiveSpell.getName(), "debuff"))
             ) {
                 applied = false;
             } else {
@@ -702,7 +703,8 @@ export class AttackHandler {
                 const laps = currentActiveSpell.getLapsTotal();
 
                 if (!(
-                    currentActiveSpell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance()
+                    currentActiveSpell.getPowerType() === SpellPowerType.MIND &&
+                    debuffTarget.hasMindAttackResistance(currentActiveSpell.getName(), "debuff")
                 )) {
                     // A swap exchanges anchors, so it is only well defined between two bodies of the SAME
                     // footprint. Re-check the EFFECTIVE target after Absorb Penalties redirection: the aura
@@ -828,7 +830,7 @@ export class AttackHandler {
                     !SpellHelper.hasAlreadyAppliedSpell(attackerUnit, currentActiveSpell) &&
                     !(
                         currentActiveSpell.getPowerType() === SpellPowerType.MIND &&
-                        attackerUnit.hasMindAttackResistance()
+                        attackerUnit.hasMindAttackResistance(currentActiveSpell.getName(), "debuff")
                     )
                 ) {
                     // Extended, always. A mirrored debuff lands on the unit whose turn is ending THIS
@@ -862,7 +864,7 @@ export class AttackHandler {
                         : SpellHelper.hasAlreadyAppliedSpell(debuffTarget, currentActiveSpell)) &&
                     !(
                         currentActiveSpell.getPowerType() === SpellPowerType.MIND &&
-                        debuffTarget.hasMindAttackResistance()
+                        debuffTarget.hasMindAttackResistance(currentActiveSpell.getName(), "debuff")
                     )
                 ) {
                     debuffTarget.applyDebuff(

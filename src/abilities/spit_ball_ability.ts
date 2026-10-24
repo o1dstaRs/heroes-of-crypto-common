@@ -92,7 +92,8 @@ export function processSpitBallAbility(
 
         if (
             HoCLib.getRandomInt(0, 100) < Math.floor(targetUnit.getMagicResist()) ||
-            (debuff.getPowerType() === SpellPowerType.MIND && targetUnit.hasMindAttackResistance())
+            (debuff.getPowerType() === SpellPowerType.MIND &&
+                targetUnit.hasMindAttackResistance(debuff.getName(), "debuff"))
         ) {
             applied = false;
         }
@@ -110,7 +111,10 @@ export function processSpitBallAbility(
             // we already know it has not been applied already
             if (
                 SpellHelper.isMirrored(targetUnit) &&
-                !(debuff.getPowerType() === SpellPowerType.MIND && fromUnit.hasMindAttackResistance())
+                !(
+                    debuff.getPowerType() === SpellPowerType.MIND &&
+                    fromUnit.hasMindAttackResistance(debuff.getName(), "debuff")
+                )
             ) {
                 fromUnit.applyDebuff(debuff, undefined, undefined, fromUnit.getId() === currentActiveUnit.getId());
                 sceneLog.updateLog(
