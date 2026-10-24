@@ -146,7 +146,7 @@ export function processFleshShieldAura(
         return result;
     }
     // The protected unit's own Water Shield answers first: a hit it absorbs whole never reaches the aura.
-    if (targetUnit.willWaterShieldAbsorb(attackerUnit)) {
+    if (targetUnit.willAbsorbIncomingHit(attackerUnit)) {
         return result;
     }
 

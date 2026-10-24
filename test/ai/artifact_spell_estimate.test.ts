@@ -111,6 +111,24 @@ function fixture(
 afterEach(() => setDeterministicRandomSource(undefined));
 
 describe("artifact spell decisions", () => {
+    test("finishes a weak enemy to start a more valuable chain instead of spending the spell on isolated HP", () => {
+        const h = fixture({ neighbor: { maxHp: 40 } });
+        const third = createTestUnit({ team: RIGHT, maxHp: 1000 });
+        placeUnit(h.grid, h.unitsHolder, third, { x: 11, y: 10 });
+        const candidates = h.catalog();
+        const selected = selectV08DamageSpellCandidate(h.caster, candidates)!;
+        expect([h.target.getId(), h.neighbor!.getId()]).toContain(selected.targetId!);
+        expect(selected.features.expectedDamage).toBeGreaterThan(
+            candidates.find((candidate) => candidate.kind === "spell" && candidate.targetId === h.safe.getId())!
+                .features.expectedDamage,
+        );
+        const before = third.getCumulativeHp();
+        const actual = h.fire(selected);
+        expect(actual.enemyLoss + before - third.getCumulativeHp()).toBe(selected.features.expectedDamage);
+        expect(actual.blasts).toHaveLength(2);
+        expect(actual.friendlyLoss).toBe(0);
+    });
+
     test.each([1, 2, 3, 4, 5])("Last Fuse spells use caster power %s independently of target power", (stackPower) => {
         const h = fixture({
             expose: true,
@@ -211,14 +229,14 @@ describe("artifact spell decisions", () => {
         expect(h.fire(cast)).toMatchObject({ blasts: [], friendlyLoss: 0, netDamage: 0 });
     });
 
-    test("a blast that would destroy another enemy is left to search", () => {
+    test("a blast that destroys another enemy contributes its actual HP loss", () => {
         const h = fixture({ neighbor: { maxHp: 20 } });
         const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
-        const priced = h.target.getCumulativeHp();
+        const priced = h.target.getCumulativeHp() + h.neighbor!.getCumulativeHp();
         expect(cast.features).toMatchObject({ expectedDamage: priced, expectedKill: 1 });
         const result = h.fire(cast);
         expect(result.friendlyLoss).toBe(0);
-        expect(result.enemyLoss).toBeGreaterThan(priced);
+        expect(result.enemyLoss).toBe(priced);
         expect(h.neighbor && (h.neighbor.isDead() || !h.unitsHolder.getAllUnits().has(h.neighbor.getId()))).toBe(true);
     });
 

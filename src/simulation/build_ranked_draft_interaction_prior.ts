@@ -13,7 +13,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { format } from "prettier";
+import { formatJson } from "./format_json";
 
 export const RANKED_DRAFT_INTERACTION_PRIOR_SELECTION = {
     allyPair: { minimumSupport: 50, minimumAbsoluteConfidencePp: 2 },
@@ -270,10 +270,7 @@ async function cliMain(): Promise<void> {
         },
         id,
     );
-    writeFileSync(
-        resolve(outputPath),
-        await format(JSON.stringify(artifact, null, 4), { parser: "json", printWidth: 120, tabWidth: 4 }),
-    );
+    writeFileSync(resolve(outputPath), formatJson(artifact));
 }
 
 if (import.meta.main) {

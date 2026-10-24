@@ -106,6 +106,7 @@ export enum AbilityPowerType {
     // The fourth elemental affinity: an Earth Element is immune to earth and vulnerable to wind.
     // Appended to keep every existing serialized numeric value stable.
     MAGIC_VULNERABILITY_WIND = 70,
+    ARMY_FIRE_COVENANT = 71,
 }
 
 export const AllAbilityPowerTypes = [
@@ -180,6 +181,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.STUN_CHANCE,
     AbilityPowerType.DISABLE_HOURGLASS,
     AbilityPowerType.MAGIC_VULNERABILITY_WIND,
+    AbilityPowerType.ARMY_FIRE_COVENANT,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -257,6 +259,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     STUN_CHANCE: AbilityPowerType.STUN_CHANCE,
     DISABLE_HOURGLASS: AbilityPowerType.DISABLE_HOURGLASS,
     MAGIC_VULNERABILITY_WIND: AbilityPowerType.MAGIC_VULNERABILITY_WIND,
+    ARMY_FIRE_COVENANT: AbilityPowerType.ARMY_FIRE_COVENANT,
 };
 
 export enum AbilityType {

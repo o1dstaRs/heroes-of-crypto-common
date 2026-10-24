@@ -172,7 +172,7 @@ export function registerAuraRefreshMixedEventTraceShard(shardIndex: number): voi
                             auraEffects: [
                                 "Luck",
                                 "Flesh Shield",
-                                "Sharpened Weapons",
+                                "Absorb Penalties",
                                 "Disguise",
                                 "Tie up the Horses",
                                 "War Anger",

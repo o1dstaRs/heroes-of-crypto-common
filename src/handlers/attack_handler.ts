@@ -843,6 +843,7 @@ export class AttackHandler {
             }
 
             if (currentActiveSpell.isSelfDebuffApplicable()) {
+                const isHelpingHand = currentActiveSpell.getName() === "Helping Hand";
                 // effect can be absorbed
                 let debuffTarget = attackerUnit;
                 const absorptionTarget = EffectHelper.getAbsorptionTarget(
@@ -856,7 +857,9 @@ export class AttackHandler {
                 }
 
                 if (
-                    !SpellHelper.hasAlreadyAppliedSpell(debuffTarget, currentActiveSpell) &&
+                    !(isHelpingHand
+                        ? debuffTarget.hasDebuffActive("Helping Hand")
+                        : SpellHelper.hasAlreadyAppliedSpell(debuffTarget, currentActiveSpell)) &&
                     !(
                         currentActiveSpell.getPowerType() === SpellPowerType.MIND &&
                         debuffTarget.hasMindAttackResistance()
@@ -868,6 +871,9 @@ export class AttackHandler {
                         attackerUnit.getBaseArmor(),
                         true,
                     );
+                }
+                if (isHelpingHand && applied && targetUnit.hasBuffActive("Helping Hand")) {
+                    targetUnit.setHelpingHandLink(attackerUnit.getId(), debuffTarget.getId());
                 }
             }
 
@@ -1101,18 +1107,18 @@ export class AttackHandler {
         let primaryAssimilationLanded = false;
         let responseAssimilationTarget: Unit | undefined;
         const initiatingSingleHits: NonNullable<IVisibleDamage["splash"]> = [];
-        let chakramResponseHits: NonNullable<IVisibleDamage["splash"]> | undefined;
+        let splashResponseHits: NonNullable<IVisibleDamage["splash"]> | undefined;
         let rangeAttackFinalized = false;
         const finalizeRangeAttack = (): void => {
             if (rangeAttackFinalized) {
                 return;
             }
             rangeAttackFinalized = true;
-            // Splash replaces the client's single-target numbers. A counter-Chakram must therefore carry
+            // Splash replaces the client's single-target numbers. An area counter-shot must therefore carry
             // both sides of the exchange, including each initiating arrow's own hit/miss and casualties.
             // Finalize after the last arrow (or a lethal early return), so no later single hit is lost.
-            if (chakramResponseHits?.length) {
-                (damageForAnimation.splash ??= []).push(...initiatingSingleHits, ...chakramResponseHits);
+            if (splashResponseHits?.length) {
+                (damageForAnimation.splash ??= []).push(...initiatingSingleHits, ...splashResponseHits);
             } else if (
                 attackerUnit.getBonusRangedAttackChance() > 0 &&
                 !damageForAnimation.splash?.length &&
@@ -1542,9 +1548,10 @@ export class AttackHandler {
 
                 (damageForAnimation.luckyStrikeBy ??= []),
             );
+            const loggedDamage = targetUnit.willAbsorbIncomingHit(attackerUnit) ? 0 : damageFromAttack;
             this.sceneLog.updateLog(
-                `${attackerUnit.getName()} 🏹 ${targetUnit.getName()} (${damageFromAttack})` +
-                    HoCLib.killTag(targetUnit.calculatePossibleLosses(damageFromAttack)),
+                `${attackerUnit.getName()} 🏹 ${targetUnit.getName()} (${loggedDamage})` +
+                    HoCLib.killTag(targetUnit.calculatePossibleLosses(loggedDamage)),
             );
             attackDamageApplied = false;
         }
@@ -1659,12 +1666,10 @@ export class AttackHandler {
                 );
             }
             if (aoeRangeResponseResult.landed) {
-                if (responseChakramFlight) {
-                    chakramResponseHits = aoeRangeResponseResult.perUnitDamage.map((entry) => ({
-                        ...entry,
-                        position: { ...entry.position },
-                    }));
-                }
+                splashResponseHits = aoeRangeResponseResult.perUnitDamage.map((entry) => ({
+                    ...entry,
+                    position: { ...entry.position },
+                }));
                 damageFromResponse = AllAbilities.processLuckyStrikeAbility(
                     targetUnit,
                     aoeRangeResponseResult.maxDamage,
@@ -1745,7 +1750,7 @@ export class AttackHandler {
                         HoCLib.killTag(rangeResponseUnit.calculatePossibleLosses(damageFromResponse)),
                 );
 
-                rangeResponseAbsorbed = damageFromResponse > 0 && rangeResponseUnit.willWaterShieldAbsorb(targetUnit);
+                rangeResponseAbsorbed = damageFromResponse > 0 && rangeResponseUnit.willAbsorbIncomingHit(targetUnit);
                 // response damage
                 this.damageStatisticHolder.add({
                     unitName: targetUnit.getName(),
@@ -1763,6 +1768,25 @@ export class AttackHandler {
                     team: targetUnit.getTeam(),
                     lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                 });
+                // The counter-shot's fire is not the shot. A Water Shield can swallow the arrow and still burn.
+                const rangeResponseSwordResult = AllAbilities.processFireforgedSwordAbility(
+                    targetUnit,
+                    rangeResponseUnit,
+                    damageFromResponse,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                targetUnitPlusMorale += rangeResponseSwordResult.increaseMorale;
+                for (const uId of rangeResponseSwordResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(uId)) {
+                        unitIdsDied.push(uId);
+                    }
+                }
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    rangeResponseSwordResult.moraleDecreaseForTheUnitTeam,
+                );
                 if (!rangeResponseAbsorbed) {
                     const pegasusLightEffect = rangeResponseUnit.getEffect("Pegasus Light");
                     if (pegasusLightEffect) {
@@ -1781,26 +1805,6 @@ export class AttackHandler {
                         rangeResponseUnit,
                         damageFromResponse,
                         this.sceneLog,
-                    );
-                    // ...and so does the responder's Fireforged Sword, for the same reason: the card says
-                    // "the ally's attacks", and a counter-shot is one of them.
-                    const rangeResponseSwordResult = AllAbilities.processFireforgedSwordAbility(
-                        targetUnit,
-                        rangeResponseUnit,
-                        damageFromResponse,
-                        this.sceneLog,
-                        this.damageStatisticHolder,
-                        (damageForAnimation.secondary ??= []),
-                    );
-                    targetUnitPlusMorale += rangeResponseSwordResult.increaseMorale;
-                    for (const uId of rangeResponseSwordResult.unitIdsDied) {
-                        if (!unitIdsDied.includes(uId)) {
-                            unitIdsDied.push(uId);
-                        }
-                    }
-                    this.updateMoraleDecreaseForTheUnitTeam(
-                        moraleDecreaseForTheUnitTeam,
-                        rangeResponseSwordResult.moraleDecreaseForTheUnitTeam,
                     );
                 }
             }
@@ -1871,7 +1875,7 @@ export class AttackHandler {
                 damageForAnimation.amount = damageFromAttack;
                 damageForAnimation.hits = []; // Initialize hits as an array of objects
                 const initialAmountAlive = targetUnit.getAmountAlive();
-                rangeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
+                rangeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willAbsorbIncomingHit(attackerUnit);
                 // attack damage
                 const damageDealt = targetUnit.applyDamage(
                     damageFromAttack,
@@ -1921,6 +1925,27 @@ export class AttackHandler {
                     damageForAnimation,
                 );
             }
+            // The burn is fire, so a shield that ate the shot still catches fire. A landed splash already
+            // burned every unit it damaged, this one included.
+            if (!targetUnit.isDead() && !isAttackMissed && !aoeRangeAttackResult?.landed) {
+                const rangedFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
+                    attackerUnit,
+                    targetUnit,
+                    damageFromAttack,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                for (const uId of rangedFireforgedSwordResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(uId)) {
+                        unitIdsDied.push(uId);
+                    }
+                }
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    rangedFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
+                );
+            }
             if (!targetUnit.isDead() && !isAttackMissed && !rangeAttackAbsorbed) {
                 // On-hit effects only land when the shot itself did: a dodged/missed shot (Dodge /
                 // Small Specie / Boar Saliva) must not stun/petrify/etc. — mirrors the melee path,
@@ -1932,23 +1957,6 @@ export class AttackHandler {
                 // aimed unit included — rolling them here too gave the aimed unit a second chance at each.
                 const splashLanded = !!aoeRangeAttackResult?.landed;
                 if (!splashLanded) {
-                    const rangedFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
-                        attackerUnit,
-                        targetUnit,
-                        damageFromAttack,
-                        this.sceneLog,
-                        this.damageStatisticHolder,
-                        (damageForAnimation.secondary ??= []),
-                    );
-                    for (const uId of rangedFireforgedSwordResult.unitIdsDied) {
-                        if (!unitIdsDied.includes(uId)) {
-                            unitIdsDied.push(uId);
-                        }
-                    }
-                    this.updateMoraleDecreaseForTheUnitTeam(
-                        moraleDecreaseForTheUnitTeam,
-                        rangedFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
-                    );
                     AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 }
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -2231,7 +2239,7 @@ export class AttackHandler {
             const unitsDied = Math.max(0, preSecondShotAmount - currentAmount);
 
             damageForAnimation.hits.push({
-                amount: secondShotResult.damage,
+                amount: Math.max(0, preSecondShotHp - targetUnit.getCumulativeHp()),
                 unitsDied: unitsDied,
             });
             damageForAnimation.unitId = targetUnit.getId();
@@ -2283,9 +2291,8 @@ export class AttackHandler {
                     1,
                 );
             }
-            if (!targetUnit.isDead() && secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
-                // The second shot is a second attack, so it sets the target alight again on its own
-                // damage. It rides with the other on-hit riders here and under the same gate.
+            if (!targetUnit.isDead() && secondShotResult.applied) {
+                // The second shot's fire still lands when a Water Shield ate the arrow.
                 const secondShotSwordResult = AllAbilities.processFireforgedSwordAbility(
                     attackerUnit,
                     targetUnit,
@@ -2304,6 +2311,8 @@ export class AttackHandler {
                     moraleDecreaseForTheUnitTeam,
                     secondShotSwordResult.moraleDecreaseForTheUnitTeam,
                 );
+            }
+            if (!targetUnit.isDead() && secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -2749,6 +2758,7 @@ export class AttackHandler {
                 position: sd.unitPosition,
                 amount: sd.damage,
                 unitsDied: sd.unitsDied,
+                ...(sd.ignition ? { ignition: sd.ignition } : {}),
             });
         }
         // The blade over everything the sweeps hit: a Fireforged breath, spin or skewer sets every unit it
@@ -2815,9 +2825,10 @@ export class AttackHandler {
             );
             // just log attack here,
             // to make sure that logs are in chronological order
+            const loggedDamage = targetUnit.willAbsorbIncomingHit(attackerUnit) ? 0 : damageFromAttack;
             this.sceneLog.updateLog(
-                `${attackerUnit.getName()} ⚔️ ${targetUnit.getName()} (${damageFromAttack})` +
-                    HoCLib.killTag(targetUnit.calculatePossibleLosses(damageFromAttack)),
+                `${attackerUnit.getName()} ⚔️ ${targetUnit.getName()} (${loggedDamage})` +
+                    HoCLib.killTag(targetUnit.calculatePossibleLosses(loggedDamage)),
             );
 
             const fireShieldReflectResult = AllAbilities.processFireShieldAbility(
@@ -2901,6 +2912,7 @@ export class AttackHandler {
                         position: sd.unitPosition,
                         amount: sd.damage,
                         unitsDied: sd.unitsDied,
+                        ...(sd.ignition ? { ignition: sd.ignition } : {}),
                     });
                 }
 
@@ -3023,7 +3035,7 @@ export class AttackHandler {
                     // Water Shield on the counterattacked ATTACKER: an absorbed response lands none of the
                     // responder's on-hit riders — same rule as a missed response.
                     const meleeResponseAbsorbed =
-                        damageFromResponse > 0 && attackerUnit.willWaterShieldAbsorb(targetUnit);
+                        damageFromResponse > 0 && attackerUnit.willAbsorbIncomingHit(targetUnit);
                     this.damageStatisticHolder.add({
                         unitName: targetUnit.getName(),
                         damage: attackerUnit.applyDamage(
@@ -3038,6 +3050,21 @@ export class AttackHandler {
                         team: targetUnit.getTeam(),
                         lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                     });
+                    // The responder's blade is fire. A shield that ate the retaliation still burns.
+                    const responseFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
+                        targetUnit,
+                        attackerUnit,
+                        damageFromResponse,
+                        this.sceneLog,
+                        this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
+                    );
+                    updateUnitsDied(responseFireforgedSwordResult.unitIdsDied);
+                    targetUnitPlusMorale += responseFireforgedSwordResult.increaseMorale;
+                    this.updateMoraleDecreaseForTheUnitTeam(
+                        moraleDecreaseForTheUnitTeam,
+                        responseFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
+                    );
                     if (!meleeResponseAbsorbed) {
                         const pegasusLightEffect = attackerUnit.getEffect("Pegasus Light");
                         if (pegasusLightEffect) {
@@ -3058,24 +3085,6 @@ export class AttackHandler {
                         this.updateMoraleDecreaseForTheUnitTeam(
                             moraleDecreaseForTheUnitTeam,
                             fireShieldFromAttackerResult.moraleDecreaseForTheUnitTeam,
-                        );
-                        // The RESPONDER's own Fireforged Sword. A retaliation is one of "the ally's
-                        // attacks" the card promises, and the mirror-image Fire Shield already fires on
-                        // this exact path — the blade simply never did, so a buffed defender struck back
-                        // with cold steel (owner report 2026-09-20).
-                        const responseFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
-                            targetUnit,
-                            attackerUnit,
-                            damageFromResponse,
-                            this.sceneLog,
-                            this.damageStatisticHolder,
-                            (damageForAnimation.secondary ??= []),
-                        );
-                        updateUnitsDied(responseFireforgedSwordResult.unitIdsDied);
-                        targetUnitPlusMorale += responseFireforgedSwordResult.increaseMorale;
-                        this.updateMoraleDecreaseForTheUnitTeam(
-                            moraleDecreaseForTheUnitTeam,
-                            responseFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
                         );
                         AllAbilities.processStunAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processStunAuraOnHit(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
@@ -3135,19 +3144,20 @@ export class AttackHandler {
                             damageForAnimation,
                         );
                         AllAbilities.processBlindnessAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                        updateUnitsDied(
-                            AllAbilities.processChainLightningAbility(
-                                targetUnit,
-                                attackerUnit,
-                                damageFromResponse,
-                                this.grid,
-                                unitsHolder,
-                                this.sceneLog,
-                                this.damageStatisticHolder,
-                                (damageForAnimation.secondary ??= []),
-                            ),
-                        );
                     }
+                    // The response's lightning is a separate magical hit after the physical shield breaks.
+                    updateUnitsDied(
+                        AllAbilities.processChainLightningAbility(
+                            targetUnit,
+                            attackerUnit,
+                            damageFromResponse,
+                            this.grid,
+                            unitsHolder,
+                            this.sceneLog,
+                            this.damageStatisticHolder,
+                            (damageForAnimation.secondary ??= []),
+                        ),
+                    );
                 }
                 AllAbilities.processOneInTheFieldAbility(targetUnit);
             }
@@ -3160,9 +3170,9 @@ export class AttackHandler {
         captureResponse();
 
         if (!hasLightningSpinAttackLanded && !isAttackMissed && !targetUnit.isDead()) {
-            // Water Shield: captured BEFORE the blow lands (applyDamage consumes the shield). An absorbed
-            // strike applies nothing — the whole on-hit rider block below is skipped like a missed blow.
-            const meleeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
+            // Capture absorption before applyDamage consumes the shield. The physical blow's on-hit
+            // debuffs are skipped; separate magical damage still resolves after the shield breaks.
+            const meleeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willAbsorbIncomingHit(attackerUnit);
             // this code has to be here to make sure that respond damage has been applied as well
             damageForAnimation.render = true;
             damageForAnimation.amount = damageFromAttack;
@@ -3207,21 +3217,22 @@ export class AttackHandler {
                 });
             }
 
+            // The burn is fire. The shield can swallow the steel and still catch fire; other riders stay off.
+            const fireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
+                attackerUnit,
+                targetUnit,
+                damageFromAttack,
+                this.sceneLog,
+                this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
+            );
+            updateUnitsDied(fireforgedSwordResult.unitIdsDied);
+            this.updateMoraleDecreaseForTheUnitTeam(
+                moraleDecreaseForTheUnitTeam,
+                fireforgedSwordResult.moraleDecreaseForTheUnitTeam,
+            );
             // An absorbed strike lands no on-hit riders — same rule as a missed blow (the outer gate).
             if (!meleeAttackAbsorbed) {
-                const fireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
-                    attackerUnit,
-                    targetUnit,
-                    damageFromAttack,
-                    this.sceneLog,
-                    this.damageStatisticHolder,
-                    (damageForAnimation.secondary ??= []),
-                );
-                updateUnitsDied(fireforgedSwordResult.unitIdsDied);
-                this.updateMoraleDecreaseForTheUnitTeam(
-                    moraleDecreaseForTheUnitTeam,
-                    fireforgedSwordResult.moraleDecreaseForTheUnitTeam,
-                );
                 AllAbilities.processMinerAbility(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -3285,18 +3296,21 @@ export class AttackHandler {
                 // Blindness rides the blow the Unicorn strikes as well as the one it answers — it used to
                 // fire only from the response path, so a Unicorn that opened the exchange blinded nobody.
                 AllAbilities.processBlindnessAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-                updateUnitsDied(
-                    AllAbilities.processChainLightningAbility(
-                        attackerUnit,
-                        targetUnit,
-                        damageFromAttack,
-                        this.grid,
-                        unitsHolder,
-                        this.sceneLog,
-                        this.damageStatisticHolder,
-                        (damageForAnimation.secondary ??= []),
-                    ),
-                );
+            }
+            // Chain Lightning uses the swing's damage even when its physical component was absorbed.
+            updateUnitsDied(
+                AllAbilities.processChainLightningAbility(
+                    attackerUnit,
+                    targetUnit,
+                    damageFromAttack,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                ),
+            );
+            if (!meleeAttackAbsorbed) {
                 const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");
                 if (pegasusLightEffect) {
                     attackerUnitPlusMorale += pegasusLightEffect.getPower();
@@ -3331,7 +3345,7 @@ export class AttackHandler {
             captureResponse();
             // Water Shield vs the second punch: possible when the FIRST punch missed (shield intact).
             // Captured before the second punch's damage lands; an absorbed punch applies no riders.
-            const secondPunchAbsorbed = secondPunchResult.damage > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
+            const secondPunchAbsorbed = secondPunchResult.damage > 0 && targetUnit.willAbsorbIncomingHit(attackerUnit);
             if (secondPunchResult.damage > 0) {
                 const secondPunchFleshShieldAbsorb = AllAbilities.processFleshShieldAura(
                     attackerUnit,
@@ -3409,7 +3423,7 @@ export class AttackHandler {
                 secondFireShieldResult.moraleDecreaseForTheUnitTeam,
             );
 
-            if (!secondPunchResult.missed && !secondPunchAbsorbed) {
+            if (!secondPunchResult.missed) {
                 const secondFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
                     attackerUnit,
                     targetUnit,
@@ -3423,6 +3437,8 @@ export class AttackHandler {
                     moraleDecreaseForTheUnitTeam,
                     secondFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
                 );
+            }
+            if (!secondPunchResult.missed && !secondPunchAbsorbed) {
                 AllAbilities.processMinerAbility(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -3736,6 +3752,7 @@ export class AttackHandler {
                     position: sd.unitPosition,
                     amount: sd.damage,
                     unitsDied: sd.unitsDied,
+                    ...(sd.ignition ? { ignition: sd.ignition } : {}),
                 });
             }
             settleMorale(skewerResult);
@@ -4412,7 +4429,7 @@ export class AttackHandler {
         const victims = secondary
             .slice(fromIndex)
             .filter((entry) => sources.includes(entry.source))
-            .map((entry) => ({ unitId: entry.unitId, amount: entry.amount }));
+            .map((entry) => ({ unitId: entry.unitId, amount: entry.amount, ignition: entry.ignition }));
         return AllAbilities.processFireforgedSwordOnVictims(
             fromUnit,
             victims,

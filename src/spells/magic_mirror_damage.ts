@@ -79,8 +79,9 @@ export function projectMagicMirrorDamage(input: {
         element,
         attacker,
     );
-    const absorbedByWaterShield = landed > 0 && attacker.willWaterShieldAbsorb(attacker);
-    const damage = absorbedByWaterShield ? 0 : landed;
+    const covenantBlocks = attacker.willEmberCovenantBlock(attacker, element);
+    const absorbedByWaterShield = !covenantBlocks && landed > 0 && attacker.willWaterShieldAbsorb(attacker, element);
+    const damage = absorbedByWaterShield || covenantBlocks ? 0 : landed;
 
     return {
         landed,
@@ -104,7 +105,7 @@ export function applyMagicMirrorDamage(input: {
     sceneLog: ISceneLog;
     secondaryDamage?: ISecondaryDamage[];
 }): IAppliedMagicMirrorDamage | undefined {
-    const { attacker, holder, sceneLog, secondaryDamage } = input;
+    const { attacker, holder, sceneLog, secondaryDamage, element } = input;
     if (attacker.isDead()) {
         return undefined;
     }
@@ -115,9 +116,9 @@ export function applyMagicMirrorDamage(input: {
 
     const positionAtImpact = { ...attacker.getPosition() };
     const amountAliveBefore = attacker.getAmountAlive();
-    // Passing the original attacker back into applyDamage preserves Water Shield's source rule. In
-    // particular, reflected Fire Breath from a Fire Element remains fire that passes its own shield.
-    const appliedDamage = attacker.applyDamage(projection.landed, 0, sceneLog, false, attacker);
+    // Passing the original attacker and the hit's element preserves Water Shield's source rule. A fire
+    // attack, including reflected Fire Breath or a reflected Fireball, passes the shield without breaking it.
+    const appliedDamage = attacker.applyDamage(projection.landed, 0, sceneLog, false, attacker, undefined, element);
     const unitDied = attacker.isDead();
     secondaryDamage?.push({
         source: "magic_mirror",

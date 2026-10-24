@@ -43,7 +43,15 @@ export interface IAOERangeAttackResult {
     // an entry with no damage rather than no entry at all: the engine's own log line about the miss never
     // reaches ranked, which rebuilds its scene log from events, and the client needs something to pop the
     // MISS over. Every other entry is a unit that was actually hit.
-    perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number; missed?: boolean }[];
+    perUnitDamage: {
+        unitId: string;
+        position: HoCMath.XY;
+        amount: number;
+        unitsDied: number;
+        missed?: boolean;
+        /** Swing a Water Shield ate. The displayed amount stays 0; a Fireforged Sword burns from this. */
+        ignition?: number;
+    }[];
 }
 
 export function processRangeAOEAbility(
@@ -214,7 +222,7 @@ export function processRangeAOEAbility(
                 // unit stood when hit (it may die and be removed before the visuals play).
                 const unitPositionAtImpact = { ...unit.getPosition() };
                 const amountAliveBeforeDamage = unit.getAmountAlive();
-                const waterShieldAbsorbed = damageFromAttack > 0 && unit.willWaterShieldAbsorb(attackerUnit);
+                const waterShieldAbsorbed = damageFromAttack > 0 && unit.willAbsorbIncomingHit(attackerUnit);
                 if (!waterShieldAbsorbed) {
                     landedHitUnitIds.add(unit.getId());
                 }
@@ -233,6 +241,8 @@ export function processRangeAOEAbility(
                     position: unitPositionAtImpact,
                     amount: damageDealt,
                     unitsDied: unitsKilled,
+                    // The floater shows what landed. The sword still burns from the swing the shield ate.
+                    ...(waterShieldAbsorbed && damageFromAttack > 0 ? { ignition: damageFromAttack } : {}),
                 });
 
                 damageStatisticHolder.add({

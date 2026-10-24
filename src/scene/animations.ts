@@ -40,7 +40,9 @@ export type SecondaryDamageSource =
     | "devour_essence"
     // Water Shield: the one-per-battle absorb — the shield ate the WHOLE hit (owner took nothing) and
     // broke. Log/ABSORBED-pop material only; renderers must never draw it as damage taken.
-    | "water_shield";
+    | "water_shield"
+    // Ember Covenant blocked this hit. Presentation only: the owner lost no HP.
+    | "ember_covenant";
 
 /**
  * A damage instance dealt by an ability that triggers DURING an attack but isn't the primary hit:
@@ -55,6 +57,11 @@ export interface ISecondaryDamage {
     position: XY;
     amount: number;
     unitsDied: number;
+    /**
+     * Swing a Water Shield ate, when this entry's `amount` is the 0 the shield left. The Fireforged Sword
+     * prices its burn from this and not from `amount`. Not a damage number to draw.
+     */
+    ignition?: number;
     /** This secondary hit absorbed a Magic Mirror rebound, so it is not offensive output by the caster. */
     rebounded?: boolean;
 }

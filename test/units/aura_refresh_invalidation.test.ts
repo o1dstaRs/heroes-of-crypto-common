@@ -106,7 +106,7 @@ describe("aura refresh dirty invalidation", () => {
             team: PBTypes.TeamVals.LEFT,
             luck: 4,
             stackPower: 3,
-            auraEffects: ["Luck", "Flesh Shield", "Sharpened Weapons"],
+            auraEffects: ["Luck", "Flesh Shield", "Absorb Penalties"],
         });
         const leftLarge = createTestUnit({
             name: "Large Recipient",

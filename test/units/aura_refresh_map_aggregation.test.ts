@@ -42,19 +42,19 @@ describe("UnitsHolder aura-map aggregation", () => {
             name: "First source",
             team: PBTypes.TeamVals.LEFT,
             stackPower: 1,
-            auraEffects: ["Luck", "Sharpened Weapons"],
+            auraEffects: ["Luck", "Absorb Penalties"],
         });
         const strongest = createTestUnit({
             name: "Strongest source",
             team: PBTypes.TeamVals.LEFT,
             stackPower: 5,
-            auraEffects: ["Sharpened Weapons"],
+            auraEffects: ["Absorb Penalties"],
         });
         const equalLater = createTestUnit({
             name: "Equal later source",
             team: PBTypes.TeamVals.LEFT,
             stackPower: 5,
-            auraEffects: ["Sharpened Weapons"],
+            auraEffects: ["Absorb Penalties"],
         });
         const recipient = createTestUnit({
             name: "Recipient",
@@ -70,21 +70,21 @@ describe("UnitsHolder aura-map aggregation", () => {
 
         const beforeMaps = auraMapsForLeft(unitsHolder);
         const targetAuras = aurasAt(beforeMaps, 5, 5);
-        expect(targetAuras.map((aura) => aura.getAuraEffectProperties().name)).toEqual(["Luck", "Sharpened Weapons"]);
+        expect(targetAuras.map((aura) => aura.getAuraEffectProperties().name)).toEqual(["Luck", "Absorb Penalties"]);
 
-        const sharpened = targetAuras[1];
-        expect(sharpened.getAuraEffectProperties().power).toBe(18);
-        expect(sharpened.getSourceCellAsString()).toBe("5;4");
-        expect(recipient.getBuff("Sharpened Weapons Aura")?.getPower()).toBe(18);
-        expect(recipient.getBuff("Sharpened Weapons Aura")?.getFirstSpellProperty()).toBe(5);
-        expect(recipient.getBuff("Sharpened Weapons Aura")?.getSecondSpellProperty()).toBe(4);
+        const absorb = targetAuras[1];
+        expect(absorb.getAuraEffectProperties().power).toBe(50);
+        expect(absorb.getSourceCellAsString()).toBe("5;4");
+        expect(recipient.getBuff("Absorb Penalties Aura")?.getPower()).toBe(50);
+        expect(recipient.getBuff("Absorb Penalties Aura")?.getFirstSpellProperty()).toBe(5);
+        expect(recipient.getBuff("Absorb Penalties Aura")?.getSecondSpellProperty()).toBe(4);
 
-        const neighboringSharpened = aurasAt(beforeMaps, 5, 4).find(
-            (aura) => aura.getAuraEffectProperties().name === "Sharpened Weapons",
+        const neighboringAbsorb = aurasAt(beforeMaps, 5, 4).find(
+            (aura) => aura.getAuraEffectProperties().name === "Absorb Penalties",
         );
-        expect(neighboringSharpened).toBeDefined();
-        expect(neighboringSharpened).not.toBe(sharpened);
-        expect(neighboringSharpened!.getAuraEffectProperties()).toBe(sharpened.getAuraEffectProperties());
+        expect(neighboringAbsorb).toBeDefined();
+        expect(neighboringAbsorb).not.toBe(absorb);
+        expect(neighboringAbsorb!.getAuraEffectProperties()).toBe(absorb.getAuraEffectProperties());
 
         const fightProperties = FightStateManager.getInstance().getFightProperties();
         const snapshot = snapshotBattle(unitsHolder, grid, fightProperties);
@@ -94,9 +94,9 @@ describe("UnitsHolder aura-map aggregation", () => {
         const restoredTargetAuras = aurasAt(auraMapsForLeft(unitsHolder), 5, 5);
         expect(restoredTargetAuras.map((aura) => aura.getAuraEffectProperties().name)).toEqual([
             "Luck",
-            "Sharpened Weapons",
+            "Absorb Penalties",
         ]);
-        expect(restoredTargetAuras[1].getAuraEffectProperties().power).toBe(18);
+        expect(restoredTargetAuras[1].getAuraEffectProperties().power).toBe(50);
         expect(restoredTargetAuras[1].getSourceCellAsString()).toBe("5;4");
     });
 });

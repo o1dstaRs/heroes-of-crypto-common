@@ -87,7 +87,7 @@ const setupSplit = (source: TestUnitOptions) => {
 const spellCount = (unit: Unit, name: string): number =>
     unit.getUnitProperties().spells.filter((entry) => entry.substring(entry.indexOf(":") + 1) === name).length;
 
-describe("S3: a split shares spell charges instead of duplicating them, and copies the quiver", () => {
+describe("S3: each split stack keeps its full spellbook and quiver", () => {
     it("copies the arrows: each part keeps the quiver, and the original is not reduced", () => {
         const { unit, split } = setupSplit({
             name: "Arbalester",
@@ -107,7 +107,7 @@ describe("S3: a split shares spell charges instead of duplicating them, and copi
         expect(unit.getRangeShots()).toBe(9);
     });
 
-    it("shares every spell charge and keeps a single charge with the source", () => {
+    it("copies every spell charge, including spells with only one cast", () => {
         const { unit, split } = setupSplit({
             name: "Healer",
             spells: [...HEALER_BOOK, ":Resurrection"],
@@ -116,13 +116,13 @@ describe("S3: a split shares spell charges instead of duplicating them, and copi
 
         const half = split(20);
 
-        expect(spellCount(half, "Heal")).toBe(2);
-        expect(spellCount(unit, "Heal")).toBe(2);
-        expect(spellCount(half, "Blessing")).toBe(1);
-        expect(spellCount(unit, "Blessing")).toBe(1);
-        expect(spellCount(half, "Resurrection")).toBe(0);
+        expect(spellCount(half, "Heal")).toBe(4);
+        expect(spellCount(unit, "Heal")).toBe(4);
+        expect(spellCount(half, "Blessing")).toBe(2);
+        expect(spellCount(unit, "Blessing")).toBe(2);
+        expect(spellCount(half, "Resurrection")).toBe(1);
         expect(spellCount(unit, "Resurrection")).toBe(1);
-        expect(half.hasSpellRemaining("Resurrection")).toBe(false);
+        expect(half.hasSpellRemaining("Resurrection")).toBe(true);
         expect(unit.hasSpellRemaining("Resurrection")).toBe(true);
     });
 
@@ -141,27 +141,27 @@ describe("S3: a split shares spell charges instead of duplicating them, and copi
 
         const lone = split(1);
 
-        expect(spellCount(lone, "Fireforged Sword")).toBe(1);
-        expect(spellCount(unit, "Fireforged Sword")).toBe(1);
-        expect(spellCount(lone, "Misfortune")).toBe(0);
+        expect(spellCount(lone, "Fireforged Sword")).toBe(2);
+        expect(spellCount(unit, "Fireforged Sword")).toBe(2);
+        expect(spellCount(lone, "Misfortune")).toBe(1);
         expect(spellCount(unit, "Misfortune")).toBe(1);
-        expect(spellCount(lone, "Smoke")).toBe(0);
-        expect(spellCount(lone, "Fireball")).toBe(0);
+        expect(spellCount(lone, "Smoke")).toBe(1);
+        expect(spellCount(lone, "Fireball")).toBe(1);
         lone.setStackPower(1);
         const sword = lone.getSpells().find((spell) => spell.getName() === "Fireforged Sword");
         expect(sword && isSpellUsableByCaster(lone, sword)).toBe(true);
     });
 
-    it("a one-creature split keeps a spare charge of every stack-power-1 spell, buff or not", () => {
+    it("a one-creature caster keeps its entire book, including gated spells", () => {
         const battle = setupSplit({
             name: "Battle Mage",
             spells: ["Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Meteorite"],
             amountAlive: 10,
         });
         const loneMage = battle.split(1);
-        expect(spellCount(loneMage, "Fire Strike")).toBe(1);
-        expect(spellCount(battle.unit, "Fire Strike")).toBe(2);
-        expect(spellCount(loneMage, "Meteorite")).toBe(0);
+        expect(spellCount(loneMage, "Fire Strike")).toBe(3);
+        expect(spellCount(battle.unit, "Fire Strike")).toBe(3);
+        expect(spellCount(loneMage, "Meteorite")).toBe(1);
         expect(spellCount(battle.unit, "Meteorite")).toBe(1);
         loneMage.setStackPower(1);
         const fireStrike = loneMage.getSpells().find((spell) => spell.getName() === "Fire Strike");
@@ -182,11 +182,11 @@ describe("S3: a split shares spell charges instead of duplicating them, and copi
             amountAlive: 10,
         });
         const loneDragon = dragon.split(1);
-        expect(spellCount(loneDragon, "Lightning Strike")).toBe(1);
-        expect(spellCount(dragon.unit, "Lightning Strike")).toBe(3);
-        expect(spellCount(loneDragon, "Whirlpool")).toBe(0);
-        expect(spellCount(loneDragon, "Ring of Fire")).toBe(0);
-        expect(spellCount(loneDragon, "Meteor Shower")).toBe(0);
+        expect(spellCount(loneDragon, "Lightning Strike")).toBe(4);
+        expect(spellCount(dragon.unit, "Lightning Strike")).toBe(4);
+        expect(spellCount(loneDragon, "Whirlpool")).toBe(1);
+        expect(spellCount(loneDragon, "Ring of Fire")).toBe(2);
+        expect(spellCount(loneDragon, "Meteor Shower")).toBe(1);
         loneDragon.setStackPower(1);
         const lightning = loneDragon.getSpells().find((spell) => spell.getName() === "Lightning Strike");
         expect(lightning && isSpellUsableByCaster(loneDragon, lightning)).toBe(true);
@@ -204,16 +204,16 @@ describe("S3: a split shares spell charges instead of duplicating them, and copi
             amountAlive: 8,
         });
         const loneSatyr = satyr.split(1);
-        expect(spellCount(loneSatyr, "Summon Wolves")).toBe(1);
-        expect(spellCount(satyr.unit, "Summon Wolves")).toBe(1);
-        expect(spellCount(loneSatyr, "Courage")).toBe(1);
-        expect(spellCount(loneSatyr, "Helping Hand")).toBe(0);
+        expect(spellCount(loneSatyr, "Summon Wolves")).toBe(2);
+        expect(spellCount(satyr.unit, "Summon Wolves")).toBe(2);
+        expect(spellCount(loneSatyr, "Courage")).toBe(3);
+        expect(spellCount(loneSatyr, "Helping Hand")).toBe(1);
         loneSatyr.setStackPower(1);
         const wolves = loneSatyr.getSpells().find((spell) => spell.getName() === "Summon Wolves");
         expect(wolves && isSpellUsableByCaster(loneSatyr, wolves)).toBe(true);
     });
 
-    it("a one-creature split does not take the last charge of a basic buff", () => {
+    it("a one-creature split copies a single-charge buff without reducing the source", () => {
         const { unit, split } = setupSplit({
             name: "Wandering Mage",
             spells: ["Chaos:Fireforged Sword"],
@@ -222,11 +222,11 @@ describe("S3: a split shares spell charges instead of duplicating them, and copi
 
         const lone = split(1);
 
-        expect(spellCount(lone, "Fireforged Sword")).toBe(0);
+        expect(spellCount(lone, "Fireforged Sword")).toBe(1);
         expect(spellCount(unit, "Fireforged Sword")).toBe(1);
     });
 
-    it("a split-off Angel gets no Resurrection charge, so it can't raise itself as well", () => {
+    it("a split-off Angel keeps its own Resurrection charge", () => {
         const { unit, split } = setupSplit({
             name: "Angel",
             abilities: ["Resurrection"],
@@ -236,11 +236,11 @@ describe("S3: a split shares spell charges instead of duplicating them, and copi
 
         const lone = split(1);
 
-        expect(lone.canSelfResurrect()).toBe(false);
+        expect(lone.canSelfResurrect()).toBe(true);
         expect(unit.canSelfResurrect()).toBe(true);
     });
 
-    it("merging a part back returns its charges but not its arrows", () => {
+    it("merging full books does not add spell charges or refill arrows", () => {
         const { unit, split } = setupSplit({
             name: "Healer",
             spells: HEALER_BOOK,
@@ -258,7 +258,7 @@ describe("S3: a split shares spell charges instead of duplicating them, and copi
         expect(spellCount(unit, "Heal")).toBe(4);
         expect(spellCount(unit, "Blessing")).toBe(2);
         expect(unit.getRangeShots()).toBe(8);
-        expect(spellCount(half, "Heal")).toBe(0);
+        expect(spellCount(half, "Heal")).toBe(4);
         expect(half.getRangeShots()).toBe(9);
     });
 });

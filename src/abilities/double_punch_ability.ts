@@ -91,9 +91,10 @@ export function processDoublePunchAbility(fromUnit: Unit, toUnit: Unit, sceneLog
             moraleIncrease = pegasusLightEffect.getPower();
         }
         // Losses computed pre-damage — the caller applies secondPunchResult.damage after this returns.
+        const loggedDamage = toUnit.willAbsorbIncomingHit(fromUnit) ? 0 : damageFromAttack;
         sceneLog.updateLog(
-            `${fromUnit.getName()} ⚔️ ${toUnit.getName()} (${damageFromAttack})` +
-                HoCLib.killTag(toUnit.calculatePossibleLosses(damageFromAttack)),
+            `${fromUnit.getName()} ⚔️ ${toUnit.getName()} (${loggedDamage})` +
+                HoCLib.killTag(toUnit.calculatePossibleLosses(loggedDamage)),
         );
 
         secondPunchLanded = true;

@@ -43,8 +43,9 @@ const NO_BURN: IFireforgedSwordResult = Object.freeze({
  * secondary damage entry rather than being folded into the swing's number, so the player can see what the
  * steel did and what the fire did.
  *
- * Call it after the attack's own applyDamage, with the damage that actually landed — a swing fully
- * absorbed by a shield leaves nothing to set alight.
+ * Call it after the attack's own applyDamage, with the swing's damage (not the 0 a shield returned).
+ * The burn is fire: a Water Shield does not absorb it or break on it. The weapon hit underneath is
+ * not fire, so that hit can still break the shield; the burn is then priced from the swing anyway.
  */
 export function processFireforgedSwordAbility(
     fromUnit: Unit,
@@ -81,7 +82,15 @@ export function processFireforgedSwordAbility(
     damageStatisticHolder.add({
         unitName: fromUnit.getName(),
         // 0 break chance: this is a magic hit, not another swing.
-        damage: toUnit.applyDamage(burnDamage, 0 /* magic attack */, sceneLog, false, fromUnit),
+        damage: toUnit.applyDamage(
+            burnDamage,
+            0 /* magic attack */,
+            sceneLog,
+            false,
+            fromUnit,
+            undefined,
+            SpellElement.FIRE,
+        ),
         team: fromUnit.getTeam(),
         lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
     });
@@ -138,7 +147,7 @@ export interface IFireforgedSwordUnitLookup {
  */
 export function processFireforgedSwordOnVictims(
     fromUnit: Unit,
-    victims: readonly { unitId: string; amount: number }[],
+    victims: readonly { unitId: string; amount: number; ignition?: number }[],
     unitsHolder: IFireforgedSwordUnitLookup,
     sceneLog: ISceneLog,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
@@ -152,10 +161,12 @@ export function processFireforgedSwordOnVictims(
     const unitIdsDied: string[] = [];
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
     // One burn per victim even when a processor reported it in several pieces, so a unit hit twice by the
-    // same sweep is not set alight twice by one swing.
+    // same sweep is not set alight twice by one swing. `ignition` is the swing a Water Shield ate: the
+    // displayed amount is 0, but the fire is still priced from that swing.
     const burned = new Set<string>();
     for (const victim of victims) {
-        if (!(victim.amount > 0) || burned.has(victim.unitId)) {
+        const burnBase = victim.ignition ?? victim.amount;
+        if (!(burnBase > 0) || burned.has(victim.unitId)) {
             continue;
         }
         const target = allUnits.get(victim.unitId);
@@ -167,7 +178,7 @@ export function processFireforgedSwordOnVictims(
         const result = processFireforgedSwordAbility(
             fromUnit,
             target,
-            victim.amount,
+            burnBase,
             sceneLog,
             damageStatisticHolder,
             secondaryDamage,

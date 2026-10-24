@@ -24,7 +24,7 @@ import { createInterface } from "node:readline";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { createGunzip } from "node:zlib";
 
-import { format } from "prettier";
+import { formatJson } from "./format_json";
 
 import {
     AI_META_GAMES_PER_MATCHUP,
@@ -188,11 +188,7 @@ const publishJsonAtomically = async (outputPath: string, value: unknown): Promis
     mkdirSync(dirname(outputPath), { recursive: true });
     const temporaryPath = resolve(dirname(outputPath), `.${basename(outputPath)}.${process.pid}.${Date.now()}.tmp`);
     try {
-        writeFileSync(
-            temporaryPath,
-            await format(JSON.stringify(value, null, 4), { parser: "json", printWidth: 120, tabWidth: 4 }),
-            { flag: "wx" },
-        );
+        writeFileSync(temporaryPath, formatJson(value), { flag: "wx" });
         linkSync(temporaryPath, outputPath);
     } finally {
         if (existsSync(temporaryPath)) unlinkSync(temporaryPath);

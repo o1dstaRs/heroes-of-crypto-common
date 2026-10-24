@@ -128,6 +128,44 @@ describe("Fireball", () => {
         expect(s.mage.getCumulativeHp()).toBe(mageHpBefore);
     });
 
+    it("passes through a Water Shield without breaking it", () => {
+        const s = setup({ casterAmount: 10 });
+        const mermaid = createTestUnit({
+            name: "Mermaid",
+            team: PBTypes.TeamVals.RIGHT,
+            abilities: ["Water Shield"],
+            maxHp: 1000,
+            amountAlive: 5,
+            damageMin: 0,
+            damageMax: 0,
+        });
+        const beside = createTestUnit({
+            name: "Beside",
+            team: PBTypes.TeamVals.RIGHT,
+            abilities: ["Water Shield"],
+            maxHp: 1000,
+            amountAlive: 5,
+            damageMin: 0,
+            damageMax: 0,
+        });
+        placeUnit(s.grid, s.unitsHolder, mermaid, { x: 8, y: 8 });
+        placeUnit(s.grid, s.unitsHolder, beside, { x: 9, y: 8 });
+        mermaid.trySeedWaterShield();
+        beside.trySeedWaterShield();
+        const before = mermaid.getCumulativeHp();
+        const besideBefore = beside.getCumulativeHp();
+
+        expect(s.cast(mermaid.getId()).completed).toBe(true);
+
+        const burned = 10 * CONFIG.power;
+        expect(before - mermaid.getCumulativeHp()).toBe(burned);
+        expect(besideBefore - beside.getCumulativeHp()).toBe(burned);
+        expect(mermaid.hasBuffActive("Water Shield")).toBe(true);
+        expect(beside.hasBuffActive("Water Shield")).toBe(true);
+        expect(mermaid.willWaterShieldAbsorb()).toBe(true);
+        expect(s.sceneLog.lines.some((line) => line.includes("Water Shield absorbs"))).toBe(false);
+    });
+
     // Unlike Ring of Fire, which needs somebody in its ring because it spares the middle.
     it("still burns a lone target with nothing around it", () => {
         const s = setup();

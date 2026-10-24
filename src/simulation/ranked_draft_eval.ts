@@ -410,6 +410,7 @@ export interface IRankedDraftEvaluationReport {
         liveSynergyVariants?: true;
         tacticalSplits?: true;
         candidateSkipsSplits?: true;
+        researchCandidatePreferredCreature?: number;
         candidateSearchEnvOverrides?: Record<string, string>;
         draftDimensions: { offset: number; length: number };
         clusterSize: 4;
@@ -485,6 +486,8 @@ export interface IRankedDraftEvaluationOptions {
     tacticalSplits?: boolean;
     /** Research, with tacticalSplits: the candidate leaves its extra stack slots empty (the opponent still splits). */
     candidateSkipsSplits?: boolean;
+    /** Research only: prefer this legally visible creature for the candidate draft seat. */
+    researchCandidatePreferredCreature?: number;
     /** Research: the candidate's promoted search runs with these V08_A19_SEARCH_ENV_OVERRIDES (key -> value). */
     candidateSearchEnvOverrides?: Readonly<Record<string, string>>;
     /**
@@ -522,6 +525,7 @@ interface INormalizedOptions {
     liveSynergyVariants: boolean;
     tacticalSplits: boolean;
     candidateSkipsSplits: boolean;
+    researchCandidatePreferredCreature?: number;
     candidateSearchEnvOverrides?: Record<string, string>;
     valueDataPath?: string;
     liveDraftRules: boolean;
@@ -770,6 +774,13 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
     if (candidateTier1Override !== undefined && !LIVE_TIER1_ARTIFACT_IDS.includes(candidateTier1Override)) {
         throw new RangeError(`candidateTier1Override must be a live Tier-1 artifact id (${LIVE_TIER1_ARTIFACT_IDS})`);
     }
+    const preferredCreature = options.researchCandidatePreferredCreature;
+    if (
+        preferredCreature !== undefined &&
+        (!options.liveDraftRules || !Number.isSafeInteger(preferredCreature) || !creatureInfo(preferredCreature))
+    ) {
+        throw new RangeError("researchCandidatePreferredCreature needs a known creature and liveDraftRules");
+    }
     const explorationRate = options.explorationRate ?? 0;
     if (!Number.isFinite(explorationRate) || explorationRate < 0 || explorationRate >= 1) {
         throw new RangeError("explorationRate must be in [0, 1)");
@@ -816,6 +827,7 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
         liveSynergyVariants,
         tacticalSplits,
         candidateSkipsSplits,
+        ...(preferredCreature === undefined ? {} : { researchCandidatePreferredCreature: preferredCreature }),
         ...(searchOverrides === undefined ? {} : { candidateSearchEnvOverrides: { ...searchOverrides } }),
         ...(options.valueDataPath ? { valueDataPath: options.valueDataPath } : {}),
         liveDraftRules: options.liveDraftRules === true,
@@ -923,6 +935,8 @@ export interface IRankedDraftPickRules {
     synergyVariants?: RankedDraftSynergyVariants;
     /** Observational trace only; never receives hidden opponent state or a future creature pick. */
     onTier2Decision?: (decision: IRankedDraftTier2Decision) => void;
+    /** Research only. Preferences see the same legal choices as the corresponding public draft seat. */
+    researchPreferredCreatureByTeam?: Readonly<Partial<Record<PickTeam, number>>>;
 }
 
 export interface IRankedDraftTier2Decision {
@@ -948,6 +962,18 @@ export function resolveRankedDraftPick(
     setupPolicySpecs: IRankedDraftSetupPolicySpecs = {},
     rules: IRankedDraftPickRules = {},
 ): IPickSimState {
+    for (const [team, id] of Object.entries(rules.researchPreferredCreatureByTeam ?? {})) {
+        if (
+            !rules.liveDraftRules ||
+            ![LEFT, RIGHT].includes(Number(team)) ||
+            !Number.isSafeInteger(id) ||
+            !creatureInfo(id)
+        ) {
+            throw new RangeError(
+                "Research draft preference must name a legal team and known creature under live rules",
+            );
+        }
+    }
     const leftGenome = normalizeRankedDraftGenome(leftInput);
     const rightGenome = normalizeRankedDraftGenome(rightInput);
     const pickCreature = (
@@ -1103,21 +1129,24 @@ export function resolveRankedDraftPick(
         const own = teamState(team);
         const visible = getVisibleCreatureChoices(state, team);
         const explored = explore(visible.length);
+        const preferred = rules.researchPreferredCreatureByTeam?.[team];
         const creatureId =
             explored !== undefined
                 ? visible[explored]
-                : pickCreature(
-                      team === LEFT ? leftGenome : rightGenome,
-                      visible,
-                      own.creatures,
-                      getKnownOpponentCreatures(state, team),
-                      own.tier1Artifact,
-                      phase.creatureLevel >= 3 ? rules.gridType : undefined,
-                      artifactFitVersionForSetupSpec((team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec) >= 2
-                          ? own.tier2Artifact
-                          : undefined,
-                      artifactFitVersionForSetupSpec((team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec),
-                  );
+                : preferred !== undefined && visible.includes(preferred)
+                  ? preferred
+                  : pickCreature(
+                        team === LEFT ? leftGenome : rightGenome,
+                        visible,
+                        own.creatures,
+                        getKnownOpponentCreatures(state, team),
+                        own.tier1Artifact,
+                        phase.creatureLevel >= 3 ? rules.gridType : undefined,
+                        artifactFitVersionForSetupSpec((team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec) >= 2
+                            ? own.tier2Artifact
+                            : undefined,
+                        artifactFitVersionForSetupSpec((team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec),
+                    );
         if (creatureId === undefined) {
             throw new Error(`Ranked draft creature policy found no visible L${phase.creatureLevel} creature`);
         }
@@ -1365,6 +1394,13 @@ export function playRankedDraftGame(
         },
         {
             ...rankedDraftPickRules(options, gridType, synergyVariants),
+            ...(options.researchCandidatePreferredCreature === undefined
+                ? {}
+                : {
+                      researchPreferredCreatureByTeam: {
+                          [candidatePickedLeft ? LEFT : RIGHT]: options.researchCandidatePreferredCreature,
+                      },
+                  }),
             onTier2Decision: (decision) => tier2Decisions.set(decision.team, decision),
         },
     );
@@ -1823,6 +1859,9 @@ export function summarizeRankedDraftRecords(
             ...(options.liveSynergyVariants ? { liveSynergyVariants: true as const } : {}),
             ...(options.tacticalSplits ? { tacticalSplits: true as const } : {}),
             ...(options.candidateSkipsSplits ? { candidateSkipsSplits: true as const } : {}),
+            ...(options.researchCandidatePreferredCreature === undefined
+                ? {}
+                : { researchCandidatePreferredCreature: options.researchCandidatePreferredCreature }),
             ...(options.candidateSearchEnvOverrides === undefined
                 ? {}
                 : { candidateSearchEnvOverrides: options.candidateSearchEnvOverrides }),

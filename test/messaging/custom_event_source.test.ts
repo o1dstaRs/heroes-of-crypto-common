@@ -14,10 +14,97 @@ import { afterEach, describe, expect, it } from "bun:test";
 import CustomEventSource from "../../src/messaging/custom_event_source";
 
 const originalFetch = globalThis.fetch;
+const cleanupSources: Array<() => void> = [];
 
 describe("CustomEventSource", () => {
     afterEach(() => {
+        for (const close of cleanupSources.splice(0)) close();
         globalThis.fetch = originalFetch;
+    });
+
+    it("receives a ready match after the queue stream ends without a network error", async () => {
+        let fetchCount = 0;
+        const reconnectStates: number[] = [];
+        const errors: string[] = [];
+        globalThis.fetch = (async () => {
+            fetchCount += 1;
+            return streamResponse(fetchCount === 1 ? [`{"ps":"","po":1}\n\n`] : [`{"ps":"match-1","r":28,"c":0}\n\n`]);
+        }) as unknown as typeof fetch;
+        const source = new CustomEventSource<{ ps: string; r?: number }>("https://example.test/matchmaking", {
+            reconnectDelay: 1,
+        });
+        cleanupSources.push(() => source.close());
+        const pendingMatch = Promise.withResolvers<{ ps: string; r?: number }>();
+        source.onmessage = (event) => {
+            if (event.ps) {
+                source.close();
+                pendingMatch.resolve(event);
+            }
+        };
+        source.onreconnect = () => reconnectStates.push(source.readyState);
+        source.onerror = (error) => errors.push(error.message);
+        expect(await pendingMatch.promise).toEqual({ ps: "match-1", r: 28, c: 0 });
+        expect(fetchCount).toBe(2);
+        expect(reconnectStates).toEqual([0]);
+        expect(errors).toEqual([]);
+    }, 1000);
+
+    it("does not deliver queued frames after the ready-match handler closes the stream", async () => {
+        globalThis.fetch = (async () =>
+            streamResponse([`{"ps":"match-1","c":1}\n\n{"ps":"","po":1}\n\n`])) as unknown as typeof fetch;
+        const source = new CustomEventSource<{ ps: string }>("https://example.test/handoff");
+        cleanupSources.push(() => source.close());
+        const delivered: string[] = [];
+        const received = Promise.withResolvers<void>();
+        source.onmessage = (event) => {
+            delivered.push(event.ps);
+            source.close();
+            received.resolve();
+        };
+        await received.promise;
+        expect(delivered).toEqual(["match-1"]);
+        expect(source.readyState).toBe(2);
+    });
+
+    it("ignores a response that arrives after the queue stream was intentionally closed", async () => {
+        const response = Promise.withResolvers<Response>();
+        globalThis.fetch = (() => response.promise) as unknown as typeof fetch;
+        const source = new CustomEventSource<unknown>("https://example.test/retired");
+        cleanupSources.push(() => source.close());
+        let opened = 0;
+        source.onopen = () => {
+            opened += 1;
+        };
+        source.close();
+        response.resolve(streamResponse([`{"ps":"old-match"}\n\n`]));
+        await Bun.sleep(5);
+        expect(opened).toBe(0);
+        expect(source.readyState).toBe(2);
+    });
+
+    it("does not reconnect when an intentional close finishes a pending read", async () => {
+        let controller!: ReadableStreamDefaultController<Uint8Array>;
+        let fetchCount = 0;
+        globalThis.fetch = (async () => {
+            fetchCount += 1;
+            return new Response(
+                new ReadableStream<Uint8Array>({
+                    start(value) {
+                        controller = value;
+                    },
+                }),
+            );
+        }) as unknown as typeof fetch;
+        const source = new CustomEventSource<unknown>("https://example.test/cancel", { reconnectDelay: 1 });
+        cleanupSources.push(() => source.close());
+        const opened = Promise.withResolvers<void>();
+        source.onopen = () => opened.resolve();
+        await opened.promise;
+        source.close();
+        controller.close();
+        await Bun.sleep(5);
+        expect(fetchCount).toBe(1);
+        expect(source.readyState).toBe(2);
     });
 
     it("connects with headers, dispatches messages, listeners, and closes", async () => {

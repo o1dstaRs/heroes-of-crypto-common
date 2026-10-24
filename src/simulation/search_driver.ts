@@ -1429,6 +1429,9 @@ export class SearchDriver {
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
     private readonly a19GravechainCoverage: boolean;
     private readonly a19LastFuseTrades: boolean;
+    private readonly a19LightningSpinCoverage: boolean;
+    private readonly researchRangedShieldSequence: boolean;
+    private readonly researchFireBreathValue: boolean;
     private readonly a19LastFusePrimaryTrades: boolean;
     private readonly a19ArtifactBarrelShotProjection: boolean;
     private readonly a19ArtifactBarrelOwnShotProjectionOnly: boolean;
@@ -1723,6 +1726,26 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_GRAVECHAIN_COVERAGE must be 0 or 1");
         }
         this.a19GravechainCoverage = this.mode === "search" && gravechainCoverage === "1";
+        const fireBreathValue = searchEnv("SEARCH_RESEARCH_FIRE_BREATH_VALUE");
+        if (
+            fireBreathValue !== undefined &&
+            fireBreathValue !== "" &&
+            fireBreathValue !== "0" &&
+            fireBreathValue !== "1"
+        ) {
+            throw new Error("SEARCH_RESEARCH_FIRE_BREATH_VALUE must be 0 or 1");
+        }
+        this.researchFireBreathValue = this.mode === "search" && fireBreathValue === "1";
+        const shieldSequence = searchEnv("SEARCH_RESEARCH_RANGED_SHIELD_SEQUENCE");
+        if (shieldSequence !== undefined && shieldSequence !== "" && shieldSequence !== "0" && shieldSequence !== "1") {
+            throw new Error("SEARCH_RESEARCH_RANGED_SHIELD_SEQUENCE must be 0 or 1");
+        }
+        this.researchRangedShieldSequence = this.mode === "search" && shieldSequence === "1";
+        const spinCoverage = searchEnv("SEARCH_A19_LIGHTNING_SPIN_COVERAGE");
+        if (spinCoverage !== undefined && spinCoverage !== "" && spinCoverage !== "0" && spinCoverage !== "1") {
+            throw new Error("SEARCH_A19_LIGHTNING_SPIN_COVERAGE must be 0 or 1");
+        }
+        this.a19LightningSpinCoverage = this.mode === "search" && spinCoverage === "1";
         const lastFuseTrades = searchEnv("SEARCH_A19_LAST_FUSE_TRADES");
         if (lastFuseTrades !== undefined && lastFuseTrades !== "" && lastFuseTrades !== "0" && lastFuseTrades !== "1") {
             throw new Error("SEARCH_A19_LAST_FUSE_TRADES must be 0 or 1");
@@ -2650,6 +2673,9 @@ export class SearchDriver {
                 includeArtifactBarrelAttackCoverage: isV08Search && this.a19ArtifactBarrelAttackCoverage,
                 includeLastFuseCounterTrades: isV08Search && this.a19LastFuseTrades,
                 includeLastFusePrimaryTrades: isV08Search && this.a19LastFusePrimaryTrades,
+                includeLightningSpinCoverage: isV08Search && this.a19LightningSpinCoverage,
+                researchRangedShieldSequence: isV08Search && this.researchRangedShieldSequence,
+                researchFireBreathValue: isV08Search && this.researchFireBreathValue,
                 // v0.8 search rolls out the free Through Shot lines its native policy can take (V08_THROUGH_SHOT_LINE
                 // scopes both together, so a seat A/B compares whole seats); older versions keep their exact catalog.
                 throughShotFreeAim: isV08Search && throughShotLineEnabled(unit),
@@ -2841,6 +2867,9 @@ export class SearchDriver {
                         includeArtifactBarrelAttackCoverage: isV08Search && this.a19ArtifactBarrelAttackCoverage,
                         includeLastFuseCounterTrades: isV08Search && this.a19LastFuseTrades,
                         includeLastFusePrimaryTrades: isV08Search && this.a19LastFusePrimaryTrades,
+                        includeLightningSpinCoverage: isV08Search && this.a19LightningSpinCoverage,
+                        researchRangedShieldSequence: isV08Search && this.researchRangedShieldSequence,
+                        researchFireBreathValue: isV08Search && this.researchFireBreathValue,
                         enrichIncumbentMetadata:
                             isV08Search || this.ilPath !== undefined || this.scoredDecisionObserver !== undefined,
                         preserveMovePostureDiversity:

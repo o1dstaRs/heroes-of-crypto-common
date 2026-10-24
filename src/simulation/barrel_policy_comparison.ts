@@ -88,7 +88,7 @@ export function barrelComparisonPlan(
     clusters: number,
     baseSeed: number,
     timing: Experiment["timing"],
-    policy: "exact" | "own" | "placement" = "exact",
+    policy: "exact" | "own" | "placement" | "cover" | "caster-cover" | "landing-cover" = "exact",
 ): BarrelFightRequest[] {
     if (!Number.isSafeInteger(clusters) || clusters < 1) throw new RangeError("clusters must be a positive integer");
     if (!Number.isSafeInteger(baseSeed)) throw new RangeError("seed must be an integer");
@@ -257,8 +257,15 @@ export async function runBarrelPolicyComparison(argv: readonly string[], study?:
     if (timing !== "work" && timing !== "live") throw new Error("timing must be work or live");
     if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new RangeError("concurrency must be positive");
     const policy = argv[5] ?? "exact";
-    if (policy !== "exact" && policy !== "own" && policy !== "placement")
-        throw new Error("policy must be exact, own or placement");
+    if (
+        policy !== "exact" &&
+        policy !== "own" &&
+        policy !== "placement" &&
+        policy !== "cover" &&
+        policy !== "caster-cover" &&
+        policy !== "landing-cover"
+    )
+        throw new Error("policy must be exact, own, placement, cover, caster-cover or landing-cover");
     const requests = study
         ? barrelArtifactValuePlan(clusters, seed, timing)
         : barrelComparisonPlan(clusters, seed, timing, policy);

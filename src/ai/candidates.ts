@@ -63,7 +63,10 @@ import { decisionFireWalls } from "./decision_fight_state";
 import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 import { estimateShieldedRangedDamage } from "./ranged_shield_estimate";
+import { estimateRangedShieldSequence, type IShieldSequenceImpact } from "./ranged_shield_sequence";
 import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
+import { estimateFireBreathMeleePotential } from "./fire_breath_tactics";
+import { estimateLightningSpinPotential } from "./lightning_spin_tactics";
 import { lastFuseCounterTradePotential } from "./last_fuse_tactics";
 import {
     estimateLastFuseMeleeDamage,
@@ -313,6 +316,7 @@ function evaluatePreparedRangeCandidateDamage(
     aimTargetId: string | undefined,
     prepared: IPreparedRangeCandidateDamage,
     stationary: boolean,
+    researchShieldSequence = false,
 ): IRangeCandidateDamage {
     const onlyTarget =
         evaluation.affectedUnits.length === 1 && evaluation.affectedUnits[0]?.length === 1
@@ -340,6 +344,8 @@ function evaluatePreparedRangeCandidateDamage(
     let primaryTargetDamage = 0;
     let aimTargetDamage = 0;
     const counted = new Set<string>();
+    const shieldImpacts: IShieldSequenceImpact[] = [];
+    let shieldSupported = true;
     const fightProperties = context.fightProperties;
     // The action spends arrows against its first impact, not independently against every splash victim.
     // Through Shot spends one arrow for the whole line; its native follow-up does not spend another.
@@ -423,6 +429,20 @@ function evaluatePreparedRangeCandidateDamage(
             const hitChance =
                 1 - Math.min(100, Math.max(0, unit.calculateMissChance(target, defenderAbilityPower))) / 100;
             const missChance = 1 - hitChance;
+            if (researchShieldSequence) {
+                shieldImpacts.push({
+                    unit: target,
+                    hp,
+                    hitChance,
+                    firstDamage: firstConditionalDamage,
+                    secondDamage: secondConditionalDamage,
+                });
+                shieldSupported &&=
+                    (firstMin > 0 || firstMax <= 0) &&
+                    (!secondVolleyMultiplier || secondMin > 0 || secondMax <= 0) &&
+                    !target.hasBuffActive("Flesh Shield Aura") &&
+                    !target.hasAbilityActive("Flesh Shield Aura");
+            }
             let effective =
                 secondVolleyMultiplier > 0
                     ? hitChance * missChance * Math.min(firstConditionalDamage, hp) +
@@ -483,7 +503,7 @@ function evaluatePreparedRangeCandidateDamage(
                     }
                 }
             }
-            if (target.willWaterShieldAbsorb(unit)) {
+            if (target.willAbsorbIncomingHit(unit)) {
                 effective = estimateShieldedRangedDamage(unit, ammunitionTarget, {
                     hp,
                     hitChance,
@@ -511,6 +531,40 @@ function evaluatePreparedRangeCandidateDamage(
                 value -= effective;
                 friendlyFireDamage += effective;
             }
+        }
+    }
+    if (
+        researchShieldSequence &&
+        shieldSupported &&
+        !unit.hasAbilityActive("Chakram") &&
+        shieldImpacts.some(({ unit: target }) => target.hasStatusBuffApplied("Ember Covenant Blessing"))
+    ) {
+        const projected = estimateRangedShieldSequence(unit, shieldImpacts, ammunitionTarget, {
+            nativeSecondVolley: prepared.secondVolleyMultiplier > 0,
+            echoChance: prepared.bonusVolleyChance,
+            spendsOnHitOnly: prepared.shotCostOnHitOnly,
+            throughShot: prepared.isThroughShot,
+        });
+        value = 0;
+        enemyDamage = 0;
+        friendlyFireDamage = 0;
+        primaryTargetDamage = 0;
+        aimTargetDamage = 0;
+        kill = 0;
+        for (const impact of shieldImpacts) {
+            const damage = projected.get(impact.unit.getId()) ?? 0;
+            if (impact.unit.getTeam() === prepared.enemyTeam) {
+                enemyDamage += damage;
+                value += damage;
+            } else {
+                friendlyFireDamage += damage;
+                value -= damage;
+            }
+            if (impact.unit.getId() === primaryTargetId) {
+                primaryTargetDamage = damage;
+                if (impact.unit.getTeam() === prepared.enemyTeam && damage >= impact.hp) kill = 1;
+            }
+            if (impact.unit.getId() === aimTargetId) aimTargetDamage = damage;
         }
     }
     return { value, kill, enemyDamage, friendlyFireDamage, primaryTargetDamage, aimTargetDamage };
@@ -825,6 +879,12 @@ export interface IEnumerateOptions {
     /** Preserve one supported own-Last-Fuse counter trade across the melee cap; off for historical catalogs. */
     includeLastFuseCounterTrades?: boolean;
     includeLastFusePrimaryTrades?: boolean;
+    /** Rank radial melee stands by the whole impact, rather than the declared primary target. */
+    includeLightningSpinCoverage?: boolean;
+    /** Research only: preserve shared and personal shield layers across ranged impacts. */
+    researchRangedShieldSequence?: boolean;
+    /** Research only: rank Fire Breath strikes by primary damage plus the complete magical tail. */
+    researchFireBreathValue?: boolean;
     /** Cap on move destinations, kept nearest-to-enemy first (0/undefined = all reachable). */
     maxMoveDestinations?: number;
     /**
@@ -1491,9 +1551,14 @@ class CandidateGenerator {
             effective: number;
             kill: 0 | 1;
             sourceIndex: number;
+            spinValue?: number;
         }
         const targetViews: IMeleeTarget[] = targets.map((target) => ({ unit: target, cells: target.getCells() }));
-        const pairs: IMeleePair[] = [];
+        let pairs: IMeleePair[] = [];
+        const spinByCell =
+            this.options.includeLightningSpinCoverage && this.unit.hasAbilityActive("Lightning Spin")
+                ? new Map<string, ReturnType<typeof estimateLightningSpinPotential>>()
+                : undefined;
         // All legal melee stands touch the same corpse. Without these position/distance modifiers, the
         // supported projection is identical within stationary or moving attacks against one target.
         const invariantFuseDamage =
@@ -1533,13 +1598,55 @@ class CandidateGenerator {
                     }
                 }
             }
+            let spin: ReturnType<typeof estimateLightningSpinPotential>;
+            if (spinByCell) {
+                const key = `${cell.x},${cell.y}`;
+                if (!spinByCell.has(key)) {
+                    spinByCell.set(
+                        key,
+                        estimateLightningSpinPotential(
+                            this.unit,
+                            this.context,
+                            cell,
+                            actionsFor(target.unit, cell, route),
+                        ),
+                    );
+                }
+                spin = spinByCell.get(key);
+            }
+            const breath = this.options.researchFireBreathValue
+                ? estimateFireBreathMeleePotential(
+                      this.unit,
+                      target.unit,
+                      this.context,
+                      cell,
+                      actionsFor(target.unit, cell, route),
+                  )
+                : undefined;
             return {
                 target: target.unit,
                 cell,
                 route,
-                effective: fuse?.expectedNetDamage ?? target.damage.effective,
-                kill: fuse ? (fuse.secureKill ? 1 : 0) : target.damage.kill,
+                effective:
+                    breath?.netDamage ??
+                    spin?.expectedDirectDamage ??
+                    fuse?.expectedNetDamage ??
+                    target.damage.effective,
+                kill: breath
+                    ? breath.securePrimaryKill
+                        ? 1
+                        : 0
+                    : spin
+                      ? spin.secureKill
+                          ? 1
+                          : 0
+                      : fuse
+                        ? fuse.secureKill
+                            ? 1
+                            : 0
+                        : target.damage.kill,
                 sourceIndex: pairs.length,
+                spinValue: spin ? spin.expectedDirectDamage + spin.healingPotential : undefined,
             };
         };
         // In-place strikes: enemies already adjacent to the current footprint.
@@ -1575,6 +1682,20 @@ class CandidateGenerator {
             }
         }
 
+        const allPairs = pairs;
+        // A radial spin has no primary-target retaliation. Choosing another legal primary from the same
+        // stand repeats the same impact. Keep different stands (their exposure matters to the rollout),
+        // but do not spend the melee cap repeatedly on the same stand under different target IDs.
+        if (spinByCell) {
+            const seen = new Set<string>();
+            pairs = pairs.filter((pair) => {
+                if (pair.spinValue === undefined) return true;
+                const key = `${pair.cell.x},${pair.cell.y}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+        }
         const actionsOf = (p: IMeleePair): GameAction[] => actionsFor(p.target, p.cell, p.route);
 
         let reservedLastFusePair: IMeleePair | undefined;
@@ -1681,7 +1802,7 @@ class CandidateGenerator {
         if (cap > 0 && pairs.length > cap) {
             kept = capAttackCandidates(pairs, cap, this.options.preserveAttackTargetCoverage === true, (pair) => ({
                 targetId: pair.target.getId(),
-                expectedDamage: pair.effective,
+                expectedDamage: pair.spinValue ?? pair.effective,
                 expectedKill: pair.kill,
                 stationary: pair.route === undefined,
             }));
@@ -1705,7 +1826,7 @@ class CandidateGenerator {
             };
         };
         if (this.options.enrichIncumbentMetadata) {
-            for (const pair of pairs) this.enrichIncumbentCandidate(candidateOf(pair));
+            for (const pair of allPairs) this.enrichIncumbentCandidate(candidateOf(pair));
         }
         for (const p of kept) {
             this.push(candidateOf(p));
@@ -2198,6 +2319,7 @@ class CandidateGenerator {
             aimTargetId,
             this.preparedRangeDamage.value,
             attackerAmountAlive === undefined,
+            this.options.researchRangedShieldSequence,
         );
     }
     /** Target-local signals already used by v0.5's shot scorer, exposed without changing that scorer. */

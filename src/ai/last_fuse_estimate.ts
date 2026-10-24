@@ -1,4 +1,5 @@
 import { getDoubleShotAbility } from "../abilities/ability_helper";
+import { lastFuseDamage } from "../abilities/last_fuse_ability";
 import { applyAttackDamageChain, resolveAttackDamageChain } from "../damage/damage_projection";
 import type { GameAction } from "../engine/actions";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -30,20 +31,38 @@ function enemyBlastDamage(
     target: Unit,
     context: Pick<IDecisionContext, "unitsHolder">,
 ): number | undefined {
-    const blast = target.getLastFuseDamage(unit.getBuffPower("Last Fuse"), unit.getStackPower());
+    const enemies = context.unitsHolder
+        .getAllEnemyUnits(unit.getTeam())
+        .filter((enemy) => enemy.getId() !== target.getId() && !enemy.isDead())
+        .map((enemy) => ({
+            cells: enemy.getCells(),
+            hp: enemy.getCumulativeHp(),
+            shielded: enemy.willAbsorbIncomingHit(),
+            resurrects: enemy.canSelfResurrect(),
+        }));
+    const power = unit.getStackPower();
+    const percent = unit.getBuffPower("Last Fuse");
     let damage = 0;
-    for (const enemy of context.unitsHolder.getAllEnemyUnits(unit.getTeam())) {
-        if (
-            enemy.getId() === target.getId() ||
-            enemy.isDead() ||
-            enemy.willWaterShieldAbsorb() ||
-            !touches(target.getCells(), enemy.getCells())
-        )
-            continue;
-        if (blast >= enemy.getCumulativeHp() && !enemy.canSelfResurrect()) return undefined;
-        damage += Math.min(blast, enemy.getCumulativeHp());
-    }
-    return damage;
+    const detonate = (cells: readonly XY[], fatalDamage: number): boolean => {
+        const blast = lastFuseDamage(fatalDamage, power, percent);
+        const destroyed: Array<{ cells: readonly XY[]; fatalDamage: number }> = [];
+        for (const enemy of enemies) {
+            if (enemy.hp <= 0 || !touches(cells, enemy.cells)) continue;
+            if (enemy.shielded) {
+                enemy.shielded = false;
+                continue;
+            }
+            const dealt = Math.min(blast, enemy.hp);
+            enemy.hp -= dealt;
+            damage += dealt;
+            if (enemy.hp <= 0) {
+                if (enemy.resurrects) return false;
+                destroyed.push({ cells: enemy.cells, fatalDamage: dealt });
+            }
+        }
+        return destroyed.every((enemy) => detonate(enemy.cells, enemy.fatalDamage));
+    };
+    return detonate(target.getCells(), target.getCumulativeHp()) ? damage : undefined;
 }
 
 const SECONDARY_RIDERS = ["Devour Essence", "Petrifying Gaze", "Predatory Assimilation", "Borrowed Grace"];
@@ -51,7 +70,7 @@ const SECONDARY_RIDERS = ["Devour Essence", "Petrifying Gaze", "Predatory Assimi
 /**
  * Price one direct spell execution and the enemy corpse's blast. The caster must hold Last Fuse: the
  * victim's own buff does not explode, and allies beside the corpse are not damaged. A reflected cast, an
- * area impact, or a blast that would itself destroy another enemy stays with engine search.
+ * area impact, or a blast that would resurrect another enemy stays with engine search.
  */
 export function estimateLastFuseSpellDamage(
     unit: Unit,
@@ -108,14 +127,14 @@ function canProjectMeleeResponse(
         },
     ]);
     if (!response) return false;
-    if (response.hitChance <= 0 || unit.willWaterShieldAbsorb(target)) return true;
+    if (response.hitChance <= 0 || unit.willAbsorbIncomingHit(target)) return true;
     return response.landedOutcomes.every((outcome) => outcome.damage < unit.getCumulativeHp());
 }
 
 /**
  * Price a supported direct melee hit and the enemy corpse's blast in the same HP units. The strike must
  * actually destroy the stack: a miss, nonfatal roll, absorbed hit or native resurrection buys no explosion.
- * Redirection, secondary damage, hazardous movement and chained deaths stay with the real engine search.
+ * Redirection, secondary damage, hazardous movement and chained resurrection stay with the real engine search.
  * No live HP, shields, positions or combat randomness are changed by this projection.
  */
 export function estimateLastFuseMeleeDamage(
@@ -140,7 +159,7 @@ export function estimateLastFuseMeleeDamage(
     if (resurrects && (context.fightProperties?.getBreakChancePerTeam(unit.getTeam()) ?? 0) > 0) return undefined;
     const damage = estimatePrimaryMeleeDamage(unit, target, context, standCell, actions);
     if (!damage) return undefined;
-    if (target.willWaterShieldAbsorb(unit)) {
+    if (target.willAbsorbIncomingHit(unit)) {
         return { expectedNetDamage: 0, expectedFriendlyDamage: 0, fatalChance: 0, secureKill: false };
     }
     const fatalChance = resurrects
@@ -250,7 +269,7 @@ export function estimateLastFuseRangedDamage(
             if (damage >= hp) conditionalFatalChance += probability;
         }
     }
-    const absorbed = target.willWaterShieldAbsorb(unit);
+    const absorbed = target.willAbsorbIncomingHit(unit);
     const firstKills = hitChance === 1 && minimum >= hp && !absorbed;
     const mayFollow = !!getDoubleShotAbility(unit) || unit.getBonusRangedAttackChance() > 0;
     if (mayFollow && !firstKills && !(hitChance === 1 && unit.projectRangeShotsAfterVolleys(target) <= 0))

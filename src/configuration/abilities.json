@@ -183,18 +183,6 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Leather Armor": {
-        "name": "Leather Armor",
-        "type": "DEFENCE",
-        "desc": ["This unit's ranged armor is reduced by {}%"],
-        "power": 50,
-        "power_type": "RANGE_ARMOR_MODIFIER",
-        "skip_reponse": false,
-        "stack_powered": false,
-        "effect": null,
-        "aura_effect": null,
-        "can_be_cast": false
-    },
     "Limited Supply": {
         "name": "Limited Supply",
         "type": "DEFENCE",
@@ -279,6 +267,22 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Ember Covenant Blessing": {
+        "name": "Ember Covenant Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "At battle start, surrounds every allied stack with a shared ring of fire.",
+            "Blocks fire damage without breaking. Absorbs the first other hit, then every allied ring dissolves.",
+            "Water Element attacks and water magic bypass absorption, deal damage and dissolve every ring. Once per battle; does not stack."
+        ],
+        "power": 100,
+        "power_type": "ARMY_FIRE_COVENANT",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Water Element": {
         "name": "Water Element",
         "type": "DEFENCE",
@@ -306,7 +310,10 @@
     "Water Shield": {
         "name": "Water Shield",
         "type": "DEFENCE",
-        "desc": ["Once per battle, fully absorbs the first incoming attack (0 damage taken), then breaks"],
+        "desc": [
+            "Once per battle, fully absorbs the first incoming attack (0 damage taken), then breaks.",
+            "Fire attacks pass through without breaking it, including Fireball, Fire Breath, Fire Shield and Fireforged burns."
+        ],
         "power": 100,
         "power_type": "ABSORB_FIRST_HIT",
         "skip_reponse": false,
@@ -399,16 +406,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Sharpened Weapons Aura": {
-        "name": "Sharpened Weapons Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Affected melee allies have +{}% base attack power"],
+    "Sharpened Weapons Blessing": {
+        "name": "Sharpened Weapons Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allied melee and magic units on the battlefield gain +{}% base attack power.",
+            "Does not stack with other Sharpened Weapons Blessings."
+        ],
         "power": 18,
         "power_type": "ADDITIONAL_MELEE_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,
-        "aura_effect": "Sharpened Weapons",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Range Null Field Aura": {

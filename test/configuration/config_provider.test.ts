@@ -132,6 +132,14 @@ describe("config_provider", () => {
         expect(creature.base_armor).toBe(33);
     });
 
+    // Owner request 2026-10-22: damage floor 35 -> 40. The ceiling stays 60.
+    it("loads Hydra's damage range", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Hydra", "hydra_512", 1);
+
+        expect(creature.attack_damage_min).toBe(40);
+        expect(creature.attack_damage_max).toBe(60);
+    });
+
     it("loads Hyena's reduced attack", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Hyena", "hyena_512", 0, 40);
 
@@ -154,6 +162,15 @@ describe("config_provider", () => {
         expect(creature.attack_damage_min).toBe(40);
         expect(creature.attack_damage_max).toBe(55);
         expect(creature.shot_distance).toBe(6.5);
+    });
+
+    // Owner request 2026-10-18: attack 21 -> 22 and damage floor 17 -> 18. The ceiling stays 23.
+    it("loads Cyclops's attack profile", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Cyclops", "cyclops_512", 1);
+
+        expect(creature.base_attack).toBe(22);
+        expect(creature.attack_damage_min).toBe(18);
+        expect(creature.attack_damage_max).toBe(23);
     });
 
     it("loads Dryad's improved attack profile", () => {
@@ -206,6 +223,21 @@ describe("config_provider", () => {
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(2.3);
         expect(creature.movement_type).toBe(PBTypes.MovementVals.WALK);
+        // Owner request 2026-10-18: experience 6.1 -> 6.466, six percent more expensive.
+        expect(creature.exp).toBe(6.466);
+    });
+
+    it("fields fewer Wandering Mages after the six percent experience increase", () => {
+        const creature = getCreatureConfig(
+            PBTypes.TeamVals.RIGHT,
+            "Chaos",
+            "Wandering Mage",
+            "wandering_mage_512",
+            0,
+            1000,
+        );
+
+        expect(creature.amount_alive).toBe(155);
     });
 
     it("preserves Battle Mage's walking movement", () => {

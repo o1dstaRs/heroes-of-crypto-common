@@ -19,6 +19,12 @@ import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilitie
 import { BORROWED_GRACE_NAME, borrowedGraceChance } from "../abilities/borrowed_grace_ability";
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
 import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/double_shot_names";
+import {
+    EMBER_COVENANT_BLESSING,
+    isEmberCovenantFireHit,
+    isEmberCovenantWaterHit,
+    notifyEmberCovenantDamage,
+} from "../abilities/ember_covenant";
 import { getCraftChances } from "../abilities/craft_ability";
 import { lastFuseDamage, lastFuseSourceFor, type ILastFuseSource } from "../abilities/last_fuse_ability";
 import { ARTIFACT_POWER, BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
@@ -56,9 +62,15 @@ import type { IWeightedRoute } from "../grid/path_definitions";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { fillEffectPowerPlaceholders, positionalPropertyCount } from "../spells/effect_description";
+import { notifyHelpingHandChange } from "../spells/helping_hand";
 import { Spell } from "../spells/spell";
+import { SpellElement } from "../spells/spell_properties";
 import { isMagicDamageAbility } from "../spells/spell_damage";
-import { recordEffectApplication, recordWaterShieldAbsorb } from "./effect_application_capture";
+import {
+    recordEffectApplication,
+    recordEmberCovenantAbsorb,
+    recordWaterShieldAbsorb,
+} from "./effect_application_capture";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, type XY } from "../utils/math";
@@ -333,6 +345,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // `abilities` leaked onto every same-type unit (e.g. Craft's Crafted Frozen Bow on ALL Elves).
         this.unitProperties = structuredClone(unitProperties);
         this.normalizeLegacyRallyingVolley();
+        this.normalizeLegacySharpenedWeapons();
+        this.stripRetiredLeatherArmor();
         this.initialUnitProperties = structuredClone(this.unitProperties);
         this.gridSettings = gridSettings;
         this.teamType = teamType;
@@ -408,6 +422,77 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 `Rallying Volley Blessing grants +${power} ranged shots once, anywhere on the battlefield.;;`;
         }
         properties.rallying_volley_granted ??= Math.max(0, Math.floor(legacyGrant));
+    }
+    /** Saved Crusaders keep their card, but no longer project a local attack aura. */
+    private normalizeLegacySharpenedWeapons(): void {
+        const properties = this.unitProperties;
+        const oldName = "Sharpened Weapons Aura";
+        const blessingName = "Sharpened Weapons Blessing";
+        if (
+            !properties.abilities.includes(oldName) &&
+            !properties.applied_buffs.includes(oldName) &&
+            !properties.aura_effects.includes("Sharpened Weapons") &&
+            !properties.stolen_abilities?.includes(oldName) &&
+            !properties.artifact_granted_abilities?.includes(oldName)
+        ) {
+            return;
+        }
+        const config = getAbilityConfig(blessingName);
+        for (let i = 0; i < properties.abilities.length; i++) {
+            if (properties.abilities[i] !== oldName) continue;
+            properties.abilities[i] = blessingName;
+            properties.abilities_descriptions[i] = config.desc.join("\n").replace(/\{\}/g, config.power.toString());
+            properties.abilities_stack_powered[i] = true;
+            properties.abilities_auras[i] = false;
+            properties.aura_ranges[i] = 0;
+            properties.aura_is_buff[i] = true;
+        }
+        properties.aura_effects = properties.aura_effects.filter((name) => name !== "Sharpened Weapons");
+        properties.stolen_abilities = (properties.stolen_abilities ?? []).map((name) =>
+            name === oldName ? blessingName : name,
+        );
+        properties.artifact_granted_abilities = properties.artifact_granted_abilities?.map((name) =>
+            name === oldName ? blessingName : name,
+        );
+        for (let i = 0; i < properties.applied_buffs.length; i++) {
+            if (properties.applied_buffs[i] !== oldName) continue;
+            const power = properties.applied_buffs_powers[i] ?? 0;
+            properties.applied_buffs[i] = blessingName;
+            properties.applied_buffs_laps[i] = NUMBER_OF_LAPS_TOTAL;
+            properties.applied_buffs_descriptions[i] =
+                `Sharpened Weapons Blessing grants +${power}% base attack power anywhere on the battlefield.;;`;
+        }
+    }
+    /** Drop the retired card so an old Arbalester snapshot still constructs. */
+    private stripRetiredLeatherArmor(): void {
+        const properties = this.unitProperties;
+        const retired = "Leather Armor";
+        if (
+            !properties.abilities.includes(retired) &&
+            !properties.stolen_abilities?.includes(retired) &&
+            !properties.artifact_granted_abilities?.includes(retired)
+        ) {
+            return;
+        }
+        for (let i = properties.abilities.length - 1; i >= 0; i--) {
+            if (properties.abilities[i] !== retired) {
+                continue;
+            }
+            properties.abilities.splice(i, 1);
+            properties.abilities_descriptions.splice(i, 1);
+            properties.abilities_stack_powered.splice(i, 1);
+            properties.abilities_auras.splice(i, 1);
+            properties.aura_ranges.splice(i, 1);
+            properties.aura_is_buff.splice(i, 1);
+        }
+        if (properties.stolen_abilities) {
+            properties.stolen_abilities = properties.stolen_abilities.filter((name) => name !== retired);
+        }
+        if (properties.artifact_granted_abilities) {
+            properties.artifact_granted_abilities = properties.artifact_granted_abilities.filter(
+                (name) => name !== retired,
+            );
+        }
     }
     public static createUnit(
         unitProperties: UnitProperties,
@@ -521,6 +606,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // hasAbilityActive / processDeepWoundsAbility all see it.
     public grantAbility(abilityName: string, options: { restoreStolen?: boolean; spellEntries?: string[] } = {}): void {
         if (abilityName === "Rallying Volley Aura") abilityName = "Rallying Volley Blessing";
+        if (abilityName === "Sharpened Weapons Aura") abilityName = "Sharpened Weapons Blessing";
         if (this.abilities.some((ability) => ability.getName() === abilityName)) {
             return;
         }
@@ -768,6 +854,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     .join("\n")
                     .replace(/\{\}/g, Number(this.calculateAuraPower(projectedAura, 0).toFixed(2)).toString());
             }
+        }
+        if (ability.getName() === "Sharpened Weapons Blessing") {
+            return ability
+                .getDesc()
+                .join("\n")
+                .replace(/\{\}/g, this.calculateSharpenedWeaponsBlessingPower().toString());
         }
         if (ability.getName() === "Warding Mane Blessing") {
             return ability.getDesc().join("\n").replace(/\{\}/g, this.calculateWardingManeBlessingPower().toString());
@@ -1021,6 +1113,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
+    public setHelpingHandLink(casterId: string, penaltyId: string): void {
+        this.unitProperties.helping_hand_caster_id = casterId;
+        this.unitProperties.helping_hand_penalty_id = penaltyId;
+    }
+    public clearHelpingHandLink(): void {
+        delete this.unitProperties.helping_hand_caster_id;
+        delete this.unitProperties.helping_hand_penalty_id;
+    }
     public deleteBuff(buffName: string): void {
         // Global aura refreshes probe several blessing names on every unit. Most are absent; avoid allocating
         // and filtering a replacement array for that no-op case. Do not return early: ranked mirrors may carry
@@ -1051,8 +1151,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
             }
         }
+        if (buffName === "Helping Hand") notifyHelpingHandChange(this);
     }
     public deleteAllBuffs(): void {
+        const hadHelpingHand = this.unitProperties.applied_buffs.includes("Helping Hand");
         this.buffs = [];
 
         if (
@@ -1070,6 +1172,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
             }
         }
+        if (hadHelpingHand) notifyHelpingHandChange(this);
     }
     public deleteDebuff(debuffName: string): void {
         this.debuffs = this.debuffs.filter((d) => d.getName() !== debuffName);
@@ -1088,8 +1191,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
             }
         }
+        if (debuffName === "Helping Hand") notifyHelpingHandChange(this);
     }
     public deleteAllDebuffs(): void {
+        const hadHelpingHand = this.unitProperties.applied_debuffs.includes("Helping Hand");
         this.debuffs = [];
 
         if (
@@ -1104,6 +1209,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.applied_debuffs_powers.splice(i, 1);
             }
         }
+        if (hadHelpingHand) notifyHelpingHandChange(this);
     }
     public minusLap(): void {
         const dismoraleDebuff = this.getDebuff("Dismorale");
@@ -1877,6 +1983,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         extendBreak = false,
         attacker?: Unit,
         lastFuseSource?: Readonly<ILastFuseSource>,
+        damageElement?: SpellElement,
     ): number {
         const observed = observeUnitHpChange(this, "damage", minusHp, attacker);
         try {
@@ -1884,12 +1991,23 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 return 0;
             }
 
+            if (this.willEmberCovenantBlock(attacker, damageElement)) {
+                recordEmberCovenantAbsorb({ unitId: this.getId(), amount: minusHp });
+                const fireHit = isEmberCovenantFireHit(damageElement);
+                sceneLog.updateLog(
+                    `${this.getName()}'s Ember Covenant blocks ${fireHit ? "the fire attack" : "the hit"}`,
+                );
+                if (!fireHit) notifyEmberCovenantDamage(this, sceneLog);
+                return 0;
+            }
+
             // Water Shield: once per battle, the first incoming damage instance is fully absorbed (0 damage taken)
             // and the shield breaks. Sits above the Break roll and the HP subtraction so an absorbed hit lands
             // nothing at all; `waterShieldSpent` stops the seeding refresh from re-granting the buff afterwards.
-            // FIRE IGNORES IT: a Fire Element attacker (and the fire abilities they cast — Fire Breath, Fire
-            // Shield) passes straight through, dealing full damage without absorbing OR consuming the shield.
-            if (this.willWaterShieldAbsorb(attacker)) {
+            // FIRE IGNORES IT: a Fire Element attacker's hit, and any fire attack — fire spells, Fire Breath,
+            // Fire Shield, a Fireforged burn — passes straight through without absorbing OR consuming the
+            // shield. A Fire Wall burn is not an attack and does not pass an element, so it still spends it.
+            if (this.willWaterShieldAbsorb(attacker, damageElement)) {
                 this.waterShieldSpent = true;
                 this.deleteBuff("Water Shield");
                 // Name the striker when the caller passed one — "the shield broke" without a culprit reads
@@ -1955,12 +2073,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.max_hp = damage.state.maxHp;
             this.unitProperties.amount_alive = damage.state.amountAlive;
             this.unitProperties.amount_died = damage.state.amountDied;
+            if (damage.appliedDamage > 0) notifyEmberCovenantDamage(this, sceneLog);
             if (damage.dead && damage.unitsDied > 0) {
                 const source = lastFuseSource ?? lastFuseSourceFor(attacker);
                 this.lastFuseFatalHit = {
                     damage: damage.appliedDamage,
                     source: source && source.team !== this.getTeam() ? { ...source } : undefined,
                 };
+                notifyHelpingHandChange(this);
             }
             this.handleDamageAnimation(damage.animationDeaths);
 
@@ -2180,13 +2300,24 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * through this same check, and attack paths call it BEFORE dealing damage to know that the strike's
      * on-hit riders (debuffs, gazes, auras) must not land: an absorbed hit applies nothing, like a miss.
      */
-    public willWaterShieldAbsorb(attacker?: Unit): boolean {
+    public willWaterShieldAbsorb(attacker?: Unit, damageElement?: SpellElement): boolean {
         // The shield is the Water Shield ability at work, so Break turns it off like every other ability: a
-        // Broken holder takes the hit and keeps the shield for when Break wears off.
+        // Broken holder takes the hit and keeps the shield for when Break wears off. Fire attacks — a Fire
+        // Element creature's own hit, or damage whose element is fire (a spell, Fire Breath, Fire Shield,
+        // a Fireforged burn) — pass through and leave it intact.
         return (
             this.hasBuffActive("Water Shield") &&
             !this.hasEffectActive("Break") &&
-            !attacker?.hasAbilityActive("Fire Element")
+            !attacker?.hasAbilityActive("Fire Element") &&
+            damageElement !== SpellElement.FIRE
+        );
+    }
+    public willEmberCovenantBlock(attacker?: Unit, damageElement?: SpellElement): boolean {
+        return this.hasStatusBuffApplied(EMBER_COVENANT_BLESSING) && !isEmberCovenantWaterHit(attacker, damageElement);
+    }
+    public willAbsorbIncomingHit(attacker?: Unit, damageElement?: SpellElement): boolean {
+        return (
+            this.willEmberCovenantBlock(attacker, damageElement) || this.willWaterShieldAbsorb(attacker, damageElement)
         );
     }
     public calculatePossibleLosses(minusHp: number): number {
@@ -2302,6 +2433,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         return Number((calculatedCoeff * 100).toFixed(2)) - 100;
+    }
+    /** Preserve the Crusader aura's stack, luck, Might synergy and Made of Fire scaling. */
+    public calculateSharpenedWeaponsBlessingPower(synergyAbilityPowerIncrease = 0): number {
+        const ability = this.getAbility("Sharpened Weapons Blessing");
+        if (!ability) {
+            return 0;
+        }
+        const madeOfFire = this.getBuff("Made of Fire");
+        return Number(
+            (
+                (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                this.getLuck() +
+                synergyAbilityPowerIncrease +
+                (madeOfFire ? (ability.getPower() * madeOfFire.getPower()) / 100 : 0)
+            ).toFixed(2),
+        );
     }
     /** Flat board-wide Squire projection: base power plus the source's luck, never stack/team scaled. */
     public calculateArcaneWardBlessingPower(): number {
@@ -3028,7 +3175,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.applied_buffs_powers.push(buff.getPower());
         if (buff.getName() === "Last Fuse") this.refreshLastFuseDescription();
     }
-    /** Once-only ammunition; the army marker itself may also land on allies that cannot shoot. */
+    /** Once-only ammunition for a unit that can already shoot. Callers do not apply the marker otherwise. */
     private tryGrantRallyingVolleyShots(power: number): void {
         if (
             this.unitProperties.range_shots_authoritative ||
@@ -3135,6 +3282,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.applied_buffs_laps.push(laps);
         this.unitProperties.applied_buffs_descriptions.push(description);
         this.unitProperties.applied_buffs_powers.push(power);
+        if (buffName === "Helping Hand") {
+            const { helping_hand_caster_id: casterId, helping_hand_penalty_id: penaltyId } = from.unitProperties;
+            if (casterId && penaltyId) this.setHelpingHandLink(casterId, penaltyId);
+        }
         recordEffectApplication({
             unitId: this.getId(),
             name: buffName,
@@ -3212,78 +3363,39 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
     }
-    /**
-     * A split peels `amount` creatures off this stack into `part`. Spell charges are shared, never
-     * duplicated: `part` gets its share of every charge, in proportion to the creatures it takes and
-     * rounded down, and this stack keeps the rest — a single Resurrection, Castling or Battle Roar charge
-     * always stays here. A one-creature split is the exception for every spell whose own requirement is
-     * already stack power 1 and that this stack has more than one charge of: that lone caster takes one,
-     * so it can still cast Fire Strike or Fireforged Sword. Arrows are not shared: `part` copies this
-     * stack's remaining quiver, and this stack keeps every arrow it has left. Call it before this
-     * stack's count is reduced.
-     */
+    /** Give the new stack its own complete spellbook and quiver without reducing this stack's casts. */
     public shareResourcesWithSplit(part: Unit, amount: number): void {
         const total = this.getAmountAlive();
         if (total <= 0 || amount <= 0 || amount >= total) {
             return;
         }
-        this.moveResourcesTo(part, amount / total, false, amount);
+        part.syncAuthoritativeSpellEntries([...this.unitProperties.spells]);
+        part.unitProperties.range_shots = Math.max(0, Math.floor(this.unitProperties.range_shots));
+        part.unitProperties.rallying_volley_granted = this.unitProperties.rallying_volley_granted;
     }
     /**
-     * Merging `moved` of `from`'s creatures back into this stack brings their share of `from`'s spell
-     * charges along (all of them when the whole stack merges). Arrows stay where they are: the absorbed
-     * stack's quiver is not added to this one. Call it before `from`'s count is reduced.
+     * Spellbooks belong to stacks, not individual creatures. A merge keeps the larger remaining count
+     * of each spell instead of adding the books together. A partial merge leaves the donor's book
+     * intact, and neither kind of merge combines the quivers. Call before reducing `from`'s count.
      */
     public takeResourcesFromMerge(from: Unit, moved: number): void {
-        const total = from.getAmountAlive();
-        if (total <= 0 || moved <= 0) {
+        if (from.getAmountAlive() <= 0 || moved <= 0) {
             return;
         }
-        from.moveResourcesTo(this, Math.min(1, moved / total), true);
-    }
-    private moveResourcesTo(other: Unit, share: number, addToOther: boolean, peeledCreatures = 0): void {
-        const counts = new Map<string, number>();
-        for (const rawEntry of this.unitProperties.spells) {
+        const entries = [...this.unitProperties.spells];
+        const ownCounts = new Map<string, number>();
+        for (const rawEntry of entries) {
             const entry = normalizeSpellEntry(rawEntry);
-            counts.set(entry, (counts.get(entry) ?? 0) + 1);
+            ownCounts.set(entry, (ownCounts.get(entry) ?? 0) + 1);
         }
-        // A one-creature peel of a large stack rounds every share to 0. Any spell whose own
-        // requirement is already 1 is still a cast that stack can make, so it takes one charge of
-        // each when this stack has a spare. A higher requirement, or the last charge, stays here.
-        const basicSpells = new Set(
-            this.spells.filter((spell) => spell.getMinimalCasterStackPower() <= 1).map((spell) => spell.getName()),
-        );
-        const toMove = new Map<string, number>();
-        for (const [entry, count] of counts) {
-            let moving = Math.floor(count * share);
-            const spellName = entry.substring(entry.indexOf(":") + 1);
-            if (moving === 0 && peeledCreatures === 1 && count > 1 && basicSpells.has(spellName)) {
-                moving = 1;
-            }
-            toMove.set(entry, moving);
-        }
-        const moved: string[] = [];
-        const kept: string[] = [];
-        for (const rawEntry of this.unitProperties.spells) {
+        const donorCounts = new Map<string, number>();
+        for (const rawEntry of from.unitProperties.spells) {
             const entry = normalizeSpellEntry(rawEntry);
-            const left = toMove.get(entry) ?? 0;
-            if (left > 0) {
-                moved.push(rawEntry);
-                toMove.set(entry, left - 1);
-            } else {
-                kept.push(rawEntry);
-            }
+            const count = (donorCounts.get(entry) ?? 0) + 1;
+            donorCounts.set(entry, count);
+            if (count > (ownCounts.get(entry) ?? 0)) entries.push(rawEntry);
         }
-        this.syncAuthoritativeSpellEntries(kept);
-        other.syncAuthoritativeSpellEntries(addToOther ? [...other.unitProperties.spells, ...moved] : moved);
-
-        // Arrows are not a shared pool. A split copies this stack's remaining quiver (and the blessing
-        // ledger already counted in it, so those arrows are not granted a second time) and leaves this
-        // stack's arrows untouched. A merge does not move them: absorbing a stack must not refill this one.
-        if (!addToOther) {
-            other.unitProperties.range_shots = Math.max(0, Math.floor(this.unitProperties.range_shots));
-            other.unitProperties.rallying_volley_granted = this.unitProperties.rallying_volley_granted;
-        }
+        this.syncAuthoritativeSpellEntries(entries);
     }
     public useSpell(spellName: string): void {
         for (const s of this.spells) {
@@ -3458,7 +3570,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         let madnessAbility: Ability | undefined;
         let mechanismAbility: Ability | undefined;
         let heavyArmorAbility: Ability | undefined;
-        let leatherArmorAbility: Ability | undefined;
         let enchantedSkinAbility: Ability | undefined;
         let magicShieldAbility: Ability | undefined;
         let wardguardAbility: Ability | undefined;
@@ -3503,9 +3614,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                         break;
                     case "Heavy Armor":
                         heavyArmorAbility ??= ability;
-                        break;
-                    case "Leather Armor":
-                        leatherArmorAbility ??= ability;
                         break;
                     case "Enchanted Skin":
                         enchantedSkinAbility ??= ability;
@@ -3911,8 +4019,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // this.unitProperties.armor_mod = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
 
-        leatherArmorAbility = getStatAbility(leatherArmorAbility, "Leather Armor");
-        let rangeArmorMultiplier = leatherArmorAbility ? leatherArmorAbility.getPower() / 100 : 1;
+        let rangeArmorMultiplier = 1;
 
         // Arrows Wingshield Blessing (Angel): the strongest living allied Angel projects this board-wide. Its
         // marker carries the source's already stack- and luck-scaled percentage, so every ally reads the same
@@ -4195,7 +4302,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         // Veteran Helm grants NO attack — it is a DEFENSE-ONLY artifact (armor_mod block above).
         // Warlord's Edge: +% attack as an ADDITIONAL stat (attack_mod), not folded into base_attack — so it never
-        // compounds with the Sharpened Weapons aura multiplier and isn't amplified by base_attack-derived effects
+        // compounds with the Sharpened Weapons blessing multiplier and isn't amplified by base_attack-derived effects
         // (Riot/Weakness). The power holds the ranged percentage; the second property holds the melee percentage.
         // A legacy single-value buff retains its original percentage for both modes.
         const warlordsEdgeBuff = statBuffs.get("Warlords Edge");
@@ -4225,10 +4332,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         let baseAttackMultiplier = 1;
-        const sharpenedWeaponsAura = this.getAppliedAuraEffect("Sharpened Weapons Aura");
+        const sharpenedWeaponsBlessing = statBuffs.get("Sharpened Weapons Blessing");
 
-        if (sharpenedWeaponsAura) {
-            baseAttackMultiplier = baseAttackMultiplier * (1 + sharpenedWeaponsAura.getPower() / 100);
+        if (sharpenedWeaponsBlessing) {
+            baseAttackMultiplier = baseAttackMultiplier * (1 + sharpenedWeaponsBlessing.getPower() / 100);
         }
 
         // Blessing / Battle Roar force every roll to the maximum. Honour the applied_buffs DISPLAY list
@@ -4610,6 +4717,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         let hasDoubleShot = false;
         let hasMaulAoe = false;
         let hasBorrowedGrace = false;
+        let hasSharpenedWeapons = false;
         for (const abilityName of this.unitProperties.abilities) {
             switch (abilityName) {
                 case BLIND_FURY_ABILITY_NAME:
@@ -4629,6 +4737,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     break;
                 case BORROWED_GRACE_NAME:
                     hasBorrowedGrace = true;
+                    break;
+                case "Sharpened Weapons Blessing":
+                    hasSharpenedWeapons = true;
                     break;
                 default:
                     if (DOUBLE_SHOT_ABILITY_NAMES.includes(abilityName)) {
@@ -4676,6 +4787,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     .replace(
                         /\{\}/g,
                         Number(borrowedGraceChance(this, _synergyAbilityPowerIncrease).toFixed(2)).toString(),
+                    );
+            }
+        }
+        if (hasSharpenedWeapons) {
+            const ability = this.getAbility("Sharpened Weapons Blessing");
+            if (ability) {
+                const index = this.unitProperties.abilities.indexOf(ability.getName());
+                this.unitProperties.abilities_descriptions[index] = ability
+                    .getDesc()
+                    .join("\n")
+                    .replace(
+                        /\{\}/g,
+                        this.calculateSharpenedWeaponsBlessingPower(_synergyAbilityPowerIncrease).toString(),
                     );
             }
         }

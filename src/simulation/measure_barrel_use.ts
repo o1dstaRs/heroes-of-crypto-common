@@ -5,7 +5,7 @@
  *
  *   bun src/simulation/measure_barrel_use.ts [games=10000] [concurrency=12] [baseSeed=1] [outDir]
  *
- *   bun src/simulation/measure_barrel_use.ts --compare [clusters=112] [concurrency=12] [seed=1] [outDir] [work|live] [exact|own|placement]
+ *   bun src/simulation/measure_barrel_use.ts --compare [clusters=112] [concurrency=12] [seed=1] [outDir] [work|live] [exact|own|placement|cover|caster-cover|landing-cover]
  *   bun src/simulation/measure_barrel_use.ts --calibrate [clusters=7*3*liveT1Count] [concurrency=12] [seed=1] [outDir] [work|live]
  * Calibration swaps Barrel Barricade against every live Tier-1 on fixed armies, both seats, with a
  * barrel-vs-barrel negative control. This measures artifact value, not the combat candidate's lift.
@@ -27,7 +27,7 @@ import { PersistentWorkerPool } from "./persistent_worker_pool";
 import type { BarrelFightRequest, BarrelFightResult } from "./measure_barrel_use_worker";
 
 const USAGE =
-    "Usage: bun src/simulation/measure_barrel_use.ts [games=10000] [concurrency=12] [baseSeed=1] [outDir]\n       bun src/simulation/measure_barrel_use.ts --compare [clusters=112] [concurrency=12] [seed=1] [outDir] [work|live] [exact|own|placement]\n       bun src/simulation/measure_barrel_use.ts --calibrate [clusters=7*3*liveT1Count] [concurrency=12] [seed=1] [outDir] [work|live]";
+    "Usage: bun src/simulation/measure_barrel_use.ts [games=10000] [concurrency=12] [baseSeed=1] [outDir]\n       bun src/simulation/measure_barrel_use.ts --compare [clusters=112] [concurrency=12] [seed=1] [outDir] [work|live] [exact|own|placement|cover|caster-cover|landing-cover]\n       bun src/simulation/measure_barrel_use.ts --calibrate [clusters=7*3*liveT1Count] [concurrency=12] [seed=1] [outDir] [work|live]";
 
 interface CohortTotals {
     games: number;

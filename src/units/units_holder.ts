@@ -27,6 +27,7 @@ import {
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
 import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES } from "../abilities/double_shot_names";
+import { EMBER_COVENANT_BLESSING, registerEmberCovenantArmy } from "../abilities/ember_covenant";
 import { getSpellConfig, POISON_ON_HIT_AURA_EFFECT_NAMES } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effects/effect_properties";
@@ -42,6 +43,8 @@ import {
 } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
+import type { ISceneLog } from "../scene/scene_log_interface";
+import { reconcileHelpingHandLinks, registerHelpingHandOwner } from "../spells/helping_hand";
 import { getDistance, type XY } from "../utils/math";
 import { type IUnitAIRepr, Unit } from "./unit";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -60,6 +63,7 @@ const ARCANE_WARD_BLESSING_BIT = 2;
 const WARDING_MANE_BLESSING_BIT = 4;
 const ARROWS_WINGSHIELD_BLESSING_BIT = 8;
 const RALLYING_VOLLEY_BLESSING_BIT = 16;
+const SHARPENED_WEAPONS_BLESSING_BIT = 32;
 
 /** The board-wide blessings as seen at the start of one stack-power refresh. */
 interface IBlessingCensus {
@@ -68,6 +72,7 @@ interface IBlessingCensus {
     wardingMane: Map<TeamType, number>;
     arrowsWingshield: Map<TeamType, number>;
     rallyingVolley: Map<TeamType, number>;
+    sharpenedWeapons: Map<TeamType, number>;
     /** Per unit, in allUnits order: the blessing bits it carries as a buff object or a display entry. */
     carriers: number[];
     /** Every blessing bit carried by any unit. */
@@ -86,9 +91,25 @@ function blessingBit(name: string): number {
             return ARROWS_WINGSHIELD_BLESSING_BIT;
         case "Rallying Volley Blessing":
             return RALLYING_VOLLEY_BLESSING_BIT;
+        case "Sharpened Weapons Blessing":
+            return SHARPENED_WEAPONS_BLESSING_BIT;
         default:
             return 0;
     }
+}
+
+/** A shot top-up. Native shooters qualify even with an empty quiver; a stolen Endless Quiver does too. */
+function canReceiveRallyingVolley(unit: Unit): boolean {
+    return unit.isRangeCapable() || unit.hasAbilityActive("Endless Quiver");
+}
+
+function canReceiveSharpenedWeapons(unit: Unit): boolean {
+    const attackType = unit.getAttackType();
+    return (
+        attackType === PBTypes.AttackVals.MELEE ||
+        attackType === PBTypes.AttackVals.MAGIC ||
+        attackType === PBTypes.AttackVals.MELEE_MAGIC
+    );
 }
 
 function hasPositivePower(powerPerTeam: ReadonlyMap<TeamType, number>): boolean {
@@ -108,6 +129,8 @@ export class UnitsHolder {
     private distancesToClosestEnemies: Map<string, number> = new Map();
     private auraRefreshFingerprint: AuraRefreshFingerprintValue[] | undefined;
     private auraRefreshKnownEmpty: boolean;
+    private emberCovenantSeeded = false;
+    private readonly emberCovenantTeams = new Set<TeamType>();
     public constructor(grid: Grid) {
         this.grid = grid;
         this.gridSettings = grid.getSettings();
@@ -841,6 +864,7 @@ export class UnitsHolder {
         }
 
         const unitToDelete = this.allUnits.get(unitId);
+        this.refreshHelpingHandLinks(unitId);
         let considerResurrection = checkForResurrection && unitToDelete?.canSelfResurrect();
 
         if (considerResurrection) {
@@ -1026,6 +1050,7 @@ export class UnitsHolder {
             wardingMane: new Map(),
             arrowsWingshield: new Map(),
             rallyingVolley: new Map(),
+            sharpenedWeapons: new Map(),
             carriers: [],
             carried: 0,
         };
@@ -1046,6 +1071,18 @@ export class UnitsHolder {
             }
 
             const team = unit.getTeam();
+            if (unit.getAbility("Sharpened Weapons Blessing")) {
+                const synergyPower = FightStateManager.getInstance()
+                    .getFightProperties()
+                    .getAdditionalAbilityPowerPerTeam(team);
+                census.sharpenedWeapons.set(
+                    team,
+                    Math.max(
+                        census.sharpenedWeapons.get(team) ?? Number.NEGATIVE_INFINITY,
+                        unit.calculateSharpenedWeaponsBlessingPower(synergyPower),
+                    ),
+                );
+            }
             const angelicHostAbility = unit.getAbility("Angelic Host Blessing");
             if (angelicHostAbility) {
                 census.angelicHost.set(
@@ -1128,14 +1165,21 @@ export class UnitsHolder {
             "Arrows Wingshield Blessing",
         );
     }
-    /** Strip `blessingName` from its carriers, then grant every living on-board unit its team's strongest power. */
+    /**
+     * Strip `blessingName` from its carriers, then grant every living on-board unit its team's strongest power.
+     * `eligible`, when set, also skips units the blessing cannot help; those units are still stripped.
+     * `allowNonPositivePower` preserves Sharpened Weapons' attack reduction under a weak source's negative luck.
+     */
     private reapplyTeamBlessing(
         census: IBlessingCensus,
         powerPerTeam: ReadonlyMap<TeamType, number>,
         bit: number,
         blessingName: string,
+        eligible?: (unit: Unit) => boolean,
+        allowNonPositivePower = false,
     ): void {
-        if (!(census.carried & bit) && !hasPositivePower(powerPerTeam)) {
+        const hasPower = allowNonPositivePower ? powerPerTeam.size > 0 : hasPositivePower(powerPerTeam);
+        if (!(census.carried & bit) && !hasPower) {
             return;
         }
 
@@ -1145,8 +1189,14 @@ export class UnitsHolder {
                 unit.deleteBuff(blessingName);
             }
 
-            const power = powerPerTeam.get(unit.getTeam()) ?? 0;
-            if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
+            const power = powerPerTeam.get(unit.getTeam());
+            if (
+                power === undefined ||
+                (!allowNonPositivePower && power <= 0) ||
+                unit.isDead() ||
+                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
+                (eligible && !eligible(unit))
+            ) {
                 continue;
             }
 
@@ -1170,7 +1220,61 @@ export class UnitsHolder {
             unit.trySeedWaterShield();
         }
     }
+    public seedEmberCovenant(): void {
+        if (this.emberCovenantSeeded) return;
+        this.emberCovenantSeeded = true;
+        for (const unit of this.getAllUnitsIterator()) {
+            if (
+                !unit.isDead() &&
+                isCellWithinGrid(this.gridSettings, unit.getBaseCell()) &&
+                unit.hasAbilityActive(EMBER_COVENANT_BLESSING)
+            )
+                this.emberCovenantTeams.add(unit.getTeam());
+        }
+        for (const unit of this.getAllUnitsIterator()) {
+            if (
+                !this.emberCovenantTeams.has(unit.getTeam()) ||
+                unit.isDead() ||
+                !isCellWithinGrid(this.gridSettings, unit.getBaseCell())
+            )
+                continue;
+            unit.applyBuff(
+                new Spell({ spellProperties: getSpellConfig("System", EMBER_COVENANT_BLESSING), amount: 1 }),
+            );
+        }
+    }
+    public hasEmberCovenant(team: TeamType): boolean {
+        return this.emberCovenantTeams.has(team);
+    }
+    public breakEmberCovenant(team: TeamType, victim: Unit, sceneLog: ISceneLog): void {
+        if (!this.emberCovenantTeams.delete(team)) return;
+        for (const unit of this.getAllUnitsIterator()) {
+            if (unit.getTeam() === team) unit.deleteBuff(EMBER_COVENANT_BLESSING);
+        }
+        sceneLog.updateLog(`${victim.getName()}'s Ember Covenant dissolves across the army`);
+    }
+    public refreshHelpingHandLinks(removedUnitId?: string): void {
+        const affected = reconcileHelpingHandLinks(this, removedUnitId);
+        if (!affected.length) return;
+        const fight = FightStateManager.getInstance().getFightProperties();
+        for (const unit of affected) {
+            if (unit.isDead()) continue;
+            const team = unit.getTeam();
+            unit.adjustBaseStats(
+                fight.hasFightStarted(),
+                fight.getCurrentLap(),
+                fight.getAdditionalAbilityPowerPerTeam(team),
+                fight.getAdditionalMovementStepsPerTeam(team),
+                fight.getAdditionalFlyArmorPerTeam(team),
+                fight.getAdditionalMoralePerTeam(team),
+                fight.getAdditionalLuckPerTeam(team),
+                fight.getStepsMoraleMultiplier(),
+            );
+            unit.increaseAttackMod(this.getUnitAuraAttackMod(unit));
+        }
+    }
     public refreshStackPowerForAllUnits(): void {
+        reconcileHelpingHandLinks(this);
         FightStateManager.getInstance()
             .getFightProperties()
             .setUnitsCalculatedStacksPower(this.gridSettings, this.allUnits);
@@ -1187,9 +1291,18 @@ export class UnitsHolder {
         this.refreshArrowsWingshieldBlessingForAllUnits(blessingCensus);
         this.reapplyTeamBlessing(
             blessingCensus,
+            blessingCensus.sharpenedWeapons,
+            SHARPENED_WEAPONS_BLESSING_BIT,
+            "Sharpened Weapons Blessing",
+            canReceiveSharpenedWeapons,
+            true,
+        );
+        this.reapplyTeamBlessing(
+            blessingCensus,
             blessingCensus.rallyingVolley,
             RALLYING_VOLLEY_BLESSING_BIT,
             "Rallying Volley Blessing",
+            canReceiveRallyingVolley,
         );
         this.refreshWaterShieldForAllUnits();
         // This loop runs after EVERY engine action, so a19 rollouts walk it millions of times. The fight
@@ -1850,6 +1963,9 @@ export class UnitsHolder {
     }
     public addUnit(unit: Unit): void {
         this.allUnits.set(unit.getId(), unit);
+        registerHelpingHandOwner(unit, this);
+        registerEmberCovenantArmy(unit, this);
+        if (unit.hasStatusBuffApplied?.(EMBER_COVENANT_BLESSING)) this.emberCovenantTeams.add(unit.getTeam());
     }
     public decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam: Record<string, number>): void {
         for (const unitNameKey of Object.keys(moraleDecreaseForTheUnitTeam)) {

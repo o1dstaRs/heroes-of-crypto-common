@@ -1204,7 +1204,7 @@ describe("aura-aware AI positioning", () => {
 
     it("auraCoverageScore counts only allies inside a buff aura, ignoring far allies and enemies", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const auraUnit = createTestUnit({ team: TeamVals.RIGHT, auraEffects: ["Sharpened Weapons"] }); // range 2 buff
+        const auraUnit = createTestUnit({ team: TeamVals.RIGHT, auraEffects: ["Absorb Penalties"] }); // range 2 buff
         const nearAlly = createTestUnit({ team: TeamVals.RIGHT, name: "near-ally" });
         const farAlly = createTestUnit({ team: TeamVals.RIGHT, name: "far-ally" });
         const enemy = createTestUnit({ team: TeamVals.LEFT, name: "enemy" });
@@ -1221,7 +1221,7 @@ describe("aura-aware AI positioning", () => {
 
     it("planAuraMove picks the reachable cell that covers the most allies", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const auraUnit = createTestUnit({ team: TeamVals.RIGHT, auraEffects: ["Sharpened Weapons"] });
+        const auraUnit = createTestUnit({ team: TeamVals.RIGHT, auraEffects: ["Absorb Penalties"] });
         const allyA = createTestUnit({ team: TeamVals.RIGHT, name: "ally-a" });
         const allyB = createTestUnit({ team: TeamVals.RIGHT, name: "ally-b" });
         const start = { x: 6, y: 6 };

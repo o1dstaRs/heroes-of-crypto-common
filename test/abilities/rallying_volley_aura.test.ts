@@ -51,10 +51,16 @@ describe("Rallying Volley Blessing", () => {
             team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE,
         });
+        const mageAlly = createTestUnit({
+            name: "Mage Ally",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.MAGIC,
+        });
 
         placeUnit(grid, unitsHolder, zena, { x: 2, y: 2 });
         placeUnit(grid, unitsHolder, nearArcher, { x: 3, y: 2 });
         placeUnit(grid, unitsHolder, meleeAlly, { x: 2, y: 3 });
+        placeUnit(grid, unitsHolder, mageAlly, { x: 2, y: 4 });
         placeUnit(grid, unitsHolder, farArcher, { x: 9, y: 9 });
 
         unitsHolder.refreshAuraEffectsForAllUnits();
@@ -63,9 +69,12 @@ describe("Rallying Volley Blessing", () => {
         // The board-wide marker carries the flat configured shot count.
         expect(nearArcher.getBuff("Rallying Volley Blessing")?.getPower()).toBe(BLESSING_SHOTS);
         expect(nearArcher.getRangeShots()).toBe(5 + BLESSING_SHOTS);
-        // Every ally carries the marker, but melee-only units receive no ammunition.
-        expect(meleeAlly.getBuff("Rallying Volley Blessing")?.getPower()).toBe(BLESSING_SHOTS);
-        expect(meleeAlly.getRangeShots()).toBe(0);
+        // Units that cannot shoot do not wear the marker and do not grow a bow.
+        for (const ally of [meleeAlly, mageAlly]) {
+            expect(ally.getBuff("Rallying Volley Blessing")).toBeUndefined();
+            expect(ally.getUnitProperties().applied_buffs).not.toContain("Rallying Volley Blessing");
+            expect(ally.getRangeShots()).toBe(0);
+        }
         // Board-wide reach, and the source receives its own top-up.
         expect(farArcher.getRangeShots()).toBe(5 + BLESSING_SHOTS);
         expect(zena.getRangeShots()).toBe(8 + BLESSING_SHOTS);

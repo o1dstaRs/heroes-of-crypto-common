@@ -66,15 +66,30 @@ export interface IWaterShieldAbsorbRecord {
     amount: number;
 }
 
+export type IEmberCovenantAbsorbRecord = IWaterShieldAbsorbRecord;
+
 let captureActive = false;
 let records: IEffectApplicationRecord[] = [];
 let waterShieldAbsorbs: IWaterShieldAbsorbRecord[] = [];
+let emberCovenantAbsorbs: IEmberCovenantAbsorbRecord[] = [];
 
 /** Start capturing applications. Callers MUST pair with endEffectApplicationCapture. */
 export const beginEffectApplicationCapture = (): void => {
     captureActive = true;
     records = [];
     waterShieldAbsorbs = [];
+    emberCovenantAbsorbs = [];
+};
+
+/** Record actual blocked damage, so water bypasses and shared-ring removal never look like absorbs. */
+export const recordEmberCovenantAbsorb = (record: IEmberCovenantAbsorbRecord): void => {
+    if (captureActive) emberCovenantAbsorbs.push(record);
+};
+
+export const endEmberCovenantAbsorbCapture = (): IEmberCovenantAbsorbRecord[] => {
+    const out = emberCovenantAbsorbs;
+    emberCovenantAbsorbs = [];
+    return out;
 };
 
 /** Record one Water Shield absorb; a no-op outside a capture window. */

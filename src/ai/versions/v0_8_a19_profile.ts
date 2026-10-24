@@ -84,6 +84,8 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     // Give a wounded Last Fuse stack one supported counter-trade stand for real-engine comparison.
     SEARCH_A19_LAST_FUSE_TRADES: "1",
     SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "1",
+    // Hydra's capped catalog prices the complete radial impact, shared shields and Devour recovery.
+    SEARCH_A19_LIGHTNING_SPIN_COVERAGE: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -112,7 +114,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "766de6b8ef722c9a8ef0bc5aaa99f2f4f61e2ccc937010369b6f24f06b883fe3" as const;
+    "34f6b79e5726d4ddde02029a5f5b5f8d0cce5fc8d0e9b8984a36375e03bac33e" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -144,13 +146,13 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for primary-only Last Fuse trades and their complete score comparison.
-        sha256: "dd6a61936b2377278f6dad3d5d46dd36a55270ece4213aff16ffff90fb49c727" as const,
+        // Re-pinned for whole-impact Hydra catalogs in both production enumeration paths.
+        sha256: "98ffdbcd49cda3b48c59338fe8f024d7eb4b7de5b7e086baefb2b1e2a39b917a" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
         source: "src/ai/gravechain_shortlist.ts" as const,
-        sha256: "9dc203749776483b504e3aa82fc4d4158ba5d896f1e1c5e85e228cdf1d509c76" as const,
+        sha256: "e6355ebe4367ec4218b3bd6803fe2e7e9764bf61fd1d7870fad6113d2433790f" as const,
     }),
     Object.freeze({
         role: "last-fuse-trades" as const,
@@ -160,12 +162,17 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        sha256: "2a44b767828ff6aecab76247eae9ddd93e72025d4bbee250f1ebfa542bbf3dfd" as const,
+        sha256: "abd39ce4e60afdfc509ca20fe22817b33c87cc770dca8f0549d9a1187d129a25" as const,
     }),
     Object.freeze({
         role: "last-fuse-estimates" as const,
         source: "src/ai/last_fuse_estimate.ts" as const,
-        sha256: "ea4cb6f02139d8d5416c0ed90a68427fab5b489d36e84180949817ee3100561d" as const,
+        sha256: "c30b7fefd4174b5e9062e4fec0e608da9ef42d7e61d7f342cb651e499a8926f0" as const,
+    }),
+    Object.freeze({
+        role: "lightning-spin-tactics" as const,
+        source: "src/ai/lightning_spin_tactics.ts" as const,
+        sha256: "bb904e3a03b1b233865a257dd1950605d61308857a21737c9c0317bc06b792b6" as const,
     }),
     Object.freeze({
         role: "ranged-shields" as const,
@@ -231,7 +238,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
         // Re-pinned for an explicit research deployment intervention; absent hook preserves routing.
-        sha256: "1b8b5374e2d3bf73258e0be37a7921c47d05796276502a066b4c607412680a6e" as const,
+        sha256: "60b69ddd9f487c477562ebe6f3a19d1a32067a96a2de368e2024f060f012fe55" as const,
     }),
 ] as const);
 
@@ -263,6 +270,11 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         SEARCH_DECISION_DEADLINE_MS: String(V08_A19_SEARCH.decisionDeadlineMs),
         SEARCH_CIRCUIT_BREAKER_MS: String(V08_A19_SEARCH.circuitBreakerMs),
         ...V08_A19_SEARCH_RULES,
+        // Research candidates require an explicit seat-scoped JSON override; never inherit a shell gate.
+        SEARCH_RESEARCH_RANGED_SHIELD_SEQUENCE: "0",
+        SEARCH_RESEARCH_FIRE_BREATH_VALUE: "0",
+        V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT: "0",
+        V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT: "0",
         // Only the explicit JSON research override may enable this unqualified candidate.
         SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
         // Selection-aware tail bounds are an offline, measured research arm. Production stays sealed off.

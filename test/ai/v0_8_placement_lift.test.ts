@@ -2402,7 +2402,7 @@ describe("r4c1 pierce files, back-rank thirds, and HP corners", () => {
         expect(cell(wide, high)).toEqual({ x: 1, y: 14 });
     });
 
-    test("against two grounded shooters the highest HP bows take the corners and leather does not", () => {
+    test("against two grounded shooters the highest HP bows take the corners", () => {
         const low = stack("Low", 10);
         const high = stack("High", 50, RANGE, ["Sniper"]);
         const mid = stack("Mid", 30);
@@ -2419,23 +2419,6 @@ describe("r4c1 pierce files, back-rank thirds, and HP corners", () => {
         expect(cell(next, mid)).toEqual({ x: 1, y: 14 });
         expect(cell(next, low)).toEqual({ x: 1, y: 8 });
         expect(cell(next, guard)).toEqual({ x: 2, y: 8 });
-
-        const leather = stack("Leather", 200, RANGE, ["Leather Armor"]);
-        const sniper = stack("Sniper", 40, RANGE, ["Sniper"]);
-        const other = stack("Other", 30);
-        const body = stack("Body", 15, MELEE);
-        const leatherUnits = [leather, sniper, other, body];
-        const leatherPlaced = at(leatherUnits, [
-            { x: 1, y: 1 },
-            { x: 1, y: 6 },
-            { x: 1, y: 14 },
-            { x: 2, y: 8 },
-        ]);
-        const swapped = placeArmyR4C1(leatherPlaced, leatherUnits, contextFor(leatherUnits, ["Elf", "Monk"]));
-        expect(cell(swapped, sniper)).toEqual({ x: 1, y: 1 });
-        expect(cell(swapped, other)).toEqual({ x: 1, y: 14 });
-        expect(cell(swapped, leather)).toEqual({ x: 1, y: 6 });
-        expect(cell(swapped, body)).toEqual({ x: 2, y: 8 });
     });
 
     test("an own splash bow stays put with exactly two bows and otherwise takes the centre back rank", () => {

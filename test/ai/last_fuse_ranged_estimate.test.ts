@@ -69,9 +69,8 @@ test("nonlethal shots and resurrection grant no explosion bonus", () => {
     }
 });
 
-test("chained deaths, secondary riders, and uncertain volleys stay with engine search", () => {
+test("secondary riders and uncertain volleys stay with engine search", () => {
     for (const options of [
-        { neighbor: { maxHp: 10 } },
         { attacker: { abilities: ["Through Shot"] } },
         { attacker: { abilities: ["Crafted Double Shot"], damageMin: 10, damageMax: 10 } },
     ]) {

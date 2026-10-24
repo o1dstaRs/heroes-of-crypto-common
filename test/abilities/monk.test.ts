@@ -91,13 +91,14 @@ describe("Monk configuration", () => {
         expect(softer(monk.magic_resist, cyclops.magic_resist)).toBeGreaterThanOrEqual(0.8);
         expect(softer(monk.magic_resist, cyclops.magic_resist)).toBeLessThanOrEqual(0.9);
 
-        // Offence: attack power keeps the original +25%..+35% edge; the damage dice were re-priced by
-        // the owner (2026-08-05) from 22-29 to a tighter, more reliable 20-25 — still strictly above
-        // the Cyclops' 17-23 on both ends (+8%..+25%), with the spread tightened from 7 to 5 (now
-        // matching the Cyclops'): the shot hits harder on average without the old spike ceiling.
+        // Offence: the owner raised Cyclops attack 21 -> 22 and its damage floor 17 -> 18
+        // (2026-10-18); the ceiling stays 23. Monk attack stays 27, so it is no longer inside the
+        // old +25%..+35% band. Monk damage stays 20-25, still strictly above 18-23 on both ends.
+        expect(cyclops.base_attack).toBe(22);
+        expect(cyclops.attack_damage_min).toBe(18);
+        expect(cyclops.attack_damage_max).toBe(23);
+        expect(monk.base_attack).toBe(27);
         const harder = (monkStat: number, cyclopsStat: number) => monkStat / cyclopsStat;
-        expect(harder(monk.base_attack, cyclops.base_attack)).toBeGreaterThanOrEqual(1.25);
-        expect(harder(monk.base_attack, cyclops.base_attack)).toBeLessThanOrEqual(1.35);
         expect(monk.attack_damage_min).toBe(20);
         expect(monk.attack_damage_max).toBe(25);
         expect(harder(monk.attack_damage_min, cyclops.attack_damage_min)).toBeGreaterThanOrEqual(1.1);

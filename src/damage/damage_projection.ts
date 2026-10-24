@@ -58,6 +58,8 @@ export interface IAttackDamageProjectionInput {
     attackRate?: number;
     /** Stack size override for what-if previews. Defaults to the attacker's current amount_alive. */
     amountAliveOverride?: number;
+    /** Earlier landed hits by this attacker in the same double attack, before the hit being projected. */
+    priorHits?: number;
 }
 
 /**
@@ -190,6 +192,7 @@ export function reachableTopRoll(chain: IAttackDamageChain): number {
 
 /** Band (no kills) of the damage this attack can deal: both ends are values the engine can actually produce. */
 export function projectAttackDamageBand(input: IAttackDamageProjectionInput): { min: number; max: number } {
+    if (input.target.willEmberCovenantBlock(input.attacker) && (input.priorHits ?? 0) <= 0) return { min: 0, max: 0 };
     const chain = resolveAttackDamageChain(input);
     if (chain.outOfShots) {
         return { min: 0, max: 0 };

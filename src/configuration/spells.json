@@ -438,6 +438,27 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Sharpened Weapons Blessing": {
+            "name": "Sharpened Weapons Blessing",
+            "level": 0,
+            "desc": [
+                "Sharpened Weapons Blessing grants +{}% base attack power anywhere on the battlefield.",
+                "Active while an allied unit with Sharpened Weapons Blessing is alive."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 18,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Rallying Volley Blessing": {
             "name": "Rallying Volley Blessing",
             "level": 0,
@@ -930,6 +951,28 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Ember Covenant Blessing": {
+            "name": "Ember Covenant Blessing",
+            "level": 0,
+            "desc": [
+                "Fire attacks are blocked without consuming the blessing.",
+                "The first other hit is fully absorbed, then every allied ring dissolves. Water Element attacks and water magic bypass absorption and dissolve every ring.",
+                "Lasts until broken."
+            ],
+            "target": "AUTO",
+            "power": 100,
+            "power_type": "COMMON",
+            "element": "FIRE",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Water Shield": {
             "name": "Water Shield",
             "level": 0,
@@ -1174,7 +1217,11 @@
         "Helping Hand": {
             "name": "Helping Hand",
             "level": 2,
-            "desc": ["Gives 30% of max HP and base armor from caster to an ally.", "Lasts 3 laps."],
+            "desc": [
+                "Transfers 30% of the caster's max HP and base armor to an ally through a golden spiritual link.",
+                "The bonus and penalty end immediately if either linked stack dies.",
+                "Lasts 3 laps."
+            ],
             "target": "ANY_ALLY",
             "power": 30,
             "power_type": "COMMON",

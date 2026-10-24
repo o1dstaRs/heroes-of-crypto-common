@@ -2,6 +2,7 @@ import { ARTIFACT_POWER, TIER2_ARTIFACT_LIST, Tier1Artifact, Tier2Artifact } fro
 import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES } from "../../abilities/double_shot_names";
 import { LUCK_MAX_VALUE_TOTAL } from "../../constants";
 import { creatureInfo, type ICreatureInfo } from "./creature_score";
+import { dualStrikeRelativeDamageGain } from "./dual_strike_fit";
 import {
     TIER2_ARTIFACT_SCORE_A19_RANGED,
     TIER2_ARTIFACT_WINRATE_MELEE,
@@ -9,25 +10,36 @@ import {
 } from "./setup_conditional";
 import { TIER2_ARTIFACT_WINRATE, type ITier2ArtifactDecisionContext } from "./setup_strategy";
 import type { IResolvedSetupPolicy } from "./setup_ship";
-import { lastFuseDraftContact, lastFuseIncomingMeleeShare } from "./last_fuse_fit";
+import {
+    lastFuseDraftContact,
+    lastFuseIncomingMeleeShare,
+    lastFuseExecutionAccess,
+    lastFuseVictimAvailability,
+} from "./last_fuse_fit";
 
 export const ARTIFACT_FIT_SETUP_PREFIX = "artifact-fit-v1:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V2 = "artifact-fit-v2:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V3 = "artifact-fit-v3:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V4 = "artifact-fit-v4:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V5 = "artifact-fit-v5:";
-export type ArtifactFitVersion = 1 | 2 | 3 | 4 | 5;
+export const ARTIFACT_FIT_SETUP_PREFIX_V6 = "artifact-fit-v6:";
+export const ARTIFACT_FIT_SETUP_PREFIX_V7 = "artifact-fit-v7:";
+export type ArtifactFitVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export const artifactFitVersionForSetupSpec = (spec: string): ArtifactFitVersion =>
-    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V5)
-        ? 5
-        : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V4)
-          ? 4
-          : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3)
-            ? 3
-            : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
-              ? 2
-              : 1;
+    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V7)
+        ? 7
+        : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V6)
+          ? 6
+          : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V5)
+            ? 5
+            : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V4)
+              ? 4
+              : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3)
+                ? 3
+                : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
+                  ? 2
+                  : 1;
 
 const roster = (ids: readonly number[]): ICreatureInfo[] =>
     [...new Set(ids)].flatMap((id) => {
@@ -119,6 +131,15 @@ export function tier1ArtifactFitScoreV4(id: number, ownIds: readonly number[], b
                 unit.melee || unit.ranged ? procPerTurn(ARTIFACT_POWER.RIME_PROC_PERCENT, unit, undefined, true) : 0,
             )
     );
+}
+
+/** v7 adds Dual Strike's known native/Craft beneficiaries; every other Tier-1 keeps its v4 score. */
+export function tier1ArtifactFitScoreV7(id: number, ownIds: readonly number[], baseline: number): number {
+    if (id !== Tier1Artifact.DUAL_STRIKE_CHARM) return tier1ArtifactFitScoreV4(id, ownIds, baseline);
+    const own = roster(ownIds);
+    if (!own.length) return baseline;
+    const gain = average(own, (unit) => dualStrikeRelativeDamageGain(unit, own));
+    return gain > 0 ? 50 + 100 * gain : 0;
 }
 
 const FIT_TIER2_IDS: ReadonlySet<number> = new Set([
@@ -234,6 +255,22 @@ export function tier2ArtifactFitScoreV5(
     );
 }
 
+export function tier2ArtifactFitScoreV6(
+    id: number,
+    ownIds: readonly number[],
+    context?: Readonly<ITier2ArtifactDecisionContext>,
+): number {
+    if (id !== Tier2Artifact.LAST_FUSE) return tier2ArtifactFitScoreV5(id, ownIds, context);
+    const own = roster(ownIds);
+    if (!own.length) return 50;
+    return (
+        40 +
+        ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER *
+            average(own, lastFuseExecutionAccess) *
+            lastFuseVictimAvailability(roster(context?.publicOpponentCreatureIds ?? []))
+    );
+}
+
 function tier2ArtifactFitScoreWithMagicPressure(
     id: number,
     ownIds: readonly number[],
@@ -344,15 +381,19 @@ export function withArtifactFitSetupPolicy(
     version: ArtifactFitVersion = 1,
 ): IResolvedSetupPolicy {
     const prefix =
-        version === 5
-            ? ARTIFACT_FIT_SETUP_PREFIX_V5
-            : version === 4
-              ? ARTIFACT_FIT_SETUP_PREFIX_V4
-              : version === 1
-                ? ARTIFACT_FIT_SETUP_PREFIX
-                : version === 2
-                  ? ARTIFACT_FIT_SETUP_PREFIX_V2
-                  : ARTIFACT_FIT_SETUP_PREFIX_V3;
+        version === 7
+            ? ARTIFACT_FIT_SETUP_PREFIX_V7
+            : version === 6
+              ? ARTIFACT_FIT_SETUP_PREFIX_V6
+              : version === 5
+                ? ARTIFACT_FIT_SETUP_PREFIX_V5
+                : version === 4
+                  ? ARTIFACT_FIT_SETUP_PREFIX_V4
+                  : version === 1
+                    ? ARTIFACT_FIT_SETUP_PREFIX
+                    : version === 2
+                      ? ARTIFACT_FIT_SETUP_PREFIX_V2
+                      : ARTIFACT_FIT_SETUP_PREFIX_V3;
     if (base.spec.startsWith(prefix)) return base;
     return Object.freeze({
         ...base,
@@ -392,7 +433,9 @@ export function withArtifactFitSetupPolicy(
                             ? tier2ArtifactFitScoreV3
                             : version === 4
                               ? tier2ArtifactFitScoreV4
-                              : tier2ArtifactFitScoreV5
+                              : version === 5
+                                ? tier2ArtifactFitScoreV5
+                                : tier2ArtifactFitScoreV6
                 )(id, ownIds, context);
                 if (score > bestScore) {
                     best = id;

@@ -111,7 +111,7 @@ export function reserveGravechainShortlistCandidate(
         const covered = new Set<string>();
         for (const target of attackRoots(unit, context, candidate)) {
             if (target.isDead() || target.getTeam() === unit.getTeam()) continue;
-            if (target.willWaterShieldAbsorb(unit)) continue;
+            if (target.willAbsorbIncomingHit(unit)) continue;
             // Absorption/redirection and a guaranteed miss cannot be advertised as a landed root.
             if (target.hasBuffActive("Flesh Shield Aura")) continue;
             const enemyPower = context.fightProperties?.getAdditionalAbilityPowerPerTeam(target.getTeam()) ?? 0;

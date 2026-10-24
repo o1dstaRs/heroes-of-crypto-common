@@ -47,6 +47,8 @@ export interface ISkewerStrikeDamage {
     unitIsSmall: boolean;
     damage: number;
     unitsDied: number;
+    /** Swing a Water Shield ate. The displayed damage stays 0; a Fireforged Sword burns from this. */
+    ignition?: number;
 }
 
 export interface ISkewerStrikeResult {
@@ -203,7 +205,7 @@ export function strikeSkewerTargets(
         // Water Shield: captured BEFORE the damage lands (applyDamage consumes the shield). An
         // absorbed skewer hit applies no on-hit riders — same rule as the main melee path and
         // Lightning Spin's per-enemy gate.
-        const waterShieldAbsorbed = damageFromAttack > 0 && nextStandingTarget.willWaterShieldAbsorb(fromUnit);
+        const waterShieldAbsorbed = damageFromAttack > 0 && nextStandingTarget.willAbsorbIncomingHit(fromUnit);
         const amountBefore = nextStandingTarget.getAmountAlive();
         const damageDealt = nextStandingTarget.applyDamage(
             damageFromAttack,
@@ -230,6 +232,8 @@ export function strikeSkewerTargets(
             unitIsSmall: nextStandingTarget.isSmallSize(),
             damage: damageDealt,
             unitsDied: Math.max(0, amountBefore - amountAfter),
+            // The floater shows what landed. The sword still burns from the swing the shield ate.
+            ...(waterShieldAbsorbed && damageFromAttack > 0 ? { ignition: damageFromAttack } : {}),
         });
 
         sceneLog.updateLog(

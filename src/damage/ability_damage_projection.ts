@@ -304,7 +304,7 @@ export function projectDoubleShotSecondVolley(input: IDoubleShotProjectionInput)
         return { ...NO_DAMAGE };
     }
 
-    return projectVolley(input, doubleShotSecondVolleyMultiplier(attacker, synergyAbilityPowerIncrease));
+    return projectVolley(input, doubleShotSecondVolleyMultiplier(attacker, synergyAbilityPowerIncrease), 1);
 }
 
 export interface IDoubleShotProjection {
@@ -334,7 +334,7 @@ export function projectDoubleShotAttack(input: IDoubleShotProjectionInput): IDou
     const spentVolleys = doubleShotAbility(input.attacker) ? 2 : 1;
     const bonus =
         bonusChance > 0 && input.attacker.projectRangeShotsAfterVolleys(input.target, spentVolleys) > 0
-            ? first
+            ? projectVolley(input, attackerParalysisMultiplier(input.attacker), spentVolleys)
             : undefined;
 
     return {
@@ -345,7 +345,11 @@ export function projectDoubleShotAttack(input: IDoubleShotProjectionInput): IDou
     };
 }
 
-function projectVolley(input: IDoubleShotProjectionInput, abilityMultiplier: number): IAttackDamageProjection {
+function projectVolley(
+    input: IDoubleShotProjectionInput,
+    abilityMultiplier: number,
+    priorHits = 0,
+): IAttackDamageProjection {
     const projectionInput: IAttackDamageProjectionInput = {
         attacker: input.attacker,
         target: input.target,
@@ -355,6 +359,7 @@ function projectVolley(input: IDoubleShotProjectionInput, abilityMultiplier: num
         abilityMultiplier,
         attackRate: input.attackRate,
         amountAliveOverride: input.amountAliveOverride,
+        priorHits,
     };
     const band = projectAttackDamageBand(projectionInput);
 

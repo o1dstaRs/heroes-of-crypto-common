@@ -95,7 +95,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": ["Sniper", "Leather Armor", "Limited Supply"]
+            "abilities": ["Sniper", "Limited Supply"]
         },
         "Pikeman": {
             "name": "Pikeman",
@@ -212,7 +212,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Double Punch", "Sharpened Weapons Aura"]
+            "abilities": ["Double Punch", "Sharpened Weapons Blessing"]
         },
         "Griffin": {
             "name": "Griffin",
@@ -359,7 +359,7 @@
             "shot_distance": 6.5,
             "magic_resist": 0,
             "movement_type": "WALK",
-            "exp": 10,
+            "exp": 11,
             "size": 1,
             "level": 1,
             "spells": [],
@@ -692,9 +692,9 @@
             "initiative": 5.1,
             "armor": 20,
             "attack_type": "MELEE",
-            "attack": 20,
-            "attack_damage_min": 27,
-            "attack_damage_max": 39,
+            "attack": 31,
+            "attack_damage_min": 55,
+            "attack_damage_max": 70,
             "attack_range": 1,
             "range_shots": 0,
             "shot_distance": 0,
@@ -905,7 +905,7 @@
             "armor": 33,
             "attack_type": "MELEE",
             "attack": 33,
-            "attack_damage_min": 35,
+            "attack_damage_min": 40,
             "attack_damage_max": 60,
             "attack_range": 1,
             "range_shots": 0,
@@ -916,7 +916,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["Lightning Spin", "Devour Essence"]
+            "abilities": ["Lightning Spin", "Devour Essence", "Ember Covenant Blessing"]
         },
         "Abomination": {
             "name": "Abomination",
@@ -954,7 +954,7 @@
             "shot_distance": 0,
             "magic_resist": 0,
             "movement_type": "WALK",
-            "exp": 6.1,
+            "exp": 6.466,
             "size": 1,
             "level": 1,
             "spells": [
@@ -1313,8 +1313,8 @@
             "initiative": 4,
             "armor": 19,
             "attack_type": "RANGE",
-            "attack": 21,
-            "attack_damage_min": 17,
+            "attack": 22,
+            "attack_damage_min": 18,
             "attack_damage_max": 23,
             "attack_range": 1,
             "range_shots": 8,
@@ -1334,7 +1334,7 @@
             "initiative": 4,
             "armor": 17,
             "attack_type": "RANGE",
-            "attack": 24,
+            "attack": 23,
             "attack_damage_min": 19,
             "attack_damage_max": 24,
             "attack_range": 1,

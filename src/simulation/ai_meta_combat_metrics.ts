@@ -240,7 +240,7 @@ export function summarizePremiumCombatMetrics(fight: Input): IPremiumCombatMetri
             else if (entry.source === "water_shield") {
                 recipient.waterShieldAbsorbedHp += entry.amount;
                 recipient.waterShieldTriggers++;
-            } else {
+            } else if (entry.source !== "ember_covenant") {
                 hit(entry.unitId, entry.amount, entry.unitsDied, `secondary:${entry.source}`);
                 if (entry.source === "flesh_shield") recipient.fleshShieldRedirectedHp += entry.amount;
             }

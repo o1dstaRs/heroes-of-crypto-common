@@ -64,7 +64,16 @@ export function processFireShieldAbility(
         );
         const positionAtImpact = { ...toUnit.getPosition() };
         const amountAliveBefore = toUnit.getAmountAlive();
-        const damageDealt = toUnit.applyDamage(fireShieldDmg, 0 /* magic attack */, sceneLog, false, fromUnit);
+        // Fire even when the shield's owner is not a Fire Element, so the striker's Water Shield cannot eat it.
+        const damageDealt = toUnit.applyDamage(
+            fireShieldDmg,
+            0 /* magic attack */,
+            sceneLog,
+            false,
+            fromUnit,
+            undefined,
+            SpellElement.FIRE,
+        );
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             damage: damageDealt,

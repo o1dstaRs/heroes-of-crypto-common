@@ -96,6 +96,11 @@ class CustomEventSource<T> {
                 throw error;
             });
 
+            if (this.isClosed) {
+                await response.body?.cancel();
+                return false;
+            }
+
             if (response.status === 429) {
                 this.debugLog("429 received - Session exists");
                 this.handleReconnection();
@@ -131,11 +136,15 @@ class CustomEventSource<T> {
                 try {
                     const { done, value } = await reader.read();
 
+                    if (this.isClosed) {
+                        await reader.cancel();
+                        return;
+                    }
+
                     if (done) {
                         this.debugLog("Stream complete");
-                        // this.debugLog("Stream complete, closing connection");
-                        // this.close();
-                        // this.handleReconnection();
+                        this.readyState = 0;
+                        this.handleReconnection();
                         return;
                     }
 
@@ -144,6 +153,7 @@ class CustomEventSource<T> {
                     buffer = parts.pop() || "";
 
                     parts.forEach((part) => {
+                        if (this.isClosed) return;
                         if (!part.trim()) {
                             this.debugLog("Received empty line - Skipping...");
                             return;
