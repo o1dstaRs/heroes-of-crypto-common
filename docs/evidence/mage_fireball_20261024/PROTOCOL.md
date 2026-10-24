@@ -43,3 +43,8 @@ Source: common `ab162d2768ee73ee3b7829e3e4a4592104d71073`, with the frozen resea
 Frozen source SHA-256: `c38bebf008f69e86f9e4901ecb5a1aa3c606279c0e60e2933725775902943e40`.
 The shipped Mage-priority gate remains off pending qualification. Generated data and frozen sources are
 kept outside Git under `game/core/tmp/mage-fireball-study-20261024` and the matching research-host folder.
+
+The separate sandbox runtime was registered before examining the ranked screen outcomes. To control
+the family of two runtime hypotheses, tighten both contexts to two-sided 97.5% clustered intervals
+and exact sign-flip p <= 0.025. Ranked raw output retains its originally registered 95% interval;
+the stricter independent analysis controls qualification. Sample sizes and endpoints remain fixed.

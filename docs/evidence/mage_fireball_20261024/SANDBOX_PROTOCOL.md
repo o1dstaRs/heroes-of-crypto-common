@@ -45,3 +45,12 @@ selection/tight bounds accelerate exact deterministic search for both arms; thos
 selection and are not active in the browser wall-clock path. Compare complete pilot trajectories to the
 unoptimized sandbox profile before the strength screen. Spell telemetry uses the corrected recording
 switch and side field, independently verified on all 18 original pilot fights without changing gameplay.
+
+Before the sandbox strength screen, computation was partitioned into fixed ranges: pairs 0–314 on
+macOS (12 workers) and 315–629 on the 9800X3D (8 workers). Each range has exactly 35 pairs per
+composition/map cell. No partial-shard inference is computed. Analyze only their complete 630-pair
+union, without duplicate or selected records; require identical source/runtime and pilot trajectories.
+
+Because ranked and sandbox are now separate tested contexts, use a Bonferroni two-sided 97.5% interval
+and p <= 0.025 per context. This tightens the original gate before examining either strength outcome;
+it does not change either sample size. Confirmation uses the same stricter threshold.
