@@ -34,11 +34,34 @@ than half of the boards but never chosen. M's prespecified deciding population t
 Black Dragon to exercise its intended change. M was withdrawn before its deciding screen, rather than
 replacing the population after observing a favorable result. Its production flag remains disabled.
 
-## D: legal Hydra draft preference — pending
+## D: legal Hydra draft preference — do not promote
 
 See `DRAFT_HYDRA_PROTOCOL.md`. This is a separately identified hypothesis with new seeds, a stricter
 98.75% clustered interval, an exact sign-flip gate and fresh confirmation. It does not inherit any claim
 of strength from the shield tests or the draft census.
+
+Frozen source SHA-256:
+`07a2affc72b54215b4b909f02e982f5745b2222c73306bd0487b2e8baa32bc60`.
+The 12-game smoke exercised Hydra on the candidate seat only. Its A/A completed 24 boards / 96 games,
+seed 2026102410, at exactly 50% with zero rejected actions.
+
+The fixed screen completed 300 fresh offer boards / 1,200 games, seed 2026102411:
+
+- 532 wins, 659 losses, 9 draws; draw-aware score **44.7083%**, decisive-only win rate **44.6683%**.
+- Delta from the 50% paired null: **-5.2917 percentage points**.
+- Registered 98.75% whole-cluster bootstrap interval: **[41.8750%, 47.5417%]**.
+- Exact two-sided cluster sign-flip p = **0.00000452235**, in the unfavorable direction.
+- Normal: 50.00%; Lava: 46.00%; Block: 38.125%; each map has 100 independent boards / 400 games.
+- Zero rejected actions. Hydra appeared in 700 candidate games and zero opponent games. Unlike S,
+  D changed trajectories on 175/300 clusters; 103 clusters had a nonzero score difference from 50%.
+
+D fails its screen and is inferior in this sampled population. Do not launch confirmation or enable a
+Hydra preference. The result concerns the complete legal-preference policy against the frozen A19
+control; it is not an isolated creature-balance estimate. Do not turn the neutral Normal-map subgroup
+into a qualified conditional policy. Any new rule needs its own registration and fresh data.
+
+Raw `boards.jsonl` SHA-256:
+`f05949c495d1261175032f8f31b493348c73c7b18d5a4538480547594ead75ba`.
 
 ## Reproducibility and exclusions
 
@@ -48,7 +71,23 @@ kept outside Git under the client research-output directories `game/core/tmp/a19
 frozen source digest before and after each stage and refuse to overwrite a stage directory.
 
 The S 12-game smoke run matched all trajectory hashes, setups and outcomes across macOS arm64 and
-Linux x64 using Bun 1.4.4. A slower remote S A/A was stopped and retained as incomplete; it contributes
-no strength evidence. An M smoke attempt with invalid dependency resolution was also retained and
+Linux x64 using Bun 1.4.4. All 96 M remote A/A trajectory hashes also matched the corresponding
+local S A/A hashes, verifying disabled-candidate parity across both source snapshots. A slower remote
+S A/A was stopped and retained as incomplete; it contributes no strength evidence. An M smoke attempt with invalid dependency resolution was also retained and
 excluded; the corrected smoke completed. No partial run or failed setup is pooled into a qualifying
 sample. The exact cluster sign-flip analysis for S/M was registered before their screen outcomes.
+
+
+## Validation and limits
+
+The common build passed 7,111 tests, formatting and TypeScript before later concurrent mainline edits.
+All 20 focused tests for S, M, the research baseline seam and legal/seat-scoped D preferences also passed
+on the shared checkout after the screen. Both combat flags remain sealed to zero; D exists only as an
+explicit simulation override. No experiment in this report is enabled or deployed.
+
+The broader client check passed lint and type checks. Its first core run had one Unicorn timing failure;
+that test passed in isolation and the full repeated core stage passed 5,235 tests. The repeated workspace
+gate then encountered concurrent Mage export/profile edits in common, so it did not finish green. Those
+failures must not be represented as a passing full gate or repaired by discarding peer edits. Research
+outcomes use the independently hashed frozen snapshot, not that changing checkout. If a future candidate
+qualifies, validate against the then-current engine and complete all required gates before promotion.
