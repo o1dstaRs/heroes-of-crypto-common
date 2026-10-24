@@ -65,6 +65,7 @@ import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 import { estimateShieldedRangedDamage } from "./ranged_shield_estimate";
 import { estimateRangedShieldSequence, type IShieldSequenceImpact } from "./ranged_shield_sequence";
 import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
+import { estimateFireBreathMeleePotential } from "./fire_breath_tactics";
 import { estimateLightningSpinPotential } from "./lightning_spin_tactics";
 import { lastFuseCounterTradePotential } from "./last_fuse_tactics";
 import {
@@ -882,6 +883,8 @@ export interface IEnumerateOptions {
     includeLightningSpinCoverage?: boolean;
     /** Research only: preserve shared and personal shield layers across ranged impacts. */
     researchRangedShieldSequence?: boolean;
+    /** Research only: rank Fire Breath strikes by primary damage plus the complete magical tail. */
+    researchFireBreathValue?: boolean;
     /** Cap on move destinations, kept nearest-to-enemy first (0/undefined = all reachable). */
     maxMoveDestinations?: number;
     /**
@@ -1611,12 +1614,37 @@ class CandidateGenerator {
                 }
                 spin = spinByCell.get(key);
             }
+            const breath = this.options.researchFireBreathValue
+                ? estimateFireBreathMeleePotential(
+                      this.unit,
+                      target.unit,
+                      this.context,
+                      cell,
+                      actionsFor(target.unit, cell, route),
+                  )
+                : undefined;
             return {
                 target: target.unit,
                 cell,
                 route,
-                effective: spin?.expectedDirectDamage ?? fuse?.expectedNetDamage ?? target.damage.effective,
-                kill: spin ? (spin.secureKill ? 1 : 0) : fuse ? (fuse.secureKill ? 1 : 0) : target.damage.kill,
+                effective:
+                    breath?.netDamage ??
+                    spin?.expectedDirectDamage ??
+                    fuse?.expectedNetDamage ??
+                    target.damage.effective,
+                kill: breath
+                    ? breath.securePrimaryKill
+                        ? 1
+                        : 0
+                    : spin
+                      ? spin.secureKill
+                          ? 1
+                          : 0
+                      : fuse
+                        ? fuse.secureKill
+                            ? 1
+                            : 0
+                        : target.damage.kill,
                 sourceIndex: pairs.length,
                 spinValue: spin ? spin.expectedDirectDamage + spin.healingPotential : undefined,
             };

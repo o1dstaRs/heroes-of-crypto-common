@@ -114,7 +114,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "4e2492aea2a7ad178298ea7dd41cf5d4221e4b981502588b3bd95ae1b00bb622" as const;
+    "a15a24581387b4f46eecd2d9764d7aa60e61ef171e83d46c25e92b3af3246236" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -147,7 +147,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for whole-impact Hydra catalogs in both production enumeration paths.
-        sha256: "e8fdd4c1bd8082377cb496503257f1fb3cd90e3657a3e333a77362cc30ec10b3" as const,
+        sha256: "98ffdbcd49cda3b48c59338fe8f024d7eb4b7de5b7e086baefb2b1e2a39b917a" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
@@ -162,7 +162,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        sha256: "25c20b7fc9192150e928885120d484de6e4936e3ba87445f084cbf8bc5b52615" as const,
+        sha256: "abd39ce4e60afdfc509ca20fe22817b33c87cc770dca8f0549d9a1187d129a25" as const,
     }),
     Object.freeze({
         role: "last-fuse-estimates" as const,
@@ -272,6 +272,7 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         ...V08_A19_SEARCH_RULES,
         // Research candidates require an explicit seat-scoped JSON override; never inherit a shell gate.
         SEARCH_RESEARCH_RANGED_SHIELD_SEQUENCE: "0",
+        SEARCH_RESEARCH_FIRE_BREATH_VALUE: "0",
         // Only the explicit JSON research override may enable this unqualified candidate.
         SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
         // Selection-aware tail bounds are an offline, measured research arm. Production stays sealed off.
