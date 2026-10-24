@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { processRangeAOEAbility } from "../../src/abilities/aoe_range_ability";
-import { processFleshShieldAura } from "../../src/abilities/flesh_shield_aura_ability";
+import { processFleshShieldAura, projectFleshShieldAura } from "../../src/abilities/flesh_shield_aura_ability";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -133,6 +133,19 @@ describe("Flesh Shield target health cap", () => {
         { targetArmor: 20, ownerArmor: 20, ownerHp: 5, redirected: 5, absorbed: 5 },
     ])("caps a lethal single-Leprechaun hit across armor and owner HP: %p", (testCase) => {
         const context = shieldedTarget(testCase);
+        const projection = projectFleshShieldAura(
+            context.attacker,
+            context.target,
+            239,
+            false,
+            context.grid,
+            context.unitsHolder,
+        )!;
+        expect(projection.remainingDamage).toBe(239 - testCase.redirected);
+        expect(projection.redirectedDamage).toBe(testCase.absorbed);
+        expect(context.owner.getCumulativeHp()).toBe(testCase.ownerHp);
+        expect(context.target.getCumulativeHp()).toBe(8);
+        expect(context.damageStatisticHolder.get()).toEqual([]);
         const { result, secondary } = absorb(context, 239);
         expect(result.remainingDamage).toBe(239 - testCase.redirected);
         expect(result.absorbedDamage).toBe(testCase.absorbed);

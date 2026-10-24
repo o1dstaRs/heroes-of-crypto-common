@@ -123,43 +123,33 @@ function coveringFleshShield(
     return best;
 }
 
-export function processFleshShieldAura(
+/** Resolve a physical hit's redirection without changing HP, auras, statistics or random state. */
+export function projectFleshShieldAura(
     attackerUnit: Unit,
     targetUnit: Unit,
     damage: number,
     isRangeAttack: boolean,
     grid: Grid,
     unitsHolder: UnitsHolder,
-    sceneLog: ISceneLog,
-    damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
-    secondaryDamage?: ISecondaryDamage[],
-): IFleshShieldResult {
-    const result: IFleshShieldResult = {
-        remainingDamage: damage,
-        absorbedDamage: 0,
-        increaseMorale: 0,
-        unitIdsDied: [],
-        moraleDecreaseForTheUnitTeam: {},
-    };
-
+): { absorber: Unit; remainingDamage: number; redirectedDamage: number } | undefined {
     if (damage <= 0 || targetUnit.isDead()) {
-        return result;
+        return undefined;
     }
     // The protected unit's own Water Shield answers first: a hit it absorbs whole never reaches the aura.
     if (targetUnit.willAbsorbIncomingHit(attackerUnit)) {
-        return result;
+        return undefined;
     }
 
     const covering = coveringFleshShield(targetUnit, grid, unitsHolder);
     if (!covering) {
-        return result;
+        return undefined;
     }
     const absorberUnit = covering.absorber;
     const absorbPercentage = covering.absorbPercentage;
     const targetHpCapacity = targetUnit.getCumulativeHp();
     const requestedAbsorbedBase = Math.min(Math.floor(targetHpCapacity), Math.floor((damage * absorbPercentage) / 100));
     if (requestedAbsorbedBase <= 0) {
-        return result;
+        return undefined;
     }
 
     // Recalculate the absorbed chunk against the absorber's own armor as seen by this attacker (including
@@ -196,17 +186,43 @@ export function processFleshShieldAura(
     }
     const absorbedBase = low;
     if (absorbedBase <= 0) {
-        return result;
+        return undefined;
     }
-    const absorbedRecalculated = recalculateForAbsorber(absorbedBase);
+    return {
+        absorber: absorberUnit,
+        remainingDamage: damage - absorbedBase,
+        redirectedDamage: recalculateForAbsorber(absorbedBase),
+    };
+}
 
-    result.remainingDamage = damage - absorbedBase;
+export function processFleshShieldAura(
+    attackerUnit: Unit,
+    targetUnit: Unit,
+    damage: number,
+    isRangeAttack: boolean,
+    grid: Grid,
+    unitsHolder: UnitsHolder,
+    sceneLog: ISceneLog,
+    damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
+    secondaryDamage?: ISecondaryDamage[],
+): IFleshShieldResult {
+    const result: IFleshShieldResult = {
+        remainingDamage: damage,
+        absorbedDamage: 0,
+        increaseMorale: 0,
+        unitIdsDied: [],
+        moraleDecreaseForTheUnitTeam: {},
+    };
+    const projected = projectFleshShieldAura(attackerUnit, targetUnit, damage, isRangeAttack, grid, unitsHolder);
+    if (!projected) return result;
+    const absorberUnit = projected.absorber;
+    result.remainingDamage = projected.remainingDamage;
 
     const positionAtImpact = { ...absorberUnit.getPosition() };
     const amountAliveBefore = absorberUnit.getAmountAlive();
     // 0 break chance: this is a share of one hit, and that hit already rolled Break on the unit it struck.
     const damageDealt = absorberUnit.applyDamage(
-        absorbedRecalculated,
+        projected.redirectedDamage,
         0,
         sceneLog,
         false,
