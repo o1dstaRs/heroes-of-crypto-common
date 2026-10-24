@@ -2502,8 +2502,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return calculatedCoeff;
     }
-    public hasMindAttackResistance(): boolean {
-        return this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism");
+    public hasMindAttackResistance(effectName?: string, kind: "effect" | "debuff" = "effect"): boolean {
+        const madness = this.hasAbilityActive("Madness");
+        // Only resolution callers pass a name. Eligibility, AI and hover queries remain observational.
+        if (madness && effectName) {
+            recordEffectApplication({
+                unitId: this.getId(),
+                name: effectName,
+                kind,
+                resisted: true,
+                resistedBy: "Madness",
+            });
+        }
+        return madness || this.hasAbilityActive("Mechanism");
     }
     public canBeHealed(): boolean {
         return !this.hasAbilityActive("Mechanism");

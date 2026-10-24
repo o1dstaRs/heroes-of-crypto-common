@@ -65,7 +65,7 @@ export function processPetrifyingGazeAbility(
     const petrifyingGazeAbility = fromUnit.getAbility("Petrifying Gaze");
     if (
         !petrifyingGazeAbility ||
-        (petrifyingGazeAbility.getType() === AbilityType.MIND && toUnit.hasMindAttackResistance())
+        (petrifyingGazeAbility.getType() === AbilityType.MIND && toUnit.hasMindAttackResistance("Petrifying Gaze"))
     ) {
         return;
     }
