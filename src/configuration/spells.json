@@ -438,6 +438,27 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Sharpened Weapons Blessing": {
+            "name": "Sharpened Weapons Blessing",
+            "level": 0,
+            "desc": [
+                "Sharpened Weapons Blessing grants +{}% base attack power anywhere on the battlefield.",
+                "Active while an allied unit with Sharpened Weapons Blessing is alive."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 18,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Rallying Volley Blessing": {
             "name": "Rallying Volley Blessing",
             "level": 0,

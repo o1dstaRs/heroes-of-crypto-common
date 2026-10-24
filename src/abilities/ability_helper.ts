@@ -151,6 +151,7 @@ const ABILITY_TEXTURE_OVERRIDES: ReadonlyMap<string, string> = new Map([
     ["Warding Mane Blessing", "warding_mane_aura_256"],
     ["Arrows Wingshield Blessing", "arrows_wingshield_aura_256"],
     ["Angelic Host Blessing", "angelic_host_256"],
+    ["Sharpened Weapons Blessing", "sharpened_weapons_aura_256"],
 ]);
 
 export const abilityToTextureName = (abilityName: string): string =>
@@ -191,6 +192,7 @@ const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
     "Warding Mane Blessing",
     "Arrows Wingshield Blessing",
     "Rallying Volley Blessing",
+    "Sharpened Weapons Blessing",
     "Water Shield",
     "Ember Covenant Blessing",
 ]);

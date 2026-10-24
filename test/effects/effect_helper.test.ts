@@ -48,8 +48,8 @@ describe("effect_helper", () => {
         expect(canApplyAuraEffect(flying, getAuraEffectConfig("Tie up the Horses")!)).toBe(false);
         expect(canApplyAuraEffect(ranged, getAuraEffectConfig("Range Null Field")!)).toBe(true);
         expect(canApplyAuraEffect(melee, getAuraEffectConfig("Range Null Field")!)).toBe(false);
-        expect(canApplyAuraEffect(melee, getAuraEffectConfig("Sharpened Weapons")!)).toBe(true);
-        expect(canApplyAuraEffect(ranged, getAuraEffectConfig("Sharpened Weapons")!)).toBe(false);
+        expect(canApplyAuraEffect(melee, getAuraEffectConfig("War Anger")!)).toBe(true);
+        expect(canApplyAuraEffect(ranged, getAuraEffectConfig("War Anger")!)).toBe(false);
     });
 
     it("collects aura cells and keys around a source cell", () => {

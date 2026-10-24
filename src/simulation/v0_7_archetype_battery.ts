@@ -133,7 +133,10 @@ const POST_V07_FREEZE_ABILITIES: ReadonlySet<string> = new Set(["Sylvan Focus Au
  * Listed by their CURRENT config name, since that is what a frozen creature's ability list now holds. Angel's
  * Arrows Wingshield was a range-2 aura when this battery ran; it is a board-wide MASS_BUFF blessing today.
  */
-const PRE_V07_FREEZE_AURA_ABILITIES: ReadonlySet<string> = new Set(["Arrows Wingshield Blessing"]);
+const PRE_V07_FREEZE_AURA_ABILITIES: ReadonlySet<string> = new Set([
+    "Arrows Wingshield Blessing",
+    "Sharpened Weapons Blessing",
+]);
 
 const creatureEnumId = (creatureName: string): number =>
     (PBTypes.CreatureVals as unknown as Record<string, number>)[creatureName.toUpperCase().replace(/ /g, "_")] ?? 0;

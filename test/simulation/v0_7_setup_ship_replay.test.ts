@@ -156,7 +156,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Restoring only that creatures.json reproduces the prior digest. Two isolated runs reproduce this
 // digest with zero rejected actions in all eight fights.
 // Previous digest: 84304ae47731629d3ee488944fad7ff0eefb305e40f4a58f09d5af3adbbad846.
-const EXPECTED_REPLAY_SHA256 = "8e856328c77432416e1e39f2257b0c544f9290bae9d143428d57cde36912d228";
+// Re-pinned 2026-10-23: Crusader's Sharpened Weapons now blesses the whole army instead of a local aura.
+// Two isolated runs match with zero rejected actions; the committed engine reproduces the previous digest.
+// Previous digest: 8e856328c77432416e1e39f2257b0c544f9290bae9d143428d57cde36912d228.
+const EXPECTED_REPLAY_SHA256 = "6a4b3e3de96be982e1ac7fa11e65b5b2557b0783c61efc0ade946d682552d03b";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

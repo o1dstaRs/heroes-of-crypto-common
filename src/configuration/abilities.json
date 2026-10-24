@@ -406,16 +406,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Sharpened Weapons Aura": {
-        "name": "Sharpened Weapons Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Affected melee allies have +{}% base attack power"],
+    "Sharpened Weapons Blessing": {
+        "name": "Sharpened Weapons Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allied melee and magic units on the battlefield gain +{}% base attack power.",
+            "Does not stack with other Sharpened Weapons Blessings."
+        ],
         "power": 18,
         "power_type": "ADDITIONAL_MELEE_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,
-        "aura_effect": "Sharpened Weapons",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Range Null Field Aura": {

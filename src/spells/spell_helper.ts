@@ -668,7 +668,10 @@ export function firstSummonableAnchor(
  * the spell from the whole spellbook (RenderableUnit could not build the card without it) — which is how
  * Wandering Mage shipped with an empty book. One icon is all a new spell needs.
  */
-export const spellToTextureName = (spellName: string): string => `${spellName.toLowerCase().replace(/ /g, "_")}_256`;
+export const spellToTextureName = (spellName: string): string =>
+    spellName === "Sharpened Weapons Blessing"
+        ? "sharpened_weapons_aura_256"
+        : `${spellName.toLowerCase().replace(/ /g, "_")}_256`;
 
 /**
  * Shared caster gate used by the engine and AI before target-specific spell legality: a Broken unit can't cast

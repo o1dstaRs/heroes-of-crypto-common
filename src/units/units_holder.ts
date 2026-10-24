@@ -63,6 +63,7 @@ const ARCANE_WARD_BLESSING_BIT = 2;
 const WARDING_MANE_BLESSING_BIT = 4;
 const ARROWS_WINGSHIELD_BLESSING_BIT = 8;
 const RALLYING_VOLLEY_BLESSING_BIT = 16;
+const SHARPENED_WEAPONS_BLESSING_BIT = 32;
 
 /** The board-wide blessings as seen at the start of one stack-power refresh. */
 interface IBlessingCensus {
@@ -71,6 +72,7 @@ interface IBlessingCensus {
     wardingMane: Map<TeamType, number>;
     arrowsWingshield: Map<TeamType, number>;
     rallyingVolley: Map<TeamType, number>;
+    sharpenedWeapons: Map<TeamType, number>;
     /** Per unit, in allUnits order: the blessing bits it carries as a buff object or a display entry. */
     carriers: number[];
     /** Every blessing bit carried by any unit. */
@@ -89,6 +91,8 @@ function blessingBit(name: string): number {
             return ARROWS_WINGSHIELD_BLESSING_BIT;
         case "Rallying Volley Blessing":
             return RALLYING_VOLLEY_BLESSING_BIT;
+        case "Sharpened Weapons Blessing":
+            return SHARPENED_WEAPONS_BLESSING_BIT;
         default:
             return 0;
     }
@@ -97,6 +101,15 @@ function blessingBit(name: string): number {
 /** A shot top-up. Native shooters qualify even with an empty quiver; a stolen Endless Quiver does too. */
 function canReceiveRallyingVolley(unit: Unit): boolean {
     return unit.isRangeCapable() || unit.hasAbilityActive("Endless Quiver");
+}
+
+function canReceiveSharpenedWeapons(unit: Unit): boolean {
+    const attackType = unit.getAttackType();
+    return (
+        attackType === PBTypes.AttackVals.MELEE ||
+        attackType === PBTypes.AttackVals.MAGIC ||
+        attackType === PBTypes.AttackVals.MELEE_MAGIC
+    );
 }
 
 function hasPositivePower(powerPerTeam: ReadonlyMap<TeamType, number>): boolean {
@@ -1037,6 +1050,7 @@ export class UnitsHolder {
             wardingMane: new Map(),
             arrowsWingshield: new Map(),
             rallyingVolley: new Map(),
+            sharpenedWeapons: new Map(),
             carriers: [],
             carried: 0,
         };
@@ -1057,6 +1071,18 @@ export class UnitsHolder {
             }
 
             const team = unit.getTeam();
+            if (unit.getAbility("Sharpened Weapons Blessing")) {
+                const synergyPower = FightStateManager.getInstance()
+                    .getFightProperties()
+                    .getAdditionalAbilityPowerPerTeam(team);
+                census.sharpenedWeapons.set(
+                    team,
+                    Math.max(
+                        census.sharpenedWeapons.get(team) ?? Number.NEGATIVE_INFINITY,
+                        unit.calculateSharpenedWeaponsBlessingPower(synergyPower),
+                    ),
+                );
+            }
             const angelicHostAbility = unit.getAbility("Angelic Host Blessing");
             if (angelicHostAbility) {
                 census.angelicHost.set(
@@ -1142,6 +1168,7 @@ export class UnitsHolder {
     /**
      * Strip `blessingName` from its carriers, then grant every living on-board unit its team's strongest power.
      * `eligible`, when set, also skips units the blessing cannot help; those units are still stripped.
+     * `allowNonPositivePower` preserves Sharpened Weapons' attack reduction under a weak source's negative luck.
      */
     private reapplyTeamBlessing(
         census: IBlessingCensus,
@@ -1149,8 +1176,10 @@ export class UnitsHolder {
         bit: number,
         blessingName: string,
         eligible?: (unit: Unit) => boolean,
+        allowNonPositivePower = false,
     ): void {
-        if (!(census.carried & bit) && !hasPositivePower(powerPerTeam)) {
+        const hasPower = allowNonPositivePower ? powerPerTeam.size > 0 : hasPositivePower(powerPerTeam);
+        if (!(census.carried & bit) && !hasPower) {
             return;
         }
 
@@ -1160,9 +1189,10 @@ export class UnitsHolder {
                 unit.deleteBuff(blessingName);
             }
 
-            const power = powerPerTeam.get(unit.getTeam()) ?? 0;
+            const power = powerPerTeam.get(unit.getTeam());
             if (
-                power <= 0 ||
+                power === undefined ||
+                (!allowNonPositivePower && power <= 0) ||
                 unit.isDead() ||
                 !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
                 (eligible && !eligible(unit))
@@ -1259,6 +1289,14 @@ export class UnitsHolder {
         this.refreshArcaneWardBlessingForAllUnits(blessingCensus);
         this.refreshWardingManeBlessingForAllUnits(blessingCensus);
         this.refreshArrowsWingshieldBlessingForAllUnits(blessingCensus);
+        this.reapplyTeamBlessing(
+            blessingCensus,
+            blessingCensus.sharpenedWeapons,
+            SHARPENED_WEAPONS_BLESSING_BIT,
+            "Sharpened Weapons Blessing",
+            canReceiveSharpenedWeapons,
+            true,
+        );
         this.reapplyTeamBlessing(
             blessingCensus,
             blessingCensus.rallyingVolley,

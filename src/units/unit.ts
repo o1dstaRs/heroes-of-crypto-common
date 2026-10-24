@@ -345,6 +345,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // `abilities` leaked onto every same-type unit (e.g. Craft's Crafted Frozen Bow on ALL Elves).
         this.unitProperties = structuredClone(unitProperties);
         this.normalizeLegacyRallyingVolley();
+        this.normalizeLegacySharpenedWeapons();
         this.stripRetiredLeatherArmor();
         this.initialUnitProperties = structuredClone(this.unitProperties);
         this.gridSettings = gridSettings;
@@ -421,6 +422,46 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 `Rallying Volley Blessing grants +${power} ranged shots once, anywhere on the battlefield.;;`;
         }
         properties.rallying_volley_granted ??= Math.max(0, Math.floor(legacyGrant));
+    }
+    /** Saved Crusaders keep their card, but no longer project a local attack aura. */
+    private normalizeLegacySharpenedWeapons(): void {
+        const properties = this.unitProperties;
+        const oldName = "Sharpened Weapons Aura";
+        const blessingName = "Sharpened Weapons Blessing";
+        if (
+            !properties.abilities.includes(oldName) &&
+            !properties.applied_buffs.includes(oldName) &&
+            !properties.aura_effects.includes("Sharpened Weapons") &&
+            !properties.stolen_abilities?.includes(oldName) &&
+            !properties.artifact_granted_abilities?.includes(oldName)
+        ) {
+            return;
+        }
+        const config = getAbilityConfig(blessingName);
+        for (let i = 0; i < properties.abilities.length; i++) {
+            if (properties.abilities[i] !== oldName) continue;
+            properties.abilities[i] = blessingName;
+            properties.abilities_descriptions[i] = config.desc.join("\n").replace(/\{\}/g, config.power.toString());
+            properties.abilities_stack_powered[i] = true;
+            properties.abilities_auras[i] = false;
+            properties.aura_ranges[i] = 0;
+            properties.aura_is_buff[i] = true;
+        }
+        properties.aura_effects = properties.aura_effects.filter((name) => name !== "Sharpened Weapons");
+        properties.stolen_abilities = (properties.stolen_abilities ?? []).map((name) =>
+            name === oldName ? blessingName : name,
+        );
+        properties.artifact_granted_abilities = properties.artifact_granted_abilities?.map((name) =>
+            name === oldName ? blessingName : name,
+        );
+        for (let i = 0; i < properties.applied_buffs.length; i++) {
+            if (properties.applied_buffs[i] !== oldName) continue;
+            const power = properties.applied_buffs_powers[i] ?? 0;
+            properties.applied_buffs[i] = blessingName;
+            properties.applied_buffs_laps[i] = NUMBER_OF_LAPS_TOTAL;
+            properties.applied_buffs_descriptions[i] =
+                `Sharpened Weapons Blessing grants +${power}% base attack power anywhere on the battlefield.;;`;
+        }
     }
     /** Drop the retired card so an old Arbalester snapshot still constructs. */
     private stripRetiredLeatherArmor(): void {
@@ -565,6 +606,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // hasAbilityActive / processDeepWoundsAbility all see it.
     public grantAbility(abilityName: string, options: { restoreStolen?: boolean; spellEntries?: string[] } = {}): void {
         if (abilityName === "Rallying Volley Aura") abilityName = "Rallying Volley Blessing";
+        if (abilityName === "Sharpened Weapons Aura") abilityName = "Sharpened Weapons Blessing";
         if (this.abilities.some((ability) => ability.getName() === abilityName)) {
             return;
         }
@@ -812,6 +854,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     .join("\n")
                     .replace(/\{\}/g, Number(this.calculateAuraPower(projectedAura, 0).toFixed(2)).toString());
             }
+        }
+        if (ability.getName() === "Sharpened Weapons Blessing") {
+            return ability
+                .getDesc()
+                .join("\n")
+                .replace(/\{\}/g, this.calculateSharpenedWeaponsBlessingPower().toString());
         }
         if (ability.getName() === "Warding Mane Blessing") {
             return ability.getDesc().join("\n").replace(/\{\}/g, this.calculateWardingManeBlessingPower().toString());
@@ -2385,6 +2433,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         return Number((calculatedCoeff * 100).toFixed(2)) - 100;
+    }
+    /** Preserve the Crusader aura's stack, luck, Might synergy and Made of Fire scaling. */
+    public calculateSharpenedWeaponsBlessingPower(synergyAbilityPowerIncrease = 0): number {
+        const ability = this.getAbility("Sharpened Weapons Blessing");
+        if (!ability) {
+            return 0;
+        }
+        const madeOfFire = this.getBuff("Made of Fire");
+        return Number(
+            (
+                (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                this.getLuck() +
+                synergyAbilityPowerIncrease +
+                (madeOfFire ? (ability.getPower() * madeOfFire.getPower()) / 100 : 0)
+            ).toFixed(2),
+        );
     }
     /** Flat board-wide Squire projection: base power plus the source's luck, never stack/team scaled. */
     public calculateArcaneWardBlessingPower(): number {
@@ -4238,7 +4302,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         // Veteran Helm grants NO attack — it is a DEFENSE-ONLY artifact (armor_mod block above).
         // Warlord's Edge: +% attack as an ADDITIONAL stat (attack_mod), not folded into base_attack — so it never
-        // compounds with the Sharpened Weapons aura multiplier and isn't amplified by base_attack-derived effects
+        // compounds with the Sharpened Weapons blessing multiplier and isn't amplified by base_attack-derived effects
         // (Riot/Weakness). The power holds the ranged percentage; the second property holds the melee percentage.
         // A legacy single-value buff retains its original percentage for both modes.
         const warlordsEdgeBuff = statBuffs.get("Warlords Edge");
@@ -4268,10 +4332,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         let baseAttackMultiplier = 1;
-        const sharpenedWeaponsAura = this.getAppliedAuraEffect("Sharpened Weapons Aura");
+        const sharpenedWeaponsBlessing = statBuffs.get("Sharpened Weapons Blessing");
 
-        if (sharpenedWeaponsAura) {
-            baseAttackMultiplier = baseAttackMultiplier * (1 + sharpenedWeaponsAura.getPower() / 100);
+        if (sharpenedWeaponsBlessing) {
+            baseAttackMultiplier = baseAttackMultiplier * (1 + sharpenedWeaponsBlessing.getPower() / 100);
         }
 
         // Blessing / Battle Roar force every roll to the maximum. Honour the applied_buffs DISPLAY list
@@ -4653,6 +4717,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         let hasDoubleShot = false;
         let hasMaulAoe = false;
         let hasBorrowedGrace = false;
+        let hasSharpenedWeapons = false;
         for (const abilityName of this.unitProperties.abilities) {
             switch (abilityName) {
                 case BLIND_FURY_ABILITY_NAME:
@@ -4672,6 +4737,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     break;
                 case BORROWED_GRACE_NAME:
                     hasBorrowedGrace = true;
+                    break;
+                case "Sharpened Weapons Blessing":
+                    hasSharpenedWeapons = true;
                     break;
                 default:
                     if (DOUBLE_SHOT_ABILITY_NAMES.includes(abilityName)) {
@@ -4719,6 +4787,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     .replace(
                         /\{\}/g,
                         Number(borrowedGraceChance(this, _synergyAbilityPowerIncrease).toFixed(2)).toString(),
+                    );
+            }
+        }
+        if (hasSharpenedWeapons) {
+            const ability = this.getAbility("Sharpened Weapons Blessing");
+            if (ability) {
+                const index = this.unitProperties.abilities.indexOf(ability.getName());
+                this.unitProperties.abilities_descriptions[index] = ability
+                    .getDesc()
+                    .join("\n")
+                    .replace(
+                        /\{\}/g,
+                        this.calculateSharpenedWeaponsBlessingPower(_synergyAbilityPowerIncrease).toString(),
                     );
             }
         }

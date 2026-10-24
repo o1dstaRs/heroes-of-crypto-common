@@ -481,13 +481,13 @@ describe("UnitsHolder", () => {
         const weakAuraSource = createTestUnit({
             name: "Weak Aura",
             team: PBTypes.TeamVals.LEFT,
-            auraEffects: ["Sharpened Weapons"],
+            auraEffects: ["Absorb Penalties"],
             stackPower: 1,
         });
         const strongAuraSource = createTestUnit({
             name: "Strong Aura",
             team: PBTypes.TeamVals.LEFT,
-            auraEffects: ["Sharpened Weapons", "Range Null Field"],
+            auraEffects: ["Absorb Penalties", "Range Null Field"],
             stackPower: 10,
         });
         const meleeAlly = createTestUnit({
@@ -515,8 +515,8 @@ describe("UnitsHolder", () => {
 
         unitsHolder.refreshAuraEffectsForAllUnits();
 
-        expect(meleeAlly.hasBuffActive("Sharpened Weapons Aura")).toBe(true);
-        expect(meleeAlly.getBuff("Sharpened Weapons Aura")?.getPower()).toBe(18);
+        expect(meleeAlly.hasBuffActive("Absorb Penalties Aura")).toBe(true);
+        expect(meleeAlly.getBuff("Absorb Penalties Aura")?.getPower()).toBe(50);
         expect(rangedEnemy.hasDebuffActive("Range Null Field Aura")).toBe(true);
         expect(meleeEnemy.hasDebuffActive("Range Null Field Aura")).toBe(false);
     });
