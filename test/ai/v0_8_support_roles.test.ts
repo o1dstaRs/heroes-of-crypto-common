@@ -123,6 +123,7 @@ describe("v0.8 Wandering Mage anti-ranged role", () => {
             team: RIGHT,
             name: "Enemy ranger",
             attackType: RANGE,
+            maxHp: 100,
             rangeShots: 4,
             damageMax: 10,
             amountAlive: 10,
