@@ -63,6 +63,7 @@ import { decisionFireWalls } from "./decision_fight_state";
 import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 import { estimateShieldedRangedDamage } from "./ranged_shield_estimate";
+import { estimateRangedShieldSequence, type IShieldSequenceImpact } from "./ranged_shield_sequence";
 import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
 import { estimateLightningSpinPotential } from "./lightning_spin_tactics";
 import { lastFuseCounterTradePotential } from "./last_fuse_tactics";
@@ -314,6 +315,7 @@ function evaluatePreparedRangeCandidateDamage(
     aimTargetId: string | undefined,
     prepared: IPreparedRangeCandidateDamage,
     stationary: boolean,
+    researchShieldSequence = false,
 ): IRangeCandidateDamage {
     const onlyTarget =
         evaluation.affectedUnits.length === 1 && evaluation.affectedUnits[0]?.length === 1
@@ -341,6 +343,8 @@ function evaluatePreparedRangeCandidateDamage(
     let primaryTargetDamage = 0;
     let aimTargetDamage = 0;
     const counted = new Set<string>();
+    const shieldImpacts: IShieldSequenceImpact[] = [];
+    let shieldSupported = true;
     const fightProperties = context.fightProperties;
     // The action spends arrows against its first impact, not independently against every splash victim.
     // Through Shot spends one arrow for the whole line; its native follow-up does not spend another.
@@ -424,6 +428,20 @@ function evaluatePreparedRangeCandidateDamage(
             const hitChance =
                 1 - Math.min(100, Math.max(0, unit.calculateMissChance(target, defenderAbilityPower))) / 100;
             const missChance = 1 - hitChance;
+            if (researchShieldSequence) {
+                shieldImpacts.push({
+                    unit: target,
+                    hp,
+                    hitChance,
+                    firstDamage: firstConditionalDamage,
+                    secondDamage: secondConditionalDamage,
+                });
+                shieldSupported &&=
+                    (firstMin > 0 || firstMax <= 0) &&
+                    (!secondVolleyMultiplier || secondMin > 0 || secondMax <= 0) &&
+                    !target.hasBuffActive("Flesh Shield Aura") &&
+                    !target.hasAbilityActive("Flesh Shield Aura");
+            }
             let effective =
                 secondVolleyMultiplier > 0
                     ? hitChance * missChance * Math.min(firstConditionalDamage, hp) +
@@ -512,6 +530,40 @@ function evaluatePreparedRangeCandidateDamage(
                 value -= effective;
                 friendlyFireDamage += effective;
             }
+        }
+    }
+    if (
+        researchShieldSequence &&
+        shieldSupported &&
+        !unit.hasAbilityActive("Chakram") &&
+        shieldImpacts.some(({ unit: target }) => target.hasStatusBuffApplied("Ember Covenant Blessing"))
+    ) {
+        const projected = estimateRangedShieldSequence(unit, shieldImpacts, ammunitionTarget, {
+            nativeSecondVolley: prepared.secondVolleyMultiplier > 0,
+            echoChance: prepared.bonusVolleyChance,
+            spendsOnHitOnly: prepared.shotCostOnHitOnly,
+            throughShot: prepared.isThroughShot,
+        });
+        value = 0;
+        enemyDamage = 0;
+        friendlyFireDamage = 0;
+        primaryTargetDamage = 0;
+        aimTargetDamage = 0;
+        kill = 0;
+        for (const impact of shieldImpacts) {
+            const damage = projected.get(impact.unit.getId()) ?? 0;
+            if (impact.unit.getTeam() === prepared.enemyTeam) {
+                enemyDamage += damage;
+                value += damage;
+            } else {
+                friendlyFireDamage += damage;
+                value -= damage;
+            }
+            if (impact.unit.getId() === primaryTargetId) {
+                primaryTargetDamage = damage;
+                if (impact.unit.getTeam() === prepared.enemyTeam && damage >= impact.hp) kill = 1;
+            }
+            if (impact.unit.getId() === aimTargetId) aimTargetDamage = damage;
         }
     }
     return { value, kill, enemyDamage, friendlyFireDamage, primaryTargetDamage, aimTargetDamage };
@@ -828,6 +880,8 @@ export interface IEnumerateOptions {
     includeLastFusePrimaryTrades?: boolean;
     /** Rank radial melee stands by the whole impact, rather than the declared primary target. */
     includeLightningSpinCoverage?: boolean;
+    /** Research only: preserve shared and personal shield layers across ranged impacts. */
+    researchRangedShieldSequence?: boolean;
     /** Cap on move destinations, kept nearest-to-enemy first (0/undefined = all reachable). */
     maxMoveDestinations?: number;
     /**
@@ -2237,6 +2291,7 @@ class CandidateGenerator {
             aimTargetId,
             this.preparedRangeDamage.value,
             attackerAmountAlive === undefined,
+            this.options.researchRangedShieldSequence,
         );
     }
     /** Target-local signals already used by v0.5's shot scorer, exposed without changing that scorer. */

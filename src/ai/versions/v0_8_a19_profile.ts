@@ -114,7 +114,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "851c04ca64883575b7e6a3d2747fb9938d8f42ec421a509bfa2b8227dc4423af" as const;
+    "4e2492aea2a7ad178298ea7dd41cf5d4221e4b981502588b3bd95ae1b00bb622" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -147,7 +147,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for whole-impact Hydra catalogs in both production enumeration paths.
-        sha256: "3a7c78692eafb952a69a559895d9d71696ea36124df59fd02c915eca56388425" as const,
+        sha256: "e8fdd4c1bd8082377cb496503257f1fb3cd90e3657a3e333a77362cc30ec10b3" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
@@ -162,7 +162,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        sha256: "c7087e83b89170255074a603ad4be74463d0087b69db8a7332e2bac38488b0e6" as const,
+        sha256: "25c20b7fc9192150e928885120d484de6e4936e3ba87445f084cbf8bc5b52615" as const,
     }),
     Object.freeze({
         role: "last-fuse-estimates" as const,
@@ -238,7 +238,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
         // Re-pinned for an explicit research deployment intervention; absent hook preserves routing.
-        sha256: "1b8b5374e2d3bf73258e0be37a7921c47d05796276502a066b4c607412680a6e" as const,
+        sha256: "60b69ddd9f487c477562ebe6f3a19d1a32067a96a2de368e2024f060f012fe55" as const,
     }),
 ] as const);
 
@@ -270,6 +270,8 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         SEARCH_DECISION_DEADLINE_MS: String(V08_A19_SEARCH.decisionDeadlineMs),
         SEARCH_CIRCUIT_BREAKER_MS: String(V08_A19_SEARCH.circuitBreakerMs),
         ...V08_A19_SEARCH_RULES,
+        // Research candidates require an explicit seat-scoped JSON override; never inherit a shell gate.
+        SEARCH_RESEARCH_RANGED_SHIELD_SEQUENCE: "0",
         // Only the explicit JSON research override may enable this unqualified candidate.
         SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
         // Selection-aware tail bounds are an offline, measured research arm. Production stays sealed off.

@@ -316,6 +316,8 @@ export interface IMatchConfig {
      * env being set.
      */
     searchEnvOverrideTeams?: readonly TeamType[];
+    /** Research only: freeze the current server's base A19 environment for BOTH experimental seats. */
+    researchA19BaseSearchEnvironment?: Readonly<Record<string, string>>;
     /**
      * Research: narrows `searchEnvOverrideTeams` to the units this returns true for; that team's other units
      * keep the stock driver. Omitted routes every unit of a listed team, as before.
@@ -1012,6 +1014,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     if (withheldSearchEnvOverrides !== undefined) {
         delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
     }
+    const stockA19Search = () =>
+        config.researchA19BaseSearchEnvironment
+            ? withScopedAIEnvironment(
+                  { V08_A19_SEARCH_ENV_OVERRIDES: JSON.stringify(config.researchA19BaseSearchEnvironment) },
+                  () => createV08A19SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver),
+              )
+            : createV08A19SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver);
     const search = config.searchScoredDecisionObserver
         ? new SearchDriver(
               driverDeps,
@@ -1022,7 +1031,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         : a13Rollback
           ? createV08A13SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver)
           : shouldUseDefaultV08A19Search(searchMatch)
-            ? createV08A19SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver)
+            ? stockA19Search()
             : new SearchDriver(driverDeps, searchMatch, undefined, config.searchPassiveProductiveProbeObserver);
     if (withheldSearchEnvOverrides !== undefined) {
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = withheldSearchEnvOverrides;
