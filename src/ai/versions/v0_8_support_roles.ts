@@ -10,7 +10,7 @@
  */
 
 import type { GameAction } from "../../engine/actions";
-import { getSpellMoraleMultiplier } from "../../spells/spell_damage";
+import { getSpellMoraleMultiplier, isOffensiveSpellMultiplier } from "../../spells/spell_damage";
 import type { Unit } from "../../units/unit";
 import type { IDecisionContext } from "../ai_strategy";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../candidates";
@@ -67,9 +67,16 @@ const incumbentGuaranteedKill = (
     candidates: readonly IEnumeratedCandidate[],
 ): boolean => {
     const incumbent = candidates[0];
+    const damageSpell = unit
+        .getSpells()
+        .some(
+            (spell) =>
+                spell.getName() === incumbent?.spellName && isOffensiveSpellMultiplier(spell.getMultiplierType()),
+        );
     const target = incumbent?.targetId ? context.unitsHolder.getAllUnits().get(incumbent.targetId) : undefined;
     const targetCanAbsorbPrimary =
         !!target &&
+        !damageSpell &&
         ((target.hasBuffActive("Water Shield") && !unit.hasAbilityActive("Fire Element")) ||
             target.hasBuffActive("Flesh Shield Aura"));
     const melee = incumbent?.actions.some((action) => action.type === "melee_attack") === true;
@@ -82,7 +89,7 @@ const incumbentGuaranteedKill = (
                 unit.getMagicResist() < 100));
     return (
         !!incumbent &&
-        isV08DirectCombatDecision(incumbent.actions) &&
+        (isV08DirectCombatDecision(incumbent.actions) || damageSpell) &&
         incumbent.features.expectedKill === 1 &&
         incumbent.features.expectedDamage > 0 &&
         !targetCanAbsorbPrimary &&
