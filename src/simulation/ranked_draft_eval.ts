@@ -537,6 +537,8 @@ interface INormalizedOptions {
 
 interface IRankedDraftGameDependencies {
     matchRunner: (config: IMatchConfig) => IMatchResult;
+    /** Offline research only; called for the candidate at the real, public Tier-2 decision. */
+    researchCandidateTier2Choice?: ResearchRankedTier2Choice;
 }
 
 const DEFAULT_DEPENDENCIES: IRankedDraftGameDependencies = { matchRunner: runMatch };
@@ -937,7 +939,16 @@ export interface IRankedDraftPickRules {
     onTier2Decision?: (decision: IRankedDraftTier2Decision) => void;
     /** Research only. Preferences see the same legal choices as the corresponding public draft seat. */
     researchPreferredCreatureByTeam?: Readonly<Partial<Record<PickTeam, number>>>;
+    /** Offline research only. Each callback receives that seat's public pick-time information. */
+    researchTier2ChoiceByTeam?: Readonly<Partial<Record<PickTeam, ResearchRankedTier2Choice>>>;
 }
+
+export type ResearchRankedTier2Choice = (
+    offered: readonly number[],
+    ownCreatureIds: readonly number[],
+    context: Readonly<ITier2ArtifactDecisionContext>,
+    policyChosen: number,
+) => number;
 
 export interface IRankedDraftTier2Decision {
     team: PickTeam;
@@ -945,6 +956,8 @@ export interface IRankedDraftTier2Decision {
     ownCreatureIds: number[];
     context: Readonly<ITier2ArtifactDecisionContext>;
     chosen: number;
+    /** Only with an explicit research choice: the unmodified setup policy's decision. */
+    policyChosen?: number;
 }
 
 /** Tier-1 bundle score for a seat: the composition-corrected table when that genome's policy opts in. */
@@ -962,6 +975,11 @@ export function resolveRankedDraftPick(
     setupPolicySpecs: IRankedDraftSetupPolicySpecs = {},
     rules: IRankedDraftPickRules = {},
 ): IPickSimState {
+    for (const [team, choice] of Object.entries(rules.researchTier2ChoiceByTeam ?? {})) {
+        if (!rules.liveDraftRules || ![LEFT, RIGHT].includes(Number(team)) || typeof choice !== "function") {
+            throw new RangeError("Research Tier-2 choices require legal teams and live draft rules");
+        }
+    }
     for (const [team, id] of Object.entries(rules.researchPreferredCreatureByTeam ?? {})) {
         if (
             !rules.liveDraftRules ||
@@ -1106,13 +1124,26 @@ export function resolveRankedDraftPick(
                     ownDoctrine: own.doctrine,
                     ownArtifactIds: own.tier1Artifact === undefined ? [] : [own.tier1Artifact],
                 });
-                const chosen = policy.pickArtifactT2(own.tier2Offers, own.creatures, context);
+                const policyChosen = policy.pickArtifactT2(own.tier2Offers, own.creatures, context);
+                const researchChoice = rules.researchTier2ChoiceByTeam?.[team];
+                const chosen = researchChoice
+                    ? researchChoice(
+                          Object.freeze([...own.tier2Offers]),
+                          Object.freeze([...own.creatures]),
+                          context,
+                          policyChosen,
+                      )
+                    : policyChosen;
+                if (researchChoice && (!Number.isSafeInteger(chosen) || !own.tier2Offers.includes(chosen))) {
+                    throw new RangeError("Research Tier-2 choice must be one of that seat's live offers");
+                }
                 rules.onTier2Decision?.({
                     team,
                     offered: [...own.tier2Offers],
                     ownCreatureIds: [...own.creatures],
                     context,
                     chosen,
+                    ...(researchChoice ? { policyChosen } : {}),
                 });
                 return chosen;
             };
@@ -1360,6 +1391,12 @@ export function playRankedDraftGame(
         throw new RangeError("opponentIndex and seedLaneIndex must be non-negative integers");
     }
     const options = normalizeOptions(optionsInput, seedLaneIndex + 1);
+    if (
+        dependencies.researchCandidateTier2Choice !== undefined &&
+        (!options.liveDraftRules || typeof dependencies.researchCandidateTier2Choice !== "function")
+    ) {
+        throw new RangeError("Research Tier-2 choice requires a callback and live draft rules");
+    }
     if (!Number.isInteger(game) || game < 0 || game >= options.gamesPerOpponent) {
         throw new RangeError(`game must be in [0, ${options.gamesPerOpponent})`);
     }
@@ -1394,6 +1431,13 @@ export function playRankedDraftGame(
         },
         {
             ...rankedDraftPickRules(options, gridType, synergyVariants),
+            ...(dependencies.researchCandidateTier2Choice
+                ? {
+                      researchTier2ChoiceByTeam: {
+                          [candidatePickedLeft ? LEFT : RIGHT]: dependencies.researchCandidateTier2Choice,
+                      },
+                  }
+                : {}),
             ...(options.researchCandidatePreferredCreature === undefined
                 ? {}
                 : {
