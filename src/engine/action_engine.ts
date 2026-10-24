@@ -2043,7 +2043,16 @@ export class GameActionEngine {
                 targetId: victim.getId(),
                 targetCell: impact.cell,
                 unitIdsDied,
-                animations: [],
+                animations:
+                    impact.fromPosition && impact.toPosition
+                        ? [
+                              {
+                                  fromPosition: impact.fromPosition,
+                                  toPosition: impact.toPosition,
+                                  affectedUnitId: victim.getId(),
+                              },
+                          ]
+                        : [],
                 damaged,
             },
         ];
@@ -2461,7 +2470,16 @@ export class GameActionEngine {
                 targetId: epicentre.getId(),
                 targetCell: impact.cell,
                 unitIdsDied,
-                animations: [],
+                animations:
+                    impact.fromPosition && impact.toPosition
+                        ? [
+                              {
+                                  fromPosition: impact.fromPosition,
+                                  toPosition: impact.toPosition,
+                                  affectedUnitId: epicentre.getId(),
+                              },
+                          ]
+                        : [],
                 damaged,
             },
         ];

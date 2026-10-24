@@ -11,7 +11,15 @@
 
 import { getCreatureFootprint } from "../configuration/config_provider";
 import { ToFactionName } from "../factions/faction_type";
-import { getFootprintCellsForAnchor, isCellWithinGrid } from "../grid/grid_math";
+import {
+    getFootprintCellsForAnchor,
+    getPositionForCells,
+    getRangeAttackSideCenter,
+    isCellWithinGrid,
+    type IClosestSideCenter,
+    RangeAttackCellSide,
+} from "../grid/grid_math";
+import { traceGridRayCells } from "../grid/ray_traversal";
 import { GridSettings } from "../grid/grid_settings";
 import { MAGIC_REFLECTION_ABILITY_NAME, magicReflectionPercent } from "../abilities/magic_reflection_ability";
 import { Unit } from "../units/unit";
@@ -186,6 +194,108 @@ export function canMassCastSpell(
 /** Minimal grid surface the line-of-sight walk needs, mirroring ISmokeGrid for the same reason. */
 export interface ISpellSightGrid {
     getOccupantUnitId(cell: XY): string | undefined;
+    getSettings?(): GridSettings;
+}
+
+function spellEndpointCells(grid: ISpellSightGrid, base: XY, isWithinGrid: (cell: XY) => boolean): XY[] {
+    const id = grid.getOccupantUnitId(base);
+    if (!id || ["B", "H", "L", "W"].includes(id)) return [base];
+    const result = [{ ...base }];
+    const seen = new Set([`${base.x}:${base.y}`]);
+    for (let i = 0; i < result.length; i++) {
+        for (const offset of THROWN_SPELL_SIDE_OFFSETS) {
+            const cell = { x: result[i].x + offset.x, y: result[i].y + offset.y };
+            const key = `${cell.x}:${cell.y}`;
+            if (seen.has(key) || !isWithinGrid(cell) || grid.getOccupantUnitId(cell) !== id) continue;
+            seen.add(key);
+            result.push(cell);
+        }
+    }
+    return result;
+}
+
+interface InterceptedThrowTrajectory {
+    aim: IClosestSideCenter;
+    fromPosition: XY;
+    blocker?: ISpellSightBlocker;
+    impactPosition: XY;
+}
+
+/** Fire Strike and Fireball use the same visible edge and pixel ray on every calling surface. */
+function interceptedThrowTrajectory(
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    from: XY,
+    to: XY,
+    isTransparentUnit?: (unitId: string) => boolean,
+): InterceptedThrowTrajectory | undefined {
+    const settings = grid.getSettings?.();
+    if (!settings || typeof settings.getStep !== "function") return undefined;
+    const casterId = grid.getOccupantUnitId(from);
+    const targetId = grid.getOccupantUnitId(to);
+    const fromPosition = getPositionForCells(settings, spellEndpointCells(grid, from, isWithinGrid));
+    if (!fromPosition) return undefined;
+    const candidates: Array<InterceptedThrowTrajectory & { distance: number; obstruction: number }> = [];
+    // The ranged rasterizer retains a centred-X coordinate convention. Normalize grids with a different
+    // origin for the trace, then restore the contact point to the caller's world coordinates.
+    const traceOffsetX = settings.getMinX() + settings.getMaxX();
+    for (const cell of spellEndpointCells(grid, to, isWithinGrid)) {
+        for (let side = 0; side < THROWN_SPELL_SIDE_OFFSETS.length; side++) {
+            if (
+                !isThrownSpellSideObservable(
+                    grid,
+                    isWithinGrid,
+                    cell,
+                    THROWN_SPELL_SIDE_OFFSETS[side],
+                    isTransparentUnit,
+                )
+            )
+                continue;
+            const position = getRangeAttackSideCenter(settings, cell, side as RangeAttackCellSide, fromPosition);
+            let blocker: ISpellSightBlocker | undefined;
+            let impactPosition = position;
+            for (const [crossed, contact] of traceGridRayCells(
+                settings,
+                { x: fromPosition.x - traceOffsetX, y: fromPosition.y },
+                { x: position.x - traceOffsetX, y: position.y },
+            )) {
+                const occupantId = grid.getOccupantUnitId(crossed);
+                if (occupantId && occupantId === targetId) break;
+                if (
+                    !occupantId ||
+                    occupantId === casterId ||
+                    occupantId === "L" ||
+                    occupantId === "W" ||
+                    (!["B", "H"].includes(occupantId) && isTransparentUnit?.(occupantId))
+                )
+                    continue;
+                blocker = { cell: crossed, occupantId };
+                impactPosition = { x: contact.x + traceOffsetX, y: contact.y };
+                break;
+            }
+            const obstruction = !blocker ? 0 : ["B", "H"].includes(blocker.occupantId) ? 2 : 1;
+            candidates.push({
+                aim: { cell: { ...cell }, side: side as RangeAttackCellSide, position },
+                fromPosition,
+                blocker,
+                impactPosition,
+                obstruction,
+                distance: Math.hypot(position.x - fromPosition.x, position.y - fromPosition.y),
+            });
+        }
+    }
+    candidates.sort((a, b) => a.obstruction - b.obstruction || a.distance - b.distance);
+    return candidates[0];
+}
+
+export function interceptedThrownSpellAim(
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    from: XY,
+    to: XY,
+    isTransparentUnit?: (unitId: string) => boolean,
+): IClosestSideCenter | undefined {
+    return interceptedThrowTrajectory(grid, isWithinGrid, from, to, isTransparentUnit)?.aim;
 }
 
 /**
@@ -428,6 +538,11 @@ export function firstTargetedSpellSightBlocker(
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return undefined;
     }
+    const settings = grid.getSettings?.();
+    if (isInterceptedThrownSpell(spellName) && settings && typeof settings.getStep === "function") {
+        const trajectory = interceptedThrowTrajectory(grid, isWithinGrid, from, to, isTransparentUnit);
+        return trajectory ? trajectory.blocker : { cell: to, occupantId: "B" };
+    }
     return firstSpellSightBlocker(
         grid,
         isWithinGrid,
@@ -477,6 +592,9 @@ export interface IThrownSpellImpact {
     interceptedBy?: string;
     /** Terrain stopped it outright — the mountain or a narrowed hole, so nothing is hit. */
     blockedByTerrain: boolean;
+    /** Exact accepted flight; recorded on spell events so playback does not choose another ray. */
+    fromPosition?: XY;
+    toPosition?: XY;
 }
 
 /**
@@ -495,6 +613,19 @@ export function resolveThrownSpellImpact(
     to: XY,
     isTransparentUnit?: (unitId: string) => boolean,
 ): IThrownSpellImpact {
+    const settings = grid.getSettings?.();
+    if (isInterceptedThrownSpell(spellName) && settings && typeof settings.getStep === "function") {
+        const trajectory = interceptedThrowTrajectory(grid, isWithinGrid, from, to, isTransparentUnit);
+        if (!trajectory) return { cell: to, blockedByTerrain: true };
+        const blocker = trajectory.blocker;
+        return {
+            cell: blocker?.cell ?? to,
+            blockedByTerrain: blocker?.occupantId === "B" || blocker?.occupantId === "H",
+            ...(blocker && !["B", "H"].includes(blocker.occupantId) ? { interceptedBy: blocker.occupantId } : {}),
+            fromPosition: { ...trajectory.fromPosition },
+            toPosition: { ...trajectory.impactPosition },
+        };
+    }
     const blocker = firstTargetedSpellSightBlocker(spellName, grid, isWithinGrid, from, to, isTransparentUnit);
     if (!blocker) {
         return { cell: to, blockedByTerrain: false };
