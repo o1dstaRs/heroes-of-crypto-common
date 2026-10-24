@@ -287,7 +287,10 @@ describe("v0.8 damage-spell policy", () => {
             placeCombatUnit(combat, mage, { x: 2, y: 7 });
             placeCombatUnit(combat, screen, { x: 2, y: 9 });
             placeCombatUnit(combat, shooter, { x: 13, y: 8 });
-            if (waterShield) shooter.trySeedWaterShield();
+            if (waterShield) {
+                shooter.trySeedWaterShield();
+                expect(shooter.hasBuffActive("Water Shield")).toBe(true);
+            }
             const context = decisionContext(combat);
             const decision = new StrategyV0_8().decideTurn(mage, context);
 
