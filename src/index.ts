@@ -178,8 +178,20 @@ export type {
     ITier2ArtifactDecisionContext,
 } from "./ai/setup/setup_strategy";
 export { creatureIdForName, creatureInfo, scoreCreature } from "./ai/setup/creature_score";
-export { draftFactionContinuations, draftContextAfterCreature } from "./ai/setup/draft_continuations";
-export type { IDraftFactionContinuation } from "./ai/setup/draft_continuations";
+export {
+    draftFactionContinuations,
+    draftContextAfterCreature,
+    draftFutureSlots,
+    draftCreatureContinuation,
+    draftFactionCompletion,
+} from "./ai/setup/draft_continuations";
+export type {
+    IDraftFactionContinuation,
+    IDraftFutureSlot,
+    IDraftCreatureContinuation,
+    IDraftFactionGoal,
+    IDraftFactionCompletion,
+} from "./ai/setup/draft_continuations";
 export {
     applyDraftCoherenceOverlay,
     DRAFT_COHERENCE_WEIGHT,
