@@ -2363,12 +2363,9 @@ export class GameActionEngine {
     /**
      * Fireball (Wandering Mage / Book of Chaos): a thrown fireball that bursts where it lands.
      *
-     * Ring of Fire's opposite number, and deliberately built from the same parts. Both are aimed at one
-     * enemy in line of sight and both catch everything on the cells touching it, friend or foe — but the
-     * ring SPARES the creature at its centre while the fireball is thrown AT it, so the aim point takes the
-     * blast like everyone else (owner call 2026-09-20: "like fire arrow, but with AOE around the target,
-     * like cyclops attack"). That is the whole difference, and it is why the target is in the victim list
-     * here and filtered out there.
+     * A 3x3 blast around the cell the projectile actually strikes, catching friend and foe. A large victim
+     * does not enlarge the blast: hitting a Dragon's upper cell cannot burn creatures beside its lower
+     * cells unless those creatures also occupy the 3x3. Each stack is damaged once, including the target.
      *
      * Everything else is the shared spell tail: each victim resists separately, a Fire Element shrugs the
      * whole thing off and a Water Element takes half again as much, and the damage is magical so armour
@@ -2425,15 +2422,11 @@ export class GameActionEngine {
             );
         }
 
-        // The blast is lifted from the epicentre's own cells, so a 2x2 creature is ringed by the 12 cells
-        // that touch it rather than the 8 around one corner — the same footprint rule Ring of Fire uses,
-        // and the reason a big body is not blasted through its own middle.
-        const cells = getCellsAroundFootprint(settings, epicentre.getCells());
+        const cells = SpellHelper.fireballBlastCells(settings, impact.cell);
         const splashed = (
             evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? []
         ).filter(
-            // The caster is spared: a mage does not blow itself up with its own throw. The epicentre is
-            // not — it owns none of the surrounding cells, so it is absent here and added below by name.
+            // The caster is spared. Add the impact victim separately so a multi-cell body is hit once.
             (unit) => !unit.isDead() && unit.getId() !== caster.getId() && unit.getId() !== epicentre.getId(),
         );
         // The unit it burst on first, so the log and the damage list read epicentre-then-splash.

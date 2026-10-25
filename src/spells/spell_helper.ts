@@ -12,6 +12,7 @@
 import { getCreatureFootprint } from "../configuration/config_provider";
 import { ToFactionName } from "../factions/faction_type";
 import {
+    getCellsAroundCell,
     getFootprintCellsForAnchor,
     getPositionForCells,
     getRangeAttackSideCenter,
@@ -572,6 +573,11 @@ export function cellTargetedSpellBlockCells(spellName: string, origin: XY): XY[]
     return spread.flatMap((dx) => spread.map((dy) => ({ x: origin.x + dx, y: origin.y + dy })));
 }
 
+/** Fireball's blast stays 3x3 around the cell struck, including when the victim occupies several cells. */
+export function fireballBlastCells(gridSettings: GridSettings, impactCell: XY): XY[] {
+    return [{ ...impactCell }, ...getCellsAroundCell(gridSettings, impactCell)];
+}
+
 /**
  * Whether a called-down block aimed at `origin` actually LANDS: the WHOLE footprint has to be on the board.
  *
@@ -619,7 +625,7 @@ export function resolveThrownSpellImpact(
         if (!trajectory) return { cell: to, blockedByTerrain: true };
         const blocker = trajectory.blocker;
         return {
-            cell: blocker?.cell ?? to,
+            cell: blocker?.cell ?? trajectory.aim.cell,
             blockedByTerrain: blocker?.occupantId === "B" || blocker?.occupantId === "H",
             ...(blocker && !["B", "H"].includes(blocker.occupantId) ? { interceptedBy: blocker.occupantId } : {}),
             fromPosition: { ...trajectory.fromPosition },
