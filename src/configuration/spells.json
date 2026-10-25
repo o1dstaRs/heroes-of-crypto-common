@@ -1602,7 +1602,7 @@
             "level": 1,
             "desc": [
                 "Hurls a fireball at an enemy in line of sight, dealing {} damage.",
-                "Everything on a cell touching it — friend or foe — is caught in the blast for the same.",
+                "The struck cell and its eight neighboring cells form a 3x3 blast, hitting friend and foe for the same damage.",
                 "Magical: it ignores armor, but magic resistance cuts it down.",
                 "Fire magic: a Fire Element is untouched, a Water Element burns half again as hard."
             ],

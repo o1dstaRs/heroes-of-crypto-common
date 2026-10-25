@@ -38,6 +38,8 @@ import {
     cellTargetedSpellBlockCells,
     firstSummonableAnchor,
     canMassCastSpell,
+    fireballBlastCells,
+    resolveThrownSpellImpact,
     thrownSpellReachesAimedTarget,
     CASTLING_RANGE_BONUS_CELLS,
     hasSwappableFootprint,
@@ -3342,10 +3344,16 @@ class CandidateGenerator {
      * spell does not care whose side a body is on.
      */
     private fireballDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
-        const cells = getCellsAroundFootprint(
-            this.context.grid.getSettings(),
-            target.isSmallSize() ? [target.getBaseCell()] : target.getCells(),
+        const settings = this.context.grid.getSettings();
+        const impact = resolveThrownSpellImpact(
+            spell.getName(),
+            this.context.grid,
+            (cell) => isCellWithinGrid(settings, cell),
+            this.unit.getBaseCell(),
+            target.getBaseCell(),
+            (unitId) => this.context.unitsHolder.getAllUnits().get(unitId)?.getTeam() === this.unit.getTeam(),
         );
+        const cells = fireballBlastCells(settings, impact.cell);
         const splashed = (
             evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? []
         ).filter((unit) => !unit.isDead() && unit.getId() !== this.unit.getId() && unit.getId() !== target.getId());
