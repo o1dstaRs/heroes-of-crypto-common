@@ -4,6 +4,7 @@ import { enumerateCandidates } from "../../src/ai/candidates";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { getCellForPosition } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
@@ -139,23 +140,57 @@ describe("Fireball bursts around the struck cell", () => {
         expect(s.caster.hasSpellRemaining("Fireball")).toBe(true);
     });
 
-    test("AI values exactly the same Dragon and Wolf hits as the engine", () => {
+    test("an exposed far-side aim still bursts on the first Dragon cell entered by the ray", () => {
         const s = formation();
-        const candidate = enumerateCandidates(s.caster, s.context, [
-            { type: "end_turn", unitId: s.caster.getId(), reason: "manual" },
-        ]).candidates.find(
-            (candidate) =>
-                candidate.kind === "spell" &&
-                candidate.spellName === "Fireball" &&
-                candidate.targetId === s.dragon.getId(),
-        );
-        expect(candidate).toBeDefined();
-        expect(candidate?.features.expectedDamage).toBe(40);
-        const result = s.engine.apply(candidate!.actions[0]);
+        s.context.grid.setScatteredMountains([
+            { x: 11, y: 4 },
+            { x: 11, y: 6 },
+        ]);
+        const impact = s.impact(s.dragon);
+        expect(impact.blockedByTerrain).toBe(false);
+        expect(impact.cell).toEqual({ x: 14, y: 2 });
+        expect(getCellForPosition(testGridSettings, impact.toPosition!)).toEqual(impact.cell);
+        const before = [s.satyr, s.mage].map((unit) => unit.getCumulativeHp());
+        const result = s.engine.apply({
+            type: "cast_spell",
+            casterId: s.caster.getId(),
+            targetId: s.dragon.getId(),
+            spellName: "Fireball",
+        });
         expect(result.completed).toBe(true);
+        expect([s.satyr, s.mage].map((unit) => unit.getCumulativeHp())).toEqual(before);
         const cast = result.events.find((event) => event.type === "spell_cast");
+        expect(cast).toMatchObject({ targetId: s.dragon.getId(), targetCell: impact.cell });
         if (cast?.type === "spell_cast") {
-            expect(cast.damaged?.reduce((sum, hit) => sum + hit.amount, 0)).toBe(candidate?.features.expectedDamage);
+            expect(cast.damaged?.map((hit) => hit.unitId).sort()).toEqual([s.dragon.getId(), s.wolf.getId()].sort());
         }
     });
+
+    for (const farSide of [false, true])
+        test(`AI values the same hits as the engine, far-side aim=${farSide}`, () => {
+            const s = formation();
+            if (farSide)
+                s.context.grid.setScatteredMountains([
+                    { x: 11, y: 4 },
+                    { x: 11, y: 6 },
+                ]);
+            const candidate = enumerateCandidates(s.caster, s.context, [
+                { type: "end_turn", unitId: s.caster.getId(), reason: "manual" },
+            ]).candidates.find(
+                (candidate) =>
+                    candidate.kind === "spell" &&
+                    candidate.spellName === "Fireball" &&
+                    candidate.targetId === s.dragon.getId(),
+            );
+            expect(candidate).toBeDefined();
+            expect(candidate?.features.expectedDamage).toBe(40);
+            const result = s.engine.apply(candidate!.actions[0]);
+            expect(result.completed).toBe(true);
+            const cast = result.events.find((event) => event.type === "spell_cast");
+            if (cast?.type === "spell_cast") {
+                expect(cast.damaged?.reduce((sum, hit) => sum + hit.amount, 0)).toBe(
+                    candidate?.features.expectedDamage,
+                );
+            }
+        });
 });

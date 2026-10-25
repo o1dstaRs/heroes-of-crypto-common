@@ -219,6 +219,7 @@ interface InterceptedThrowTrajectory {
     aim: IClosestSideCenter;
     fromPosition: XY;
     blocker?: ISpellSightBlocker;
+    impactCell: XY;
     impactPosition: XY;
 }
 
@@ -254,6 +255,7 @@ function interceptedThrowTrajectory(
                 continue;
             const position = getRangeAttackSideCenter(settings, cell, side as RangeAttackCellSide, fromPosition);
             let blocker: ISpellSightBlocker | undefined;
+            let impactCell = cell;
             let impactPosition = position;
             for (const [crossed, contact] of traceGridRayCells(
                 settings,
@@ -261,7 +263,11 @@ function interceptedThrowTrajectory(
                 { x: position.x - traceOffsetX, y: position.y },
             )) {
                 const occupantId = grid.getOccupantUnitId(crossed);
-                if (occupantId && occupantId === targetId) break;
+                if (occupantId && occupantId === targetId) {
+                    impactCell = crossed;
+                    impactPosition = { x: contact.x + traceOffsetX, y: contact.y };
+                    break;
+                }
                 if (
                     !occupantId ||
                     occupantId === casterId ||
@@ -279,6 +285,7 @@ function interceptedThrowTrajectory(
                 aim: { cell: { ...cell }, side: side as RangeAttackCellSide, position },
                 fromPosition,
                 blocker,
+                impactCell,
                 impactPosition,
                 obstruction,
                 distance: Math.hypot(position.x - fromPosition.x, position.y - fromPosition.y),
@@ -625,7 +632,7 @@ export function resolveThrownSpellImpact(
         if (!trajectory) return { cell: to, blockedByTerrain: true };
         const blocker = trajectory.blocker;
         return {
-            cell: blocker?.cell ?? trajectory.aim.cell,
+            cell: blocker?.cell ?? trajectory.impactCell,
             blockedByTerrain: blocker?.occupantId === "B" || blocker?.occupantId === "H",
             ...(blocker && !["B", "H"].includes(blocker.occupantId) ? { interceptedBy: blocker.occupantId } : {}),
             fromPosition: { ...trajectory.fromPosition },
