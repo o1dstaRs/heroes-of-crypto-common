@@ -2086,6 +2086,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
             // Apply "Bitter Experience" if available
             if (!damage.dead && damage.unitsDied > 0 && this.hasAbilityActive("Bitter Experience")) {
+                this.unitProperties.bitter_experience_stacks = (this.unitProperties.bitter_experience_stacks ?? 0) + 1;
+                this.initialUnitProperties.bitter_experience_stacks = this.unitProperties.bitter_experience_stacks;
                 this.unitProperties.base_armor += 1;
                 this.initialUnitProperties.base_armor += 1;
                 this.unitProperties.steps += 1;
