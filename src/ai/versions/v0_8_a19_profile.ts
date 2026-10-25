@@ -162,8 +162,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        // Re-pinned for Fireball estimates matching the engine's 3x3 blast around the impact cell.
-        sha256: "c4d0a189a7cc37ce29bb0f814d50dc30eafc97a4339132be5489f9973a5094a2" as const,
+        // Re-pinned for decision-scoped Smoke damage reuse and exact zero-prevention early exits.
+        sha256: "569cce67764aafa1e4ccc0645ccf3c742834c27141bc08c6692bae829b69e051" as const,
     }),
     Object.freeze({
         role: "last-fuse-estimates" as const,

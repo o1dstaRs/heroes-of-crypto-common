@@ -90,6 +90,19 @@ const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
 // adjustBaseStats only while the initial shot_distance is 0, so natural shooters keep their own range.
 const STOLEN_ENDLESS_QUIVER_SHOT_DISTANCE = 6.5;
 
+/** Keep every byte after the prose, including empty or extended positional-property rows. */
+function buffDescriptionSuffix(description: string): string {
+    const separator = description.indexOf(";");
+    return separator < 0 ? "" : description.slice(separator + 1);
+}
+
+function secondBuffProperty(suffix: string): string | undefined {
+    const separator = suffix.indexOf(";");
+    if (separator < 0) return undefined;
+    const end = suffix.indexOf(";", separator + 1);
+    return suffix.slice(separator + 1, end < 0 ? undefined : end);
+}
+
 // SPELLBOOK cards own these faction-prefixed spell charges. Keep the mapping explicit: a unit can have
 // unrelated castable abilities (stored with a leading colon) or, in the future, more than one spell source,
 // and Assimilation must transfer only the remaining charges belonging to the stolen card.
@@ -1537,33 +1550,33 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     private refreshLastFuseDescription(): void {
         const index = this.unitProperties.applied_buffs.indexOf("Last Fuse");
         if (index < 0) return;
-        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        const properties = buffDescriptionSuffix(this.unitProperties.applied_buffs_descriptions[index]);
         const minimumDamage = Math.max(0, this.getStackPower()) * ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER;
         this.unitProperties.applied_buffs_descriptions[index] =
-            `Artifact. Enemy stacks this unit destroys explode, damaging other enemies next to them for ${this.getBuffPower("Last Fuse") ?? ARTIFACT_POWER.LAST_FUSE_PERCENT}% of the killing blow's actual damage, with a minimum of ${minimumDamage} damage at this unit's current stack power (${ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER} per attacker stack power). Your allies are not damaged.;${properties.join(";")}`;
+            `Artifact. Enemy stacks this unit destroys explode, damaging other enemies next to them for ${this.getBuffPower("Last Fuse") ?? ARTIFACT_POWER.LAST_FUSE_PERCENT}% of the killing blow's actual damage, with a minimum of ${minimumDamage} damage at this unit's current stack power (${ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER} per attacker stack power). Your allies are not damaged.;${properties}`;
     }
     private refreshQuiverOfEchoesDescription(): void {
         const index = this.unitProperties.applied_buffs.indexOf("Quiver of Echoes");
         if (index < 0) return;
-        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        const properties = buffDescriptionSuffix(this.unitProperties.applied_buffs_descriptions[index]);
         this.unitProperties.applied_buffs_descriptions[index] =
-            `Artifact. Ranged attacks have a ${this.getBonusRangedAttackChance()}% chance to make one extra attack.;${properties.join(";")}`;
+            `Artifact. Ranged attacks have a ${this.getBonusRangedAttackChance()}% chance to make one extra attack.;${properties}`;
     }
     private refreshRimeCharmDescription(): void {
         const index = this.unitProperties.applied_buffs.indexOf("Rime Charm");
         if (index < 0) return;
-        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
-        const laps = Number(properties[1]) || ARTIFACT_POWER.RIME_SLOW_LAPS;
+        const properties = buffDescriptionSuffix(this.unitProperties.applied_buffs_descriptions[index]);
+        const laps = Number(secondBuffProperty(properties)) || ARTIFACT_POWER.RIME_SLOW_LAPS;
         this.unitProperties.applied_buffs_descriptions[index] =
-            `Artifact. ${this.getRimeCharmChance()}% chance for any attack to slow the target for ${laps} laps.;${properties.join(";")}`;
+            `Artifact. ${this.getRimeCharmChance()}% chance for any attack to slow the target for ${laps} laps.;${properties}`;
     }
     private refreshGravechainDescription(): void {
         const index = this.unitProperties.applied_buffs.indexOf("Gravechain");
         if (index < 0) return;
-        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
-        const laps = Number(properties[1]) || ARTIFACT_POWER.GRAVECHAIN_SLOW_LAPS;
+        const properties = buffDescriptionSuffix(this.unitProperties.applied_buffs_descriptions[index]);
+        const laps = Number(secondBuffProperty(properties)) || ARTIFACT_POWER.GRAVECHAIN_SLOW_LAPS;
         this.unitProperties.applied_buffs_descriptions[index] =
-            `Artifact. Attacks have a ${this.getGravechainChance()}% chance per enemy to inflict Gravebound, chaining through connected enemies up to ${ARTIFACT_POWER.GRAVECHAIN_CONNECTIONS} links away: −25% movement for ${laps} laps. Failed rolls do not stop the chain.;${properties.join(";")}`;
+            `Artifact. Attacks have a ${this.getGravechainChance()}% chance per enemy to inflict Gravebound, chaining through connected enemies up to ${ARTIFACT_POWER.GRAVECHAIN_CONNECTIONS} links away: −25% movement for ${laps} laps. Failed rolls do not stop the chain.;${properties}`;
     }
     public projectRangeShotsAfterVolleys(target?: Unit, volleys = 1): number {
         const cost = projectShotCost(this, target) * Math.max(0, volleys);

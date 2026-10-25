@@ -31,6 +31,7 @@ import { EMBER_COVENANT_BLESSING, registerEmberCovenantArmy } from "../abilities
 import { getSpellConfig, POISON_ON_HIT_AURA_EFFECT_NAMES } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effects/effect_properties";
+import { AuraEffect } from "../effects/aura_effect";
 import type { FightProperties } from "../fights/fight_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
@@ -1466,6 +1467,7 @@ export class UnitsHolder {
         laps: readonly number[],
         descriptions: readonly string[],
         powers: readonly number[],
+        includeOrdinaryDescriptions: boolean,
     ): boolean {
         target.push(channel, names.length, laps.length, descriptions.length, powers.length);
 
@@ -1483,7 +1485,17 @@ export class UnitsHolder {
         }
 
         for (let i = 0; i < names.length; i++) {
-            target.push(i, names[i], laps[i], descriptions[i], powers[i]);
+            // Native aura refresh cleans permanent rows and replaces `${name} Aura` rows. It preserves
+            // every ordinary finite row verbatim, so that row's text is not an aura input. Names, order,
+            // laps and powers stay in the key; the complete live description is retained as output.
+            const description =
+                includeOrdinaryDescriptions ||
+                laps[i] === Number.MAX_SAFE_INTEGER ||
+                typeof names[i] !== "string" ||
+                names[i].endsWith(" Aura")
+                    ? descriptions[i]
+                    : undefined;
+            target.push(i, names[i], laps[i], description, powers[i]);
         }
         return true;
     }
@@ -1547,7 +1559,7 @@ export class UnitsHolder {
             unit.getFootprintHeight(),
             unit.getAttackType(),
             unit.canFly(),
-            unit.getLuck(),
+            this.auraRefreshLuckInput(unit, auraEffects),
             unit.hasEffectActive("Break"),
             unit.hasAuraEffect("Disguise"),
             unit.hasAbilityActive("Disguise Aura"),
@@ -1559,6 +1571,49 @@ export class UnitsHolder {
         }
         fingerprint[lengthIndex] = fingerprint.length - lengthIndex - 1;
         return true;
+    }
+    /**
+     * Luck changes aura power at a source and the displayed chance on a poison recipient. For a native
+     * recipient carrying only other auras it is not a refresh input: its stats are still recomputed by
+     * adjustBaseStats. Keep the conservative input for custom aura application and Unit subclasses.
+     */
+    private auraRefreshLuckInput(unit: Unit, auraEffects: ReturnType<Unit["getAuraEffects"]>): number {
+        if (!this.usesNativeAuraApplication(unit)) {
+            return unit.getLuck();
+        }
+        for (const aura of auraEffects) {
+            // Native zero-power auras bypass calculateAuraPower in the full refresh. Luck therefore
+            // cannot change their emission; custom aura implementations retain the conservative key.
+            if (
+                aura.defaultProperties.power !== 0 ||
+                Object.getPrototypeOf(aura) !== AuraEffect.prototype ||
+                aura.toDefault !== AuraEffect.prototype.toDefault ||
+                aura.getProperties !== AuraEffect.prototype.getProperties
+            ) {
+                return unit.getLuck();
+            }
+        }
+        const properties = unit.getUnitProperties();
+        for (const name of properties.applied_buffs) {
+            if (name.endsWith(" Aura") && POISON_ON_HIT_AURA_EFFECT_NAMES.has(name.slice(0, -5))) {
+                return unit.getLuck();
+            }
+        }
+        for (const name of properties.applied_debuffs) {
+            if (name.endsWith(" Aura") && POISON_ON_HIT_AURA_EFFECT_NAMES.has(name.slice(0, -5))) {
+                return unit.getLuck();
+            }
+        }
+        return 0;
+    }
+    private usesNativeAuraApplication(unit: Unit): boolean {
+        return (
+            Object.getPrototypeOf(unit) === Unit.prototype &&
+            unit.applyAuraEffect === Unit.prototype.applyAuraEffect &&
+            unit.cleanAuraEffects === Unit.prototype.cleanAuraEffects &&
+            unit.deleteBuff === Unit.prototype.deleteBuff &&
+            unit.deleteDebuff === Unit.prototype.deleteDebuff
+        );
     }
     /** A unit's fingerprint after its header: aura power inputs, aura definitions, and applied aura state. */
     private appendUnitAuraRefreshDetail(
@@ -1586,6 +1641,7 @@ export class UnitsHolder {
         }
 
         const properties = unit.getUnitProperties();
+        const includeOrdinaryDescriptions = !this.usesNativeAuraApplication(unit);
         if (
             !this.appendAppliedAuraState(
                 fingerprint,
@@ -1594,6 +1650,7 @@ export class UnitsHolder {
                 properties.applied_buffs_laps,
                 properties.applied_buffs_descriptions,
                 properties.applied_buffs_powers,
+                includeOrdinaryDescriptions,
             ) ||
             !this.appendAppliedAuraState(
                 fingerprint,
@@ -1602,6 +1659,7 @@ export class UnitsHolder {
                 properties.applied_debuffs_laps,
                 properties.applied_debuffs_descriptions,
                 properties.applied_debuffs_powers,
+                includeOrdinaryDescriptions,
             )
         ) {
             return false;
@@ -1665,7 +1723,7 @@ export class UnitsHolder {
             if (
                 !Object.is(current[offset + 4], position.x) ||
                 !Object.is(current[offset + 5], position.y) ||
-                !Object.is(current[offset + 10], unit.getLuck()) ||
+                !Object.is(current[offset + 10], this.auraRefreshLuckInput(unit, unit.getAuraEffects())) ||
                 current[offset + 1] !== "unit" ||
                 !Object.is(current[offset + 2], unit.getId()) ||
                 !Object.is(current[offset + 3], unit.getTeam()) ||

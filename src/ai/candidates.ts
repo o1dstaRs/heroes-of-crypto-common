@@ -585,6 +585,8 @@ interface IStationaryRangeAttackProbe {
     readonly aimCell: XY;
     readonly aimSide: RangeAttackCellSide;
     readonly prepared: IPreparedRangeAttackEvaluation;
+    /** Only the Smoke divisors vary during this synchronous candidate enumeration. */
+    readonly damageByDivisors: Map<string, number>;
 }
 
 interface IStationaryRangeAttackSearch {
@@ -668,6 +670,7 @@ function prepareStationaryRangeAttackSearch(
                         false,
                         isAOE,
                     ),
+                    damageByDivisors: new Map(),
                 });
             }
         }
@@ -692,6 +695,7 @@ function prepareStationaryRangeAttackSearch(
 function findBestPreparedStationaryRangeAttack(
     search: IStationaryRangeAttackSearch | undefined,
     hypotheticalSmokeCells?: readonly XY[],
+    damageToMatch = Infinity,
 ): IBestLegalStationaryRangeAttack | undefined {
     if (!search) return undefined;
     const hypotheticalSmokeKeys = hypotheticalSmokeCells?.length
@@ -724,16 +728,21 @@ function findBestPreparedStationaryRangeAttack(
         ) {
             continue;
         }
-        const damage = evaluatePreparedRangeCandidateDamage(
-            search.shooter,
-            search.context,
-            evaluation,
-            primaryTargetId,
-            search.attackerAmountAlive,
-            probe.aimTargetId,
-            search.preparedDamage,
-            true,
-        ).value;
+        const divisorKey = evaluation.rangeAttackDivisors.join(",");
+        let damage = probe.damageByDivisors.get(divisorKey);
+        if (damage === undefined) {
+            damage = evaluatePreparedRangeCandidateDamage(
+                search.shooter,
+                search.context,
+                evaluation,
+                primaryTargetId,
+                search.attackerAmountAlive,
+                probe.aimTargetId,
+                search.preparedDamage,
+                true,
+            ).value;
+            probe.damageByDivisors.set(divisorKey, damage);
+        }
         if (damage > 0 && (!best || damage > best.expectedDamage)) {
             best = {
                 expectedDamage: damage,
@@ -742,6 +751,10 @@ function findBestPreparedStationaryRangeAttack(
                 aimCell: { x: probe.aimCell.x, y: probe.aimCell.y },
                 aimSide: probe.aimSide,
             };
+            // Smoke scoring only needs max(0, before - after). A legal bypass matching `before` proves
+            // zero prevention, even if another shot would score higher (for example by avoiding friendly
+            // fire). Otherwise keep scanning every edge/target, preserving the exact maximum and ties.
+            if (damage >= damageToMatch) return best;
         }
     }
     return best;
@@ -3110,7 +3123,7 @@ class CandidateGenerator {
                 const before = baselineDamage.get(shooter.getId()) ?? 0;
                 if (before <= 0) continue;
                 const after = usePreparedGeometry
-                    ? (findBestPreparedStationaryRangeAttack(stationarySearches.get(shooter.getId()), cells)
+                    ? (findBestPreparedStationaryRangeAttack(stationarySearches.get(shooter.getId()), cells, before)
                           ?.expectedDamage ?? 0)
                     : (findBestLegalStationaryRangeAttack(shooter, this.context, cells)?.expectedDamage ?? 0);
                 total += Math.max(0, before - after);
