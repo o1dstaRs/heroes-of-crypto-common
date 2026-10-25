@@ -45,6 +45,7 @@ export * as PickHelper from "./picks/pick_helper";
 export * as PickSim from "./picks/pick_sim";
 export * from "./picks/pick_sim";
 export * from "./picks/ban_visibility";
+export * from "./picks/draft_visibility";
 export * from "./engine/actions";
 export * from "./engine/action_engine";
 export * from "./engine/events";
@@ -177,6 +178,20 @@ export type {
     ITier2ArtifactDecisionContext,
 } from "./ai/setup/setup_strategy";
 export { creatureIdForName, creatureInfo, scoreCreature } from "./ai/setup/creature_score";
+export {
+    draftFactionContinuations,
+    draftContextAfterCreature,
+    draftFutureSlots,
+    draftCreatureContinuation,
+    draftFactionCompletion,
+} from "./ai/setup/draft_continuations";
+export type {
+    IDraftFactionContinuation,
+    IDraftFutureSlot,
+    IDraftCreatureContinuation,
+    IDraftFactionGoal,
+    IDraftFactionCompletion,
+} from "./ai/setup/draft_continuations";
 export {
     applyDraftCoherenceOverlay,
     DRAFT_COHERENCE_WEIGHT,

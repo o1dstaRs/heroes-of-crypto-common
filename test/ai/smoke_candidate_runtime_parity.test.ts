@@ -775,6 +775,37 @@ describe("hypothetical/live Smoke differential", () => {
 });
 
 describe("Smoke candidate/runtime parity", () => {
+    test("recomputes Smoke scores after stack damage and live cloud changes between decisions", () => {
+        const harness = smokeHarness(PBTypes.GridVals.LAVA_CENTER);
+        harness.enemy.setAmountAlive(10);
+        const handler = harness.combat.attackHandler;
+        const originalEvaluate = handler.evaluateRangeAttack;
+        const compare = () => {
+            const prepared = smokeCandidates(harness);
+            handler.evaluateRangeAttack = function (...args) {
+                return originalEvaluate.apply(this, args);
+            };
+            try {
+                expect(smokeCandidates(harness)).toEqual(prepared);
+            } finally {
+                handler.evaluateRangeAttack = originalEvaluate;
+            }
+            return prepared;
+        };
+
+        const before = compare();
+        expect(before).toHaveLength(1);
+        harness.enemy.applyDamage(harness.enemy.getCumulativeHp() / 2, 0, new SceneLogMock());
+        const wounded = compare();
+        expect(wounded).not.toEqual(before);
+
+        const clouds = harness.context.fightProperties!.getSmokeClouds();
+        for (const cell of smokeCells(before[0]!.targetCell!)) clouds.add(cell);
+        expect(compare()).toEqual([]);
+        clouds.clear();
+        expect(compare()).toEqual(wounded);
+    });
+
     test("matches the eager fallback across randomized multi-ranger candidate boards", () => {
         let state = 0x50c0_a11e;
         const next = (bound: number): number => {

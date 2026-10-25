@@ -37,6 +37,7 @@ import { runMatch, GREEN_TEAM, RED_TEAM, type IMatchResult } from "./battle_engi
 import { restoreBattle, snapshotBattle } from "./battle_snapshot";
 import type { ILookaheadDeps } from "./lookahead";
 import { PersistentWorkerPool, startPersistentWorker } from "./persistent_worker_pool";
+import { exitCompletedWorkerCli } from "./completed_worker_cli";
 import { playRankedDraftGame, rankedDraftStrengthCandidate } from "./ranked_draft_eval";
 import type { RankedDraftStrengthPolicyId } from "../ai/setup/draft_strength_prior";
 import { SearchDriver, withSearchEnvironment, type ISearchMatchInfo } from "./search_driver";
@@ -810,6 +811,9 @@ if (!isMainThread && workerData?.a19DecisionAudit) {
                 report: join(settings.out, "report.html"),
             }),
         );
+        // runBatch has returned every task; report() writes its artifacts synchronously. Failure paths
+        // retain normal pool cleanup, while a successful standalone CLI can skip idle realm destruction.
+        await exitCompletedWorkerCli();
     } finally {
         await pool.close();
     }

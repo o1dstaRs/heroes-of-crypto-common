@@ -99,6 +99,157 @@ function compareWithForcedFullRefresh(
 }
 
 describe("aura refresh dirty invalidation", () => {
+    it("preserves changed ordinary buff and debuff descriptions without rebuilding auras", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const source = createTestUnit({ team: PBTypes.TeamVals.LEFT, auraEffects: ["Flesh Shield"] });
+        const recipient = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        placeUnit(grid, unitsHolder, source, { x: 4, y: 4 });
+        placeUnit(grid, unitsHolder, recipient, { x: 5, y: 4 });
+        const p = recipient.getUnitProperties();
+        for (const [names, laps, descriptions, powers] of [
+            [p.applied_buffs, p.applied_buffs_laps, p.applied_buffs_descriptions, p.applied_buffs_powers],
+            [p.applied_debuffs, p.applied_debuffs_laps, p.applied_debuffs_descriptions, p.applied_debuffs_powers],
+        ] as const) {
+            names.push("Ordinary Effect");
+            laps.push(3);
+            descriptions.push("original prose;1;2");
+            powers.push(4);
+        }
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+        const changed = recipient.getUnitProperties();
+        const buffIndex = changed.applied_buffs.indexOf("Ordinary Effect");
+        const debuffIndex = changed.applied_debuffs.indexOf("Ordinary Effect");
+        changed.applied_buffs_descriptions[buffIndex] = "new buff prose;17;19;extra";
+        changed.applied_debuffs_descriptions[debuffIndex] = "new debuff prose;23;29";
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(false);
+        const after = recipient.getUnitProperties();
+        expect(after.applied_buffs_descriptions[buffIndex]).toBe("new buff prose;17;19;extra");
+        expect(after.applied_debuffs_descriptions[debuffIndex]).toBe("new debuff prose;23;29");
+        after.applied_buffs_powers[buffIndex] = 8;
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+    });
+
+    it("continues tracking permanent aura text and finite rows whose names can collide with an aura", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const source = createTestUnit({ team: PBTypes.TeamVals.LEFT, auraEffects: ["Flesh Shield"] });
+        const recipient = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        placeUnit(grid, unitsHolder, source, { x: 4, y: 4 });
+        placeUnit(grid, unitsHolder, recipient, { x: 5, y: 4 });
+        const p = recipient.getUnitProperties();
+        p.applied_buffs.push("Unmapped Aura");
+        p.applied_buffs_laps.push(3);
+        p.applied_buffs_descriptions.push("finite aura-named row;1;2");
+        p.applied_buffs_powers.push(4);
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+        const changed = recipient.getUnitProperties();
+        const finiteIndex = changed.applied_buffs.indexOf("Unmapped Aura");
+        changed.applied_buffs_descriptions[finiteIndex] = "changed finite aura row;3;4";
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+        const current = recipient.getUnitProperties();
+        const auraIndex = current.applied_buffs.indexOf("Flesh Shield Aura");
+        const description = current.applied_buffs_descriptions[auraIndex];
+        current.applied_buffs_descriptions[auraIndex] = "corrupted live aura;5;6";
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+        expect(recipient.getUnitProperties().applied_buffs_descriptions[auraIndex]).toBe(description);
+    });
+
+    it("ignores unrelated recipient luck but tracks source luck through snapshot restoration", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const source = createTestUnit({ team: PBTypes.TeamVals.LEFT, auraEffects: ["Flesh Shield"], luck: 1 });
+        const recipient = createTestUnit({ team: PBTypes.TeamVals.LEFT, luck: 2 });
+        placeUnit(grid, unitsHolder, source, { x: 4, y: 4 });
+        placeUnit(grid, unitsHolder, recipient, { x: 5, y: 4 });
+
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+        expect(recipient.hasBuffActive("Flesh Shield Aura")).toBe(true);
+        const fight = FightStateManager.getInstance().getFightProperties();
+        const saved = snapshotBattle(unitsHolder, grid, fight);
+        recipient.getUnitProperties().luck = 7;
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(false);
+        expect(recipient.getLuck()).toBe(7);
+
+        source.getUnitProperties().luck = 6;
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(false);
+        restoreBattle(saved, unitsHolder, grid, fight);
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(false);
+        expect(recipient.getLuck()).toBe(2);
+    });
+
+    for (const isBuff of [true, false]) {
+        it(`tracks poison recipient luck for ${isBuff ? "buff" : "debuff"} descriptions`, () => {
+            const { grid, unitsHolder } = createCombatTestContext();
+            const source = createTestUnit({ team: PBTypes.TeamVals.LEFT, auraEffects: ["Venom Cloud"] });
+            (source.getAuraEffects()[0]!.defaultProperties as { is_buff: boolean }).is_buff = isBuff;
+            const recipient = createTestUnit({ team: isBuff ? PBTypes.TeamVals.LEFT : PBTypes.TeamVals.RIGHT });
+            placeUnit(grid, unitsHolder, source, { x: 4, y: 4 });
+            placeUnit(grid, unitsHolder, recipient, { x: 5, y: 4 });
+
+            expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+            const description = () => {
+                const p = recipient.getUnitProperties();
+                const names = isBuff ? p.applied_buffs : p.applied_debuffs;
+                const descriptions = isBuff ? p.applied_buffs_descriptions : p.applied_debuffs_descriptions;
+                const index = names.indexOf("Venom Cloud Aura");
+                expect(index).toBeGreaterThanOrEqual(0);
+                return descriptions[index];
+            };
+            const before = description();
+            recipient.getUnitProperties().luck = 5;
+            expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+            expect(description()).not.toBe(before);
+            expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(false);
+        });
+    }
+
+    it("ignores luck for native zero-power sources and notices a later power change", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const source = createTestUnit({ team: PBTypes.TeamVals.RIGHT, auraEffects: ["Range Null Field"] });
+        const recipient = createTestUnit({
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 3,
+        });
+        placeUnit(grid, unitsHolder, source, { x: 4, y: 4 });
+        placeUnit(grid, unitsHolder, recipient, { x: 5, y: 4 });
+
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+        expect(recipient.hasDebuffActive("Range Null Field Aura")).toBe(true);
+        source.getUnitProperties().luck = 5;
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(false);
+        source.getAuraEffects()[0]!.defaultProperties.power = 3;
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+        source.getUnitProperties().luck = 7;
+        expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
+    });
+
+    it("keeps luck in the fingerprint when custom aura application can observe it", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const source = createTestUnit({ team: PBTypes.TeamVals.LEFT, auraEffects: ["Flesh Shield"] });
+        const recipient = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const apply = recipient.applyAuraEffect;
+        const seenLuck: number[] = [];
+        recipient.applyAuraEffect = function (...args) {
+            seenLuck.push(this.getLuck());
+            apply.apply(this, args);
+        };
+        placeUnit(grid, unitsHolder, source, { x: 4, y: 4 });
+        placeUnit(grid, unitsHolder, recipient, { x: 5, y: 4 });
+
+        const p = recipient.getUnitProperties();
+        p.applied_buffs.push("Ordinary Effect");
+        p.applied_buffs_laps.push(3);
+        p.applied_buffs_descriptions.push("original;1;2");
+        p.applied_buffs_powers.push(4);
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(false);
+        recipient.getUnitProperties().luck = 4;
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
+        p.applied_buffs_descriptions[p.applied_buffs.indexOf("Ordinary Effect")] = "changed;3;4";
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
+        expect(seenLuck).toEqual([0, 4, 4]);
+    });
+
     it("matches a forced full refresh through no-op, movement, cleanse, power, Break, and restore events", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const leftEmitter = createTestUnit({

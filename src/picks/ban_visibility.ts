@@ -2,8 +2,7 @@ import { Doctrine } from "../doctrines/doctrine_properties";
 import { CreatureLevelMap } from "../units/unit_properties";
 
 /** Public viewers use NO_DOCTRINE so scouting cannot leak through an observer link. */
-export function getVisibleDraftBans(
-    banned: readonly number[],
+export function getVisibleDraftBanLevels(
     phaseLevels: readonly number[],
     phaseSequence: number,
     doctrine: number = Doctrine.NO_DOCTRINE,
@@ -23,8 +22,15 @@ export function getVisibleDraftBans(
             }
         }
     }
-    return banned.filter((id) => {
-        const level = CreatureLevelMap[id];
-        return revealedLevels.has(level);
-    });
+    return [...revealedLevels];
+}
+
+export function getVisibleDraftBans(
+    banned: readonly number[],
+    phaseLevels: readonly number[],
+    phaseSequence: number,
+    doctrine: number = Doctrine.NO_DOCTRINE,
+): number[] {
+    const revealedLevels = new Set(getVisibleDraftBanLevels(phaseLevels, phaseSequence, doctrine));
+    return banned.filter((id) => revealedLevels.has(CreatureLevelMap[id]));
 }

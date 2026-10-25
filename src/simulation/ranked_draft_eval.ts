@@ -54,6 +54,7 @@ import {
     createPickSimState,
     getCurrentPickPhase,
     getKnownOpponentCreatures,
+    getPickScoutingContext,
     getVisibleCreatureChoices,
     isPickSimComplete,
     LIVE_TIER1_ARTIFACT_IDS,
@@ -66,6 +67,7 @@ import {
     type PickRandomInt,
     type PickTeam,
 } from "../picks/pick_sim";
+import type { IDraftScoutingContext } from "../picks/draft_visibility";
 import { CreatureFactions } from "../generated/protobuf/v1/creature_gen";
 import { ToFactionName } from "../factions/faction_type";
 import {
@@ -539,6 +541,7 @@ interface IRankedDraftGameDependencies {
     matchRunner: (config: IMatchConfig) => IMatchResult;
     /** Offline research only; called for the candidate at the real, public Tier-2 decision. */
     researchCandidateTier2Choice?: ResearchRankedTier2Choice;
+    researchCandidateDraftChoices?: IRankedDraftResearchChoices;
 }
 
 const DEFAULT_DEPENDENCIES: IRankedDraftGameDependencies = { matchRunner: runMatch };
@@ -931,8 +934,9 @@ export interface IRankedDraftPickRules {
     liveDraftRules?: boolean;
     /** Replace each bundle/creature decision with a uniform legal choice at this rate. */
     explorationRate?: number;
-    /** The board's map. Creature decisions see it from level 3 on, when the live pick phase reveals it. */
+    /** The board's map, masked separately for each seat by its scouting doctrine. */
     gridType?: number;
+    onDraftInformation?: (team: PickTeam, phaseSequence: number, context: IDraftScoutingContext) => void;
     /** The board's synergy variants, public from the first draft screen (live rules only; read by `-sv` policies). */
     synergyVariants?: RankedDraftSynergyVariants;
     /** Observational trace only; never receives hidden opponent state or a future creature pick. */
@@ -941,6 +945,29 @@ export interface IRankedDraftPickRules {
     researchPreferredCreatureByTeam?: Readonly<Partial<Record<PickTeam, number>>>;
     /** Offline research only. Each callback receives that seat's public pick-time information. */
     researchTier2ChoiceByTeam?: Readonly<Partial<Record<PickTeam, ResearchRankedTier2Choice>>>;
+    researchDraftChoicesByTeam?: Readonly<Partial<Record<PickTeam, IRankedDraftResearchChoices>>>;
+}
+
+export interface IRankedDraftResearchContext {
+    readonly ownCreatureIds: readonly number[];
+    readonly knownOpponentCreatureIds: readonly number[];
+    readonly tier1ArtifactId?: number;
+    readonly tier2ArtifactId?: number;
+    readonly artifactFitVersion: ArtifactFitVersion;
+    readonly scouting: IDraftScoutingContext;
+}
+
+export interface IRankedDraftResearchChoices {
+    readonly bundle?: (
+        bundles: readonly (readonly [number, number, number])[],
+        context: IRankedDraftResearchContext,
+        policyChosen: number,
+    ) => number;
+    readonly creature?: (
+        available: readonly number[],
+        context: IRankedDraftResearchContext,
+        policyChosen: number,
+    ) => number;
 }
 
 export type ResearchRankedTier2Choice = (
@@ -994,6 +1021,17 @@ export function resolveRankedDraftPick(
     }
     const leftGenome = normalizeRankedDraftGenome(leftInput);
     const rightGenome = normalizeRankedDraftGenome(rightInput);
+    for (const [team, choice] of Object.entries(rules.researchDraftChoicesByTeam ?? {})) {
+        if (
+            !rules.liveDraftRules ||
+            ![LEFT, RIGHT].includes(Number(team)) ||
+            !choice ||
+            (choice.bundle !== undefined && typeof choice.bundle !== "function") ||
+            (choice.creature !== undefined && typeof choice.creature !== "function")
+        ) {
+            throw new RangeError("Research draft choices require legal teams and live draft rules");
+        }
+    }
     const pickCreature = (
         genome: ILeagueGenome,
         available: readonly number[],
@@ -1054,6 +1092,48 @@ export function resolveRankedDraftPick(
     accept({ type: "select_doctrine", team: LEFT, doctrine: leftDoctrine });
     accept({ type: "select_doctrine", team: RIGHT, doctrine: rightDoctrine });
 
+    const scouting = (team: PickTeam): IDraftScoutingContext => {
+        const context = getPickScoutingContext(state, team, rules.gridType);
+        rules.onDraftInformation?.(team, state.phaseSequence, context);
+        return context;
+    };
+
+    scouting(LEFT);
+    scouting(RIGHT);
+
+    const researchContext = (team: PickTeam): IRankedDraftResearchContext => {
+        const own = teamState(team);
+        const context = getPickScoutingContext(state, team, rules.gridType);
+        return Object.freeze({
+            ownCreatureIds: Object.freeze([...own.creatures]),
+            knownOpponentCreatureIds: Object.freeze(getKnownOpponentCreatures(state, team)),
+            tier1ArtifactId: own.tier1Artifact,
+            tier2ArtifactId: own.tier2Artifact,
+            artifactFitVersion: artifactFitVersionForSetupSpec(
+                (team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec,
+            ),
+            scouting: Object.freeze({
+                ...context,
+                bannedCreatureIds: Object.freeze([...context.bannedCreatureIds]),
+                knownBanLevels: Object.freeze([...context.knownBanLevels]),
+                remainingPickLevels: Object.freeze([...context.remainingPickLevels]),
+            }),
+        });
+    };
+
+    const researchBundle = (team: PickTeam, policyChosen: number): number => {
+        const choice = rules.researchDraftChoicesByTeam?.[team]?.bundle;
+        if (!choice) return policyChosen;
+        const bundles = Object.freeze(
+            teamState(team).bundles.map((bundle) => Object.freeze([...bundle] as [number, number, number])),
+        );
+        const selected = choice(bundles, researchContext(team), policyChosen);
+        if (!Number.isInteger(selected) || selected < 0 || selected >= bundles.length) {
+            throw new RangeError("Research bundle choice must be one of the seat's offers");
+        }
+        return selected;
+    };
+
     // Both simultaneous policies decide from the same pre-commit state.
     const leftBundle =
         explore(state.left.bundles.length) ??
@@ -1105,8 +1185,10 @@ export function resolveRankedDraftPick(
                           : {}),
                   },
               ));
-    accept({ type: "select_bundle", team: LEFT, bundleIndex: leftBundle });
-    accept({ type: "select_bundle", team: RIGHT, bundleIndex: rightBundle });
+    const chosenLeftBundle = researchBundle(LEFT, leftBundle);
+    const chosenRightBundle = researchBundle(RIGHT, rightBundle);
+    accept({ type: "select_bundle", team: LEFT, bundleIndex: chosenLeftBundle });
+    accept({ type: "select_bundle", team: RIGHT, bundleIndex: chosenRightBundle });
 
     let transitions = 0;
     while (!isPickSimComplete(state)) {
@@ -1172,7 +1254,7 @@ export function resolveRankedDraftPick(
                         own.creatures,
                         getKnownOpponentCreatures(state, team),
                         own.tier1Artifact,
-                        phase.creatureLevel >= 3 ? rules.gridType : undefined,
+                        scouting(team).map,
                         artifactFitVersionForSetupSpec((team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec) >= 2
                             ? own.tier2Artifact
                             : undefined,
@@ -1181,7 +1263,14 @@ export function resolveRankedDraftPick(
         if (creatureId === undefined) {
             throw new Error(`Ranked draft creature policy found no visible L${phase.creatureLevel} creature`);
         }
-        const result = transition({ type: "pick_creature", team, creatureId });
+        const researchChoice = rules.researchDraftChoicesByTeam?.[team]?.creature;
+        const selected = researchChoice
+            ? researchChoice(Object.freeze([...visible]), researchContext(team), creatureId)
+            : creatureId;
+        if (!Number.isSafeInteger(selected) || !visible.includes(selected)) {
+            throw new RangeError("Research creature choice must be visible to the seat");
+        }
+        const result = transition({ type: "pick_creature", team, creatureId: selected });
         if (result.status === "rejected") {
             throw new Error(`Ranked draft creature policy was rejected as ${result.reason}`);
         }
@@ -1431,6 +1520,13 @@ export function playRankedDraftGame(
         },
         {
             ...rankedDraftPickRules(options, gridType, synergyVariants),
+            ...(dependencies.researchCandidateDraftChoices
+                ? {
+                      researchDraftChoicesByTeam: {
+                          [candidatePickedLeft ? LEFT : RIGHT]: dependencies.researchCandidateDraftChoices,
+                      },
+                  }
+                : {}),
             ...(dependencies.researchCandidateTier2Choice
                 ? {
                       researchTier2ChoiceByTeam: {

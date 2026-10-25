@@ -100,6 +100,7 @@ import {
 } from "./army";
 import { runMatch, type ISetupAugment, type Side } from "./battle_engine";
 import { PersistentWorkerPool, startPersistentWorker } from "./persistent_worker_pool";
+import { exitCompletedWorkerCli } from "./completed_worker_cli";
 import { materializeReplayAbSplits } from "./ranked_replay_tactics_ab_core";
 
 const SCHEMA = "hoc.a19-placement-lift.v1";
@@ -456,22 +457,22 @@ const main = async (): Promise<void> => {
         workerUrl: new URL(import.meta.url),
         workerOptions: { workerData: { [WORKER_FLAG]: true } },
     });
-    let records: ILiftRecord[];
     try {
-        records = await pool.runBatch(jobs, (progress) => {
+        const records = await pool.runBatch(jobs, (progress) => {
             if (progress.completed % 24 === 0 || progress.completed === progress.total) {
                 console.error(`progress ${progress.completed}/${progress.total}`);
             }
         });
+        const rows = summarizePlacementLift(records, candidate);
+        console.log(formatRows(rows));
+        const output = resolve(values.output ?? `sim-out/a19-placement-lift-${candidate}.json`);
+        mkdirSync(dirname(output), { recursive: true });
+        writeFileSync(output, JSON.stringify({ schema: SCHEMA, candidate, games, baseSeed, rows }, null, 2));
+        console.error(`wrote ${output}`);
+        await exitCompletedWorkerCli();
     } finally {
         await pool.close();
     }
-    const rows = summarizePlacementLift(records, candidate);
-    console.log(formatRows(rows));
-    const output = resolve(values.output ?? `sim-out/a19-placement-lift-${candidate}.json`);
-    mkdirSync(dirname(output), { recursive: true });
-    writeFileSync(output, JSON.stringify({ schema: SCHEMA, candidate, games, baseSeed, rows }, null, 2));
-    console.error(`wrote ${output}`);
 };
 
 if (!isMainThread && workerData?.[WORKER_FLAG] === true) {
