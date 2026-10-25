@@ -14,6 +14,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import { getDoctrineRevealMode, DOCTRINES, Doctrine } from "../doctrines/doctrine_properties";
 import { CreatureLevelList, CreatureLevelMap, CreaturePoolByLevel } from "../units/unit_properties";
 import { getVisibleDraftBans } from "./ban_visibility";
+import { getDraftScoutingContext, type IDraftScoutingContext } from "./draft_visibility";
 
 export type PickTeam = typeof PBTypes.TeamVals.LEFT | typeof PBTypes.TeamVals.RIGHT;
 export type PickBundle = readonly [level1Creature: number, level2Creature: number, tier1Artifact: number];
@@ -728,6 +729,19 @@ export function getKnownOpponentCreatures(state: IPickSimState, team: PickTeam):
         }
     }
     return known;
+}
+
+export function getPickScoutingContext(state: IPickSimState, team: PickTeam, gridType?: number): IDraftScoutingContext {
+    return getDraftScoutingContext({
+        gridType,
+        bannedCreatureIds: state.creaturesBanned,
+        phaseOrder: LIVE_PICK_PHASES.map((phase) => phase.phase),
+        phaseLevels: LIVE_PICK_PHASE_LEVELS,
+        phaseActors: LIVE_PICK_PHASES.map((phase) => phase.actors),
+        phaseSequence: state.phaseSequence,
+        doctrine: teamState(state, team).doctrine,
+        team,
+    });
 }
 
 const creatureChoices = (state: IPickSimState, team: PickTeam, omniscient: boolean): number[] => {

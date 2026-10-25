@@ -79,6 +79,35 @@ const playPanel = (options: IRankedDraftEvaluationOptions) => {
 };
 
 describe("ranked draft doctrine policies", () => {
+    it("uses doctrine-specific map and ban information from bundles through the last pick", () => {
+        const candidate = rankedDraftCurrentIncumbent();
+        for (const spymaster of [LEFT, RIGHT]) {
+            const seen: { team: number; sequence: number; map?: number; bans: number }[] = [];
+            resolveRankedDraftPick(
+                91_740_000,
+                candidate,
+                candidate,
+                {
+                    leftDoctrine: spymaster === LEFT ? Doctrine.SEE_ALL : Doctrine.SEE_NONE,
+                    rightDoctrine: spymaster === RIGHT ? Doctrine.SEE_ALL : Doctrine.SEE_NONE,
+                },
+                {
+                    liveDraftRules: true,
+                    gridType: PBTypes.GridVals.BLOCK_CENTER,
+                    onDraftInformation: (team, sequence, context) =>
+                        seen.push({ team, sequence, map: context.map, bans: context.bannedCreatureIds.length }),
+                },
+            );
+            expect(seen.filter((entry) => entry.sequence === 1)).toHaveLength(2);
+            for (const entry of seen) {
+                expect(entry.map).toBe(
+                    entry.team === spymaster || entry.sequence >= 6 ? PBTypes.GridVals.BLOCK_CENTER : undefined,
+                );
+                if (entry.sequence === 1) expect(entry.bans > 0).toBe(entry.team === spymaster);
+            }
+        }
+    });
+
     it("keeps see-none as the default every earlier panel measured", () => {
         expect(RANKED_DRAFT_DEFAULT_DOCTRINE_POLICY).toBe("see-none");
         expect(SETUP_POLICY_V0.pickDoctrine()).toBe(Doctrine.SEE_NONE);

@@ -45,6 +45,7 @@ export * as PickHelper from "./picks/pick_helper";
 export * as PickSim from "./picks/pick_sim";
 export * from "./picks/pick_sim";
 export * from "./picks/ban_visibility";
+export * from "./picks/draft_visibility";
 export * from "./engine/actions";
 export * from "./engine/action_engine";
 export * from "./engine/events";

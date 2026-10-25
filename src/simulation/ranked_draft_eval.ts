@@ -54,6 +54,7 @@ import {
     createPickSimState,
     getCurrentPickPhase,
     getKnownOpponentCreatures,
+    getPickScoutingContext,
     getVisibleCreatureChoices,
     isPickSimComplete,
     LIVE_TIER1_ARTIFACT_IDS,
@@ -66,6 +67,7 @@ import {
     type PickRandomInt,
     type PickTeam,
 } from "../picks/pick_sim";
+import type { IDraftScoutingContext } from "../picks/draft_visibility";
 import { CreatureFactions } from "../generated/protobuf/v1/creature_gen";
 import { ToFactionName } from "../factions/faction_type";
 import {
@@ -931,8 +933,9 @@ export interface IRankedDraftPickRules {
     liveDraftRules?: boolean;
     /** Replace each bundle/creature decision with a uniform legal choice at this rate. */
     explorationRate?: number;
-    /** The board's map. Creature decisions see it from level 3 on, when the live pick phase reveals it. */
+    /** The board's map, masked separately for each seat by its scouting doctrine. */
     gridType?: number;
+    onDraftInformation?: (team: PickTeam, phaseSequence: number, context: IDraftScoutingContext) => void;
     /** The board's synergy variants, public from the first draft screen (live rules only; read by `-sv` policies). */
     synergyVariants?: RankedDraftSynergyVariants;
     /** Observational trace only; never receives hidden opponent state or a future creature pick. */
@@ -1054,6 +1057,15 @@ export function resolveRankedDraftPick(
     accept({ type: "select_doctrine", team: LEFT, doctrine: leftDoctrine });
     accept({ type: "select_doctrine", team: RIGHT, doctrine: rightDoctrine });
 
+    const scouting = (team: PickTeam): IDraftScoutingContext => {
+        const context = getPickScoutingContext(state, team, rules.gridType);
+        rules.onDraftInformation?.(team, state.phaseSequence, context);
+        return context;
+    };
+
+    scouting(LEFT);
+    scouting(RIGHT);
+
     // Both simultaneous policies decide from the same pre-commit state.
     const leftBundle =
         explore(state.left.bundles.length) ??
@@ -1172,7 +1184,7 @@ export function resolveRankedDraftPick(
                         own.creatures,
                         getKnownOpponentCreatures(state, team),
                         own.tier1Artifact,
-                        phase.creatureLevel >= 3 ? rules.gridType : undefined,
+                        scouting(team).map,
                         artifactFitVersionForSetupSpec((team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec) >= 2
                             ? own.tier2Artifact
                             : undefined,
