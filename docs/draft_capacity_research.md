@@ -27,3 +27,19 @@ candidate's decisive score, zero rejected actions, worst map at least 49%, refer
 opponent checks and fresh held-out confirmation. Doctrine changes require a separate
 comparison including their different augment budgets. Raw outputs remain outside Git;
 execution reuses `playRankedDraftGame` and the canonical result validation.
+
+## Pilot result
+
+The frozen candidate at `b24f3f12` completed 360 candidate games and 360 matched unchanged-policy counterfactuals (90 independent offer boards). Both seats used the same doctrine within each group; these results do not compare the doctrines against each other.
+
+| Doctrine      | Candidate W / L / D | Draw-aware score | Paired change (pp), 95% interval |
+| ------------- | ------------------: | ---------------: | -------------------------------: |
+| Battle Trance |         59 / 59 / 2 |           50.00% |             +0.00 [+0.00, +0.00] |
+| Scout         |         54 / 62 / 4 |           46.67% |             -3.33 [-6.56, -0.11] |
+| Spymaster     |         62 / 58 / 0 |           51.67% |             +1.67 [-3.78, +7.11] |
+
+The pooled paired change was -0.56 percentage points [-2.63, +1.52]. Intervals use offer-board clustered Student-t estimates on draw-aware score differences. Battle Trance made no changed decisions and reproduced every control trace; its zero sample interval is not a claim of general statistical equivalence.
+
+All 720 records passed canonical seed/mirror validation, distinct-identity and 2/2/1/1 roster checks, balanced-map checks and zero-rejection checks. All 336 unchanged candidate setups reproduced their control behavior hashes and outcomes exactly. Scout and Spymaster each changed 12 draft decisions and 12 game setups; the remaining defaults, setup and combat stayed frozen.
+
+**Rejected for promotion.** The early shooter restriction did not establish an overall gain and hurt the Scout sample. The production draft scorer and default Battle Trance doctrine remain unchanged. Do not retune this candidate on these seeds or treat the positive Spymaster point estimate as qualification. Raw records, source hashes and review artifacts remain outside Git.
