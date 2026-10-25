@@ -131,6 +131,7 @@ export class UnitProperties {
     public small_texture_name: string;
     public large_texture_name: string;
     public stack_power: number;
+    public bitter_experience_stacks?: number;
     public target: string;
     /**
      * The exact inverse of `target`: the id of an enemy this unit may NOT attack or retaliate against, while
@@ -330,6 +331,7 @@ export class UnitProperties {
         this.small_texture_name = small_texture_name;
         this.large_texture_name = large_texture_name;
         this.stack_power = stack_power;
+        this.bitter_experience_stacks = 0;
         this.target = target;
         this.forbidden_target = "";
         this.stolen_abilities = structuredClone(stolenAbilities);
