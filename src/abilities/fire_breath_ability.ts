@@ -215,7 +215,10 @@ export function fireBreathObstacleCells(
     }
     const settings = grid.getSettings();
     return AbilityHelper.pierceSweepCells(fromUnit, target, attackFromCell).filter(
-        (cell) => isCellWithinGrid(settings, cell) && grid.getOccupantUnitId(cell) === "B",
+        (cell) =>
+            isCellWithinGrid(settings, cell) &&
+            grid.isScatteredMountainCell(cell) &&
+            grid.getOccupantUnitId(cell) === "B",
     );
 }
 

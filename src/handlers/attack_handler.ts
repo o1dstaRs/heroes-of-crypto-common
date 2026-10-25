@@ -3703,6 +3703,7 @@ export class AttackHandler {
             return [];
         }
         if (this.grid.getOccupantUnitId(behindCell) === "B") {
+            if (!this.grid.isScatteredMountainCell(behindCell)) return [];
             this.spendObstacleHit(behindCell, behindCell.x >= this.gridSettings.getGridSize() >> 1);
             this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
             return [];
