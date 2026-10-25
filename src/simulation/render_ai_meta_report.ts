@@ -627,6 +627,56 @@ const flattenProvenance = (value: unknown): { key: string; value: string }[] => 
 
 const formatInteger = (value: number): string => new Intl.NumberFormat("en-US").format(value);
 
+const formatDuration = (seconds: number | null): string => {
+    if (seconds === null || seconds < 0) return "—";
+    const rounded = Math.round(seconds);
+    return `${Math.floor(rounded / 3600)}h ${Math.floor((rounded % 3600) / 60)}m ${rounded % 60}s`;
+};
+
+/** Concurrent shard durations accumulate; only the run's elapsed interval measures wall time. */
+const renderExecutionTiming = (summary: UnknownRecord): string => {
+    const provenance = asRecord(summary.provenance);
+    const sharding = asRecord(provenance.sharding);
+    const timing = asRecord(provenance.timing);
+    const start = Date.parse(textValue(timing, ["startedAt"], textValue(provenance, ["startedAt"])));
+    const finish = Date.parse(
+        textValue(
+            timing,
+            ["finishedAt"],
+            textValue(sharding, ["shardsFinishedAt"], textValue(summary, ["generatedAt"])),
+        ),
+    );
+    const measured = finiteNumber(timing, ["wallSeconds"]);
+    const wallSeconds = measured ?? (Number.isFinite(start) && finish >= start ? (finish - start) / 1000 : null);
+    if (wallSeconds === null || wallSeconds < 0) return "";
+    const cohorts = Array.isArray(summary.cohorts) ? summary.cohorts.map(asRecord) : [];
+    const details = Array.isArray(timing.cohorts) ? timing.cohorts.map(asRecord) : [];
+    const totalGames = cohorts.reduce((sum, cohort) => sum + (countValue(cohort, ["games"]) ?? 0), 0);
+    const throughput = wallSeconds > 0 ? `${(totalGames / wallSeconds).toFixed(3)} fights/s` : "—";
+    const rows = cohorts
+        .map((cohort) => {
+            const id = textValue(cohort, ["cohort", "id"]);
+            const detail = details.find((entry) => entry.cohort === id) ?? {};
+            return `<tr><th scope="row">${escapeHtml(id)}</th><td>${formatInteger(countValue(cohort, ["games"]) ?? 0)}</td><td>${formatDuration(finiteNumber(detail, ["wallSpanSeconds"]))}</td><td>${formatDuration(finiteNumber(cohort, ["seconds"]))}</td></tr>`;
+        })
+        .join("");
+    const processes = countValue(sharding, ["processes"]);
+    const workers = countValue(sharding, ["workersPerProcess"]);
+    const layout =
+        processes && workers
+            ? `${processes} processes × ${workers} workers`
+            : textValue(provenance, ["concurrency"], "Unknown");
+    return `<section id="execution" data-report-section aria-labelledby="execution-title">
+    <div class="section-head"><div><p class="eyebrow">Measured on this run</p><h2 id="execution-title">Execution time</h2></div><p>Simulation wall time includes process startup and scheduling. Cohort spans overlap; accumulated process time sums concurrent shard durations and is not CPU time.</p></div>
+    <div class="hero-stats" style="width:100%;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:18px">
+      <div class="hero-stat"><strong>${formatDuration(wallSeconds)}</strong><span>Simulation wall time</span></div>
+      <div class="hero-stat"><strong>${throughput}</strong><span>Total throughput</span></div>
+      <div class="hero-stat"><strong>${escapeHtml(layout)}</strong><span>Execution layout</span></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Cohort</th><th>Fights</th><th>First start to last finish</th><th>Accumulated process time</th></tr></thead><tbody>${rows}</tbody></table></div>
+    </section>`;
+};
+
 /**
  * Render an arbitrary AI meta-analysis summary as one portable HTML document.
  * Missing optional fields intentionally remain blank instead of rejecting the report.
@@ -635,6 +685,8 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
     const summary = asRecord(summaryValue);
     const rows = normalizeRows(summary);
     const studyProfile = String(asRecord(asRecord(summary.provenance).fightProfile).studyProfile);
+    const searchProfile = asRecord(asRecord(asRecord(summary.provenance).fightProfile).search);
+    const complementaryR2 = searchProfile.rollouts === 2 && searchProfile.chanceSampling === "actor-antithetic";
     const premiumStudy = ["premium-ranked-v1", "premium-ranked-v2", "premium-ranked-v3"].includes(studyProfile);
     const premiumSetupNotice =
         studyProfile === "premium-ranked-v1"
@@ -684,6 +736,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
             : definition,
     );
     const provenance = flattenProvenance(summary.provenance);
+    const executionTimingHtml = renderExecutionTiming(summary);
     const provenanceHtml = provenance.length
         ? provenance
               .map(
@@ -716,6 +769,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
     };
     const heroStyle = background ? ` style="--hero-image:url('${background}')"` : "";
     const sectionNavigationHtml = [
+        ...(executionTimingHtml ? [{ id: "execution", label: "Timing" }] : []),
         { id: "overview", label: "Overview" },
         { id: "rankings", label: "Rankings" },
         { id: "patterns", label: "Patterns" },
@@ -861,6 +915,11 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
   </div>
 </header>
 <main class="shell report-main">
+  ${
+      complementaryR2
+          ? '<aside class="notice" aria-label="Complementary R2 adoption"><div class="notice-mark">i</div><div><h2>Default AI: H64 / complementary R2</h2><p>This policy was adopted by user instruction with strength uncertainty accepted. The earlier 6,000-game offline comparison scored 48.91% against R4 (95% interval 47.33–50.50%); it did not establish the 48% non-inferiority floor. Its 37.86% time reduction was measured on a separate fight workload. The timings below measure this cohort run directly.</p></div></aside>'
+          : ""
+  }
   <aside class="notice" aria-label="Interpretation caveat">
     <div class="notice-mark">!</div>
     <div><h2>${premiumStudy ? "Premium coverage study · exploratory evidence" : "Controlled strength and associative composition"}</h2><p>${premiumStudy ? premiumSetupNotice + augmentDomainNotice + "Ranked draft artifacts are retained from visible offers; their setup rows have no randomized artifact assignments and must not be read as zero strength. Synthetic cohorts explore setup artifacts. Augment exploration spans the actual 5/6/7-point doctrine budgets. Unit and synergy results are composition-confounded associations; no Premium advisor has been fitted or evaluated. This coverage pilot does not establish counter-pick gains or optimal formations. Premium charts use conservative family-bounded 95% intervals instead of the legacy summary variance intervals." : "Artifact and augment score rates use the policy's 20% uniform exploration assignments, breaking the link between a strong army and its usual item choice. Synergy rows instead track exact faction, choice, and active level under the deployed deterministic setup policy; they remain composition-confounded associations, not randomized causal effects. Augment plans are the causal unit; individual levels remain compositional diagnostics."}</p></div>
@@ -886,6 +945,7 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
     <div class="filter-row"><nav class="cohort-tabs" id="cohort-tabs" aria-label="Filter report by cohort"></nav><label class="map-picker" for="map-filter"><span>Map</span><select class="map-filter" id="map-filter" aria-label="Filter report by map"></select></label><div class="filter-coverage" id="filter-coverage" aria-live="polite"></div></div>
   </div>
 
+  ${executionTimingHtml}
   <section id="overview" data-report-section aria-labelledby="leaders-title">
     <div class="section-head"><div><p class="eyebrow">At a glance</p><h2 id="leaders-title">Category leaders</h2></div><p>Highest observed draw-aware score rate in the selected cohort and map set. Treat close results as a tier rather than a proven unique winner: confidence intervals can overlap, synergy rows inherit roster composition, ${premiumStudy ? "and augment plans must be compared within their doctrine budget." : "and the augment-plan view compares 96 candidates."}</p></div>
     <div class="leaders" id="leaders"></div>

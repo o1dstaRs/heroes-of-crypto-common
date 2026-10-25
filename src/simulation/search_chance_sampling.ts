@@ -20,7 +20,8 @@ export function complementSearchChance(value: number): number {
 }
 
 /**
- * Offline four-sample research banks. Actor/lap streams isolate another actor's extra random draws.
+ * Actor/lap streams isolate another actor's extra random draws. Production complementary R2 uses indices
+ * 0 and 1; offline diagnostics can also use the independent second pair at indices 2 and 3.
  * Antithetic pairs use two independent seed banks, each with an exact uint32-grid complement.
  * Only key hashes may be reused across branches; mutable generator states belong to THIS rollout.
  * An XOR seed permutation preserves an individual stream's seed distribution. It does not establish

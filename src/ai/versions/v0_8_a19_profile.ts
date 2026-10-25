@@ -35,7 +35,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
 
 /**
  * The production v0.8 AI: "a19". One flat profile — the a13 genome and value leaf, the A19 search rules that were
- * each measured on top of it, the deep search budget, and the four-layer public-roster placement composition.
+ * each measured on top of it, complementary R2 search, and the four-layer public-roster placement composition.
  * Saved games and AI seats keep the wire version `v0.8`; this profile is what that version resolves to.
  *
  * The research chain that produced it (h18 -> h64 score-safe -> compact -> validated -> finalist v6 -> v7) was
@@ -50,8 +50,11 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     shortlist 6 / max melee 10 measured 55.1% ± 2.0 (2,312 decisive, z 4.9) against the 2/3/6 budget, and
  *     the live-host deadline curve recovered the whole gain at 600 ms (+13.4pp) with 0% deadline fallbacks
  *     at 1,000 ms (p50 211 ms / p90 544 ms / max 980 ms on the 2 vCPU game server).
+ *   - complementary R2 adopted by explicit user instruction on 2026-10-25: 37.86% less offline fight time,
+ *     48.91% score against R4 over 6,000 games (95% interval 47.33–50.50%). The user accepted the remaining
+ *     strength uncertainty; this does not establish the earlier 48% non-inferiority floor or live latency.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v3" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v4" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -59,7 +62,8 @@ export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 export const V08_A19_SEARCH = Object.freeze({
     ...V08_A13_SEARCH,
     horizon: 64,
-    rollouts: 4,
+    rollouts: 2,
+    chanceSampling: "actor-antithetic",
     shortlist: 6,
     maxMelee: 10,
     decisionDeadlineMs: 1000,
@@ -68,6 +72,8 @@ export const V08_A19_SEARCH = Object.freeze({
 
 /** The A19 search rules layered over the a13 driver, all on. Each key is a `SearchDriver` environment switch. */
 export const V08_A19_SEARCH_RULES = Object.freeze({
+    // User-adopted 2026-10-25: complementary actor/lap-aligned R2; strength uncertainty is documented.
+    SEARCH_A19_COMPLEMENTARY_R2: "1",
     SEARCH_A19_FAST_FLYER_COHESION: "1",
     SEARCH_A19_ABOMINATION_MIRROR_RELEASE: "1",
     SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES: "1",
@@ -112,9 +118,9 @@ export const V08_A19_GENOME = Object.freeze({
         decisionDeadlineMs: V08_A19_SEARCH.decisionDeadlineMs,
     }),
 });
-export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
+export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8078c75f34a4030ad5c767c" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "34f6b79e5726d4ddde02029a5f5b5f8d0cce5fc8d0e9b8984a36375e03bac33e" as const;
+    "4446fbda753ccb0602324d3b2f3698b0e63f20a6beb4e7c5d69a90910026df32" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -147,7 +153,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for whole-impact Hydra catalogs in both production enumeration paths.
-        sha256: "98ffdbcd49cda3b48c59338fe8f024d7eb4b7de5b7e086baefb2b1e2a39b917a" as const,
+        sha256: "5c654f92f8088887090ffb35a3c142861648e4be1ba414b034d447d16b944195" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
@@ -189,6 +195,11 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "rollout-allocation" as const,
         source: "src/simulation/search_rollout_allocation.ts" as const,
         sha256: "b0b8b9a488af042195081daeaa4f4c35a25d5d0a34cdf61cb5784d1cc56cb700" as const,
+    }),
+    Object.freeze({
+        role: "chance-sampling" as const,
+        source: "src/simulation/search_chance_sampling.ts" as const,
+        sha256: "76437941046cf686f4ad2cb389afd48672d8ed05c9e379c43edd1e1d7dd6370e" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,

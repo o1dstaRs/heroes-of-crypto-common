@@ -1,0 +1,21 @@
+{
+    "schema": "hoc.puffalo-ai-meta-runtime.v1",
+    "minimumBunVersion": "1.4.4",
+    "processes": 6,
+    "workersPerProcess": 4,
+    "maxWorkers": 24,
+    "pairWindow": 24,
+    "fightProfile": "a19-work",
+    "nice": 10,
+    "environment": {
+        "BUN_JSC_numberOfGCMarkers": "2"
+    },
+    "algorithm": {
+        "horizon": 64,
+        "rollouts": 2,
+        "shortlist": 6,
+        "maxMelee": 10,
+        "allocation": "uniform",
+        "chanceSampling": "actor-antithetic"
+    }
+}

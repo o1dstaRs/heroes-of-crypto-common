@@ -1,6 +1,6 @@
 # Ranked replay strategy research
 
-Status: three placement experiments remain unqualified. A larger fresh opening-spell comparison found no reliable benefit from unconditional Mass Riot or a deeper paired recheck. Controlled continuations confirmed that the native rollout policy can rank the spells differently from later A19 play. No experimental policy is promoted. The next target is modeling later ranged/caster decisions more accurately within a fixed search budget; artifact and purchase fit remains queued.
+Status: three placement experiments and the opening-spell revisions remain unqualified. The bounded ranged/caster reply candidate improved the point estimate in a 1,107-game fresh comparison, but its intervals crossed zero and its local opening cost rose substantially. A reply-level diagnostic identified discarded and incorrectly ranked responses inside that cheap predictor. No experimental policy is promoted. Improving reply ranking and total query cost remains research; artifact and purchase fit is still queued.
 
 This work follows the latest ten test-server games between player and dNJk, finished October 20–22, 2026. The observed result was 6–4 to dNJk; excluding the round-1 quit leaves 6–3. Four games ended by elimination and six through an exit button. Treat the games as diagnostic examples, not causal win-rate evidence.
 
@@ -571,3 +571,73 @@ The primary endpoints are paired draw-aware score against both stock and R5, wit
 Only a primary pass permits the 32-root same-state, order-alternated timing gate. If it also passes, held-out seed **102520323**, three new armies per cohort/budget cell, may run unchanged. Promotion still requires separately registered 6,000+ game strength confirmation and authoritative server deadline/behavior checks. A failed gate stops this candidate without changing production.
 
 The immutable engine export remains commit 3806a0d60a512dfc981c9bec65f36b17d87ba0cd. Research scripts, complete source receipts, registration, prefix audits and fight records are under the ignored game/core/tmp/analysis/ranged-caster-replies-20261025 directory. The module adapts the bounded child chooser and target-memory/state-restoration approach from the existing future-policy diagnostic; it does not introduce another game engine or meta-cohort generator.
+
+### Experiment 6 preflight and selection
+
+The first 18 historical shadow battles passed complete result parity while computing and ignoring 802 reply proposals. Work-cap telemetry was then added without changing the policy, and all 18 were repeated on the final frozen source. The final replay set again reproduced exactly: 802 child queries, 270 different proposed replies, at most two different-team queries per parent rollout, and **zero child future unit-turns**. These are passivity checks on reused historical armies, not independent strength evidence.
+
+A separate 21-fight smoke test covered stock, R5 and reply arms on one historical army per cohort. All pre-root state hashes, shortlists and root seed banks matched; all 13 equal-root-choice arm pairs reproduced their complete records except elapsed time. All actions were accepted. Four of the seven reply-arm root choices differed from stock, demonstrating intervention without qualifying a gain.
+
+The registered fresh audit completed all **378 prefixes** without observing terminal outcomes, finding **355 native Mass Riot openings**: ranked-draft 49, uniform-mixed 52, ranged-heavy 52, ground-melee 51, flyer-heavy 52, caster/support 49, cross-archetype 50. They include 173 green and 182 red matchups; Normal/Lava/Block have 113/123/119. The planned full batch is **1,107 games**: 355 eligible armies in three arms and 14 parity conditions in three arms.
+
+Final reply-policy source SHA-256: 5924994474bbd138d70b9aedbe8f19c1b03d12c7bfde3957b726f65365eb9fc9. The source receipt hashes the runner and preregistration plus all 586 inherited engine source files. Primary results are evaluated only after the complete registered batch; seed 102520323 remains reserved.
+
+## Experiment 6 results: directional gain, insufficient evidence and excessive cost
+
+**Decision: do not promote.** The complete primary failed both adjusted confidence gates. Its 71 actual root-choice interventions exceeded the registered minimum, so insufficient activation is not the explanation. The serial timing gate and held-out seed **102520323** were not run, following the registered stop rule.
+
+All **1,107 full-A19 games** completed: 355 independent eligible-opening armies in three arms, plus 14 three-arm parity conditions. Every game ended by elimination, with **zero rejected actions**.
+
+| Comparison on 355 fresh eligible openings | Score difference | Two-comparison adjusted 95% interval | Improved / worsened / same |
+| ----------------------------------------- | ---------------: | -----------------------------------: | -------------------------: |
+| Bounded reply model versus stock R4       |         +1.83 pp |                    −0.82 to +4.49 pp |               13 / 7 / 335 |
+| Bounded reply model versus native R5      |         +2.39 pp |                    −0.77 to +5.56 pp |              19 / 10 / 326 |
+| Native R5 versus stock, descriptive       |         −0.56 pp |                    −2.56 to +1.43 pp |                5 / 8 / 342 |
+
+Draw-aware scores were stock 41.13%, reply model 42.96%, and R5 40.56% on these roster-conditioned matchups. The reply-versus-stock paired sign check was inconclusive (p = 0.263). The result is a positive point estimate, not established strength improvement. Across all 378 roster-selected prefixes, including the 23 exact no-opening zeros, the estimate was +1.72 pp with an adjusted interval of −0.77 to +4.21 pp. Those zeros are not additional observed fight pairs or baseline win rates.
+
+The reply model changed **71 of 355 opening choices**. It changed Riot to Mass Riot in 26 cases (three improved, two worsened), and Mass Riot to Riot in 23 cases (five improved, five worsened). Other changes included Riot target selection and movement/attack choices. These transitions reinforce that a universal preference for either buff is not supported.
+
+Directional gains appeared in ranked-draft and ground-melee; uniform-mixed and caster/support were negative, while ranged-heavy and flyer-heavy had no net score change. No cohort established a reliable gain. In particular, zero observed outcome variation in a slice is not a population equivalence result. Lava was favorable and Block unfavorable in point estimates; no map or cohort exception is qualified by these overlapping descriptive slices.
+
+### Work and validity
+
+The model computed **14,992 immediate reply queries**, with 4,119 different proposals. That is 42.23 queries per eligible opening on average: the per-rollout cap of two still repeats across root candidates and chance samples. All caps passed, including zero child future unit-turns.
+
+Local opening search time, measured with 12 offline workers and research validation overhead:
+
+| Arm       | Median |      p90 |
+| --------- | -----: | -------: |
+| Stock R4  | 564 ms | 1,157 ms |
+| Native R5 | 789 ms | 1,534 ms |
+| Reply R4  | 899 ms | 1,934 ms |
+
+Pooled reply-root time was **1.56× stock** and **1.15× R5**. Child-query work accounted for about a third of aggregate reply-root time. These are descriptive local costs, not the registered serial same-state timing gate or authoritative-server latency qualification. Keeping the outer R4/H64 caps did not keep total computation close to stock.
+
+Independent validation checked every frozen source hash; every planned factor cell; initial rosters, budgets and boards; prefix-to-combat root-state equality; identical root shortlists and seed banks; R5/R4 allocation; work caps; actions and termination; and complete outcome-record equality whenever final root actions matched. All equivalent-policy and parity records reproduced exactly, excluding elapsed time. No validity failure explains the uncertain gain.
+
+Primary records SHA-256: **9485d890f235d8d64652be4fe50e41ab1113421461089d17788656916a935fd8**. Records, independent validation, root-choice transitions and source receipts are in the ignored ranged-caster-replies-20261025 research directory.
+
+### What the cheap predictor still misses
+
+A separate historical diagnostic replayed all 18 original conflict armies in shadow mode. It sampled the first eligible reply from each army on the native Mass Riot branch's first private rollout, yielding **36 native-rollout-state reply positions**. For each, the native and H0 choices were compared with an ordinary full A19 H64/R4 choice on that exact hypothetical state. These are historical mechanism checks, not fresh fidelity or strength qualification and not 36 additional complete games.
+
+All 18 complete shadow match records reproduced, and every reference query restored its speculative state. The full A19 reply matched native in **15 of 36** positions and matched the cheap predictor in **12 of 36**. The predictor rescued one native miss and spoiled four native matches. This selected small sample does not establish general policy accuracy, but it supplies concrete failure cases.
+
+The full-A19 choice was available in the cheap predictor's input catalog in every position. Among the 24 cheap misses:
+
+- **16 were discarded by the cheap two-action shortlist.**
+- **Eight remained available in that shortlist but were ranked differently.**
+- None was missing from the input catalog.
+
+This is the **predictor's internal shortlist**, not the production root shortlist, which was held identical across the primary arms. For example, on uniform-mixed pair 3 after hypothetical Mass Riot, Tsar Cannon's H0 choice still targets Scavenger while full A19 targets Ogre Mage; the latter was retained but ranked below it. On uniform-mixed pair 52, the Orc's full-A19 Hydra shot was present in the catalog but discarded from the cheap shortlist. Earlier friendly/enemy actions also change the correct response, so labels on native-rollout states should not be conflated with labels on a complete searched trajectory.
+
+Two initial reference-instrumentation attempts incorrectly nested rollback checkpoints and produced no usable diagnostic rows. The reference diagnostic was corrected to snapshot rollback, as in the existing future-policy tool, then all 18 full-record parity checks passed. The frozen candidate, fresh primary source and its validated outcomes were not modified. Failed logs remain with the artifacts; only the successful diagnostic contributes the counts above.
+
+Diagnostic records SHA-256: **8821271fbe1f66eb1493056bc6c6a6fca7bb43fa694c1ed1b641df8a9aed16c8**. The inspector and analysis files record raw catalogs, shortlists, native/cheap/reference choices and readable target names.
+
+### Next research target
+
+Before funding another large reply-policy trial, improve the cheap predictor's ranking/retention on independently sampled full-A19 reply labels and measure its total per-opening work. A larger shortlist by itself does not resolve the retained-but-misranked cases. Profile exact repeated states and safe reuse opportunities, and cap work across root candidates/chance samples as well as within each rollout. A changed ranking or allocation rule is a new candidate with fresh seeds; this primary's favorable subgroups do not qualify an exception.
+
+Use the existing continuation collection/feature tools for a learned ranker if pursued. Earlier rejected imitation and residual models remain development evidence; better fidelity or lower value MSE alone cannot replace full-match, compute-matched and held-out strength checks. No production profile, engine entry point, server dependency or deployment changed. **55 repository safeguard tests passed, zero failed.**

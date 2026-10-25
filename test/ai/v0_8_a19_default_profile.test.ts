@@ -54,6 +54,7 @@ const ENV_KEYS = [
     "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
     "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
     "SEARCH_A19_ROLLOUT_ALLOCATION",
+    "SEARCH_A19_COMPLEMENTARY_R2",
     "V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT",
     "V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT",
 ] as const;
@@ -84,11 +85,11 @@ describe("v0.8+A19 production profile", () => {
         expect(buildV08A19SearchEnvironment().V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT).toBe("0");
     });
 
-    it("is one flat production identity with the deep search budget and every A19 rule on", () => {
+    it("is one flat production identity with complementary R2 and the full horizon and shortlist", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v3",
+            schema: "hoc.v0_8_a19_production_profile.v4",
             candidateId: "a19",
             productionVersion: "v0.8",
             researchOnly: false,
@@ -96,7 +97,8 @@ describe("v0.8+A19 production profile", () => {
         expect(V08_A19_SEARCH).toMatchObject({
             gate: 0.03,
             horizon: 64,
-            rollouts: 4,
+            rollouts: 2,
+            chanceSampling: "actor-antithetic",
             shortlist: 6,
             maxMelee: 10,
             maxShots: 4,
@@ -110,7 +112,7 @@ describe("v0.8+A19 production profile", () => {
             SEARCH_VERSIONS: "v0.8",
             SEARCH_GATE: "0.03",
             SEARCH_HORIZON: "64",
-            SEARCH_ROLLOUTS: "4",
+            SEARCH_ROLLOUTS: "2",
             SEARCH_SHORTLIST: "6",
             SEARCH_MAX_MELEE: "10",
             SEARCH_DECISION_DEADLINE_MS: "1000",
@@ -146,6 +148,25 @@ describe("v0.8+A19 production profile", () => {
             }
             expect(environment[key]).toBe(value);
         }
+    });
+
+    it("seals complementary R2 on for live and offline drivers with an explicit rollback", () => {
+        process.env.SEARCH_A19_COMPLEMENTARY_R2 = "0";
+        const match = { greenVersion: "v0.8", redVersion: "v0.8" };
+        for (const offlineDeterministicWork of [false, true]) {
+            const driver = createV08A19SearchDriver({} as ILookaheadDeps, { ...match, offlineDeterministicWork });
+            expect(driver).toMatchObject({ rollouts: 2, horizon: 64, complementaryR2: true });
+        }
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({
+            SEARCH_ROLLOUTS: "4",
+            SEARCH_A19_COMPLEMENTARY_R2: "0",
+        });
+        expect(createV08A19SearchDriver({} as ILookaheadDeps, match)).toMatchObject({
+            rollouts: 4,
+            complementaryR2: false,
+        });
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_COMPLEMENTARY_R2: "yes" });
+        expect(() => createV08A19SearchDriver({} as ILookaheadDeps, match)).toThrow("SEARCH_A19_COMPLEMENTARY_R2");
     });
 
     it("keeps the unqualified barrel candidate off unless explicitly overridden for research", () => {
@@ -217,7 +238,7 @@ describe("v0.8+A19 production profile", () => {
         expect(V08_A19_GENOME.search).toMatchObject({
             ...V08_A13_GENOME.search,
             horizon: 64,
-            rollouts: 4,
+            rollouts: 2,
             maxMelee: 10,
         });
         // The deep budget sits outside the v0.7 aligned-campaign grid, so the genome is hashed canonically as-is.
@@ -237,6 +258,7 @@ describe("v0.8+A19 production profile", () => {
             "ranged-shields",
             "selection-bounds",
             "rollout-allocation",
+            "chance-sampling",
             "scored-arbitration",
             "material-arbitration",
             "armageddon-endgame",
