@@ -20,7 +20,8 @@ in every cohort, live deadline mode, or deployment. Preserve this uncertainty in
 
 For explicit R4 rollback or historical comparison, set both `SEARCH_ROLLOUTS` to `"4"` and
 `SEARCH_A19_COMPLEMENTARY_R2` to `"0"` through `V08_A19_SEARCH_ENV_OVERRIDES`. Ambient shell flags cannot
-silently disable the sealed default. The one-rollout deadline degradation keeps its work cap and uses the first actor-aligned stream.
+silently disable the sealed default. One-rollout deadline degradation uses the first actor-aligned stream, as in the measured candidate.
+Higher-budget reference queries retain independent streams.
 
 The measured six-by-four layout reduced elapsed time by 27.16% against two-by-twelve in the
 frozen 48-unique-fight benchmark, with exact action and outcome parity and 2.38% more CPU time.

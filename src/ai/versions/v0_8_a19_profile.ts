@@ -153,7 +153,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for whole-impact Hydra catalogs in both production enumeration paths.
-        sha256: "5c654f92f8088887090ffb35a3c142861648e4be1ba414b034d447d16b944195" as const,
+        sha256: "f7037a687a6c35adbb1b3110b3a1352113eaab45e7f421a95ea1dd2232969801" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,

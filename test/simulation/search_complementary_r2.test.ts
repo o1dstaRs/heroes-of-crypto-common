@@ -11,14 +11,23 @@ interface IReferenceDriver {
     deps: ILookaheadDeps;
     rollouts: number;
     rollout(unit: Unit, candidate: unknown, seed: number, index: number, mode: string, ...rest: unknown[]): number;
+    scoreCandidates(
+        unit: Unit,
+        candidates: readonly unknown[],
+        seed: number,
+        mode: string,
+        ...rest: unknown[]
+    ): number[];
 }
 
 const savedOverride = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
 const prototype = SearchDriver.prototype as unknown as IReferenceDriver;
 const originalRollout = prototype.rollout;
+const originalScore = prototype.scoreCandidates;
 
 afterEach(() => {
     prototype.rollout = originalRollout;
+    prototype.scoreCandidates = originalScore;
     if (savedOverride === undefined) delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
     else process.env.V08_A19_SEARCH_ENV_OVERRIDES = savedOverride;
 });
@@ -36,6 +45,55 @@ const match: IMatchConfig = {
 };
 
 describe("complementary R2 integration", () => {
+    test("uses the first complementary stream for single samples and independent higher-budget references", () => {
+        delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+        for (const budget of [1, 8]) {
+            let issued = false;
+            let referenceActive = false;
+            const flags: boolean[] = [];
+            const sampledIndices: number[] = [];
+            prototype.rollout = function (...args) {
+                if (referenceActive) {
+                    flags.push(args[7] === true);
+                    sampledIndices.push(args[3]);
+                }
+                return originalRollout.apply(this, args);
+            };
+            prototype.scoreCandidates = function (...args) {
+                if (!issued && args[3] === "turns") {
+                    issued = true;
+                    referenceActive = true;
+                    try {
+                        const cache =
+                            budget > 2
+                                ? new Map(args[1].map((candidate) => [candidate, new Map([[0, { score: 0.5 }]])]))
+                                : undefined;
+                        return originalScore.call(
+                            this,
+                            args[0],
+                            args[1],
+                            args[2],
+                            args[3],
+                            budget,
+                            null,
+                            0,
+                            false,
+                            cache,
+                        );
+                    } finally {
+                        referenceActive = false;
+                    }
+                }
+                return originalScore.apply(this, args);
+            };
+            runMatch({ ...match, maxLaps: 1 });
+            expect(issued).toBe(true);
+            expect(flags.length).toBeGreaterThanOrEqual(budget);
+            expect(flags.every((flag) => flag === (budget === 1))).toBe(true);
+            expect(sampledIndices).toContain(0);
+        }
+    }, 120_000);
+
     test("matches the measured first-action interception across all live maps", () => {
         for (const gridType of [1, 3, 4]) {
             const config = { ...match, gridType };
