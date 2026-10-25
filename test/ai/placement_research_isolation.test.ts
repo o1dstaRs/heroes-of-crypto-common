@@ -16,6 +16,9 @@ const unqualified = [
     "src/ai/barrel_caster_cover.ts",
     "src/ai/barrel_landing_cover.ts",
     "src/simulation/barrel_deployment_research.ts",
+    "src/simulation/first_contact_placement_research.ts",
+    "src/simulation/measure_first_contact_placement.ts",
+    "src/simulation/blocked_approach_placement_research.ts",
 ].map((source) => resolve(root, source));
 
 // Follow executable imports/re-exports, not comments or type-only references. A helper silently called
