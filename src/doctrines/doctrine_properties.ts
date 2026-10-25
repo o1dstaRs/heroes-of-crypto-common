@@ -83,7 +83,7 @@ export const DOCTRINES: { [key in Doctrine]: DoctrineProperties } = {
         Doctrine.SEE_ALL,
         "see_all",
         "Spymaster",
-        "See all of the opponent's picks during the draft and all draft bans in advance. Grants 5 upgrade points.",
+        "See all of the opponent's picks during the draft and all draft bans in advance. Know the map from the starting bundle choice. Grants 5 upgrade points.",
         5,
         "all",
     ),
