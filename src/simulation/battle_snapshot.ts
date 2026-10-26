@@ -566,6 +566,9 @@ export class BattleRollbackCheckpoint {
     private readonly units = new Map<string, Bag>();
     // One checkpoint-wide graph, including references shared by a unit and the holder's aura cache.
     private readonly cloneMemo = new WeakMap<object, unknown>();
+    // adjustBaseStats shares these small string lists between fight state and multiple units. Restore
+    // their contents in place: replacing only a touched owner's bag would detach untouched owners.
+    private readonly synergyArrays = new Map<string[], string[]>();
     private gridSnapshot: Bag | undefined;
     private fightSnapshot: Bag | undefined;
     private holderSnapshot: Bag | undefined;
@@ -586,6 +589,23 @@ export class BattleRollbackCheckpoint {
         this.smokeClouds = fightProperties.getSmokeClouds();
         this.vines = fightProperties.getVines();
         this.fireWalls = fightProperties.getFireWalls();
+        const rememberSynergies = (value: unknown): void => {
+            if (
+                !Array.isArray(value) ||
+                !value.every((entry) => typeof entry === "string") ||
+                this.synergyArrays.has(value)
+            ) {
+                return;
+            }
+            this.synergyArrays.set(value, deepClone(value));
+            this.cloneMemo.set(value, value);
+        };
+        // Read the field bags directly; mutable-property getters would first-touch whole units here.
+        for (const unit of unitRefs.values()) {
+            rememberSynergies((Reflect.get(unit, "unitProperties") as { synergies?: unknown }).synergies);
+        }
+        const fightSynergies = Reflect.get(fightProperties, "synergiesPerTeam") as Map<unknown, unknown>;
+        for (const value of fightSynergies.values()) rememberSynergies(value);
     }
     public recordUnitMutation(unit: Unit): void {
         const id = unit.getId();
@@ -646,6 +666,22 @@ export class BattleRollbackCheckpoint {
         }
         this.consumed = true;
         activeRollbackCheckpoint = undefined;
+        for (const [live, saved] of this.synergyArrays) {
+            const liveKeys = Object.keys(live),
+                savedKeys = Object.keys(saved);
+            if (
+                live.length === saved.length &&
+                liveKeys.length === savedKeys.length &&
+                liveKeys.every(
+                    (key, index) => key === savedKeys[index] && Reflect.get(live, key) === Reflect.get(saved, key),
+                )
+            ) {
+                continue;
+            }
+            for (const key of liveKeys) Reflect.deleteProperty(live, key);
+            live.length = saved.length;
+            for (const key of savedKeys) Reflect.set(live, key, Reflect.get(saved, key));
+        }
         const liveUnits = this.unitsHolder.getAllUnits() as Map<string, Unit>;
         liveUnits.clear();
         for (const id of this.unitOrder) {
