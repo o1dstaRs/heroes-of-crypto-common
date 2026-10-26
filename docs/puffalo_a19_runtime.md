@@ -23,14 +23,21 @@ For explicit R4 rollback or historical comparison, set both `SEARCH_ROLLOUTS` to
 silently disable the sealed default. One-rollout deadline degradation uses the first actor-aligned stream, as in the measured candidate.
 Higher-budget reference queries retain independent streams.
 
-Future Puffalo jobs now use a clean published source containing the shared-aura rollback repair
+Future Puffalo jobs use a clean published source containing the shared-aura rollback repair
 (`6cb91b96d9b1b87daf47b006fd3813abebfa5522`). It restores shared object relationships during speculative
-search; the general algorithm remains complementary R2. The runtime manifest and adoption receipt record
-the precise published commit and source hash
-(`105048137b3ff66079c6f2516d78b5daba5c587fa5061167ee3d1ee26651c178`). The clean published export passed
-7,195 tests, TypeScript and lint; Linux bounds/chance/alias/default-profile tests and both launcher dry-runs
-passed for this adoption. No cohort job or ranked deployment was started. Historical cohort and speed
-results retain their original unrepaired-engine identities.
+search; the general algorithm remains complementary R2. The initial repaired adoption used source hash
+`105048137b3ff66079c6f2516d78b5daba5c587fa5061167ee3d1ee26651c178` and passed 7,195 tests, TypeScript,
+lint, Linux bounds/chance/alias/default-profile tests and both launcher dry-runs. Subsequent source
+refreshes record their exact published commit and hash in the runtime manifest and adoption receipt.
+Research-only source additions require proof that existing production source bytes and the adopted
+profile remain unchanged, followed by the relevant Linux tests and launcher dry-runs. Source refreshes
+do not start cohort jobs or deploy ranked services. Historical cohort and speed results retain their
+original engine identities.
+
+The [integer-antithetic R2 experiment](a19_discrete_chance_research.md) is closed: it covered 84 of 96
+registered positions and descriptively increased action-difference error by 6.69%. Its inert sampler has
+no production caller; its private integer dispatch exists only in the frozen research export. A newer
+runtime source revision containing that module still defaults to the measured raw-complement R2.
 
 The separate [repaired-engine R8 reference](a19_r8_reference_research.md) scored 54.81% against R2 over
 1,008 fresh games, with a whole-board 95% interval of 52.78–56.89%. That is a promising stronger teacher;
