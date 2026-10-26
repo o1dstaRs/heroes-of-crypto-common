@@ -82,6 +82,23 @@ another transfer. Four of the seven subsequent seven-point regressions had such 
 Their unselected Movement validation outcomes were never measured, so this is evidence of a weak
 selection criterion, not proof that replacing the tie would have prevented those four losses.
 
+## Value-representation check
+
+A structural reuse of **all 2,592 original discovery openings** reproduces their complete state and
+reference-graph witnesses, then reads both teams' sixty-dimensional deployed V2 feature vectors.
+Every feature read passes a further state/reference/memory/RNG restoration check. Independent
+verification matches the original witnesses and every case/plan pairing.
+
+All **324 Armor-to-Empower pairs and 324 Armor-to-Movement pairs** have exactly identical full
+feature vectors to their incumbent, for both teams. The encoder records HP, attack, composition,
+turn queues and geometry, but no direct Armor, movement allowance or remaining damaging-spell
+resource. Future attacks and movement can expose these differences during rollouts; the identical
+initial features alone cannot price them.
+
+This is a measured information gap, not a strength result for adding features or coefficients.
+It motivates testing a richer learned representation against the existing R8 reference and actual
+held-out full-game labels. Earlier failed hand-weighted support-resource rules remain closed.
+
 ## New fixed hypothesis: keep Armor and Sniper, fund Movement from Might
 
 The actual seven-point ranged template is **P0 A3 M1 S3 V0 E0**. Test **P0 A3 M0 S3 V1 E0** instead:
@@ -112,6 +129,9 @@ The new screen keeps the same frozen corrected engine and captured H64/R2/K6 ser
 Its 72 opening checks and **84 full preflight fights** pass, including exact ordinary/incumbent and
 checkpoint/full-snapshot controls. Independent Python reconstruction checks all 1,629 distinct fresh
 seed channels, legal spending, actual buff powers, roster supply and nonoverlapping occupancy.
+Reconstructing every one of the 900 configurations through the canonical helper's augment override
+before tactical splitting produces the exact effective configuration used by this screen. Placement
+and the Nature capacity bonus remain unchanged, so the split roster also matches exactly.
 
 | Registered population                     | Offer boards | Paired cases | Full fights |
 | ----------------------------------------- | -----------: | -----------: | ----------: |
