@@ -16,6 +16,7 @@
         "shortlist": 6,
         "maxMelee": 10,
         "allocation": "uniform",
-        "chanceSampling": "actor-antithetic"
+        "chanceSampling": "actor-antithetic",
+        "offlineSelectionBounds": "certified-tight-v1"
     }
 }

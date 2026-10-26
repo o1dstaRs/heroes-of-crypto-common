@@ -27,6 +27,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import { validateAiMetaEvidence, type IAiMetaFightEvidence, type IAiMetaFormationEvidence } from "./ai_meta_evidence";
 import { summarizePremiumParticipation } from "./ai_meta_participation";
 import { summarizePremiumCombatMetrics } from "./ai_meta_combat_metrics";
+import { AI_META_OFFLINE_SEARCH_ENVIRONMENT } from "./ai_meta_search_budget";
 
 export const aiMetaMatchConfig = (
     green: IAiMetaArmy,
@@ -250,7 +251,12 @@ function playMetaPairInner(
     const prepared = prepareMetaPair(options, pair);
     const synergyVariants = aiMetaSynergyVariantsForPair(prepared.setupSeed, prepared.combatSeed);
     // Finite search budgets replace the live move deadline, so outcomes stop depending on host speed and load.
-    const searchBudget = offlineDeterministicWork ? { searchOfflineDeterministicWork: true } : {};
+    const searchBudget = offlineDeterministicWork
+        ? {
+              searchOfflineDeterministicWork: true,
+              researchA19BaseSearchEnvironment: AI_META_OFFLINE_SEARCH_ENVIRONMENT,
+          }
+        : {};
     FightStateManager.getInstance();
     const aConfig = {
         ...aiMetaMatchConfig(

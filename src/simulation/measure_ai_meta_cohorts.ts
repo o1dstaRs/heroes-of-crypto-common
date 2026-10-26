@@ -72,6 +72,7 @@ import { creaturesByLevel, DEFAULT_ROSTER_COMPOSITION } from "./army";
 import { captureGitSourceStatus } from "./git_source_status";
 import { fingerprintSourceTree } from "./source_tree_fingerprint";
 import { AI_META_EVIDENCE_SCHEMA } from "./ai_meta_evidence";
+import { AI_META_OFFLINE_SEARCH_ENVIRONMENT } from "./ai_meta_search_budget";
 
 interface ICountedOutcome {
     score: number;
@@ -816,6 +817,7 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             searchRules: V08_A19_PROFILE.searchRules,
             placementPolicy: V08_A19_PROFILE.placementPolicy,
             searchBudget: "offline-deterministic-work",
+            offlineSearchEnvironment: AI_META_OFFLINE_SEARCH_ENVIRONMENT,
             workerOverride: "V08_A19_SEARCH=1; searchOfflineDeterministicWork=true",
         }),
         workerEnvironment: definedEnvironment({
@@ -858,10 +860,12 @@ export function sanitizedAiMetaEnvironment(
     const exact = new Set([
         "COHORT",
         "FORCE_CREATURES",
+        "GRID_MATRIX_CACHE_VERIFY",
         "MAPS",
         "PHASE_B_RUN_FINGERPRINT",
         "RANDOM",
         "SIM_NO_ACTIONS",
+        "SIM_GRID_MATRIX_CACHE",
         "TEAM_WR_RANDOM",
         "VALUE_DATA",
         "VALUE_DATA_FEATURES",

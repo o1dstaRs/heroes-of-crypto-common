@@ -34,6 +34,28 @@ using this config and the user-installed Bun. The launcher tiles globally seeded
 changing process layout must preserve the raw matchup records. It must refuse more than 24 total
 workers and preserve failed output for diagnosis.
 
+The canonical `a19-work` cohort path now enables certified, tight selection bounds. These skip only
+rollout tails whose maximum possible score cannot change selection. H64, complementary R2, candidate
+order, and the shortlisted actions stay the same. Live deadline profiles retain their existing settings;
+full-score observers and other unsupported search modes remain excluded by the driver's guards.
+The exact offline search overrides are recorded as `offlineSearchEnvironment` in report provenance.
+
+On October 26, two fresh M4 Max banks replayed 168 distinct game instances in both arms (336 battles),
+covering all seven cohorts, all three live maps, and both physical seats. All selected-turn traces,
+committed events, and final results matched exactly, with zero rejected actions. Baseline/bounded wall
+times were 147.77/108.39 seconds and 146.30/116.18 seconds: reductions of 26.65% and 20.59%.
+Process CPU time decreased 2.21% and 2.67%, respectively. Orders were reversed between banks.
+A separate 14-game comparison confirmed 9,309 versus 9,193 full-horizon rollouts, unchanged 6,586 leaf
+probes, and exact traces. The elapsed gains are local measurements, not a Puffalo throughput claim;
+the occupied node needs its own quiet calibration. The existing derived-board/aura cache was rejected:
+it preserved 84 game traces but took 109.87 versus 97.72 seconds in its first valid bank. Ambient cache
+flags are stripped before cohort workers initialize, so shell state cannot silently enable that arm.
+
+The local timing protocol required at least 10% less elapsed time in both fresh banks, no more than
+5% extra CPU time, exact full-game parity, and no rejected actions. An initial queue overlap affected
+partial trials only; those files were retained and excluded before the two fresh deciding banks.
+No new AI-strength gain is claimed from an optimization that retained the measured decisions.
+
 For example, from the frozen, published common source:
 
 ```sh
