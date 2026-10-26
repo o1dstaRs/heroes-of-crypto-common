@@ -111,7 +111,71 @@ remained unchanged.
 
 ## Result
 
-Primary collection is in progress. No strength or headroom conclusion is admitted before both complete
-phases and independent reconstruction. A positive headroom gate would fund a separate selector
-development study and seven-cohort stress tests, followed by fresh 6,000-game qualification and
-unchanged fresh confirmation. It cannot promote this offline oracle.
+**Closed: the fixed single-discovery-fight selection procedure failed its validation gate.**
+
+All **2,592 discovery fights and 648 validation fights** completed. Discovery appeared to improve
+draw-aware score by **33.1790 percentage points**. Under independent actual combat randomness, the
+locked choices improved only **1.2346 pp**, with a whole-board 95% interval of
+**−2.1605 to +4.7840 pp** and exact paired sign-flip **p = .62890625**. Neither the +2 pp floor nor
+the positive lower bound nor the p-value gate passes. Selection changed plans in 110 of 324 cases,
+spanning all 27 boards, so lack of activation does not explain failure.
+
+Validation score was 47.5309% for the incumbent and 48.7654% for the selected plans. There were
+24 improved outcomes, twenty worsened outcomes and 280 unchanged outcomes. All 214 cases retaining
+the incumbent reproduced its full validation behavior and root-input hashes exactly. Among the
+110 changed plans, 66 retained the same outcome, 24 improved and twenty worsened.
+
+| Exploratory map slice | Cases | Paired validation gain |
+| --------------------- | ----: | ---------------------: |
+| Normal                |   108 |             −4.6296 pp |
+| Lava                  |   108 |             −1.3889 pp |
+| Block                 |   108 |             +9.7222 pp |
+
+The seven-point slice relevant to the source-default v0.8 doctrine was **−0.4630 pp** over 108
+cases. Five points scored +5.5556 pp and six points −1.3889 pp. These are descriptive slices of a
+failed primary. Neither Block nor a transfer family qualifies a conditional policy or another
+validation bank. Each map also has its own nine offer boards; this is not a controlled estimate
+of changing terrain on identical rosters.
+
+The selected Armor-to-Movement slice improved ten cases and worsened four among thirty selected
+cases. Armor-to-Empower improved seven and worsened nine among 38. They are outcome-selected,
+overlapping exploratory populations, not evidence that a general Movement rule wins or Empower is
+universally bad. No positive slice rescues the complete procedure.
+
+## Why the discovery result was misleading
+
+The complete opening values, reference graphs, identities, buffs and geometry match across phases
+for every incumbent and selected plan. Nevertheless, the unchanged incumbent's terminal outcome
+changes in **118/324 cases (36.42%)** when only actual combat randomness changes. This is a direct
+measure of chance sensitivity on these fixed cases, not a new independent population estimate.
+Choosing the best of seven to nine observed results per case strongly favors fortunate discoveries.
+The apparent +33.18 pp did not survive the registered independent-seed check.
+
+The discovery selector has one outcome per alternative, not knowledge of its expected win probability.
+Its validation performance is therefore not a mathematical upper bound on the best possible setup
+policy. Failure rejects this selection procedure; it does not prove that no one-point improvement
+exists. A future selector needs expected-value evidence and fresh offer-board qualification, rather
+than a rule copied from this bank's favorable results. The present procedure and its bank stay closed.
+
+## Final verification and disposition
+
+All **3,330 admitted full fights**, including ninety controls, ended by elimination with zero rejected
+or censored games. They supplied **172,275 real searched-root restoration checks**. Independent
+verification covered all 43,800 opening units in those fights. Source/tool hashes, factor cells,
+legal funded neighbors, complete phase pairings, every discovery choice and all unchanged controls
+passed. Independent JavaScript and Python calculations reproduce every integer in the sorted
+20,000-resample bootstrap distribution, both interval endpoints and the exact p-value.
+
+The snapshot repair was published as common `331c53ba43e0a23375d51198fd46de4b11ef923c` during collection;
+the validated snapshot bytes are unchanged. This study retains its original sealed source identity
+and does not absorb that commit's separate research modules or relabel older experiments.
+
+No selector fit, seven-cohort strength extension, qualification, confirmation, timing qualification
+or serving change follows this failed gate. No new strategy qualified. The positive R8 reference
+and its cost/teacher work remain separate priorities. Generated evidence stays outside Git.
+
+Following the subsequent request to analyze every regression and continue, the
+[loss-mechanism follow-up](a19_augment_loss_mechanisms_research.md) preserves this closed verdict and
+replays all twenty worsened and 24 improved cases. It separately registers a fixed seven-point
+Might-to-Movement rule on untouched offer boards, keeping Armor and Sniper capped. That is a new
+hypothesis and bank, not a second validation or subgroup rescue of this one-fight selection procedure.

@@ -1,8 +1,22 @@
 # A19: the next measurable improvements
 
 Reviewed October 26, 2026. Prioritize a better strength/cost tradeoff, with complete games as the
-endpoint. The latest support research qualified no strategy; its synergy rollback repair remains local.
-Keep historical results attached to their original engine and profile.
+endpoint. No new strategy qualified. The synergy rollback repair is now published in `331c53ba`;
+historical results retain their original engine and profile identities.
+
+The first [augment-transfer diagnostic](a19_augment_transfer_research.md) is complete: 3,240 primary
+fights, +1.2346 pp on independent-combat validation, 95% whole-board interval −2.1605 to +4.7840 pp.
+Its fixed selection procedure failed. The unchanged incumbent changed outcomes in 36.42% of cases
+across combat seeds, showing why a single discovery winner is a poor expected-value label here.
+No augment rule was promoted; the R8 cost/teacher branch remains the strongest measured direction.
+
+The subsequent [loss-mechanism study](a19_augment_loss_mechanisms_research.md) reproduces every
+regression and improvement exactly. Six of eleven Empower regressions never realize offensive magic
+damage; three Empower improvements also have no output. Early attacks and caster presence therefore
+cannot select the wins reliably. A separate fixed seven-point screen now tests funding Movement from
+Might while retaining maximum Armor and Sniper, on 48 untouched offer boards with crossed maps,
+seats/sides and independent combat streams. Its original selector bank remains closed; fresh collection
+is not a qualified policy or a serving change.
 
 ## What the evidence supports
 
@@ -55,7 +69,10 @@ every frozen engine input, including binary generated files.
 
 ## First new experiment to fund: setup value without a combat-search increase
 
-This is a design for a separately registered study, not an opened strength bank or a locked candidate.
+The following design motivated the now-completed diagnostic. Its actual registration and failed
+result are in the [experiment report](a19_augment_transfer_research.md); it is not an open bank or
+a qualified candidate. Source-default v0.8 uses the seven-point doctrine, so the balanced five- and
+six-point cases are stress coverage rather than the serving population.
 
 1. Use fresh legal ranked offer boards and the actual captured draft policy through the existing ranked
    simulator. Keep the fight controller at current H64/R2. Retain both draft seats and battle mirrors,
@@ -85,7 +102,8 @@ This is a design for a separately registered study, not an opened strength bank 
 
 Register the exact source, candidate family, diagnostic funding, seed exclusions and stopping rule
 before executing this design. Previously closed or unopened reserved channels remain excluded. No
-such trial ran as part of the coverage census.
+such trial ran as part of the original coverage census. The subsequent registered one-point trial
+is closed after its independent-combat validation failure.
 
 ## Parallel research priorities
 
@@ -102,5 +120,7 @@ existing controllers, each on the same source and with fully specified profiles.
 worst supported regression, rather than treating a better result against one controller as universal
 strength. This panel does not replace the untouched primary confirmation.
 
-The most useful new branch is therefore an outcome-validated setup selector. The best existing positive
-branch is R8 made affordable. Neither requires reopening the failed support-value heuristics.
+The single-fight setup selector has now failed its independent-seed check. A future setup learner
+needs expected-value evidence and fresh boards; the absence of Empower purchases alone is insufficient.
+The best existing positive branch is R8 made affordable and qualified on the admitted engine. Do not
+reopen the failed support-value heuristics or promote an exploratory slice of this setup diagnostic.

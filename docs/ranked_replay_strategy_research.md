@@ -1,6 +1,6 @@
 # Ranked replay strategy research
 
-Status on 2026-10-26: **no new strategy qualified; a further rollback defect is fixed locally**. A fresh repaired-engine audit collected 378 full teacher fights and 276 support decisions. Timing improved reply agreement, but its resource model failed the stronger-control and scope gates; ordinary shallow search bought more accuracy with fewer future turns. The following support-R8 strength screen stopped after 293 complete records because stock checkpoint rollback broke shared synergy-array references. That partial bank has no admitted strength result. The local repair passes 7,206 common tests, 284 complete replay checks and isolated ranked-server compatibility. See [the repair report](a19_synergy_rollback_research.md); a new frozen source and fresh strength registration are required before retrying strategy qualification.
+Status on 2026-10-26: **no new strategy qualified; rollback repair published; single-fight augment selector closed; distinct fixed-policy screen collecting**. The shared synergy-list repair passed 7,206 common tests, 284 exact replay checks and isolated ranked-server compatibility and is now published in common `331c53ba`. The interrupted support-R8 bank remains invalid and closed. A subsequent 3,240-fight augment diagnostic found +1.2346 pp under independent combat randomness, with a 95% whole-board interval of −2.1605 to +4.7840 pp; it failed its fixed gate. The unchanged incumbent changed outcomes across combat seeds in 36.42% of cases. A [separate loss-mechanism follow-up](a19_augment_loss_mechanisms_research.md) replays every regression and improvement, then tests a fixed Armor-preserving Movement purchase on untouched seven-point drafts. See the [repair report](a19_synergy_rollback_research.md) and [augment-transfer results](a19_augment_transfer_research.md). Historical experiments retain their original source identities; no strategy profile or serving default was changed by this research iteration.
 
 **Baseline clarification:** preceding studies use their documented common-package or native-controller settings. References below to current R2 mean the sealed common R2 default, not the exact ranked-server configuration. Reading the server sources for experiment 12 exposed additional material-tie arbitration, certified/tight selection bounds, zero replay tie epsilon and disabled flyer-backline priorities. The new diagnostic installs and verifies those settings on every real A19 call. Keep earlier findings scoped to their recorded baselines; do not pool them with this server-profile study.
 
@@ -1263,3 +1263,58 @@ All **284 complete replays** passed: 142 exact checkpoint/full-snapshot pairs, i
 The isolated full common build passes **7,206 tests**, TypeScript and generated/JSON copies. Targeted lint and formatting pass. The isolated server export uses the exact fixed source and compiled snapshot module with one shared dependency tree: server TypeScript and **890 ranked API tests pass**, with 45 skipped tests. No credentials, actual server dependency installation, manifest or lockfile were changed. A first validation setup omitted the archived profile seam and was rejected before any complete game; its receipt and log are preserved, and the final sealed build and replay bank include the seam explicitly.
 
 The fix preserves original synergy-list objects and restores changed contents in place without capturing untouched unit bags. It does not establish a stronger strategic policy or a production latency improvement. The incomplete R8 strength bank, its reserved confirmation/artifact channels and the unused first-choice outcome diagnostic stay closed. Existing experiments retain their recorded source identities; none is relabeled as post-repair strength evidence. Review the [repair report](a19_synergy_rollback_research.md) and the source/tests before publishing a new common commit and registering fresh strategy outcomes.
+
+## Experiment 28: one-point augment choices under independent combat randomness
+
+The [coverage census](a19_frontier_priorities.md) identified an action-space gap: the captured setup
+offers two spending templates per budget and never buys Empower. Freeze 9dde84d1 plus the validated
+synergy-list repair, the exact captured server profile and legal v4-w16-r4 ranked drafts. Twenty-seven
+offer boards supply both draft seats and battle mirrors across own budgets 5/6/7, rotating opponent
+budgets so every map/budget joint cell has twelve cases. This is a balanced diagnostic; the source-default
+v0.8 doctrine itself uses seven points.
+
+Keep each original split roster, free formation, artifacts, synergies and opponent plan. Evaluate the
+incumbent and every legal one-point Armor/Might/Sniper/Empower/Movement transfer: **2,592 discovery
+fights over 324 cases**. Lock the highest terminal discovery result, retaining the incumbent on ties.
+Then run **648 fresh-actual-RNG validation fights**, including duplicate controls when unchanged.
+No unit, map, item or outcome filter and no changing choices during validation.
+
+Discovery's apparent gain of **+33.1790 pp** fell to **+1.2346 pp**, whole-board 95% interval
+**−2.1605 to +4.7840 pp**, exact paired p **.62890625**. It fails the +2 pp, positive lower-bound and
+p-value gates. All 27 boards activated; 110 plans changed, giving 24 better and twenty worse validation
+outcomes. All 214 unchanged choices reproduced full validation traces and root inputs exactly.
+The seven-point slice was −0.4630 pp; exploratory Block and Armor-to-Movement signals cannot rescue
+the failed primary or authorize a conditional policy.
+
+All **3,330 admitted full fights**, including ninety control replays, ended by elimination with no
+rejected or censored game. They supplied **172,275 actual searched-root restoration checks**.
+Independent source/seed/neighbor/factor/choice/pairing verification and all 43,800 opening-unit checks
+passed. JavaScript and Python reproduce the complete sorted bootstrap distribution and exact p-value.
+For every fixed plan, complete initial state/graph/geometry matches across phases, yet the unchanged
+incumbent changes terminal outcome in **118/324 cases (36.42%)** when actual combat RNG changes.
+
+Close this fixed single-fight selection procedure without fitting a selector, opening another bank,
+promoting a favorable slice, or running qualification/confirmation. It is not a mathematical upper
+bound on optimal expected-value setup, and its failure does not prove that every one-point change is
+bad. No new policy qualified. Detailed gates, preserved admission attempts and all-sign slices are in
+the [experiment report](a19_augment_transfer_research.md); raw output stays ignored under
+game/core/tmp/analysis/augment-transfer-headroom-20261026. The snapshot repair was separately
+published as 331c53ba during collection; the sealed study's engine bytes remained unchanged.
+
+## Experiment 29: all-loss diagnosis and an Armor-preserving Movement hypothesis
+
+After the request to examine losses and continue, preserve experiment 28's negative verdict. Replay
+all twenty worsened and 24 improved validation cases, both plans, under the original exact seeds.
+Two admitted instrumentation modes and their controls reproduce all actual choices and states:
+200 diagnostic replays and 11,789 root restoration checks. Six of eleven Empower regressions never
+realize offensive damage; three Empower improvements also have no output. Two of four Movement
+regressions gain early physical attacks. These are failed proxies for a winning setup selector.
+
+A new fixed rule exchanges the single Might point in P0 A3 M1 S3 V0 E0 for Movement, preserving
+both Armor and Sniper. Other own templates remain unchanged. It uses no hidden opponents, map,
+identity or combat outcome. Normal full setup/placement runs with the plan chosen before combat.
+The separate untouched primary has 48 offer boards, crossed maps/seats/sides and two actual combat
+streams: 1,152 paired cases / 2,304 fights. A further 576 fights test opponent budgets five and six.
+Seventy-two opening checks and 84 full preflight fights pass, including independent seed/funding/
+buff/supply/occupancy reconstruction. Fresh strength collection is in progress; partial outcomes
+cannot qualify the rule. See the [full design and loss cases](a19_augment_loss_mechanisms_research.md).
