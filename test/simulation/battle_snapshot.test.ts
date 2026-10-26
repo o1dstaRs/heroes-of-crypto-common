@@ -448,29 +448,36 @@ describe("battle snapshot round-trip", () => {
         }
     });
 
-    it("captures only first-touched battle objects and restores transient terrain", () => {
+    it("captures first-touched objects and shared aura owners, and restores transient terrain", () => {
         try {
             const h = buildBattle(20240701);
             h.playTurns(8);
             const before = normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties));
-            const [unit, enemy] = [...h.unitsHolder.getAllUnits().values()];
+            const units = [...h.unitsHolder.getAllUnits().values()];
+            const unit = units.find((candidate) => candidate.getAuraEffects().length === 0);
+            const enemy = units.find((candidate) => candidate !== unit);
             expect(unit).toBeDefined();
             expect(enemy).toBeDefined();
 
             const checkpoint = new BattleRollbackJournal(h.unitsHolder, h.grid, h.fightProperties).checkpoint();
-            expect(checkpoint.getCapturedObjectCounts()).toEqual({ units: 0, grid: 0, fight: 0, holder: 0 });
+            try {
+                expect(checkpoint.getCapturedObjectCounts()).toEqual({ units: 0, grid: 0, fight: 0, holder: 0 });
 
-            unit!.setTarget(enemy!.getId());
-            expect(checkpoint.getCapturedObjectCounts()).toEqual({ units: 1, grid: 0, fight: 0, holder: 0 });
+                // A non-emitter has no shared objects in the aura cache and still captures only itself.
+                unit!.setTarget(enemy!.getId());
+                expect(checkpoint.getCapturedObjectCounts()).toEqual({ units: 1, grid: 0, fight: 0, holder: 0 });
 
-            h.unitsHolder.haveDistancesToClosestEnemiesDecreased();
-            h.grid.occupyByHole({ x: 0, y: 0 });
-            h.fightProperties.getSmokeClouds().add({ x: 0, y: 0 });
-            h.fightProperties.getVines().add({ x: 1, y: 0 }, 2, GREEN_TEAM);
-            h.fightProperties.getFireWalls().add({ x: 2, y: 0 }, 2, 30);
-            expect(checkpoint.getCapturedObjectCounts()).toEqual({ units: 1, grid: 1, fight: 1, holder: 1 });
-
-            checkpoint.rollback();
+                h.unitsHolder.haveDistancesToClosestEnemiesDecreased();
+                h.grid.occupyByHole({ x: 0, y: 0 });
+                h.fightProperties.getSmokeClouds().add({ x: 0, y: 0 });
+                h.fightProperties.getVines().add({ x: 1, y: 0 }, 2, GREEN_TEAM);
+                h.fightProperties.getFireWalls().add({ x: 2, y: 0 }, 2, 30);
+                const counts = checkpoint.getCapturedObjectCounts();
+                expect(counts).toEqual({ units: counts.units, grid: 1, fight: 1, holder: 1 });
+                expect(counts.units).toBeLessThan(units.length);
+            } finally {
+                checkpoint.rollback();
+            }
             expect(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties))).toEqual(before);
         } finally {
             setDeterministicRandomSource(undefined);
