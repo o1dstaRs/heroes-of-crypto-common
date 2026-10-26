@@ -23,6 +23,22 @@ For explicit R4 rollback or historical comparison, set both `SEARCH_ROLLOUTS` to
 silently disable the sealed default. One-rollout deadline degradation uses the first actor-aligned stream, as in the measured candidate.
 Higher-budget reference queries retain independent streams.
 
+Future Puffalo jobs now use a clean published source containing the shared-aura rollback repair
+(`6cb91b96d9b1b87daf47b006fd3813abebfa5522`). It restores shared object relationships during speculative
+search; the general algorithm remains complementary R2. The runtime manifest and adoption receipt record
+the precise published commit and source hash
+(`105048137b3ff66079c6f2516d78b5daba5c587fa5061167ee3d1ee26651c178`). The clean published export passed
+7,195 tests, TypeScript and lint; Linux bounds/chance/alias/default-profile tests and both launcher dry-runs
+passed for this adoption. No cohort job or ranked deployment was started. Historical cohort and speed
+results retain their original unrepaired-engine identities.
+
+The separate [repaired-engine R8 reference](a19_r8_reference_research.md) scored 54.81% against R2 over
+1,008 fresh games, with a whole-board 95% interval of 52.78–56.89%. That is a promising stronger teacher;
+it does not change the default. Its single complete whole-job cost bank took 3.00 times R2's elapsed time
+and 2.83 times its CPU; the second bank was interrupted by another campaign. Its follow-up pruning banks
+remained unopened because that campaign occupied all 24 workers. These are separate from the historical
+R2 cohort timings below. A live R8 promotion still requires held-out strength and deadline qualification.
+
 The measured six-by-four layout reduced elapsed time by 27.16% against two-by-twelve in the
 frozen 48-unique-fight benchmark, with exact action and outcome parity and 2.38% more CPU time.
 This is a direct measurement of that fight workload, not a claim about every training pipeline.
