@@ -1157,6 +1157,111 @@
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
+        },
+        "Tie up the Horses Blessing": {
+            "name": "Tie up the Horses Blessing",
+            "level": 0,
+            "desc": [
+                "Tie up the Horses Blessing: all non-flying allies gain +{} movement distance.",
+                "Active while an allied source is alive; only the strongest source applies."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 2,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Luck Blessing": {
+            "name": "Luck Blessing",
+            "level": 0,
+            "desc": [
+                "Luck Blessing: all allies gain +{} luck (total luck is capped at 10).",
+                "Active while an allied source is alive; only the strongest source applies."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 10,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Sylvan Focus Blessing": {
+            "name": "Sylvan Focus Blessing",
+            "level": 0,
+            "desc": [
+                "Sylvan Focus Blessing: all allies deal +{}% magic damage.",
+                "Active while an allied source is alive; only the strongest source applies."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 15,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Pegasus Might Blessing": {
+            "name": "Pegasus Might Blessing",
+            "level": 0,
+            "desc": [
+                "Pegasus Might Blessing: all allies gain +{} base attack and armor.",
+                "Active while an allied source is alive; only the strongest source applies."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 2,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Wolf Trail Blessing": {
+            "name": "Wolf Trail Blessing",
+            "level": 0,
+            "desc": [
+                "Wolf Trail Blessing: all allies gain +{} movement distance.",
+                "Active while an allied source is alive; only the strongest source applies."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 1,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     },
     "Life": {

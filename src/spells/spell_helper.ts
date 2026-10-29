@@ -30,6 +30,7 @@ import type { XY } from "../utils/math";
 import { AppliedSpell } from "./applied_spell";
 import type { ICalculatedBuffsDebuffsEffect, Spell } from "./spell";
 import { elementalSpellMultiplier, isThrownOffensiveSpell } from "./spell_damage";
+import { stackBlessingTextureName } from "../abilities/stack_blessings";
 import { SpellPowerType, SpellTargetType } from "./spell_properties";
 import { vinePathCells } from "./vines";
 
@@ -815,7 +816,7 @@ export function firstSummonableAnchor(
 export const spellToTextureName = (spellName: string): string =>
     spellName === "Sharpened Weapons Blessing"
         ? "sharpened_weapons_aura_256"
-        : `${spellName.toLowerCase().replace(/ /g, "_")}_256`;
+        : (stackBlessingTextureName(spellName) ?? `${spellName.toLowerCase().replace(/ /g, "_")}_256`);
 
 /**
  * Shared caster gate used by the engine and AI before target-specific spell legality: a Broken unit can't cast

@@ -319,7 +319,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["Tie up the Horses Aura", "Crusade", "Rapid Charge"]
+            "abilities": ["Tie up the Horses Blessing", "Crusade", "Rapid Charge"]
         }
     },
     "Nature": {
@@ -407,7 +407,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": ["Luck Aura", "Lucky Strike"]
+            "abilities": ["Luck Blessing", "Lucky Strike"]
         },
         "White Tiger": {
             "name": "White Tiger",
@@ -479,7 +479,7 @@
                 "Nature:Summon Wolves",
                 "Nature:Summon Wolves"
             ],
-            "abilities": ["Forest Spellbook", "Sylvan Focus Aura"]
+            "abilities": ["Forest Spellbook", "Sylvan Focus Blessing"]
         },
         "Trent": {
             "name": "Trent",
@@ -569,7 +569,7 @@
             "footprint_height": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Pegasus Might Aura", "Pegasus Light"]
+            "abilities": ["Pegasus Might Blessing", "Pegasus Light"]
         },
         "Phoenix": {
             "name": "Phoenix",
@@ -1186,7 +1186,7 @@
             "footprint_height": 1,
             "level": 1,
             "spells": [],
-            "abilities": ["Wolf Trail Aura", "Rapid Charge"]
+            "abilities": ["Wolf Trail Blessing", "Rapid Charge"]
         },
         "Nomad": {
             "name": "Nomad",

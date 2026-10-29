@@ -104,10 +104,11 @@ describe("v0.2 MAGIC caster (decideSpellTurn)", () => {
     });
 });
 
-describe("v0.2 aura emitter (Pegasus, withAura)", () => {
+describe("v0.2 aura emitter (Pegasus granted Flesh Shield, withAura)", () => {
     it("does not just advance into the enemy — holds, repositions, or waits to keep its aura up", () => {
         const c = createCombatTestContext();
         const pegasus = makeCreature("Pegasus", "Nature", RIGHT);
+        pegasus.grantAbility("Flesh Shield Aura");
         // Allies it should keep covered, all on its own side; the enemy is far (no imminent melee).
         const allyA = createTestUnit({ team: RIGHT, name: "A", attackType: MELEE });
         const allyB = createTestUnit({ team: RIGHT, name: "B", attackType: MELEE });
@@ -127,6 +128,7 @@ describe("v0.2 aura emitter (Pegasus, withAura)", () => {
     it("hourglasses (waits) when an ally is out of aura range and unreachable, to re-cover later", () => {
         const c = createCombatTestContext();
         const pegasus = makeCreature("Pegasus", "Nature", RIGHT);
+        pegasus.grantAbility("Flesh Shield Aura");
         const covered = createTestUnit({ team: RIGHT, name: "Near", attackType: MELEE });
         // A second ally far across the board: out of aura range and unreachable this turn, so no move
         // improves coverage — the Pegasus should wait for the army to close up rather than advance.

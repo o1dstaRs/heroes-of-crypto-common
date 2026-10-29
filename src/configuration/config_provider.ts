@@ -9,6 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
+import { canonicalStackBlessingName } from "../abilities/stack_blessings";
+
 import abilitiesJson from "./abilities.json";
 import auraEffectsJson from "./aura_effects.json";
 import effectsJson from "./effects.json";
@@ -185,7 +187,7 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
             ? "Rallying Volley Blessing"
             : abilityName === "Sharpened Weapons Aura"
               ? "Sharpened Weapons Blessing"
-              : abilityName;
+              : canonicalStackBlessingName(abilityName);
     // @ts-ignore: we do not know the type here yet
     const ability = abilitiesJson[canonicalName];
     if (!ability) {

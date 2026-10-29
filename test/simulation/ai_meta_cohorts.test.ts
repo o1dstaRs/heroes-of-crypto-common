@@ -186,7 +186,7 @@ describe("AI meta cohort generation", () => {
         expect(passiveFeatures.buffers).toBe(0);
         expect(passiveFeatures.auraCarriers).toBe(0);
         expect(auraFeatures.buffers).toBe(0);
-        expect(auraFeatures.auraCarriers).toBe(1);
+        expect(auraFeatures.auraCarriers).toBe(0);
     });
 
     it("generates two globally exclusive, non-mirrored armies in every cohort", () => {
