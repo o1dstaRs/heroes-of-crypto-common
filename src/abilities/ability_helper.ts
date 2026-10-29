@@ -17,6 +17,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { getFootprintCellsForAnchor, normalizeFootprintSide } from "../grid/grid_math";
 import { getDistance, type XY } from "../utils/math";
+import { STACK_BLESSING_NAMES, stackBlessingTextureName } from "./stack_blessings";
 import { Ability } from "./ability";
 import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "./double_shot_names";
 
@@ -155,7 +156,9 @@ const ABILITY_TEXTURE_OVERRIDES: ReadonlyMap<string, string> = new Map([
 ]);
 
 export const abilityToTextureName = (abilityName: string): string =>
-    ABILITY_TEXTURE_OVERRIDES.get(abilityName) ?? `${abilityName.toLowerCase().replace(/ /g, "_")}_256`;
+    stackBlessingTextureName(abilityName) ??
+    ABILITY_TEXTURE_OVERRIDES.get(abilityName) ??
+    `${abilityName.toLowerCase().replace(/ /g, "_")}_256`;
 
 /**
  * Buffs and debuffs that are NOT a cast blessing or a landed curse: army equipment (artifacts, augments)
@@ -183,6 +186,7 @@ const ARTIFACT_BUFF_NAMES: ReadonlySet<string> = new Set(
 // Morale/Dismorale are lap-scoped turn state; Hidden/Visible, army passives and Water Shield are re-seeded
 // by UnitsHolder on every refresh, so taking or lifting one would either do nothing or desync the seeder.
 const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
+    ...STACK_BLESSING_NAMES,
     "Morale",
     "Dismorale",
     "Hidden",

@@ -56,9 +56,10 @@ describe("aura coverage priced the way the engine stamps it", () => {
 
     const build = () => {
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
-        // Wolf Rider is 2x1 and emits Wolf Trail (range 2, buff). Anchored at (5,5) its body is
+        // Wolf Rider is 2x1; this fixture grants Flesh Shield (range 2, buff). Anchored at (5,5) its body is
         // {(5,5),(4,5)}, so the engine's zone spans x 2..7 while the anchor ball only reaches x 3..7.
         const rider = createConfiguredUnit("Might", "Wolf Rider", LEFT, 10);
+        rider.grantAbility("Flesh Shield Aura");
         const nomad = createConfiguredUnit("Might", "Nomad", LEFT, 5);
         placeUnit(combat.grid, combat.unitsHolder, rider, { x: 5, y: 5 });
         // Anchor (2,5) sits in the engine's zone and outside the anchor ball — the whole disagreement.
@@ -70,7 +71,7 @@ describe("aura coverage priced the way the engine stamps it", () => {
         const { combat, nomad } = build();
         combat.unitsHolder.refreshAuraEffectsForAllUnits();
         // Authority: not a restatement of either formula, but whether the buff landed.
-        expect(nomad.getBuff("Wolf Trail Aura")).toBeDefined();
+        expect(nomad.getBuff("Flesh Shield Aura")).toBeDefined();
     });
 
     it("scores zero by default, which is what the anchor ball sees", () => {

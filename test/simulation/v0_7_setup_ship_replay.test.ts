@@ -161,7 +161,7 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Previous digest: 8e856328c77432416e1e39f2257b0c544f9290bae9d143428d57cde36912d228.
 // Re-pinned 2026-10-24: Crusader damage 12-20 -> 13-20. Two isolated runs reproduce this digest.
 // Previous digest: 6a4b3e3de96be982e1ac7fa11e65b5b2557b0783c61efc0ade946d682552d03b.
-const EXPECTED_REPLAY_SHA256 = "7dae00c1d34d6ff3f18a1629ca5e9010c81d6f981e00d48290d77c50e14f1573";
+const EXPECTED_REPLAY_SHA256 = "aa90a0564c400d9b7ab220e885444a03db69889297925b7bdb533ea0bb26785a";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

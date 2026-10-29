@@ -10,6 +10,7 @@
  */
 
 import Denque from "denque";
+import { STACK_BLESSINGS, STACK_BLESSING_NAMES, canonicalStackBlessingName } from "../abilities/stack_blessings";
 import { observeUnitHpChange } from "./hp_change_capture";
 import { Ability } from "../abilities/ability";
 import { BLIND_FURY_ABILITY_NAME, blindFuryDescription } from "../abilities/blind_fury_ability";
@@ -359,6 +360,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties = structuredClone(unitProperties);
         this.normalizeLegacyRallyingVolley();
         this.normalizeLegacySharpenedWeapons();
+        this.normalizeLegacyStackBlessings();
         this.stripRetiredLeatherArmor();
         this.initialUnitProperties = structuredClone(this.unitProperties);
         this.gridSettings = gridSettings;
@@ -392,6 +394,42 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.parseAbilities(addConfiguredAbilitySpells);
         this.unitProperties.spell_entries_authoritative = true;
         this.parseAuraEffects();
+    }
+    private normalizeLegacyStackBlessings(): void {
+        const properties = this.unitProperties;
+        const isLegacy = (name: string) => canonicalStackBlessingName(name) !== name;
+        if (
+            !properties.abilities.some(isLegacy) &&
+            !properties.applied_buffs.some(isLegacy) &&
+            !properties.stolen_abilities?.some(isLegacy) &&
+            !properties.artifact_granted_abilities?.some(isLegacy)
+        )
+            return;
+        for (const { name, effect } of STACK_BLESSINGS) {
+            const oldName = `${effect} Aura`;
+            for (let i = 0; i < properties.abilities.length; i++) {
+                if (properties.abilities[i] !== oldName) continue;
+                const config = getAbilityConfig(name);
+                properties.abilities[i] = name;
+                properties.abilities_descriptions[i] = config.desc.join("\n").replace(/\{\}/g, config.power.toString());
+                properties.abilities_stack_powered[i] = true;
+                properties.abilities_auras[i] = false;
+                properties.aura_ranges[i] = 0;
+                properties.aura_is_buff[i] = true;
+            }
+            if (properties.abilities.includes(name)) {
+                properties.aura_effects = properties.aura_effects.filter((entry) => entry !== effect);
+            }
+            for (let i = properties.applied_buffs.length - 1; i >= 0; i--) {
+                if (properties.applied_buffs[i] !== oldName) continue;
+                properties.applied_buffs.splice(i, 1);
+                properties.applied_buffs_descriptions.splice(i, 1);
+                properties.applied_buffs_powers.splice(i, 1);
+                properties.applied_buffs_laps.splice(i, 1);
+            }
+        }
+        properties.stolen_abilities = properties.stolen_abilities?.map(canonicalStackBlessingName);
+        properties.artifact_granted_abilities = properties.artifact_granted_abilities?.map(canonicalStackBlessingName);
     }
     /** Keep old saved cards/markers readable without restoring the retired local aura or gifting ammo twice. */
     private normalizeLegacyRallyingVolley(): void {
@@ -618,6 +656,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // real Ability (with its effect) via the ability factory and registers it in both lists so getAbility /
     // hasAbilityActive / processDeepWoundsAbility all see it.
     public grantAbility(abilityName: string, options: { restoreStolen?: boolean; spellEntries?: string[] } = {}): void {
+        abilityName = canonicalStackBlessingName(abilityName);
         if (abilityName === "Rallying Volley Aura") abilityName = "Rallying Volley Blessing";
         if (abilityName === "Sharpened Weapons Aura") abilityName = "Sharpened Weapons Blessing";
         if (this.abilities.some((ability) => ability.getName() === abilityName)) {
@@ -867,6 +906,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     .join("\n")
                     .replace(/\{\}/g, Number(this.calculateAuraPower(projectedAura, 0).toFixed(2)).toString());
             }
+        }
+        if (STACK_BLESSING_NAMES.has(ability.getName())) {
+            return ability
+                .getDesc()
+                .join("\n")
+                .replace(/\{\}/g, this.calculateStackBlessingPower(ability.getName()).toString());
         }
         if (ability.getName() === "Sharpened Weapons Blessing") {
             return ability
@@ -2449,6 +2494,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return Number((calculatedCoeff * 100).toFixed(2)) - 100;
     }
+    public calculateStackBlessingPower(name: string): number {
+        if (!STACK_BLESSING_NAMES.has(name)) return 0;
+        const ability = this.getAbility(name);
+        const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, this.getStackPower()));
+        return Number((((ability?.getPower() ?? 0) * stackPower) / MAX_UNIT_STACK_POWER).toFixed(2));
+    }
     /** Preserve the Crusader aura's stack, luck, Might synergy and Made of Fire scaling. */
     public calculateSharpenedWeaponsBlessingPower(synergyAbilityPowerIncrease = 0): number {
         const ability = this.getAbility("Sharpened Weapons Blessing");
@@ -2517,8 +2568,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return calculatedCoeff;
     }
-    public hasMindAttackResistance(): boolean {
-        return this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism");
+    public hasMindAttackResistance(effectName?: string, kind: "effect" | "debuff" = "effect"): boolean {
+        const madness = this.hasAbilityActive("Madness");
+        // Only resolution callers pass a name. Eligibility, AI and hover queries remain observational.
+        if (madness && effectName) {
+            recordEffectApplication({
+                unitId: this.getId(),
+                name: effectName,
+                kind,
+                resisted: true,
+                resistedBy: "Madness",
+            });
+        }
+        return madness || this.hasAbilityActive("Mechanism");
     }
     public canBeHealed(): boolean {
         return !this.hasAbilityActive("Mechanism");
@@ -2646,8 +2708,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        // Sylvan Focus (Satyr): allies standing within 2 cells of it deal more magic damage.
-        const sylvanFocus = this.getAppliedAuraEffect("Sylvan Focus Aura");
+        const sylvanFocus = this.getBuff("Sylvan Focus Blessing");
         if (sylvanFocus) {
             const power = sylvanFocus.getPower();
             if (Number.isFinite(power) && power > 0) {
@@ -3771,6 +3832,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 const luckBuffed =
                     baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER ||
                     !!statBuffs.get("Luck Aura") ||
+                    !!statBuffs.get("Luck Blessing") ||
                     !!statBuffs.get("Clover of Fortune") ||
                     !!statBuffs.get("Fortune");
                 this.unitProperties.luck = luckBuffed ? 0 : -LUCK_MAX_VALUE_TOTAL;
@@ -3805,7 +3867,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 if (cloverOfFortuneBuff) {
                     artifactLuck += cloverOfFortuneBuff.getPower();
                 }
-                this.unitProperties.luck_mod = this.luckPerTurn + synergyLuckIncrease + artifactLuck;
+                this.unitProperties.luck_mod =
+                    this.luckPerTurn +
+                    synergyLuckIncrease +
+                    artifactLuck +
+                    (statBuffs.get("Luck Blessing")?.getPower() ?? 0);
                 if (this.unitProperties.luck_mod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
                     this.unitProperties.luck_mod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
                 } else if (this.unitProperties.luck_mod + this.unitProperties.luck < -LUCK_MAX_VALUE_TOTAL) {
@@ -3883,15 +3949,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // ARMOR
-        const pegasusMightAura = this.getAppliedAuraEffect("Pegasus Might Aura");
+        const pegasusMightBlessing = statBuffs.get("Pegasus Might Blessing");
         this.unitProperties.base_armor = roundUnitStat(
             (madeOfFireBuff
                 ? this.initialUnitProperties.base_armor + this.initialUnitProperties.base_armor / 10
                 : this.initialUnitProperties.base_armor) + baseStatsDiff.baseStats.armor,
             2,
         );
-        if (pegasusMightAura) {
-            this.unitProperties.base_armor += pegasusMightAura.getPower();
+        if (pegasusMightBlessing) {
+            this.unitProperties.base_armor += pegasusMightBlessing.getPower();
         }
         const windFlowBuff = statBuffs.get("Wind Flow");
         if (windFlowBuff) {
@@ -4159,12 +4225,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (skyRunnerAbility) {
             this.unitProperties.steps += this.calculateAbilityCount(skyRunnerAbility, synergyAbilityPowerIncrease);
         }
-        const wolfTrailAuraEffect = this.getAppliedAuraEffect("Wolf Trail Aura");
+        const wolfTrailAuraEffect = statBuffs.get("Wolf Trail Blessing");
         if (wolfTrailAuraEffect) {
             this.unitProperties.steps_mod += wolfTrailAuraEffect.getPower();
         }
         if (!this.canFly()) {
-            const tieUpTheHorsesAuraEffect = this.getAppliedAuraEffect("Tie up the Horses Aura");
+            const tieUpTheHorsesAuraEffect = statBuffs.get("Tie up the Horses Blessing");
             if (tieUpTheHorsesAuraEffect) {
                 this.unitProperties.steps_mod += tieUpTheHorsesAuraEffect.getPower();
             }
@@ -4265,8 +4331,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (endlessQuiverAbility && this.initialUnitProperties.shot_distance <= 0) {
             this.unitProperties.shot_distance = STOLEN_ENDLESS_QUIVER_SHOT_DISTANCE;
         }
-        if (pegasusMightAura) {
-            this.unitProperties.base_attack += pegasusMightAura.getPower();
+        if (pegasusMightBlessing) {
+            this.unitProperties.base_attack += pegasusMightBlessing.getPower();
         }
 
         const mightAugmentBuff = statBuffs.get("Might Augment");
@@ -4719,6 +4785,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return spellAdded;
     }
     protected refreshAbilitiesDescriptions(_synergyAbilityPowerIncrease: number): void {
+        for (let i = 0; i < this.unitProperties.abilities.length; i++) {
+            const name = this.unitProperties.abilities[i];
+            if (!STACK_BLESSING_NAMES.has(name)) continue;
+            const config = getAbilityConfig(name);
+            this.unitProperties.abilities_descriptions[i] = config.desc
+                .join("\n")
+                .replace(/\{\}/g, this.calculateStackBlessingPower(name).toString());
+        }
         // One pass over the unit's ability names decides which cards below can possibly change. Every
         // rewriter opens with an `abilities.indexOf(name)` probe and returns on a miss, so a unit without
         // the ability sees exactly the same result whether the rewriter runs or not — and this refresh runs

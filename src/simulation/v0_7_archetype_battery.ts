@@ -122,7 +122,7 @@ const V07_CATALOG_MAX_CREATURE_ID: number = PBTypes.CreatureVals.ANGEL;
  * move it between trait sets (auras are the usual case, since `aura` is the one set derived from abilities
  * rather than from attack type).
  */
-const POST_V07_FREEZE_ABILITIES: ReadonlySet<string> = new Set(["Sylvan Focus Aura"]);
+const POST_V07_FREEZE_ABILITIES: ReadonlySet<string> = new Set(["Sylvan Focus Aura", "Sylvan Focus Blessing"]);
 
 /**
  * The mirror of POST_V07_FREEZE_ABILITIES: abilities that DID project an aura at the v0.7 preregistration and
@@ -136,6 +136,10 @@ const POST_V07_FREEZE_ABILITIES: ReadonlySet<string> = new Set(["Sylvan Focus Au
 const PRE_V07_FREEZE_AURA_ABILITIES: ReadonlySet<string> = new Set([
     "Arrows Wingshield Blessing",
     "Sharpened Weapons Blessing",
+    "Tie up the Horses Blessing",
+    "Luck Blessing",
+    "Pegasus Might Blessing",
+    "Wolf Trail Blessing",
 ]);
 
 const creatureEnumId = (creatureName: string): number =>

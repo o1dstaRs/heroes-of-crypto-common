@@ -72,7 +72,10 @@ export function processTerrifyingGazeAbility(
     }
 
     if (
-        !(terrifyingGazeAbility.getType() === AbilityType.MIND && targetUnit.hasMindAttackResistance()) &&
+        !(
+            terrifyingGazeAbility.getType() === AbilityType.MIND &&
+            targetUnit.hasMindAttackResistance(terrifyingGazeEffect.getName())
+        ) &&
         targetUnit.applyEffect(terrifyingGazeEffect)
     ) {
         targetUnit.setForbiddenTarget(fromUnit.getId());

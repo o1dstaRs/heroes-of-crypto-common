@@ -96,6 +96,7 @@ export type GameEvent =
               /** Previous owner when this application transfers a buff. */
               sourceUnitId?: string;
               resisted?: boolean;
+              resistedBy?: "Madness";
           }[];
       }
     | {

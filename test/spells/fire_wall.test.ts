@@ -397,13 +397,10 @@ describe("Fire Wall through the action engine", () => {
         const satyr = createTestUnit({
             name: "Satyr",
             team: PBTypes.TeamVals.LEFT,
-            abilities: ["Sylvan Focus Aura"],
-            auraEffects: ["Sylvan Focus"],
-            auraRanges: [2],
-            auraIsBuff: [true],
+            abilities: ["Sylvan Focus Blessing"],
         });
         placeUnit(s.grid, s.unitsHolder, satyr, { x: 2, y: 3 });
-        s.unitsHolder.refreshAuraEffectsForAllUnits();
+        s.unitsHolder.refreshStackPowerForAllUnits();
 
         const augment = new Spell({
             spellProperties: getSpellConfig("System", "Empower Augment", NUMBER_OF_LAPS_TOTAL),

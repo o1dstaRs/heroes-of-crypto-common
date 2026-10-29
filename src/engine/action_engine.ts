@@ -842,7 +842,13 @@ export class GameActionEngine {
         if (isFreeAim && !attacker.hasAbilityActive("Through Shot")) {
             return this.reject("attack_not_available");
         }
-        if (isFreeAim && !isPositionWithinGrid(this.context.grid.getSettings(), freeAimPosition)) {
+        if (
+            isFreeAim &&
+            (!Number.isFinite(freeAimPosition.x) ||
+                !Number.isFinite(freeAimPosition.y) ||
+                !isPositionWithinGrid(this.context.grid.getSettings(), freeAimPosition) ||
+                (freeAimPosition.x === attacker.getPosition().x && freeAimPosition.y === attacker.getPosition().y))
+        ) {
             return this.reject("attack_not_available");
         }
         const target = isFreeAim ? undefined : this.context.unitsHolder.getAllUnits().get(action.targetId);
@@ -884,6 +890,43 @@ export class GameActionEngine {
             false,
             attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
         );
+        if (isFreeAim && evalResult.affectedUnits.length === 0) {
+            if (
+                !this.context.attackHandler.canLandRangeAttack(
+                    attacker,
+                    this.context.grid.getEnemyAggrMatrixByUnitId(attacker.getId()),
+                )
+            ) {
+                return this.reject("attack_not_available");
+            }
+            const forcedTarget = this.context.unitsHolder.getAllUnits().get(attacker.getTarget());
+            if (forcedTarget && !forcedTarget.isDead()) {
+                return this.reject("attack_not_available");
+            }
+            if (evalResult.attackObstacle) {
+                return this.obstacleAttack({
+                    type: "obstacle_attack",
+                    attackerId: attacker.getId(),
+                    targetPosition: evalResult.attackObstacle.position,
+                });
+            }
+            attacker.decreaseNumberOfShots();
+            const events: GameEvent[] = this.headlessEvents
+                ? []
+                : [
+                      {
+                          type: "unit_attacked",
+                          attackType: "range",
+                          attackerId: attacker.getId(),
+                          targetId: "",
+                          unitIdsDied: [],
+                          damage: this.cloneVisibleDamage(this.createVisibleDamage()),
+                          animations: [],
+                      },
+                  ];
+            events.push(...this.turnEngine.completeTurn(attacker));
+            return { completed: true, events };
+        }
         const destroyedScatteredCells: XY[] = [];
         const doubleShot = AbilityHelper.getDoubleShotAbility(attacker);
         // "Ranged attacks ignore structures" (Large Caliber, Area Throw) outranks the Double Shot stone rule.
@@ -2961,7 +3004,10 @@ export class GameActionEngine {
             }
             // Shrugging off a MIND spell is a resist and reads as one; say so. An already-applied spell is
             // not a resist — it stays silent, as the "suffers" line for it was already written.
-            if (spell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance()) {
+            if (
+                spell.getPowerType() === SpellPowerType.MIND &&
+                debuffTarget.hasMindAttackResistance(spell.getName(), "debuff")
+            ) {
                 this.context.sceneLog.updateLog(`${debuffTarget.getName()} resisted from ${spell.getName()}`);
                 recordEffectApplication({
                     unitId: debuffTarget.getId(),
@@ -2988,7 +3034,10 @@ export class GameActionEngine {
             if (
                 SpellHelper.isMirrored(debuffTarget) &&
                 !SpellHelper.hasAlreadyAppliedSpell(caster, spell) &&
-                !(spell.getPowerType() === SpellPowerType.MIND && caster.hasMindAttackResistance())
+                !(
+                    spell.getPowerType() === SpellPowerType.MIND &&
+                    caster.hasMindAttackResistance(spell.getName(), "debuff")
+                )
             ) {
                 caster.applyDebuff(spell, undefined, undefined, true);
                 this.context.sceneLog.updateLog(

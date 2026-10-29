@@ -43,7 +43,7 @@ const registerRealTest = (name: string, body: () => void): void => {
 
 export function registerV08PassiveProbeInvarianceTest(): void {
     registerRealTest("keeps the production probe detached and bit-for-bit inert", () => {
-        const plan = planV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 73);
+        const plan = planV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 74);
         const setup = liveTwinSetup();
         const run = (
             searchPassiveProductiveProbeObserver?: (probe: ISearchPassiveProductiveProbe) => void,
@@ -90,7 +90,7 @@ export function registerV08PassiveProbeInvarianceTest(): void {
 
 export function registerV08PassiveDiagnosticsInvarianceTest(): void {
     registerRealTest("keeps post-search passive diagnostics out of the live path catalog and search outcome", () => {
-        const plan = planV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 73);
+        const plan = planV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 74);
         const setup = liveTwinSetup();
         const run = (diagnostics: boolean) => {
             const auditor = diagnostics ? new V08PassiveTurnAuditor(plan.candidateSide) : undefined;

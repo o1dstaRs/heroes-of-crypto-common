@@ -433,16 +433,19 @@
         "aura_effect": "Range Null Field",
         "can_be_cast": false
     },
-    "Luck Aura": {
-        "name": "Luck Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allies within range gain maximum luck"],
-        "power": 0,
+    "Luck Blessing": {
+        "name": "Luck Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allies gain +{} luck (total luck is capped at 10) anywhere on the battlefield.",
+            "Each stack-power tier grants 20% of base power (20/40/60/80/100%). Only the strongest allied source applies."
+        ],
+        "power": 10,
         "power_type": "LUCK_10",
         "skip_reponse": false,
-        "stack_powered": false,
+        "stack_powered": true,
         "effect": null,
-        "aura_effect": "Luck",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Arrows Wingshield Blessing": {
@@ -594,16 +597,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Sylvan Focus Aura": {
-        "name": "Sylvan Focus Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allies within 2 cells deal {}% more magic damage"],
+    "Sylvan Focus Blessing": {
+        "name": "Sylvan Focus Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allies deal +{}% magic damage anywhere on the battlefield.",
+            "Each stack-power tier grants 20% of base power (20/40/60/80/100%). Only the strongest allied source applies."
+        ],
         "power": 15,
         "power_type": "ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
-        "stack_powered": false,
+        "stack_powered": true,
         "effect": null,
-        "aura_effect": "Sylvan Focus",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Guiding Winds Aura": {
@@ -932,16 +938,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Wolf Trail Aura": {
-        "name": "Wolf Trail Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allies within range gain {} additional moving distance"],
+    "Wolf Trail Blessing": {
+        "name": "Wolf Trail Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allies gain +{} movement distance anywhere on the battlefield.",
+            "Each stack-power tier grants 20% of base power (20/40/60/80/100%). Only the strongest allied source applies."
+        ],
         "power": 1,
         "power_type": "ADDITIONAL_STEPS",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,
-        "aura_effect": "Wolf Trail",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Penetrating Bite": {
@@ -956,16 +965,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Pegasus Might Aura": {
-        "name": "Pegasus Might Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allies within range gain +{} base attack and armor"],
+    "Pegasus Might Blessing": {
+        "name": "Pegasus Might Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allies gain +{} base attack and armor anywhere on the battlefield.",
+            "Each stack-power tier grants 20% of base power (20/40/60/80/100%). Only the strongest allied source applies."
+        ],
         "power": 2,
         "power_type": "ADDITIONAL_BASE_ATTACK_AND_ARMOR",
         "skip_reponse": false,
-        "stack_powered": false,
+        "stack_powered": true,
         "effect": null,
-        "aura_effect": "Pegasus Might",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Pegasus Light": {
@@ -1248,16 +1260,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Tie up the Horses Aura": {
-        "name": "Tie up the Horses Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allied non-flying units within the aura's range gain +{} movement distance"],
+    "Tie up the Horses Blessing": {
+        "name": "Tie up the Horses Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all non-flying allies gain +{} movement distance anywhere on the battlefield.",
+            "Each stack-power tier grants 20% of base power (20/40/60/80/100%). Only the strongest allied source applies."
+        ],
         "power": 2,
         "power_type": "ADDITIONAL_STEPS_WALK",
         "skip_reponse": false,
-        "stack_powered": false,
+        "stack_powered": true,
         "effect": null,
-        "aura_effect": "Tie up the Horses",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Crusade": {
