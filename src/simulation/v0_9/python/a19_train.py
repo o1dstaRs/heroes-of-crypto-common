@@ -15,6 +15,7 @@ import torch
 from torch.nn import functional as F
 
 from a19_model import A19ProposalModel, a19_proposal_loss
+from a19_batches import DEFAULT_STAGING_MAX_BYTES, prepare_staged_batches
 from preflight import APPROVED_GPU_UUID
 
 
@@ -99,13 +100,14 @@ def collate(rows: list[dict], device: torch.device):
     return tuple(x.to(device) for x in inputs), samples.to(device), candidate_mask.to(device), torch.tensor([x["outcome"] for x in rows], dtype=torch.float32, device=device), torch.tensor([x["selectedIndex"] for x in rows], dtype=torch.long, device=device), action_mask.to(device)
 
 
-def evaluate(model, rows, device, batch_size):
+def evaluate(model, rows, device, batch_size, batches=None):
     model.eval()
     total, correct, regret, value_error, policy_error, unscored = 0, 0, 0.0, 0.0, 0.0, 0
     with torch.no_grad():
         for first in range(0, len(rows), batch_size):
             chunk = rows[first:first + batch_size]
-            inputs, samples, mask, outcomes, selected_indices, action_mask = collate(chunk, device)
+            inputs, samples, mask, outcomes, selected_indices, action_mask = (
+                batches.get(range(first, first + len(chunk))) if batches is not None else collate(chunk, device))
             logits, value, primary = model(*inputs)
             means = samples.mean(-1)
             selected = primary.masked_fill(~mask, -torch.inf).argmax(-1)
@@ -131,6 +133,10 @@ def main():
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--seed", type=int, default=2026102562)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--batch-mode", choices=("auto", "staged", "legacy"), default="auto",
+                        help="Stage exact corpus tensors once when memory permits (default: auto)")
+    parser.add_argument("--staging-max-mib", type=int, default=DEFAULT_STAGING_MAX_BYTES // 1024**2,
+                        help="Maximum aggregate staged corpus storage; auto falls back before allocation")
     args = parser.parse_args()
     campaign, repository, output = args.campaign.resolve(), args.repository.resolve(), args.out.resolve()
     if (output.exists() and not args.resume) or output.parent != campaign / "models":
@@ -139,6 +145,8 @@ def main():
         raise ValueError("Resume requires an accepted epoch checkpoint; preserve failed startup output")
     if not 1 <= args.epochs <= 100 or not 1 <= args.batch_size <= 256:
         raise ValueError("Invalid bounded training schedule")
+    if not 1 <= args.staging_max_mib <= 65536:
+        raise ValueError("Invalid bounded staging memory limit")
     if os.environ.get("CUDA_VISIBLE_DEVICES") != APPROVED_GPU_UUID:
         raise ValueError("CUDA_VISIBLE_DEVICES must name the approved RTX 5090 UUID exactly")
     if Path(__file__).resolve() != repository / "src/simulation/v0_9/python/a19_train.py":
@@ -180,6 +188,15 @@ def main():
     validation = load_decisions(validation_receipt, contract["contractSha256"])
     model = A19ProposalModel(len(contract["entities"]), len(contract["candidates"]), len(contract["globals"])).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.0001)
+    preparation_started = time.monotonic()
+    batches, batching = prepare_staged_batches({"train": train, "validation": validation}, device, collate,
+        mode=args.batch_mode, maximum_bytes=args.staging_max_mib * 1024**2)
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    batching["preparationSeconds"] = time.monotonic() - preparation_started
+    batching["manifestSha256"] = train_receipt["manifestSha256"]
+    (output / f"batching-{time.time_ns()}.json").write_text(json.dumps(batching, indent=2) + "\n")
+    print(json.dumps({"batching": batching}), flush=True)
     corpus_sha256 = hashlib.sha256(json.dumps([
         [receipt["stage"], [entry["sha256"] for entry in receipt["files"]]]
         for receipt in [train_receipt, validation_receipt]
@@ -211,8 +228,9 @@ def main():
         random.Random(args.seed + epoch).shuffle(order)
         losses = 0.0
         for first in range(0, len(order), args.batch_size):
-            rows = [train[i] for i in order[first:first + args.batch_size]]
-            inputs, samples, mask, outcomes, selected_indices, action_mask = collate(rows, device)
+            indices = order[first:first + args.batch_size]
+            inputs, samples, mask, outcomes, selected_indices, action_mask = (
+                batches["train"].get(indices) if "train" in batches else collate([train[i] for i in indices], device))
             optimizer.zero_grad(set_to_none=True)
             logits, value, primary = model(*inputs)
             loss, _ = a19_proposal_loss(logits, value, primary, samples, mask, outcomes, selected_indices, action_mask)
@@ -221,8 +239,8 @@ def main():
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
-            losses += float(loss.detach()) * len(rows)
-        metrics = evaluate(model, validation, device, args.batch_size)
+            losses += float(loss.detach()) * len(indices)
+        metrics = evaluate(model, validation, device, args.batch_size, batches.get("validation"))
         record = {"epoch": epoch, "trainingLoss": losses / len(train), "validation": metrics,
                   "elapsedSeconds": time.monotonic() - started, "cudaPeakMemoryBytes": torch.cuda.max_memory_allocated()}
         with (output / "epochs.jsonl").open("a") as log:
