@@ -18,7 +18,6 @@ const creatures = [
     ["Life", "Champion", "Tie up the Horses Blessing"],
     ["Nature", "Leprechaun", "Luck Blessing"],
     ["Nature", "Satyr", "Sylvan Focus Blessing"],
-    ["Nature", "Pegasus", "Pegasus Might Blessing"],
     ["Might", "Wolf Rider", "Wolf Trail Blessing"],
 ];
 
@@ -94,7 +93,7 @@ for (const { name, effect, walkingOnly } of STACK_BLESSINGS) {
     });
 }
 
-it("converts exactly the five requested creature cards", () => {
+it("converts the four requested creature cards", () => {
     for (const [faction, creature, blessing] of creatures) {
         const properties = getCreatureConfig(left, faction, creature, "test_512", 10);
         expect(properties.abilities).toContain(blessing);
@@ -103,7 +102,7 @@ it("converts exactly the five requested creature cards", () => {
     }
 });
 
-it("applies and removes actual movement, attack, armor, luck and magic bonuses without accumulating", () => {
+it("applies and removes actual movement, luck and magic bonuses without accumulating", () => {
     const { grid, unitsHolder } = createCombatTestContext();
     const source = createTestUnit({
         team: left,
@@ -118,8 +117,8 @@ it("applies and removes actual movement, attack, armor, luck and magic bonuses w
     for (let i = 0; i < 3; i++) {
         unitsHolder.refreshStackPowerForAllUnits();
         expect(source.getStackPower()).toBe(2);
-        expect(ally.getBaseAttack()).toBe(100.8);
-        expect(ally.getBaseArmor()).toBe(100.8);
+        expect(ally.getBaseAttack()).toBe(100);
+        expect(ally.getBaseArmor()).toBe(100);
         expect(ally.getSteps()).toBeCloseTo(baseSteps + 1.2);
         expect(ally.getLuck()).toBe(4);
         expect(ally.getMagicDamageBonusPercentage()).toBe(6);
@@ -149,7 +148,7 @@ it("caps luck at 10 and preserves the Misfortune cancellation", () => {
 });
 
 for (let tier = 1; tier <= 5; tier++) {
-    it(`projects all five blessings at tier ${tier} and updates after casualties`, () => {
+    it(`projects all four blessings at tier ${tier} and updates after casualties`, () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const source = createTestUnit({
             team: left,
@@ -163,8 +162,8 @@ for (let tier = 1; tier <= 5; tier++) {
         const steps = ally.getSteps();
         unitsHolder.refreshStackPowerForAllUnits();
         expect(source.getStackPower()).toBe(tier);
-        expect(ally.getBaseAttack()).toBe(100 + tier * 0.4);
-        expect(ally.getBaseArmor()).toBe(100 + tier * 0.4);
+        expect(ally.getBaseAttack()).toBe(100);
+        expect(ally.getBaseArmor()).toBe(100);
         expect(ally.getSteps()).toBeCloseTo(steps + tier * 0.6);
         expect(ally.getLuck()).toBe(Math.min(10, tier * 2));
         expect(ally.getMagicDamageBonusPercentage()).toBe(tier * 3);

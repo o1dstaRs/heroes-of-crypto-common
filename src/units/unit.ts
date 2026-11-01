@@ -360,6 +360,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties = structuredClone(unitProperties);
         this.normalizeLegacyRallyingVolley();
         this.normalizeLegacySharpenedWeapons();
+        this.normalizeLegacyPegasusMight();
         this.normalizeLegacyStackBlessings();
         this.stripRetiredLeatherArmor();
         this.initialUnitProperties = structuredClone(this.unitProperties);
@@ -394,6 +395,34 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.parseAbilities(addConfiguredAbilitySpells);
         this.unitProperties.spell_entries_authoritative = true;
         this.parseAuraEffects();
+    }
+    private normalizeLegacyPegasusMight(): void {
+        const properties = this.unitProperties;
+        const retiredName = "Pegasus Might Blessing";
+        if (
+            !properties.abilities.includes(retiredName) &&
+            !properties.applied_buffs.includes(retiredName) &&
+            !properties.stolen_abilities?.includes(retiredName) &&
+            !properties.artifact_granted_abilities?.includes(retiredName)
+        )
+            return;
+        for (let i = 0; i < properties.abilities.length; i++) {
+            if (properties.abilities[i] !== retiredName) continue;
+            const config = getAbilityConfig("Pegasus Might Aura");
+            properties.abilities[i] = config.name;
+            properties.abilities_descriptions[i] = config.desc.join("\n").replace(/\{\}/g, config.power.toString());
+            properties.abilities_stack_powered[i] = config.stack_powered;
+            properties.abilities_auras[i] = true;
+        }
+        for (let i = properties.applied_buffs.length - 1; i >= 0; i--) {
+            if (properties.applied_buffs[i] !== retiredName) continue;
+            properties.applied_buffs.splice(i, 1);
+            properties.applied_buffs_descriptions.splice(i, 1);
+            properties.applied_buffs_powers.splice(i, 1);
+            properties.applied_buffs_laps.splice(i, 1);
+        }
+        properties.stolen_abilities = properties.stolen_abilities?.map(canonicalStackBlessingName);
+        properties.artifact_granted_abilities = properties.artifact_granted_abilities?.map(canonicalStackBlessingName);
     }
     private normalizeLegacyStackBlessings(): void {
         const properties = this.unitProperties;
@@ -3953,15 +3982,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // ARMOR
-        const pegasusMightBlessing = statBuffs.get("Pegasus Might Blessing");
+        const pegasusMightAura = this.getAppliedAuraEffect("Pegasus Might Aura");
         this.unitProperties.base_armor = roundUnitStat(
             (madeOfFireBuff
                 ? this.initialUnitProperties.base_armor + this.initialUnitProperties.base_armor / 10
                 : this.initialUnitProperties.base_armor) + baseStatsDiff.baseStats.armor,
             2,
         );
-        if (pegasusMightBlessing) {
-            this.unitProperties.base_armor += pegasusMightBlessing.getPower();
+        if (pegasusMightAura) {
+            this.unitProperties.base_armor += pegasusMightAura.getPower();
         }
         const windFlowBuff = statBuffs.get("Wind Flow");
         if (windFlowBuff) {
@@ -4335,8 +4364,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (endlessQuiverAbility && this.initialUnitProperties.shot_distance <= 0) {
             this.unitProperties.shot_distance = STOLEN_ENDLESS_QUIVER_SHOT_DISTANCE;
         }
-        if (pegasusMightBlessing) {
-            this.unitProperties.base_attack += pegasusMightBlessing.getPower();
+        if (pegasusMightAura) {
+            this.unitProperties.base_attack += pegasusMightAura.getPower();
         }
 
         const mightAugmentBuff = statBuffs.get("Might Augment");

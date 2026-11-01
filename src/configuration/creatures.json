@@ -569,7 +569,7 @@
             "footprint_height": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Pegasus Might Blessing", "Pegasus Light"]
+            "abilities": ["Pegasus Might Aura", "Pegasus Light"]
         },
         "Phoenix": {
             "name": "Phoenix",

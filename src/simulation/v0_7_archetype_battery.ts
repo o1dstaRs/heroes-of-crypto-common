@@ -138,7 +138,7 @@ const PRE_V07_FREEZE_AURA_ABILITIES: ReadonlySet<string> = new Set([
     "Sharpened Weapons Blessing",
     "Tie up the Horses Blessing",
     "Luck Blessing",
-    "Pegasus Might Blessing",
+    "Pegasus Might Aura",
     "Wolf Trail Blessing",
 ]);
 
