@@ -36,9 +36,12 @@ export function chakramMaxTargets(stackPower: number): number {
     return Math.max(MIN_UNIT_STACK_POWER, Math.min(MAX_UNIT_STACK_POWER, normalized));
 }
 
-/** Fill the card's target-count placeholder with the same stack tier the trajectory enforces. */
-export function chakramDescription(descriptionTemplate: string, stackPower: number): string {
-    return descriptionTemplate.replace(/\{\}/g, chakramMaxTargets(stackPower).toString());
+/** Keep the target budget and both damage percentages aligned with the holder's live attack multiplier. */
+export function chakramDescription(descriptionTemplate: string, stackPower: number, damagePercentage: number): string {
+    return descriptionTemplate
+        .replace(/\{\}/g, chakramMaxTargets(stackPower).toString())
+        .replace(/\{damage\}/g, Number(damagePercentage.toFixed(2)).toString())
+        .replace(/\{halfDamage\}/g, Number((damagePercentage * CHAKRAM_HALF_DAMAGE_FACTOR).toFixed(2)).toString());
 }
 
 /**

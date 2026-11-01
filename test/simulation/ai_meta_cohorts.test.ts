@@ -279,6 +279,8 @@ describe("AI meta cohort generation", () => {
                 PHASE_B_RUN_FINGERPRINT: "injected",
                 FORCE_CREATURES: "Wolf",
                 FIGHT_MELEE_ROSTERS: "1",
+                SIM_GRID_MATRIX_CACHE: "1",
+                GRID_MATRIX_CACHE_VERIFY: "1",
             },
             resolveAiMetaFightProfile("a13"),
         );
@@ -290,6 +292,8 @@ describe("AI meta cohort generation", () => {
         expect(environment.VALUE_DATA_FEATURES).toBeUndefined();
         expect(environment.PHASE_B_RUN_FINGERPRINT).toBeUndefined();
         expect(environment.FORCE_CREATURES).toBeUndefined();
+        expect(environment.SIM_GRID_MATRIX_CACHE).toBeUndefined();
+        expect(environment.GRID_MATRIX_CACHE_VERIFY).toBeUndefined();
         expect(environment.SIM_NO_ACTIONS).toBe("1");
         expect(environment.LIVETWIN).toBe("1");
         expect(environment.FIGHT_MELEE_ROSTERS).toBe("0");
@@ -322,6 +326,10 @@ describe("AI meta cohort generation", () => {
             candidateId: "a19",
             researchOnly: true,
             searchBudget: "offline-deterministic-work",
+            offlineSearchEnvironment: {
+                SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1",
+                SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: "1",
+            },
             genomeSha256: productionProfile.provenance.genomeSha256,
             search: productionProfile.provenance.search,
         });

@@ -324,7 +324,10 @@ export function skewerStrikeObstacleCell(
         return undefined;
     }
     const behindCell = AbilityHelper.pierceCellBehind(fromUnit, attackFromCell, target.getBaseCell());
-    return behindCell && isCellWithinGrid(grid.getSettings(), behindCell) && grid.getOccupantUnitId(behindCell) === "B"
+    return behindCell &&
+        isCellWithinGrid(grid.getSettings(), behindCell) &&
+        grid.isScatteredMountainCell(behindCell) &&
+        grid.getOccupantUnitId(behindCell) === "B"
         ? behindCell
         : undefined;
 }

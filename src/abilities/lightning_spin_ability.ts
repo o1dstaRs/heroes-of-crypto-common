@@ -69,7 +69,12 @@ export function lightningSpinObstacleCells(
     const settings = grid.getSettings();
     return unitsHolder
         .cellsAroundUnit(fromUnit, true, attackFromCell)
-        .filter((cell) => isCellWithinGrid(settings, cell) && grid.getOccupantUnitId(cell) === "B");
+        .filter(
+            (cell) =>
+                isCellWithinGrid(settings, cell) &&
+                grid.isScatteredMountainCell(cell) &&
+                grid.getOccupantUnitId(cell) === "B",
+        );
 }
 
 export function processLightningSpinAbility(

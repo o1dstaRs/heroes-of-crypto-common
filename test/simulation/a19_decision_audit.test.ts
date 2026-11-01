@@ -8,7 +8,7 @@ import {
 } from "../../src/simulation/a19_decision_audit";
 
 const sources = {
-    search: `export const BOT_SEARCH_PRODUCTION_REVISION = "a19-material-v1" as const;
+    search: `export const BOT_SEARCH_PRODUCTION_REVISION = "a19-material-r2-v1" as const;
         const environments = Object.freeze({ a19: Object.freeze({
             ...buildV08A19SearchEnvironment(), SEARCH_A19_MATERIAL_ARBITRATION: "ties",
             SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1", SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: "1",
@@ -24,8 +24,9 @@ describe("server A19 profile receipt", () => {
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = '{"SEARCH_ROLLOUTS":"99"}';
         try {
             const profile = readA19AuditProfile(sources);
-            expect(profile.revision).toBe("a19-material-v1");
-            expect(profile.environment.SEARCH_ROLLOUTS).toBe("4");
+            expect(profile.revision).toBe("a19-material-r2-v1");
+            expect(profile.environment.SEARCH_ROLLOUTS).toBe("2");
+            expect(profile.environment.SEARCH_A19_COMPLEMENTARY_R2).toBe("1");
             expect(profile.environment.SEARCH_A19_CERTIFIED_TIGHT_BOUNDS).toBe("1");
             expect(profile.environment.SEARCH_A19_MATERIAL_ARBITRATION).toBe("ties");
             expect(profile.setup).toBe("artifact-fit-v6:conditional-v1:sniper+t2a19");

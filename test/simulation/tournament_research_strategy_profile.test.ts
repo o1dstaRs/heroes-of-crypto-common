@@ -61,7 +61,7 @@ describe("tournament entrant-A research strategy profile", () => {
         expect(summary.entrantAResearchProfile).toEqual(records[0].entrantAResearchProfile);
         expect(records[0].entrantAResearchProfile).toMatchObject({
             selector: TOURNAMENT_RESEARCH_A19,
-            schema: "hoc.v0_8_a19_production_profile.v3",
+            schema: "hoc.v0_8_a19_production_profile.v4",
             candidateId: "a19",
             searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
         });
@@ -76,6 +76,7 @@ describe("tournament entrant-A research strategy profile", () => {
             "ranged-shields",
             "selection-bounds",
             "rollout-allocation",
+            "chance-sampling",
             "scored-arbitration",
             "material-arbitration",
             "armageddon-endgame",

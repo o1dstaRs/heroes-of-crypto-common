@@ -19,6 +19,40 @@ import { renderAiMetaReport } from "../../src/simulation/render_ai_meta_report";
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
 describe("render_ai_meta_report", () => {
+    test("shows elapsed wall time separately from overlapping shard durations", () => {
+        const html = renderAiMetaReport({
+            provenance: {
+                startedAt: "2026-10-25T12:00:00Z",
+                sharding: { processes: 6, workersPerProcess: 4, shardsFinishedAt: "2026-10-25T12:01:00Z" },
+                timing: {
+                    wallSeconds: 62,
+                    cohorts: [{ cohort: "ranked-draft", wallSpanSeconds: 45 }],
+                },
+            },
+            cohorts: [{ cohort: "ranked-draft", games: 1008, seconds: 240 }],
+            rankings: {},
+        });
+        expect(html).toContain("0h 1m 2s");
+        expect(html).toContain("16.258 fights/s");
+        expect(html).toContain("6 processes × 4 workers");
+        expect(html).toContain("0h 0m 45s</td><td>0h 4m 0s");
+        expect(html).toContain("is not CPU time");
+    });
+
+    test("uses the shard completion timestamp instead of later report generation", () => {
+        const html = renderAiMetaReport({
+            generatedAt: "2026-10-25T14:00:00Z",
+            provenance: {
+                startedAt: "2026-10-25T12:00:00Z",
+                sharding: { shardsFinishedAt: "2026-10-25T12:01:30Z" },
+            },
+            cohorts: [{ cohort: "uniform-mixed", games: 72, seconds: 300 }],
+            rankings: {},
+        });
+        expect(html).toContain("0h 1m 30s");
+        expect(html).toContain("0.800 fights/s");
+    });
+
     test("renders sparse mixed rankings as a standalone interactive document", () => {
         const html = renderAiMetaReport({
             schemaVersion: 1,

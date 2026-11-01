@@ -100,6 +100,7 @@ import {
     setDeterministicRandomSource,
 } from "../utils/lib";
 import { hashSimulationParts, makeRng } from "./army";
+import { makeSearchChanceStream } from "./search_chance_sampling";
 import { BattleRollbackJournal, restoreBattle, snapshotBattle } from "./battle_snapshot";
 import {
     IL_DATASET_VERSION,
@@ -1463,6 +1464,8 @@ export class SearchDriver {
     private readonly researchHorizonVersions: ReadonlySet<string>;
     private readonly researchHorizonMinRangedTypes: number | null;
     private readonly rollouts: number;
+    private readonly complementaryR2: boolean;
+    private readonly chanceHashCache = { hashes: new Map<string, number>() };
     private readonly certifiedSelectionBounds: boolean;
     private readonly certifiedTightBounds: boolean;
     private readonly rolloutAllocation: SearchRolloutAllocation;
@@ -1790,6 +1793,11 @@ export class SearchDriver {
         this.researchHorizonVersions = researchHorizon?.versions ?? new Set();
         this.researchHorizonMinRangedTypes = researchHorizon?.minRangedTypes ?? null;
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
+        const complementaryR2 = searchEnv("SEARCH_A19_COMPLEMENTARY_R2");
+        if (complementaryR2 !== undefined && complementaryR2 !== "0" && complementaryR2 !== "1") {
+            throw new Error("SEARCH_A19_COMPLEMENTARY_R2 must be 0 or 1");
+        }
+        this.complementaryR2 = complementaryR2 === "1";
         const rawCertifiedBounds = searchEnv("SEARCH_A19_CERTIFIED_SELECTION_BOUNDS");
         if (rawCertifiedBounds !== undefined && rawCertifiedBounds !== "0" && rawCertifiedBounds !== "1") {
             throw new Error("SEARCH_A19_CERTIFIED_SELECTION_BOUNDS must be 0 or 1");
@@ -5408,6 +5416,9 @@ export class SearchDriver {
         rolloutCache?: SearchRolloutCache,
     ): number[] {
         this.assertBeforeDecisionDeadline(deadlineAt);
+        const complementaryR2 = this.complementaryR2 && this.rollouts === 2 && horizonMode === "turns";
+        // A full-budget reference must not reuse samples from the complementary R2 prefix.
+        if (complementaryR2 && rolloutCount > 2) rolloutCache = undefined;
         const journal =
             this.rollbackStrategy === "checkpoint"
                 ? new BattleRollbackJournal(this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties)
@@ -5468,7 +5479,16 @@ export class SearchDriver {
                 let checkpoint;
                 try {
                     checkpoint = journal?.checkpoint();
-                    score = this.rollout(unit, cand, seedBase, r, horizonMode, deadlineAt, turnHorizon);
+                    score = this.rollout(
+                        unit,
+                        cand,
+                        seedBase,
+                        r,
+                        horizonMode,
+                        deadlineAt,
+                        turnHorizon,
+                        complementaryR2 && rolloutCount <= 2,
+                    );
                     if (captureMaterial && Number.isFinite(score)) {
                         let ours = 0,
                             enemy = 0;
@@ -5565,6 +5585,7 @@ export class SearchDriver {
         horizonMode: HorizonMode,
         deadlineAt: number | null = null,
         turnHorizon = this.horizon,
+        complementaryR2 = false,
     ): number {
         this.assertBeforeDecisionDeadline(deadlineAt);
         setDeterministicRandomSource(makeRng((seedBase + r * 0x9e3779b1) >>> 0));
@@ -5577,6 +5598,13 @@ export class SearchDriver {
         const isIncumbent = cand.kind === "incumbent";
 
         // ply 0 — the candidate itself.
+        // Match the measured candidate's stream at its first engine action, after restoring the actor.
+        // Leaf/reply/lap probes and explicit R4 rollback retain their original independent streams.
+        if (complementaryR2) {
+            setDeterministicRandomSource(
+                makeSearchChanceStream(seedBase, r, "actor-antithetic", this.deps, this.chanceHashCache),
+            );
+        }
         let didSomething = false;
         for (const a of cand.actions) {
             this.assertBeforeDecisionDeadline(deadlineAt);

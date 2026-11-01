@@ -41,39 +41,58 @@ import type { UnitsHolder } from "../units/units_holder";
  * Deep-clone `value`, preserving the prototype of class instances (so methods keep working) and
  * faithfully copying Map / Set / Denque / typed arrays. Every value reachable from the captured
  * battle fields is plain data or one of these containers — there are NO shared/opaque references
- * (factories, grid settings) inside the captured subtrees, so a full recursive clone is safe.
+ * (factories, grid settings) inside the captured subtrees. The memo preserves shared references: granted
+ * auras can be shared by an Ability and Unit.auraEffects, and projected aura cells share their properties.
+ * Equal serialized values are insufficient if a later write would reach different objects after rollback.
  */
-export function deepClone<T>(value: T): T {
+export function deepClone<T>(value: T, memo = new WeakMap<object, unknown>()): T {
     if (value === null || typeof value !== "object") {
         return value;
     }
+    const existing = memo.get(value);
+    if (existing !== undefined) {
+        return existing as T;
+    }
     if (value instanceof Denque) {
-        return new Denque((value as Denque<unknown>).toArray().map((v) => deepClone(v))) as unknown as T;
+        const out = new Denque<unknown>();
+        memo.set(value, out);
+        for (const entry of (value as Denque<unknown>).toArray()) out.push(deepClone(entry, memo));
+        return out as unknown as T;
     }
     if (value instanceof Map) {
         const out = new Map();
+        memo.set(value, out);
         for (const [k, v] of value as Map<unknown, unknown>) {
-            out.set(deepClone(k), deepClone(v));
+            out.set(deepClone(k, memo), deepClone(v, memo));
         }
         return out as unknown as T;
     }
     if (value instanceof Set) {
         const out = new Set();
+        memo.set(value, out);
         for (const v of value as Set<unknown>) {
-            out.add(deepClone(v));
+            out.add(deepClone(v, memo));
         }
         return out as unknown as T;
     }
     if (ArrayBuffer.isView(value)) {
         // Typed array (Uint8Array etc.) — copy the underlying buffer slice.
-        return (value as unknown as { slice(): T }).slice();
+        const out = (value as unknown as { slice(): T }).slice();
+        memo.set(value, out);
+        return out;
     }
     if (Array.isArray(value)) {
-        return (value as unknown[]).map((v) => deepClone(v)) as unknown as T;
+        const out: unknown[] = new Array(value.length);
+        memo.set(value, out);
+        for (let index = 0; index < value.length; index++) {
+            if (index in value) out[index] = deepClone(value[index], memo);
+        }
+        return out as unknown as T;
     }
     const out = Object.create(Object.getPrototypeOf(value));
+    memo.set(value, out);
     for (const key of Object.keys(value as object)) {
-        out[key] = deepClone((value as Record<string, unknown>)[key]);
+        out[key] = deepClone((value as Record<string, unknown>)[key], memo);
     }
     return out as T;
 }
@@ -472,11 +491,11 @@ function wrapMutationMethods(
     }
 }
 
-function captureFields(obj: object, fields: readonly string[]): Bag {
+function captureFields(obj: object, fields: readonly string[], memo: WeakMap<object, unknown>): Bag {
     const bag: Bag = {};
     const src = obj as Bag;
     for (const f of fields) {
-        bag[f] = deepClone(src[f]);
+        bag[f] = deepClone(src[f], memo);
     }
     return bag;
 }
@@ -499,10 +518,16 @@ function assertFieldCoverage(
     }
 }
 
-function writeFields(obj: object, fields: readonly string[], bag: Bag, cloneValues: boolean): void {
+function writeFields(
+    obj: object,
+    fields: readonly string[],
+    bag: Bag,
+    cloneValues: boolean,
+    memo?: WeakMap<object, unknown>,
+): void {
     const dst = obj as Bag;
     for (const f of fields) {
-        dst[f] = cloneValues ? deepClone(bag[f]) : bag[f];
+        dst[f] = cloneValues ? deepClone(bag[f], memo) : bag[f];
     }
 }
 
@@ -539,6 +564,11 @@ export class BattleRollbackCheckpoint {
     private readonly vines: object;
     private readonly fireWalls: object;
     private readonly units = new Map<string, Bag>();
+    // One checkpoint-wide graph, including references shared by a unit and the holder's aura cache.
+    private readonly cloneMemo = new WeakMap<object, unknown>();
+    // adjustBaseStats shares these small string lists between fight state and multiple units. Restore
+    // their contents in place: replacing only a touched owner's bag would detach untouched owners.
+    private readonly synergyArrays = new Map<string[], string[]>();
     private gridSnapshot: Bag | undefined;
     private fightSnapshot: Bag | undefined;
     private holderSnapshot: Bag | undefined;
@@ -559,31 +589,60 @@ export class BattleRollbackCheckpoint {
         this.smokeClouds = fightProperties.getSmokeClouds();
         this.vines = fightProperties.getVines();
         this.fireWalls = fightProperties.getFireWalls();
+        const rememberSynergies = (value: unknown): void => {
+            if (
+                !Array.isArray(value) ||
+                !value.every((entry) => typeof entry === "string") ||
+                this.synergyArrays.has(value)
+            ) {
+                return;
+            }
+            this.synergyArrays.set(value, deepClone(value));
+            this.cloneMemo.set(value, value);
+        };
+        // Read the field bags directly; mutable-property getters would first-touch whole units here.
+        for (const unit of unitRefs.values()) {
+            rememberSynergies((Reflect.get(unit, "unitProperties") as { synergies?: unknown }).synergies);
+        }
+        const fightSynergies = Reflect.get(fightProperties, "synergiesPerTeam") as Map<unknown, unknown>;
+        for (const value of fightSynergies.values()) rememberSynergies(value);
     }
     public recordUnitMutation(unit: Unit): void {
         const id = unit.getId();
         if (this.unitRefs.get(id) !== unit || this.units.has(id)) {
             return;
         }
-        this.units.set(id, captureFields(unit, UNIT_FIELDS));
+        this.units.set(id, captureFields(unit, UNIT_FIELDS, this.cloneMemo));
+        // Replacing a source's field bag also replaces objects referenced by the holder's aura cache.
+        // Capture both owners even when this branch only changes an unrelated field such as target memory.
+        if (unit.getAuraEffects().length) {
+            this.recordHolderMutation(this.unitsHolder);
+        }
     }
     public recordGridMutation(grid: Grid): void {
         if (grid !== this.grid || this.gridSnapshot) {
             return;
         }
-        this.gridSnapshot = captureFields(grid, GRID_FIELDS);
+        this.gridSnapshot = captureFields(grid, GRID_FIELDS, this.cloneMemo);
     }
     public recordFightMutation(fightProperties: FightProperties): void {
         if (fightProperties !== this.fightProperties || this.fightSnapshot) {
             return;
         }
-        this.fightSnapshot = captureFields(fightProperties, FIGHT_FIELDS);
+        this.fightSnapshot = captureFields(fightProperties, FIGHT_FIELDS, this.cloneMemo);
     }
     public recordHolderMutation(unitsHolder: UnitsHolder): void {
         if (unitsHolder !== this.unitsHolder || this.holderSnapshot) {
             return;
         }
-        this.holderSnapshot = captureFields(unitsHolder, HOLDER_FIELDS);
+        this.holderSnapshot = captureFields(unitsHolder, HOLDER_FIELDS, this.cloneMemo);
+        // The converse matters too: restoring only the cache would detach it from untouched live sources.
+        // Mark the holder captured before visiting sources so the two capture paths cannot recurse.
+        for (const unit of this.unitRefs.values()) {
+            if (unit.getAuraEffects().length) {
+                this.recordUnitMutation(unit);
+            }
+        }
     }
     public recordTerrainMutation(terrain: object): void {
         if (terrain === this.smokeClouds || terrain === this.vines || terrain === this.fireWalls) {
@@ -607,6 +666,22 @@ export class BattleRollbackCheckpoint {
         }
         this.consumed = true;
         activeRollbackCheckpoint = undefined;
+        for (const [live, saved] of this.synergyArrays) {
+            const liveKeys = Object.keys(live),
+                savedKeys = Object.keys(saved);
+            if (
+                live.length === saved.length &&
+                liveKeys.length === savedKeys.length &&
+                liveKeys.every(
+                    (key, index) => key === savedKeys[index] && Reflect.get(live, key) === Reflect.get(saved, key),
+                )
+            ) {
+                continue;
+            }
+            for (const key of liveKeys) Reflect.deleteProperty(live, key);
+            live.length = saved.length;
+            for (const key of savedKeys) Reflect.set(live, key, Reflect.get(saved, key));
+        }
         const liveUnits = this.unitsHolder.getAllUnits() as Map<string, Unit>;
         liveUnits.clear();
         for (const id of this.unitOrder) {
@@ -676,11 +751,12 @@ export function assertBattleSnapshotCoverage(
 }
 
 function captureBattleSnapshot(unitsHolder: UnitsHolder, grid: Grid, fightProperties: FightProperties): BattleSnapshot {
+    const memo = new WeakMap<object, unknown>();
     const units = new Map<string, Bag>();
     const unitRefs = new Map<string, Unit>();
     const unitOrder: string[] = [];
     for (const [id, unit] of unitsHolder.getAllUnits()) {
-        units.set(id, captureFields(unit, UNIT_FIELDS));
+        units.set(id, captureFields(unit, UNIT_FIELDS, memo));
         unitRefs.set(id, unit);
         unitOrder.push(id);
     }
@@ -688,9 +764,9 @@ function captureBattleSnapshot(unitsHolder: UnitsHolder, grid: Grid, fightProper
         units,
         unitRefs,
         unitOrder,
-        grid: captureFields(grid, GRID_FIELDS),
-        fight: captureFields(fightProperties, FIGHT_FIELDS),
-        holder: captureFields(unitsHolder, HOLDER_FIELDS),
+        grid: captureFields(grid, GRID_FIELDS, memo),
+        fight: captureFields(fightProperties, FIGHT_FIELDS, memo),
+        holder: captureFields(unitsHolder, HOLDER_FIELDS, memo),
         aiTargetMemory: captureAITargetMemory(unitsHolder),
     };
 }
@@ -707,6 +783,7 @@ function restoreBattleSnapshot(
     fightProperties: FightProperties,
     cloneValues: boolean,
 ): void {
+    const memo = new WeakMap<object, unknown>();
     const liveUnits = unitsHolder.getAllUnits() as Map<string, Unit>;
 
     liveUnits.clear();
@@ -716,14 +793,14 @@ function restoreBattleSnapshot(
         if (!unit || !bag) {
             continue;
         }
-        writeFields(unit, UNIT_FIELDS, bag, cloneValues);
+        writeFields(unit, UNIT_FIELDS, bag, cloneValues, memo);
         liveUnits.set(id, unit);
     }
 
-    writeFields(grid, GRID_FIELDS, snapshot.grid, cloneValues);
+    writeFields(grid, GRID_FIELDS, snapshot.grid, cloneValues, memo);
     grid.invalidateMatrixCache();
-    writeFields(fightProperties, FIGHT_FIELDS, snapshot.fight, cloneValues);
-    writeFields(unitsHolder, HOLDER_FIELDS, snapshot.holder, cloneValues);
+    writeFields(fightProperties, FIGHT_FIELDS, snapshot.fight, cloneValues, memo);
+    writeFields(unitsHolder, HOLDER_FIELDS, snapshot.holder, cloneValues, memo);
     restoreAITargetMemory(unitsHolder, snapshot.aiTargetMemory);
 }
 

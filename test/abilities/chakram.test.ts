@@ -136,7 +136,7 @@ describe("Zena's Chakram — separation chain", () => {
         }
     });
 
-    it("automatically prints the live total-target limit on the ability card", () => {
+    it("prints the live target limit and damage percentages at every stack tier", () => {
         for (let stackPower = 1; stackPower <= 5; stackPower += 1) {
             const context = setup(stackPower);
             context.zena.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
@@ -145,8 +145,27 @@ describe("Zena's Chakram — separation chain", () => {
             const description = properties.abilities_descriptions[chakramIndex];
 
             expect(description).toContain(`Maximum targets: ${stackPower}.`);
-            expect(description).not.toContain("{}");
+            expect(description).toContain(`deal ${stackPower * 20}% of normal ranged damage`);
+            expect(description).toContain(`deals ${stackPower * 10}% of normal ranged damage`);
+            expect(description).not.toMatch(/\{.*\}/);
         }
+    });
+
+    it("refreshes damage after a stack change and includes live luck and ability-power bonuses", () => {
+        const zena = createTestUnit({ name: "Zena", team: GREEN, stackPower: 3, luck: 10, abilities: ["Chakram"] });
+        zena.adjustBaseStats(false, 1, 15, 0, 0, 0, 0);
+        const description = () => {
+            const properties = zena.getUnitProperties();
+            return properties.abilities_descriptions[properties.abilities.indexOf("Chakram")];
+        };
+        expect(description()).toContain("deal 75% of normal ranged damage");
+        expect(description()).toContain("deals 37.5% of normal ranged damage");
+
+        zena.setStackPower(1);
+        zena.adjustBaseStats(false, 1, 15, 0, 0, 0, 0);
+        expect(description()).toContain("Maximum targets: 1.");
+        expect(description()).toContain("deal 25% of normal ranged damage");
+        expect(description()).toContain("deals 12.5% of normal ranged damage");
     });
 
     it("prints the holder's current limit when Chakram is granted at runtime", () => {
@@ -157,6 +176,8 @@ describe("Zena's Chakram — separation chain", () => {
         const properties = holder.getUnitProperties();
         const chakramIndex = properties.abilities.indexOf("Chakram");
         expect(properties.abilities_descriptions[chakramIndex]).toContain("Maximum targets: 3.");
+        expect(properties.abilities_descriptions[chakramIndex]).toContain("deal 60% of normal ranged damage");
+        expect(properties.abilities_descriptions[chakramIndex]).toContain("deals 30% of normal ranged damage");
     });
 
     it("bounces only to enemies separated by 1 or 2 empty cells, never to touching ones", () => {
