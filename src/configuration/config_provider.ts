@@ -484,7 +484,13 @@ export const getCreatureConfig = (
         } else if (abilityConfig.name === CHAKRAM_ABILITY_NAME) {
             // Creature configs are templates with the minimum stack tier. Live units rewrite this after
             // stack power is calculated; keeping the template at 1 avoids ever rendering power=100 targets.
-            abilityDescriptions.push(chakramDescription(abilityConfig.desc.join("\n"), MIN_UNIT_STACK_POWER));
+            abilityDescriptions.push(
+                chakramDescription(
+                    abilityConfig.desc.join("\n"),
+                    MIN_UNIT_STACK_POWER,
+                    (abilityConfig.power * MIN_UNIT_STACK_POWER) / MAX_UNIT_STACK_POWER,
+                ),
+            );
         } else if (abilityConfig.name === "Blacksmith Tools") {
             // Craft's four outcome odds are computed, not a single power — the config carries power 0, so the
             // generic branch below printed "0%" for all four and the card claimed the spell does nothing.

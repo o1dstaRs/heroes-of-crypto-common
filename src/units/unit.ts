@@ -832,7 +832,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 .replace("{}", Number(((percentage * 5) / 8).toFixed()).toString());
         }
         if (ability.getName() === CHAKRAM_ABILITY_NAME) {
-            return chakramDescription(ability.getDesc().join("\n"), this.getStackPower());
+            return chakramDescription(
+                ability.getDesc().join("\n"),
+                this.getStackPower(),
+                this.calculateAbilityMultiplier(ability, 0) * 100,
+            );
         }
         if (ability.getName() === "Paralysis") {
             return this.getParalysisDescription(ability, 0);
@@ -4779,9 +4783,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (hasStunAura) {
             this.refreshStunAuraDescription(_synergyAbilityPowerIncrease);
         }
-        // Chakram's maximum TOTAL victims follows the live stack tier, which can change after casualties.
+        // Target count and damage follow the live stack tier, which can change after casualties.
         if (hasChakram) {
-            this.refreshChakramDescription();
+            this.refreshChakramDescription(_synergyAbilityPowerIncrease);
         }
         // Miner scales with stack power, luck and Might synergy. Keep the shared/server-owned description
         // aligned with the amount processMinerAbility actually transfers, including sane decimal rounding.
@@ -5013,7 +5017,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.amount_died,
         );
     }
-    private refreshChakramDescription(): void {
+    private refreshChakramDescription(synergyAbilityPowerIncrease: number): void {
         const index = this.unitProperties.abilities.indexOf(CHAKRAM_ABILITY_NAME);
         if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
             return;
@@ -5025,6 +5029,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.abilities_descriptions[index] = chakramDescription(
             ability.getDesc().join("\n"),
             this.getStackPower(),
+            this.calculateAbilityMultiplier(ability, synergyAbilityPowerIncrease) * 100,
         );
     }
     protected parseSpellData(spellData: string[]): Map<string, number> {
