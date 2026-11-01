@@ -1,6 +1,6 @@
 # A19: the next measurable improvements
 
-Reviewed October 27, 2026. Prioritize a better strength/cost tradeoff, with complete games as the
+Updated November 1, 2026 UTC. Prioritize a better strength/cost tradeoff, with complete games as the
 endpoint. No new strategy qualified. The synergy rollback repair is now published in `331c53ba`;
 historical results retain their original engine and profile identities.
 
@@ -23,7 +23,7 @@ The first [augment-transfer diagnostic](a19_augment_transfer_research.md) is com
 fights, +1.2346 pp on independent-combat validation, 95% whole-board interval −2.1605 to +4.7840 pp.
 Its fixed selection procedure failed. The unchanged incumbent changed outcomes in 36.42% of cases
 across combat seeds, showing why a single discovery winner is a poor expected-value label here.
-No augment rule was promoted; the R8 cost/teacher branch remains the strongest measured direction.
+No augment rule was promoted. Later model, live-budget and actual-controller evidence is recorded below.
 
 The subsequent [loss-mechanism study](a19_augment_loss_mechanisms_research.md) reproduces every
 regression and improvement exactly. Six of eleven Empower regressions never realize offensive magic
@@ -126,6 +126,144 @@ registered quiet-host cost banks, then qualification and unchanged held-out conf
 coverage and production-wall-clock strength/latency. The previous failed policies and their
 unopened banks remain closed. Natural development includes no Black Dragon; its legally preferred
 exercises remain a required separate coverage gate.
+
+### Live allocation and direct correction
+
+The separately frozen `neural-r8-live-v1` is closed after 1,536 fresh games: **51.6276% against R2**
+(95% whole-board interval 50.2604–52.9948%) and **52.0182% against R4** (49.5443–54.4922%). It misses
+the registered 52% R2 funding floor. Between 20% and 27% of requested teacher decisions time out
+within the native-start allowance and retain completed R2; this is a plausible contributor, not an
+isolated causal explanation. No same-bank retuning, subgroup rescue or promotion follows. The original
+offline allocation's cost campaign also stops on its observer/aggregate-worker-CPU control failure;
+its cost remains unresolved. Neither result changes the original offline development evidence.
+
+The cheaper `direct-all-family-live-v1` uses the existing first fitted model, margin one and only fully
+completed exact R2 primary ties. It requests no additional combat search. On **192 different fresh
+boards and 1,536 full games**, it scores **54.2969% against R2** (411 wins, 345 losses, 12 draws;
+95% interval **52.1484–56.3802%**, Holm p=0.000276) and **49.4792% against R4** (373 wins, 381 losses,
+14 draws; **46.8750–52.0182%**). Every map exceeds 53.5% against R2. Against R4, map 1 scores
+46.4844%, below the fixed 47% map floor; the overall score also misses the fixed 50% floor. This
+complete policy therefore fails its development funding gate and remains experimental.
+
+The direct implementation matches the original frozen all-family algorithm in 108 full functional
+games and 72 exact trajectory comparisons, with 4,930 actual-root restoration checks. All 128 fitted
+CPU reference states pass with zero ranking differences. Native computation, encoding, prediction,
+selection and cloning share the original inference allowance; missing or invalid starts, model faults
+and late inference preserve stock actions. The 1,536-game run has zero rejected actions, model errors
+or inference overruns. Loaded local timing does not qualify production latency. The new helper's
+default remains the previous same-family research rule; shipped profiles do not enable either policy.
+
+The matched stock-R2-versus-R4 control completes all 768 games on the consumed boards: stock scores
+**46.9401%**, versus **49.4792%** with direct correction. The paired gain is **2.5391 points**,
+95% whole-board interval **+0.1953 to +4.9479 points**; 62 outcomes improve, 40 worsen and 666 stay
+unchanged. Independent Python/TypeScript reconstruction agrees on every outcome, setup pair and the
+entire 20,000-sample bootstrap distribution. This supports improvement over current behavior against
+R4, but supplies no fresh confirmation and does not waive the failed absolute R4 funding floor.
+
+Eighteen preselected cases receive complete root/action/score/event traces. Six regressions and two
+improvements reproduce both original trajectories exactly; ten cases differ under a nonexpiring
+clock and are excluded from exact causal claims. Three separate stock controls prove that recording
+the traces itself preserves the full nonexpiring trajectories. In sixteen additional full-game branches
+on the eight reproduced roots, vetoing the first neural change recovers a win in all six regressions;
+vetoing it loses both Zena improvements, while applying only that correction wins both. These fixed
+branches do not establish expected regret across random futures or justify a unit/action-family ban.
+Examples include Magic Dragon replacing Meteor Shower with Lightning Strike, Tsar Cannon choosing
+free aim over a targeted shot, and Zena benefiting from shooting instead of closing into melee.
+
+The expanded-data `global-lr0003-v1` model (`509a61a4`) changes only the fitted weights, chosen from
+its existing independent development record before fresh serving seeds. Its 1,536-game fresh serving
+screen clears the fixed funding gates: **53.5807% against R2** (95% whole-board interval
+**51.5625–55.6641%**) and **50.3906% against R4** (**48.0469–52.7344%**). Every map clears the
+registered absolute floor. CPU export parity, 108 functional games and 72 exact controls pass.
+This funds further checks; it does not meet final strength, cost or untouched confirmation admission.
+The independent learner's original 55% progress requirement also remains unchanged.
+
+The separate legal preferred-Black-Dragon exercise then completes **1,728 games on 54 independent
+boards**, covering all 27 map/budget-pair strata, both pick seats and battle mirrors. Paired gains
+against stock are +3.7037 points playing Black Dragon versus R2, +2.0833 versus R4, +5.0926 countering
+it versus R2, and +3.2407 versus R4. Each aggregate noninferiority/coverage check passes, but countering
+R4 on map 4 loses **6.25 points**, below the registered −5-point map floor. Independent Python and
+TypeScript reconstruct every outcome, setup and bootstrap draw. The complete attempt is closed;
+no posthoc map, unit or confidence mask rescues it. Qualification and confirmation stay unopened.
+
+All five worsened map-4 games have exact original-action/state replays. Their first changes are three
+Wandering Mage spell/position choices, an Elf shot replacing movement, and an Orc shot replacing
+movement. Black Dragon is already dead at one first divergence, so this is not evidence of one
+Dragon-specific interaction. A passive paired-world probe reproduces all five complete original
+trajectories. Stock dominates the model choice in both primary/material sampled worlds in only one
+case; the other four trade material across worlds, like the earlier beneficial Zena changes. This
+does not establish a reliable dominance veto.
+
+The actual-controller diagnostic completes **320 continuations**: five already observed losses and
+five explicitly outcome-selected gains, sixteen fresh matched combat worlds per first changed action.
+Ten full original replays and ten stock-identity interventions pass. Future controlled turns use complete
+R2/model search and the opposing controller uses actual R4. Independent Python/TypeScript reconstruct
+all raw outcomes and bootstrap distributions. This diagnostic cannot qualify strength or supply training
+labels because its positions were selected using outcomes.
+
+Only the Wandering Mage decision on board 38/index 2 shows supported regret across this ten-position
+family: stock's move scores **16/16**, versus **7.5/16** for the immediate Fireball, paired **−53.125
+points**, conditional 95% interval **−75 to −28.125**, Holm exact p=.0390625. The other four original
+losses score 0, +18.75, −6.25 and +18.75 points for the model action in fresh continuations. Their one
+historical loss is not a reliable label of action regret. All five selected gains retain positive point
+differences, but none passes the family correction.
+
+Four passive trajectory replays preserve both first losing and first unchanged worlds exactly. In the
+losing world, immediate Fireball spends the Mage's only cast for 259 Wolf Rider HP. Stock preserves the
+cast and later hits Trent for 242, Battle Mage for 242 and a 72-HP Cyclops together. The important target
+is spell timing and whole-army continuation value; this is not evidence for a blanket retreat or
+spell-casting veto. Charge conservation, positioning, reply selection and RNG consumption remain coupled
+in that trace. A fresh complete policy still needs its own registration and unchanged qualification gates.
+
+A read-only check of the independent learner's completed selected-member evaluations reports 52.9948%
+for the TF32 member (`fca2a66f`) and 53.0599% for the graph/FP32 member (`a0b72673`) on 768 games each.
+Both miss its fixed 55% progress gate; no held-out bank was opened. Do not launch redundant serving
+trials of these exports or treat faster training as stronger decisions. The expanded-model coverage
+failure stays closed, and production AI remains unchanged. No HTML reports are generated.
+
+Two follow-up filters are closed. Last-charge paired support passes 84 executions and 48 exact
+controls, but its two vetoes on two maps miss the fixed functional coverage gate; no strength bank
+opens. The actual-return ridge ranker completes 5,664 collector/control/label games, training on 96
+boards and validating on 96 different boards. Its 94 vetoes lose **1.4323 conditional points**,
+95% whole-board interval **−2.9622 to −0.2279**, exact p=.038394; both independent readers agree.
+The three precomputed confident-stock cases give two ties and one small loss, so reversing that
+filter is unsupported. Neither policy is enabled; the corpus is development data, never qualification.
+
+The next frozen candidate equally mixes policy probabilities from the two existing best fits,
+batch256-v2 (`62cc8844`) and lr0003-v1 (`509a61a4`). It adds no veto, rollout, retraining or unit/map
+filter. CPU parity passes all 128 independently combined PyTorch states. Its 84-game preflight passes
+48 exact pairs and 3,906 root restorations, with 28 corrections across all maps. Fresh 3,072-game
+development scores **54.6875% against R2** (95% board interval 52.6042–56.8359%) and **52.6042%
+against R4** (50.0000–55.1432%). Absolute funding gates pass, but the paired gain over the single-model
+parent is only **+0.3906 points**, 95% interval **−0.6510 to +1.4648**, missing both the fixed half-point
+minimum and positive lower bound. Both raw/statistical readers agree. The ensemble is closed without
+promotion or same-bank retuning. A task-flattening repair occurred after warmup and before any strength
+game; its game-policy function is byte-identical and both source seals remain valid. Both predictions
+share the existing native-start budget; qualification, confirmation and Black Dragon exercise banks
+remain unopened.
+
+### Promotion review: fixed ensemble release candidate
+
+The November 1 promotion review separates the earlier research novelty test from release value.
+The ensemble's 54.6875% against current R2 supports advancing one fixed candidate; its uncertain
+0.3906-point gain over the unshipped single model is not a requirement to improve production. The
+old paired study remains failed and closed, and its unopened banks stay excluded. The original
+55% learner progress goal is not silently rewritten as a passed result.
+
+A separate release contract locks the unchanged two fits and correction rule on committed engine
+`62e2af4f`, with identical new Satyr/Wolf Rider blessings in both arms. It requires production CPU
+admission, 6,000 fresh qualification games and unchanged 6,000-game confirmation, each scoring at
+least 52% with a whole-board lower 95% bound above 50%. R4 controls, funded budget stress, six-unit
+coverage and legal Black Dragon play/counter exercises remain required. No default or deployment
+changes until that evidence and authoritative integration checks are complete.
+
+Admission exposed an actual compatibility bug: deriving V2 spell columns from live configuration
+changed the input width when blessing spells were added. V2 now fixes its original 90-spell
+vocabulary and 204 candidate columns; future spell-specific columns require a new model contract.
+The original fitted contract and all 128 PyTorch parity states pass without modifying weights or
+weakening identity checks. The initial failed admission is preserved; the corrected capsule has
+entirely fresh reserved channels. Raw outputs remain ignored in
+`game/core/tmp/analysis/a19-release-qualification-20261101-v2` in the client repository.
 
 ## What the evidence supports
 
@@ -233,9 +371,10 @@ strength. This panel does not replace the untouched primary confirmation.
 
 The single-fight setup selector has now failed its independent-seed check. A future setup learner
 needs expected-value evidence and fresh boards; the absence of Empower purchases alone is insufficient.
-The strongest currently funded serving hypothesis is the frozen neural-guided R8 allocation above.
-Complete its cost, held-out strength and production admission before enabling it. Do not reopen the
-failed support-value heuristics or promote an exploratory slice of this setup diagnostic.
+The current serving evidence is in the November 1 live allocation/direct correction section above.
+The original R8 cost campaign and live variant are closed; the expanded direct model passes natural
+development but fails its separate Black Dragon coverage gate. Do not reopen the failed support-value
+heuristics or promote an exploratory slice of this setup diagnostic.
 
 The October 31 continuation preserves that candidate and all development results. Continuous
 external-load auditing invalidates contended measurements and keeps qualification closed. The
@@ -282,5 +421,5 @@ The original losing Monk choice instead scores .875 in its fresh worlds. None
 of the twelve paired action contrasts survives the registered family correction;
 these are explanatory point estimates, not new shipped exceptions. Prioritize
 actual-continuation calibration or a separately work-matched symmetry test over
-another same-bank reply-count/horizon sweep. The frozen positive neural-R8
-allocation remains unchanged and still needs valid cost and held-out admission.
+another same-bank reply-count/horizon sweep. The historical positive neural-R8
+development result remains unchanged; its failed live and cost attempts stay closed.

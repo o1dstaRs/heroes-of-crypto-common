@@ -289,6 +289,8 @@ export interface ITurnExecutionObservation {
 }
 
 export interface IMatchConfig {
+    /** Research-only timing seam; omitted callers retain the existing clock path. */
+    researchCaptureDecisionStart?: boolean;
     greenVersion: string;
     redVersion: string;
     /** Roster for the GREEN team. In a mirrored match the red team gets the same list. */
@@ -1466,6 +1468,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 : undefined;
         const v09ServerPreflightStartedAt =
             config.v09ServerPreflightObserver && strategy.version === "v0.9" ? performance.now() : undefined;
+        if (config.researchCaptureDecisionStart) decisionContext.decisionStartedAtMs = performance.now();
         const decided0 = strategy.decideTurn(unit, decisionContext);
         let v09ServerPreflightObservation: IV09ServerPreflightTimingObservation | undefined;
         if (v09ServerPreflightStartedAt !== undefined) {

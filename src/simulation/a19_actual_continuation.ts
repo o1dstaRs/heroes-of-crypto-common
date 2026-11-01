@@ -155,6 +155,8 @@ export function observeActualA19Match(
         maxCandidates?: number;
         captureAllPositions?: boolean;
         captureState?: boolean;
+        /** Research opponent budgets; intervention/policy roots must still use R2. */
+        rolloutsByTeam?: Readonly<Partial<Record<number, 2 | 4>>>;
         /** Offline research only. Undefined/baseline selections preserve the original action array. */
         policy?: {
             team: number;
@@ -174,6 +176,10 @@ export function observeActualA19Match(
     if (options.policy && options.intervention) throw new Error("Policy and root intervention are mutually exclusive");
     if (options.policy && options.policy.team !== GREEN_TEAM && options.policy.team !== RED_TEAM)
         throw new Error("Invalid continuation policy team");
+    for (const [team, rollouts] of Object.entries(options.rolloutsByTeam ?? {})) {
+        if ((team !== String(GREEN_TEAM) && team !== String(RED_TEAM)) || (rollouts !== 2 && rollouts !== 4))
+            throw new Error("Invalid continuation team rollout budget");
+    }
     const maxCandidates = options.maxCandidates ?? 7;
     if (!Number.isSafeInteger(maxCandidates) || maxCandidates < 2 || maxCandidates > 7)
         throw new Error("Invalid retained-candidate cap");
@@ -239,114 +245,134 @@ export function observeActualA19Match(
             this.certifiedTightBounds !== (expected.SEARCH_A19_CERTIFIED_TIGHT_BOUNDS === "1")
         )
             throw new Error("Continuation driver differs from captured R2 profile");
+        const rollouts = options.rolloutsByTeam?.[unit.getTeam()] ?? 2;
         const ordinal = searchedTurns++;
-        if (applied) searchedTurnsAfterIntervention++;
-        const policyTurn = options.policy?.team === unit.getTeam();
-        const capture =
-            options.captureAllPositions !== false || ordinal === options.intervention?.position.ordinal || policyTurn;
-        const prior = active;
-        const frame = { driver: this, candidates: new Map() } as NonNullable<typeof active>;
-        active = capture ? frame : undefined;
-        let chosen: GameAction[];
+        if (
+            rollouts !== 2 &&
+            (ordinal === options.intervention?.position.ordinal || options.policy?.team === unit.getTeam())
+        )
+            throw new Error("Continuation intervention and policy roots require R2");
+        const priorRollouts = this.rollouts;
+        const priorComplementary = this.complementaryR2;
+        this.rollouts = rollouts;
+        this.complementaryR2 = rollouts === 2;
         try {
-            chosen = choose.apply(this, args);
-        } finally {
-            active = prior;
-        }
-        const baselineSignature = v09CandidateSignature(chosen);
-        let returned = chosen;
-        if (capture) {
-            if (!context) throw new Error("Actual A19 root lacks decision context");
-            const state = () => ({
-                ...snapshotBattle(this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties),
-                unitRefs: undefined,
-                uuidSequence: captureDeterministicRandomState().uuidSequence,
-            });
-            const epoch = () => auditDigest(state());
-            const stateDigest = epoch();
-            const priorRandom = captureDeterministicRandomState();
-            let candidates: IActualContinuationCandidate[];
+            if (applied) searchedTurnsAfterIntervention++;
+            const policyTurn = options.policy?.team === unit.getTeam();
+            const capture =
+                options.captureAllPositions !== false ||
+                ordinal === options.intervention?.position.ordinal ||
+                policyTurn;
+            const prior = active;
+            const frame = { driver: this, candidates: new Map() } as NonNullable<typeof active>;
+            active = capture ? frame : undefined;
+            let chosen: GameAction[];
             try {
-                const baseline =
-                    frame.candidates.get(baselineSignature)?.candidate ??
-                    continuationCandidates(unit, context, chosen)[0];
-                const retained = [...frame.candidates.entries()]
-                    .filter(([signature]) => signature !== baselineSignature)
-                    .sort(([left, a], [right, b]) => b.score - a.score || left.localeCompare(right))
-                    .slice(0, maxCandidates - 1)
-                    .map(([, entry]) => entry.candidate);
-                const catalog = [baseline, ...retained];
-                const features =
-                    options.featureOrdinal === ordinal || policyTurn
-                        ? continuationFeatures(unit, context, catalog)
-                        : undefined;
-                candidates = catalog.map((candidate, index) => ({
-                    signature: v09CandidateSignature(candidate.actions),
-                    actions: structuredClone(candidate.actions),
-                    kind: candidate.kind,
-                    returnedR2Score: frame.candidates.get(v09CandidateSignature(candidate.actions))?.score ?? null,
-                    ...(features ? { features: features[index] } : {}),
-                }));
+                chosen = choose.apply(this, args);
             } finally {
-                restoreDeterministicRandomState(priorRandom);
+                active = prior;
             }
-            if (epoch() !== stateDigest) throw new Error("Candidate recording changed the live decision epoch");
-            const position: IActualContinuationPosition = {
-                ordinal,
-                actorId: unit.getId(),
-                actor: unit.getName(),
-                team: unit.getTeam(),
-                lap: this.deps.fightProperties.getCurrentLap(),
-                stateDigest,
-                prefixDigest: auditDigest(trace),
-                baselineSignature,
-                candidates,
-                ...(options.captureState
-                    ? {
-                          state: JSON.parse(
-                              JSON.stringify(state(), (_key, value) =>
-                                  value instanceof Map || value instanceof Set ? [...value] : value,
-                              ),
-                          ),
-                      }
-                    : {}),
-            };
-            positions.push(position);
-            if (policyTurn) {
-                const policyRandom = captureDeterministicRandomState();
-                let signature: string | undefined;
+            const baselineSignature = v09CandidateSignature(chosen);
+            let returned = chosen;
+            if (capture) {
+                if (!context) throw new Error("Actual A19 root lacks decision context");
+                const state = () => ({
+                    ...snapshotBattle(this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties),
+                    unitRefs: undefined,
+                    uuidSequence: captureDeterministicRandomState().uuidSequence,
+                });
+                const epoch = () => auditDigest(state());
+                const stateDigest = epoch();
+                const priorRandom = captureDeterministicRandomState();
+                let candidates: IActualContinuationCandidate[];
                 try {
-                    signature = options.policy!.select(position);
+                    const baseline =
+                        frame.candidates.get(baselineSignature)?.candidate ??
+                        continuationCandidates(unit, context, chosen)[0];
+                    const retained = [...frame.candidates.entries()]
+                        .filter(([signature]) => signature !== baselineSignature)
+                        .sort(([left, a], [right, b]) => b.score - a.score || left.localeCompare(right))
+                        .slice(0, maxCandidates - 1)
+                        .map(([, entry]) => entry.candidate);
+                    const catalog = [baseline, ...retained];
+                    const features =
+                        options.featureOrdinal === ordinal || policyTurn
+                            ? continuationFeatures(unit, context, catalog)
+                            : undefined;
+                    candidates = catalog.map((candidate, index) => ({
+                        signature: v09CandidateSignature(candidate.actions),
+                        actions: structuredClone(candidate.actions),
+                        kind: candidate.kind,
+                        returnedR2Score: frame.candidates.get(v09CandidateSignature(candidate.actions))?.score ?? null,
+                        ...(features ? { features: features[index] } : {}),
+                    }));
                 } finally {
-                    restoreDeterministicRandomState(policyRandom);
+                    restoreDeterministicRandomState(priorRandom);
                 }
-                if (epoch() !== stateDigest) throw new Error("Continuation policy changed the live decision epoch");
-                if (signature !== undefined && signature !== baselineSignature) {
-                    const selected = candidates.find((candidate) => candidate.signature === signature);
-                    if (!selected || v09CandidateSignature(selected.actions) !== signature)
-                        throw new Error("Policy selection is outside the recorded retained catalog");
-                    returned = structuredClone(selected.actions);
+                if (epoch() !== stateDigest) throw new Error("Candidate recording changed the live decision epoch");
+                const position: IActualContinuationPosition = {
+                    ordinal,
+                    actorId: unit.getId(),
+                    actor: unit.getName(),
+                    team: unit.getTeam(),
+                    lap: this.deps.fightProperties.getCurrentLap(),
+                    stateDigest,
+                    prefixDigest: auditDigest(trace),
+                    baselineSignature,
+                    candidates,
+                    ...(options.captureState
+                        ? {
+                              state: JSON.parse(
+                                  JSON.stringify(state(), (_key, value) =>
+                                      value instanceof Map || value instanceof Set ? [...value] : value,
+                                  ),
+                              ),
+                          }
+                        : {}),
+                };
+                positions.push(position);
+                if (policyTurn) {
+                    const policyRandom = captureDeterministicRandomState();
+                    let signature: string | undefined;
+                    try {
+                        signature = options.policy!.select(position);
+                    } finally {
+                        restoreDeterministicRandomState(policyRandom);
+                    }
+                    if (epoch() !== stateDigest) throw new Error("Continuation policy changed the live decision epoch");
+                    if (signature !== undefined && signature !== baselineSignature) {
+                        const selected = candidates.find((candidate) => candidate.signature === signature);
+                        if (!selected || v09CandidateSignature(selected.actions) !== signature)
+                            throw new Error("Policy selection is outside the recorded retained catalog");
+                        returned = structuredClone(selected.actions);
+                    }
+                }
+                const intervention = options.intervention;
+                if (intervention?.position.ordinal === ordinal) {
+                    for (const key of ["actorId", "stateDigest", "prefixDigest", "baselineSignature"] as const) {
+                        if (position[key] !== intervention.position[key])
+                            throw new Error(`Continuation prefix drift: ${key}`);
+                    }
+                    const signature = v09CandidateSignature(intervention.actions);
+                    if (!candidates.some((candidate) => candidate.signature === signature))
+                        throw new Error("Intervention is outside the recorded retained catalog");
+                    if (intervention.combatSeed !== null)
+                        setDeterministicRandomSource(makeRng(intervention.combatSeed));
+                    // The engine uses reference identity to preserve the native target-memory commit.
+                    // An unchanged baseline must retain that identity even with a new combat seed.
+                    returned =
+                        signature === baselineSignature
+                            ? chosen
+                            : (structuredClone(intervention.actions) as GameAction[]);
+                    applied = true;
                 }
             }
-            const intervention = options.intervention;
-            if (intervention?.position.ordinal === ordinal) {
-                for (const key of ["actorId", "stateDigest", "prefixDigest", "baselineSignature"] as const) {
-                    if (position[key] !== intervention.position[key])
-                        throw new Error(`Continuation prefix drift: ${key}`);
-                }
-                const signature = v09CandidateSignature(intervention.actions);
-                if (!candidates.some((candidate) => candidate.signature === signature))
-                    throw new Error("Intervention is outside the recorded retained catalog");
-                if (intervention.combatSeed !== null) setDeterministicRandomSource(makeRng(intervention.combatSeed));
-                // The engine uses reference identity to preserve the native target-memory commit.
-                // An unchanged baseline must retain that identity even with a new combat seed.
-                returned =
-                    signature === baselineSignature ? chosen : (structuredClone(intervention.actions) as GameAction[]);
-                applied = true;
-            }
+            trace.push([unit.getId(), unit.getTeam(), this.deps.fightProperties.getCurrentLap(), returned]);
+            return returned;
+        } finally {
+            this.rollouts = priorRollouts;
+            this.complementaryR2 = priorComplementary;
         }
-        trace.push([unit.getId(), unit.getTeam(), this.deps.fightProperties.getCurrentLap(), returned]);
-        return returned;
     };
     try {
         const result = withScopedAIEnvironment({ V08_A19_SEARCH: "1", V08_A13_SEARCH: undefined, LIVETWIN: "1" }, () =>

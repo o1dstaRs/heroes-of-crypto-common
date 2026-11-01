@@ -264,3 +264,84 @@ test("policy overrides use retained legal actions; callback faults and invented 
     expect(SearchDriver.prototype.chooseDecision).toBe(choose);
     expect(Reflect.get(SearchDriver.prototype, "scoreCandidates")).toBe(score);
 }, 60_000);
+
+test("explicit R4 opponent budgets match real searched controls and restore both driver settings", () => {
+    const choose = SearchDriver.prototype.chooseDecision;
+    const routed: Array<[number, number]> = [];
+    let failR4 = false;
+    const drivers = new Set<SearchDriver>();
+    SearchDriver.prototype.chooseDecision = function (...args) {
+        const team = args[0].getTeam();
+        const rollouts = Reflect.get(this, "rollouts");
+        const complementary = Reflect.get(this, "complementaryR2");
+        drivers.add(this);
+        routed.push([team, rollouts]);
+        if (failR4 && team === RED_TEAM && rollouts === 4) throw new Error("R4 continuation fault");
+        if (team === RED_TEAM && rollouts === 2) {
+            Reflect.set(this, "rollouts", 4);
+            Reflect.set(this, "complementaryR2", false);
+        }
+        try {
+            return choose.apply(this, args);
+        } finally {
+            Reflect.set(this, "rollouts", rollouts);
+            Reflect.set(this, "complementaryR2", complementary);
+        }
+    };
+    try {
+        const plain = withScopedAIEnvironment({ V08_A19_SEARCH: "1", V08_A13_SEARCH: undefined, LIVETWIN: "1" }, () =>
+            runMatch({ ...config, headlessEvents: true, researchA19BaseSearchEnvironment: profile.overrides }),
+        );
+        routed.length = 0;
+        const replay = observeActualA19Match(config, profile, {
+            captureAllPositions: false,
+            rolloutsByTeam: { [RED_TEAM]: 4 },
+        });
+        expect(rankedDraftBehaviorTraceSha256(replay.result)).toBe(rankedDraftBehaviorTraceSha256(plain));
+        expect(routed.some(([team, rollouts]) => team === RED_TEAM && rollouts === 4)).toBe(true);
+        expect(routed.some(([team, rollouts]) => team === GREEN_TEAM && rollouts === 2)).toBe(true);
+        for (const driver of drivers) {
+            expect(Reflect.get(driver, "rollouts")).toBe(2);
+            expect(Reflect.get(driver, "complementaryR2")).toBe(true);
+        }
+        expect(() =>
+            observeActualA19Match(config, profile, {
+                rolloutsByTeam: { [GREEN_TEAM]: 4 },
+                policy: { team: GREEN_TEAM, select: () => undefined },
+            }),
+        ).toThrow("roots require R2");
+        expect(() =>
+            observeActualA19Match(config, profile, {
+                rolloutsByTeam: { [GREEN_TEAM]: 4 },
+                intervention: { position: { ...root, ordinal: 0 }, actions: [], combatSeed: null },
+            }),
+        ).toThrow("roots require R2");
+        failR4 = true;
+        const routedChoose = SearchDriver.prototype.chooseDecision;
+        expect(() =>
+            observeActualA19Match(config, profile, {
+                captureAllPositions: false,
+                rolloutsByTeam: { [RED_TEAM]: 4 },
+            }),
+        ).toThrow("R4 continuation fault");
+        expect(SearchDriver.prototype.chooseDecision).toBe(routedChoose);
+        for (const driver of drivers) {
+            expect(Reflect.get(driver, "rollouts")).toBe(2);
+            expect(Reflect.get(driver, "complementaryR2")).toBe(true);
+        }
+    } finally {
+        SearchDriver.prototype.chooseDecision = choose;
+    }
+}, 60_000);
+
+test("invalid team budgets fail before installing hooks", () => {
+    const choose = SearchDriver.prototype.chooseDecision;
+    for (const rolloutsByTeam of [{ 3: 4 }, { [GREEN_TEAM]: 8 }, { [RED_TEAM]: undefined }]) {
+        expect(() =>
+            observeActualA19Match(config, profile, {
+                rolloutsByTeam: rolloutsByTeam as Partial<Record<number, 2 | 4>>,
+            }),
+        ).toThrow("team rollout budget");
+        expect(SearchDriver.prototype.chooseDecision).toBe(choose);
+    }
+});
