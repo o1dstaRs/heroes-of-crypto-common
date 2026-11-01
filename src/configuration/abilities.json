@@ -126,7 +126,10 @@
     "Enchants": {
         "name": "Enchants",
         "type": "INFO",
-        "desc": ["Enchant an ally's Armor or Weapon (stack 1).", "Each cast: 50% chance to add +1 (stacks)."],
+        "desc": [
+            "Enchant an ally's Armor or Weapon (stack 1).",
+            "Each cast: 50% chance to add +1 (stacks); otherwise +0. Existing bonuses are kept."
+        ],
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
