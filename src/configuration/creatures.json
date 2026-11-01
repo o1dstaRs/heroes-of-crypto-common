@@ -1350,7 +1350,7 @@
         },
         "Thunderbird": {
             "name": "Thunderbird",
-            "hp": 132,
+            "hp": 140,
             "steps": 8,
             "initiative": 8.5,
             "armor": 25,
