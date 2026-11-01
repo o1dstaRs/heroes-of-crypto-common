@@ -53,6 +53,7 @@ export function createV08A19SearchDriver(
     deps: ILookaheadDeps,
     match: ISearchMatchInfo,
     passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver,
+    options: { neuralCorrection?: boolean } = {},
 ): SearchDriver {
     const environment = buildV08A19SearchEnvironment();
     const neural = environment.SEARCH_A19_NEURAL_TIES;
@@ -62,7 +63,7 @@ export function createV08A19SearchDriver(
     return withSearchEnvironment(environment, () =>
         withScopedAIEnvironment(environment, () => {
             const driver = new SearchDriver(deps, match, undefined, passiveProductiveProbeObserver);
-            return neural === "1"
+            return neural === "1" && options.neuralCorrection !== false
                 ? attachA19NeuralCorrection(driver, { offline: match.offlineDeterministicWork === true })
                 : driver;
         }),

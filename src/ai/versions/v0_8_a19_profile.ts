@@ -248,7 +248,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "default-search-factory" as const,
         source: "src/simulation/v0_8_a19_search.ts" as const,
-        sha256: "1fd23dc59efd86cb6296da8a19f4473d6a02b88bc89d8d1c019f9da946e88628" as const,
+        sha256: "830047c4327eedcacbedab7804860db794a7db2859451b95fe9f4d078f9fa1c7" as const,
     }),
     Object.freeze({
         role: "default-search-routing" as const,
@@ -264,7 +264,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "neural-adapter" as const,
         source: "src/simulation/a19_neural.ts" as const,
-        sha256: "41953bc7c3291febf7a6148366c780c4373020db4ce3a4ef75c979162f7a739e" as const,
+        sha256: "d37efcce4a123294b133c71de94bf85ebfcda9c44d0ab62a26d78982cfbae14d" as const,
     }),
     Object.freeze({
         role: "neural-model" as const,

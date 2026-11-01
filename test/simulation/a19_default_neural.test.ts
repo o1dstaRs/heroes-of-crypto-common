@@ -57,7 +57,33 @@ test("the public default factory enables the frozen ensemble without changing gl
         createV08A19SearchDriver({} as ILookaheadDeps, { greenVersion: "v0.8", redVersion: "v0.8" }),
     );
     expect(getA19NeuralState(rollback)).toBeUndefined();
+    const advice = scope(true, () =>
+        createV08A19SearchDriver({} as ILookaheadDeps, { greenVersion: "v0.8", redVersion: "v0.8" }, undefined, {
+            neuralCorrection: false,
+        }),
+    );
+    expect(getA19NeuralState(advice)).toBeUndefined();
     expect(SearchDriver.prototype.chooseDecision).toBe(original);
+});
+
+test("a cached driver follows restored and replaced base-method instrumentation", () => {
+    const first: GameAction[] = [{ type: "wait_turn", unitId: "probe" }];
+    const second: GameAction[] = [{ type: "defend_turn", unitId: "probe" }];
+    const unit = {} as Parameters<SearchDriver["chooseDecision"]>[0];
+    const initial = spyOn(SearchDriver.prototype, "chooseDecision").mockReturnValue(first);
+    let replacement: ReturnType<typeof spyOn> | undefined;
+    try {
+        const driver = scope(true, () =>
+            createV08A19SearchDriver({} as ILookaheadDeps, { greenVersion: "v0.8", redVersion: "v0.8" }),
+        );
+        expect(driver.chooseDecision(unit, "v0.1", [])).toBe(first);
+        initial.mockRestore();
+        replacement = spyOn(SearchDriver.prototype, "chooseDecision").mockReturnValue(second);
+        expect(driver.chooseDecision(unit, "v0.1", [])).toBe(second);
+    } finally {
+        replacement?.mockRestore();
+        initial.mockRestore();
+    }
 });
 
 test("the shipped packed ensemble reproduces the frozen correction policy through complete games", () => {

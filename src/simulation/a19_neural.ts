@@ -49,7 +49,8 @@ export function attachA19NeuralCorrection(
         modelErrors: 0,
     };
     states.set(driver, state);
-    const nativeChoose = driver.chooseDecision;
+    const ownChoose = Object.getOwnPropertyDescriptor(driver, "chooseDecision")?.value as
+        SearchDriver["chooseDecision"] | undefined;
     const model = options.model ?? { predict: (observation) => getA19NeuralModel().predict(observation) };
     const choose = function (
         this: SearchDriver,
@@ -58,6 +59,7 @@ export function attachA19NeuralCorrection(
         incumbent: GameAction[],
         context?: IDecisionContext,
     ): GameAction[] {
+        const nativeChoose = ownChoose ?? (Object.getPrototypeOf(this) as SearchDriver).chooseDecision;
         const budget = this as unknown as INeuralBudget;
         if (
             version !== "v0.8" ||
