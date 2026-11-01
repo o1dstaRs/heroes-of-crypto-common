@@ -28,6 +28,8 @@ export interface IEffectApplicationRecord {
     sourceUnitId?: string;
     /** A debuff that ROLLED but was resisted — recorded so the log can say the target shrugged it off. */
     resisted?: boolean;
+    /** The passive that actually blocked this application, rather than a generic resistance roll. */
+    resistedBy?: "Madness";
 }
 
 // System/marker state the seeding and refresh machinery re-applies over and over — never player-visible
@@ -119,6 +121,20 @@ export const endEffectApplicationCapture = (): IEffectApplicationRecord[] => {
 export const recordEffectApplication = (record: IEffectApplicationRecord): void => {
     if (!captureActive || isEffectApplicationNoise(record.name)) {
         return;
+    }
+    if (record.resisted) {
+        const existing = records.find(
+            (entry) =>
+                entry.resisted &&
+                entry.unitId === record.unitId &&
+                entry.name === record.name &&
+                entry.kind === record.kind &&
+                (entry.resistedBy || record.resistedBy),
+        );
+        if (existing) {
+            existing.resistedBy ??= record.resistedBy;
+            return;
+        }
     }
     records.push(record);
 };

@@ -1,45 +1,30 @@
-/*
- * -----------------------------------------------------------------------------
- * The Satyr's Sylvan Focus Aura: allies standing within 2 cells deal more MAGIC damage.
- *
- * The bonus lands on the same surface the Empower augment amplifies — spells and the magic
- * abilities — which is why both are summed in one place (Unit.getMagicDamageBonusPercentage)
- * rather than each multiplying the damage separately.
- * -----------------------------------------------------------------------------
- */
-
 import { describe, expect, it } from "bun:test";
 
-import { getAbilityConfig, getAuraEffectConfig, getCreatureConfig } from "../../src/configuration/config_provider";
+import { getAbilityConfig, getCreatureConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
-const AURA_PERCENT = getAbilityConfig("Sylvan Focus Aura").power;
+const BASE_PERCENT = getAbilityConfig("Sylvan Focus Blessing").power;
 
 const makeSatyr = () =>
     createTestUnit({
         name: "Satyr",
         team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.MAGIC,
-        abilities: ["Sylvan Focus Aura"],
-        auraEffects: ["Sylvan Focus"],
-        auraRanges: [2],
-        auraIsBuff: [true],
+        abilities: ["Sylvan Focus Blessing"],
     });
 
 const makeAlly = (name: string) =>
     createTestUnit({ name, team: PBTypes.TeamVals.LEFT, attackType: PBTypes.AttackVals.MAGIC });
 
-describe("Sylvan Focus Aura", () => {
-    it("is a flat, non-stack-powered 2-cell buff aura worth 15%", () => {
-        const aura = getAuraEffectConfig("Sylvan Focus");
-        expect(aura?.range).toBe(2);
-        expect(aura?.is_buff).toBe(true);
-        expect(AURA_PERCENT).toBe(15);
-        expect(getAbilityConfig("Sylvan Focus Aura").stack_powered).toBe(false);
+describe("Sylvan Focus Blessing", () => {
+    it("is a stack-powered army blessing with base power 15%", () => {
+        expect(BASE_PERCENT).toBe(15);
+        expect(getAbilityConfig("Sylvan Focus Blessing").stack_powered).toBe(true);
+        expect(getAbilityConfig("Sylvan Focus Blessing").aura_effect).toBeNull();
     });
 
-    it("raises the magic-damage bonus of allies in range, and only those", () => {
+    it("raises the magic-damage bonus of allies anywhere on the battlefield", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const satyr = makeSatyr();
         const near = makeAlly("Near Ally");
@@ -58,28 +43,20 @@ describe("Sylvan Focus Aura", () => {
         unitsHolder.refreshAuraEffectsForAllUnits();
         unitsHolder.refreshStackPowerForAllUnits();
 
-        expect(near.getAppliedAuraEffect("Sylvan Focus Aura")?.getPower()).toBe(AURA_PERCENT);
-        expect(near.getMagicDamageBonusPercentage()).toBe(AURA_PERCENT);
-        // It buffs allies only — an enemy standing just as close gets nothing.
+        expect(near.getBuff("Sylvan Focus Blessing")?.getPower()).toBe(BASE_PERCENT);
+        expect(near.getMagicDamageBonusPercentage()).toBe(BASE_PERCENT);
         expect(enemy.getMagicDamageBonusPercentage()).toBe(0);
-        expect(far.getMagicDamageBonusPercentage()).toBe(0);
-        // The Satyr stands in its own aura.
-        expect(satyr.getMagicDamageBonusPercentage()).toBe(AURA_PERCENT);
+        expect(far.getMagicDamageBonusPercentage()).toBe(BASE_PERCENT);
+        expect(satyr.getMagicDamageBonusPercentage()).toBe(BASE_PERCENT);
     });
 
-    // The SATYR's luck sets the strength for everyone — it is folded into the stored aura power, so the
-    // ally's buff and the Satyr's own ability card both read the same recalculated number. The ally's own
-    // luck is irrelevant, which is what makes it "the aura's strength" rather than a per-ally roll.
-    it("adds the Satyr's luck to the bonus every ally receives", () => {
+    it("uses stack power independently of source and recipient luck", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const luckySatyr = createTestUnit({
             name: "Lucky Satyr",
             team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MAGIC,
-            abilities: ["Sylvan Focus Aura"],
-            auraEffects: ["Sylvan Focus"],
-            auraRanges: [2],
-            auraIsBuff: [true],
+            abilities: ["Sylvan Focus Blessing"],
             luck: 10,
         });
         const ally = createTestUnit({
@@ -94,21 +71,21 @@ describe("Sylvan Focus Aura", () => {
         unitsHolder.refreshAuraEffectsForAllUnits();
         unitsHolder.refreshStackPowerForAllUnits();
 
-        expect(ally.getAppliedAuraEffect("Sylvan Focus Aura")?.getPower()).toBe(AURA_PERCENT + 10);
-        expect(ally.getMagicDamageBonusPercentage()).toBe(AURA_PERCENT + 10);
+        expect(ally.getBuff("Sylvan Focus Blessing")?.getPower()).toBe(BASE_PERCENT);
+        expect(ally.getMagicDamageBonusPercentage()).toBe(BASE_PERCENT);
     });
 
-    it("prints the owner's luck-adjusted value on a runtime-granted card", () => {
+    it("prints the current stack-scaled value on a runtime-granted card", () => {
         const bearer = createTestUnit({
             name: "Bearer",
             team: PBTypes.TeamVals.LEFT,
             stackPower: 1,
             luck: 10,
         });
-        bearer.grantAbility("Sylvan Focus Aura");
+        bearer.grantAbility("Sylvan Focus Blessing");
 
-        const index = bearer.getUnitProperties().abilities.indexOf("Sylvan Focus Aura");
-        expect(bearer.getUnitProperties().abilities_descriptions[index]).toContain("25%");
+        const index = bearer.getUnitProperties().abilities.indexOf("Sylvan Focus Blessing");
+        expect(bearer.getUnitProperties().abilities_descriptions[index]).toContain("3%");
     });
 
     it("does not compound across aura refreshes", () => {
@@ -123,10 +100,10 @@ describe("Sylvan Focus Aura", () => {
             unitsHolder.refreshStackPowerForAllUnits();
         }
 
-        expect(ally.getMagicDamageBonusPercentage()).toBe(AURA_PERCENT);
+        expect(ally.getMagicDamageBonusPercentage()).toBe(BASE_PERCENT);
     });
 
-    it("is given up when the ally walks out of the aura", () => {
+    it("persists when the ally walks far away from the source", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const satyr = makeSatyr();
         const ally = makeAlly("Ally");
@@ -135,21 +112,21 @@ describe("Sylvan Focus Aura", () => {
 
         unitsHolder.refreshAuraEffectsForAllUnits();
         unitsHolder.refreshStackPowerForAllUnits();
-        expect(ally.getMagicDamageBonusPercentage()).toBe(AURA_PERCENT);
+        expect(ally.getMagicDamageBonusPercentage()).toBe(BASE_PERCENT);
 
         grid.cleanupAll(ally.getId(), ally.getAttackRange(), ally.isSmallSize());
         placeUnit(grid, unitsHolder, ally, { x: 9, y: 9 });
         unitsHolder.refreshAuraEffectsForAllUnits();
         unitsHolder.refreshStackPowerForAllUnits();
 
-        expect(ally.getAppliedAuraEffect("Sylvan Focus Aura")).toBeUndefined();
-        expect(ally.getMagicDamageBonusPercentage()).toBe(0);
+        expect(ally.getBuff("Sylvan Focus Blessing")).toBeDefined();
+        expect(ally.getMagicDamageBonusPercentage()).toBe(BASE_PERCENT);
     });
 });
 
 describe("Satyr", () => {
     it("carries Sylvan Focus alongside its spellbook", () => {
         const satyr = getCreatureConfig(PBTypes.TeamVals.LEFT, "Nature", "Satyr", "satyr_512", 1, 0);
-        expect(satyr.abilities).toEqual(["Forest Spellbook", "Sylvan Focus Aura"]);
+        expect(satyr.abilities).toEqual(["Forest Spellbook", "Sylvan Focus Blessing"]);
     });
 });

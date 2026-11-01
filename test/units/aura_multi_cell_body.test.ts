@@ -94,7 +94,7 @@ describe("auras on a body wider than one cell", () => {
         const team = PBTypes.TeamVals.LEFT;
 
         // Wolf Rider emits Wolf Trail; Nomad is a 2x1 that carries no aura of its own.
-        const rider = createConfiguredUnit("Might", "Wolf Rider", team, 10);
+        const rider = createConfiguredUnit("Might", "Wyvern", team, 10);
         const nomad = createConfiguredUnit("Might", "Nomad", team, 5);
         place(context, rider, { x: 11, y: 8 });
         // Anchored so BOTH of the Nomad's cells sit inside the rider's aura. With only one cell covered the
@@ -105,15 +105,15 @@ describe("auras on a body wider than one cell", () => {
         expect(nomad.getCells()).toHaveLength(2);
 
         const calls = recordAuraApplications(nomad, () => context.unitsHolder.refreshAuraEffectsForAllUnits());
-        const wolfTrail = calls.filter((call) => call.name === "Wolf Trail Aura");
-        expect(wolfTrail).toHaveLength(1);
+        const venomCloud = calls.filter((call) => call.name === "Venom Cloud Aura");
+        expect(venomCloud).toHaveLength(1);
     });
 
     it("applies one aura once to a 2x2 recipient either — the same defect predated any rectangle", () => {
         const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
         const team = PBTypes.TeamVals.LEFT;
 
-        const rider = createConfiguredUnit("Might", "Wolf Rider", team, 10);
+        const rider = createConfiguredUnit("Might", "Wyvern", team, 10);
         const behemoth = createConfiguredUnit("Might", "Behemoth", team, 2);
         place(context, rider, { x: 11, y: 8 });
         place(context, behemoth, { x: 9, y: 9 });
@@ -121,7 +121,7 @@ describe("auras on a body wider than one cell", () => {
         expect(behemoth.getCells()).toHaveLength(4);
 
         const calls = recordAuraApplications(behemoth, () => context.unitsHolder.refreshAuraEffectsForAllUnits());
-        const wolfTrail = calls.filter((call) => call.name === "Wolf Trail Aura");
-        expect(wolfTrail).toHaveLength(1);
+        const venomCloud = calls.filter((call) => call.name === "Venom Cloud Aura");
+        expect(venomCloud).toHaveLength(1);
     });
 });

@@ -65,7 +65,10 @@ export function processBoarSalivaAbility(
         }
 
         if (
-            !(boarSalivaAbility.getType() === AbilityType.MIND && targetUnit.hasMindAttackResistance()) &&
+            !(
+                boarSalivaAbility.getType() === AbilityType.MIND &&
+                targetUnit.hasMindAttackResistance(boarSalivaEffect.getName())
+            ) &&
             targetUnit.applyEffect(boarSalivaEffect)
         ) {
             sceneLog.updateLog(

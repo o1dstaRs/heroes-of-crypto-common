@@ -328,13 +328,10 @@ describe("action engine — Fire Strike", () => {
         const satyr = createTestUnit({
             name: "Satyr",
             team: PBTypes.TeamVals.LEFT,
-            abilities: ["Sylvan Focus Aura"],
-            auraEffects: ["Sylvan Focus"],
-            auraRanges: [2],
-            auraIsBuff: [true],
+            abilities: ["Sylvan Focus Blessing"],
         });
         placeUnit(setup.grid, setup.unitsHolder, satyr, { x: 2, y: 3 });
-        setup.unitsHolder.refreshAuraEffectsForAllUnits();
+        setup.unitsHolder.refreshStackPowerForAllUnits();
 
         const augment = new Spell({
             spellProperties: getSpellConfig("System", "Empower Augment", NUMBER_OF_LAPS_TOTAL),
@@ -348,7 +345,7 @@ describe("action engine — Fire Strike", () => {
                 amount: 1,
             }),
         );
-        expect(setup.caster.getMagicDamageBonusPercentage()).toBe(47); // 7 augment + 25 spell + 15 aura
+        expect(setup.caster.getMagicDamageBonusPercentage()).toBe(47);
 
         const hpBefore = setup.enemies[0].getHp();
         const result = setup.engine.apply({
@@ -359,7 +356,7 @@ describe("action engine — Fire Strike", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(335); // floor(38 mages x 6 x 1.47)
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(335);
     });
 
     it("reports the damage on the cast event so ranked can draw the number", () => {

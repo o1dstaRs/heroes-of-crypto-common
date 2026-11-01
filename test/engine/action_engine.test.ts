@@ -2413,6 +2413,73 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
+    for (const hit of [true, false]) {
+        it(`fires a free Through Shot ${hit ? "through a stack" : "into empty ground"}`, () => {
+            const setup = setupActionFight({
+                leftAttackType: PBTypes.AttackVals.RANGE,
+                leftAbilities: ["Through Shot"],
+                leftRangeShots: 3,
+                leftAttack: 20,
+                leftDamageMin: 10,
+                leftDamageMax: 10,
+                rightCell: { x: 9, y: 3 },
+                supportCell: { x: 2, y: 8 },
+                rightMaxHp: 500,
+                rightAmountAlive: 10,
+            });
+            setup.left.refreshPossibleAttackTypes(true);
+            const gs = setup.grid.getSettings();
+            const endpoint = getPositionForCell(
+                { x: 14, y: hit ? 3 : 12 },
+                gs.getMinX(),
+                gs.getStep(),
+                gs.getHalfStep(),
+            );
+            const before = setup.right.getCumulativeHp();
+            const shots = setup.left.getRangeShots();
+            const result = setup.engine.apply({
+                type: "range_attack",
+                attackerId: setup.left.getId(),
+                targetId: "",
+                targetPosition: endpoint,
+            });
+            expect(result.completed).toBe(true);
+            expect(setup.left.getRangeShots()).toBeLessThan(shots);
+            expect(result.events.some((event) => event.type === "unit_attacked")).toBe(true);
+            if (hit) expect(setup.right.getCumulativeHp()).toBeLessThan(before);
+            else expect(setup.right.getCumulativeHp()).toBe(before);
+        });
+    }
+    for (const invalid of ["ordinary", "out-of-bounds", "nan", "origin"] as const) {
+        it(`rejects invalid free ranged intent: ${invalid}`, () => {
+            const setup = setupActionFight({
+                leftAttackType: PBTypes.AttackVals.RANGE,
+                leftAbilities: invalid === "ordinary" ? [] : ["Through Shot"],
+                leftRangeShots: 3,
+                supportCell: { x: 2, y: 8 },
+            });
+            setup.left.refreshPossibleAttackTypes(true);
+            const endpoint =
+                invalid === "origin"
+                    ? setup.left.getPosition()
+                    : invalid === "nan"
+                      ? { x: NaN, y: 100 }
+                      : invalid === "out-of-bounds"
+                        ? { x: 1e9, y: 1e9 }
+                        : setup.right.getPosition();
+            const shots = setup.left.getRangeShots();
+            const result = setup.engine.apply({
+                type: "range_attack",
+                attackerId: setup.left.getId(),
+                targetId: "",
+                targetPosition: endpoint,
+            });
+            expect(result.completed).toBe(false);
+            expect(setup.left.getRangeShots()).toBe(shots);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
+        });
+    }
+
     it("casts a single-target spell and completes the active unit turn", () => {
         const setup = setupActionFight({ leftSpells: ["Death:Weakness"] });
 
