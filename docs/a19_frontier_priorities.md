@@ -1,7 +1,8 @@
 # A19: the next measurable improvements
 
-Updated November 1, 2026 UTC. Prioritize a better strength/cost tradeoff, with complete games as the
-endpoint. No new strategy qualified. The synergy rollback repair is now published in `331c53ba`;
+Updated November 1, 2026 UTC. The user explicitly adopted the two-fit neural ensemble as the default
+A19 model; see the [promotion decision](a19_neural_promotion.md). The historical research gates and
+remaining confirmation uncertainty are preserved separately. The synergy rollback repair is now published in `331c53ba`;
 historical results retain their original engine and profile identities.
 
 The requested [six-unit mastery curriculum](a19_six_unit_mastery_research.md) now has a completed

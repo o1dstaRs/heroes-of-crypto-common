@@ -13,7 +13,6 @@ import type { Unit } from "../../units/unit";
 import { hashSimulationParts } from "../army";
 import { v09CandidateSignature } from "../../ai/versions/v0_9";
 import { VALUE_FEATURE_NAMES_V2, extractValueFeaturesV2 } from "../value_features";
-import { fingerprintV09 } from "./protocol";
 import { ilCandidateActionMetadata } from "../il_action_features";
 import type { XY } from "../../utils/math";
 
@@ -178,7 +177,7 @@ export const V09_A19_OBSERVATION_CONTRACT = {
     geometry: "occupied-cell centroid; actor-forward and lateral; canonical candidate cells",
     terrainUnderUnits: "restore source-bound built-in terrain beneath occupants",
 };
-export const V09_A19_OBSERVATION_SHA256 = fingerprintV09(V09_A19_OBSERVATION_CONTRACT);
+export const V09_A19_OBSERVATION_SHA256 = "8215d66c7477692586be173c382ed40b3dafc2d4161769fef3be8ae7eb418af3";
 
 export interface IV09A19Observation {
     schema: typeof V09_A19_OBSERVATION_SCHEMA;

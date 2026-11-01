@@ -1,4 +1,4 @@
-/** Isolated research arm. Importing this file never changes the shipped A19 controller. */
+/** Exact primary-tie correction. Production supplies one driver; importing never installs hooks. */
 import type { IDecisionContext } from "../../ai/ai_strategy";
 import type { IEnumeratedCandidate } from "../../ai/candidates";
 import { v09CandidateSignature } from "../../ai/versions/v0_9";
@@ -104,6 +104,8 @@ export function withV09A19Correction<T>(
         actionFamily?: "same" | "all";
         /** Charge inference to the timestamp captured before the native root decision. Missing evidence abstains. */
         chargeNativeDecision?: boolean;
+        /** Runtime callers keep completed stock on an inference fault in either execution mode. */
+        failClosed?: boolean;
     },
     run: () => T,
 ) {
@@ -259,7 +261,7 @@ export function withV09A19Correction<T>(
                         ]),
                     );
                 } catch (error) {
-                    if (!live) throw error;
+                    if (!live && !options.failClosed) throw error;
                     statistics.modelErrors++;
                     return stock;
                 } finally {

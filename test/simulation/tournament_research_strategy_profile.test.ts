@@ -61,7 +61,7 @@ describe("tournament entrant-A research strategy profile", () => {
         expect(summary.entrantAResearchProfile).toEqual(records[0].entrantAResearchProfile);
         expect(records[0].entrantAResearchProfile).toMatchObject({
             selector: TOURNAMENT_RESEARCH_A19,
-            schema: "hoc.v0_8_a19_production_profile.v4",
+            schema: "hoc.v0_8_a19_production_profile.v5",
             candidateId: "a19",
             searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
         });
@@ -87,6 +87,14 @@ describe("tournament entrant-A research strategy profile", () => {
             "ai-registry-promotion",
             "default-search-factory",
             "default-search-routing",
+            "neural-policy",
+            "neural-adapter",
+            "neural-model",
+            "neural-correction",
+            "neural-observation",
+            "neural-inference",
+            "neural-batch256-weights",
+            "neural-lr0003-weights",
         ]);
 
         // Game 0: entrant A owns GREEN and receives the scoped compact placement; B remains native v0.8.

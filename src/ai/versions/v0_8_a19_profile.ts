@@ -11,6 +11,7 @@
 
 import { StrategyV0_8 } from "./v0_8";
 import { V08_A19_SCORED_ARBITRATION_POLICY } from "./v0_8_a19_scored_arbitration";
+import { A19_NEURAL_POLICY } from "./v0_8_a19_neural_policy";
 import {
     buildV08A13SearchEnvironment,
     V08_A13_GENOME,
@@ -53,8 +54,10 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - complementary R2 adopted by explicit user instruction on 2026-10-25: 37.86% less offline fight time,
  *     48.91% score against R4 over 6,000 games (95% interval 47.33–50.50%). The user accepted the remaining
  *     strength uncertainty; this does not establish the earlier 48% non-inferiority floor or live latency.
+ *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
+ *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v4" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v5" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -92,6 +95,7 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "1",
     // Hydra's capped catalog prices the complete radial impact, shared shields and Devour recovery.
     SEARCH_A19_LIGHTNING_SPIN_COVERAGE: "1",
+    SEARCH_A19_NEURAL_TIES: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -120,7 +124,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8078c75f34a4030ad5c767c" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "4446fbda753ccb0602324d3b2f3698b0e63f20a6beb4e7c5d69a90910026df32" as const;
+    "5f298494ab93fde4fcb682c33df268f28cac1793ff61f0203c7e9e93ad96d890" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -244,13 +248,53 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "default-search-factory" as const,
         source: "src/simulation/v0_8_a19_search.ts" as const,
-        sha256: "77d6ffbfbf9a2ad74e2b7a995875ceec71b35bd663831e1f92c7ac337dbff860" as const,
+        sha256: "1fd23dc59efd86cb6296da8a19f4473d6a02b88bc89d8d1c019f9da946e88628" as const,
     }),
     Object.freeze({
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
-        // Optional pre-native timing for research; absent hooks preserve the existing routing.
-        sha256: "b0e1ebe32a4ee7fba1098791f130d5ef27a88b85710bc2a04754011655dcc6f3" as const,
+        // Capture native-start timing when the default neural policy is attached.
+        sha256: "4f1211262af0eae8c43484412915c65f1e4c1c2ceda88ff944957577b4b8d9be" as const,
+    }),
+    Object.freeze({
+        role: "neural-policy" as const,
+        source: "src/ai/versions/v0_8_a19_neural_policy.ts" as const,
+        sha256: "69312ffe37e2970365ca412425dd2091966d31fc6b55e86d0bdb01c7c02852e0" as const,
+    }),
+    Object.freeze({
+        role: "neural-adapter" as const,
+        source: "src/simulation/a19_neural.ts" as const,
+        sha256: "41953bc7c3291febf7a6148366c780c4373020db4ce3a4ef75c979162f7a739e" as const,
+    }),
+    Object.freeze({
+        role: "neural-model" as const,
+        source: "src/simulation/a19_neural_model.ts" as const,
+        sha256: "29d0cb24082df024959221998db27fa018b76868c2b938a2312025524a049b22" as const,
+    }),
+    Object.freeze({
+        role: "neural-correction" as const,
+        source: "src/simulation/v0_9/a19_correction.ts" as const,
+        sha256: "e0d0368c74b05470aa2490af56706be0a157d0bc998fd9e1e18b4cca54b625b2" as const,
+    }),
+    Object.freeze({
+        role: "neural-observation" as const,
+        source: "src/simulation/v0_9/a19_observation.ts" as const,
+        sha256: "8dd195a919cac26cd6db4336711121b0828aebe88e080404876d0322c1b4f780" as const,
+    }),
+    Object.freeze({
+        role: "neural-inference" as const,
+        source: "src/simulation/v0_9/a19_inference.ts" as const,
+        sha256: "3c15122bbadfee4bd8f3ba041211ad39dce607324ad0a5911067c96d02287d03" as const,
+    }),
+    Object.freeze({
+        role: "neural-batch256-weights" as const,
+        source: "src/ai/models/a19/batch256.json" as const,
+        sha256: "63c07debd0e08debe24482a8cd9d6046e09d0f7fd73292c65b80dbca7f4e1ef3" as const,
+    }),
+    Object.freeze({
+        role: "neural-lr0003-weights" as const,
+        source: "src/ai/models/a19/lr0003.json" as const,
+        sha256: "c0be648360497095958f85af2068fcbf7d79176526feb270935770e6f0c30507" as const,
     }),
 ] as const);
 
@@ -268,6 +312,7 @@ export const V08_A19_PROFILE = Object.freeze({
     degradedBudget: V08_A19_DEGRADED_BUDGET,
     policy: V08_A19_POLICY,
     placementPolicy: V08_A19_PLACEMENT_POLICY,
+    neuralPolicy: A19_NEURAL_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 
@@ -289,8 +334,9 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT: "0",
         // Only the explicit JSON research override may enable this unqualified candidate.
         SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
-        // Selection-aware tail bounds are an offline, measured research arm. Production stays sealed off.
-        SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "0",
+        SEARCH_A19_MATERIAL_ARBITRATION: "ties",
+        SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1",
+        SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: "1",
         // Adaptive allocation is an offline experiment; live A19 retains uniform sampling.
         SEARCH_A19_ROLLOUT_ALLOCATION: "uniform",
     });

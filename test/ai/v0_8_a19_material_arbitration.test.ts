@@ -32,12 +32,12 @@ describe("A19 secondary rollout material evidence", () => {
         }
     });
 
-    it("enables the controls only through explicit A19 overrides", () => {
+    it("defaults to primary ties and retains explicit research overrides", () => {
         const key = "V08_A19_SEARCH_ENV_OVERRIDES";
         const saved = process.env[key];
         try {
             delete process.env[key];
-            expect(buildV08A19SearchEnvironment().SEARCH_A19_MATERIAL_ARBITRATION).toBeUndefined();
+            expect(buildV08A19SearchEnvironment().SEARCH_A19_MATERIAL_ARBITRATION).toBe("ties");
             process.env[key] = JSON.stringify({
                 SEARCH_A19_MATERIAL_ARBITRATION: "sample-relative",
                 SEARCH_A19_MATERIAL_LOW_EVIDENCE_WINS: "3",

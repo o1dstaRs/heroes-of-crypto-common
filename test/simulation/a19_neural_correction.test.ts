@@ -11,6 +11,7 @@ import type { V09A19CpuModel } from "../../src/simulation/v0_9/a19_inference";
 const environment = withScopedAIEnvironment({ V08_A19_SEARCH_ENV_OVERRIDES: undefined }, () => ({
     ...buildV08A19SearchEnvironment(),
     SEARCH_A19_MATERIAL_ARBITRATION: "ties",
+    SEARCH_A19_NEURAL_TIES: "0",
 }));
 const match: IMatchConfig = {
     greenVersion: "v0.8",
