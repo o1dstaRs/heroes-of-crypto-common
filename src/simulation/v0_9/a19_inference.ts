@@ -176,13 +176,40 @@ export class V09A19CpuModel {
         const valueLogit = apply(this.value2, apply(this.value0, context, true))[0];
         const policy: number[] = [],
             primary: number[] = [];
+        // Preserve the original accumulation order, but reuse its identical context/target prefixes.
+        const contextPrefix = new Float64Array(this.candidate0.output);
+        for (let row = 0; row < this.candidate0.output; row++) {
+            let value = this.candidate0.bias[row];
+            const offset = row * this.candidate0.input;
+            for (let column = 0; column < context.length; column++)
+                value += this.candidate0.weights[offset + column] * context[column];
+            contextPrefix[row] = value;
+        }
+        const targetPrefixes = new Map<number, Float64Array>();
         for (const candidate of observation.candidates) {
-            const target = candidate.targetIndex < 0 ? new Float64Array(96) : encoded[candidate.targetIndex];
-            const features = apply(
-                this.candidate2,
-                apply(this.candidate0, [...context, ...target, ...new Float32Array(candidate.features)], true),
-                true,
-            );
+            let prefix = targetPrefixes.get(candidate.targetIndex);
+            if (!prefix) {
+                const target = candidate.targetIndex < 0 ? new Float64Array(96) : encoded[candidate.targetIndex];
+                prefix = new Float64Array(this.candidate0.output);
+                for (let row = 0; row < this.candidate0.output; row++) {
+                    let value = contextPrefix[row];
+                    const offset = row * this.candidate0.input + context.length;
+                    for (let column = 0; column < target.length; column++)
+                        value += this.candidate0.weights[offset + column] * target[column];
+                    prefix[row] = value;
+                }
+                targetPrefixes.set(candidate.targetIndex, prefix);
+            }
+            const inputs = new Float32Array(candidate.features);
+            const first = new Float64Array(this.candidate0.output);
+            for (let row = 0; row < this.candidate0.output; row++) {
+                let value = prefix[row];
+                const offset = row * this.candidate0.input + context.length + 96;
+                for (let column = 0; column < inputs.length; column++)
+                    value += this.candidate0.weights[offset + column] * inputs[column];
+                first[row] = Math.max(0, value);
+            }
+            const features = apply(this.candidate2, first, true);
             policy.push(apply(this.policy, features)[0]);
             primary.push(apply(this.primary, features)[0]);
         }
