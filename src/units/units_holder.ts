@@ -10,6 +10,7 @@
  */
 
 import { EffectHelper, type IPlacement, Spell } from "..";
+import { STACK_BLESSINGS, STACK_BLESSING_BY_NAME } from "../abilities/stack_blessings";
 import {
     getArmorPower,
     getEmpowerPower,
@@ -68,6 +69,7 @@ const SHARPENED_WEAPONS_BLESSING_BIT = 32;
 
 /** The board-wide blessings as seen at the start of one stack-power refresh. */
 interface IBlessingCensus {
+    stackBlessings: Map<string, Map<TeamType, number>>;
     angelicHost: Map<TeamType, number>;
     arcaneWard: Map<TeamType, number>;
     wardingMane: Map<TeamType, number>;
@@ -95,7 +97,7 @@ function blessingBit(name: string): number {
         case "Sharpened Weapons Blessing":
             return SHARPENED_WEAPONS_BLESSING_BIT;
         default:
-            return 0;
+            return STACK_BLESSING_BY_NAME.get(name)?.bit ?? 0;
     }
 }
 
@@ -1046,6 +1048,7 @@ export class UnitsHolder {
      */
     private captureBlessingCensus(): IBlessingCensus {
         const census: IBlessingCensus = {
+            stackBlessings: new Map(STACK_BLESSINGS.map(({ name }) => [name, new Map()])),
             angelicHost: new Map(),
             arcaneWard: new Map(),
             wardingMane: new Map(),
@@ -1072,6 +1075,13 @@ export class UnitsHolder {
             }
 
             const team = unit.getTeam();
+            for (const name of unit.getUnitProperties().abilities) {
+                if (!STACK_BLESSING_BY_NAME.has(name)) continue;
+                const power = unit.calculateStackBlessingPower(name);
+                if (power <= 0) continue;
+                const powers = census.stackBlessings.get(name)!;
+                powers.set(team, Math.max(powers.get(team) ?? 0, power));
+            }
             if (unit.getAbility("Sharpened Weapons Blessing")) {
                 const synergyPower = FightStateManager.getInstance()
                     .getFightProperties()
@@ -1286,6 +1296,15 @@ export class UnitsHolder {
         // whose refreshUnits() has always run both. cleanAuraEffects() makes this idempotent.
         this.refreshAuraEffectsIfNeeded();
         const blessingCensus = this.captureBlessingCensus();
+        for (const { name, bit, walkingOnly } of STACK_BLESSINGS) {
+            this.reapplyTeamBlessing(
+                blessingCensus,
+                blessingCensus.stackBlessings.get(name)!,
+                bit,
+                name,
+                walkingOnly ? (unit) => !unit.canFly() : undefined,
+            );
+        }
         this.refreshAngelicHostForAllUnits(blessingCensus);
         this.refreshArcaneWardBlessingForAllUnits(blessingCensus);
         this.refreshWardingManeBlessingForAllUnits(blessingCensus);

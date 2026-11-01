@@ -479,7 +479,7 @@
                 "Nature:Summon Wolves",
                 "Nature:Summon Wolves"
             ],
-            "abilities": ["Forest Spellbook", "Sylvan Focus Aura"]
+            "abilities": ["Forest Spellbook", "Sylvan Focus Blessing"]
         },
         "Trent": {
             "name": "Trent",
@@ -1186,7 +1186,7 @@
             "footprint_height": 1,
             "level": 1,
             "spells": [],
-            "abilities": ["Wolf Trail Aura", "Rapid Charge"]
+            "abilities": ["Wolf Trail Blessing", "Rapid Charge"]
         },
         "Nomad": {
             "name": "Nomad",

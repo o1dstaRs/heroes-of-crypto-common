@@ -597,16 +597,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Sylvan Focus Aura": {
-        "name": "Sylvan Focus Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allies within 2 cells deal {}% more magic damage"],
+    "Sylvan Focus Blessing": {
+        "name": "Sylvan Focus Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allies deal +{}% magic damage anywhere on the battlefield.",
+            "Each stack-power tier grants 20% of base power (20/40/60/80/100%). Only the strongest allied source applies."
+        ],
         "power": 15,
         "power_type": "ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
-        "stack_powered": false,
+        "stack_powered": true,
         "effect": null,
-        "aura_effect": "Sylvan Focus",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Guiding Winds Aura": {
@@ -935,16 +938,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Wolf Trail Aura": {
-        "name": "Wolf Trail Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allies within range gain {} additional moving distance"],
+    "Wolf Trail Blessing": {
+        "name": "Wolf Trail Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allies gain +{} movement distance anywhere on the battlefield.",
+            "Each stack-power tier grants 20% of base power (20/40/60/80/100%). Only the strongest allied source applies."
+        ],
         "power": 1,
         "power_type": "ADDITIONAL_STEPS",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,
-        "aura_effect": "Wolf Trail",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Penetrating Bite": {

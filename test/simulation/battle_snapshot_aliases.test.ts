@@ -9,14 +9,14 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 function fixture() {
     const context = createCombatTestContext();
     const thief = createTestUnit({ name: "Arachna Queen", amountAlive: 20, stackPower: 3 });
-    thief.grantStolenAbility("Wolf Trail Aura");
+    thief.grantStolenAbility("Guiding Winds Aura");
     placeUnit(context.grid, context.unitsHolder, thief, { x: 4, y: 4 });
     const ally = createTestUnit({ name: "Nearby ally" });
     placeUnit(context.grid, context.unitsHolder, ally, { x: 4, y: 5 });
     context.unitsHolder.refreshAuraEffectsForAllUnits();
     const fight = FightStateManager.getInstance().getFightProperties();
-    const cardAura = () => Reflect.get(thief.getAbility("Wolf Trail Aura")!, "auraEffect") as AuraEffect;
-    const aura = () => thief.getAuraEffect("Wolf Trail")!;
+    const cardAura = () => Reflect.get(thief.getAbility("Guiding Winds Aura")!, "auraEffect") as AuraEffect;
+    const aura = () => thief.getAuraEffect("Guiding Winds")!;
     const projected = () => {
         const teams = Reflect.get(context.unitsHolder, "teamsAuraEffects") as Map<
             number,
@@ -24,7 +24,7 @@ function fixture() {
         >;
         return [...teams.get(thief.getTeam())!.values()]
             .flat()
-            .filter((entry) => entry.getAuraEffectProperties().name === "Wolf Trail");
+            .filter((entry) => entry.getAuraEffectProperties().name === "Guiding Winds");
     };
     expect(cardAura()).toBe(aura());
     expect(projected().length).toBeGreaterThan(1);
