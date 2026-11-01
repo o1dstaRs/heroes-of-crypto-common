@@ -19,6 +19,7 @@ import { playRankedDraftGame, rankedDraftStrengthCandidate, type IRankedDraftGam
 import { SearchDriver } from "../search_driver";
 import { fingerprintV09 } from "./protocol";
 import { withV09A19Recording, type IV09A19TrainingDecision } from "./a19_pilot_recording";
+import { withV09RootRestoreAudit } from "./a19_root_restore";
 import { V09_A19_OBSERVATION_CONTRACT, V09_A19_OBSERVATION_SHA256 } from "./a19_observation";
 import { assertV09OutputIsolation } from "./supervisor";
 import {
@@ -87,6 +88,7 @@ interface IPilotGame {
     record: IRankedDraftGameRecord;
     trajectorySha256: string;
     driverCounts: IV09PilotDriverCounts;
+    rootRestorationChecks: number;
     training?: { decisions: IV09A19TrainingDecision[]; sampledWithoutCompleteEvidence: number };
 }
 
@@ -127,6 +129,7 @@ export function runV09PilotBoard(task: IPilotTask): IV09PilotBoard {
     for (let caseIndex = 0; caseIndex < 4; caseIndex++) {
         const trajectory = createHash("sha256");
         let driverCounts: IV09PilotDriverCounts | undefined;
+        let rootRestorationChecks = 0;
         let training: IPilotGame["training"];
         const record = playRankedDraftGame(
             genome,
@@ -163,15 +166,19 @@ export function runV09PilotBoard(task: IPilotTask): IV09PilotBoard {
                                 trajectory.update(JSON.stringify([turn.side, turn.unitId, turn.chosenDecision]));
                             },
                         });
-                    const checked = withV09PilotDriverAudit(candidateTeam, manifest.baseline, candidate, () => {
-                        if (!recording) return execute();
-                        const collected = withV09A19Recording(candidateTeam, config.seed, execute);
-                        training = {
-                            decisions: collected.decisions,
-                            sampledWithoutCompleteEvidence: collected.sampledWithoutCompleteEvidence,
-                        };
-                        return collected.value;
-                    });
+                    const restored = withV09RootRestoreAudit(() =>
+                        withV09PilotDriverAudit(candidateTeam, manifest.baseline, candidate, () => {
+                            if (!recording) return execute();
+                            const collected = withV09A19Recording(candidateTeam, config.seed, execute);
+                            training = {
+                                decisions: collected.decisions,
+                                sampledWithoutCompleteEvidence: collected.sampledWithoutCompleteEvidence,
+                            };
+                            return collected.value;
+                        }),
+                    );
+                    const checked = restored.value;
+                    rootRestorationChecks = restored.checks;
                     driverCounts = checked.counts;
                     return checked.value;
                 },
@@ -181,10 +188,13 @@ export function runV09PilotBoard(task: IPilotTask): IV09PilotBoard {
             throw new Error(`Pilot requires completed legal games: ${JSON.stringify(record)}`);
         if (!driverCounts || driverCounts.baseline === 0 || driverCounts.candidate === 0)
             throw new Error("Pilot did not exercise both search profiles");
+        if (rootRestorationChecks !== driverCounts.baseline + driverCounts.candidate)
+            throw new Error("Pilot did not verify every actual searched root");
         if (training) for (const decision of training.decisions) decision.outcome = score(record);
         games.push({
             record,
             driverCounts,
+            rootRestorationChecks,
             trajectorySha256: trajectory.digest("hex"),
             ...(training ? { training } : {}),
         });

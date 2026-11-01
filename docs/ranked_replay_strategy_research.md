@@ -1,6 +1,26 @@
 # Ranked replay strategy research
 
-Status on 2026-10-26: **no new strategy qualified; rollback repair published; single-fight augment selector closed; distinct fixed-policy screen collecting**. The shared synergy-list repair passed 7,206 common tests, 284 exact replay checks and isolated ranked-server compatibility and is now published in common `331c53ba`. The interrupted support-R8 bank remains invalid and closed. A subsequent 3,240-fight augment diagnostic found +1.2346 pp under independent combat randomness, with a 95% whole-board interval of −2.1605 to +4.7840 pp; it failed its fixed gate. The unchanged incumbent changed outcomes across combat seeds in 36.42% of cases. A [separate loss-mechanism follow-up](a19_augment_loss_mechanisms_research.md) replays every regression and improvement, then tests a fixed Armor-preserving Movement purchase on untouched seven-point drafts. See the [repair report](a19_synergy_rollback_research.md) and [augment-transfer results](a19_augment_transfer_research.md). Historical experiments retain their original source identities; no strategy profile or serving default was changed by this research iteration.
+Status on 2026-10-26: **no new strategy qualified; rollback repair published; three augment procedures closed**. The shared synergy-list repair is published in common `331c53ba`; historical studies retain their source identities. The original single-fight selector failed at +1.2346 pp, 95% interval −2.1605 to +4.7840 pp. The [loss-mechanism follow-up](a19_augment_loss_mechanisms_research.md) reproduces all regressions and improvements, then tests a broad Armor-preserving Movement purchase: +1.9531 pp, interval −0.9549 to +4.9045 pp, failed. The [fresh two-shooter test](a19_two_shooter_mobility_research.md) also fails at +1.9531 pp, interval −2.0833 to +5.9245 pp; confirmation stays unopened. Two authoritative prefix probes verify that extra movement can displace legal nearer stops from the sparse candidate pool. This is a concrete coverage target, without a qualified strength gain or serving-default change.
+
+The [individual game-by-game analysis](a19_game_by_game_loss_analysis.md) now tests actual interventions:
+885 own-action alternatives recover nineteen of the twenty old losses by hindsight. Repeated futures
+favor one retained Gargantuan throw and reject forcing Pikeman's omitted nearer stop. All four further
+tactical probes remain unproven. Exact endpoint audits separate sparse terminal samples and future
+controllers from truncated learned leaves in the two inspected ranged decisions. No rule is promoted.
+
+The [joint placement, splits and purchase study](a19_joint_placement_research.md) also completes:
+6,624 full research fights and 108 new independent offer boards, with no qualifying policy. Paid P2
+loses 11.17 pp in the broad bank. A separate full-wall prototype loses 31.25 pp under its actual
+small-flyer filter, which still admits Chakram and Through Shot; this is not a clean no-multi-target
+comparison. Exact replays show how protecting Gargantuan can sacrifice the other ranged stacks.
+
+The [public-kit setup selector follow-up](a19_joint_setup_selector_research.md) completes 3,888
+fresh primary fights and 1,728 old-board split/formation diagnostics. The adaptive free setup
+estimates **+2.8935 pp versus current**, but fails its three-point minimum and Holm-four p=.09234;
+the untouched confirmation is not generated. The factorial identifies the large opposite spacing
+effects against Chakram and non-Chakram opponents. Four-way development misses its separate
+funding screen. All seven negatively changed aggregate boards and nineteen positive ones receive
+exact replay coverage. No setup policy, dependency pin or serving default changes.
 
 **Baseline clarification:** preceding studies use their documented common-package or native-controller settings. References below to current R2 mean the sealed common R2 default, not the exact ranked-server configuration. Reading the server sources for experiment 12 exposed additional material-tie arbitration, certified/tight selection bounds, zero replay tie epsilon and disabled flyer-backline priorities. The new diagnostic installs and verifies those settings on every real A19 call. Keep earlier findings scoped to their recorded baselines; do not pool them with this server-profile study.
 
@@ -1316,5 +1336,216 @@ identity or combat outcome. Normal full setup/placement runs with the plan chose
 The separate untouched primary has 48 offer boards, crossed maps/seats/sides and two actual combat
 streams: 1,152 paired cases / 2,304 fights. A further 576 fights test opponent budgets five and six.
 Seventy-two opening checks and 84 full preflight fights pass, including independent seed/funding/
-buff/supply/occupancy reconstruction. Fresh strength collection is in progress; partial outcomes
-cannot qualify the rule. See the [full design and loss cases](a19_augment_loss_mechanisms_research.md).
+buff/supply/occupancy reconstruction. The complete screen yields **+1.953125 pp**, 95% whole-board
+interval **−0.954861 to +4.904514 pp**, exact paired p **.2035404128**. It fails all three strength
+gates. All 2,964 full fights including controls pass legality and 143,190 searched-root checks.
+Independent TypeScript/Python reproduce the complete bootstrap and exact sign-flip result.
+
+The additional candidate-path audit brings the old-case diagnostic to 300 exact replays and
+17,634 root checks. In eighteen of twenty regressions, the counterpart first action reaches full
+evaluation: ten primary ties and eight different rankings/gates. Two are absent from the entering
+pool; none is lost solely in shortlisting at that first divergence. Eleven first actors are our
+army and nine are the opponent. This is path evidence, not proof that forcing the baseline action
+improves expectation. The 2,592 reused openings also expose identical deployed leaf features for
+all 324 Armor-to-Empower and 324 Armor-to-Movement transfers. See the
+[full design, loss cases and limitations](a19_augment_loss_mechanisms_research.md).
+
+## Experiment 30: fixed two-shooter mobility on fresh eligible boards
+
+Preserve both prior negative verdicts. The two-shooter slice of experiment 29 is development-only
+(+9.9206 pp, eighteen boards). A new rule requires budget seven, the accepted P0 A3 M1 S3 V0 E0
+template and exactly two native RANGE identities among six own creatures, counting split clones
+once. Exchange M1 for V1, keeping Armor/Sniper; every other input retains the incumbent exactly.
+
+The separately registered primary and unchanged confirmation each contain 192 fresh eligible offer
+boards, balanced map and actual draft seat, both physical mirrors and two independent actual combat
+streams: 768 paired cases / 1,536 fights per phase. Require at least +5 pp conditional gain, positive
+whole-board lower interval and exact paired p below .05. Confirmation stays unopened after any failed
+primary. Forty-eight preflight fights and independent input/source/seed/funding/fallback checks pass.
+The complete primary gives **+1.953125 pp**, whole-board interval **−2.083333 to +5.924479 pp**,
+exact paired p **.3591753925**. It fails all three strength gates. Its 144 opponent-budget stress
+fights are also complete; the 1,728 total full fights including controls pass 95,877 root restoration
+checks and independent source/selector/seed/buff/pairing/bootstrap verification. Zero confirmation
+fights run. No new side, caster, map or unit filter rescues the candidate. See the
+[conditional result and preserved admission corrections](a19_two_shooter_mobility_research.md).
+
+Two additional legality-only historical-prefix probes accept the omitted nearer advances for
+Pikeman and Harpy under their Movement augmentation. Those processes stop after the injected move
+and supply no terminal strength label. The sparse advance pool can therefore lose a legal nearer
+stop as reach increases. A future candidate-generation experiment should retain nearer choices and
+compare full games with both current behavior and an appropriate computing control. No such
+strength trial or production change is implied by these two probes.
+
+## Experiment 31: individual losses, full continuations and later own decisions
+
+Inspect every one of experiment 28's twenty regressions with actual single-action interventions.
+Forty unchanged full replays reproduce both original plans, and forty further games exchange the
+first disputed action in both directions. Only one of eleven first differences controlled by our
+army recovers its original loss; two other recoveries require changing the opponent's action.
+
+Every selected-plan position then receives 32 matched new future combat streams for its actual and
+old actions: **1,280 complete full-A19 fights**. Gargantuan's Centaur-removing area throw scores
+**24/32 versus 11.5/32**, conditional +39.0625 pp, Holm p **.0299377441** across all twenty positions.
+Pikeman's legal omitted nearer stop is worse, **0/32 versus 15/32**, Holm p **.001159668**.
+The opposing Angel's Elf Resurrection is much stronger against us than its old Troll target;
+opponent-action ablations cannot become a deployable own-action correction. The Monk-to-Elf
+correction wins its original replay but does not improve repeated continuations.
+
+Twenty exact observational captures expose all **233 own A19 roots in laps one and two**. After
+twenty additional exact controls, execute **all 885 finite retained alternatives**, one change per
+original game: 146 wins, eighteen draws and 721 losses. Nineteen of the twenty original losses admit
+a one-action winning continuation by hindsight. The remaining Cyclops/Medusa splash-exposure game
+has no recovery among its twenty-five tested alternatives. Neither count establishes a stronger
+policy; the raw scan retains every failed branch.
+
+Four separately fixed tactical choices receive **256 further fresh conditional fights**. None
+establishes a gain after family correction. A matched native-controller ablation adds 128 complete
+fights: both Monk targets win 32/32 under native futures but score around half under full A19;
+Gargantuan's area throw remains better under native futures as well. Read-only endpoint probes show
+that all eight relevant original forecasts terminate before H64. This rules out truncated leaf values
+as the final comparison's cause in those two examples, while leaving chance sampling and future-policy
+context as distinct research questions.
+
+Twenty-nine exact rich replays package nineteen own recoveries, both endpoint audits and fixed
+stream-zero examples of every tactical probe. Independent row/catalogue/root/source verification and
+TypeScript/Python exact-inference checks pass. No original failed procedure is reopened or promoted,
+and no production source/profile/pin changes. See the [twenty individual game notes and limitations](a19_game_by_game_loss_analysis.md).
+
+## Experiment 32: joint paid Placement, split allocation and formations
+
+The user correctly identified that a fixed-position shot study cannot evaluate a different purchased
+zone and split plan. The new [complete report](a19_joint_placement_research.md) tests 180 funded setups:
+nine full-spend seven-point plans, four split allocations including large Gargantuan splits, and five
+formations. Source/profile and every actual A19 root retain the admitted synergy repair and exact
+captured server configuration. Actual engine actions validate split stats/resources and footprints.
+
+Development scores rise from 1/8 for current behavior to 8/8 for several alternatives on one old army.
+Those results select and lock one P0/P1/P2 setup, without treating the one army as strength evidence.
+Across 72 fresh legal ranked boards and 3,456 full fights, the free candidate loses 5.5556 pp, P1 loses
+5.2662 pp and P2 loses 11.1690 pp against current behavior. P2's adjusted interval is entirely negative.
+No rule qualifies against both current behavior and the optimized free control.
+
+A second mechanism is registered before reading those primary outcomes: close actual small-flyer
+landing cells rather than place a nearby guard. The free wall leaves seven cells; P1 averages 1.0556;
+P2 closes every opening. Its independent 36-board/1,728-fight pilot still rejects the implemented rule:
+P2 loses 31.25 pp against current behavior. Importantly, its old exclusion list only checks Area Throw,
+Large Caliber and ranged-damage spells. Thirty-five boards contain Zena and 31 contain Tsar Cannon.
+Do not interpret it as a clean test with all multi-target threats removed or rescue a non-Zena slice.
+
+In a paired loss, Cannon's Through Shot kills the Elf stack and almost all Cyclops while Gargantuan
+remains alive. Only 123 of 424 P2 games in which Gargantuan acts still have a closed screen at its
+first turn. Guard persistence and the army's surviving output matter more than initial closure alone.
+Chakram's actual empty-bridge geometry must also be distinguished from ordinary radial splash.
+
+Both statistical analyses reproduce independently in Python and TypeScript. All admitted full fights
+have zero rejected actions; 256 exact trajectory replays, complete initial-board checks and native/
+framed plus checkpoint/snapshot controls verify execution separately from strength. Research remains
+outside the public AI. No balance, production profile, dependency pin or deploy changes.
+
+## Experiment 33: public-kit learning, independent splits and exact loss coverage
+
+Reuse experiment 32's complete 72-board generic bank as development data, never new qualification
+evidence. A frozen 31-feature public-input extractor and six board-level folds select small
+regularized setup trees. Free and fully funded joint learners choose the same rule: retain current
+against Chakram; otherwise remove utility splits and use the low-spaced formation. No paid plan is
+selected. The out-of-fold development estimate is +4.6875 pp.
+
+The untouched primary contains 108 independent legal Gargantuan offer boards, both physical mirrors,
+two actual RNG streams and three enemy formations. Exact model aliasing reduces duplicate execution
+to 3,888 actual full fights while preserving the four planned comparisons. The free selector scores
+66.0880% versus current 63.1944%, **+2.8935 pp**, adjusted bootstrap interval +0.1543 to +5.8642 pp.
+Its Holm exact p=.09234 and registered +3pp minimum both fail. It gains 9.2207 pp over applying the
+fixed spaced setup everywhere, but that comparison cannot replace the failed current-behavior gate.
+The prepared confirmation stays ungenerated; no primary/confirmation pooling or hidden-budget rule.
+
+A registered full factorial adds 1,728 complete fights on the old 72 boards, filling no-splits/current
+and utility/spaced. Spacing with utility splits gains 13.26 pp without enemy Chakram and loses
+15.17 pp against it. Removing splits alone gains about two points. These are development mechanism
+estimates, not an independently confirmed splitting policy. A new four-option free learner gains
+6.0764 pp out of fold, 1.3889 pp above the first learner, below its separately registered 1.5pp
+resource floor. That family generates no new primary outcomes and does not reopen the first one.
+
+Exact replay coverage includes all seven negatively changed aggregate boards and all nineteen positive
+ones. The actual chains include changed target value, early Magic Dragon burst, Fairy accessing the
+carry and deaths after outgoing attacks. A one-cell Medusa edit breaks the old five-target Chakram
+flight for a fixed primary; full responsive-enemy replays improve that old spaced army from 2/12 to
+5/12, versus current 3/12, with seven first-target changes. This remains one explanatory army.
+
+Both statistical implementations agree on the complete primary distributions and factorial estimates;
+all 1,296 duplicate-policy transcripts match. Functional openings, hidden-input tests, root rollback,
+replay controls and the 17 existing production/isolation tests pass. The viewer contains 51 conditions,
+102 branches and 5,264 validated frames. See the [complete findings and scope](a19_joint_setup_selector_research.md).
+No runtime policy, shared dependency pin, creature stat or deployment changes.
+
+## Experiment 34: exact Chakram formations and their movement failure
+
+The [complete formation study](a19_chakram_formation_research.md) registers eight funded setups:
+current, touching wall, filled block, separated pods, robust selection with/without utility splits,
+and fully funded Placement 1/2 variants. Twenty-seven reused historical armies supply 1,296 development
+fights across maps, budgets, physical mirrors and three responsive enemy formations. Robust/no-splits
+gains 8.9506 pp and funds a frozen fresh primary; neither paid variant beats current or optimized free.
+
+Across 108 untouched natural Gargantuan-versus-Zena boards and 2,592 complete A19 fights, the free
+policy gains **2.7392 pp**, 95% whole-board interval **−0.1929 to +5.8256 pp**, exact p=.0997933.
+Its registered minimum and statistical requirements fail. Confirmation remains ungenerated, and the
+previous failed spacing selector is not reopened or combined into a promoted rule.
+
+The corrected 16x16 static audit executes 5,005,302 canonical trajectories and adds potential-edge
+path bounds valid when blockers remove edges. Every robust/no-split opening permits only one target;
+after any single body disappears, the bound is two while other bodies stay fixed. Filled blocks can
+permit five. The original inner-cell-only audit is preserved and corrected without changing the policy.
+
+All 29 negatively changed fresh aggregate armies receive a paired exact replay of a prespecified
+same-sign condition, alongside six favorable boards. Combined explanation coverage is 212 complete
+headless/full-event replays, 106 references, 50 viewer conditions and 5,413 frames. Thirteen selected
+fresh regressions have no enemy Chakram collateral at all, and 21 lose ranged carry actions. One
+lap-two chain hits Dryad, Cyclops, White Tiger and Medusa for 808 reported HP after three own moves.
+Eight fixed-shooter/primary movement combinations reproduce its exact bridges: moving only Medusa
+from (13,1) to (12,0) already opens four full-damage targets. Moving a body is not equivalent to removing
+it. Another regression preserves the carry far longer but loses its companion army to Cannon/Fireball.
+
+Independent Python/TypeScript inference and raw-pair reductions agree; 192 identical openings retain
+identical complete transcripts. Source, root rollback, funding, supply, footprints, hidden-input and
+existing profile/isolation checks pass. No production policy, dependency pin or deployment changes.
+
+## Experiment 35: six key units and action-family coverage
+
+The user requested dedicated mastery of Tsar Cannon, Gargantuan, Black Dragon, Zena, Wandering Mage
+and the level-four spellbook dragon, whose active roster name is Magic Dragon. The
+[six-unit curriculum and evidence](a19_six_unit_mastery_research.md) separate piloting and countering
+each unit, including draft competition, ammunition, independent split spellbooks and stack-power
+thresholds, funded augments, placement, subsequent movement and complete combat continuations.
+
+A metadata-only scan of 8,192 independent offer boards in both draft assignments found no Black
+Dragon picks. An unchanged-choice offer audit verified all 16,384 assignment rosters: Black Dragon
+was visible on 4,786 boards per assignment and was never attempted. Gargantuan/Zena's absent opposite
+draft assignments instead involve attempted picks colliding with hidden earlier enemy picks. These
+are distinct coverage mechanisms. A separately registered legal preferred-pick extension supplies
+18 Black Dragon exercise boards; it is not natural incidence or evidence of draft strength.
+
+The completed census covers 72 natural plus 18 exercise armies, both physical sides, two combat
+streams, Normal/Lava/Block and own budgets 5/6/7. All 360 observed/unobserved pairs match complete
+behavior and final state: **720 full fights**, 17,743 recorded turns and 34,646 searched-root
+restoration checks. Detailed actor catalogues/shortlists are collected for the six units; every
+other actor's actual action and board transition is also retained. Magic Dragon lost its entire
+stack before activation in eight of 72 target conditions; Whirlpool was available on 206 turns,
+shortlisted on 46 and cast on nine. Availability and nonselection are questions, not regret labels.
+
+The first registered development intervention enables the existing whole-breath melee ranking for
+the controlled Black Dragon only, without widening H64/R2/K6 or changing setup/native rollouts.
+All 18 exercise boards and four conditions per board are retained. Over **144 paired fights**, both
+arms finish 32 wins / 40 losses: **0.00 pp**, 95% map-stratified board interval **−2.7778 to +2.7778**,
+exact p = **1**. One condition improves and one worsens. The complete Python/TypeScript bootstrap
+distributions, exact test and raw outcomes agree. No automatic primary or policy change follows.
+
+Exact explanatory replays show complementary shortlist effects. In the regression, a one-HP Dragon's
+escape move remains in production but drops out of the new shortlist; the selected breath attack
+removes 655 enemy HP and costs the Dragon its final HP. The old search preferred escape when
+retained. In the improvement, a previously capped-out move-and-breath attack damages both enemy
+Mages while the Dragon survives. Neither individual outcome establishes expected regret, but together
+they motivate preserving useful move/control families while improving attack-angle coverage.
+
+Total accepted execution: **866 full-game runs**, including two explanatory replays, with **41,601
+actual-root** and **4,158 diagnostic-enumeration** restoration checks. Replays add no independent
+armies. Existing profile/isolation and relevant ability/support checks pass (40 tests). The separate
+teacher/student campaign, shipped strategy, dependency pins and deployments remain unchanged.

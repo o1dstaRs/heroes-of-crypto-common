@@ -75,6 +75,36 @@ already executed candidate/shortlist/scoring path at those exact roots, preservi
 return identities. Three first differences are AI Driven Berserker/Frenzied Boar turns with no A19
 root; they must remain a separate native-controller branch rather than receive invented search scores.
 
+The additional twelve controls and 88 candidate-path replays pass exact original behavior and
+restoration checks, bringing the diagnostic total to **300 replays and 17,634 searched-root checks**.
+At the first disputed action in each regression, the baseline action is handled as follows:
+
+| Existing candidate path                 | Controlled actor | Opponent actor |
+| --------------------------------------- | ---------------: | -------------: |
+| Fully scored, equal primary value       |                6 |              4 |
+| Fully scored, different ranking or gate |                3 |              5 |
+| Absent from the pool entering search    |                2 |              0 |
+| Removed by the immediate shortlist      |                0 |              0 |
+
+Thus eighteen of twenty counterparts reach full evaluation; the first divergence usually concerns
+ranking or final arbitration rather than shortlist loss. Entering-pool absence does not separate
+generation from an earlier filter. Nine first divergences belong to the opponent, which can react
+better to changed stats. None of these labels proves that forcing a one-game baseline action would
+improve expected strength, or describes every later decision in the fight.
+
+Both entering-pool omissions have a concrete movement mechanism. With the extra step, Pikeman's
+advance destination changes from (10, 2) to (9, 2), and Harpy's from (5, 12) to (4, 12). Their
+sparse pools contain three and two choices respectively, below the six-action shortlist cap.
+The nearer stops disappear before shortlisting.
+
+Two dedicated historical-prefix probes match the prior choices and recorded pre-root unit state,
+then apply each missing nearer move through the authoritative engine under the augmented plan.
+**Both moves are accepted** and reach their requested cells. The processes stop immediately after
+the probe; these are neither new full fights nor strength labels or restoration-check replays.
+This verifies a legal-option coverage gap when movement increases. Retaining nearer advances is
+a concrete future candidate-generation hypothesis, still requiring complete games and an appropriate
+work-matched reference before any claim of stronger play.
+
 The old selector also discarded information through its alphabetical tie rule. On seven-point
 discovery cases, Might-to-Movement improved eighteen outcomes but was selected only three times.
 In thirteen further cases it tied the selected alternative, and the fixed canonical order preferred
@@ -133,6 +163,13 @@ Reconstructing every one of the 900 configurations through the canonical helper'
 before tactical splitting produces the exact effective configuration used by this screen. Placement
 and the Nature capacity bonus remain unchanged, so the split roster also matches exactly.
 
+A separate structural check enumerates all **783 legal full-spend plans** across budgets five, six
+and seven. Exactly the registered seven-point template activates; every other plan is unchanged.
+Read-only proxies permit access only to own budget and own accepted plan. The rule preserves full
+funding, legal caps, Placement, Armor, Sniper and Empower. On the reused 126-army seven-cohort census,
+nine applicable armies change and 117 retain the incumbent exactly. These are fallback/domain checks,
+not additional strength games or a statement about live cohort frequency.
+
 | Registered population                     | Offer boards | Paired cases | Full fights |
 | ----------------------------------------- | -----------: | -----------: | ----------: |
 | Primary: own seven points, opponent seven |           48 |        1,152 |       2,304 |
@@ -152,10 +189,64 @@ the complete 20,000-sample bootstrap distribution and exact sign-flip result. Pa
 fund fresh 6,000-game qualification, unchanged confirmation, broader opponents/cohorts and live-path
 checks. No policy qualifies from this screen alone.
 
-**Collection in progress.** Do not interpret partial outcomes. One four-worker pool, fixed sample and
-a 90-minute registered primary/stress budget; no speed claim on the shared contended host.
+## Result: broad spending rule failed its gate
+
+All **2,304 primary fights and 576 opponent-budget stress fights** completed. The fixed broad rule
+improved paired primary score by **1.953125 pp**, with whole-board 95% interval
+**−0.954861 to +4.904514 pp**, exact paired **p = .2035404128**. It fails the +2 pp floor,
+positive-lower-bound and p-value gates. No extra bank or favorable subgroup rescues that rule.
+
+Incumbent score was 50.3472% and policy score 52.3003%. There were 175 better, 149 worse and
+828 equal outcomes. Every case changed plans, and 1,151 of 1,152 paired behavior records changed.
+Both actual-RNG replicates, both physical sides and both draft-seat slices had positive point
+estimates, which does not replace the failed whole-board primary.
+
+| Descriptive slice                 | Paired cases | Paired gain |
+| --------------------------------- | -----------: | ----------: |
+| Normal                            |          384 |  +3.3854 pp |
+| Lava                              |          384 |  +3.7760 pp |
+| Block                             |          384 |  −1.3021 pp |
+| Opponent five points, stress      |          144 | +10.4167 pp |
+| Opponent six points, stress       |          144 |  +6.5972 pp |
+| Exactly two own native shooters   |          252 |  +9.9206 pp |
+| Exactly three own native shooters |          432 |  −0.4630 pp |
+| Exactly four own native shooters  |          432 |  −0.4630 pp |
+| Exactly five own native shooters  |           36 |  +4.1667 pp |
+
+The two-shooter slice spans eighteen offer boards; the five-shooter slice only three. The stress
+rows share twelve boards. These are development descriptions, not independent subgroup qualification.
+The earlier attractive Block result changes sign here, illustrating the danger of copying an old
+map-specific winner.
+
+Including the 84 preflight controls, all **2,964 fresh full fights** end by elimination, with zero
+rejected or censored games. They supply **143,190 searched-root restoration checks**. Independent
+verification passes all 39,672 opening units, complete source/input/seed/funding/fallback controls,
+and every integer in the 20,000-resample bootstrap distribution, both endpoints and the exact
+sign-flip numerator/denominator. No timing or serving improvement is qualified.
+
+The four non-shooters in a two-shooter army provide a distinct mobility hypothesis. A
+[separately registered conditional study](a19_two_shooter_mobility_research.md) tests that fixed
+own-roster predicate on new eligible offer boards, with an unchanged held-out confirmation only
+after a primary pass. The broad rule and original one-fight selector remain closed and failed;
+no source-default AI or package pin changes.
 
 The ignored packages `game/core/tmp/analysis/augment-loss-mechanisms-20261026` and
 `game/core/tmp/analysis/augment-preserve-armor-movement-20261026` retain registrations, immutable
 source/tool/input hashes, every raw request, all-sign case diagnoses and independent verification.
 Generated results remain outside Git.
+
+## Follow-up: actual game-by-game interventions
+
+The [individual loss report](a19_game_by_game_loss_analysis.md) goes beyond first-divergence labels:
+forty exact original controls, forty two-direction action exchanges, 1,280 full-A19 conditional
+continuations, all 885 retained own alternatives across 233 first-two-lap positions, and four fixed
+tactical probes with another 256 fresh continuations. Nineteen original losses have a one-action
+hindsight recovery; that is not a strategy gain.
+
+The new evidence rejects forcing the missing Pikeman stop: **0/32 versus 15/32** for its actual wait.
+Gargantuan's retained Centaur-removing ground throw instead improves its frozen position,
+**24/32 versus 11.5/32**, while the appealing Monk-to-Elf correction does not improve repeated results.
+All eight relevant private forecasts in those two ranged examples reached terminal outcomes before
+H64. The final comparison therefore exposes sparse chance evidence and future-controller sensitivity,
+rather than a truncated learned leaf in those particular decisions. The report retains every loss,
+opponent-action distinction, failed tactical probe, source receipt and exact review replay.
