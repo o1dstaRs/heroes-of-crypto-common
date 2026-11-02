@@ -1,5 +1,131 @@
 # v0.9 training against current A19 R2
 
+## Completed 5090 sweep and iteration speedups — November 2, 2026 UTC
+
+The registered 192-teacher sweep, four student development evaluations and both
+queued GPU experiment jobs completed. **The best new student won 53.52% of its
+768 development games against the frozen A19 R2 baseline. The previous reference
+won 54.04%; this sweep did not establish a stronger replacement or reach the 75%
+win-rate target.** No model was promoted and the untouched student banks remain
+sealed. These results use the frozen research engine, not subsequent mainline
+changes.
+
+All GPU work used one RTX 5090. Workers pin the approved device UUID and require
+exactly one visible CUDA device before allocation; sequential GPU jobs hold the
+same exclusive lock. Development evaluation is CPU-only. The authorization cutoff
+is November 2, 08:00 UTC; this report does not extend that authorization.
+
+### Game counts and strength
+
+Each new student completed the same 192 development boards with four games per
+board: **768 games per candidate, 3,072 candidate-game evaluations across four
+candidates**. These are paired comparisons on a shared bank, not 3,072 independent
+board setups. Smoke tests and performance replays are separate from this count.
+The 192 teacher fits are training experiments, not 192 additional game banks.
+
+| Student recipe / reference | Wins | Losses | Draws | Raw win rate | Draw-aware score |
+| -------------------------- | ---: | -----: | ----: | -----------: | ---------------: |
+| `cf85d3b9dc37`             | 406  | 352    | 10    | 52.86%       | 53.52%           |
+| `7e9b9ed69458`             | 411  | 351    | 6     | 53.52%       | 53.91%           |
+| `ba817b8a5134`             | 401  | 358    | 9     | 52.21%       | 52.80%           |
+| `8539c26d7c62`             | 404  | 354    | 10    | 52.60%       | 53.26%           |
+| Prior lower-LR reference   | 415  | 345    | 8     | 54.04%       | 54.56%           |
+
+Raw win rate is wins / 768; draw-aware score is (wins + half the draws) / 768.
+The best new student's board-bootstrap 95% score interval is 51.95–55.92%.
+The reference interval is 52.73–56.45%. These are score intervals, not raw-win
+intervals or a paired significance test. The numerical difference between the
+two point estimates does not establish which model is stronger. The separate
+6,000-game primary and 3,000-game R4 student confirmation banks were not opened.
+
+### Validated CPU evaluation layout
+
+Six counterbalanced arms replayed the same 64 games: one pool of four, one pool
+of eight, two pools of four, then the reverse order. All 384 replayed game records
+and trajectories matched after excluding timing fields. Mean wall times were
+321.326 seconds, 204.130 seconds and 192.886 seconds respectively. Two four-worker
+pools used **39.97% less wall time than one four-worker pool** and 5.51% less than
+one eight-worker pool. The former comparison uses twice as many simulation
+workers; the latter keeps the same eight-worker total.
+
+A separate complete 192-board / 768-game run with two four-worker pools took
+1,710.010 seconds (28.50 minutes), with all records and trajectories matching the
+reference. There is no fresh full-bank four-worker timing to pair with that
+absolute duration. A subsequent new student's development shards took 28.22
+minutes before the summary merge. Timing replays add no independent strength
+evidence.
+
+The reusable `python/a19_development_controller.py` now defaults to two processes
+with four workers each and caps development at eight workers. The smoke stage
+uses one pool with at most three workers, preserving all three boards. The native
+evaluator still validates the original manifest, owns disjoint board ranges and
+merges the complete bank. Export, simulation and summary subprocesses have empty
+CUDA visibility; simulation children use one Bun GC marker. Existing resource
+admission, yielding, accepted-board recovery and confirmation isolation remain.
+This default is justified for the measured Puffalo development workload, not as a
+general claim that two pools are fastest on every host.
+
+### Shorter stopping and GPU backend experiments
+
+The fixed candidate rule uses at least 16 epochs, patience 12 and minimum
+validation improvement 0.0001. It retained the selected checkpoint on all 64
+previously untouched recipe histories. Their observed prefixes estimate 37.42%
+less active fitting time. This is a counterfactual estimate, not measured whole-job
+speed. A more aggressive 12-epoch / patience-eight rule changed two selections in
+the 96-fit exploratory bank and was rejected.
+
+Three actual shortened reruns, one each at 6.1M, 32.8M and 94.4M parameters,
+reproduced every selected weight tensor bit-for-bit and validation exactly. They
+used 415.036 seconds of active fitting in total versus 762.075 seconds in their
+historical originals: **45.54% less active fitting time**. Batch sizes were reused
+from the matching originals and the original learning-rate horizon was preserved.
+This is not a fresh paired end-to-end benchmark. Do not change stopping defaults
+for a different corpus or architecture based on this result.
+
+The portable `python/a19_early_stop_replay.py` reproduces the read-only history
+analysis without importing Torch, fitting a model or changing any checkpoint. It
+rejects inconsistent histories, recipe/checkpoint mismatches and nonfinite
+metrics. Rejected histories prevent an all-checkpoints-preserved result. Supply
+an exported evidence object containing `registration` and completed `teachers`
+with their epoch histories, and a rule registration bound to the original sweep:
+
+```bash
+python3 src/simulation/v0_9/python/a19_early_stop_replay.py \
+    --evidence "$HOC_V09_EVIDENCE" \
+    --registration "$HOC_V09_STOP_RULE" \
+    --out "$HOC_V09_REPLAY_RESULT"
+python3 -m unittest discover -s src/simulation/v0_9/python -p 'test_a19_early_stop_replay.py'
+python3 -m unittest discover -s src/simulation/v0_9/python -p 'test_a19_development_controller.py'
+```
+
+The short backend probe used eight reversed-order arms, batch 2,048 and a 32.8M
+teacher, with two warmup and 12 measured steps per arm. BF16 math and BF16 fused
+attention achieved 1.411× and 1.567× the native training-step throughput. Weights
+and optimizer state remained FP32. These are short-probe results; BF16 still needs
+complete-fit and game-quality validation and is not enabled by this change.
+Both compiled arms failed because the host lacked Python 3.12 `Python.h`; the six
+other arms completed. A completed experiment job does not mean every backend
+passed.
+
+Source-bound evidence identities:
+
+- Original sweep: `d14553089ce0b36300c159025b189eb3c7ae8c4c97746f210610830bfb638c1a`.
+- Frozen evaluation source: `71c2547c12b797e9d88cd319a7cefb2a8a5ea8a9690b1fa883f594c0c5388470`.
+- Prospective stopping admission: `d443d2c0bb7455ba2b82064e590ca91885e9721a36e4c5a5ab35147866325ef2`.
+- Shortened-fit registration: `1332b8b80dd00e6b3caa3144c38b9c0e55c6ef09ba6b0bbac3e0d3736ee61d3f`.
+- Backend-probe registration: `7120cd30bbfe9b408c0609c5a3dbdc0fa61ee3b803a56101e664ee9b9062795a`.
+- Completion evidence file: `d840118ea5c5bbe426924801b4342060a8a8085faf7ea34ac99f793e5af28852`.
+
+The campaign-relative evidence directories are `overnight-12h-20261101`,
+`next-iteration-performance-20261101`, and `speedup-trial-20261101`. Generated
+models, raw games, histories and result JSON stay outside Git. Local research
+receipts remain under `game/core/tmp/v09-independent-20261027` in the client
+checkout. The sections below preserve the earlier campaign history and original
+qualification requirements; they are not a claim that the newly tested models
+passed production qualification.
+
+## Earlier campaign history — October 27–28, 2026 UTC
+
 Research plan updated on 2026-10-27 UTC. Target: train on Puffalo's approved RTX 5090 and beat the current complementary-R2 A19 controller. **Two repaired-source 5090 fits completed. The fixed all-family correction scores 53.58% on 768 development games (95% board interval 51.69–55.53%); untouched confirmation and production timing remain unqualified. Independent research and further bounded training are authorized through Sunday, November 1 at 11:59 p.m. Pacific.** No research artifact is promoted automatically.
 
 The first budget is a 48-hour proof of progress. Report CPU actor time, learner time and time waiting for GPU access separately. GPU visibility and SSH access have returned. The approved UUID-pinned CUDA device identifies as RTX 5090. Earlier OS-blocked visibility and subsequent SSH timeouts are historical observations.

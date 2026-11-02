@@ -17,6 +17,11 @@ from types import SimpleNamespace
 from a19_pilot_controller import PilotController
 
 
+def cpu_environment():
+    return {**os.environ, "CUDA_VISIBLE_DEVICES": "", "BUN_JSC_numberOfGCMarkers": "1",
+            "OMP_NUM_THREADS": "2", "OPENBLAS_NUM_THREADS": "2"}
+
+
 class DevelopmentStages(PilotController):
     """Reuse the admitted resource/yield/resume policy and the existing ranked-match worker pool."""
     def command(self, action, stage):
@@ -29,14 +34,25 @@ class DevelopmentStages(PilotController):
         if name not in ("smoke", "development"):
             raise ValueError("Automatic development cannot consume a confirmation bank")
         original = self.manifest
+        original_args = self.args
+        if (self.args.processes < 1 or self.args.workers_per_process < 1
+            or self.args.processes * self.args.workers_per_process > 8):
+            raise ValueError("Development evaluation permits at most eight simulation workers")
         # The inherited scheduler needs only board counts and the immutable trial identity.
         # Its child CLI always validates the complete, unchanged on-disk manifest itself.
         self.manifest = {"manifestSha256": original["manifestSha256"],
                          "stages": {"smoke": range(3), "development": original["registration"]["stages"]["development"]}}
+        if name == "smoke":
+            self.args = SimpleNamespace(**{**vars(original_args), "processes": 1,
+                                          "workers_per_process": min(3, original_args.workers_per_process)})
         try:
             return super().stage(name)
         finally:
             self.manifest = original
+            self.args = original_args
+
+    def child_environment(self):
+        return cpu_environment()
 
     def stop_children(self):
         pids = {child.pid for child in self.children}
@@ -78,7 +94,7 @@ class DevelopmentContinuation:
     def command(self, name, command):
         with (self.output / f"{name}.log").open("x") as log:
             self.child = subprocess.Popen(["nice", "-n", "19", *command], cwd=self.repository,
-                env={**os.environ, "OMP_NUM_THREADS": "2", "OPENBLAS_NUM_THREADS": "2"},
+                env=cpu_environment(),
                 stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
             while self.child.poll() is None:
                 if time.monotonic() >= self.deadline:
@@ -152,20 +168,25 @@ class DevelopmentContinuation:
             raise
 
 
-def main():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     for name in ("campaign", "repository", "actor-repository", "registration", "out", "protect-v08-root"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--python", required=True)
     parser.add_argument("--bun", default="bun")
     parser.add_argument("--minimum-logit-gain", type=float, default=1)
-    parser.add_argument("--processes", type=int, default=6)
+    parser.add_argument("--processes", type=int, default=2)
     parser.add_argument("--workers-per-process", type=int, default=4)
     parser.add_argument("--max-hours", type=float, default=24)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if (not 0 < args.max_hours <= 48 or args.processes < 1 or args.workers_per_process < 1
-        or args.processes * args.workers_per_process > 24 or not 0 < args.minimum_logit_gain < float("inf")):
+        or args.processes * args.workers_per_process > 8 or not 0 < args.minimum_logit_gain < float("inf")):
         parser.error("Invalid bounded development resource policy")
+    return args
+
+
+def main():
+    args = parse_args()
     args.out.mkdir(parents=True, exist_ok=False)
     def stop_requested(_signal, _frame):
         raise InterruptedError("Development stop requested")

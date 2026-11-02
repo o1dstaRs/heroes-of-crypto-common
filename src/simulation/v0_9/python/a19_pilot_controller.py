@@ -90,9 +90,13 @@ class PilotController:
         self.children.clear()
         self.logs.clear()
 
+    def child_environment(self):
+        return {**os.environ, "BUN_JSC_numberOfGCMarkers": "2"}
+
     def stage(self, name):
         if (self.campaign / name / "summary.json").exists():
-            subprocess.run(self.command("verify", name), check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(self.command("verify", name), check=True, stdout=subprocess.DEVNULL,
+                           env=self.child_environment())
             return json.loads((self.campaign / name / "summary.json").read_text())
         while True:
             self.wait_available(name)
@@ -107,7 +111,7 @@ class PilotController:
                     command = ["nice", "-n", "10", *self.command("run", name), "--workers", str(self.args.workers_per_process),
                                "--first-board", str(first), "--board-count", str(size)]
                     self.children.append(subprocess.Popen(command, cwd=self.repository, stdout=log, stderr=subprocess.STDOUT,
-                                                          start_new_session=True, env={**os.environ, "BUN_JSC_numberOfGCMarkers": "2"}))
+                                                          start_new_session=True, env=self.child_environment()))
                 own = {p.pid for p in self.children}
                 while any(p.poll() is None for p in self.children):
                     if time.monotonic() >= self.deadline:
@@ -128,7 +132,8 @@ class PilotController:
                 self.stop_children()
             if interrupted:
                 continue
-            subprocess.run(self.command("finalize", name), check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(self.command("finalize", name), check=True, stdout=subprocess.DEVNULL,
+                           env=self.child_environment())
             return json.loads((self.campaign / name / "summary.json").read_text())
 
     def command(self, action, stage):
