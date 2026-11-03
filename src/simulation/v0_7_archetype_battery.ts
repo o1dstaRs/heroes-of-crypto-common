@@ -134,6 +134,7 @@ const POST_V07_FREEZE_ABILITIES: ReadonlySet<string> = new Set(["Sylvan Focus Au
  * Arrows Wingshield was a range-2 aura when this battery ran; it is a board-wide MASS_BUFF blessing today.
  */
 const PRE_V07_FREEZE_AURA_ABILITIES: ReadonlySet<string> = new Set([
+    "Luck Blessing",
     "Arrows Wingshield Blessing",
     "Sharpened Weapons Blessing",
     "Wolf Trail Blessing",

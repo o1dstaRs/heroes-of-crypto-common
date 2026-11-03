@@ -161,7 +161,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Previous digest: 8e856328c77432416e1e39f2257b0c544f9290bae9d143428d57cde36912d228.
 // Re-pinned 2026-10-24: Crusader damage 12-20 -> 13-20. Two isolated runs reproduce this digest.
 // Previous digest: 6a4b3e3de96be982e1ac7fa11e65b5b2557b0783c61efc0ade946d682552d03b.
-const EXPECTED_REPLAY_SHA256 = "7dae00c1d34d6ff3f18a1629ca5e9010c81d6f981e00d48290d77c50e14f1573";
+// Re-pinned 2026-11-03 for the requested Arbalester attack, Crusader armor, Wandering Mage XP and
+// Leprechaun army blessing changes. Two isolated runs agree, with zero rejected actions in all eight fights.
+// Previous digest: 7dae00c1d34d6ff3f18a1629ca5e9010c81d6f981e00d48290d77c50e14f1573.
+const EXPECTED_REPLAY_SHA256 = "fa5b3e2df22860366e14f423cf2db7ceb264ebdadf180971344ae9738bae650d";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
