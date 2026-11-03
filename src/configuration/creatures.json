@@ -83,7 +83,7 @@
             "initiative": 2,
             "armor": 8,
             "attack_type": "RANGE",
-            "attack": 7,
+            "attack": 8,
             "attack_damage_min": 2,
             "attack_damage_max": 4,
             "attack_range": 1,
@@ -198,7 +198,7 @@
             "hp": 74,
             "steps": 4.8,
             "initiative": 5,
-            "armor": 25,
+            "armor": 26,
             "attack_type": "MELEE",
             "attack": 20,
             "attack_damage_min": 13,
@@ -407,7 +407,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": ["Luck Aura", "Lucky Strike"]
+            "abilities": ["Luck Blessing", "Lucky Strike"]
         },
         "White Tiger": {
             "name": "White Tiger",
@@ -954,7 +954,7 @@
             "shot_distance": 0,
             "magic_resist": 0,
             "movement_type": "WALK",
-            "exp": 6.466,
+            "exp": 7.1126,
             "size": 1,
             "level": 1,
             "spells": [

@@ -1,4 +1,5 @@
 export const STACK_BLESSINGS = [
+    { name: "Luck Blessing", effect: "Luck", bit: 128, walkingOnly: false },
     { name: "Sylvan Focus Blessing", effect: "Sylvan Focus", bit: 256, walkingOnly: false },
     { name: "Wolf Trail Blessing", effect: "Wolf Trail", bit: 1024, walkingOnly: false },
 ] as const;

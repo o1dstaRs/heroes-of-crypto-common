@@ -436,16 +436,19 @@
         "aura_effect": "Range Null Field",
         "can_be_cast": false
     },
-    "Luck Aura": {
-        "name": "Luck Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allies within range gain maximum luck"],
-        "power": 0,
+    "Luck Blessing": {
+        "name": "Luck Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive and not Broken, all allies gain +{} luck anywhere on the battlefield (total luck is capped at 10).",
+            "Each stack-power tier grants 20% of base power (20/40/60/80/100%). Only the strongest allied source applies."
+        ],
+        "power": 10,
         "power_type": "LUCK_10",
         "skip_reponse": false,
-        "stack_powered": false,
+        "stack_powered": true,
         "effect": null,
-        "aura_effect": "Luck",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Arrows Wingshield Blessing": {

@@ -3817,14 +3817,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             if (this.hasDebuffActive("Misfortune")) {
                 // Misfortune bottoms luck out at -10 — UNLESS the target is actively luck-buffed, in which
                 // case the two CANCEL to exactly 0 rather than stacking into a double penalty. Qualifying
-                // sources are the Leprechaun's Luck Aura (it arrives as a "Luck Aura" buff, the same one
-                // that raises the max-luck sentinel below) and the Clover of Fortune artifact. "Fortune" is
+                // sources are Luck Blessing, legacy Luck Aura buffs and the Clover of Fortune artifact. "Fortune" is
                 // matched by name as well, so a future luck buff under that name is covered without another
                 // edit here. luck_mod is zeroed either way, so the result cannot be lifted back by per-turn
                 // rolls, synergy or artifact luck. See the Sadness block below for the morale equivalent.
                 const luckBuffed =
                     baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER ||
                     !!statBuffs.get("Luck Aura") ||
+                    !!statBuffs.get("Luck Blessing") ||
                     !!statBuffs.get("Clover of Fortune") ||
                     !!statBuffs.get("Fortune");
                 this.unitProperties.luck = luckBuffed ? 0 : -LUCK_MAX_VALUE_TOTAL;
@@ -3859,7 +3859,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 if (cloverOfFortuneBuff) {
                     artifactLuck += cloverOfFortuneBuff.getPower();
                 }
-                this.unitProperties.luck_mod = this.luckPerTurn + synergyLuckIncrease + artifactLuck;
+                this.unitProperties.luck_mod =
+                    this.luckPerTurn +
+                    synergyLuckIncrease +
+                    artifactLuck +
+                    (statBuffs.get("Luck Blessing")?.getPower() ?? 0);
                 if (this.unitProperties.luck_mod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
                     this.unitProperties.luck_mod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
                 } else if (this.unitProperties.luck_mod + this.unitProperties.luck < -LUCK_MAX_VALUE_TOTAL) {
