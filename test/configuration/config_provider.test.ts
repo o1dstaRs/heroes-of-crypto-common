@@ -223,11 +223,11 @@ describe("config_provider", () => {
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(2.3);
         expect(creature.movement_type).toBe(PBTypes.MovementVals.WALK);
-        // Owner request 2026-11-03: ten percent above the previous 6.466 XP cost.
-        expect(creature.exp).toBe(7.1126);
+        // Owner request 2026-11-03: round the increased XP cost to 7.2.
+        expect(creature.exp).toBe(7.2);
     });
 
-    it("fields fewer Wandering Mages after the ten percent experience increase", () => {
+    it("fields 139 Wandering Mages for a 1000 XP budget at 7.2 XP each", () => {
         const creature = getCreatureConfig(
             PBTypes.TeamVals.RIGHT,
             "Chaos",
@@ -237,7 +237,7 @@ describe("config_provider", () => {
             1000,
         );
 
-        expect(creature.amount_alive).toBe(141);
+        expect(creature.amount_alive).toBe(139);
     });
 
     it("preserves Battle Mage's walking movement", () => {
