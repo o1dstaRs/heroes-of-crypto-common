@@ -94,9 +94,11 @@ def main():
     raw = subprocess.check_output([args.bun, str(repository / "src/simulation/v0_9/a19_pilot.ts"), "verify",
         "--out", str(campaign), "--repository", str(repository), "--stage", "smoke"], text=True)
     smoke = json.loads(raw)
-    if smoke["stage"] != "smoke" or len(smoke["files"]) != 3 or smoke["summary"]["teacherRollouts"] != 8:
+    if (smoke["stage"] != "smoke" or len(smoke["files"]) != len(manifest["stages"]["smoke"])
+        or smoke["summary"]["teacherRollouts"] != 8):
         raise ValueError("Use the complete verified R8 smoke; no confirmation states are allowed")
-    train_receipt, validation_receipt = {**smoke, "files": smoke["files"][:2]}, {**smoke, "files": smoke["files"][2:]}
+    split = len(smoke["files"]) * 2 // 3
+    train_receipt, validation_receipt = {**smoke, "files": smoke["files"][:split]}, {**smoke, "files": smoke["files"][split:]}
     if {entry["path"] for entry in train_receipt["files"]} & {entry["path"] for entry in validation_receipt["files"]}:
         raise ValueError("Rehearsal train and validation boards overlap")
     python_root = repository / "src/simulation/v0_9/python"

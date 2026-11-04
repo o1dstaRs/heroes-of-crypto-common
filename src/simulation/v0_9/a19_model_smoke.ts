@@ -19,6 +19,7 @@ import { withV09PilotDriverAudit } from "./a19_pilot";
 import { readV09PilotSource, validateV09A19PilotManifest, type IV09A19PilotManifest } from "./a19_pilot_protocol";
 import { assertV09StudentSource, v09StudentFileSha256 } from "./a19_student_protocol";
 import { fingerprintV09 } from "./protocol";
+import { assertV09DoctrineSetup, v09DoctrineBoard } from "./a19_doctrine_population";
 
 interface ITask {
     parent: IV09A19PilotManifest;
@@ -28,12 +29,14 @@ interface ITask {
 
 export function runV09ModelSmokeBoard({ parent, model: modelBytes, board }: ITask) {
     validateV09A19PilotManifest(parent);
-    if (!Number.isInteger(board) || board < 0 || board >= 3) throw new Error("Rehearsal uses only actor smoke boards");
+    if (!Number.isInteger(board) || board < 0 || board >= parent.stages.smoke.length)
+        throw new Error("Rehearsal uses only actor smoke boards");
     const model = new V09A19CpuModel(JSON.parse(modelBytes), {
         manifestSha256: parent.manifestSha256,
         sourceSha256: parent.source.sha256,
     });
     const genome = rankedDraftStrengthCandidate(parent.profile.draft as RankedDraftStrengthPolicyId);
+    const candidate = parent.doctrinePopulation ? { ...parent.baseline, SEARCH_A19_NEURAL_TIES: "0" } : parent.baseline;
     const games = [];
     for (let index = 0; index < 4; index++) {
         const play = (mode: "stock" | "abstaining" | "active") => {
@@ -45,7 +48,7 @@ export function runV09ModelSmokeBoard({ parent, model: modelBytes, board }: ITas
                 {
                     gamesPerOpponent: 8,
                     baseSeed: parent.stages.smoke[board],
-                    mapTypes: [[1, 3, 4][board]],
+                    mapTypes: [[1, 3, 4][board % 3]],
                     fightProfile: "a19",
                     maxLaps: 256,
                     liveDraftRules: true,
@@ -53,24 +56,25 @@ export function runV09ModelSmokeBoard({ parent, model: modelBytes, board }: ITas
                     deterministicSearch: true,
                     liveSynergyVariants: true,
                     tacticalSplits: true,
-                    candidateSearchEnvOverrides: parent.baseline,
+                    candidateSearchEnvOverrides: candidate,
                     candidateSetupPolicySpec: parent.profile.setup,
                     opponentSetupPolicySpec: parent.profile.setup,
-                    candidateDoctrinePolicy: "see-none",
-                    opponentDoctrinePolicy: "see-none",
+                    ...v09DoctrineBoard(board, parent.doctrinePopulation),
                 },
                 index,
                 0,
                 {
                     matchRunner: (config: IMatchConfig) => {
+                        if (parent.doctrinePopulation) assertV09DoctrineSetup(config, board);
                         const team = config.searchEnvOverrideTeams?.[0];
                         if (team === undefined) throw new Error("Rehearsal has no actual candidate seat");
-                        const audited = withV09PilotDriverAudit(team, parent.baseline, parent.baseline, () => {
+                        const audited = withV09PilotDriverAudit(team, parent.baseline, candidate, () => {
                             const corrected = withV09A19Correction(
                                 {
                                     team,
                                     model: mode === "stock" ? null : model,
                                     minimumLogitGain: mode === "active" ? 0.000001 : 1_000_000,
+                                    ...(parent.doctrinePopulation ? { actionFamily: "all" as const } : {}),
                                 },
                                 () =>
                                     runMatch({
@@ -148,7 +152,7 @@ async function main() {
         },
     });
     try {
-        const boards = await pool.runBatch([0, 1, 2].map((board) => ({ parent, model, board })));
+        const boards = await pool.runBatch(parent.stages.smoke.map((_, board) => ({ parent, model, board })));
         const games = boards.flatMap((board) => board.games);
         const inferred = games.reduce((n, game) => n + game.active.statistics.inferred, 0),
             corrected = games.reduce((n, game) => n + game.active.statistics.corrected, 0);
