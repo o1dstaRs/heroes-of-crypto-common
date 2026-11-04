@@ -100,7 +100,8 @@ def main():
             raise ValueError("CPU preparation differs from the admitted learner")
     evidence_sha = validate_tooling(args.evidence.resolve(), manifest)
     teacher = verify_stage(campaign, repository, "teacher_confirmation", args.bun)
-    if (teacher["summary"]["statistics"]["games"] != 6000 or teacher["summary"]["statistics"]["lower95"] <= 0.5
+    if (teacher["summary"]["statistics"]["games"] != 4 * len(manifest["stages"]["teacher_confirmation"])
+        or teacher["summary"]["statistics"]["games"] < 6000 or teacher["summary"]["statistics"]["lower95"] <= 0.5
         or teacher["summary"]["rejectedActions"] != 0):
         raise ValueError("Teacher has not qualified; do not spend GPU time")
     receipts = {stage: verify_stage(campaign, repository, stage, args.bun)

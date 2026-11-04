@@ -46,7 +46,8 @@ def validate_readiness(report: dict, manifest: dict, campaign: Path, verify_file
             "trainValidationIndependent", "exactLearnerCpuRehearsal", "checkpointResumeExact",
             "cpuExportParity", "activeEngineSmoke", "maximumShapeBatchChecked", "currentEngineAdmitted"))):
         raise ValueError("Complete source-bound CPU readiness evidence is required before GPU work")
-    for stage, count in (("corpus_train", 510), ("corpus_validation", 96)):
+    for stage, legacy_count in (("corpus_train", 510), ("corpus_validation", 96)):
+        count = len(manifest.get("stages", {}).get(stage, range(legacy_count)))
         receipt = report.get("corpus", {}).get(stage, {})
         files = receipt.get("files", [])
         if (len(files) != count or not isinstance(receipt.get("decisions"), int) or receipt["decisions"] < 1

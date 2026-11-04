@@ -4,6 +4,7 @@ import { fingerprintV09 } from "./protocol";
 import { V09_A19_OBSERVATION_SHA256 } from "./a19_observation";
 import { V09A19CpuModel } from "./a19_inference";
 import { validateV09A19PilotManifest, type IV09A19PilotManifest, type IV09PilotSource } from "./a19_pilot_protocol";
+import { v09DoctrineBoardCount } from "./a19_doctrine_population";
 
 export const V09_A19_STUDENT_SCHEMA = "hoc.ai.v0_9_a19_student_trial.v1" as const;
 export const V09_A19_STUDENT_STAGES = { smoke: 3, development: 192, confirmation_r2: 1500, secondary_r4: 750 } as const;
@@ -58,7 +59,8 @@ export function validateV09StudentRegistration(
     for (const [stage, count] of Object.entries(V09_A19_STUDENT_STAGES)) {
         if (stage === "smoke") continue;
         const seeds = registration.stages[stage as Exclude<V09A19StudentStage, "smoke">];
-        if (!Array.isArray(seeds) || seeds.length !== count) throw new Error("Incomplete reserved student board bank");
+        if (!Array.isArray(seeds) || seeds.length !== v09DoctrineBoardCount(count, parent.doctrinePopulation))
+            throw new Error("Incomplete reserved student board bank");
         for (const seed of seeds) {
             if (
                 !Number.isSafeInteger(seed) ||
@@ -172,7 +174,10 @@ export function v09StudentSeeds(manifest: IV09A19StudentManifest, stage: V09A19S
     if (manifest.diagnosticOnly && stage !== "smoke")
         throw new Error("Diagnostic model cannot consume a strength bank");
     return stage === "smoke"
-        ? manifest.registration.stages.development.slice(0, 3)
+        ? manifest.registration.stages.development.slice(
+              0,
+              v09DoctrineBoardCount(3, manifest.parent.doctrinePopulation),
+          )
         : manifest.registration.stages[stage];
 }
 

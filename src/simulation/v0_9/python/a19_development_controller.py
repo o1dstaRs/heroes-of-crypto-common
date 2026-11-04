@@ -41,7 +41,8 @@ class DevelopmentStages(PilotController):
         # The inherited scheduler needs only board counts and the immutable trial identity.
         # Its child CLI always validates the complete, unchanged on-disk manifest itself.
         self.manifest = {"manifestSha256": original["manifestSha256"],
-                         "stages": {"smoke": range(3), "development": original["registration"]["stages"]["development"]}}
+                         "stages": {"smoke": range(27 if original.get("parent", {}).get("doctrinePopulation") else 3),
+                                    "development": original["registration"]["stages"]["development"]}}
         if name == "smoke":
             self.args = SimpleNamespace(**{**vars(original_args), "processes": 1,
                                           "workers_per_process": min(3, original_args.workers_per_process)})
