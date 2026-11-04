@@ -80,3 +80,42 @@ Each game audits all teacher roots and records neural inference and correction c
 The R8 correction is explicitly operation-bounded research. It is rejected in wall-clock mode, requires
 eight completed samples for each eligible action, and leaves the production two-rollout contract intact.
 Adding the option is not a strength result or permission to replace a production model.
+
+Both November 4 R8 screens failed their registered raw-score gate. The native teacher scored 51.27%
+(board interval 49.07–53.47%); the neural teacher scored 51.10% (48.50–53.70%), each over 216 boards
+and 864 games. A post-screen, same-setup shipped-policy control for the neural teacher found a paired
+gain of 1.04 percentage points (−1.45 to +3.53). That diagnostic is inconclusive and cannot qualify
+training. Neither confirmation bank was opened, and neither campaign performed optimizer steps.
+
+## Outcome-trained scouting draft head
+
+`src/simulation/v0_9/doctrine_draft_training.ts` is a separate research path. Its labels come directly
+from paired battle outcomes, without using either failed teacher. The frozen current policy and one
+alternative draft choice play the same scenario and both battle seats. Each training board chooses
+one of the opening bundle, level-1 pick or level-2 pick for intervention; all later decisions retain
+the current policy. The full 27-cell population covers all maps and both players' doctrines.
+
+The fourteen-feature linear model contains public unit/build fit, own doctrine, visible terrain fit,
+and changes to faction paths, future artifact fit and ranged capacity under advance bans. It accepts
+only the reducer's projected draft context. Unknown future offers and hidden opponent picks are not
+inputs. Fixed full-batch Adam runs 2,000 updates, with squared paired-score loss, ridge 0.02, learning
+rate 0.03, and training-only RMS feature scales. Inference changes at most one early pick per draft,
+only when predicted score gain exceeds 0.02. Seven-point play retains the current policy.
+
+The independently registered banks contain 27 smoke boards, 810 training boards, 270 development
+boards, and 1,512 confirmation boards. The source, model, board records and seed channels are hashed.
+There is one fit and one fixed threshold; development results do not tune either. Actual setup audits
+check all 5/6/7 point budgets and reject incomplete or illegal fights.
+
+Evaluation uses three conditions on identical scenario seeds: current policy, learned policy, and
+the same learned policy with advance information removed from its features. The latter retains the
+learned weights, doctrine indicators, public build features, current-policy candidate menu and full
+actual setup budget. This tests the incremental contribution of scouting content rather than merely
+disabling the learned policy. It is not an estimate of the total value of a doctrine.
+
+Each gain is a paired difference, bootstrapped over whole independent boards within the 27 map/own/
+opponent-doctrine cells. Development must have a positive lower 95% bound against both controls and
+nonnegative point estimates for every doctrine before confirmation opens. Fresh confirmation repeats
+both tests over 6,048 games per condition. The seven-point negative control must reproduce complete
+game records exactly. All generated data and weights remain outside Git. No result auto-promotes a
+model into the runtime; a failed or inconclusive evaluation preserves current behavior.
