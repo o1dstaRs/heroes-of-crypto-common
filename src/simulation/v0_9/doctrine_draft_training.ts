@@ -30,6 +30,7 @@ import {
     doctrineDraftFeatures,
     fitDoctrineDraftModel,
     predictDoctrineDraftGain,
+    type DoctrineDraftModelVersion,
     type IDoctrineDraftChoice,
     type IDoctrineDraftExample,
     type IDoctrineDraftModel,
@@ -37,10 +38,11 @@ import {
 } from "./doctrine_draft_model";
 
 export const DOCTRINE_DRAFT_STAGES = { smoke: 27, train: 810, development: 270, confirmation: 1512 } as const;
+export const DOCTRINE_DRAFT_V2_STAGES = { smoke: 27, train: 1080, development: 540, confirmation: 1512 } as const;
 type Stage = keyof typeof DOCTRINE_DRAFT_STAGES;
 type Condition = "current" | "alternative" | "learned" | "masked";
 export interface IDoctrineDraftRegistration {
-    readonly schema: "hoc.ai.v0_9.doctrine_draft_training.v1";
+    readonly schema: `hoc.ai.v0_9.doctrine_draft_training.${DoctrineDraftModelVersion}`;
     readonly sourceCommit: string;
     readonly sourceSha256: string;
     readonly profile: A19AuditProfile;
@@ -78,20 +80,28 @@ const score = (game: IGame): number =>
     game.record.candidateResult === "win" ? 1 : game.record.candidateResult === "draw" ? 0.5 : 0;
 const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, "utf8")) as T;
 const save = (path: string, value: unknown): void => writeFileSync(path, JSON.stringify(value) + "\n", { flag: "wx" });
+const modelVersion = (registration: IDoctrineDraftRegistration): DoctrineDraftModelVersion =>
+    registration.schema === "hoc.ai.v0_9.doctrine_draft_training.v2" ? "v2" : "v1";
+
+export function doctrineDraftTrainingLevel(version: DoctrineDraftModelVersion, stage: Stage, board: number): number {
+    if (version === "v2") return stage === "smoke" ? 3 : Math.floor(board / 27) % 4;
+    return Math.floor(board / (stage === "smoke" ? 9 : 27)) % 3;
+}
 
 export function validateDoctrineDraftRegistration(registration: IDoctrineDraftRegistration): void {
     const { registrationSha256, ...body } = registration;
+    const version = modelVersion(registration);
+    const stages = version === "v2" ? DOCTRINE_DRAFT_V2_STAGES : DOCTRINE_DRAFT_STAGES;
     if (
-        registration.schema !== "hoc.ai.v0_9.doctrine_draft_training.v1" ||
+        registration.schema !== `hoc.ai.v0_9.doctrine_draft_training.${version}` ||
         registration.productionPromotion !== false ||
         fingerprintV09(body) !== registrationSha256 ||
         !Number.isFinite(registration.deadlineAtMs)
     )
         throw new Error("Invalid doctrine draft registration");
     const used = new Set<number>();
-    for (const stage of Object.keys(DOCTRINE_DRAFT_STAGES) as Stage[]) {
-        if (registration.banks[stage]?.length !== DOCTRINE_DRAFT_STAGES[stage])
-            throw new Error("Incomplete registered bank");
+    for (const stage of Object.keys(stages) as Stage[]) {
+        if (registration.banks[stage]?.length !== stages[stage]) throw new Error("Incomplete registered bank");
         for (const seed of registration.banks[stage]) {
             if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffff_fffc) throw new Error("Invalid board seed");
             for (const offset of [0, 1, 2]) {
@@ -108,7 +118,11 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
     const seed = registration.banks[stage][board];
     if (seed === undefined) throw new Error("Unregistered board");
     const training = stage === "train" || stage === "smoke";
+    const version = modelVersion(registration);
+    const lastDecisionLevel = version === "v2" ? 3 : 2;
     const model = training ? undefined : readJson<IDoctrineDraftModel>(join(root, "model.json"));
+    if (model && model.schema !== `hoc.ai.v0_9.doctrine_draft.${version}`)
+        throw new Error("Registered model version changed");
     if (!isRankedDraftStrengthPolicy(registration.profile.draft)) throw new Error("Unknown registered draft policy");
     const environment = Object.fromEntries(
         Object.entries(registration.profile.environment).filter(
@@ -122,7 +136,7 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
     };
     const variants = synergyVariantsForSeed(`ranked-draft-${permuteRankedDraftSeed(seed + 1)}`);
     const conditions: IBoard["conditions"] = {};
-    const targetLevel = Math.floor(board / (stage === "smoke" ? 9 : 27)) % 3;
+    const targetLevel = doctrineDraftTrainingLevel(version, stage, board);
     const run = (condition: Condition, game: number): IGame => {
         const decisions: IDecision[] = [];
         let switched = false;
@@ -134,7 +148,7 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
             other: IDoctrineDraftChoice | undefined,
             level: number,
         ): number => {
-            if (alternative === undefined || !other || switched || level > 2) return preferred;
+            if (alternative === undefined || !other || switched || level > lastDecisionLevel) return preferred;
             if (training && level !== targetLevel) return preferred;
             const features = doctrineDraftFeatures(
                 policies.candidateDoctrinePolicy,
@@ -143,6 +157,7 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
                 other,
                 level,
                 condition === "masked",
+                version,
             );
             if (!features) return preferred;
             const shouldSwitch =
@@ -182,7 +197,7 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
             },
             creature: (available, context, preferred) => {
                 const level = creatureInfo(preferred)?.level ?? 4;
-                if (level > 2) return preferred;
+                if (level > lastDecisionLevel) return preferred;
                 const alternative = pickRankedLiveDraftCreature(
                     genome,
                     available.filter((id) => id !== preferred),
@@ -439,7 +454,10 @@ if (!isMainThread && workerData?.doctrineDraftTraining) {
         throw new Error("Frozen training source changed");
     if (args.fit) {
         const rows = readBoards(root, "train", registration);
-        const model = fitDoctrineDraftModel(rows.flatMap((row) => row.examples));
+        const model = fitDoctrineDraftModel(
+            rows.flatMap((row) => row.examples),
+            modelVersion(registration),
+        );
         save(join(root, "model.json"), model);
         save(join(root, "fit-receipt.json"), {
             registrationSha256: registration.registrationSha256,

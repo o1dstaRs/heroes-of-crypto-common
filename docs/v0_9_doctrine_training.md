@@ -15,17 +15,17 @@ budgets would not be an exact null control. Training, validation, and evaluation
 Whole-board confidence intervals and separate doctrine scores prevent four correlated seat permutations
 from being counted as four independent samples.
 
-| Stage | Boards | Games |
-| --- | ---: | ---: |
-| Smoke | 27 | 108 |
-| A/A | 27 | 108 |
-| Teacher screen | 216 | 864 |
-| Teacher confirmation | 1,512 | 6,048 |
-| Training corpus | 513 | 2,052 |
-| Validation corpus | 108 | 432 |
-| Student development | 216 | 864 |
-| Student confirmation R2 | 1,512 | 6,048 |
-| Student comparison R4 | 756 | 3,024 |
+| Stage                   | Boards | Games |
+| ----------------------- | -----: | ----: |
+| Smoke                   |     27 |   108 |
+| A/A                     |     27 |   108 |
+| Teacher screen          |    216 |   864 |
+| Teacher confirmation    |  1,512 | 6,048 |
+| Training corpus         |    513 | 2,052 |
+| Validation corpus       |    108 |   432 |
+| Student development     |    216 |   864 |
+| Student confirmation R2 |  1,512 | 6,048 |
+| Student comparison R4   |    756 | 3,024 |
 
 The existing source, independent-seed, teacher, learner recovery, CPU export, and live latency gates still
 apply. The precise R8 teacher must beat the frozen current R2 opponent before its corpus is funded. A
@@ -52,12 +52,12 @@ The control delayed advance bans and the early map inside the draft decision pol
 the full-information policy was required to reproduce every original draft choice. The seven-point
 control was required to reproduce complete game records exactly.
 
-| Candidate doctrine | Score change, percentage points | Paired board 95% interval |
-| --- | ---: | ---: |
-| Spymaster, 5 points | +0.28 | −2.22 to +2.78 |
-| Scout, 6 points | +0.42 | −1.53 to +2.50 |
-| Battle Trance, 7 points | 0.00 | 0.00 to 0.00 |
-| Equal mixture | +0.23 | −0.83 to +1.34 |
+| Candidate doctrine      | Score change, percentage points | Paired board 95% interval |
+| ----------------------- | ------------------------------: | ------------------------: |
+| Spymaster, 5 points     |                           +0.28 |            −2.22 to +2.78 |
+| Scout, 6 points         |                           +0.42 |            −1.53 to +2.50 |
+| Battle Trance, 7 points |                            0.00 |              0.00 to 0.00 |
+| Equal mixture           |                           +0.23 |            −0.83 to +1.34 |
 
 The information changed 106 draft decisions, with zero rejected actions. This is **inconclusive**:
 it establishes that the inputs affect choices, but does not establish a win-rate gain. Its reserved
@@ -119,3 +119,32 @@ nonnegative point estimates for every doctrine before confirmation opens. Fresh 
 both tests over 6,048 games per condition. The seven-point negative control must reproduce complete
 game records exactly. All generated data and weights remain outside Git. No result auto-promotes a
 model into the runtime; a failed or inconclusive evaluation preserves current behavior.
+
+### First fitted model and late-ban follow-up
+
+The first model used source `c4f7de5549d134387155b64837a913db64e7bedb`, 810 training boards and
+1,080 paired-decision examples. Its 2,000 optimizer steps reduced training squared error from 0.15480
+to 0.15122. On 270 fresh development boards (3,240 games across the three conditions), the learned
+policy gained 1.57 percentage points over current behavior (paired 95% interval +0.28 to +2.87).
+Spymaster gained 3.47 points and Scout 1.25; Battle Trance reproduced the negative control exactly.
+
+The information-specific comparison was inconclusive: +0.37 points overall (−0.09 to +0.83), with
+Spymaster at +1.39 and Scout at −0.28. This fails the registered gate despite the overall improvement.
+Its confirmation bank remains closed, and the model is not promoted. An independent implementation
+reproduced every paired mean and interval. The model SHA-256 is
+`e0c8ed4ffd4e4d6faa05f185830b9c39543c2e510b51a18344287dd8e3cfb16b`; registration SHA-256 is
+`5d730dc2cf4bcf48209e1c4a110a81f47d7d707c9571a5fb8d143ab9b9ff50ab`.
+
+The separately registered v2 follow-up adds the level-3 decision, when Scout still sees level-4 bans
+in advance. Those bans can eliminate a faction's remaining completion path. Its feature contract
+appends a level-3 intercept; the existing fourteen features retain their meanings. Masking at level 3
+keeps the already-public map and removes only unrevealed level-4 bans. The maximum of one override,
+fixed optimizer, switch margin and two-control promotion gates are unchanged. The original v1 model
+and registration schemas retain their exact behavior.
+
+V2 uses 27 smoke boards focused on the new level-3 path, 1,080 training boards (ten per decision in
+each of the 27 population cells), 540 development boards, and 1,512 sealed confirmation boards.
+All seed channels are fresh, including exclusion of unused prior confirmation banks. It freezes the
+current balance source and collects new outcomes; labels from the pre-Cyclops-buff model are not reused.
+This is a follow-up hypothesis informed by development diagnostics, not a retrospective change to the
+first model's test or evidence of a scouting gain.

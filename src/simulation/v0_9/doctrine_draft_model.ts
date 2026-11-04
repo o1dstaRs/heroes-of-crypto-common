@@ -29,6 +29,11 @@ export const DOCTRINE_DRAFT_FEATURES = [
     "advance_bans_ranged_capacity_difference",
 ] as const;
 
+export const DOCTRINE_DRAFT_V2_FEATURES = [...DOCTRINE_DRAFT_FEATURES, "level_3_intercept"] as const;
+export type DoctrineDraftModelVersion = "v1" | "v2";
+const featureNames = (version: DoctrineDraftModelVersion): readonly string[] =>
+    version === "v2" ? DOCTRINE_DRAFT_V2_FEATURES : DOCTRINE_DRAFT_FEATURES;
+
 export type ScoutingDoctrine = "see-all" | "three-reveals" | "see-none";
 export interface IDoctrineDraftChoice {
     readonly creatureIds: readonly number[];
@@ -41,7 +46,7 @@ export interface IDoctrineDraftExample {
     readonly gain: number;
 }
 export interface IDoctrineDraftModel {
-    readonly schema: "hoc.ai.v0_9.doctrine_draft.v1";
+    readonly schema: `hoc.ai.v0_9.doctrine_draft.${DoctrineDraftModelVersion}`;
     readonly features: readonly string[];
     readonly weights: readonly number[];
     readonly scales: readonly number[];
@@ -159,8 +164,9 @@ export function doctrineDraftFeatures(
     alternative: IDoctrineDraftChoice,
     level: number,
     maskAdvanceInformation = false,
+    version: DoctrineDraftModelVersion = "v1",
 ): number[] | undefined {
-    if (doctrine === "see-none" || level > 2) return undefined;
+    if (doctrine === "see-none" || level > (version === "v2" ? 3 : 2)) return undefined;
     if (!Number.isInteger(level) || level < 0) throw new Error("Invalid scouting decision level");
     const visible = maskAdvanceInformation
         ? { ...context, scouting: delayedDoctrineScouting(context.scouting, level) }
@@ -174,19 +180,21 @@ export function doctrineDraftFeatures(
         Number(doctrine === "three-reveals"),
         Number(level === 0),
         ...other.map((value, index) => value - base[index]),
+        ...(version === "v2" ? [Number(level === 3)] : []),
     ];
 }
 
-function validateFeatures(features: readonly number[]): void {
-    if (features.length !== DOCTRINE_DRAFT_FEATURES.length || !features.every(Number.isFinite))
+function validateFeatures(features: readonly number[], version: DoctrineDraftModelVersion): void {
+    if (features.length !== featureNames(version).length || !features.every(Number.isFinite))
         throw new Error("Invalid doctrine draft feature vector");
 }
 
 export function predictDoctrineDraftGain(model: IDoctrineDraftModel, features: readonly number[]): number {
-    validateFeatures(features);
+    const version = model.schema === "hoc.ai.v0_9.doctrine_draft.v2" ? "v2" : "v1";
+    validateFeatures(features, version);
     if (
-        model.schema !== "hoc.ai.v0_9.doctrine_draft.v1" ||
-        model.features.join("|") !== DOCTRINE_DRAFT_FEATURES.join("|") ||
+        model.schema !== `hoc.ai.v0_9.doctrine_draft.${version}` ||
+        model.features.join("|") !== featureNames(version).join("|") ||
         model.weights.length !== features.length ||
         model.scales.length !== features.length ||
         !model.weights.every(Number.isFinite) ||
@@ -197,10 +205,13 @@ export function predictDoctrineDraftGain(model: IDoctrineDraftModel, features: r
 }
 
 /** Fixed full-batch Adam fit to counterfactual battle outcomes; held-out rows never enter this function. */
-export function fitDoctrineDraftModel(examples: readonly IDoctrineDraftExample[]): IDoctrineDraftModel {
+export function fitDoctrineDraftModel(
+    examples: readonly IDoctrineDraftExample[],
+    version: DoctrineDraftModelVersion = "v1",
+): IDoctrineDraftModel {
     if (!examples.length) throw new Error("No counterfactual training examples");
     for (const example of examples) {
-        validateFeatures(example.features);
+        validateFeatures(example.features, version);
         if (
             !Number.isSafeInteger(example.board) ||
             example.board < 0 ||
@@ -209,7 +220,8 @@ export function fitDoctrineDraftModel(examples: readonly IDoctrineDraftExample[]
         )
             throw new Error("Invalid counterfactual training outcome");
     }
-    const size = DOCTRINE_DRAFT_FEATURES.length;
+    const names = featureNames(version);
+    const size = names.length;
     const scales = Array.from({ length: size }, (_, index) =>
         Math.max(0.1, Math.sqrt(examples.reduce((sum, row) => sum + row.features[index] ** 2, 0) / examples.length)),
     );
@@ -240,8 +252,8 @@ export function fitDoctrineDraftModel(examples: readonly IDoctrineDraftExample[]
         }
     }
     return {
-        schema: "hoc.ai.v0_9.doctrine_draft.v1",
-        features: DOCTRINE_DRAFT_FEATURES,
+        schema: `hoc.ai.v0_9.doctrine_draft.${version}`,
+        features: names,
         weights,
         scales,
         optimizerSteps,
