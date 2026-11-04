@@ -148,3 +148,43 @@ All seed channels are fresh, including exclusion of unused prior confirmation ba
 current balance source and collects new outcomes; labels from the pre-Cyclops-buff model are not reused.
 This is a follow-up hypothesis informed by development diagnostics, not a retrospective change to the
 first model's test or evidence of a scouting gain.
+
+V2 completed on source `1cdc43a751c213d976cbf97937191044fbc0d40c`. Its 1,080 training boards
+provided 1,440 paired examples; 2,000 Adam steps reduced squared error from 0.16393 to 0.15993.
+The 540-board development bank contained 6,480 games across the three conditions:
+
+| Candidate doctrine      | Learned minus current, pp (95% interval) | Learned minus masked, pp (95% interval) |
+| ----------------------- | ---------------------------------------: | --------------------------------------: |
+| Spymaster, 5 points     |                   −0.90 (−3.75 to +1.94) |                  −0.56 (−2.78 to +1.67) |
+| Scout, 6 points         |                   −0.42 (−2.08 to +1.25) |                  −0.07 (−0.56 to +0.49) |
+| Battle Trance, 7 points |                      0.00 (0.00 to 0.00) |                     0.00 (0.00 to 0.00) |
+| Equal mixture           |                   −0.44 (−1.57 to +0.65) |                  −0.21 (−1.00 to +0.56) |
+
+It failed the gate; its 1,512 confirmation boards remain unused and the model is not promoted.
+There were zero rejected actions. Independent Python code reproduced all training labels, every
+trained weight, the final loss and every paired evaluation interval. Matching JavaScript's ordered
+sums and bias-correction power arithmetic was necessary for an exact optimizer replay.
+Model SHA-256: `0365ea067b5409a05fc26ae547ee71bbfbf11e7bdff7e3a6678fa0defd535550`.
+Registration SHA-256: `c2ce6df77610f56048c78f689a40f026503b47f9fc5a7b634eb96c91e799d589`.
+
+### V3 representation follow-up
+
+The first two models capped their ranged-capacity feature at two, although the frozen ranked policy
+targets four shooters. This can hide the loss of the final ranged continuation. They also represented
+faction reachability and build affinity without distinguishing the strength of available faction
+partners, and did not fit public unit-specific residuals against the historical strength prior.
+
+V3 retains the first fifteen features and appends 56 public draft-unit identity differences, advance-ban
+effects on a four-shooter capacity ceiling, and advance-ban effects on the strongest possible partner
+for each odd faction count. Partner quality is the maximum of zero and `10 + v4Lift / 10` over that
+faction's visible possible continuations; the offset makes a missing partner worse than a known unit.
+Only projected bans, own picks and already-visible opponent picks filter this public creature pool.
+The information mask retains all unit identity features and the ordinary map reveal. It removes the
+advance-ban effects, including those of the new features. No hidden state or future offer is an input.
+
+The separate v3 schema has 73 features. It keeps the fixed 2,000-step optimizer, ridge, learning rate,
+switch margin, one-override limit and both paired evaluation gates. Its prospective banks contain
+27 smoke boards, 3,240 training boards (30 per decision/population cell), 1,080 development boards,
+and 1,512 sealed confirmation boards. New seeds exclude all earlier banks, including their unused
+confirmation seeds. All training outcomes are collected afresh. Unit identity effects can improve
+overall play, but only the matched information ablation can establish an additional scouting gain.

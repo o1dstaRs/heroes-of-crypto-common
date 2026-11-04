@@ -10,6 +10,7 @@ import {
 } from "../../ai/setup/draft_continuations";
 import { rankedDraftStrengthV4LiftPp, rankedDraftUnitSynergyLiftPp } from "../../ai/setup/draft_strength_prior";
 import type { IDraftScoutingContext } from "../../picks/draft_visibility";
+import { CreatureLevelList } from "../../units/unit_properties";
 import type { IRankedDraftResearchContext } from "../ranked_draft_eval";
 
 export const DOCTRINE_DRAFT_FEATURES = [
@@ -30,9 +31,20 @@ export const DOCTRINE_DRAFT_FEATURES = [
 ] as const;
 
 export const DOCTRINE_DRAFT_V2_FEATURES = [...DOCTRINE_DRAFT_FEATURES, "level_3_intercept"] as const;
-export type DoctrineDraftModelVersion = "v1" | "v2";
+const draftCreatures = [...new Set([1, 2, 3, 4].flatMap((level) => CreatureLevelList[level]))].sort((a, b) => a - b);
+export const DOCTRINE_DRAFT_V3_FEATURES = [
+    ...DOCTRINE_DRAFT_V2_FEATURES,
+    ...draftCreatures.map((id) => `unit_${id}_difference`),
+    "advance_bans_four_ranged_capacity_difference",
+    "advance_bans_faction_partner_strength_difference",
+] as const;
+export type DoctrineDraftModelVersion = "v1" | "v2" | "v3";
 const featureNames = (version: DoctrineDraftModelVersion): readonly string[] =>
-    version === "v2" ? DOCTRINE_DRAFT_V2_FEATURES : DOCTRINE_DRAFT_FEATURES;
+    version === "v3"
+        ? DOCTRINE_DRAFT_V3_FEATURES
+        : version === "v2"
+          ? DOCTRINE_DRAFT_V2_FEATURES
+          : DOCTRINE_DRAFT_FEATURES;
 
 export type ScoutingDoctrine = "see-all" | "three-reveals" | "see-none";
 export interface IDoctrineDraftChoice {
@@ -73,10 +85,10 @@ function continuationFeatures(
     context: IRankedDraftResearchContext,
     scouting: IDraftScoutingContext,
     artifact: number | undefined,
+    includeQuality: boolean,
 ): number[] {
-    const blocked = draftFactionContinuations(roster, context.knownOpponentCreatureIds, scouting).filter(
-        (path) => path.count % 2 === 1 && !path.reachable,
-    ).length;
+    const paths = draftFactionContinuations(roster, context.knownOpponentCreatureIds, scouting);
+    const blocked = paths.filter((path) => path.count % 2 === 1 && !path.reachable).length;
     const ranged = draftCreatureContinuation(roster, context.knownOpponentCreatureIds, scouting, (unit) => unit.ranged);
     const slots = draftFutureSlots(roster, context.knownOpponentCreatureIds, scouting);
     const fit = slots.reduce((sum, slot) => {
@@ -93,18 +105,44 @@ function continuationFeatures(
         );
         return sum + best * slot.count;
     }, 0);
-    return [blocked, fit / Math.max(1, scouting.remainingPickLevels.length), Math.min(2, ranged.maximumCount)];
+    const features = [
+        blocked,
+        fit / Math.max(1, scouting.remainingPickLevels.length),
+        Math.min(2, ranged.maximumCount),
+    ];
+    if (includeQuality) {
+        const partnerStrength = paths
+            .filter((path) => path.count % 2 === 1)
+            .reduce(
+                (sum, path) =>
+                    sum + Math.max(0, ...path.creatureIds.map((id) => 10 + rankedDraftStrengthV4LiftPp(id) / 10)),
+                0,
+            );
+        features.push(Math.min(4, ranged.maximumCount), partnerStrength);
+    }
+    return features;
 }
 
-function choiceFeatures(context: IRankedDraftResearchContext, choice: IDoctrineDraftChoice, level: number): number[] {
+function choiceFeatures(
+    context: IRankedDraftResearchContext,
+    choice: IDoctrineDraftChoice,
+    level: number,
+    version: DoctrineDraftModelVersion,
+): number[] {
     const added = choice.creatureIds.flatMap((id) => creatureInfo(id) ?? []);
     const roster = [...context.ownCreatureIds, ...choice.creatureIds];
     // Bundles supply two starter units, not either of the future level-1/level-2 pick slots.
     const scouting =
         level === 0 ? context.scouting : choice.creatureIds.reduce(draftContextAfterCreature, context.scouting);
     const artifact = choice.tier1ArtifactId ?? context.tier1ArtifactId;
-    const full = continuationFeatures(roster, context, scouting, artifact);
-    const delayed = continuationFeatures(roster, context, delayedDoctrineScouting(scouting, level), artifact);
+    const full = continuationFeatures(roster, context, scouting, artifact, version === "v3");
+    const delayed = continuationFeatures(
+        roster,
+        context,
+        delayedDoctrineScouting(scouting, level),
+        artifact,
+        version === "v3",
+    );
     const map = context.scouting.map;
     const hazard = map === PBTypes.GridVals.LAVA_CENTER || map === PBTypes.GridVals.WATER_CENTER;
     const block = map === PBTypes.GridVals.BLOCK_CENTER;
@@ -166,21 +204,30 @@ export function doctrineDraftFeatures(
     maskAdvanceInformation = false,
     version: DoctrineDraftModelVersion = "v1",
 ): number[] | undefined {
-    if (doctrine === "see-none" || level > (version === "v2" ? 3 : 2)) return undefined;
+    if (doctrine === "see-none" || level > (version === "v1" ? 2 : 3)) return undefined;
     if (!Number.isInteger(level) || level < 0) throw new Error("Invalid scouting decision level");
     const visible = maskAdvanceInformation
         ? { ...context, scouting: delayedDoctrineScouting(context.scouting, level) }
         : context;
-    const base = choiceFeatures(visible, preferred, level);
-    const other = choiceFeatures(visible, alternative, level);
+    const base = choiceFeatures(visible, preferred, level, version);
+    const other = choiceFeatures(visible, alternative, level, version);
+    const difference = other.map((value, index) => value - base[index]);
     // These three indicators and the public strength/build features survive the information ablation.
     // This prevents 'turn the new policy off' from masquerading as a causal information comparison.
     return [
         Number(doctrine === "see-all"),
         Number(doctrine === "three-reveals"),
         Number(level === 0),
-        ...other.map((value, index) => value - base[index]),
-        ...(version === "v2" ? [Number(level === 3)] : []),
+        ...difference.slice(0, 11),
+        ...(version !== "v1" ? [Number(level === 3)] : []),
+        ...(version === "v3"
+            ? [
+                  ...draftCreatures.map(
+                      (id) => Number(alternative.creatureIds.includes(id)) - Number(preferred.creatureIds.includes(id)),
+                  ),
+                  ...difference.slice(11),
+              ]
+            : []),
     ];
 }
 
@@ -190,7 +237,12 @@ function validateFeatures(features: readonly number[], version: DoctrineDraftMod
 }
 
 export function predictDoctrineDraftGain(model: IDoctrineDraftModel, features: readonly number[]): number {
-    const version = model.schema === "hoc.ai.v0_9.doctrine_draft.v2" ? "v2" : "v1";
+    const version =
+        model.schema === "hoc.ai.v0_9.doctrine_draft.v3"
+            ? "v3"
+            : model.schema === "hoc.ai.v0_9.doctrine_draft.v2"
+              ? "v2"
+              : "v1";
     validateFeatures(features, version);
     if (
         model.schema !== `hoc.ai.v0_9.doctrine_draft.${version}` ||

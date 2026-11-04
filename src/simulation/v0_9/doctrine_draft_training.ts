@@ -39,6 +39,7 @@ import {
 
 export const DOCTRINE_DRAFT_STAGES = { smoke: 27, train: 810, development: 270, confirmation: 1512 } as const;
 export const DOCTRINE_DRAFT_V2_STAGES = { smoke: 27, train: 1080, development: 540, confirmation: 1512 } as const;
+export const DOCTRINE_DRAFT_V3_STAGES = { smoke: 27, train: 3240, development: 1080, confirmation: 1512 } as const;
 type Stage = keyof typeof DOCTRINE_DRAFT_STAGES;
 type Condition = "current" | "alternative" | "learned" | "masked";
 export interface IDoctrineDraftRegistration {
@@ -81,17 +82,26 @@ const score = (game: IGame): number =>
 const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, "utf8")) as T;
 const save = (path: string, value: unknown): void => writeFileSync(path, JSON.stringify(value) + "\n", { flag: "wx" });
 const modelVersion = (registration: IDoctrineDraftRegistration): DoctrineDraftModelVersion =>
-    registration.schema === "hoc.ai.v0_9.doctrine_draft_training.v2" ? "v2" : "v1";
+    registration.schema === "hoc.ai.v0_9.doctrine_draft_training.v3"
+        ? "v3"
+        : registration.schema === "hoc.ai.v0_9.doctrine_draft_training.v2"
+          ? "v2"
+          : "v1";
 
 export function doctrineDraftTrainingLevel(version: DoctrineDraftModelVersion, stage: Stage, board: number): number {
-    if (version === "v2") return stage === "smoke" ? 3 : Math.floor(board / 27) % 4;
+    if (version !== "v1") return stage === "smoke" ? 3 : Math.floor(board / 27) % 4;
     return Math.floor(board / (stage === "smoke" ? 9 : 27)) % 3;
 }
 
 export function validateDoctrineDraftRegistration(registration: IDoctrineDraftRegistration): void {
     const { registrationSha256, ...body } = registration;
     const version = modelVersion(registration);
-    const stages = version === "v2" ? DOCTRINE_DRAFT_V2_STAGES : DOCTRINE_DRAFT_STAGES;
+    const stages =
+        version === "v3"
+            ? DOCTRINE_DRAFT_V3_STAGES
+            : version === "v2"
+              ? DOCTRINE_DRAFT_V2_STAGES
+              : DOCTRINE_DRAFT_STAGES;
     if (
         registration.schema !== `hoc.ai.v0_9.doctrine_draft_training.${version}` ||
         registration.productionPromotion !== false ||
@@ -119,7 +129,7 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
     if (seed === undefined) throw new Error("Unregistered board");
     const training = stage === "train" || stage === "smoke";
     const version = modelVersion(registration);
-    const lastDecisionLevel = version === "v2" ? 3 : 2;
+    const lastDecisionLevel = version === "v1" ? 2 : 3;
     const model = training ? undefined : readJson<IDoctrineDraftModel>(join(root, "model.json"));
     if (model && model.schema !== `hoc.ai.v0_9.doctrine_draft.${version}`)
         throw new Error("Registered model version changed");

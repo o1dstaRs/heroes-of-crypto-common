@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { creatureInfo } from "../../src/ai/setup/creature_score";
+import { rankedDraftStrengthV4LiftPp } from "../../src/ai/setup/draft_strength_prior";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { CreatureLevelList } from "../../src/units/unit_properties";
 import type { IRankedDraftResearchContext } from "../../src/simulation/ranked_draft_eval";
@@ -7,6 +8,7 @@ import {
     delayedDoctrineScouting,
     DOCTRINE_DRAFT_FEATURES,
     DOCTRINE_DRAFT_V2_FEATURES,
+    DOCTRINE_DRAFT_V3_FEATURES,
     doctrineDraftFeatures,
     fitDoctrineDraftModel,
     predictDoctrineDraftGain,
@@ -14,6 +16,7 @@ import {
 import {
     DOCTRINE_DRAFT_STAGES,
     DOCTRINE_DRAFT_V2_STAGES,
+    DOCTRINE_DRAFT_V3_STAGES,
     doctrineDraftTrainingLevel,
     pairedDoctrineDraftStatistics,
     validateDoctrineDraftRegistration,
@@ -136,8 +139,13 @@ describe("outcome-trained doctrine draft research", () => {
     });
 
     test("registered populations cover every decision in every doctrine/map cell", () => {
-        for (const version of ["v1", "v2"] as const) {
-            const stages = version === "v2" ? DOCTRINE_DRAFT_V2_STAGES : DOCTRINE_DRAFT_STAGES;
+        for (const version of ["v1", "v2", "v3"] as const) {
+            const stages =
+                version === "v3"
+                    ? DOCTRINE_DRAFT_V3_STAGES
+                    : version === "v2"
+                      ? DOCTRINE_DRAFT_V2_STAGES
+                      : DOCTRINE_DRAFT_STAGES;
             let index = 0;
             const body = {
                 schema: `hoc.ai.v0_9.doctrine_draft_training.${version}`,
@@ -157,9 +165,9 @@ describe("outcome-trained doctrine draft research", () => {
                 const cell = `${board % 27}:${doctrineDraftTrainingLevel(version, "train", board)}`;
                 counts.set(cell, (counts.get(cell) ?? 0) + 1);
             }
-            expect(counts.size).toBe(27 * (version === "v2" ? 4 : 3));
-            expect([...counts.values()].every((count) => count === 10)).toBe(true);
-            if (version === "v2") {
+            expect(counts.size).toBe(27 * (version === "v1" ? 3 : 4));
+            expect([...counts.values()].every((count) => count === (version === "v3" ? 30 : 10))).toBe(true);
+            if (version !== "v1") {
                 expect(
                     Array.from({ length: 27 }, (_, board) => doctrineDraftTrainingLevel(version, "smoke", board)),
                 ).toEqual(new Array(27).fill(3));
@@ -172,6 +180,79 @@ describe("outcome-trained doctrine draft research", () => {
                 ).toThrow("Incomplete registered bank");
             }
         }
+    });
+
+    test("v3 sees losing the fourth shooter when the old two-shooter feature is saturated", () => {
+        const ranged = (id: number): boolean => Boolean(creatureInfo(id)?.ranged);
+        const evidence = {
+            ...context,
+            ownCreatureIds: [
+                ...CreatureLevelList[1].filter(ranged).slice(0, 2),
+                CreatureLevelList[2].find(ranged)!,
+                CreatureLevelList[2].find((id) => !ranged(id))!,
+            ],
+            scouting: {
+                ...context.scouting,
+                remainingPickLevels: [3, 4],
+                bannedCreatureIds: CreatureLevelList[4].filter(ranged),
+            },
+        };
+        const preferred = { creatureIds: [CreatureLevelList[3].find((id) => !ranged(id))!] };
+        const alternative = { creatureIds: [CreatureLevelList[3].find(ranged)!] };
+        const full = doctrineDraftFeatures("three-reveals", evidence, preferred, alternative, 3, false, "v3")!;
+        const masked = doctrineDraftFeatures("three-reveals", evidence, preferred, alternative, 3, true, "v3")!;
+        const old = doctrineDraftFeatures("three-reveals", evidence, preferred, alternative, 3, false, "v2")!;
+        const capacity = DOCTRINE_DRAFT_V3_FEATURES.indexOf("advance_bans_four_ranged_capacity_difference");
+        expect(full).toHaveLength(73);
+        expect(full.slice(0, 15)).toEqual(old);
+        expect(full[13]).toBe(0);
+        expect(full[capacity]).toBe(1);
+        expect(masked[capacity]).toBe(0);
+        expect(masked.slice(15, 71)).toEqual(full.slice(15, 71));
+        expect(full[DOCTRINE_DRAFT_V3_FEATURES.indexOf(`unit_${preferred.creatureIds[0]}_difference`)]).toBe(-1);
+        expect(full[DOCTRINE_DRAFT_V3_FEATURES.indexOf(`unit_${alternative.creatureIds[0]}_difference`)]).toBe(1);
+        expect(DOCTRINE_DRAFT_V3_FEATURES).not.toContain("unit_0_difference");
+        expect(doctrineDraftFeatures("see-none", evidence, preferred, alternative, 3, false, "v3")).toBeUndefined();
+    });
+
+    test("v3 distinguishes losing a strong faction partner while the faction remains reachable", () => {
+        const c = PBTypes.CreatureVals;
+        const chaos = CreatureLevelList[4]
+            .filter((id) => creatureInfo(id)?.faction === creatureInfo(c.ORC)?.faction)
+            .sort((a, b) => rankedDraftStrengthV4LiftPp(b) - rankedDraftStrengthV4LiftPp(a));
+        const evidence = {
+            ...context,
+            ownCreatureIds: [c.ORC, c.TROLL, c.WOLF, c.ELF],
+            scouting: { ...context.scouting, remainingPickLevels: [3, 4], bannedCreatureIds: [chaos[0]] },
+        };
+        const preferred = { creatureIds: [c.NIGHTMARE] },
+            alternative = { creatureIds: [c.MANTIS] };
+        const full = doctrineDraftFeatures("three-reveals", evidence, preferred, alternative, 3, false, "v3")!;
+        const masked = doctrineDraftFeatures("three-reveals", evidence, preferred, alternative, 3, true, "v3")!;
+        const quality = DOCTRINE_DRAFT_V3_FEATURES.indexOf("advance_bans_faction_partner_strength_difference");
+        expect(full[11]).toBe(0);
+        expect(full[quality]).toBeGreaterThan(0);
+        expect(full[quality]).toBeCloseTo(
+            (rankedDraftStrengthV4LiftPp(chaos[0]) - rankedDraftStrengthV4LiftPp(chaos[1])) / 10,
+            10,
+        );
+        expect(masked[quality]).toBe(0);
+    });
+
+    test("v3 learns the new information feature while preserving public unit identity in the mask", () => {
+        const capacity = DOCTRINE_DRAFT_V3_FEATURES.indexOf("advance_bans_four_ranged_capacity_difference");
+        const examples = Array.from({ length: 80 }, (_, board) => {
+            const features = new Array<number>(DOCTRINE_DRAFT_V3_FEATURES.length).fill(0);
+            features[1] = 1;
+            features[capacity] = (board % 3) - 1;
+            return { board, features, gain: 0.2 * features[capacity] - 0.05 };
+        });
+        const model = fitDoctrineDraftModel(examples, "v3");
+        expect(model.schema).toBe("hoc.ai.v0_9.doctrine_draft.v3");
+        expect(model.features).toEqual(DOCTRINE_DRAFT_V3_FEATURES);
+        expect(model.finalLoss).toBeLessThan(model.initialLoss / 100);
+        expect(predictDoctrineDraftGain(model, examples[2].features)).toBeCloseTo(0.15, 2);
+        expect(() => fitDoctrineDraftModel(examples, "v2")).toThrow();
     });
 
     test("actual optimizer steps learn a held-out synthetic causal direction deterministically", () => {
