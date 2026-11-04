@@ -52,6 +52,7 @@ export const V09_A19_PRECISE_TEACHER = Object.freeze({
 export const V09_A19_TEACHERS = Object.freeze({
     "wide-r4": V09_A19_WIDE_TEACHER,
     "precise-r8": V09_A19_PRECISE_TEACHER,
+    "precise-r8-neural": V09_A19_PRECISE_TEACHER,
 });
 export type V09A19TeacherPreset = keyof typeof V09_A19_TEACHERS;
 

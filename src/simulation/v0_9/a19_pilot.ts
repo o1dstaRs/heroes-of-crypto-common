@@ -17,6 +17,9 @@ import { exitCompletedWorkerCli } from "../completed_worker_cli";
 import { PersistentWorkerPool, startPersistentWorker } from "../persistent_worker_pool";
 import { playRankedDraftGame, rankedDraftStrengthCandidate, type IRankedDraftGameRecord } from "../ranked_draft_eval";
 import { SearchDriver } from "../search_driver";
+import { getA19NeuralModel } from "../a19_neural_model";
+import { A19_NEURAL_POLICY } from "../../ai/versions/v0_8_a19_neural_policy";
+import { withV09A19NeuralTeacher } from "./a19_teacher_correction";
 import { fingerprintV09 } from "./protocol";
 import { withV09A19Recording, type IV09A19TrainingDecision } from "./a19_pilot_recording";
 import { withV09RootRestoreAudit } from "./a19_root_restore";
@@ -91,6 +94,7 @@ interface IPilotGame {
     trajectorySha256: string;
     driverCounts: IV09PilotDriverCounts;
     rootRestorationChecks: number;
+    teacherNeural?: { decisions: number; inferred: number; corrected: number };
     training?: { decisions: IV09A19TrainingDecision[]; sampledWithoutCompleteEvidence: number };
 }
 
@@ -132,6 +136,7 @@ export function runV09PilotBoard(task: IPilotTask): IV09PilotBoard {
         const trajectory = createHash("sha256");
         let driverCounts: IV09PilotDriverCounts | undefined;
         let rootRestorationChecks = 0;
+        let teacherNeural: IPilotGame["teacherNeural"];
         let training: IPilotGame["training"];
         const record = playRankedDraftGame(
             genome,
@@ -170,13 +175,30 @@ export function runV09PilotBoard(task: IPilotTask): IV09PilotBoard {
                         });
                     const restored = withV09RootRestoreAudit(() =>
                         withV09PilotDriverAudit(candidateTeam, manifest.baseline, candidate, () => {
-                            if (!recording) return execute();
-                            const collected = withV09A19Recording(candidateTeam, config.seed, execute);
-                            training = {
-                                decisions: collected.decisions,
-                                sampledWithoutCompleteEvidence: collected.sampledWithoutCompleteEvidence,
+                            const recorded = () => {
+                                if (!recording) return execute();
+                                const collected = withV09A19Recording(candidateTeam, config.seed, execute);
+                                training = {
+                                    decisions: collected.decisions,
+                                    sampledWithoutCompleteEvidence: collected.sampledWithoutCompleteEvidence,
+                                };
+                                return collected.value;
                             };
-                            return collected.value;
+                            if (stage !== "aa" && manifest.teacherPreset === "precise-r8-neural") {
+                                const corrected = withV09A19NeuralTeacher(
+                                    {
+                                        team: candidateTeam,
+                                        model: getA19NeuralModel(),
+                                        minimumLogitGain: A19_NEURAL_POLICY.minimumLogitGain,
+                                        actionFamily: A19_NEURAL_POLICY.actionFamily,
+                                    },
+                                    recorded,
+                                );
+                                const { decisions, inferred, corrected: changes } = corrected.statistics;
+                                teacherNeural = { decisions, inferred, corrected: changes };
+                                return corrected.value;
+                            }
+                            return recorded();
                         }),
                     );
                     const checked = restored.value;
@@ -192,11 +214,18 @@ export function runV09PilotBoard(task: IPilotTask): IV09PilotBoard {
             throw new Error("Pilot did not exercise both search profiles");
         if (rootRestorationChecks !== driverCounts.baseline + driverCounts.candidate)
             throw new Error("Pilot did not verify every actual searched root");
+        if (
+            stage !== "aa" &&
+            manifest.teacherPreset === "precise-r8-neural" &&
+            teacherNeural?.decisions !== driverCounts.candidate
+        )
+            throw new Error("Neural R8 teacher did not observe every candidate root");
         if (training) for (const decision of training.decisions) decision.outcome = score(record);
         games.push({
             record,
             driverCounts,
             rootRestorationChecks,
+            ...(teacherNeural ? { teacherNeural } : {}),
             trajectorySha256: trajectory.digest("hex"),
             ...(training ? { training } : {}),
         });
@@ -267,6 +296,9 @@ export function validateV09PilotBoard(row: IV09PilotBoard, task: IPilotTask): vo
                           ? "win"
                           : "loss") ||
                 game.driverCounts.baseline < 1 ||
+                (task.stage !== "aa" &&
+                    task.manifest.teacherPreset === "precise-r8-neural" &&
+                    game.teacherNeural?.decisions !== game.driverCounts.candidate) ||
                 game.driverCounts.candidate < 1,
         )
     )

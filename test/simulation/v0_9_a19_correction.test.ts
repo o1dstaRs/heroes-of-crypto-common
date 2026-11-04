@@ -1,3 +1,7 @@
+import {
+    selectV09A19TeacherCorrection,
+    withV09A19NeuralTeacher,
+} from "../../src/simulation/v0_9/a19_teacher_correction";
 import { expect, test } from "bun:test";
 import { buildV08A19SearchEnvironment } from "../../src/ai/versions/v0_8_a19_profile";
 import type { GameAction } from "../../src/engine/actions";
@@ -33,6 +37,28 @@ test("corrections stay among fully scored same-family primary ties", () => {
     expect(() => selectV09A19Correction({ ...evidence, policy: [0, NaN, 1, 2] })).toThrow();
 });
 
+test("offline R8 teaching requires eight complete samples and cannot weaken the production evidence rule", () => {
+    const precise = { ...evidence, completed: [8, 8, 8, 8] };
+    expect(selectV09A19TeacherCorrection(precise)).toBe(1);
+    expect(selectV09A19TeacherCorrection({ ...precise, completed: [8, 7, 8, 8] })).toBe(0);
+    expect(selectV09A19TeacherCorrection({ ...precise, completed: [2, 2, 2, 2] })).toBe(0);
+    expect(selectV09A19Correction(precise)).toBe(0);
+    expect(() =>
+        withV09A19NeuralTeacher(
+            {
+                team: GREEN_TEAM,
+                minimumLogitGain: 1,
+                model: {
+                    predict: () => {
+                        throw new Error("must not infer");
+                    },
+                },
+            },
+            () => runMatch({ ...match, searchOfflineDeterministicWork: false }),
+        ),
+    ).toThrow("offline");
+});
+
 test("live inference reserves time inside the original A19 deadline", () => {
     expect(v09A19HasInferenceTime(974, 0, 1000)).toBe(true);
     expect(v09A19HasInferenceTime(975, 0, 1000)).toBe(false);
@@ -58,6 +84,79 @@ const match: IMatchConfig = {
         Object.entries(environment).filter((entry): entry is [string, string] => entry[1] !== undefined),
     ),
 };
+
+test("an offline R8 teacher can use the neural policy while exact abstention preserves the native match", () => {
+    const precise = {
+        ...match.researchA19BaseSearchEnvironment!,
+        SEARCH_ROLLOUTS: "8",
+        SEARCH_A19_COMPLEMENTARY_R2: "0",
+        SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "0",
+        SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: "0",
+        SEARCH_A19_NEURAL_TIES: "0",
+    };
+    withScopedAIEnvironment(
+        { V08_A19_SEARCH: "1", V08_A13_SEARCH: undefined, V08_A19_SEARCH_ENV_OVERRIDES: undefined },
+        () => {
+            const config = { ...match, researchA19BaseSearchEnvironment: precise };
+            const stock = runMatch(config);
+            const abstaining = withV09A19NeuralTeacher(
+                {
+                    team: GREEN_TEAM,
+                    minimumLogitGain: 1,
+                    actionFamily: "all",
+                    model: {
+                        predict: (observation) => ({
+                            policy: observation.candidates.map(() => 0),
+                            primary: observation.candidates.map(() => 0),
+                            valueLogit: 0,
+                        }),
+                    },
+                },
+                () => runMatch(config),
+            );
+            expect(abstaining.value).toEqual(stock);
+            expect(abstaining.statistics.decisions).toBeGreaterThan(0);
+            expect(abstaining.statistics.inferred).toBeGreaterThan(0);
+            expect(abstaining.statistics.corrected).toBe(0);
+            const active = withV09A19NeuralTeacher(
+                {
+                    team: GREEN_TEAM,
+                    minimumLogitGain: 1,
+                    actionFamily: "all",
+                    model: {
+                        predict: (observation) => ({
+                            policy: observation.candidates.map((_, index) => index * 1000),
+                            primary: observation.candidates.map(() => 0),
+                            valueLogit: 0,
+                        }),
+                    },
+                },
+                () => runMatch(config),
+            );
+            expect(active.statistics.corrected).toBeGreaterThan(0);
+            expect(active.value.rejectedGreen).toBe(0);
+            expect(active.value.rejectedRed).toBe(0);
+            const original = Object.getOwnPropertyDescriptors(SearchDriver.prototype);
+            expect(() =>
+                withV09A19NeuralTeacher(
+                    {
+                        team: GREEN_TEAM,
+                        minimumLogitGain: 1,
+                        actionFamily: "all",
+                        model: {
+                            predict: () => {
+                                throw new Error("teacher model fault");
+                            },
+                        },
+                    },
+                    () => runMatch(config),
+                ),
+            ).toThrow("teacher model fault");
+            expect(Object.getOwnPropertyDescriptors(SearchDriver.prototype)).toEqual(original);
+            expect(runMatch(config)).toEqual(stock);
+        },
+    );
+});
 
 test("wall-clock abstention and a model fault preserve the actual stock controller path", () => {
     withScopedAIEnvironment(
