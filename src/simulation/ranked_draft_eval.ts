@@ -1059,6 +1059,7 @@ export function resolveRankedDraftPick(
         revealedGridType?: number,
         tier2ArtifactId?: number,
         artifactFitVersion: ArtifactFitVersion = 1,
+        scoutingContext?: Readonly<IDraftScoutingContext>,
     ): number | undefined =>
         rules.liveDraftRules
             ? pickRankedLiveDraftCreature(
@@ -1071,6 +1072,7 @@ export function resolveRankedDraftPick(
                   rules.synergyVariants,
                   tier2ArtifactId,
                   artifactFitVersion,
+                  scoutingContext,
               )
             : pickDraftGenomeCreature(
                   genome,
@@ -1161,6 +1163,7 @@ export function resolveRankedDraftPick(
                   state.left.bundles,
                   rules.synergyVariants,
                   artifactFitVersionForSetupSpec(leftSetupPolicy.spec),
+                  getPickScoutingContext(state, LEFT, rules.gridType),
               )
             : pickCoherentDraftBundle(
                   state.left.bundles,
@@ -1186,6 +1189,7 @@ export function resolveRankedDraftPick(
                   state.right.bundles,
                   rules.synergyVariants,
                   artifactFitVersionForSetupSpec(rightSetupPolicy.spec),
+                  getPickScoutingContext(state, RIGHT, rules.gridType),
               )
             : pickCoherentDraftBundle(
                   state.right.bundles,
@@ -1277,6 +1281,7 @@ export function resolveRankedDraftPick(
                             ? own.tier2Artifact
                             : undefined,
                         artifactFitVersionForSetupSpec((team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec),
+                        getPickScoutingContext(state, team, rules.gridType),
                     );
         if (creatureId === undefined) {
             throw new Error(`Ranked draft creature policy found no visible L${phase.creatureLevel} creature`);

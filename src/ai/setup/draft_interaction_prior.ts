@@ -11,6 +11,8 @@
 
 import interactionPriorJson from "./draft_interaction_priors/ai_meta_a19_ranked_draft_10008_v1.json";
 import { creatureIdForName } from "./creature_score";
+import type { IDraftScoutingContext } from "../../picks/draft_visibility";
+import { draftContextAfterCreature, draftFutureSlots } from "./draft_continuations";
 
 interface IRawInteractionRow {
     units: string[];
@@ -75,6 +77,7 @@ export interface IRankedDraftInteractionContext {
     ownCreatureIds: readonly number[];
     /** Only creatures that ranked reveal rules have made visible to this seat. */
     knownOpponentCreatureIds?: readonly number[];
+    scouting?: Readonly<IDraftScoutingContext>;
 }
 
 export interface IRankedDraftInteractionBreakdown {
@@ -205,11 +208,21 @@ export const isRankedDraftInteractionPrior = (value: unknown): value is RankedDr
 const interactionOptionValue = (
     addedCreatureIds: readonly number[],
     rosterCreatureIds: ReadonlySet<number>,
+    context: IRankedDraftInteractionContext,
 ): number => {
+    const future = context.scouting
+        ? new Set(
+              draftFutureSlots(
+                  [...rosterCreatureIds],
+                  context.knownOpponentCreatureIds ?? [],
+                  addedCreatureIds.reduce(draftContextAfterCreature, context.scouting),
+              ).flatMap((slot) => slot.creatureIds),
+          )
+        : undefined;
     let value = 0;
     for (const creatureId of addedCreatureIds) {
         const futurePartners = (positivePartnersByCreature.get(creatureId) ?? []).filter(
-            (partnerId) => !rosterCreatureIds.has(partnerId),
+            (partnerId) => !rosterCreatureIds.has(partnerId) && (!future || future.has(partnerId)),
         );
         if (futurePartners.length < 2) continue;
         const secondStrongestPartnerLift = futurePartners
@@ -267,7 +280,7 @@ const interactionBreakdown = (
     const allyPair = clamp(pairLiftPp / PAIR_LIFT_SCALE_PP, -PAIR_AFFINITY_CAP, PAIR_AFFINITY_CAP);
     const counter = clamp(counterLiftPp / COUNTER_LIFT_SCALE_PP, -COUNTER_AFFINITY_CAP, COUNTER_AFFINITY_CAP);
     const allyTrio = clamp(strongestTrioLiftPp / TRIO_LIFT_SCALE_PP, 0, TRIO_AFFINITY_CAP);
-    const optionValue = interactionOptionValue(addedCreatureIds, rosterCreatureSet);
+    const optionValue = interactionOptionValue(addedCreatureIds, rosterCreatureSet, context);
     return {
         allyPair,
         counter,

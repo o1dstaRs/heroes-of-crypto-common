@@ -10,6 +10,8 @@
  */
 
 import { creatureInfo } from "./creature_score";
+import type { IDraftScoutingContext } from "../../picks/draft_visibility";
+import { draftContextAfterCreature, draftCreatureContinuation } from "./draft_continuations";
 import {
     rankedDraftRangedCountMarginalPp,
     rankedDraftSynergyVariantMarginalPp,
@@ -168,13 +170,24 @@ export function applyRankedDraftRangedFloor(
     policy: RankedDraftStrengthPolicyId | undefined,
     available: readonly number[],
     ownCreatureIds: readonly number[],
+    scouting?: Readonly<IDraftScoutingContext>,
+    knownOpponentCreatureIds: readonly number[] = [],
 ): readonly number[] {
     const floor = rankedDraftRangedFloor(policy);
     if (floor <= 0) return available;
     const isRanged = (creatureId: number): boolean => creatureInfo(creatureId)?.ranged === true;
     const ownRanged = ownCreatureIds.filter(isRanged).length;
     const picksAfterThis = Math.max(0, RANKED_DRAFT_ARMY_SIZE - ownCreatureIds.length - 1);
-    if (ownRanged + picksAfterThis >= floor) return available;
+    const possibleRanged =
+        scouting && available.length
+            ? draftCreatureContinuation(
+                  ownCreatureIds,
+                  knownOpponentCreatureIds,
+                  draftContextAfterCreature(scouting, available[0]),
+                  (unit) => unit.ranged,
+              ).maximumCount
+            : ownRanged + picksAfterThis;
+    if (possibleRanged >= floor) return available;
     const ranged = available.filter(isRanged);
     return ranged.length ? ranged : available;
 }
@@ -324,6 +337,18 @@ export function rankedDraftUnitSynergyLiftPp(creatureId: number, revealedGridTyp
     if (onMap !== undefined) return onMap;
     const lifts = [...byMap.values()];
     return lifts.reduce((sum, lift) => sum + lift, 0) / lifts.length;
+}
+
+/** Use only the fitted map residual; keep the current unit-strength prior and avoid counting v2 twice. */
+export function rankedDraftMapAdjustmentScore(
+    creatureId: number,
+    policy: RankedDraftStrengthPolicyId | undefined,
+    revealedGridType?: number,
+): number {
+    if (revealedGridType === undefined || (policy && isUnitSynergyPolicy(policy))) return 0;
+    const residual =
+        rankedDraftUnitSynergyLiftPp(creatureId, revealedGridType) - rankedDraftUnitSynergyLiftPp(creatureId);
+    return Math.max(-0.12, Math.min(0.12, (2 * residual) / 100));
 }
 
 /**

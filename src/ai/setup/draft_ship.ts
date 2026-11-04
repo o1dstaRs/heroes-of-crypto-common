@@ -11,6 +11,7 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import type { IDraftScoutingContext } from "../../picks/draft_visibility";
 
 import {
     createLeagueGenome,
@@ -372,11 +373,14 @@ export function pickRankedLiveDraftCreature(
     synergyVariants?: RankedDraftSynergyVariants,
     tier2ArtifactId?: number,
     artifactFitVersion: ArtifactFitVersion = 6,
+    scouting?: Readonly<IDraftScoutingContext>,
 ): number | undefined {
     const eligible = applyRankedDraftRangedFloor(
         genome.draftStrengthPolicy,
         eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds),
         ownCreatureIds,
+        scouting,
+        knownOpponentCreatureIds,
     );
     const roleFitScore = (creatureId: number): number =>
         applyCreatureRoleFitMultiplier(
@@ -398,6 +402,7 @@ export function pickRankedLiveDraftCreature(
             ownCreatureIds,
             tier1ArtifactId,
             artifactFitVersion,
+            ...(scouting === undefined ? {} : { scouting }),
             ...(tier2ArtifactId === undefined ? {} : { tier2ArtifactId }),
             knownOpponentCreatureIds,
             ...(revealedGridType === undefined ? {} : { revealedGridType }),
@@ -407,6 +412,7 @@ export function pickRankedLiveDraftCreature(
             ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
             ...(genome.draftStrengthPolicy ? { draftStrengthPolicy: genome.draftStrengthPolicy } : {}),
         },
+        (creatureId) => draftGenomeCreatureScore(genome, creatureId),
     );
 }
 
@@ -419,6 +425,7 @@ export function pickRankedLiveDraftBundle(
     bundles: readonly DraftBundle[],
     synergyVariants?: RankedDraftSynergyVariants,
     artifactFitVersion: ArtifactFitVersion = 6,
+    scouting?: Readonly<IDraftScoutingContext>,
 ): number {
     return pickCoherentDraftBundle(
         bundles,
@@ -441,6 +448,7 @@ export function pickRankedLiveDraftBundle(
             ),
         {
             artifactFitVersion,
+            ...(scouting === undefined ? {} : { scouting }),
             ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
             ...(genome.draftStrengthPolicy ? { draftStrengthPolicy: genome.draftStrengthPolicy } : {}),
             ...(synergyVariants === undefined ? {} : { synergyVariants }),
