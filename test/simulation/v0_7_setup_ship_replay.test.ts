@@ -164,7 +164,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned 2026-11-03 for the requested Arbalester attack, Crusader armor, Wandering Mage XP and
 // Leprechaun army blessing changes. Two isolated runs agree, with zero rejected actions in all eight fights.
 // Previous digest: 7dae00c1d34d6ff3f18a1629ca5e9010c81d6f981e00d48290d77c50e14f1573.
-const EXPECTED_REPLAY_SHA256 = "fa5b3e2df22860366e14f423cf2db7ceb264ebdadf180971344ae9738bae650d";
+// Re-pinned 2026-11-04 for the requested Crusader damage increase from 13-20 to 15-20.
+// Two isolated runs agree. Previous digest: fa5b3e2df22860366e14f423cf2db7ceb264ebdadf180971344ae9738bae650d.
+const EXPECTED_REPLAY_SHA256 = "b41a67d7a59270b3fd6054d08db2cca146ec58623638a2a9fe93a00f6c26e321";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
