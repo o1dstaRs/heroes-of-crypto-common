@@ -89,7 +89,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v5",
+            schema: "hoc.v0_8_a19_production_profile.v6",
             candidateId: "a19",
             productionVersion: "v0.8",
             researchOnly: false,
@@ -285,6 +285,8 @@ describe("v0.8+A19 production profile", () => {
             "final-placement-seed",
             "final-placement-policy",
             "final-placement-weights",
+            "final-placement-relations",
+            "final-placement-v2-weights",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));

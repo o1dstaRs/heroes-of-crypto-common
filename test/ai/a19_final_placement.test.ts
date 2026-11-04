@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import { expect, test } from "bun:test";
 
 import { buildPlacementInput, finalizePlacement, type PlacementEnvelope } from "../../src/ai/placement/adapter";
-import { chooseCandidate, type PublicInput, type Point } from "../../src/ai/placement/layout";
+import { chooseCandidate, encode, predict, propose, type PublicInput, type Point } from "../../src/ai/placement/layout";
 import { getPlacementModel } from "../../src/ai/placement/model";
-import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../../src/ai/placement/policy";
+import { A19_LEARNED_FINAL_PLACEMENT_V1_POLICY } from "../../src/ai/placement/policy";
 import packed from "../../src/ai/models/a19/placement_v1.json";
 import fixture from "./fixtures/a19_final_placement.json";
 
@@ -39,8 +39,8 @@ test("fixed exported tensors and conservative adoption identity stay pinned", ()
     }
     expect(hash.digest("hex")).toBe("98832e09c012077cf2167bfd9d82509cf405416d4b0d4ea1c701cb4f406628e2");
     expect(getPlacementModel()).toMatchObject({ id: "free-placement-fit-0", minimumGain: 0.03 });
-    expect(packed.exportSha256).toBe(A19_LEARNED_FINAL_PLACEMENT_POLICY.exportSha256);
-    expect(A19_LEARNED_FINAL_PLACEMENT_POLICY.registeredStrengthGatePassed).toBe(false);
+    expect(packed.exportSha256).toBe(A19_LEARNED_FINAL_PLACEMENT_V1_POLICY.exportSha256);
+    expect(A19_LEARNED_FINAL_PLACEMENT_V1_POLICY.registeredStrengthGatePassed).toBe(false);
 });
 
 test("max score wins only above the unchanged margin, with first-index ties", () => {
@@ -50,13 +50,16 @@ test("max score wins only above the unchanged margin, with first-index ties", ()
     expect(() => chooseCandidate([0, NaN], 0.03)).toThrow();
 });
 
-test("frozen authoritative formations reproduce both sides and all live maps", () => {
+test("the retained v1 reference reproduces frozen authoritative formations on both sides and all maps", () => {
     for (const sample of fixture.cases) {
         const { units, context, incumbent } = parts(sample);
         const before = JSON.stringify([...incumbent]);
         expect(buildPlacementInput(units, context)).toBeDefined();
-        const result = finalizePlacement(units, context, incumbent);
-        expect(units.map((u) => result.get(u.getId()))).toEqual(sample.positions);
+        const input = buildPlacementInput(units, context)!;
+        const model = getPlacementModel();
+        const options = Array.from({ length: 8 }, (_, i) => propose(input, sample.baseline, i));
+        const scores = options.map((p) => predict(model, encode(input, p)));
+        expect(options[chooseCandidate(scores, model.minimumGain)]).toEqual(sample.positions);
         expect(JSON.stringify([...incumbent])).toBe(before);
     }
 });

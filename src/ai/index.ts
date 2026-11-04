@@ -55,6 +55,7 @@ export {
     RANKED_SETUP_POLICY_V0,
 } from "./ranked_profile";
 export type { IRankedAIProfile, IRankedAISetupPolicy } from "./ranked_profile";
+export { V09_LEARNED_FINAL_PLACEMENT_POLICY } from "./placement/policy";
 export { pickRankedAIDoctrine, RANKED_AI_DOCTRINE_CHOICES } from "./setup/doctrine_variety";
 export type { IRankedAIDoctrineChoiceContext } from "./setup/doctrine_variety";
 

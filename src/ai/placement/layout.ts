@@ -246,10 +246,11 @@ export function predict(model: PlacementModel, features: number[]): number {
     return x[0];
 }
 
-export function chooseCandidate(scores: readonly number[], minimumGain: number): number {
+export function chooseCandidate(scores: readonly number[], minimumGain: number, reference = 0): number {
     assert(scores.length > 0 && scores.every(Number.isFinite));
     assert(Number.isFinite(minimumGain) && minimumGain >= 0);
+    assert(Number.isInteger(reference) && reference >= 0 && reference < scores.length);
     let best = 0;
     for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
-    return scores[best] > scores[0] + minimumGain ? best : 0;
+    return scores[best] > scores[reference] + minimumGain ? best : reference;
 }

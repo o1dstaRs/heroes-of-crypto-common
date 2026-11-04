@@ -1,6 +1,7 @@
 import { creatureIdForName, creatureInfo } from "../setup/creature_score";
 import { propose, encode, predict, chooseCandidate, valid, type PublicInput, type Point, type Body } from "./layout";
-import { getPlacementModel } from "./model";
+import { getPlacementModel, getPlacementRelationModel } from "./model";
+import { relationFeatures } from "./relations";
 export interface PlacementUnit {
     getId(): string;
     getName(): string;
@@ -107,7 +108,8 @@ export function finalizePlacement(
     context: PlacementEnvelope,
     incumbent: ReadonlyMap<string, Point>,
 ): Map<string, Point> {
-    const fallback = () => new Map([...incumbent].map(([id, p]) => [id, { ...p }]));
+    let retained = incumbent;
+    const fallback = () => new Map([...retained].map(([id, p]) => [id, { ...p }]));
     try {
         const input = buildPlacementInput(units, context);
         if (!input || incumbent.size !== units.length) return fallback();
@@ -118,7 +120,13 @@ export function finalizePlacement(
         const model = getPlacementModel();
         const options = Array.from({ length: 8 }, (_, i) => propose(input, anchors, i));
         const scores = options.map((p) => predict(model, encode(input, p)));
-        const selected = options[chooseCandidate(scores, model.minimumGain)];
+        const reference = chooseCandidate(scores, model.minimumGain);
+        retained = new Map(units.map((u, i) => [u.getId(), { ...options[reference][i] }]));
+        const relationModel = getPlacementRelationModel();
+        const relationScores = options.map((p) =>
+            predict(relationModel, relationFeatures(input, p, options[reference])),
+        );
+        const selected = options[chooseCandidate(relationScores, relationModel.minimumGain, reference)];
         if (!valid(input, selected)) return fallback();
         return new Map(units.map((u, i) => [u.getId(), { ...selected[i] }]));
     } catch {

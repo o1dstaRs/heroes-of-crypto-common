@@ -59,7 +59,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
  *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v5" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v6" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -245,7 +245,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "ai-registry-promotion" as const,
         source: "src/ai/index.ts" as const,
-        sha256: "8ab1d21ba39a7aeb52a4a6b33fc4784933f5fdbf4c210a9236e3a6cef8d14eb2" as const,
+        sha256: "049b8ecdbfc8d0aafd7dd93ae18911b0c8afe04ecd6cb6b351c90bd9bcc97e1a" as const,
     }),
     Object.freeze({
         role: "default-search-factory" as const,
@@ -301,17 +301,17 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "final-placement-adapter" as const,
         source: "src/ai/placement/adapter.ts" as const,
-        sha256: "4bb7f5f8eb99a74ca217564159700f04f29a63b9b5cea6122c6d648e36a8e659" as const,
+        sha256: "2905012efdfd8b23254cf7a8a47606141d0034e86d4583ad8bf4cc5ed7175572" as const,
     }),
     Object.freeze({
         role: "final-placement-proposals" as const,
         source: "src/ai/placement/layout.ts" as const,
-        sha256: "9d92ae8cae45bf81ed833967d4083c8021e34403164acee6e4f2ee49c5a4730f" as const,
+        sha256: "3a7668426f96442c06d22a183fe7b69125d234bb26333038b82c7c831cf7ff89" as const,
     }),
     Object.freeze({
         role: "final-placement-model" as const,
         source: "src/ai/placement/model.ts" as const,
-        sha256: "0ed00d4335d34597a4ac9c0e53145a383626449e7d3d6a744c9e83d9f741662c" as const,
+        sha256: "83b406f2e7ed70d249980a7757cff14b3d9102bec1604e1eb22534c5afaddf62" as const,
     }),
     Object.freeze({
         role: "final-placement-seed" as const,
@@ -321,12 +321,22 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "final-placement-policy" as const,
         source: "src/ai/placement/policy.ts" as const,
-        sha256: "95f2feebdfa11da5d9ca38bb03e484b9cbd45b2908de9d3008fb026017e74ab6" as const,
+        sha256: "0199fa1465ea34f41820ae72d7751153d7c419441e60d80b4783b7e642c5033d" as const,
     }),
     Object.freeze({
         role: "final-placement-weights" as const,
         source: "src/ai/models/a19/placement_v1.json" as const,
         sha256: "496842b113847a9ee902cc920daa23d3a2d8970c49353221f08ee34aedf26aa7" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-relations" as const,
+        source: "src/ai/placement/relations.ts" as const,
+        sha256: "a4cac3935c8b92d9ea4742c3e65e316729581a087b961cbe8922a0dd1ef8bce0" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-v2-weights" as const,
+        source: "src/ai/models/a19/placement_v2.json" as const,
+        sha256: "690f77e18625aab335ec4fdee3e686cd42a2a2bd677399c92fe300728431275b" as const,
     }),
 ] as const);
 
