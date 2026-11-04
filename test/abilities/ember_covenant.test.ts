@@ -204,13 +204,46 @@ describe("Ember Covenant Blessing", () => {
             expect(f.hydra.hasBuffActive(NAME)).toBe(false);
         });
 
-    test("a newly added ally's first damage also ends the original army's rings", () => {
+    test("a newly added ally shares the intact covenant and consumes it across the army", () => {
         const f = battle();
-        const summoned = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const summoned = createTestUnit({ team: PBTypes.TeamVals.LEFT, summoned: true });
         placeUnit(f.grid, f.unitsHolder, summoned, { x: 5, y: 4 });
+        expect(summoned.hasBuffActive(NAME)).toBe(true);
+        expect(summoned.applyDamage(1, 0, log)).toBe(0);
         expect(summoned.hasBuffActive(NAME)).toBe(false);
-        summoned.applyDamage(1, 0, log);
         expect(f.ally.hasBuffActive(NAME)).toBe(false);
+        expect(f.hydra.hasBuffActive(NAME)).toBe(false);
+    });
+
+    test("new allies cannot restore a covenant already consumed by their army", () => {
+        const f = battle();
+        f.ally.applyDamage(1, 0, log);
+        const summoned = createTestUnit({ team: PBTypes.TeamVals.LEFT, summoned: true });
+        placeUnit(f.grid, f.unitsHolder, summoned, { x: 5, y: 4 });
+        f.unitsHolder.seedEmberCovenant();
+        expect(summoned.hasBuffActive(NAME)).toBe(false);
+        expect(summoned.applyDamage(1, 0, log)).toBe(1);
+        expect(f.hydra.hasBuffActive(NAME)).toBe(false);
+    });
+
+    test("joining the opposing army does not grant its enemy's covenant", () => {
+        const f = battle();
+        const summoned = createTestUnit({ team: PBTypes.TeamVals.RIGHT, summoned: true });
+        placeUnit(f.grid, f.unitsHolder, summoned, { x: 9, y: 4 });
+        expect(summoned.hasBuffActive(NAME)).toBe(false);
+        expect(summoned.applyDamage(1, 0, log)).toBe(1);
+        expect(f.ally.hasBuffActive(NAME)).toBe(true);
+    });
+
+    test("dead or off-board additions do not receive an intact covenant", () => {
+        const f = battle();
+        const dead = createTestUnit({ team: PBTypes.TeamVals.LEFT, amountAlive: 0 });
+        placeUnit(f.grid, f.unitsHolder, dead, { x: 5, y: 4 });
+        expect(dead.hasBuffActive(NAME)).toBe(false);
+        const offBoard = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        offBoard.setPosition(-1000, -1000);
+        f.unitsHolder.addUnit(offBoard);
+        expect(offBoard.hasBuffActive(NAME)).toBe(false);
     });
 
     test("direct attack and fire spell projections agree with the initial zero-damage resolution", () => {
