@@ -95,6 +95,12 @@ describe("tournament entrant-A research strategy profile", () => {
             "neural-inference",
             "neural-batch256-weights",
             "neural-lr0003-weights",
+            "final-placement-adapter",
+            "final-placement-proposals",
+            "final-placement-model",
+            "final-placement-seed",
+            "final-placement-policy",
+            "final-placement-weights",
         ]);
 
         // Game 0: entrant A owns GREEN and receives the scoped compact placement; B remains native v0.8.

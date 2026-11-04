@@ -9,6 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
+import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
+
 import { StrategyV0_8 } from "./v0_8";
 import { V08_A19_SCORED_ARBITRATION_POLICY } from "./v0_8_a19_scored_arbitration";
 import { A19_NEURAL_POLICY } from "./v0_8_a19_neural_policy";
@@ -296,6 +298,36 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/models/a19/lr0003.json" as const,
         sha256: "c0be648360497095958f85af2068fcbf7d79176526feb270935770e6f0c30507" as const,
     }),
+    Object.freeze({
+        role: "final-placement-adapter" as const,
+        source: "src/ai/placement/adapter.ts" as const,
+        sha256: "4bb7f5f8eb99a74ca217564159700f04f29a63b9b5cea6122c6d648e36a8e659" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-proposals" as const,
+        source: "src/ai/placement/layout.ts" as const,
+        sha256: "9d92ae8cae45bf81ed833967d4083c8021e34403164acee6e4f2ee49c5a4730f" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-model" as const,
+        source: "src/ai/placement/model.ts" as const,
+        sha256: "0ed00d4335d34597a4ac9c0e53145a383626449e7d3d6a744c9e83d9f741662c" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-seed" as const,
+        source: "src/ai/placement/sha256.ts" as const,
+        sha256: "56dc48b19b3ff674e736335955ff2be55aac7fbf7bde6695da88826670db65c9" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-policy" as const,
+        source: "src/ai/placement/policy.ts" as const,
+        sha256: "95f2feebdfa11da5d9ca38bb03e484b9cbd45b2908de9d3008fb026017e74ab6" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-weights" as const,
+        source: "src/ai/models/a19/placement_v1.json" as const,
+        sha256: "496842b113847a9ee902cc920daa23d3a2d8970c49353221f08ee34aedf26aa7" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -313,6 +345,7 @@ export const V08_A19_PROFILE = Object.freeze({
     policy: V08_A19_POLICY,
     placementPolicy: V08_A19_PLACEMENT_POLICY,
     neuralPolicy: A19_NEURAL_POLICY,
+    authoritativeFinalPlacement: A19_LEARNED_FINAL_PLACEMENT_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

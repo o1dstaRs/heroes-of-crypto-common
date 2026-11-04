@@ -279,6 +279,12 @@ describe("v0.8+A19 production profile", () => {
             "neural-inference",
             "neural-batch256-weights",
             "neural-lr0003-weights",
+            "final-placement-adapter",
+            "final-placement-proposals",
+            "final-placement-model",
+            "final-placement-seed",
+            "final-placement-policy",
+            "final-placement-weights",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));
