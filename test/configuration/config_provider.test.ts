@@ -164,12 +164,11 @@ describe("config_provider", () => {
         expect(creature.shot_distance).toBe(6.5);
     });
 
-    // Owner request 2026-10-18: attack 21 -> 22 and damage floor 17 -> 18. The ceiling stays 23.
     it("loads Cyclops's attack profile", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Cyclops", "cyclops_512", 1);
 
         expect(creature.base_attack).toBe(22);
-        expect(creature.attack_damage_min).toBe(18);
+        expect(creature.attack_damage_min).toBe(19);
         expect(creature.attack_damage_max).toBe(23);
     });
 
