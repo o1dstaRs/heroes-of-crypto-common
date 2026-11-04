@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 
 import packed from "../../src/ai/models/a19/placement_v2.json";
 import { buildPlacementInput, finalizePlacement, type PlacementEnvelope } from "../../src/ai/placement/adapter";
@@ -8,6 +8,7 @@ import { chooseCandidate, predict, propose } from "../../src/ai/placement/layout
 import { getPlacementRelationModel } from "../../src/ai/placement/model";
 import { A19_LEARNED_FINAL_PLACEMENT_POLICY, V09_LEARNED_FINAL_PLACEMENT_POLICY } from "../../src/ai/placement/policy";
 import { relationFeatures } from "../../src/ai/placement/relations";
+import * as creatureScore from "../../src/ai/setup/creature_score";
 import fixture from "./fixtures/a19_final_placement_v2.json";
 
 test("v0.9 placement uses the unchanged independently confirmed float32 tensors", () => {
@@ -72,10 +73,22 @@ test("the serving adapter applies the confirmed choice without modifying inputs 
         };
         const incumbent = new Map(sample.input.bodies.map((b, i) => [b.id, { ...sample.baseline[i] }]));
         const before = JSON.stringify([...incumbent]);
-        expect(buildPlacementInput(units, context)).toEqual(sample.input);
-        const selected = finalizePlacement(units, context, incumbent);
-        expect(units.map((u) => selected.get(u.getId()))).toEqual(sample.positions);
-        expect(JSON.stringify([...incumbent])).toBe(before);
-        for (const [id, anchor] of selected) expect(anchor).not.toBe(incumbent.get(id));
+        // Confirmation fixtures use their recorded HP independently of later live balance changes.
+        const recordedHp = new Map(sample.input.bodies.map((b) => [b.creature, b.hp]));
+        const readCreatureInfo = creatureScore.creatureInfo;
+        const catalog = spyOn(creatureScore, "creatureInfo").mockImplementation((id) => {
+            const info = readCreatureInfo(id);
+            const hp = recordedHp.get(id);
+            return info && hp !== undefined ? { ...info, hp } : info;
+        });
+        try {
+            expect(buildPlacementInput(units, context)).toEqual(sample.input);
+            const selected = finalizePlacement(units, context, incumbent);
+            expect(units.map((u) => selected.get(u.getId()))).toEqual(sample.positions);
+            expect(JSON.stringify([...incumbent])).toBe(before);
+            for (const [id, anchor] of selected) expect(anchor).not.toBe(incumbent.get(id));
+        } finally {
+            catalog.mockRestore();
+        }
     }
 });

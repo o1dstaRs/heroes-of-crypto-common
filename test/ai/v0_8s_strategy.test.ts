@@ -210,7 +210,9 @@ describe("v0.8 search measurement alias", () => {
         // Re-pinned 2026-10-20 for area-counter splash journaling: only impactDamage/secondaryHits on
         // two recorded actions change. Comparing with the committed handler preserved every decision,
         // battle outcome and other result field, with zero rejected actions. Two isolated runs agree.
-        expect(digest("v0.7")).toBe("7cf65956b787dbc67313ca1f05d8e8cc667df574c7c646582c4ffd160fbd85f1");
+        // Re-pinned 2026-11-04 for Cyclops: 75 HP, 19-23 damage, 20 armor. The prior config restores
+        // 7cf65956b787dbc67313ca1f05d8e8cc667df574c7c646582c4ffd160fbd85f1; two updated runs agree.
+        expect(digest("v0.7")).toBe("aa5a6f53ac14d4bab234928e98069b330c0f2e2ebd1f8e4e11f5f81001050f4f");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -247,7 +249,9 @@ describe("v0.8 search measurement alias", () => {
         // this digest, both with zero rejected actions.
         // The same 2026-10-18 balance tuning changes this trace too, with identical verification.
         // The same area-counter journal update changes only those observation counters here too.
-        expect(digest("v0.8")).toBe("ad13ab7449c986e8e53ceafae5af3305afce41113c39feceaafefc7f6ee29b53");
+        // The same Cyclops update moves this trace. The prior config restores
+        // ad13ab7449c986e8e53ceafae5af3305afce41113c39feceaafefc7f6ee29b53; two updated runs agree.
+        expect(digest("v0.8")).toBe("6157cbf8d772939d93da0b55db9a5829ef846d979329c3d073c1a5acafcf734c");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

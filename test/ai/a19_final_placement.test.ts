@@ -52,15 +52,13 @@ test("max score wins only above the unchanged margin, with first-index ties", ()
 
 test("the retained v1 reference reproduces frozen authoritative formations on both sides and all maps", () => {
     for (const sample of fixture.cases) {
-        const { units, context, incumbent } = parts(sample);
-        const before = JSON.stringify([...incumbent]);
-        expect(buildPlacementInput(units, context)).toBeDefined();
-        const input = buildPlacementInput(units, context)!;
+        const input = sample.input;
+        const before = JSON.stringify(input);
         const model = getPlacementModel();
         const options = Array.from({ length: 8 }, (_, i) => propose(input, sample.baseline, i));
         const scores = options.map((p) => predict(model, encode(input, p)));
         expect(options[chooseCandidate(scores, model.minimumGain)]).toEqual(sample.positions);
-        expect(JSON.stringify([...incumbent])).toBe(before);
+        expect(JSON.stringify(input)).toBe(before);
     }
 });
 
