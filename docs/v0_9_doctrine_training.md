@@ -1,11 +1,14 @@
 # v0.9 doctrine training
 
-The user-locked improvement benchmark is **`doctrine-draft-v3-20261104`**. Its exact trained weights,
+The user-locked default draft for v0.9 seats is **`doctrine-draft-v3-20261104`**. Its exact trained weights,
 registration, independently verified results and decision regressions are versioned in
 `src/simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/`. Subsequent draft candidates must be
 compared against it as well as the original policy. Its overall draft gain now has fresh independent
 confirmation: **+3.34 match-score percentage points (95% interval +2.20 to +4.49)**. The original
 scouting-specific gate remains failed. V4 did not improve over this checkpoint and is not promoted.
+The separately registered native-v0.9 qualification below also passed: **+1.76 points (+0.91 to +2.62)**.
+The server now binds this fixed model by default for explicit v0.9 seats, preserving their native
+combat and setup profile. This does not change the global default AI version.
 
 From the common package, inspect it or export the exact model to a new file:
 
@@ -14,7 +17,7 @@ bun src/simulation/v0_9/doctrine_draft_checkpoint.ts
 bun src/simulation/v0_9/doctrine_draft_checkpoint.ts --out /tmp/hoc-doctrine-v3-model.json
 ```
 
-The CLI reports the original study and the separate overall confirmation. The loader verifies the canonical model hash and freezes the returned model. Export refuses to
+The CLI reports the original study, A19 overall confirmation and native-profile qualification. The loader verifies the canonical model hash and freezes the returned model. Export refuses to
 overwrite an existing file. Use a new checkpoint identity for further improvements. Saved seed banks,
 including unused confirmation seeds, are exclusions for future campaigns. Do not reopen V3's failed
 campaign or describe the locked checkpoint as a replacement for the in-battle combat model.
@@ -27,12 +30,12 @@ choosing an alternative consumes the single override even if the pick collides. 
 `maskAdvanceInformation` flag reproduces the information ablation; `onDecision` records the model's
 evaluated decisions. Regression fixtures reproduce 49 historical drafts, including a collided override.
 
-The measured target is `a19-neural-r2-placement-v2`, with draft policy
+The earlier measured target was `a19-neural-r2-placement-v2`, with draft policy
 `ranked-unit-strength-a19-side-v4-w16-r4` and setup `artifact-fit-v6:conditional-v1:sniper+t2a19`.
 Its battle controller is the current ranked A19 stack, routed through v0.8. The literal server v0.9
 profile uses a different setup policy and native combat path. This draft research is part of v0.9
-development, but its measured gain does not establish a gain for that different runtime profile.
-Changing the target profile requires a separately registered evaluation before promotion.
+development. Its A19 gain alone did not establish a gain for the different native profile; the separate
+native evaluation below addresses that scope. Another target profile still requires its own evaluation.
 
 The balanced population is an offline research option, `--doctrine-population balanced-doctrines-v1`.
 It does not change old campaign identities or install trained weights in the game.
@@ -240,7 +243,7 @@ Scores count a win as one, a draw as one-half, and a loss as zero. These are pai
 percentage-point changes, not comparisons of the doctrines' raw win rates. The information-specific
 pooled lower bound is exactly zero before rounding. This misses the registered requirement that it
 be strictly positive, despite the improvement over current behavior and the positive Scout result.
-The 1,512-board confirmation bank remains unopened; the model is not promoted.
+The original 1,512-board scouting confirmation bank remains unopened; this experiment did not promote the model.
 
 Independent Python verification recomputed every paired training outcome and reproduced all 2,000
 optimizer steps with zero weight error, the exact final loss, and every evaluation mean and interval.
@@ -335,6 +338,60 @@ all paired board scores in eighth-point units. Its regression test replays every
 Use `lockedDoctrineDraftOverallConfirmation()` from `doctrine_draft_checkpoint.ts` to load a validated
 copy. Fixture SHA-256: `4f23800c0742df4785b412cfc402f5ae6a39391e8dfb58bd9ed7f42786c9f354`.
 The original V3 weights, registration and evidence remain unchanged, including the failed
-scouting-specific gate and closed original confirmation bank. Runtime integration still needs to
-preserve the measured profile and draft retry state; these results do not validate the different
-literal v0.9 native-combat profile.
+scouting-specific gate and closed original confirmation bank. These A19 results do not by themselves
+validate the different literal v0.9 native-combat profile.
+
+### Default v0.9 runtime and native-profile qualification
+
+The user's subsequent request explicitly activated the fixed V3 model as v0.9's draft default.
+`src/ai/setup/doctrine_draft_policy.ts` provides pure inference with caller-owned override state.
+The server's `getRankedAiProfile("v0.9")` binds it to the exact trained candidate menu,
+`ranked-unit-strength-a19-side-v4-w16-r4`. Empty configuration and that exact base spec enable it;
+an explicit alternative `HOC_DRAFT_WEIGHTS` spec, including `off`, retains the requested override.
+The portable combat registry and global `DEFAULT_AI_VERSION` are unchanged. The old model's
+`productionPromotion: false` records its original research result; activation is expressed in this
+new profile binding rather than by editing immutable evidence.
+
+The server passes only the acting seat's projected context. Five points receive advance bans and
+the early map; six points receive advance bans; seven points keep ordinary reveal timing and the
+original draft choices. One override is allowed per draft, including an alternative that collides
+with a hidden enemy pick. Per-seat flags commit in the same database mutation as the accepted
+bundle, pick or collision reveal. Stale mutations cannot consume an override or expose a unit;
+restarts and immediate collision retries read the persisted flag. Sequential bundle decisions
+refresh committed state, allowing the second seat to use only legally revealed first-bundle units.
+Real ArangoDB regressions cover both seats, concurrent bundle commits, retries, stale writes,
+restarts and that sequential observation.
+
+The [native registration](evidence/v0_9_native_draft_registration_20261105.json) was fixed before
+the first battle, using source `99015de1cd070883567fcc6ae4204e47650943a7` and registration hash
+`acd4cc1328429361dcb139f73c7bb6cbd6d424a5c3cdff301e01c2bda471d832`.
+It excludes 4,260,210 prior seed channels, including every unopened prior bank. No optimizer,
+threshold adjustment or model selection occurs. The native setup is
+`artifact-fit-v6:v07-nonfight-4eda84635fe7`, with native v0.9 combat and no search override.
+The common runner `src/simulation/v0_9/doctrine_draft_native.ts` uses real sequential bundle
+commitments, live synergy variants and tactical splits. A 27-board correctness smoke is excluded
+from strength statistics. The 1,512 qualification boards cover 27 equal cells and four draft/battle
+seat combinations, totaling 6,048 battles per condition and 18,144 across all three conditions.
+
+| Candidate doctrine      | V3 minus original, pp (95% interval) | V3 minus masked information, pp (95% interval) |
+| ----------------------- | -----------------------------------: | ---------------------------------------------: |
+| Spymaster, 5 points     |               +2.78 (+0.87 to +4.66) |                      +0.595 (−0.198 to +1.414) |
+| Scout, 6 points         |               +2.50 (+0.74 to +4.27) |                      +0.446 (−0.124 to +1.042) |
+| Battle Trance, 7 points |                  0.00 (0.00 to 0.00) |                         0.000 (0.000 to 0.000) |
+| Equal mixture           |           **+1.76 (+0.91 to +2.62)** |                  **+0.347 (+0.025 to +0.694)** |
+
+The primary overall-strength gate passed. The secondary information comparison has a small positive
+pooled interval; individual doctrine information intervals cross zero. This separate native result
+does not retroactively pass the original A19 scouting study or justify a claim about the total value
+of a doctrine. Every battle ended by elimination, with full 5/6/7 budgets, zero rejected actions and
+zero preflight failures across 814,647 native decisions. Seven-point records matched exactly.
+Independent Python reconstructed every paired score, seed exclusion, mean and stratified 10,000-draw
+bootstrap interval from the raw battles.
+
+The [native fixture](../src/simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/native_qualification_20261105.json)
+stores both comparisons, all 1,512 paired board deltas per comparison, independent verification and
+the raw-board manifest hash. `lockedDoctrineDraftNativeQualification()` verifies its canonical hash
+`abb44c3e8b0dc9b15bec73586495c44d1ac6557a6cc368398369a0b32b97ba22`; its tests replay every interval.
+Ordinary raw output remains ignored under `game/core/tmp/v09-default-integration-20261105/` in the
+client workspace. Further candidates must use fresh banks and compare with this default. Preserve
+all old evidence, including the failed V4 continuation and both unopened scouting confirmation banks.

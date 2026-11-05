@@ -22,7 +22,7 @@ describe("ranked AI doctrine variety", () => {
     });
 
     test("allocates approximately a third of match seats to each doctrine", () => {
-        for (const version of ["v0.4", "v0.6", "v0.7", "v0.8"]) {
+        for (const version of ["v0.4", "v0.6", "v0.7", "v0.8", "v0.9"]) {
             const counts = new Map<Doctrine, number>();
             for (let match = 0; match < 10_000; match++) {
                 for (const team of [1, 2]) {

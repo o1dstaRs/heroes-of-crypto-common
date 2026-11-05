@@ -4,9 +4,9 @@ Use `bun fmt --no-script <paths>` for targeted formatting and add `--check` for 
 Do not invoke Prettier separately. `--no-script` avoids running this package's whole-source `fmt`
 script when you only intend to format your own files. Keep the required build and lint checks.
 
-## Locked v0.9 draft benchmark
+## Locked v0.9 draft default
 
-The user requested preservation of the improved draft model for subsequent agents. The immutable
+The user explicitly activated the improved model as the default draft for v0.9 seats. The immutable
 `doctrine-draft-v3-20261104` checkpoint, weights, seed registration, evaluation evidence and decision
 regressions live in `src/simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/`. Use
 `lockedDoctrineDraftModel()` from `src/simulation/v0_9/doctrine_draft_checkpoint.ts` to load it.
@@ -20,7 +20,25 @@ verification and all 1,080 paired board scores; `lockedDoctrineDraftOverallConfi
 and loads it. Keep V3 as a required comparison for further draft iterations; create a new checkpoint
 rather than overwriting or refitting it. The V4 continuation failed to improve over V3 and is not promoted.
 
-This is a locked research benchmark with confirmed overall draft strength, not a production-qualified combat model. Its original additional
+The server's `getRankedAiProfile("v0.9")` binds `selectV09DoctrineDraftChoice()` from
+`src/ai/setup/doctrine_draft_policy.ts` to the fixed `ranked-unit-strength-a19-side-v4-w16-r4` candidate policy.
+Its native v0.9 profile was separately qualified on 1,512 fresh boards / 18,144 battles: **+1.76
+match-score points (+0.91 to +2.62)** overall, +2.78 for five points and +2.50 for six points;
+seven-point decisions reproduce the original policy. The secondary information ablation measured
+**+0.347 points (+0.025 to +0.694)** pooled. Individual doctrine information intervals cross zero.
+`native_qualification_20261105.json` preserves both comparisons and every paired board delta;
+`lockedDoctrineDraftNativeQualification()` validates it. The registered runner is
+`src/simulation/v0_9/doctrine_draft_native.ts`; its source commit and seed banks are recorded in
+`docs/evidence/v0_9_native_draft_registration_20261105.json`. Exclude these banks from future work too.
+
+The server persists each seat's consumed override atomically with an accepted bundle, creature pick,
+or collision reveal. Reuse that persisted state after retries/restarts. Refresh the pick between
+sequential bundle decisions so the next seat can use the first bundle only through its legal projection.
+Keep the 5/6/7 budget and visibility rules. This activation does not change `DEFAULT_AI_VERSION` or
+the native combat artifact. The original model's `productionPromotion: false` is historical fit
+metadata and must not be rewritten to express the separate runtime activation.
+
+The draft default is not a newly qualified combat model. Its original additional
 early-information gain was +0.42 points (0.00 to +0.84), so the original scouting-specific gate failed
 and its confirmation bank stays closed. Preserve that distinction in reports. The user's request
 explicitly authorizes these small versioned checkpoint fixtures; ordinary run output remains ignored.
@@ -29,11 +47,13 @@ The separate prospective overall-strength confirmation is registered in
 `docs/evidence/v0_9_locked_draft_overall_confirmation_20261105.json`. It compares the fixed V3
 checkpoint with the original policy on V4's fresh development bank; it does not reopen or alter
 the old failed scouting-specific experiment. The fresh overall result does not establish an incremental
-scouting benefit. Preserve both conclusions before any separately reviewed runtime integration.
+scouting benefit on A19. Preserve both historical conclusions alongside the separate native qualification.
 V4's complete seed registration is saved in `docs/evidence/v0_9_doctrine_draft_v4_registration_20261105.json`;
 exclude every bank, including its unopened confirmation bank, from future campaigns.
-The measured target is the ranked A19 stack (`a19-neural-r2-placement-v2`), not the literal server
-v0.9 native-combat profile. Preserve that scope; another runtime profile needs its own evaluation.
+The earlier target was ranked A19 (`a19-neural-r2-placement-v2`). The new native qualification uses
+`artifact-fit-v6:v07-nonfight-4eda84635fe7`, native v0.9 combat without search, and live sequential
+bundle commitments. Another profile still needs its own evaluation. New candidates must improve
+over this locked default on fresh boards; never overwrite its weights or change failed studies retroactively.
 
 ## Parallel agents / mainline workflow
 
