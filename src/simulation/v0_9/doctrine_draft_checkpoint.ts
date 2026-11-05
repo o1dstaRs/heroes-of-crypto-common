@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import savedModel from "./checkpoints/doctrine_draft_v3_20261104/model.json";
 import evidence from "./checkpoints/doctrine_draft_v3_20261104/evidence.json";
 import { predictDoctrineDraftGain, type IDoctrineDraftModel } from "./doctrine_draft_model";
+import { createDoctrineDraftResearchChoices, type IDoctrineDraftResearchPolicyOptions } from "./doctrine_draft_policy";
 import { fingerprintV09 } from "./protocol";
 
 export const LOCKED_DOCTRINE_DRAFT_CHECKPOINT_ID = "doctrine-draft-v3-20261104";
@@ -24,6 +25,10 @@ export function lockedDoctrineDraftModel(): IDoctrineDraftModel {
     Object.freeze(model.weights);
     Object.freeze(model.scales);
     return Object.freeze(model);
+}
+
+export function createLockedDoctrineDraftResearchChoices(options: IDoctrineDraftResearchPolicyOptions) {
+    return createDoctrineDraftResearchChoices(lockedDoctrineDraftModel(), options);
 }
 
 if (import.meta.main) {

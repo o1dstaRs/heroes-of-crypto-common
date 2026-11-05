@@ -18,6 +18,21 @@ overwrite an existing file. Use a new checkpoint identity for further improvemen
 including unused confirmation seeds, are exclusions for future campaigns. Do not reopen V3's failed
 campaign or describe the locked checkpoint as a replacement for the in-battle combat model.
 
+To reuse its actual choices in `playRankedDraftGame`, pass
+`createLockedDoctrineDraftResearchChoices({ doctrine, genome, synergyVariants })` as the
+`researchCandidateDraftChoices` dependency. Import the factory from `doctrine_draft_checkpoint.ts`
+and create a new instance for each draft seat/game. Keep that instance through collision retries:
+choosing an alternative consumes the single override even if the pick collides. The optional
+`maskAdvanceInformation` flag reproduces the information ablation; `onDecision` records the model's
+evaluated decisions. Regression fixtures reproduce 49 historical drafts, including a collided override.
+
+The measured target is `a19-neural-r2-placement-v2`, with draft policy
+`ranked-unit-strength-a19-side-v4-w16-r4` and setup `artifact-fit-v6:conditional-v1:sniper+t2a19`.
+Its battle controller is the current ranked A19 stack, routed through v0.8. The literal server v0.9
+profile uses a different setup policy and native combat path. This draft research is part of v0.9
+development, but its measured gain does not establish a gain for that different runtime profile.
+Changing the target profile requires a separately registered evaluation before promotion.
+
 The balanced population is an offline research option, `--doctrine-population balanced-doctrines-v1`.
 It does not change old campaign identities or install trained weights in the game.
 

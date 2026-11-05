@@ -10,6 +10,8 @@ The user requested preservation of the improved draft model for subsequent agent
 `doctrine-draft-v3-20261104` checkpoint, weights, seed registration, evaluation evidence and decision
 regressions live in `src/simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/`. Use
 `lockedDoctrineDraftModel()` from `src/simulation/v0_9/doctrine_draft_checkpoint.ts` to load it.
+Use `createLockedDoctrineDraftResearchChoices()` from that module to reproduce its draft behavior;
+create one instance per draft seat/game and retain it through collision retries.
 It gained 2.28 match-score percentage points over the original policy (95% interval +1.20 to +3.38).
 Keep it as a required comparison for further draft iterations; create a new checkpoint rather than
 overwriting or refitting this one. V4 training starts from its exact weights and compares against it.
@@ -23,6 +25,8 @@ The separate prospective overall-strength confirmation is registered in
 `docs/evidence/v0_9_locked_draft_overall_confirmation_20261105.json`. It compares the fixed V3
 checkpoint with the original policy on V4's fresh development bank; it does not reopen or alter
 the old failed scouting-specific experiment. Read its independently verified result before promoting.
+The measured target is the ranked A19 stack (`a19-neural-r2-placement-v2`), not the literal server
+v0.9 native-combat profile. Preserve that scope; another runtime profile needs its own evaluation.
 
 ## Parallel agents / mainline workflow
 
