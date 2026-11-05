@@ -130,6 +130,8 @@ interface IPortraitRecipe {
 export interface IRenderAiMetaReportOptions {
     /** heroes-of-crypto-client repository root. Auto-detected from this source file when omitted. */
     repositoryRoot?: string;
+    /** Canonical game icons, supplied explicitly or through HOC_IMAGES_LOC. */
+    imagesDirectory?: string;
     title?: string;
 }
 
@@ -475,23 +477,30 @@ const placeholderUri = (label: string): string => {
     return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 };
 
-const assetCandidates = (root: string, category: RankingCategory, token: string): string[] => {
+const assetCandidates = (
+    root: string,
+    category: RankingCategory,
+    token: string,
+    imagesDirectory?: string,
+): string[] => {
+    const gameImages = (names: string[]) => [
+        ...(imagesDirectory ? names.map((name) => resolve(root, imagesDirectory, `${name}.webp`)) : []),
+        ...names.map((name) => resolve(root, "game/core/images", `${name}.webp`)),
+    ];
     if (category === "units") {
-        return [
-            resolve(root, "site/public/assets/images/units/units", `${token}.webp`),
-            resolve(root, "game/core/images", `${token}.webp`),
-        ];
+        return [resolve(root, "site/public/assets/images/units/units", `${token}.webp`), ...gameImages([token])];
     }
     if (category === "artifactsT1" || category === "artifactsT2") {
+        const names = [
+            token,
+            token.replace(/^artifact_t([12])_/, (_, tier: string) => `artifact_t${tier === "1" ? "2" : "1"}_`),
+        ];
         return [
-            resolve(root, "site/public/assets/images/artifacts", `${token}.webp`),
-            resolve(root, "game/core/images", `${token}.webp`),
+            ...names.map((name) => resolve(root, "site/public/assets/images/artifacts", `${name}.webp`)),
+            ...gameImages(names),
         ];
     }
-    return [
-        resolve(root, "site/public/assets/images/units/abilities", `${token}.webp`),
-        resolve(root, "game/core/images", `${token}.webp`),
-    ];
+    return [resolve(root, "site/public/assets/images/units/abilities", `${token}.webp`), ...gameImages([token])];
 };
 
 const portraitFileName = (value: unknown): string | null =>
@@ -580,16 +589,18 @@ const embedUnitPortraits = (
 const embedReportImages = (
     root: string,
     rows: readonly INormalizedRow[],
+    imagesDirectory?: string,
 ): { assets: IEmbeddedAsset[]; portraits: Record<string, IEmbeddedPortrait> } => {
     const assets = new Map<string, string>();
     const portraits = embedUnitPortraits(root, rows, assets);
     for (const row of rows) {
         if (assets.has(row.imageId) || portraits[row.imageId]) continue;
-        const uri = firstDataUri(assetCandidates(root, row.category, row.imageId)) ?? placeholderUri(row.name);
+        const uri =
+            firstDataUri(assetCandidates(root, row.category, row.imageId, imagesDirectory)) ?? placeholderUri(row.name);
         assets.set(row.imageId, uri);
     }
     if (!assets.has("unknown_creature_512")) {
-        const fallback = firstDataUri(assetCandidates(root, "units", "unknown_creature_512"));
+        const fallback = firstDataUri(assetCandidates(root, "units", "unknown_creature_512", imagesDirectory));
         assets.set("unknown_creature_512", fallback ?? placeholderUri("Unknown"));
     }
     return { assets: [...assets.entries()].map(([id, uri]) => ({ id, uri })), portraits };
@@ -633,8 +644,7 @@ const formatDuration = (seconds: number | null): string => {
     return `${Math.floor(rounded / 3600)}h ${Math.floor((rounded % 3600) / 60)}m ${rounded % 60}s`;
 };
 
-/** Concurrent shard durations accumulate; only the run's elapsed interval measures wall time. */
-const renderExecutionTiming = (summary: UnknownRecord): string => {
+const executionTiming = (summary: UnknownRecord) => {
     const provenance = asRecord(summary.provenance);
     const sharding = asRecord(provenance.sharding);
     const timing = asRecord(provenance.timing);
@@ -648,6 +658,31 @@ const renderExecutionTiming = (summary: UnknownRecord): string => {
     );
     const measured = finiteNumber(timing, ["wallSeconds"]);
     const wallSeconds = measured ?? (Number.isFinite(start) && finish >= start ? (finish - start) / 1000 : null);
+    return { start, finish, wallSeconds };
+};
+
+const reportTimestamp = (timestamp: number): string => {
+    if (!Number.isFinite(timestamp)) return "Not reported";
+    const iso = new Date(timestamp).toISOString();
+    return `<time datetime="${iso}" title="${iso}" data-report-time>${iso.slice(0, 16).replace("T", " ")} UTC</time>`;
+};
+
+const renderRunMetadata = (summary: UnknownRecord): string => {
+    const { start, finish, wallSeconds } = executionTiming(summary);
+    return `<dl class="run-meta" aria-label="Run dates and duration">
+      <div><dt>Started</dt><dd>${reportTimestamp(start)}</dd></div>
+      <div><dt>Finished</dt><dd>${reportTimestamp(finish)}</dd></div>
+      <div><dt>Elapsed wall time</dt><dd>${formatDuration(wallSeconds)}</dd></div>
+      <div><dt>Report generated</dt><dd>${reportTimestamp(Date.parse(textValue(summary, ["generatedAt"])))}</dd></div>
+    </dl>`;
+};
+
+/** Concurrent shard durations accumulate; only the run's elapsed interval measures wall time. */
+const renderExecutionTiming = (summary: UnknownRecord): string => {
+    const provenance = asRecord(summary.provenance);
+    const sharding = asRecord(provenance.sharding);
+    const timing = asRecord(provenance.timing);
+    const { wallSeconds } = executionTiming(summary);
     if (wallSeconds === null || wallSeconds < 0) return "";
     const cohorts = Array.isArray(summary.cohorts) ? summary.cohorts.map(asRecord) : [];
     const details = Array.isArray(timing.cohorts) ? timing.cohorts.map(asRecord) : [];
@@ -707,7 +742,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
     const interactions = normalizeUnitInteractions(summary);
     const cohorts = normalizeCohorts(summary, rows);
     const root = options.repositoryRoot ? resolve(options.repositoryRoot) : DEFAULT_REPOSITORY_ROOT;
-    const { assets, portraits } = embedReportImages(root, rows);
+    const { assets, portraits } = embedReportImages(root, rows, options.imagesDirectory ?? process.env.HOC_IMAGES_LOC);
     const assetMap = Object.fromEntries(assets.map((asset) => [asset.id, asset.uri]));
     const logo =
         firstDataUri([resolve(root, "game/core/images/logo_hoc.webp")]) ??
@@ -721,6 +756,14 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
     const schemaVersion = textValue(summary, ["schemaVersion"], "unknown");
     const provenanceRecord = asRecord(summary.provenance);
     const fightVersion = textValue(provenanceRecord, ["fightVersion", "aiVersion"], "unknown");
+    const fightProfile = asRecord(provenanceRecord.fightProfile);
+    const candidateId = textValue(fightProfile, ["candidateId"]);
+    const fightIdentity = candidateId ? `${fightVersion} + ${candidateId.toUpperCase()}` : fightVersion;
+    const horizon = finiteNumber(searchProfile, ["horizon"]);
+    const rollouts = finiteNumber(searchProfile, ["rollouts"]);
+    const searchIdentity = [horizon === null ? "" : `H${horizon}`, rollouts === null ? "" : `R${rollouts}`]
+        .filter(Boolean)
+        .join(" / ");
     const generatedAt = textValue(summary, ["generatedAt"], "Not reported");
     const totalGames = cohorts.reduce((sum, cohort) => sum + (cohort.games ?? 0), 0);
     const partialRun = summary.complete !== undefined && summary.complete !== true;
@@ -813,23 +856,33 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
 ::selection{background:rgba(220,177,88,.28);color:#fff}
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 .shell{width:min(1720px,calc(100vw - 64px))}
-.hero{min-height:430px;border-bottom-color:rgba(205,160,120,.38);background:radial-gradient(circle at 76% 14%,rgba(220,177,88,.17),transparent 35%),radial-gradient(circle at 25% 0%,rgba(255,90,63,.09),transparent 32%),#0b0704}
+.hero{min-height:0;border-bottom-color:rgba(205,160,120,.38);background:radial-gradient(circle at 76% 14%,rgba(220,177,88,.17),transparent 35%),radial-gradient(circle at 25% 0%,rgba(255,90,63,.09),transparent 32%),#0b0704}
 .hero::before{background-image:linear-gradient(90deg,rgba(7,5,4,.98) 0%,rgba(7,5,4,.8) 44%,rgba(7,5,4,.34)),linear-gradient(180deg,transparent 42%,#070504),var(--hero-image);opacity:.76}
-.hero-inner{gap:56px;padding:76px 0 82px}
-.brand{margin-bottom:38px;color:var(--gold);font-size:.72rem;letter-spacing:.18em}
-.brand img{width:60px;height:60px}
+.hero-inner{grid-template-columns:minmax(0,1fr) 260px;gap:24px;align-items:center;padding:24px 0 26px}
+.brand{gap:10px;margin-bottom:14px;color:var(--gold);font-size:.66rem;letter-spacing:.14em}
+.brand img{width:32px;height:32px}
+.hero .eyebrow{display:none}
 .eyebrow{color:var(--gold);letter-spacing:.16em}
 .hero h1,.section-head h2{font-family:Georgia,"Times New Roman",serif;font-weight:700;letter-spacing:.035em;text-shadow:0 .08em .13em rgba(0,0,0,.74),0 -.02em 0 rgba(255,229,177,.13)}
-.hero h1{max-width:980px;color:var(--gold2);font-size:clamp(3rem,5.2vw,6.15rem);line-height:.98}
-.subtitle{max-width:820px;color:rgba(239,228,204,.72);font-size:clamp(1rem,1.35vw,1.22rem)}
+.hero h1{max-width:980px;margin-bottom:10px;color:var(--gold2);font-size:clamp(1.8rem,3vw,2.65rem);line-height:1.08;letter-spacing:.015em}
+.subtitle{max-width:820px;color:rgba(239,228,204,.72);font-size:.88rem;line-height:1.5}
+.run-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0 0;font-size:.72rem}
+.run-meta dt{margin-bottom:4px;color:var(--muted2);font-size:.6rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.run-meta dd{margin:0;color:var(--gold2);font-variant-numeric:tabular-nums}
+.run-meta time{display:block}
 .hero-stats{width:min(430px,100%);gap:12px}
 .hero-stat{border-color:rgba(205,160,120,.46);border-radius:10px;background:linear-gradient(145deg,rgba(48,32,20,.82),rgba(11,7,4,.82));box-shadow:inset 0 1px rgba(255,232,189,.08),0 18px 42px rgba(0,0,0,.22)}
 .hero-stat strong{color:var(--gold2);font-family:Georgia,"Times New Roman",serif;font-size:1.8rem}
 .hero-stat span{color:rgba(239,228,204,.58)}
+.hero .hero-stats{width:100%;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.hero .hero-stat{padding:12px}
+.hero .hero-stat strong{font-size:1.15rem;overflow-wrap:anywhere}
+.hero .hero-stat span{font-size:.58rem}
 .report-main{padding:36px 0 92px}
 .notice{border-color:rgba(205,160,120,.36);border-left-color:var(--gold);border-radius:10px;background:linear-gradient(90deg,rgba(220,177,88,.13),rgba(22,14,8,.92) 58%);box-shadow:0 16px 36px rgba(0,0,0,.17)}
-.sticky-filter{top:12px;margin:0 0 42px;padding:13px 15px 14px;border:1px solid rgba(205,160,120,.44);border-radius:12px;background:linear-gradient(145deg,rgba(33,21,12,.96),rgba(12,7,4,.95));box-shadow:0 18px 44px rgba(0,0,0,.38),inset 0 1px rgba(255,231,185,.08)}
-.command-deck{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;padding-bottom:12px}
+.sticky-filter{top:8px;margin:0 0 28px;padding:9px 12px 10px;border:1px solid rgba(205,160,120,.44);border-radius:12px;background:linear-gradient(145deg,rgba(33,21,12,.96),rgba(12,7,4,.95));box-shadow:0 18px 44px rgba(0,0,0,.38),inset 0 1px rgba(255,231,185,.08)}
+.cohort-tabs{flex:1 1 auto;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
+.command-deck{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;padding-bottom:8px}
 .command-deck-label{display:flex;align-items:center;gap:10px;color:var(--muted2);font-size:.67rem;font-weight:850;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
 .command-deck-label a{padding:5px 8px;border:1px solid rgba(205,160,120,.34);border-radius:999px;color:var(--gold);font-size:.64rem;letter-spacing:.08em;text-decoration:none;transition:border-color .16s ease,background .16s ease,color .16s ease}
 .command-deck-label a:hover{border-color:rgba(220,177,88,.7);background:rgba(220,177,88,.12);color:var(--gold2)}
@@ -839,7 +892,7 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
 .report-jump{flex:0 0 auto;padding:8px 12px;border:1px solid rgba(205,160,120,.24);border-radius:999px;background:rgba(8,5,3,.48);color:var(--muted);font-size:.71rem;font-weight:800;letter-spacing:.04em;text-decoration:none;transition:transform .16s ease,border-color .16s ease,background .16s ease,color .16s ease}
 .report-jump:hover{border-color:rgba(220,177,88,.62);background:rgba(220,177,88,.1);color:var(--gold2);transform:translateY(-1px)}
 .report-jump.active,.report-jump[aria-current="true"]{border-color:rgba(220,177,88,.78);background:linear-gradient(145deg,rgba(220,177,88,.24),rgba(127,78,30,.15));color:var(--gold2);box-shadow:inset 0 1px rgba(255,236,194,.13)}
-.filter-row{padding-top:12px;border-top:1px solid rgba(205,160,120,.24)}
+.filter-row{padding-top:8px;border-top:1px solid rgba(205,160,120,.24)}
 .cohort-tab{border-color:rgba(205,160,120,.34);background:rgba(8,5,3,.62);color:var(--muted);transition:border-color .16s ease,background .16s ease,color .16s ease}
 .cohort-tab:hover{border-color:rgba(220,177,88,.66);color:var(--gold2)}
 .cohort-tab.active{border-color:rgba(220,177,88,.76);background:rgba(220,177,88,.14);color:var(--gold2)}
@@ -878,7 +931,8 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
 .provenance-row{border-bottom-color:rgba(205,160,120,.16)}.cohort-note{border-left-color:rgba(220,177,88,.72);background:rgba(220,177,88,.055)}.footer{border-top-color:rgba(205,160,120,.28);color:var(--muted2)}
 @media(max-width:1420px){.leaders{grid-template-columns:repeat(4,minmax(0,1fr))}.leader-art{height:clamp(210px,19vw,292px)}}
 @media(max-width:1040px){.shell{width:min(100% - 40px,1320px)}.hero-inner{gap:30px}.leaders{grid-template-columns:repeat(3,minmax(0,1fr))}.forest-row{grid-template-columns:minmax(160px,205px) minmax(130px,1fr) 66px}}
-@media(max-width:720px){.shell{width:min(100% - 24px,1320px)}.hero{min-height:0}.hero-inner{padding:46px 0 58px}.hero h1{font-size:clamp(2.5rem,12vw,4.4rem)}.command-deck{grid-template-columns:1fr}.command-deck-label{justify-content:space-between}.sticky-filter{top:6px;margin-bottom:30px;padding:11px}.filter-row{padding-top:10px}.leaders{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.leader-art{height:clamp(188px,38vw,248px)}.leader-copy{padding:0 14px 16px}.forest-row{grid-template-columns:minmax(128px,160px) minmax(100px,1fr) 54px}.forest-label{grid-template-columns:36px minmax(0,1fr);gap:8px}.forest-label img{width:36px;height:36px}.section-head{margin-top:42px}.report-main section{scroll-margin-top:214px}}
+@media(max-width:1100px){.cohort-tabs{flex:1 1 100%}.cohort-tab{padding:7px 10px}.map-filter{min-height:34px;padding-top:5px;padding-bottom:5px}.run-meta{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.shell{width:min(100% - 24px,1320px)}.hero-inner{grid-template-columns:1fr;gap:16px;padding:18px 0 20px}.brand{margin-bottom:12px;font-size:.59rem}.brand img{width:28px;height:28px}.hero h1{font-size:1.8rem}.subtitle{font-size:.8rem}.run-meta{gap:10px 14px;margin-top:14px;font-size:.7rem}.hero .hero-stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.hero .hero-stat{padding:9px 7px}.hero .hero-stat strong{font-size:.9rem}.hero .hero-stat span{font-size:.5rem;letter-spacing:.04em}.command-deck{grid-template-columns:auto minmax(0,1fr);gap:8px;padding-bottom:6px}.command-deck-label>span{display:none}.report-jump{padding:6px 8px;font-size:.66rem}.sticky-filter{top:4px;margin-bottom:24px;padding:8px}.filter-row{gap:8px;padding-top:7px}.cohort-tab{padding:7px 10px;font-size:.7rem}.map-filter{min-height:32px;padding-top:5px;padding-bottom:5px}.leaders{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.leader-art{height:clamp(188px,38vw,248px)}.leader-copy{padding:0 14px 16px}.forest-row{grid-template-columns:minmax(128px,160px) minmax(100px,1fr) 54px}.forest-label{grid-template-columns:36px minmax(0,1fr);gap:8px}.forest-label img{width:36px;height:36px}.section-head{margin-top:42px}.report-main section{scroll-margin-top:164px}}
 @media(max-width:460px){.leaders{grid-template-columns:1fr}.leader-art{height:235px}.forest-row{grid-template-columns:112px minmax(90px,1fr) 49px}.forest-label{grid-template-columns:29px minmax(0,1fr)}.forest-label img{width:29px;height:29px}.hero-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.leader,.leader-art img,.report-jump{transition:none}.leader:hover,.report-jump:hover{transform:none}}
 @media print{.sticky-filter{display:none}.report-main section{scroll-margin-top:0}}
@@ -905,9 +959,10 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
       <p class="eyebrow">Non-mirrored cohort analysis</p>
       <h1>${escapeHtml(title)}</h1>
       <p class="subtitle">Units, exact active synergies, artifacts, and augment loadouts ranked by draw-aware score rate—with uncertainty and selection frequency kept visible.</p>
+      ${renderRunMetadata(summary)}
     </div>
     <div class="hero-stats" aria-label="Report summary">
-      <div class="hero-stat"><strong>${escapeHtml(fightVersion)}</strong><span>Fight AI</span></div>
+      <div class="hero-stat"><strong>${escapeHtml(fightIdentity)}</strong><span>Fight AI${searchIdentity ? `<br>${escapeHtml(searchIdentity)} search` : ""}</span></div>
       <div class="hero-stat"><strong>${formatInteger(cohorts.length)}</strong><span>Cohorts</span></div>
       <div class="hero-stat"><strong>${formatInteger(rows.length)}</strong><span>Ranking rows</span></div>
       <div class="hero-stat"><strong>${totalGames ? formatInteger(totalGames) : "—"}</strong><span>Reported games</span></div>
@@ -1001,6 +1056,7 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
 "use strict";
 var dataNode=document.getElementById("report-data");
 var DATA=JSON.parse(dataNode&&dataNode.textContent?dataNode.textContent:"{}");
+document.querySelectorAll("[data-report-time]").forEach(function(element){try{var date=new Date(element.getAttribute("datetime"));if(Number.isFinite(date.getTime()))element.textContent=new Intl.DateTimeFormat(undefined,{year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit",timeZoneName:"short"}).format(date)}catch(error){}});
 var rows=Array.isArray(DATA.rows)?DATA.rows:[];
 var categories=Array.isArray(DATA.categories)?DATA.categories:[];
 var cohorts=Array.isArray(DATA.cohorts)?DATA.cohorts:[];

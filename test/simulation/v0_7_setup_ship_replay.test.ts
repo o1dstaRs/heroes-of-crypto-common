@@ -170,7 +170,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // The 12 HP control reproduces the previous digest. Two isolated 11 HP runs agree with zero rejected
 // actions; only the pair at seed 2147598935 changes.
 // Previous digest: b41a67d7a59270b3fd6054d08db2cca146ec58623638a2a9fe93a00f6c26e321.
-const EXPECTED_REPLAY_SHA256 = "38bdbe1d4e533c937285d6abd9abd3cc0ea66d89a6b0b8200c7d0ed6d96680e2";
+// Re-pinned 2026-11-05 for Abomination armor 45 -> 47, Healer 12 -> 13 and Blacksmith 10 -> 11.
+// An in-memory old-armor control reproduces the previous digest; two new-armor runs agree with zero
+// rejected actions across all eight fights. The Battle Mage health change above remains included.
+// Previous digest: 38bdbe1d4e533c937285d6abd9abd3cc0ea66d89a6b0b8200c7d0ed6d96680e2.
+const EXPECTED_REPLAY_SHA256 = "a0402edc4096ef6abcb089494176996c3970d99934c70d6f1fb0719b2a8afacf";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

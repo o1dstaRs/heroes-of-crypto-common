@@ -55,7 +55,7 @@ export enum Tier2Artifact {
     CLOVER_OF_FORTUNE = 4, // +10 luck
     CROWN_OF_COMMAND = 5, // +1 movement, +8 morale, and +1 armor (all)
     GIANTS_MAUL = 6, // +50% non-magical (physical) AOE damage, resisted by status resistance
-    PENDANT_OF_VITALITY = 7, // +25% HP (all) / -20% attack
+    PENDANT_OF_VITALITY = 7, // +22% HP (all) / -11% attack
     FARSIGHT_QUIVER = 8, // allied archers ignore range falloff (always 1/1); a shot through smoke is still 1/2
     BERSERKERS_BOND = 9, // +3 attack / -1 defense (flat)
     // Retired from the live Tier-2 pool (2026-10-14). New drafts pick Tier1Artifact.TOME_OF_AMPLIFICATION.
@@ -138,8 +138,8 @@ export const ARTIFACT_POWER = {
     IRON_PLATE_FLAT: 1,
     BERSERKERS_BOND_ATTACK: 3,
     BERSERKERS_BOND_DEFENSE_PENALTY: 1,
-    PENDANT_HP_PERCENT: 25,
-    PENDANT_ATTACK_PENALTY_PERCENT: 12.5,
+    PENDANT_HP_PERCENT: 22,
+    PENDANT_ATTACK_PENALTY_PERCENT: 11,
     CURSED_WARD_LUCK: 3,
     CURSED_WARD_MORALE_PENALTY: 6,
     CLOVER_LUCK: 10,
