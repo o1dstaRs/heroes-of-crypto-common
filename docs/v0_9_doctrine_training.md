@@ -188,3 +188,30 @@ switch margin, one-override limit and both paired evaluation gates. Its prospect
 and 1,512 sealed confirmation boards. New seeds exclude all earlier banks, including their unused
 confirmation seeds. All training outcomes are collected afresh. Unit identity effects can improve
 overall play, but only the matched information ablation can establish an additional scouting gain.
+
+V3 completed on source `d4f095c499c5cd8068ffbc8a1632f23b87d13f70`. Its 3,240 training boards
+contained 25,920 battles and supplied 4,320 paired examples. The 2,000 Adam steps reduced training
+squared error from 0.16622 to 0.15615. Its fresh 1,080-board development bank contained 12,960
+battles across the three conditions, with all 27 population cells balanced:
+
+| Candidate doctrine      | Learned minus current, pp (95% interval) | Learned minus masked, pp (95% interval) |
+| ----------------------- | ---------------------------------------: | --------------------------------------: |
+| Spymaster, 5 points     |                   +5.21 (+2.74 to +7.64) |                  +0.31 (−0.73 to +1.42) |
+| Scout, 6 points         |                   +1.63 (−0.56 to +3.85) |                  +0.94 (+0.28 to +1.70) |
+| Battle Trance, 7 points |                      0.00 (0.00 to 0.00) |                     0.00 (0.00 to 0.00) |
+| Equal mixture           |                   +2.28 (+1.20 to +3.38) |                   +0.42 (0.00 to +0.84) |
+
+Scores count a win as one, a draw as one-half, and a loss as zero. These are paired match-score
+percentage-point changes, not comparisons of the doctrines' raw win rates. The information-specific
+pooled lower bound is exactly zero before rounding. This misses the registered requirement that it
+be strictly positive, despite the improvement over current behavior and the positive Scout result.
+The 1,512-board confirmation bank remains unopened; the model is not promoted.
+
+Independent Python verification recomputed every paired training outcome and reproduced all 2,000
+optimizer steps with zero weight error, the exact final loss, and every evaluation mean and interval.
+All actual 5/6/7 point budgets passed the setup audit, there were zero rejected actions, and seven-point
+games reproduced both controls exactly. This experiment trained the scouting draft head; it did not
+replace the shipped combat correction. No failed teacher or evaluation example supplied training labels.
+
+Model SHA-256: `2736ce8d7917e12c5078b8cae0b51f49c2e20496b2ce181bf9995e04ef65ec7a`.
+Registration SHA-256: `5ca7c3e0ef303533e6d0d8e14797e3e2fc756f4ae6ea9312e8332f61d112cf7a`.
