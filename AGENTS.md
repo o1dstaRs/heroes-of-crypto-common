@@ -19,6 +19,10 @@ early-information gain was +0.42 points (0.00 to +0.84), so the original scoutin
 and its confirmation bank stays closed. Preserve that distinction in reports. The user's request
 explicitly authorizes these small versioned checkpoint fixtures; ordinary run output remains ignored.
 See `docs/v0_9_doctrine_training.md` for the protocol, results and continuation requirements.
+The separate prospective overall-strength confirmation is registered in
+`docs/evidence/v0_9_locked_draft_overall_confirmation_20261105.json`. It compares the fixed V3
+checkpoint with the original policy on V4's fresh development bank; it does not reopen or alter
+the old failed scouting-specific experiment. Read its independently verified result before promoting.
 
 ## Parallel agents / mainline workflow
 

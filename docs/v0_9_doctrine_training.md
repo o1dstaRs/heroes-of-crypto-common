@@ -256,3 +256,22 @@ and 24,192 battles. Both stages require a strictly positive pooled lower 95% bou
 controls and nonnegative point estimates for every doctrine against every control. The original
 one-override limit, 0.02 switch margin, legal-information projection and seven-point exact control
 remain unchanged. Passing development permits independent confirmation, not automatic deployment.
+
+### Independent overall confirmation of the locked V3 model
+
+The saved model's overall improvement is also being confirmed under a separate, prospective protocol:
+`docs/evidence/v0_9_locked_draft_overall_confirmation_20261105.json`. Its fixed V3 weights and the
+original policy play the 1,080 fresh boards reserved for V4 development, giving 4,320 battles per
+condition. Those boards are independent confirmation for the already-frozen V3 model; they remain
+development data for V4. The registration was recorded before either evaluation condition was run.
+
+This overall-strength check requires a strictly positive pooled lower 95% bound, nonnegative gains
+for every doctrine, the exact seven-point control, all actual budgets and zero rejected actions.
+It uses the same 10,000 whole-board bootstrap resamples across the 27 population cells. The old V3
+scouting-specific gate remains failed and its reserved confirmation bank remains closed. An overall
+pass would support integrating the saved draft improvement; it would not establish the separate
+claim about the incremental benefit of early information. Independent verification precedes any
+integration, and the test never automatically deploys a model.
+
+Overall-confirmation registration SHA-256:
+`f1d4be4b0ce87cf13724db8d60b866d1b35a194441b78b231398e2d7a27c931c`.
