@@ -3,12 +3,15 @@ import { parseArgs } from "node:util";
 
 import savedModel from "./checkpoints/doctrine_draft_v3_20261104/model.json";
 import evidence from "./checkpoints/doctrine_draft_v3_20261104/evidence.json";
+import savedOverallConfirmation from "./checkpoints/doctrine_draft_v3_20261104/overall_confirmation_20261105.json";
 import { predictDoctrineDraftGain, type IDoctrineDraftModel } from "./doctrine_draft_model";
 import { createDoctrineDraftResearchChoices, type IDoctrineDraftResearchPolicyOptions } from "./doctrine_draft_policy";
 import { fingerprintV09 } from "./protocol";
 
 export const LOCKED_DOCTRINE_DRAFT_CHECKPOINT_ID = "doctrine-draft-v3-20261104";
 export const LOCKED_DOCTRINE_DRAFT_MODEL_SHA256 = "2736ce8d7917e12c5078b8cae0b51f49c2e20496b2ce181bf9995e04ef65ec7a";
+export const LOCKED_DOCTRINE_DRAFT_CONFIRMATION_SHA256 =
+    "4f23800c0742df4785b412cfc402f5ae6a39391e8dfb58bd9ed7f42786c9f354";
 
 /** Immutable research benchmark; its original scouting-specific promotion gate did not pass. */
 export function lockedDoctrineDraftModel(): IDoctrineDraftModel {
@@ -31,17 +34,38 @@ export function createLockedDoctrineDraftResearchChoices(options: IDoctrineDraft
     return createDoctrineDraftResearchChoices(lockedDoctrineDraftModel(), options);
 }
 
+/** Separate fresh overall-strength evidence; the original scouting study remains unchanged. */
+export function lockedDoctrineDraftOverallConfirmation() {
+    const { sha256, ...body } = savedOverallConfirmation;
+    if (
+        sha256 !== LOCKED_DOCTRINE_DRAFT_CONFIRMATION_SHA256 ||
+        fingerprintV09(body) !== sha256 ||
+        body.checkpointId !== LOCKED_DOCTRINE_DRAFT_CHECKPOINT_ID ||
+        body.result.modelSha256 !== LOCKED_DOCTRINE_DRAFT_MODEL_SHA256 ||
+        !body.result.passed ||
+        !body.independentVerification.verified ||
+        body.productionPromotion !== false
+    )
+        throw new Error("Locked doctrine draft overall confirmation changed");
+    return structuredClone(savedOverallConfirmation);
+}
+
 if (import.meta.main) {
     const args = parseArgs({ options: { out: { type: "string" } } }).values;
     const model = lockedDoctrineDraftModel();
+    const confirmation = lockedDoctrineDraftOverallConfirmation();
     if (args.out) writeFileSync(args.out, JSON.stringify(model) + "\n", { flag: "wx" });
     console.log(
         JSON.stringify({
             checkpoint: LOCKED_DOCTRINE_DRAFT_CHECKPOINT_ID,
             modelSha256: LOCKED_DOCTRINE_DRAFT_MODEL_SHA256,
-            status: evidence.status,
-            comparisons: evidence.development.comparisons,
-            confirmationOpened: false,
+            status: "locked-overall-confirmed-research-benchmark",
+            originalStudyStatus: evidence.status,
+            originalDevelopmentComparisons: evidence.development.comparisons,
+            originalScoutingConfirmationOpened: false,
+            overallStrengthConfirmation: confirmation.result,
+            confirmationEvidenceSha256: confirmation.sha256,
+            measuredProfile: confirmation.profile,
             productionPromotion: false,
             ...(args.out ? { exportedTo: args.out } : {}),
         }),

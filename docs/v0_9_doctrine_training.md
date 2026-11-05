@@ -3,8 +3,9 @@
 The user-locked improvement benchmark is **`doctrine-draft-v3-20261104`**. Its exact trained weights,
 registration, independently verified results and decision regressions are versioned in
 `src/simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/`. Subsequent draft candidates must be
-compared against it as well as the original policy. It remains a development benchmark: locking it
-preserves its overall gain without changing the outcome of its original scouting-specific gate.
+compared against it as well as the original policy. Its overall draft gain now has fresh independent
+confirmation: **+3.34 match-score percentage points (95% interval +2.20 to +4.49)**. The original
+scouting-specific gate remains failed. V4 did not improve over this checkpoint and is not promoted.
 
 From the common package, inspect it or export the exact model to a new file:
 
@@ -13,7 +14,7 @@ bun src/simulation/v0_9/doctrine_draft_checkpoint.ts
 bun src/simulation/v0_9/doctrine_draft_checkpoint.ts --out /tmp/hoc-doctrine-v3-model.json
 ```
 
-The loader verifies the canonical model hash and freezes the returned model. Export refuses to
+The CLI reports the original study and the separate overall confirmation. The loader verifies the canonical model hash and freezes the returned model. Export refuses to
 overwrite an existing file. Use a new checkpoint identity for further improvements. Saved seed banks,
 including unused confirmation seeds, are exclusions for future campaigns. Do not reopen V3's failed
 campaign or describe the locked checkpoint as a replacement for the in-battle combat model.
@@ -272,9 +273,33 @@ controls and nonnegative point estimates for every doctrine against every contro
 one-override limit, 0.02 switch margin, legal-information projection and seven-point exact control
 remain unchanged. Passing development permits independent confirmation, not automatic deployment.
 
+V4 completed on source `dc55e9f6e4b486b7fd249913127ac973b2783b0c`. Its 2,000 optimizer steps
+reduced training squared error from 0.15840 at the V3 warm start to 0.15411. Independent Python code
+recomputed all 8,640 paired labels and reproduced every fitted weight and the final loss exactly.
+Its 1,080 fresh development boards contained 17,280 battles across the four conditions:
+
+| Candidate doctrine      | V4 minus original, pp (95% interval) | V4 minus locked V3, pp (95% interval) | V4 minus masked, pp (95% interval) |
+| ----------------------- | -----------------------------------: | ------------------------------------: | ---------------------------------: |
+| Spymaster, 5 points     |               +4.20 (+1.74 to +6.74) |                −1.42 (−3.47 to +0.56) |             +0.31 (−1.56 to +2.08) |
+| Scout, 6 points         |               +3.99 (+1.46 to +6.56) |                −0.42 (−2.29 to +1.46) |             −0.07 (−0.90 to +0.76) |
+| Battle Trance, 7 points |                  0.00 (0.00 to 0.00) |                   0.00 (0.00 to 0.00) |                0.00 (0.00 to 0.00) |
+| Equal mixture           |               +2.73 (+1.54 to +3.90) |                −0.61 (−1.55 to +0.31) |             +0.08 (−0.59 to +0.75) |
+
+This failed the registered gate. The more detailed representation and lower training loss did not
+establish an improvement over V3 or an incremental scouting gain. V3 remains the required benchmark;
+V4's 1,512 confirmation boards stay unopened. Independent verification reproduced all means and
+intervals. Every actual doctrine budget passed, there were zero rejected actions, and all seven-point
+game records matched exactly. The model and combat profile were not promoted.
+
+Model SHA-256: `ffe5c25c81ed3889bf23ff04922079b7e4186dbb89628cc332ad56c9bbe3bd7f`.
+The preserved [V4 registration](evidence/v0_9_doctrine_draft_v4_registration_20261105.json) has SHA-256
+`89e75d2cac0aa8cf0407264b219e96633bc6fed7d7b2614fc198b4a3683de845`. Exclude all its seed banks from
+later campaigns, including the unused confirmation seeds. Full run artifacts remain outside Git under
+the client workspace's `game/core/tmp/v09-doctrine-draft-v4-20261105/`.
+
 ### Independent overall confirmation of the locked V3 model
 
-The saved model's overall improvement is also being confirmed under a separate, prospective protocol:
+The saved model's overall improvement was confirmed under a separate, prospective protocol:
 `docs/evidence/v0_9_locked_draft_overall_confirmation_20261105.json`. Its fixed V3 weights and the
 original policy play the 1,080 fresh boards reserved for V4 development, giving 4,320 battles per
 condition. Those boards are independent confirmation for the already-frozen V3 model; they remain
@@ -284,9 +309,32 @@ This overall-strength check requires a strictly positive pooled lower 95% bound,
 for every doctrine, the exact seven-point control, all actual budgets and zero rejected actions.
 It uses the same 10,000 whole-board bootstrap resamples across the 27 population cells. The old V3
 scouting-specific gate remains failed and its reserved confirmation bank remains closed. An overall
-pass would support integrating the saved draft improvement; it would not establish the separate
-claim about the incremental benefit of early information. Independent verification precedes any
-integration, and the test never automatically deploys a model.
+pass supports the saved draft improvement in the measured A19 profile; it does not establish the separate
+claim about the incremental benefit of early information. The test never automatically deploys a model.
 
 Overall-confirmation registration SHA-256:
 `f1d4be4b0ce87cf13724db8d60b866d1b35a194441b78b231398e2d7a27c931c`.
+
+The fresh confirmation passed on the registered 1,080 boards and 4,320 battles per condition:
+
+| Candidate doctrine      | Locked V3 minus original, pp | Paired board 95% interval |
+| ----------------------- | ---------------------------: | ------------------------: |
+| Spymaster, 5 points     |                        +5.63 |            +3.26 to +8.06 |
+| Scout, 6 points         |                        +4.41 |            +1.94 to +6.88 |
+| Battle Trance, 7 points |                         0.00 |              0.00 to 0.00 |
+| Equal mixture           |                        +3.34 |            +2.20 to +4.49 |
+
+Independent Python verification reproduced every mean and interval. All 27 population cells were
+balanced, the scenario seeds and seats matched, all real doctrine budgets passed, and there were zero
+rejected actions. The seven-point games matched exactly. These are confirmation results for the fixed
+V3 model and development results for V4; they are not two independent evaluation banks.
+
+The separate [confirmation fixture](../src/simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/overall_confirmation_20261105.json)
+preserves the result, independent verification, source/profile identity, raw-board manifest hash and
+all paired board scores in eighth-point units. Its regression test replays every reported interval.
+Use `lockedDoctrineDraftOverallConfirmation()` from `doctrine_draft_checkpoint.ts` to load a validated
+copy. Fixture SHA-256: `4f23800c0742df4785b412cfc402f5ae6a39391e8dfb58bd9ed7f42786c9f354`.
+The original V3 weights, registration and evidence remain unchanged, including the failed
+scouting-specific gate and closed original confirmation bank. Runtime integration still needs to
+preserve the measured profile and draft retry state; these results do not validate the different
+literal v0.9 native-combat profile.

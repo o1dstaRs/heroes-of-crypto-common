@@ -12,11 +12,15 @@ regressions live in `src/simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/
 `lockedDoctrineDraftModel()` from `src/simulation/v0_9/doctrine_draft_checkpoint.ts` to load it.
 Use `createLockedDoctrineDraftResearchChoices()` from that module to reproduce its draft behavior;
 create one instance per draft seat/game and retain it through collision retries.
-It gained 2.28 match-score percentage points over the original policy (95% interval +1.20 to +3.38).
-Keep it as a required comparison for further draft iterations; create a new checkpoint rather than
-overwriting or refitting this one. V4 training starts from its exact weights and compares against it.
+Its initial development gain was 2.28 match-score percentage points over the original policy
+(95% interval +1.20 to +3.38). Fresh, prospectively registered overall confirmation passed at
+**+3.34 points (+2.20 to +4.49)**, with positive intervals for both five- and six-point doctrines.
+The separate `overall_confirmation_20261105.json` fixture preserves that result, independent
+verification and all 1,080 paired board scores; `lockedDoctrineDraftOverallConfirmation()` validates
+and loads it. Keep V3 as a required comparison for further draft iterations; create a new checkpoint
+rather than overwriting or refitting it. The V4 continuation failed to improve over V3 and is not promoted.
 
-This is a locked development benchmark, not a production-qualified combat model. Its additional
+This is a locked research benchmark with confirmed overall draft strength, not a production-qualified combat model. Its original additional
 early-information gain was +0.42 points (0.00 to +0.84), so the original scouting-specific gate failed
 and its confirmation bank stays closed. Preserve that distinction in reports. The user's request
 explicitly authorizes these small versioned checkpoint fixtures; ordinary run output remains ignored.
@@ -24,7 +28,10 @@ See `docs/v0_9_doctrine_training.md` for the protocol, results and continuation 
 The separate prospective overall-strength confirmation is registered in
 `docs/evidence/v0_9_locked_draft_overall_confirmation_20261105.json`. It compares the fixed V3
 checkpoint with the original policy on V4's fresh development bank; it does not reopen or alter
-the old failed scouting-specific experiment. Read its independently verified result before promoting.
+the old failed scouting-specific experiment. The fresh overall result does not establish an incremental
+scouting benefit. Preserve both conclusions before any separately reviewed runtime integration.
+V4's complete seed registration is saved in `docs/evidence/v0_9_doctrine_draft_v4_registration_20261105.json`;
+exclude every bank, including its unopened confirmation bank, from future campaigns.
 The measured target is the ranked A19 stack (`a19-neural-r2-placement-v2`), not the literal server
 v0.9 native-combat profile. Preserve that scope; another runtime profile needs its own evaluation.
 
