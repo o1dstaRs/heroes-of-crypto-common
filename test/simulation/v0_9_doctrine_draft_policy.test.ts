@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import { isRankedDraftStrengthPolicy } from "../../src/ai/setup/draft_strength_prior";
+import { Doctrine } from "../../src/doctrines/doctrine_properties";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { IMatchConfig, IMatchResult } from "../../src/simulation/battle_engine";
 import {
     playRankedDraftGame,
     rankedDraftStrengthCandidate,
     permuteRankedDraftSeed,
+    resolveRankedDraftPick,
     type IRankedDraftResearchContext,
 } from "../../src/simulation/ranked_draft_eval";
 import { createLockedDoctrineDraftResearchChoices } from "../../src/simulation/v0_9/doctrine_draft_checkpoint";
@@ -44,6 +47,38 @@ const skippedFight = (config: IMatchConfig): IMatchResult => ({
 });
 
 describe("reusable locked doctrine draft policy", () => {
+    test("live bundle ordering exposes the already-committed opponent bundle only to its legal observer", () => {
+        for (const liveSequentialBundles of [false, true]) {
+            const known: number[][] = [];
+            resolveRankedDraftPick(
+                fixture.rows[0].seed,
+                genome,
+                genome,
+                {
+                    left: fixture.setup,
+                    right: fixture.setup,
+                    leftDoctrine: Doctrine.SEE_ALL,
+                    rightDoctrine: Doctrine.SEE_ALL,
+                },
+                {
+                    liveDraftRules: true,
+                    liveSequentialBundles,
+                    gridType: 1,
+                    researchDraftChoicesByTeam: {
+                        [PBTypes.TeamVals.RIGHT]: {
+                            bundle: (_bundles, context, preferred) => {
+                                known.push([...context.knownOpponentCreatureIds]);
+                                return preferred;
+                            },
+                        },
+                    },
+                },
+            );
+            expect(known).toHaveLength(1);
+            expect(known[0]).toHaveLength(liveSequentialBundles ? 2 : 0);
+        }
+    });
+
     test("reproduces historical setups, decisions and collision counts across doctrines and seats", () => {
         expect(fixture.rows).toHaveLength(49);
         for (const row of fixture.rows) {

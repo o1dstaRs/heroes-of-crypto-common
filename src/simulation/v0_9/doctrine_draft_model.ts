@@ -11,7 +11,7 @@ import {
 import { rankedDraftStrengthV4LiftPp, rankedDraftUnitSynergyLiftPp } from "../../ai/setup/draft_strength_prior";
 import type { IDraftScoutingContext } from "../../picks/draft_visibility";
 import { CreatureLevelList } from "../../units/unit_properties";
-import type { IRankedDraftResearchContext } from "../ranked_draft_eval";
+import type { IDoctrineDraftContext as IRankedDraftResearchContext } from "../../ai/setup/doctrine_draft_policy";
 
 export const DOCTRINE_DRAFT_FEATURES = [
     "spymaster_intercept",

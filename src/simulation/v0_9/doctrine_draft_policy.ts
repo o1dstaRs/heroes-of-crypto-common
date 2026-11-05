@@ -2,9 +2,9 @@ import { creatureInfo } from "../../ai/setup/creature_score";
 import { pickRankedLiveDraftBundle, pickRankedLiveDraftCreature } from "../../ai/setup/draft_ship";
 import type { RankedDraftSynergyVariants } from "../../ai/setup/draft_synergy_variants";
 import type { ILeagueGenome } from "../league_genome";
+import { selectDoctrineDraftChoice } from "../../ai/setup/doctrine_draft_policy";
 import type { IRankedDraftResearchChoices, IRankedDraftResearchContext } from "../ranked_draft_eval";
 import {
-    doctrineDraftFeatures,
     predictDoctrineDraftGain,
     type DoctrineDraftModelVersion,
     type IDoctrineDraftChoice,
@@ -47,19 +47,18 @@ export function createDoctrineDraftResearchChoices(
         level: number,
     ): number => {
         if (alternative === undefined || !other || switched || level > lastDecisionLevel) return preferred;
-        const features = doctrineDraftFeatures(
-            options.doctrine,
+        const decision = selectDoctrineDraftChoice(model, options.doctrine, {
             context,
-            base,
-            other,
+            preferred: { ...base, id: preferred },
+            alternative: { ...other, id: alternative },
             level,
-            options.maskAdvanceInformation ?? false,
-            version,
-        );
-        if (!features) return preferred;
-        switched = predictDoctrineDraftGain(model, features) > model.switchMargin;
-        const chosen = switched ? alternative : preferred;
-        options.onDecision?.({ level, preferred, alternative, features, chosen });
+            overrideUsed: switched,
+            maskAdvanceInformation: options.maskAdvanceInformation,
+        });
+        if (!decision.features) return preferred;
+        switched = decision.consumeOverride;
+        const chosen = decision.choice;
+        options.onDecision?.({ level, preferred, alternative, features: decision.features, chosen });
         return chosen;
     };
     return {

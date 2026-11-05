@@ -556,6 +556,7 @@ interface INormalizedOptions {
 }
 
 interface IRankedDraftGameDependencies {
+    liveSequentialBundles?: boolean;
     matchRunner: (config: IMatchConfig) => IMatchResult;
     /** Offline research only; called for the candidate at the real, public Tier-2 decision. */
     researchCandidateTier2Choice?: ResearchRankedTier2Choice;
@@ -948,6 +949,8 @@ export interface IRankedDraftSetupPolicySpecs {
 }
 
 export interface IRankedDraftPickRules {
+    /** Match the authoritative both-seat writer order; old registered panels keep simultaneous decisions. */
+    liveSequentialBundles?: boolean;
     /** Pick creatures exactly as the ranked server does (faction-diversity tax included). */
     liveDraftRules?: boolean;
     /** Replace each bundle/creature decision with a uniform legal choice at this rate. */
@@ -1208,8 +1211,9 @@ export function resolveRankedDraftPick(
                   },
               ));
     const chosenLeftBundle = researchBundle(LEFT, leftBundle);
+    if (rules.liveSequentialBundles) accept({ type: "select_bundle", team: LEFT, bundleIndex: chosenLeftBundle });
     const chosenRightBundle = researchBundle(RIGHT, rightBundle);
-    accept({ type: "select_bundle", team: LEFT, bundleIndex: chosenLeftBundle });
+    if (!rules.liveSequentialBundles) accept({ type: "select_bundle", team: LEFT, bundleIndex: chosenLeftBundle });
     accept({ type: "select_bundle", team: RIGHT, bundleIndex: chosenRightBundle });
 
     let transitions = 0;
@@ -1543,6 +1547,7 @@ export function playRankedDraftGame(
         },
         {
             ...rankedDraftPickRules(options, gridType, synergyVariants),
+            liveSequentialBundles: dependencies.liveSequentialBundles,
             ...(dependencies.researchCandidateDraftChoices
                 ? {
                       researchDraftChoicesByTeam: {
