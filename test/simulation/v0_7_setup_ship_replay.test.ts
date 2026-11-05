@@ -166,7 +166,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Previous digest: 7dae00c1d34d6ff3f18a1629ca5e9010c81d6f981e00d48290d77c50e14f1573.
 // Re-pinned 2026-11-04 for the requested Crusader damage increase from 13-20 to 15-20.
 // Two isolated runs agree. Previous digest: fa5b3e2df22860366e14f423cf2db7ceb264ebdadf180971344ae9738bae650d.
-const EXPECTED_REPLAY_SHA256 = "b41a67d7a59270b3fd6054d08db2cca146ec58623638a2a9fe93a00f6c26e321";
+// Re-pinned 2026-11-05 for the requested Battle Mage health reduction from 12 to 11.
+// The 12 HP control reproduces the previous digest. Two isolated 11 HP runs agree with zero rejected
+// actions; only the pair at seed 2147598935 changes.
+// Previous digest: b41a67d7a59270b3fd6054d08db2cca146ec58623638a2a9fe93a00f6c26e321.
+const EXPECTED_REPLAY_SHA256 = "38bdbe1d4e533c937285d6abd9abd3cc0ea66d89a6b0b8200c7d0ed6d96680e2";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
