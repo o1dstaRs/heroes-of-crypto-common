@@ -27,6 +27,11 @@ import { withV09PilotDriverAudit } from "./a19_pilot";
 import { readV09PilotSource } from "./a19_pilot_protocol";
 import { fingerprintV09 } from "./protocol";
 import {
+    LOCKED_DOCTRINE_DRAFT_CHECKPOINT_ID,
+    LOCKED_DOCTRINE_DRAFT_MODEL_SHA256,
+    lockedDoctrineDraftModel,
+} from "./doctrine_draft_checkpoint";
+import {
     doctrineDraftFeatures,
     fitDoctrineDraftModel,
     predictDoctrineDraftGain,
@@ -40,8 +45,10 @@ import {
 export const DOCTRINE_DRAFT_STAGES = { smoke: 27, train: 810, development: 270, confirmation: 1512 } as const;
 export const DOCTRINE_DRAFT_V2_STAGES = { smoke: 27, train: 1080, development: 540, confirmation: 1512 } as const;
 export const DOCTRINE_DRAFT_V3_STAGES = { smoke: 27, train: 3240, development: 1080, confirmation: 1512 } as const;
+export const DOCTRINE_DRAFT_V4_STAGES = { smoke: 27, train: 6480, development: 1080, confirmation: 1512 } as const;
 type Stage = keyof typeof DOCTRINE_DRAFT_STAGES;
-type Condition = "current" | "alternative" | "learned" | "masked";
+type EvaluationControl = "current" | "locked" | "masked";
+type Condition = EvaluationControl | "alternative" | "learned";
 export interface IDoctrineDraftRegistration {
     readonly schema: `hoc.ai.v0_9.doctrine_draft_training.${DoctrineDraftModelVersion}`;
     readonly sourceCommit: string;
@@ -51,6 +58,7 @@ export interface IDoctrineDraftRegistration {
     readonly registrationSha256: string;
     readonly deadlineAtMs: number;
     readonly productionPromotion: false;
+    readonly benchmarkCheckpoint?: { readonly id: string; readonly modelSha256: string };
 }
 interface IDecision {
     level: number;
@@ -69,6 +77,7 @@ interface IBoard {
     stage: Stage;
     registrationSha256: string;
     modelSha256: string | null;
+    checkpointSha256?: string;
     candidateDoctrinePolicy: ScoutingDoctrine;
     opponentDoctrinePolicy: ScoutingDoctrine;
     map: number;
@@ -82,11 +91,13 @@ const score = (game: IGame): number =>
 const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, "utf8")) as T;
 const save = (path: string, value: unknown): void => writeFileSync(path, JSON.stringify(value) + "\n", { flag: "wx" });
 const modelVersion = (registration: IDoctrineDraftRegistration): DoctrineDraftModelVersion =>
-    registration.schema === "hoc.ai.v0_9.doctrine_draft_training.v3"
-        ? "v3"
-        : registration.schema === "hoc.ai.v0_9.doctrine_draft_training.v2"
-          ? "v2"
-          : "v1";
+    registration.schema === "hoc.ai.v0_9.doctrine_draft_training.v4"
+        ? "v4"
+        : registration.schema === "hoc.ai.v0_9.doctrine_draft_training.v3"
+          ? "v3"
+          : registration.schema === "hoc.ai.v0_9.doctrine_draft_training.v2"
+            ? "v2"
+            : "v1";
 
 export function doctrineDraftTrainingLevel(version: DoctrineDraftModelVersion, stage: Stage, board: number): number {
     if (version !== "v1") return stage === "smoke" ? 3 : Math.floor(board / 27) % 4;
@@ -97,11 +108,13 @@ export function validateDoctrineDraftRegistration(registration: IDoctrineDraftRe
     const { registrationSha256, ...body } = registration;
     const version = modelVersion(registration);
     const stages =
-        version === "v3"
-            ? DOCTRINE_DRAFT_V3_STAGES
-            : version === "v2"
-              ? DOCTRINE_DRAFT_V2_STAGES
-              : DOCTRINE_DRAFT_STAGES;
+        version === "v4"
+            ? DOCTRINE_DRAFT_V4_STAGES
+            : version === "v3"
+              ? DOCTRINE_DRAFT_V3_STAGES
+              : version === "v2"
+                ? DOCTRINE_DRAFT_V2_STAGES
+                : DOCTRINE_DRAFT_STAGES;
     if (
         registration.schema !== `hoc.ai.v0_9.doctrine_draft_training.${version}` ||
         registration.productionPromotion !== false ||
@@ -109,6 +122,13 @@ export function validateDoctrineDraftRegistration(registration: IDoctrineDraftRe
         !Number.isFinite(registration.deadlineAtMs)
     )
         throw new Error("Invalid doctrine draft registration");
+    if (
+        version === "v4"
+            ? registration.benchmarkCheckpoint?.id !== LOCKED_DOCTRINE_DRAFT_CHECKPOINT_ID ||
+              registration.benchmarkCheckpoint?.modelSha256 !== LOCKED_DOCTRINE_DRAFT_MODEL_SHA256
+            : registration.benchmarkCheckpoint !== undefined
+    )
+        throw new Error("Registered doctrine draft benchmark changed");
     const used = new Set<number>();
     for (const stage of Object.keys(stages) as Stage[]) {
         if (registration.banks[stage]?.length !== stages[stage]) throw new Error("Incomplete registered bank");
@@ -131,6 +151,7 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
     const version = modelVersion(registration);
     const lastDecisionLevel = version === "v1" ? 2 : 3;
     const model = training ? undefined : readJson<IDoctrineDraftModel>(join(root, "model.json"));
+    const lockedModel = version === "v4" ? lockedDoctrineDraftModel() : undefined;
     if (model && model.schema !== `hoc.ai.v0_9.doctrine_draft.${version}`)
         throw new Error("Registered model version changed");
     if (!isRankedDraftStrengthPolicy(registration.profile.draft)) throw new Error("Unknown registered draft policy");
@@ -149,6 +170,8 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
     const targetLevel = doctrineDraftTrainingLevel(version, stage, board);
     const run = (condition: Condition, game: number): IGame => {
         const decisions: IDecision[] = [];
+        const decisionModel = condition === "locked" ? lockedModel : model;
+        const decisionVersion = condition === "locked" ? "v3" : version;
         let switched = false;
         const choose = (
             context: IRankedDraftResearchContext,
@@ -167,14 +190,14 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
                 other,
                 level,
                 condition === "masked",
-                version,
+                decisionVersion,
             );
             if (!features) return preferred;
             const shouldSwitch =
                 condition === "alternative" ||
-                (model !== undefined &&
+                (decisionModel !== undefined &&
                     condition !== "current" &&
-                    predictDoctrineDraftGain(model, features) > model.switchMargin);
+                    predictDoctrineDraftGain(decisionModel, features) > decisionModel.switchMargin);
             const chosen = shouldSwitch ? alternative : preferred;
             decisions.push({ level, preferred, alternative, features, chosen });
             switched = shouldSwitch;
@@ -269,7 +292,11 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
             throw new Error("Invalid or incomplete doctrine draft game");
         return { record, decisions };
     };
-    const arms: Condition[] = training ? ["current", "alternative"] : ["current", "learned", "masked"];
+    const arms: Condition[] = training
+        ? ["current", "alternative"]
+        : version === "v4"
+          ? ["current", "locked", "learned", "masked"]
+          : ["current", "learned", "masked"];
     for (const condition of arms) {
         conditions[condition] = Array.from({ length: 4 }, (_, game) => run(condition, game));
         if (
@@ -319,6 +346,7 @@ function runBoard(root: string, stage: Stage, board: number): IBoard {
         stage,
         registrationSha256: registration.registrationSha256,
         modelSha256: model ? fingerprintV09(model) : null,
+        ...(lockedModel ? { checkpointSha256: fingerprintV09(lockedModel) } : {}),
         ...policies,
         map: [1, 3, 4][board % 3],
         conditions,
@@ -373,10 +401,35 @@ function readBoards(root: string, stage: Stage, registration: IDoctrineDraftRegi
             row.stage !== stage ||
             row.board !== board ||
             row.registrationSha256 !== registration.registrationSha256 ||
-            row.modelSha256 !== modelHash
+            row.modelSha256 !== modelHash ||
+            row.checkpointSha256 !==
+                (modelVersion(registration) === "v4" ? LOCKED_DOCTRINE_DRAFT_MODEL_SHA256 : undefined)
         )
             throw new Error("Stale or corrupted paired board");
         return row;
+    });
+}
+
+interface IDoctrineDraftComparison {
+    pooled: ReturnType<typeof pairedDoctrineDraftStatistics>;
+    doctrines: Record<ScoutingDoctrine, ReturnType<typeof pairedDoctrineDraftStatistics>>;
+}
+
+export function doctrineDraftEvaluationControls(version: DoctrineDraftModelVersion): EvaluationControl[] {
+    return version === "v4" ? ["current", "locked", "masked"] : ["current", "masked"];
+}
+
+export function doctrineDraftEvaluationPassed(
+    version: DoctrineDraftModelVersion,
+    comparisons: Partial<Record<EvaluationControl, IDoctrineDraftComparison>>,
+): boolean {
+    return doctrineDraftEvaluationControls(version).every((control) => {
+        const comparison = comparisons[control];
+        return (
+            comparison !== undefined &&
+            comparison.pooled.lower95 > 0 &&
+            V09_A19_DOCTRINES.every((doctrine) => comparison.doctrines[doctrine]?.gain >= 0)
+        );
     });
 }
 
@@ -394,7 +447,7 @@ function summarize(root: string, stage: Stage, registration: IDoctrineDraftRegis
             productionPromotion: false,
         };
     const comparisons = Object.fromEntries(
-        (["current", "masked"] as const).map((control) => {
+        doctrineDraftEvaluationControls(modelVersion(registration)).map((control) => {
             const paired = rows.map((row) => ({
                 ...row,
                 delta:
@@ -419,11 +472,7 @@ function summarize(root: string, stage: Stage, registration: IDoctrineDraftRegis
             ];
         }),
     );
-    const passed =
-        comparisons.current.pooled.lower95 > 0 &&
-        comparisons.masked.pooled.lower95 > 0 &&
-        Object.values(comparisons.current.doctrines).every((entry) => entry.gain >= 0) &&
-        Object.values(comparisons.masked.doctrines).every((entry) => entry.gain >= 0);
+    const passed = doctrineDraftEvaluationPassed(modelVersion(registration), comparisons);
     return {
         stage,
         complete: true,
@@ -431,6 +480,7 @@ function summarize(root: string, stage: Stage, registration: IDoctrineDraftRegis
         gamesPerCondition: rows.length * 4,
         registrationSha256: registration.registrationSha256,
         modelSha256: rows[0].modelSha256,
+        ...(modelVersion(registration) === "v4" ? { checkpointSha256: LOCKED_DOCTRINE_DRAFT_MODEL_SHA256 } : {}),
         comparisons,
         passed,
         rejectedActions: 0,
@@ -467,6 +517,7 @@ if (!isMainThread && workerData?.doctrineDraftTraining) {
         const model = fitDoctrineDraftModel(
             rows.flatMap((row) => row.examples),
             modelVersion(registration),
+            modelVersion(registration) === "v4" ? lockedDoctrineDraftModel() : undefined,
         );
         save(join(root, "model.json"), model);
         save(join(root, "fit-receipt.json"), {
@@ -477,6 +528,9 @@ if (!isMainThread && workerData?.doctrineDraftTraining) {
             examples: model.examples,
             initialLoss: model.initialLoss,
             finalLoss: model.finalLoss,
+            ...(modelVersion(registration) === "v4"
+                ? { warmStartModelSha256: LOCKED_DOCTRINE_DRAFT_MODEL_SHA256 }
+                : {}),
             developmentOpened: false,
             confirmationOpened: false,
             productionPromotion: false,

@@ -1,0 +1,193 @@
+{
+    "schema": "hoc.ai.v0_9.doctrine_draft_checkpoint.v1",
+    "id": "doctrine-draft-v3-20261104",
+    "status": "locked-development-benchmark",
+    "lockedByUserRequest": true,
+    "sourceCommit": "d4f095c499c5cd8068ffbc8a1632f23b87d13f70",
+    "sourceSha256": "af47ec6cc92540feb7746e4c863af1f9c40ed2e16c3d96fddf0fad45bff26fe4",
+    "modelSha256": "2736ce8d7917e12c5078b8cae0b51f49c2e20496b2ce181bf9995e04ef65ec7a",
+    "originalModelFileSha256": "a560ae9f2b1a2fda24957afc6123b34581e33a203507caf3e45a8e69b56c8303",
+    "trainingBattles": 25920,
+    "developmentBattles": 12960,
+    "confirmationOpened": false,
+    "productionPromotion": false,
+    "limitation": "The pooled learned-minus-masked lower 95% confidence bound is exactly zero; the original scouting-specific promotion gate failed.",
+    "fit": {
+        "registrationSha256": "5ca7c3e0ef303533e6d0d8e14797e3e2fc756f4ae6ea9312e8332f61d112cf7a",
+        "modelSha256": "2736ce8d7917e12c5078b8cae0b51f49c2e20496b2ce181bf9995e04ef65ec7a",
+        "trainingBoardsSha256": "c24c03fdf67fdc7537b690a68a3a354628f9b4e49d85792994a3a023d0733ad8",
+        "optimizerSteps": 2000,
+        "examples": 4320,
+        "initialLoss": 0.1662181712962963,
+        "finalLoss": 0.15615498970638977,
+        "developmentOpened": false,
+        "confirmationOpened": false,
+        "productionPromotion": false
+    },
+    "trainingVerification": {
+        "verified": true,
+        "registrationSha256": "5ca7c3e0ef303533e6d0d8e14797e3e2fc756f4ae6ea9312e8332f61d112cf7a",
+        "modelSha256": "2736ce8d7917e12c5078b8cae0b51f49c2e20496b2ce181bf9995e04ef65ec7a",
+        "trainingBoards": 3240,
+        "examples": 4320,
+        "allDecisionPopulationCellsBalanced": true,
+        "decisionPopulationCells": 108,
+        "allPairedOutcomesRecomputed": true,
+        "independentPythonOptimizerSteps": 2000,
+        "maximumWeightError": 0.0,
+        "independentFinalLoss": 0.15615498970638977,
+        "biasPowerArithmetic": "Binary powers through exponent 1000, then native pow; verified against all 4000 Bun 1.4.4 coefficients",
+        "zeroEvaluationExamplesUsed": true,
+        "productionPromotion": false
+    },
+    "development": {
+        "stage": "development",
+        "complete": true,
+        "boards": 1080,
+        "gamesPerCondition": 4320,
+        "registrationSha256": "5ca7c3e0ef303533e6d0d8e14797e3e2fc756f4ae6ea9312e8332f61d112cf7a",
+        "modelSha256": "2736ce8d7917e12c5078b8cae0b51f49c2e20496b2ce181bf9995e04ef65ec7a",
+        "comparisons": {
+            "current": {
+                "pooled": {
+                    "boards": 1080,
+                    "gain": 0.022800925925925926,
+                    "lower95": 0.012037037037037037,
+                    "upper95": 0.033796296296296297
+                },
+                "doctrines": {
+                    "see-all": {
+                        "boards": 360,
+                        "gain": 0.052083333333333336,
+                        "lower95": 0.027430555555555555,
+                        "upper95": 0.0763888888888889
+                    },
+                    "three-reveals": {
+                        "boards": 360,
+                        "gain": 0.016319444444444445,
+                        "lower95": -0.005555555555555556,
+                        "upper95": 0.03854166666666667
+                    },
+                    "see-none": {
+                        "boards": 360,
+                        "gain": 0,
+                        "lower95": 0,
+                        "upper95": 0
+                    }
+                }
+            },
+            "masked": {
+                "pooled": {
+                    "boards": 1080,
+                    "gain": 0.004166666666666667,
+                    "lower95": 0,
+                    "upper95": 0.008449074074074074
+                },
+                "doctrines": {
+                    "see-all": {
+                        "boards": 360,
+                        "gain": 0.003125,
+                        "lower95": -0.007291666666666667,
+                        "upper95": 0.01423611111111111
+                    },
+                    "three-reveals": {
+                        "boards": 360,
+                        "gain": 0.009375,
+                        "lower95": 0.002777777777777778,
+                        "upper95": 0.017013888888888887
+                    },
+                    "see-none": {
+                        "boards": 360,
+                        "gain": 0,
+                        "lower95": 0,
+                        "upper95": 0
+                    }
+                }
+            }
+        },
+        "passed": false,
+        "rejectedActions": 0,
+        "productionPromotion": false
+    },
+    "developmentVerification": {
+        "stage": "development",
+        "verified": true,
+        "registrationSha256": "5ca7c3e0ef303533e6d0d8e14797e3e2fc756f4ae6ea9312e8332f61d112cf7a",
+        "modelSha256": "2736ce8d7917e12c5078b8cae0b51f49c2e20496b2ce181bf9995e04ef65ec7a",
+        "independentPythonStatistics": {
+            "current": {
+                "pooled": {
+                    "boards": 1080,
+                    "gain": 0.022800925925925926,
+                    "lower95": 0.012037037037037037,
+                    "upper95": 0.033796296296296297
+                },
+                "see-all": {
+                    "boards": 360,
+                    "gain": 0.052083333333333336,
+                    "lower95": 0.027430555555555555,
+                    "upper95": 0.0763888888888889
+                },
+                "three-reveals": {
+                    "boards": 360,
+                    "gain": 0.016319444444444445,
+                    "lower95": -0.005555555555555556,
+                    "upper95": 0.03854166666666667
+                },
+                "see-none": {
+                    "boards": 360,
+                    "gain": 0.0,
+                    "lower95": 0.0,
+                    "upper95": 0.0
+                }
+            },
+            "masked": {
+                "pooled": {
+                    "boards": 1080,
+                    "gain": 0.004166666666666667,
+                    "lower95": 0.0,
+                    "upper95": 0.008449074074074074
+                },
+                "see-all": {
+                    "boards": 360,
+                    "gain": 0.003125,
+                    "lower95": -0.007291666666666667,
+                    "upper95": 0.01423611111111111
+                },
+                "three-reveals": {
+                    "boards": 360,
+                    "gain": 0.009375,
+                    "lower95": 0.002777777777777778,
+                    "upper95": 0.017013888888888887
+                },
+                "see-none": {
+                    "boards": 360,
+                    "gain": 0.0,
+                    "lower95": 0.0,
+                    "upper95": 0.0
+                }
+            }
+        },
+        "changedDraftSetups": {
+            "see-all": {
+                "current": 572,
+                "masked": 65
+            },
+            "three-reveals": {
+                "current": 603,
+                "masked": 31
+            },
+            "see-none": {
+                "current": 0,
+                "masked": 0
+            }
+        },
+        "passed": false,
+        "all27CellsBalanced": true,
+        "allScenarioSeedsAndSeatsMatched": true,
+        "sevenPointExactControl": true,
+        "rejectedActions": 0,
+        "productionPromotion": false,
+        "rawModelFileSha256": "a560ae9f2b1a2fda24957afc6123b34581e33a203507caf3e45a8e69b56c8303"
+    }
+}

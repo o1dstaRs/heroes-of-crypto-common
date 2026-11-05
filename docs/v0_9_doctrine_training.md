@@ -1,5 +1,23 @@
 # v0.9 doctrine training
 
+The user-locked improvement benchmark is **`doctrine-draft-v3-20261104`**. Its exact trained weights,
+registration, independently verified results and decision regressions are versioned in
+`src/simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/`. Subsequent draft candidates must be
+compared against it as well as the original policy. It remains a development benchmark: locking it
+preserves its overall gain without changing the outcome of its original scouting-specific gate.
+
+From the common package, inspect it or export the exact model to a new file:
+
+```bash
+bun src/simulation/v0_9/doctrine_draft_checkpoint.ts
+bun src/simulation/v0_9/doctrine_draft_checkpoint.ts --out /tmp/hoc-doctrine-v3-model.json
+```
+
+The loader verifies the canonical model hash and freezes the returned model. Export refuses to
+overwrite an existing file. Use a new checkpoint identity for further improvements. Saved seed banks,
+including unused confirmation seeds, are exclusions for future campaigns. Do not reopen V3's failed
+campaign or describe the locked checkpoint as a replacement for the in-battle combat model.
+
 The balanced population is an offline research option, `--doctrine-population balanced-doctrines-v1`.
 It does not change old campaign identities or install trained weights in the game.
 
@@ -117,7 +135,8 @@ Each gain is a paired difference, bootstrapped over whole independent boards wit
 opponent-doctrine cells. Development must have a positive lower 95% bound against both controls and
 nonnegative point estimates for every doctrine before confirmation opens. Fresh confirmation repeats
 both tests over 6,048 games per condition. The seven-point negative control must reproduce complete
-game records exactly. All generated data and weights remain outside Git. No result auto-promotes a
+game records exactly. Ordinary generated data and weights remain outside Git; the explicitly requested
+locked checkpoint above is the versioned exception. No result auto-promotes a
 model into the runtime; a failed or inconclusive evaluation preserves current behavior.
 
 ### First fitted model and late-ban follow-up
@@ -215,3 +234,25 @@ replace the shipped combat correction. No failed teacher or evaluation example s
 
 Model SHA-256: `2736ce8d7917e12c5078b8cae0b51f49c2e20496b2ce181bf9995e04ef65ec7a`.
 Registration SHA-256: `5ca7c3e0ef303533e6d0d8e14797e3e2fc756f4ae6ea9312e8332f61d112cf7a`.
+
+### V4 contextual-value continuation
+
+V4 retains all 73 V3 features and appends 168 unit-by-visible-map interactions, twelve already-achieved
+faction thresholds (2/4/6 units for each faction), and twelve changes in threshold reachability caused
+by advance bans. It has 265 features. Early map interactions exist only for Spymaster; Scout receives
+them at the ordinary map reveal. Masking removes early map interactions and advance-ban reachability
+while keeping already-public terrain, faction bonuses and all other public features.
+
+Training starts from the locked V3 predictions: its coefficients are converted to the new training-only
+RMS scales, and new coefficients start at zero. Adam's moment estimates start at zero. The optimizer
+still performs 2,000 full-batch steps with learning rate 0.03 and ridge 0.02. Its fresh 6,480 training
+boards provide 8,640 paired examples from 51,840 battles, equally covering all four decision levels
+and 27 population cells. No development or confirmation outcome becomes a training label.
+
+The new registration pins the exact V3 checkpoint hash. Evaluation adds the locked V3 policy as a
+fourth condition on every board, alongside original, learned and learned-with-masked-information.
+Development contains 1,080 boards and 17,280 battles. Confirmation remains sealed at 1,512 boards
+and 24,192 battles. Both stages require a strictly positive pooled lower 95% bound against **all three**
+controls and nonnegative point estimates for every doctrine against every control. The original
+one-override limit, 0.02 switch margin, legal-information projection and seven-point exact control
+remain unchanged. Passing development permits independent confirmation, not automatic deployment.

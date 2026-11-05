@@ -9,6 +9,7 @@ import {
     DOCTRINE_DRAFT_FEATURES,
     DOCTRINE_DRAFT_V2_FEATURES,
     DOCTRINE_DRAFT_V3_FEATURES,
+    DOCTRINE_DRAFT_V4_FEATURES,
     doctrineDraftFeatures,
     fitDoctrineDraftModel,
     predictDoctrineDraftGain,
@@ -17,12 +18,18 @@ import {
     DOCTRINE_DRAFT_STAGES,
     DOCTRINE_DRAFT_V2_STAGES,
     DOCTRINE_DRAFT_V3_STAGES,
+    DOCTRINE_DRAFT_V4_STAGES,
     doctrineDraftTrainingLevel,
     pairedDoctrineDraftStatistics,
     validateDoctrineDraftRegistration,
     type IDoctrineDraftRegistration,
 } from "../../src/simulation/v0_9/doctrine_draft_training";
 import { fingerprintV09 } from "../../src/simulation/v0_9/protocol";
+import {
+    LOCKED_DOCTRINE_DRAFT_CHECKPOINT_ID,
+    LOCKED_DOCTRINE_DRAFT_MODEL_SHA256,
+    lockedDoctrineDraftModel,
+} from "../../src/simulation/v0_9/doctrine_draft_checkpoint";
 
 const flyer = CreatureLevelList[1].find((id) => creatureInfo(id)?.canFly)!;
 const walker = CreatureLevelList[1].find((id) => creatureInfo(id)?.melee && !creatureInfo(id)?.canFly)!;
@@ -139,13 +146,15 @@ describe("outcome-trained doctrine draft research", () => {
     });
 
     test("registered populations cover every decision in every doctrine/map cell", () => {
-        for (const version of ["v1", "v2", "v3"] as const) {
+        for (const version of ["v1", "v2", "v3", "v4"] as const) {
             const stages =
-                version === "v3"
-                    ? DOCTRINE_DRAFT_V3_STAGES
-                    : version === "v2"
-                      ? DOCTRINE_DRAFT_V2_STAGES
-                      : DOCTRINE_DRAFT_STAGES;
+                version === "v4"
+                    ? DOCTRINE_DRAFT_V4_STAGES
+                    : version === "v3"
+                      ? DOCTRINE_DRAFT_V3_STAGES
+                      : version === "v2"
+                        ? DOCTRINE_DRAFT_V2_STAGES
+                        : DOCTRINE_DRAFT_STAGES;
             let index = 0;
             const body = {
                 schema: `hoc.ai.v0_9.doctrine_draft_training.${version}`,
@@ -157,6 +166,14 @@ describe("outcome-trained doctrine draft research", () => {
                 ),
                 deadlineAtMs: 1,
                 productionPromotion: false,
+                ...(version === "v4"
+                    ? {
+                          benchmarkCheckpoint: {
+                              id: LOCKED_DOCTRINE_DRAFT_CHECKPOINT_ID,
+                              modelSha256: LOCKED_DOCTRINE_DRAFT_MODEL_SHA256,
+                          },
+                      }
+                    : {}),
             };
             const registration = { ...body, registrationSha256: fingerprintV09(body) } as IDoctrineDraftRegistration;
             expect(() => validateDoctrineDraftRegistration(registration)).not.toThrow();
@@ -166,12 +183,15 @@ describe("outcome-trained doctrine draft research", () => {
                 counts.set(cell, (counts.get(cell) ?? 0) + 1);
             }
             expect(counts.size).toBe(27 * (version === "v1" ? 3 : 4));
-            expect([...counts.values()].every((count) => count === (version === "v3" ? 30 : 10))).toBe(true);
+            expect(
+                [...counts.values()].every((count) => count === (version === "v4" ? 60 : version === "v3" ? 30 : 10)),
+            ).toBe(true);
             if (version !== "v1") {
                 expect(
                     Array.from({ length: 27 }, (_, board) => doctrineDraftTrainingLevel(version, "smoke", board)),
                 ).toEqual(new Array(27).fill(3));
                 const wrongBody = { ...body, schema: "hoc.ai.v0_9.doctrine_draft_training.v1" };
+                delete wrongBody.benchmarkCheckpoint;
                 expect(() =>
                     validateDoctrineDraftRegistration({
                         ...wrongBody,
@@ -180,6 +200,71 @@ describe("outcome-trained doctrine draft research", () => {
                 ).toThrow("Incomplete registered bank");
             }
         }
+    });
+
+    test("v4 learns unit-map interactions only when that map is visible", () => {
+        const evidence = { ...context, scouting: { ...context.scouting, map: PBTypes.GridVals.LAVA_CENTER } };
+        const preferred = { creatureIds: [walker] },
+            alternative = { creatureIds: [flyer] };
+        const full = doctrineDraftFeatures("see-all", evidence, preferred, alternative, 1, false, "v4")!;
+        const masked = doctrineDraftFeatures("see-all", evidence, preferred, alternative, 1, true, "v4")!;
+        expect(full).toHaveLength(265);
+        expect(full.slice(0, 73)).toEqual(
+            doctrineDraftFeatures("see-all", evidence, preferred, alternative, 1, false, "v3"),
+        );
+        expect(full[DOCTRINE_DRAFT_V4_FEATURES.indexOf(`visible_map_3_unit_${flyer}_difference`)]).toBe(1);
+        expect(full[DOCTRINE_DRAFT_V4_FEATURES.indexOf(`visible_map_3_unit_${walker}_difference`)]).toBe(-1);
+        expect(masked.slice(73, 241)).toEqual(new Array(168).fill(0));
+        const late = doctrineDraftFeatures("three-reveals", evidence, preferred, alternative, 3, true, "v4")!;
+        expect(late.slice(73, 241)).toEqual(full.slice(73, 241));
+        const unknown = { ...evidence, scouting: { ...evidence.scouting, map: undefined } };
+        expect(
+            doctrineDraftFeatures("three-reveals", unknown, preferred, alternative, 1, false, "v4")!.slice(73, 241),
+        ).toEqual(new Array(168).fill(0));
+    });
+
+    test("v4 preserves public faction completions while masking advance-ban reachability", () => {
+        const c = PBTypes.CreatureVals;
+        const faction = creatureInfo(c.ORC)!.faction;
+        const evidence = {
+            ...context,
+            ownCreatureIds: [c.ORC, c.CENTAUR, c.WOLF, c.ELF],
+            scouting: {
+                ...context.scouting,
+                remainingPickLevels: [3, 4],
+                bannedCreatureIds: CreatureLevelList[4].filter((id) => creatureInfo(id)?.faction === faction),
+            },
+        };
+        const preferred = { creatureIds: [c.NIGHTMARE] },
+            alternative = { creatureIds: [c.MANTIS] };
+        const full = doctrineDraftFeatures("three-reveals", evidence, preferred, alternative, 3, false, "v4")!;
+        const masked = doctrineDraftFeatures("three-reveals", evidence, preferred, alternative, 3, true, "v4")!;
+        expect(masked.slice(241, 253)).toEqual(full.slice(241, 253));
+        expect(full.slice(241, 253).some((value) => value !== 0)).toBe(true);
+        expect(full.slice(253).some((value) => value !== 0)).toBe(true);
+        expect(masked.slice(253)).toEqual(new Array(12).fill(0));
+        expect(doctrineDraftFeatures("see-none", evidence, preferred, alternative, 3, false, "v4")).toBeUndefined();
+    });
+
+    test("v4 continues from locked predictions and fits fresh paired outcomes", () => {
+        const starting = lockedDoctrineDraftModel();
+        const examples = Array.from({ length: 30 }, (_, board) => {
+            const features = new Array<number>(DOCTRINE_DRAFT_V4_FEATURES.length).fill(0);
+            features[0] = 1;
+            features[73] = (board % 3) - 1;
+            return { board, features, gain: 0.2 * features[73] };
+        });
+        expect(() => fitDoctrineDraftModel(examples, "v4")).toThrow("starting model");
+        const model = fitDoctrineDraftModel(examples, "v4", starting);
+        const startingLoss =
+            examples.reduce(
+                (sum, row) => sum + (predictDoctrineDraftGain(starting, row.features.slice(0, 73)) - row.gain) ** 2,
+                0,
+            ) / examples.length;
+        expect(model.initialLoss).toBeCloseTo(startingLoss, 12);
+        expect(model.finalLoss).toBeLessThan(model.initialLoss / 100);
+        expect(model.optimizerSteps).toBe(2000);
+        expect(fingerprintV09(starting)).toBe(LOCKED_DOCTRINE_DRAFT_MODEL_SHA256);
     });
 
     test("v3 sees losing the fourth shooter when the old two-shooter feature is saturated", () => {

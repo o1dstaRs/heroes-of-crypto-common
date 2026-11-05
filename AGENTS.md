@@ -4,6 +4,22 @@ Use `bun fmt --no-script <paths>` for targeted formatting and add `--check` for 
 Do not invoke Prettier separately. `--no-script` avoids running this package's whole-source `fmt`
 script when you only intend to format your own files. Keep the required build and lint checks.
 
+## Locked v0.9 draft benchmark
+
+The user requested preservation of the improved draft model for subsequent agents. The immutable
+`doctrine-draft-v3-20261104` checkpoint, weights, seed registration, evaluation evidence and decision
+regressions live in `src/simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/`. Use
+`lockedDoctrineDraftModel()` from `src/simulation/v0_9/doctrine_draft_checkpoint.ts` to load it.
+It gained 2.28 match-score percentage points over the original policy (95% interval +1.20 to +3.38).
+Keep it as a required comparison for further draft iterations; create a new checkpoint rather than
+overwriting or refitting this one. V4 training starts from its exact weights and compares against it.
+
+This is a locked development benchmark, not a production-qualified combat model. Its additional
+early-information gain was +0.42 points (0.00 to +0.84), so the original scouting-specific gate failed
+and its confirmation bank stays closed. Preserve that distinction in reports. The user's request
+explicitly authorizes these small versioned checkpoint fixtures; ordinary run output remains ignored.
+See `docs/v0_9_doctrine_training.md` for the protocol, results and continuation requirements.
+
 ## Parallel agents / mainline workflow
 
 Multiple agents run on this repo **at the same time**. Rules:

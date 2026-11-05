@@ -38,13 +38,26 @@ export const DOCTRINE_DRAFT_V3_FEATURES = [
     "advance_bans_four_ranged_capacity_difference",
     "advance_bans_faction_partner_strength_difference",
 ] as const;
-export type DoctrineDraftModelVersion = "v1" | "v2" | "v3";
+const rankedMaps = [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER, PBTypes.GridVals.BLOCK_CENTER];
+const factions = [1, 2, 3, 4];
+const thresholds = [2, 4, 6];
+export const DOCTRINE_DRAFT_V4_FEATURES = [
+    ...DOCTRINE_DRAFT_V3_FEATURES,
+    ...rankedMaps.flatMap((map) => draftCreatures.map((id) => `visible_map_${map}_unit_${id}_difference`)),
+    ...factions.flatMap((faction) => thresholds.map((count) => `faction_${faction}_threshold_${count}_difference`)),
+    ...factions.flatMap((faction) =>
+        thresholds.map((count) => `advance_bans_faction_${faction}_threshold_${count}_reach_difference`),
+    ),
+] as const;
+export type DoctrineDraftModelVersion = "v1" | "v2" | "v3" | "v4";
 const featureNames = (version: DoctrineDraftModelVersion): readonly string[] =>
-    version === "v3"
-        ? DOCTRINE_DRAFT_V3_FEATURES
-        : version === "v2"
-          ? DOCTRINE_DRAFT_V2_FEATURES
-          : DOCTRINE_DRAFT_FEATURES;
+    version === "v4"
+        ? DOCTRINE_DRAFT_V4_FEATURES
+        : version === "v3"
+          ? DOCTRINE_DRAFT_V3_FEATURES
+          : version === "v2"
+            ? DOCTRINE_DRAFT_V2_FEATURES
+            : DOCTRINE_DRAFT_FEATURES;
 
 export type ScoutingDoctrine = "see-all" | "three-reveals" | "see-none";
 export interface IDoctrineDraftChoice {
@@ -135,13 +148,14 @@ function choiceFeatures(
     const scouting =
         level === 0 ? context.scouting : choice.creatureIds.reduce(draftContextAfterCreature, context.scouting);
     const artifact = choice.tier1ArtifactId ?? context.tier1ArtifactId;
-    const full = continuationFeatures(roster, context, scouting, artifact, version === "v3");
+    const includeQuality = version === "v3" || version === "v4";
+    const full = continuationFeatures(roster, context, scouting, artifact, includeQuality);
     const delayed = continuationFeatures(
         roster,
         context,
         delayedDoctrineScouting(scouting, level),
         artifact,
-        version === "v3",
+        includeQuality,
     );
     const map = context.scouting.map;
     const hazard = map === PBTypes.GridVals.LAVA_CENTER || map === PBTypes.GridVals.WATER_CENTER;
@@ -194,6 +208,42 @@ function choiceFeatures(
     ];
 }
 
+function contextualChoiceFeatures(
+    context: IRankedDraftResearchContext,
+    choice: IDoctrineDraftChoice,
+    level: number,
+): number[] {
+    const roster = [...context.ownCreatureIds, ...choice.creatureIds];
+    const scouting =
+        level === 0 ? context.scouting : choice.creatureIds.reduce(draftContextAfterCreature, context.scouting);
+    const delayed = delayedDoctrineScouting(scouting, level);
+    const paths = factions.map((faction) => ({
+        full: draftCreatureContinuation(
+            roster,
+            context.knownOpponentCreatureIds,
+            scouting,
+            (unit) => unit.faction === faction,
+        ),
+        delayed: draftCreatureContinuation(
+            roster,
+            context.knownOpponentCreatureIds,
+            delayed,
+            (unit) => unit.faction === faction,
+        ),
+    }));
+    return [
+        ...rankedMaps.flatMap((map) =>
+            draftCreatures.map((id) => Number(context.scouting.map === map && choice.creatureIds.includes(id))),
+        ),
+        ...paths.flatMap((path) => thresholds.map((count) => Number(path.full.count >= count))),
+        ...paths.flatMap((path) =>
+            thresholds.map(
+                (count) => Number(path.full.maximumCount >= count) - Number(path.delayed.maximumCount >= count),
+            ),
+        ),
+    ];
+}
+
 /** Context is already projected by the pick reducer. No state, RNG, hidden ban or future offer is accepted. */
 export function doctrineDraftFeatures(
     doctrine: ScoutingDoctrine,
@@ -212,6 +262,8 @@ export function doctrineDraftFeatures(
     const base = choiceFeatures(visible, preferred, level, version);
     const other = choiceFeatures(visible, alternative, level, version);
     const difference = other.map((value, index) => value - base[index]);
+    const contextualBase = version === "v4" ? contextualChoiceFeatures(visible, preferred, level) : [];
+    const contextualOther = version === "v4" ? contextualChoiceFeatures(visible, alternative, level) : [];
     // These three indicators and the public strength/build features survive the information ablation.
     // This prevents 'turn the new policy off' from masquerading as a causal information comparison.
     return [
@@ -220,7 +272,7 @@ export function doctrineDraftFeatures(
         Number(level === 0),
         ...difference.slice(0, 11),
         ...(version !== "v1" ? [Number(level === 3)] : []),
-        ...(version === "v3"
+        ...(version === "v3" || version === "v4"
             ? [
                   ...draftCreatures.map(
                       (id) => Number(alternative.creatureIds.includes(id)) - Number(preferred.creatureIds.includes(id)),
@@ -228,6 +280,7 @@ export function doctrineDraftFeatures(
                   ...difference.slice(11),
               ]
             : []),
+        ...contextualOther.map((value, index) => value - contextualBase[index]),
     ];
 }
 
@@ -238,11 +291,13 @@ function validateFeatures(features: readonly number[], version: DoctrineDraftMod
 
 export function predictDoctrineDraftGain(model: IDoctrineDraftModel, features: readonly number[]): number {
     const version =
-        model.schema === "hoc.ai.v0_9.doctrine_draft.v3"
-            ? "v3"
-            : model.schema === "hoc.ai.v0_9.doctrine_draft.v2"
-              ? "v2"
-              : "v1";
+        model.schema === "hoc.ai.v0_9.doctrine_draft.v4"
+            ? "v4"
+            : model.schema === "hoc.ai.v0_9.doctrine_draft.v3"
+              ? "v3"
+              : model.schema === "hoc.ai.v0_9.doctrine_draft.v2"
+                ? "v2"
+                : "v1";
     validateFeatures(features, version);
     if (
         model.schema !== `hoc.ai.v0_9.doctrine_draft.${version}` ||
@@ -260,7 +315,13 @@ export function predictDoctrineDraftGain(model: IDoctrineDraftModel, features: r
 export function fitDoctrineDraftModel(
     examples: readonly IDoctrineDraftExample[],
     version: DoctrineDraftModelVersion = "v1",
+    warmStart?: IDoctrineDraftModel,
 ): IDoctrineDraftModel {
+    if (version === "v4") {
+        if (!warmStart || warmStart.schema !== "hoc.ai.v0_9.doctrine_draft.v3")
+            throw new Error("V4 training requires the locked V3 starting model");
+        predictDoctrineDraftGain(warmStart, new Array<number>(DOCTRINE_DRAFT_V3_FEATURES.length).fill(0));
+    } else if (warmStart) throw new Error("Legacy model fitting does not accept a starting model");
     if (!examples.length) throw new Error("No counterfactual training examples");
     for (const example of examples) {
         validateFeatures(example.features, version);
@@ -279,8 +340,12 @@ export function fitDoctrineDraftModel(
     );
     const rows = examples.map((row) => ({ x: row.features.map((value, index) => value / scales[index]), y: row.gain }));
     const weights = new Array<number>(size).fill(0);
-    const first = [...weights],
-        second = [...weights];
+    if (warmStart)
+        warmStart.weights.forEach((weight, index) => {
+            weights[index] = (weight / warmStart.scales[index]) * scales[index];
+        });
+    const first = new Array<number>(size).fill(0),
+        second = new Array<number>(size).fill(0);
     const loss = () =>
         rows.reduce(
             (sum, row) => sum + (row.x.reduce((value, x, index) => value + x * weights[index], 0) - row.y) ** 2,
