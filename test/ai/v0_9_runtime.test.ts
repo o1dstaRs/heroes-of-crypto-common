@@ -100,10 +100,10 @@ afterEach(() => {
 });
 
 describe("v0.9 fixed-point runtime", () => {
-    test("registers the inert candidate without changing the latest or default v0.8", () => {
+    test("selects native v0.9 by user instruction while retaining the untrained combat artifact", () => {
         expect(AI_VERSIONS).toContain("v0.9");
         expect(LATEST_AI_VERSION).toBe("v0.8");
-        expect(DEFAULT_AI_VERSION).toBe("v0.8");
+        expect(DEFAULT_AI_VERSION).toBe("v0.9");
         expect(V09_MODEL_PROMOTED).toBe(false);
         expect(V09_MODEL_ARTIFACT.status).toBe("anchor_only");
         expect(V09_MODEL_ARTIFACT.modelSha256).toBeNull();

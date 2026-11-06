@@ -15,10 +15,13 @@ import { StrategyV0_8 } from "../ai/versions/v0_8";
 
 export const AI_META_REGISTERED_VERSION_STRATEGY_PROFILE = "registered-version" as const;
 export const AI_META_NATIVE_V08_STRATEGY_PROFILE = "native-v0.8" as const;
+export const AI_META_NATIVE_V09_STRATEGY_PROFILE = "native-v0.9" as const;
 
 /** Serializable strategy selection passed from the AI-meta coordinator into each worker isolate. */
 export type AiMetaStrategyProfileId =
-    typeof AI_META_REGISTERED_VERSION_STRATEGY_PROFILE | typeof AI_META_NATIVE_V08_STRATEGY_PROFILE;
+    | typeof AI_META_REGISTERED_VERSION_STRATEGY_PROFILE
+    | typeof AI_META_NATIVE_V08_STRATEGY_PROFILE
+    | typeof AI_META_NATIVE_V09_STRATEGY_PROFILE;
 
 export interface IAiMetaPublicOpponentRosters {
     /** RED creature identities visible to GREEN during placement. */
@@ -28,6 +31,8 @@ export interface IAiMetaPublicOpponentRosters {
 }
 
 export interface IAiMetaMatchStrategyOverrides {
+    readonly greenVersion?: string;
+    readonly redVersion?: string;
     readonly greenStrategyOverride?: IAIStrategy;
     readonly redStrategyOverride?: IAIStrategy;
     readonly greenSetupPlacementPolicy?: PlacementPolicyVariant;
@@ -47,6 +52,8 @@ export function createAiMetaMatchStrategyOverrides(
     _publicOpponents: IAiMetaPublicOpponentRosters,
 ): IAiMetaMatchStrategyOverrides {
     if (profileId === AI_META_REGISTERED_VERSION_STRATEGY_PROFILE) return Object.freeze({});
+    if (profileId === AI_META_NATIVE_V09_STRATEGY_PROFILE)
+        return Object.freeze({ greenVersion: "v0.9", redVersion: "v0.9" });
     if (profileId === AI_META_NATIVE_V08_STRATEGY_PROFILE) {
         return Object.freeze({
             greenStrategyOverride: new StrategyV0_8(),

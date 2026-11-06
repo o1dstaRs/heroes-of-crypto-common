@@ -971,6 +971,11 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
 </header>
 <main class="shell report-main">
   ${
+      fightVersion === "v0.9" && fightProfile.combatModelPromoted === false
+          ? `<aside class="notice" aria-label="Native v0.9 profile"><div class="notice-mark">i</div><div><h2>Native v0.9 · locked V3 draft</h2><p>The user selected native v0.9 draft and combat. The draft uses ${escapeHtml(textValue(fightProfile, ["draftModelId"], "the recorded checkpoint"))}. The embedded combat model is anchor-only and untrained: native v0.8 decisions run through v0.9, with no A19 rollout search. This run measures that exact profile.</p></div></aside>`
+          : ""
+  }
+  ${
       complementaryR2
           ? '<aside class="notice" aria-label="Complementary R2 adoption"><div class="notice-mark">i</div><div><h2>Default AI: H64 / complementary R2</h2><p>This policy was adopted by user instruction with strength uncertainty accepted. The earlier 6,000-game offline comparison scored 48.91% against R4 (95% interval 47.33–50.50%); it did not establish the 48% non-inferiority floor. Its 37.86% time reduction was measured on a separate fight workload. The timings below measure this cohort run directly.</p></div></aside>'
           : ""

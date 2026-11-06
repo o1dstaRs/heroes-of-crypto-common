@@ -1,5 +1,14 @@
 # Agent guidance
 
+## User-selected native v0.9 default
+
+The user explicitly selected native v0.9 draft and combat as the default on 2026-11-05, after being told
+that the embedded combat model is untrained. `DEFAULT_AI_VERSION` now selects `v0.9`; this does not promote
+the learned combat artifact or claim a combat-strength gain. Preserve its anchor-only metadata and the
+learned-model qualification gates. Existing encoded v0.8 seats retain A19. The `v09-native` AI-meta profile
+uses the locked V3 draft, native v0.9 on both combat seats, and no A19 search. The older activation notes
+below describe the earlier draft-only activation and remain historical evidence.
+
 Use `bun fmt --no-script <paths>` for targeted formatting and add `--check` for a read-only check.
 Do not invoke Prettier separately. `--no-script` avoids running this package's whole-source `fmt`
 script when you only intend to format your own files. Keep the required build and lint checks.

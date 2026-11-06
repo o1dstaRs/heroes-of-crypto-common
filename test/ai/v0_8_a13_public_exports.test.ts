@@ -38,19 +38,19 @@ import {
 
 describe("v0.8 production-profile public exports", () => {
     test("the browser-safe root exposes A19 as the promoted profile and retains a13 as rollback", () => {
-        expect(DEFAULT_AI_VERSION).toBe(V08_A19_PRODUCTION_VERSION);
+        expect(DEFAULT_AI_VERSION).toBe("v0.9");
         expect(V08_A19_CANDIDATE_ID).toBe("a19");
         expect(V08_A19_PROFILE.researchOnly).toBe(false);
-        expect(V08_A19_PROFILE.productionVersion).toBe(DEFAULT_AI_VERSION);
+        expect(V08_A19_PROFILE.productionVersion).toBe(V08_A19_PRODUCTION_VERSION);
         expect(V08_A19_PROFILE.search.horizon).toBe(64);
         expect(buildV08A19SearchEnvironment().SEARCH_HORIZON).toBe("64");
-        expect(createV08A19Strategy().version).toBe(DEFAULT_AI_VERSION);
+        expect(createV08A19Strategy().version).toBe(V08_A19_PRODUCTION_VERSION);
 
         // a13 remains a stable, explicitly selectable rollback profile behind the same wire version.
-        expect(V08_A13_PRODUCTION_VERSION).toBe(DEFAULT_AI_VERSION);
-        expect(V08_A13_PROFILE.productionVersion).toBe(DEFAULT_AI_VERSION);
+        expect(V08_A13_PRODUCTION_VERSION).toBe(V08_A19_PRODUCTION_VERSION);
+        expect(V08_A13_PROFILE.productionVersion).toBe(V08_A19_PRODUCTION_VERSION);
         expect(V08_A13_PROFILE.search).toBe(V08_A13_SEARCH);
-        expect(buildV08A13SearchEnvironment()["SEARCH_VERSIONS"]).toBe(DEFAULT_AI_VERSION);
+        expect(buildV08A13SearchEnvironment()["SEARCH_VERSIONS"]).toBe(V08_A19_PRODUCTION_VERSION);
     });
 
     test("the Node-only simulation entrypoint exposes promoted and rollback search surfaces", () => {

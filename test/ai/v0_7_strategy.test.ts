@@ -161,7 +161,7 @@ describe("v0.7 registry", () => {
         expect(AI_VERSIONS).toContain("v0.7");
         expect(getAIStrategy("v0.7").version).toBe("v0.7");
         expect(LATEST_AI_VERSION).toBe("v0.8");
-        expect(DEFAULT_AI_VERSION).toBe("v0.8");
+        expect(DEFAULT_AI_VERSION).toBe("v0.9");
     });
 });
 

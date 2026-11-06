@@ -318,7 +318,7 @@ describe("v0.8 candidate policy", () => {
         ]);
         expect(AI_VERSIONS.indexOf("v0.8")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.7"));
         expect(LATEST_AI_VERSION).toBe("v0.8");
-        expect(DEFAULT_AI_VERSION).toBe("v0.8");
+        expect(DEFAULT_AI_VERSION).toBe("v0.9");
     });
 
     it("replaces only empty/end-turn-only decisions with an explicit defend", () => {

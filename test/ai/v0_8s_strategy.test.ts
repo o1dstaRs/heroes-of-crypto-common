@@ -147,7 +147,7 @@ describe("v0.8 search measurement alias", () => {
         expect(Object.getOwnPropertyNames(StrategyV0_8S.prototype)).toEqual(["constructor"]);
         expect(AI_VERSIONS.indexOf("v0.8s")).toBe(AI_VERSIONS.indexOf("v0.8") - 1);
         expect(LATEST_AI_VERSION).toBe("v0.8");
-        expect(DEFAULT_AI_VERSION).toBe("v0.8");
+        expect(DEFAULT_AI_VERSION).toBe("v0.9");
     });
 
     it("plays byte-identically to v0.8 before the lap-6 experiment boundary", () => {

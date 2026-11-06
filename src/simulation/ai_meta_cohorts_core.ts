@@ -25,6 +25,10 @@ import {
 } from "../ai/setup/draft_ship";
 import { creatureInfo } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
+import { getRankedAIProfile } from "../ai/ranked_profile";
+import { V09_DEFAULT_DRAFT_BASE_POLICY_SPEC, V09_DEFAULT_DRAFT_MODEL_ID } from "../ai/setup/doctrine_draft_policy";
+import { createLockedDoctrineDraftResearchChoices } from "./v0_9/doctrine_draft_checkpoint";
+import type { IRankedDraftResearchContext } from "./ranked_draft_eval";
 import { TIER1_ARTIFACT_WINRATE, TIER2_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import {
     enumerateFullBudgetAugmentPlans,
@@ -53,6 +57,7 @@ import {
     createPickSimState,
     getCurrentPickPhase,
     getKnownOpponentCreatures,
+    getPickScoutingContext,
     getPickTeamView,
     getVisibleCreatureChoices,
     isPickSimComplete,
@@ -369,6 +374,7 @@ export interface IAiMetaRunOptions {
     /** Opt-in archive capture; does not change roster/setup selection policies. */
     collectEvidence?: boolean;
     studyProfile?: AiMetaStudy;
+    nativeV09?: boolean;
 }
 
 interface ICatalogEntry {
@@ -504,6 +510,7 @@ function generateSyntheticRoster(
 
 const AI_META_RANKED_DRAFT_GENOME = parseDraftGenome(AI_META_RANKED_DRAFT_POLICY_SPEC, "ai-meta-ranked-draft");
 const PREMIUM_DRAFT_GENOME = parseDraftGenome(PREMIUM_META_DRAFT_SPEC, "premium-meta-ranked-draft");
+const NATIVE_V09_DRAFT_GENOME = parseDraftGenome(V09_DEFAULT_DRAFT_BASE_POLICY_SPEC, "native-v09-meta-ranked-draft");
 const LEFT = PBTypes.TeamVals.LEFT;
 const RIGHT = PBTypes.TeamVals.RIGHT;
 
@@ -574,8 +581,10 @@ function generateRankedRosters(
     variants: ReturnType<typeof synergyVariantsForSeed>,
     collectEvidence: boolean,
     studyProfile?: AiMetaStudy,
+    nativeV09 = false,
 ): { rosters: [IArmyUnitSpec[], IArmyUnitSpec[]]; rankedDraft?: IAiMetaDraftEvidence } {
     const premiumStudy = Boolean(studyProfile);
+    const exploreDraft = premiumStudy && !nativeV09;
     const rng = rankedPickRandomInt(seed);
     let state = createPickSimState(rng);
     const decisions: IAiMetaDraftEvidence["decisions"] = [];
@@ -587,12 +596,40 @@ function generateRankedRosters(
             epsilon,
         );
     const apply = (action: PickAction, observedState = state, choice?: IAiMetaChoiceEvidence): void => {
+        if (nativeV09 && !choice) {
+            const view = getPickTeamView(observedState, action.team);
+            const ids =
+                action.type === "select_bundle"
+                    ? view.bundles.map((_, index) => index)
+                    : action.type === "select_tier2"
+                      ? view.tier2Offers
+                      : getVisibleCreatureChoices(observedState, action.team);
+            const selected =
+                action.type === "select_bundle"
+                    ? action.bundleIndex
+                    : action.type === "select_tier2"
+                      ? action.artifactId
+                      : action.type === "pick_creature"
+                        ? action.creatureId
+                        : -1;
+            choice = aiMetaChoiceEvidence(
+                ids.map((id) => ({ key: String(id), score: Number(id === selected) })),
+                String(selected),
+                String(selected),
+                "exploit",
+                0,
+            );
+        }
         const observation = collectEvidence
             ? cloneAiMetaDraftObservation({
                   ...getPickTeamView(observedState, action.team),
                   availableCreatureIds: getVisibleCreatureChoices(observedState, action.team),
                   revealedOpponentSlots: [...rankedTeamState(observedState, action.team).revealedOpponentSlots],
-                  revealedMap: observedState.phaseSequence >= 6 ? map : null,
+                  revealedMap: nativeV09
+                      ? (getPickScoutingContext(observedState, action.team, map).map ?? null)
+                      : observedState.phaseSequence >= 6
+                        ? map
+                        : null,
                   synergyVariants: variants,
               })
             : undefined;
@@ -614,7 +651,7 @@ function generateRankedRosters(
         [LEFT, "a"],
         [RIGHT, "b"],
     ] as const) {
-        const doctrine = premiumStudy ? premiumStudyDoctrine(seed, side) : SETUP_POLICY_V0.pickDoctrine();
+        const doctrine = premiumStudy || nativeV09 ? premiumStudyDoctrine(seed, side) : SETUP_POLICY_V0.pickDoctrine();
         const choice = premiumStudy
             ? aiMetaChoiceEvidence(
                   [1, 2, 3].map((id) => ({ key: String(id), score: 0 })),
@@ -627,13 +664,44 @@ function generateRankedRosters(
         apply({ type: "select_doctrine", team, doctrine }, doctrineState, choice);
     }
 
+    const nativeChoices = new Map(
+        nativeV09
+            ? ([LEFT, RIGHT] as const).map((team) => {
+                  const doctrine = rankedTeamState(state, team).doctrine;
+                  return [
+                      team,
+                      createLockedDoctrineDraftResearchChoices({
+                          doctrine:
+                              doctrine === Doctrine.SEE_ALL
+                                  ? "see-all"
+                                  : doctrine === Doctrine.THREE_REVEALS
+                                    ? "three-reveals"
+                                    : "see-none",
+                          genome: NATIVE_V09_DRAFT_GENOME,
+                          synergyVariants: variants,
+                      }),
+                  ] as const;
+              })
+            : [],
+    );
+    const nativeContext = (team: PickTeam): IRankedDraftResearchContext => {
+        const own = rankedTeamState(state, team);
+        return {
+            ownCreatureIds: own.creatures,
+            knownOpponentCreatureIds: getKnownOpponentCreatures(state, team),
+            tier1ArtifactId: own.tier1Artifact,
+            tier2ArtifactId: own.tier2Artifact,
+            artifactFitVersion: 6,
+            scouting: getPickScoutingContext(state, team, map),
+        };
+    };
     const bundleState = state;
     const bundles = ([LEFT, RIGHT] as const).map((team) => {
         const offers = getPickTeamView(bundleState, team).bundles;
         const preferred = premiumStudy
             ? pickRankedLiveDraftBundle(PREMIUM_DRAFT_GENOME, offers, variants)
             : pickRankedBundle(offers);
-        return premiumStudy
+        return exploreDraft
             ? choose(
                   offers.map((_, index) => index),
                   preferred,
@@ -642,8 +710,21 @@ function generateRankedRosters(
               )
             : { selected: preferred, evidence: undefined };
     });
-    apply({ type: "select_bundle", team: LEFT, bundleIndex: bundles[0].selected }, bundleState, bundles[0].evidence);
-    apply({ type: "select_bundle", team: RIGHT, bundleIndex: bundles[1].selected }, bundleState, bundles[1].evidence);
+    for (const [index, team] of ([LEFT, RIGHT] as const).entries()) {
+        if (nativeV09) {
+            const offers = getPickTeamView(state, team).bundles;
+            const context = nativeContext(team);
+            const preferred = pickRankedLiveDraftBundle(NATIVE_V09_DRAFT_GENOME, offers, variants, 6, context.scouting);
+            const selected = nativeChoices.get(team)!.bundle!(offers, context, preferred);
+            apply({ type: "select_bundle", team, bundleIndex: selected });
+        } else {
+            apply(
+                { type: "select_bundle", team, bundleIndex: bundles[index].selected },
+                bundleState,
+                bundles[index].evidence,
+            );
+        }
+    }
 
     let transitions = 0;
     while (!isPickSimComplete(state)) {
@@ -655,8 +736,22 @@ function generateRankedRosters(
             const artifactState = state;
             const choices = ([LEFT, RIGHT] as const).map((team) => {
                 const offers = getPickTeamView(artifactState, team).tier2Offers;
-                const preferred = SETUP_POLICY_V0.pickArtifactT2(offers);
-                return premiumStudy
+                const preferred = nativeV09
+                    ? getRankedAIProfile("v0.9").setupPolicy.pickArtifactT2(
+                          offers,
+                          rankedTeamState(state, team).creatures,
+                          {
+                              decisionPhase: "tier2-artifact",
+                              opponentRosterVisibility: "partial",
+                              publicOpponentCreatureIds: getKnownOpponentCreatures(state, team),
+                              gridType: getPickScoutingContext(state, team, map).map,
+                              gridSize: 16,
+                              ownDoctrine: rankedTeamState(state, team).doctrine,
+                              ownArtifactIds: [rankedTeamState(state, team).tier1Artifact!],
+                          },
+                      )
+                    : SETUP_POLICY_V0.pickArtifactT2(offers);
+                return exploreDraft
                     ? choose(offers, preferred, team, "tier2")
                     : { selected: preferred, evidence: undefined };
             });
@@ -680,20 +775,34 @@ function generateRankedRosters(
         const ownCreatureIds = teamState.creatures;
         const knownOpponentCreatureIds = getKnownOpponentCreatures(state, team);
         const available = getVisibleCreatureChoices(state, team);
-        const preferred = premiumStudy
+        let preferred = nativeV09
             ? pickRankedLiveDraftCreature(
-                  PREMIUM_DRAFT_GENOME,
+                  NATIVE_V09_DRAFT_GENOME,
                   available,
                   ownCreatureIds,
                   knownOpponentCreatureIds,
                   teamState.tier1Artifact,
-                  state.phaseSequence >= 6 ? map : undefined,
+                  nativeContext(team).scouting.map,
                   variants,
+                  teamState.tier2Artifact,
+                  6,
+                  nativeContext(team).scouting,
               )
-            : pickAiMetaRankedCreature(available, ownCreatureIds, knownOpponentCreatureIds, teamState.tier1Artifact);
+            : premiumStudy
+              ? pickRankedLiveDraftCreature(
+                    PREMIUM_DRAFT_GENOME,
+                    available,
+                    ownCreatureIds,
+                    knownOpponentCreatureIds,
+                    teamState.tier1Artifact,
+                    state.phaseSequence >= 6 ? map : undefined,
+                    variants,
+                )
+              : pickAiMetaRankedCreature(available, ownCreatureIds, knownOpponentCreatureIds, teamState.tier1Artifact);
         if (preferred === undefined)
             throw new Error(`AI meta ranked draft found no visible L${phase.creatureLevel} creature`);
-        const selection = premiumStudy
+        if (nativeV09) preferred = nativeChoices.get(team)!.creature!(available, nativeContext(team), preferred);
+        const selection = exploreDraft
             ? choose(available, preferred, team, "creature")
             : { selected: preferred, evidence: undefined };
         apply({ type: "pick_creature", team, creatureId: selection.selected }, state, selection.evidence);
@@ -705,8 +814,12 @@ function generateRankedRosters(
             ? {
                   rankedDraft: {
                       seed,
-                      policy: premiumStudy ? PREMIUM_META_DRAFT_SPEC : AI_META_RANKED_DRAFT_POLICY_SPEC,
-                      unusedObservationFeatures: premiumStudy ? [] : ["synergyVariants", "revealedMap"],
+                      policy: nativeV09
+                          ? `${V09_DEFAULT_DRAFT_BASE_POLICY_SPEC}+${V09_DEFAULT_DRAFT_MODEL_ID}`
+                          : premiumStudy
+                            ? PREMIUM_META_DRAFT_SPEC
+                            : AI_META_RANKED_DRAFT_POLICY_SPEC,
+                      unusedObservationFeatures: premiumStudy || nativeV09 ? [] : ["synergyVariants", "revealedMap"],
                       doctrines: { a: state.left.doctrine, b: state.right.doctrine },
                       knownOpponentCreatureIds: {
                           a: getKnownOpponentCreatures(state, LEFT),
@@ -775,6 +888,7 @@ export function generateMetaMatchup(
             aiMetaSynergyVariantsForPair(setupSeed, combatSeed),
             options.collectEvidence === true,
             options.studyProfile,
+            options.nativeV09,
         );
         [rosterA, rosterB] = generated.rosters;
         rankedDraft = generated.rankedDraft;
