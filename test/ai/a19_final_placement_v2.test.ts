@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { expect, spyOn, test } from "bun:test";
 
@@ -10,6 +11,13 @@ import { A19_LEARNED_FINAL_PLACEMENT_POLICY, V09_LEARNED_FINAL_PLACEMENT_POLICY 
 import { relationFeatures } from "../../src/ai/placement/relations";
 import * as creatureScore from "../../src/ai/setup/creature_score";
 import fixture from "./fixtures/a19_final_placement_v2.json";
+import float32Fixture from "./fixtures/a19_final_placement_v2_float32.json";
+
+const featureHash = (features: readonly number[]) => {
+    const bytes = Buffer.alloc(features.length * 4);
+    features.forEach((value, index) => bytes.writeFloatLE(value, index * 4));
+    return createHash("sha256").update(bytes).digest("hex");
+};
 
 test("v0.9 placement uses the unchanged independently confirmed float32 tensors", () => {
     const hash = createHash("sha256");
@@ -36,17 +44,22 @@ test("margin and ties are evaluated against the deployed reference, which need n
 
 test("frozen fresh-bank inputs reproduce all features, scores and applied choices", () => {
     const model = getPlacementRelationModel();
+    expect(
+        createHash("sha256")
+            .update(readFileSync(new URL("./fixtures/a19_final_placement_v2.json", import.meta.url)))
+            .digest("hex"),
+    ).toBe(float32Fixture.sourceFixtureSha256);
+    expect(float32Fixture.cases.map((sample) => sample.family)).toEqual(fixture.cases.map((sample) => sample.family));
     expect(new Set(fixture.cases.map((c) => c.input.map))).toEqual(new Set([1, 3, 4]));
     expect(new Set(fixture.cases.map((c) => c.input.left))).toEqual(new Set([true, false]));
-    for (const sample of fixture.cases) {
+    for (const [index, sample] of fixture.cases.entries()) {
         const options = Array.from({ length: 8 }, (_, i) => propose(sample.input, sample.baseline, i));
         expect(options[sample.reference]).toEqual(sample.referencePositions);
         const features = options.map((p) => relationFeatures(sample.input, p, options[sample.reference]));
-        expect(features.map((x) => createHash("sha256").update(JSON.stringify(x)).digest("hex"))).toEqual(
-            sample.featureSha256,
-        );
+        // Math.log1p can differ by one binary64 ULP across hosts. Keep exact training-precision fingerprints.
+        expect(features.map(featureHash)).toEqual(float32Fixture.cases[index].featureSha256);
         const scores = features.map((x) => predict(model, x));
-        expect(scores).toEqual(sample.scores);
+        for (const [candidate, score] of scores.entries()) expect(score).toBeCloseTo(sample.scores[candidate], 14);
         expect(chooseCandidate(scores, model.minimumGain, sample.reference)).toBe(sample.chosen);
         expect(options[sample.chosen]).toEqual(sample.positions);
     }
