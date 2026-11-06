@@ -157,13 +157,18 @@ def roots_with_terminal_contrast(returns: Tensor, mask: Tensor) -> Tensor:
     return ((maximum - minimum) > 0).any(-1)
 
 
-def paired_root_loss(policy: Tensor, actions: Tensor, returns: Tensor, mask: Tensor
+def paired_root_loss(policy: Tensor, actions: Tensor, returns: Tensor, mask: Tensor,
+                     *, weighting: str = "comparisons"
                      ) -> tuple[Tensor, dict[str, Tensor]]:
-    """Original comparison-weighted loss, with separate root-level diagnostics.
+    """Registered comparison- or equal-root-weighted loss, with both diagnostics.
 
     All paired worlds remain nested inside the root. Observed ties contribute no
     invented action preference. Unknown/unlabeled catalog actions are not negatives.
+    Equal-root research prevents more non-tied futures from increasing a root's
+    training/validation weight. The original objective remains the default.
     """
+    if weighting not in ["comparisons", "roots"]:
+        raise ValueError("unknown paired-root loss weighting")
     if returns.ndim != 3 or returns.shape[:2] != actions.shape or mask.shape != actions.shape:
         raise ValueError("paired root shape mismatch")
     if mask.dtype != torch.bool or not bool((mask.sum(-1) >= 2).all()):
@@ -188,7 +193,34 @@ def paired_root_loss(policy: Tensor, actions: Tensor, returns: Tensor, mask: Ten
     root_weight = weight.sum((-1, -2))
     root_loss = losses_.sum((-1, -2)) / root_weight.clamp_min(1)
     total = losses_.sum() / root_weight.sum().clamp_min(1)
-    return total, {"nonTiedComparisons": root_weight.sum().detach(),
+    equal_root = root_loss.sum() / (root_weight > 0).sum().clamp_min(1)
+    return (equal_root if weighting == "roots" else total), {"nonTiedComparisons": root_weight.sum().detach(),
                    "informativeRoots": (root_weight > 0).sum().detach(),
-                   "equalInformativeRootLoss": (root_loss.sum() / (root_weight > 0).sum().clamp_min(1)).detach(),
+                   "comparisonWeightedLoss": total.detach(),
+                   "equalInformativeRootLoss": equal_root.detach(),
                    "perRootLoss": root_loss.detach(), "perRootComparisonWeight": root_weight.detach()}
+
+
+def paired_gate_gain(choices: Tensor, baseline: Tensor, actions: Tensor,
+                     returns: Tensor, mask: Tensor) -> tuple[Tensor, Tensor]:
+    """Paired terminal gain for known served actions; never label unknown actions.
+
+    The boolean result is the set of roots whose selected action was actually
+    continued. Missing choices carry zero only as masked storage, not as evidence.
+    """
+    if choices.dtype != torch.int64 or baseline.dtype != torch.int64 or choices.ndim != 1 or baseline.shape != choices.shape or actions.ndim != 2 or actions.shape[0] != len(choices):
+        raise ValueError("invalid served-choice shape")
+    if mask.dtype != torch.bool or mask.shape != actions.shape or returns.ndim != 3 or returns.shape[:2] != actions.shape or returns.shape[-1] == 0:
+        raise ValueError("invalid paired-gain shape")
+    if not bool(torch.isfinite(returns[mask]).all()) or not bool(
+            ((returns[mask] == 0) | (returns[mask] == .5) | (returns[mask] == 1)).all()):
+        raise ValueError("paired gains require completed-game scores")
+    incumbent = (actions == baseline[:, None]) & mask
+    selected = (actions == choices[:, None]) & mask
+    if not bool((incumbent.sum(-1) == 1).all()) or bool((selected.sum(-1) > 1).any()):
+        raise ValueError("baseline must have exactly one paired label")
+    rows = torch.arange(len(choices), device=actions.device)
+    known = selected.any(-1)
+    safe_returns = torch.where(mask[:, :, None], returns, torch.zeros_like(returns))
+    gain = safe_returns[rows, selected.to(torch.int64).argmax(-1)] - safe_returns[rows, incumbent.to(torch.int64).argmax(-1)]
+    return torch.where(known, gain.mean(-1), torch.zeros_like(choices, dtype=returns.dtype)), known

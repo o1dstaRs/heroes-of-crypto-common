@@ -6,7 +6,7 @@ import torch
 from torch.nn import functional as F
 
 from a19_model import A19ProposalModel
-from a19_feature_adapter import (A19FeatureAdapterModel, paired_root_loss, roots_with_terminal_contrast,
+from a19_feature_adapter import (A19FeatureAdapterModel, paired_gate_gain, paired_root_loss, roots_with_terminal_contrast,
                                  served_gate_choices, served_policy)
 
 torch.set_num_threads(2)
@@ -164,6 +164,52 @@ class FeatureAdapterTests(unittest.TestCase):
         self.assertEqual(int(info["informativeRoots"]), 2)
         self.assertEqual(int(info["nonTiedComparisons"]), 9)
         self.assertNotAlmostEqual(float(loss), float(info["equalInformativeRootLoss"]), places=3)
+
+    def test_equal_root_objective_and_gradient_do_not_reweight_repeated_worlds(self):
+        actions = torch.tensor([[0, 1], [0, 1]])
+        mask = torch.ones(2, 2, dtype=torch.bool)
+        outcomes = torch.tensor([[[0.] * 8, [1.] * 8], [[0.] * 8, [.5] + [0.] * 7]])
+        policy = torch.tensor([[0., 1.], [2., 0.]], requires_grad=True)
+        balanced, info = paired_root_loss(policy, actions, outcomes, mask, weighting="roots")
+        expected = (F.softplus(policy[0, 0] - policy[0, 1]) + F.softplus(policy[1, 0] - policy[1, 1])) / 2
+        torch.testing.assert_close(balanced, expected)
+        first_gradient = torch.autograd.grad(balanced, policy)[0]
+        repeated = outcomes.clone()
+        repeated[1, 1] = .5
+        balanced_again, _ = paired_root_loss(policy, actions, repeated, mask, weighting="roots")
+        torch.testing.assert_close(balanced_again, balanced)
+        torch.testing.assert_close(torch.autograd.grad(balanced_again, policy)[0], first_gradient)
+        original, _ = paired_root_loss(policy, actions, outcomes, mask)
+        original_repeated, _ = paired_root_loss(policy, actions, repeated, mask)
+        self.assertNotAlmostEqual(float(original.detach()), float(original_repeated.detach()), places=3)
+        torch.testing.assert_close(info["comparisonWeightedLoss"], original.detach())
+
+    def test_root_objective_has_zero_gradient_without_terminal_contrast(self):
+        policy = torch.randn(2, 3, requires_grad=True)
+        loss, info = paired_root_loss(policy, torch.tensor([[0, 1], [1, 2]]),
+                                     torch.zeros(2, 2, 8), torch.ones(2, 2, dtype=torch.bool), weighting="roots")
+        loss.backward()
+        self.assertEqual(int(info["informativeRoots"]), 0)
+        self.assertEqual(float(loss.detach()), 0)
+        self.assertTrue(policy.grad.eq(0).all())
+        with self.assertRaisesRegex(ValueError, "unknown paired-root"):
+            paired_root_loss(policy, torch.tensor([[0, 1], [1, 2]]),
+                             torch.zeros(2, 2, 8), torch.ones(2, 2, dtype=torch.bool), weighting="auto")
+
+    def test_served_paired_gain_requires_observed_action_and_baseline(self):
+        actions = torch.tensor([[4, 2, -1], [1, 3, -1]])
+        returns = torch.tensor([[[0.] * 8, [1.] * 8, [float("nan")] * 8],
+                                [[1.] * 8, [.5] * 8, [float("nan")] * 8]])
+        mask = torch.tensor([[True, True, False]] * 2)
+        gains, known = paired_gate_gain(torch.tensor([2, 9]), torch.tensor([4, 3]), actions, returns, mask)
+        self.assertEqual(known.tolist(), [True, False])
+        self.assertEqual(gains[known].tolist(), [1.])
+        self.assertTrue(torch.isfinite(gains).all())
+        with self.assertRaisesRegex(ValueError, "baseline must have exactly one"):
+            paired_gate_gain(torch.tensor([2, 9]), torch.tensor([4, 8]), actions, returns, mask)
+        zero, known = paired_gate_gain(torch.tensor([4, 3]), torch.tensor([4, 3]), actions, returns, mask)
+        self.assertTrue(known.all())
+        self.assertTrue(zero.eq(0).all())
 
     def test_readiness_ignores_padding_and_shared_world_randomness(self):
         returns = torch.tensor([[[.5, .5], [.5, .5], [0., 0.]],

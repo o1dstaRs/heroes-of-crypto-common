@@ -30,6 +30,8 @@ def train(registration_path: Path) -> None:
     reg, auth = load_registration(registration_path)
     root = registration_path.resolve().parent
     check_fit_design(reg)
+    weighting = reg.get("pairLossWeighting", "comparisons")
+    require(weighting in ["comparisons", "roots"], "Unknown paired-root objective")
     checks = read(root / reg["preflightReceipt"])
     require(checks["passed"] and checks["featurePathGradientPassed"] and checks["exportGateParityPassed"]
             and checks["strictCollectorPassed"], "Source-bound functional preflights required")
@@ -42,7 +44,7 @@ def train(registration_path: Path) -> None:
     import torch
     from torch.nn import functional as F
     from a19_model import A19ProposalModel
-    from a19_feature_adapter import (A19FeatureAdapterModel, paired_root_loss,
+    from a19_feature_adapter import (A19FeatureAdapterModel, paired_gate_gain, paired_root_loss,
                                      roots_with_terminal_contrast, served_gate_choices, served_policy)
     torch.set_num_threads(2)
     torch.set_num_interop_threads(1)
@@ -136,7 +138,7 @@ def train(registration_path: Path) -> None:
         with torch.no_grad():
             fixed = partner(pack["inputs"][0][:, :, :189], *pack["inputs"][1:])[0]
         policy = served_policy(student, fixed, pack["legal"])
-        loss, details = paired_root_loss(policy, pack["actions"], pack["returns"], pack["mask"])
+        loss, details = paired_root_loss(policy, pack["actions"], pack["returns"], pack["mask"], weighting=weighting)
         return loss, trust(policy, pack["baseline"], pack["legal"]), policy, details
 
     @torch.no_grad()
@@ -144,6 +146,7 @@ def train(registration_path: Path) -> None:
         loss, kl, policy, details = root_objective(model, "validation")
         pack = packs["validation"]
         choices = served_gate_choices(policy, pack["native"], pack["eligibleOrder"])
+        gains, known = paired_gate_gain(choices, pack["baselineChoice"], pack["actions"], pack["returns"], pack["mask"])
         warm = packs["warmValidation"]
         ce = 0.
         for first in range(0, warm["rows"], 128):
@@ -152,12 +155,15 @@ def train(registration_path: Path) -> None:
             fixed = partner(columns[0][:, :, :189], *columns[1:7])[0]
             probability = served_policy(model(*columns[:7])[0], fixed, columns[11])
             ce += float(F.nll_loss(probability, columns[10])) * len(columns[10])
-        return {"pairLoss": float(loss), "equalInformativeRootLoss": float(details["equalInformativeRootLoss"]),
+        return {"pairLoss": float(loss), "pairLossWeighting": weighting,
+                "comparisonWeightedLoss": float(details["comparisonWeightedLoss"]),
+                "equalInformativeRootLoss": float(details["equalInformativeRootLoss"]),
                 "nonTiedComparisons": int(details["nonTiedComparisons"]),
                 "informativeRoots": int(details["informativeRoots"]), "kl": float(kl),
                 "warmTeacherCE": ce / warm["rows"],
                 "changedGateChoices": int((choices != pack["baselineChoice"]).sum()),
-                "unlabeledGateChoices": int((~((choices[:, None] == pack["actions"]) & pack["mask"]).any(-1)).sum())}
+                "unlabeledGateChoices": int((~known).sum()),
+                "meanLabeledPairedRootGain": float(gains[known].mean()) if bool(known.any()) else None}
 
     proofs = []
     for recipe in reg["recipes"]:
@@ -197,7 +203,9 @@ def train(registration_path: Path) -> None:
             torch.nn.utils.clip_grad_norm_(parameters, 1.)
             optimizer.step()
             measured = validate(model)
-            if measured["warmTeacherCE"] <= before["warmTeacherCE"] + reg["teacherCeTolerance"] and measured["pairLoss"] < best["pairLoss"] - 1e-5:
+            observed_gate_safe = weighting != "roots" or (
+                measured["unlabeledGateChoices"] == 0 and measured["meanLabeledPairedRootGain"] >= 0)
+            if observed_gate_safe and measured["warmTeacherCE"] <= before["warmTeacherCE"] + reg["teacherCeTolerance"] and measured["pairLoss"] < best["pairLoss"] - 1e-5:
                 best, best_state, best_epoch, stale = measured, copy.deepcopy(model.state_dict()), epoch, 0
             else:
                 stale += 1
@@ -250,7 +258,8 @@ def train(registration_path: Path) -> None:
         exclusive(destination / "references.json", {"modelFileSha256": sha(destination / "model.json"),
                   "maximumFoldError": fold_error, "foldGateMismatches": 0, "rows": references})
         del cpu, unfolded_cpu, partner_cpu, references
-        proof = {"complete": True, "recipe": recipe, "before": before, "best": best, "bestEpoch": best_epoch,
+        proof = {"complete": True, "recipe": recipe, "pairLossWeighting": weighting,
+                 "before": before, "best": best, "bestEpoch": best_epoch,
                  "weightsUpdated": best_epoch >= 0, "pairImprovement": before["pairLoss"] - best["pairLoss"],
                  "modelFileSha256": sha(destination / "model.json"), "activeSeconds": time.monotonic() - tick,
                  "frozenParametersUnchanged": True, "trainableParameters": sum(p.numel() for p in parameters)}
@@ -264,7 +273,8 @@ def train(registration_path: Path) -> None:
     if eligible:
         winner = min(eligible, key=lambda p: (p["best"]["pairLoss"], p["modelFileSha256"]))
         exclusive(out / "finalist-lock.json", {"ordinal": winner["recipe"]["ordinal"], "modelSha256": winner["modelFileSha256"],
-                  "selection": "Validation locked before any development games; no fallback finalist", "promotion": False})
+                  "selection": "Validation locked before any development games; no fallback finalist",
+                  "pairLossWeighting": weighting, "promotion": False})
     exclusive(out / "complete.json", {"complete": True, "fits": proofs, "updatedCandidates": len(eligible),
               "newStrengthGames": 0, "promotion": False, "elapsedSeconds": time.monotonic() - started})
 

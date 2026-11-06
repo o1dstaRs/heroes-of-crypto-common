@@ -1,5 +1,55 @@
 # v0.9 training against current A19 R2
 
+## Current-A19 transfer and independent-root objective — November 6, 2026 UTC
+
+The user authorized continued combat research on the RTX 5090. The target is a
+measured improvement over the complete A19 controller, including its shipped
+two-model neural correction and placement, within the original decision compute
+budget or at most 10% more. Research results retain their actual engine identity.
+
+| Completed candidate                              | Opponent engine       | Games | Draw-aware score | Whole-board 95% interval |
+| ------------------------------------------------ | --------------------- | ----: | ---------------: | ------------------------ |
+| Previously locked next-fit checkpoint `e03eda8d` | Current `d62f5ae` A19 |   864 |           50.17% | 47.86–52.55%             |
+| Strict feature-adapter finalist `99a5a03d`       | Frozen `d0fb4437` A19 |   768 |           47.79% | 46.09–49.48%             |
+
+Neither candidate passed its development gate. Their confirmation banks remain
+unopened, and neither artifact is promoted. The current-engine transfer passed
+128 CPU prediction references, candidate/entity permutation checks, 12 complete
+warm-start control games and 1,208 restoration checks before strength evaluation;
+its maximum prediction discrepancy was below 0.000002. The older checkpoint has
+no named Luck Blessing feature columns. Its trained column meanings are preserved
+explicitly; current public status information still reaches the unchanged base
+observation. This compatibility projection is part of that transfer experiment.
+
+The strict acquisition completed all 1,536 registered scenarios and 13,464 paired
+continuation battles, preserving missing roots without refills or outcome
+filtering. Its 593 usable roots produced 383 training and 210 validation rows,
+with all eight futures retained for each labeled action. Four matched rank-zero
+and rank-four fits completed on the approved 5090 in 96.88 seconds of fit-stage
+wall time. The validation-selected rank-four model reduced comparison-weighted
+loss from 0.64222 to 0.62610, while average informative-root loss worsened from
+0.63249 to 0.63391. Only 58 validation roots had non-tied terminal comparisons.
+This disagreement motivates a new objective experiment; it does not establish
+the cause of the full-game regression.
+
+The research trainer now supports an explicit `pairLossWeighting: "roots"`
+registration. It gives each informative decision one unit of loss weight while
+retaining its paired worlds and action comparisons inside that decision. The
+original comparison-weighted mode remains the default. Both losses are recorded
+in receipts. Root-weighted checkpoint selection additionally requires observed
+labels for every served gate choice and nonnegative average paired terminal gain
+against the recorded baseline choice. Unknown catalog choices receive no invented
+outcome. Confidence margin one, warm-teacher CE tolerance 0.03, minimum validation
+improvement 0.005 and the four matched recipes remain fixed.
+
+The new cycle reuses the sealed completed labels and qualified initialization;
+its 34 CPU functional tests and fresh gradient/fold/inference admission passed.
+One validation-locked finalist may enter a new balanced-doctrine current-engine
+comparison: 864 development games, then 3,132 untouched games only after at least
+55% score with the lower whole-board 95% bound above 50%. Previous development
+banks are excluded. Production timing remains a separate model-bound gate on a
+quiet production CPU. This research patch changes no shipped combat profile.
+
 ## Completed 5090 sweep and iteration speedups — November 2, 2026 UTC
 
 The registered 192-teacher sweep, four student development evaluations and both
@@ -25,11 +75,11 @@ The 192 teacher fits are training experiments, not 192 additional game banks.
 
 | Student recipe / reference | Wins | Losses | Draws | Raw win rate | Draw-aware score |
 | -------------------------- | ---: | -----: | ----: | -----------: | ---------------: |
-| `cf85d3b9dc37`             | 406  | 352    | 10    | 52.86%       | 53.52%           |
-| `7e9b9ed69458`             | 411  | 351    | 6     | 53.52%       | 53.91%           |
-| `ba817b8a5134`             | 401  | 358    | 9     | 52.21%       | 52.80%           |
-| `8539c26d7c62`             | 404  | 354    | 10    | 52.60%       | 53.26%           |
-| Prior lower-LR reference   | 415  | 345    | 8     | 54.04%       | 54.56%           |
+| `cf85d3b9dc37`             |  406 |    352 |    10 |       52.86% |           53.52% |
+| `7e9b9ed69458`             |  411 |    351 |     6 |       53.52% |           53.91% |
+| `ba817b8a5134`             |  401 |    358 |     9 |       52.21% |           52.80% |
+| `8539c26d7c62`             |  404 |    354 |    10 |       52.60% |           53.26% |
+| Prior lower-LR reference   |  415 |    345 |     8 |       54.04% |           54.56% |
 
 Raw win rate is wins / 768; draw-aware score is (wins + half the draws) / 768.
 The best new student's board-bootstrap 95% score interval is 51.95–55.92%.
