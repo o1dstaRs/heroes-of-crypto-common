@@ -11,9 +11,9 @@ import { resolveAiMetaFightProfile, sanitizedAiMetaEnvironment } from "../../src
 import { renderAiMetaReport } from "../../src/simulation/render_ai_meta_report";
 
 describe("native v0.9 meta profile", () => {
-    test("selects the explicit default without promoting an untrained combat artifact or inheriting A19 flags", () => {
-        expect(DEFAULT_AI_VERSION).toBe("v0.9");
-        expect(createAIStrategy(DEFAULT_AI_VERSION).version).toBe("v0.9");
+    test("keeps native v0.9 explicit without promoting an untrained combat artifact or inheriting A19 flags", () => {
+        expect(DEFAULT_AI_VERSION).toBe("v0.8");
+        expect(createAIStrategy("v0.9").version).toBe("v0.9");
         expect(V09_MODEL_PROMOTED).toBe(false);
         const profile = resolveAiMetaFightProfile("v09-native");
         expect(profile.fightVersion).toBe("v0.9");

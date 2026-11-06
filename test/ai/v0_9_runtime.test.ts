@@ -100,10 +100,10 @@ afterEach(() => {
 });
 
 describe("v0.9 fixed-point runtime", () => {
-    test("selects native v0.9 by user instruction while retaining the untrained combat artifact", () => {
+    test("keeps native v0.9 explicit while A19 remains the combat default", () => {
         expect(AI_VERSIONS).toContain("v0.9");
         expect(LATEST_AI_VERSION).toBe("v0.8");
-        expect(DEFAULT_AI_VERSION).toBe("v0.9");
+        expect(DEFAULT_AI_VERSION).toBe("v0.8");
         expect(V09_MODEL_PROMOTED).toBe(false);
         expect(V09_MODEL_ARTIFACT.status).toBe("anchor_only");
         expect(V09_MODEL_ARTIFACT.modelSha256).toBeNull();

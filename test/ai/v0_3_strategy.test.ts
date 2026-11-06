@@ -54,7 +54,7 @@ describe("AI version registry — v0.8 is the shipped default", () => {
         expect(AI_VERSIONS).toContain("v0.4");
         expect(AI_VERSIONS).toContain("v0.5");
         expect(AI_VERSIONS).toContain("v0.6");
-        expect(DEFAULT_AI_VERSION).toBe("v0.9");
+        expect(DEFAULT_AI_VERSION).toBe("v0.8");
         expect(AI_VERSIONS.indexOf("v0.4")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.3"));
         expect(AI_VERSIONS.indexOf("v0.5")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.4"));
         expect(AI_VERSIONS.indexOf("v0.6")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.5"));

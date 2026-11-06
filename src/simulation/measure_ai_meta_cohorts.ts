@@ -749,7 +749,7 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
-export type AiMetaFightProfileId = "a13" | "a19" | "a19-work" | "v09-native";
+export type AiMetaFightProfileId = "a13" | "a19" | "a19-work" | "v09-native" | "v09-draft-a19-work";
 
 export interface IAiMetaFightProfile {
     id: AiMetaFightProfileId;
@@ -759,6 +759,7 @@ export interface IAiMetaFightProfile {
     strategyProfileId: AiMetaStrategyProfileId;
     fightVersion?: string;
     nativeV09?: boolean;
+    lockedV09Draft?: boolean;
     /** Finite search operation budgets decide every move instead of wall-clock deadlines (host-independent). */
     offlineDeterministicWork?: boolean;
 }
@@ -773,6 +774,26 @@ const definedEnvironment = (
     );
 
 const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFightProfile>> = Object.freeze({
+    "v09-draft-a19-work": Object.freeze({
+        id: "v09-draft-a19-work",
+        title: "Heroes of Crypto — Locked v0.9 Draft + A19 Combat Meta Cohorts",
+        fightVersion: "v0.8",
+        lockedV09Draft: true,
+        provenance: Object.freeze({
+            ...V08_A19_PROFILE,
+            name: "v0.9-draft+v0.8-a19-work",
+            draftModelId: V09_DEFAULT_DRAFT_MODEL_ID,
+            draftModelSha256: V09_DEFAULT_DRAFT_MODEL_SHA256,
+            draftBase: V09_DEFAULT_DRAFT_BASE_POLICY_SPEC,
+            draftArtifactFitVersion: 6,
+            searchBudget: "offline-deterministic-work",
+            offlineSearchEnvironment: AI_META_OFFLINE_SEARCH_ENVIRONMENT,
+            workerOverride: "V08_A19_SEARCH=1; searchOfflineDeterministicWork=true",
+        }),
+        workerEnvironment: definedEnvironment({ ...buildV08A19SearchEnvironment(), V08_A19_SEARCH: "1" }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+        offlineDeterministicWork: true,
+    }),
     "v09-native": Object.freeze({
         id: "v09-native",
         title: "Heroes of Crypto — Native v0.9 AI Meta Balance Cohorts",
@@ -988,7 +1009,11 @@ export async function runAiMetaWorkerPool(
             }
             const worker = new Worker(workerUrl, {
                 workerData: {
-                    options: { ...options, nativeV09: fightProfile.nativeV09 ?? options.nativeV09 },
+                    options: {
+                        ...options,
+                        nativeV09: fightProfile.nativeV09 ?? options.nativeV09,
+                        lockedV09Draft: fightProfile.lockedV09Draft ?? options.lockedV09Draft,
+                    },
                     strategyProfileId: fightProfile.strategyProfileId,
                     offlineDeterministicWork: fightProfile.offlineDeterministicWork === true,
                 },
@@ -1187,7 +1212,8 @@ function writeSummary(
                       ? AI_META_EVIDENCE_SCHEMA
                       : null,
                 studyProfile: aiMetaStudyFromEnvironment() ?? "legacy-oracle",
-                draftExplorationRate: aiMetaStudyFromEnvironment() && !fightProfile.nativeV09 ? 0.2 : 0,
+                draftExplorationRate:
+                    aiMetaStudyFromEnvironment() && !fightProfile.nativeV09 && !fightProfile.lockedV09Draft ? 0.2 : 0,
                 artifactExplorationRate: process.env.AI_META_ARTIFACT_UNIFORM === "1" ? 1 : AI_META_EXPLORATION_RATE,
             },
             selectionPolicy: aiMetaStudyFromEnvironment() ?? AI_META_POLICY,
@@ -1195,7 +1221,9 @@ function writeSummary(
                 spec: aiMetaStudyFromEnvironment() ? PREMIUM_META_DRAFT_SPEC : AI_META_RANKED_DRAFT_POLICY_SPEC,
                 sequence: "live-ranked-pick-v1",
                 visibility: "own prior picks plus legitimately revealed opponent identities",
-                ...(fightProfile.nativeV09 ? { modelId: V09_DEFAULT_DRAFT_MODEL_ID, sequentialBundles: true } : {}),
+                ...(fightProfile.nativeV09 || fightProfile.lockedV09Draft
+                    ? { modelId: V09_DEFAULT_DRAFT_MODEL_ID, sequentialBundles: true }
+                    : {}),
             },
             explorationRate: AI_META_EXPLORATION_RATE,
             evidenceCollection:

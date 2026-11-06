@@ -375,6 +375,7 @@ export interface IAiMetaRunOptions {
     collectEvidence?: boolean;
     studyProfile?: AiMetaStudy;
     nativeV09?: boolean;
+    lockedV09Draft?: boolean;
 }
 
 interface ICatalogEntry {
@@ -888,7 +889,7 @@ export function generateMetaMatchup(
             aiMetaSynergyVariantsForPair(setupSeed, combatSeed),
             options.collectEvidence === true,
             options.studyProfile,
-            options.nativeV09,
+            options.nativeV09 || options.lockedV09Draft,
         );
         [rosterA, rosterB] = generated.rosters;
         rankedDraft = generated.rankedDraft;

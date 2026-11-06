@@ -38,7 +38,7 @@ import {
 
 describe("v0.8 production-profile public exports", () => {
     test("the browser-safe root exposes A19 as the promoted profile and retains a13 as rollback", () => {
-        expect(DEFAULT_AI_VERSION).toBe("v0.9");
+        expect(DEFAULT_AI_VERSION).toBe(V08_A19_PRODUCTION_VERSION);
         expect(V08_A19_CANDIDATE_ID).toBe("a19");
         expect(V08_A19_PROFILE.researchOnly).toBe(false);
         expect(V08_A19_PROFILE.productionVersion).toBe(V08_A19_PRODUCTION_VERSION);

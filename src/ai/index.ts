@@ -21,7 +21,7 @@ import { STRATEGY_V0_6S } from "./versions/v0_6s";
 import { STRATEGY_V0_7 } from "./versions/v0_7";
 import { STRATEGY_V0_7S } from "./versions/v0_7s";
 import { STRATEGY_V0_8S } from "./versions/v0_8s";
-import { createV08A19Strategy } from "./versions/v0_8_a19_profile";
+import { createV08A19Strategy, V08_A19_PRODUCTION_VERSION } from "./versions/v0_8_a19_profile";
 import { STRATEGY_V0_9 } from "./versions/v0_9";
 
 export type {
@@ -229,11 +229,11 @@ export const LATEST_AI_VERSION: string = STRATEGIES[STRATEGIES.length - 1].versi
  * (non-LLM) AI opponent. Kept separate from LATEST_AI_VERSION so in-development versions (e.g. v0.4)
  * can be registered and tournament-tested without shipping them to live games.
  *
- * The user selected native v0.9 draft and combat as the default. Its embedded combat artifact remains
- * untrained/unpromoted and uses its exact native v0.8 anchor; this activation does not claim learned combat
- * qualification or attach the separate v0.8+A19 search. Persisted versioned seats retain their own profiles.
+ * The user selected the locked v0.9 draft together with v0.8+A19 combat. Authoritative draft hosts bind
+ * that checkpoint to default seats; combat keeps the qualified A19 strategy and matching search profile.
+ * Native v0.9 remains explicitly selectable research, with its untrained combat artifact unchanged.
  */
-export const DEFAULT_AI_VERSION = "v0.9";
+export const DEFAULT_AI_VERSION = V08_A19_PRODUCTION_VERSION;
 
 export function getAIStrategy(version: string): IAIStrategy {
     const strategy = STRATEGY_BY_VERSION.get(version);

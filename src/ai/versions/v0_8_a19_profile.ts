@@ -245,7 +245,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "ai-registry-promotion" as const,
         source: "src/ai/index.ts" as const,
-        sha256: "822082451cf6e94bb644442c26569c7c8c502834238cf86a6c3ebab8d24e7667" as const,
+        sha256: "69d86f5c7c6a7514612e4c16df0d2d40b789c98ae0ced434c162c01905d00f6b" as const,
     }),
     Object.freeze({
         role: "default-search-factory" as const,

@@ -962,7 +962,7 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
       ${renderRunMetadata(summary)}
     </div>
     <div class="hero-stats" aria-label="Report summary">
-      <div class="hero-stat"><strong>${escapeHtml(fightIdentity)}</strong><span>Fight AI${searchIdentity ? `<br>${escapeHtml(searchIdentity)} search` : ""}</span></div>
+      <div class="hero-stat"><strong>${escapeHtml(fightIdentity)}</strong><span>Fight AI${searchIdentity ? `<br>${escapeHtml(searchIdentity)} search` : ""}${fightProfile.draftModelId ? "<br>Locked v0.9 draft" : ""}</span></div>
       <div class="hero-stat"><strong>${formatInteger(cohorts.length)}</strong><span>Cohorts</span></div>
       <div class="hero-stat"><strong>${formatInteger(rows.length)}</strong><span>Ranking rows</span></div>
       <div class="hero-stat"><strong>${totalGames ? formatInteger(totalGames) : "—"}</strong><span>Reported games</span></div>
@@ -970,6 +970,11 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
   </div>
 </header>
 <main class="shell report-main">
+  ${
+      fightVersion === "v0.8" && fightProfile.draftModelId
+          ? `<aside class="notice" aria-label="Combined draft and combat profile"><div class="notice-mark">i</div><div><h2>Locked v0.9 draft + A19 combat</h2><p>Draft checkpoint: ${escapeHtml(textValue(fightProfile, ["draftModelId"]))}. Combat uses the recorded v0.8 + A19 search and placement profile. Native v0.9 combat is a separate research profile; these games measure the user's selected combined default.</p></div></aside>`
+          : ""
+  }
   ${
       fightVersion === "v0.9" && fightProfile.combatModelPromoted === false
           ? `<aside class="notice" aria-label="Native v0.9 profile"><div class="notice-mark">i</div><div><h2>Native v0.9 · locked V3 draft</h2><p>The user selected native v0.9 draft and combat. The draft uses ${escapeHtml(textValue(fightProfile, ["draftModelId"], "the recorded checkpoint"))}. The embedded combat model is anchor-only and untrained: native v0.8 decisions run through v0.9, with no A19 rollout search. This run measures that exact profile.</p></div></aside>`
