@@ -1,5 +1,54 @@
 # v0.9 training against current A19 R2
 
+## Fresh overall-strength test — November 7, 2026 UTC
+
+The user considers a repeatable two-point advantage valuable. The completed
+52.08% development score is therefore a reason to test this fixed checkpoint
+more precisely, while retaining the original failed 55% study and its unopened
+3,132-game confirmation bank unchanged. This is a separately registered overall
+test on the current engine, which includes the ranged echo/Quiver fixes in
+`f0394f73` made after the training source `005805a5`.
+
+Study `v09-current-overall-test-20261107T211035Z` was registered before play and
+launched at **21:19:14 UTC** on the shared 9800X3D host. It freezes common
+`77af0770c79d5d1e5f8ea9c62bd648f1dc9743b1` and the unchanged full-policy pair
+`675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68`.
+Registration SHA:
+`ae470d04bc5978626ea901c512a273d3f17c49d0c6f60949673d41bd71c0143e`;
+uploaded source/model archive SHA:
+`8045cbb006eac12c488859d9773c0a630c704def5c37fff731fa77fc955c26bf`.
+
+The fixed bank contains **1,512 new boards / 6,048 games**, with four physical
+and draft-seat mirrors per board. Each of the three maps and nine doctrine
+matchups has 56 boards. Both seats use their own locked-V3 draft policy,
+authoritative sequential bundle visibility and the complete deterministic
+A19 H64/R2 search. Only the candidate's existing neural correction weights
+change. Previously registered seed channels, including unopened banks, are
+excluded. There is one candidate, no refitting, no subgroup selection and no
+optional stopping.
+
+The question is whether this fixed pair has an overall advantage on the
+current engine: its 10,000-sample, map-stratified whole-board bootstrap must
+have a **95% lower bound above 50%**. The result will be reported regardless of
+its sign. The four games within a board remain one bootstrap cluster. This
+does not retrospectively pass the old 55% gate or qualify native v0.9 combat.
+
+Before fresh games, repeat the 128-reference numerical check, observation and
+continuation parity, 48 exact warm A/A replay pairs and 12 closed-fixture
+candidate smoke games on the frozen current source. Local numerical parity
+passed with maximum error `3.143e-6`. The current-source engine suite passed
+7,543 tests in the sandbox; its sole process-identity failure passed with all
+18 tests in that file when rerun outside the sandbox. Linux replay admission
+still runs separately before the fresh bank.
+
+The CPU-only test uses eight workers at nice 10, a 24 GiB process-group memory
+limit and a six-hour registered window. Existing host services and other
+research jobs remain running. Architecture and search work are unchanged;
+quiet production whole-turn timing within 1.10 times the reference is still
+required separately. A positive result does not automatically activate or
+deploy this research pair. The GPU fit is already complete; this stage needs
+battles rather than extra VRAM allocation.
+
 ## GPU utilization and completed full-policy fit — November 7, 2026 UTC
 
 The user emphasized using the RDNA card's capacity. The experiment
