@@ -10,6 +10,7 @@
  */
 
 import type { ISceneLog } from "../scene/scene_log_interface";
+import type { IVisibleDamage } from "../scene/animations";
 import { Unit } from "../units/unit";
 import * as HoCLib from "../utils/lib";
 import { FightStateManager } from "../fights/fight_state_manager";
@@ -29,6 +30,15 @@ const DEEP_WOUNDS_ABILITY_NAMES = [
 // the amplification stacked on the target (attack handler, double punch, lightning spin, AI estimate).
 export function hasAnyDeepWoundsAbility(unit: Unit): boolean {
     return DEEP_WOUNDS_ABILITY_NAMES.some((abilityName) => unit.hasAbilityActive(abilityName));
+}
+
+/** The same stacked cards, luck and synergy used at impact, without applying an effect or drawing RNG. */
+export function deepWoundsPowerPerHit(unit: Unit, synergyAbilityPowerIncrease: number): number {
+    const abilities = DEEP_WOUNDS_ABILITY_NAMES.flatMap((name) => {
+        const ability = unit.getAbility(name);
+        return ability?.getEffect() ? [ability] : [];
+    });
+    return unit.calculateDeepWoundsCount(abilities, synergyAbilityPowerIncrease);
 }
 
 export function calculateActiveDeepWoundsEffect(fromUnit: Unit, targetUnit: Unit): number {
@@ -52,6 +62,7 @@ export function processDeepWoundsAbility(
     targetUnit: Unit,
     currentActiveUnit: Unit,
     sceneLog: ISceneLog,
+    visibleDamage?: IVisibleDamage,
 ): number {
     if (targetUnit.isDead()) {
         return 0;
@@ -90,6 +101,9 @@ export function processDeepWoundsAbility(
         }
 
         if (targetUnit.applyEffect(deepWoundsEffect)) {
+            if (visibleDamage) {
+                (visibleDamage.deepWounds ??= []).push({ unitId: targetUnit.getId(), power: totalPower });
+            }
             sceneLog.updateLog(
                 `${fromUnit.getName()} applied Deep Wounds on ${targetUnit.getName()} for ${HoCLib.getLapString(laps)}`,
             );

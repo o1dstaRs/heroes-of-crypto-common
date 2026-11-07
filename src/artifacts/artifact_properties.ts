@@ -65,7 +65,7 @@ export enum Tier2Artifact {
     // This id still applies the same buff, so a saved game or replay that drafted it does not lose it.
     RIME_CHARM = 11, // 30% plus the attacking unit's current luck to slow a target for 3 laps
     LAVA_STRIDERS = 12, // all units may move over lava
-    QUIVER_OF_ECHOES = 15, // One extra ranged attack, 40% + current luck chance
+    QUIVER_OF_ECHOES = 15, // One extra ranged attack, 35% + current luck chance
     GRAVECHAIN = 16,
     AEGIS_OF_THE_ARCANE = 14, // extra magic-defense roll (army-wide), combined, not added
     ARCHMAGES_RING = 13, // +20% magic damage (army-wide); Tier-2 half of the arcane pair
@@ -177,7 +177,7 @@ export const ARTIFACT_POWER = {
     // An independent magic-defense roll for every unit, combined with the defense it already has by
     // 1 − Π(1 − p) — the same formula as Magic Shield. Not points added onto that defense.
     AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE: 18,
-    QUIVER_OF_ECHOES_CHANCE: 40,
+    QUIVER_OF_ECHOES_CHANCE: 35,
     GRAVECHAIN_CHANCE: 50,
     GRAVECHAIN_SLOW_LAPS: 3,
     GRAVECHAIN_CONNECTIONS: 3,

@@ -32,6 +32,7 @@ import { processStunAbility } from "./stun_ability";
 import { processFreezeAbility } from "./freeze_ability";
 import { processPoisonAuraAbility } from "./poison_aura_ability";
 import { processBorrowedGraceAbility } from "./borrowed_grace_ability";
+import { processDeepWoundsAbility } from "./deep_wounds_ability";
 
 export interface IThroughShotResult {
     landed: boolean;
@@ -70,7 +71,13 @@ export function processThroughShotAbility(
     const unitIdsDied: string[] = [];
     const perUnitDamage: IThroughShotResult["perUnitDamage"] = [];
     const throughShotAbility = attackerUnit.getAbility("Through Shot");
-    if (!throughShotAbility) {
+    if (
+        !throughShotAbility ||
+        attackerUnit.isDead() ||
+        attackerUnit.isSkippingThisTurn() ||
+        attackerUnit.getRangeShots() <= 0 ||
+        !targetUnits.some((group) => group.some((unit) => !unit.isDead()))
+    ) {
         return { landed: false, unitIdsDied, animationData, perUnitDamage };
     }
 
@@ -92,15 +99,15 @@ export function processThroughShotAbility(
             continue;
         }
 
-        targetUnit = affectedUnits[0];
-        if (!targetUnit) {
+        const candidateTarget = affectedUnits[0];
+        if (!candidateTarget) {
             targetUnitUndex++;
             continue;
         }
         // An earlier pierced ally can redirect enough Flesh Shield damage to kill an Abomination that
         // appears later on this same trajectory. Do not hit that now-dead stack a second time (or emit
         // fake splash/stat damage for it); keep advancing the projectile through the lane.
-        if (targetUnit.isDead()) {
+        if (candidateTarget.isDead()) {
             targetUnitUndex++;
             continue;
         }
@@ -111,6 +118,7 @@ export function processThroughShotAbility(
             continue;
         }
         targetUnitUndex++;
+        targetUnit = candidateTarget;
 
         const isAttackMissed =
             HoCLib.getRandomInt(0, 100) <
@@ -282,6 +290,7 @@ export function processThroughShotAbility(
                     (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
             }
         } else if (!absorbedUnitIds.has(unit.getId())) {
+            processDeepWoundsAbility(attackerUnit, unit, currentActiveUnit, sceneLog, visibleDamage);
             processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
             processFreezeAbility(attackerUnit, unit, attackerUnit, sceneLog);
             processRimeCharmAbility(attackerUnit, unit, sceneLog, currentActiveUnit);

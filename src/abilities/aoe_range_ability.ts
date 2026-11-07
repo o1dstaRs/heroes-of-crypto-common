@@ -32,6 +32,7 @@ import { processFreezeAbility } from "./freeze_ability";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { processPoisonAuraAbility } from "./poison_aura_ability";
 import { processBorrowedGraceAbility } from "./borrowed_grace_ability";
+import { processDeepWoundsAbility } from "./deep_wounds_ability";
 
 export interface IAOERangeAttackResult {
     landed: boolean;
@@ -310,6 +311,7 @@ export function processRangeAOEAbility(
                 continue;
             }
             // The unit whose turn it is — the attacker even when this is a counter-volley — gets the extra lap.
+            processDeepWoundsAbility(attackerUnit, unit, currentActiveUnit, sceneLog, visibleDamage);
             processStunAbility(attackerUnit, unit, currentActiveUnit, sceneLog);
             processFreezeAbility(attackerUnit, unit, currentActiveUnit, sceneLog);
             processRimeCharmAbility(attackerUnit, unit, sceneLog, currentActiveUnit);

@@ -126,7 +126,7 @@ describe("artifact draft luck matches the combat roster", () => {
     });
 
     test("changes a legal mixed-army offer when the shooters' real luck makes Quiver preferable", () => {
-        const own = [C.PEASANT, C.BERSERKER, C.ELF, C.PIKEMAN, C.ZENA];
+        const own = [C.WOLF_RIDER, C.BERSERKER, C.ELF, C.PIKEMAN, C.ZENA];
         const offered = [T2.QUIVER_OF_ECHOES, T2.CROWN_OF_COMMAND, T2.WARLORDS_EDGE];
         const base = "conditional-v1:sniper+t2a19";
         expect(resolveSetupPolicy(`${ARTIFACT_FIT_SETUP_PREFIX_V3}${base}`).pickArtifactT2(offered, own)).toBe(
@@ -144,8 +144,8 @@ describe("artifact draft luck matches the combat roster", () => {
         expect(withArtifactFitSetupPolicy(current, 4)).toBe(current);
         expect(current.pickAugments(7, [C.ELF])).toEqual(previous.pickAugments(7, [C.ELF]));
         expect(current.pickSynergies([C.ELF])).toEqual(previous.pickSynergies([C.ELF]));
-        expect(tier2ArtifactFitScoreV3(T2.QUIVER_OF_ECHOES, [C.GARGANTUAN])).toBe(70);
-        expect(tier2ArtifactFitScoreV4(T2.QUIVER_OF_ECHOES, [C.GARGANTUAN])).toBe(72);
+        expect(tier2ArtifactFitScoreV3(T2.QUIVER_OF_ECHOES, [C.GARGANTUAN])).toBe(67.5);
+        expect(tier2ArtifactFitScoreV4(T2.QUIVER_OF_ECHOES, [C.GARGANTUAN])).toBe(69.5);
         expect(() => resolveSetupPolicy(ARTIFACT_FIT_SETUP_PREFIX_V4)).toThrow();
     });
 

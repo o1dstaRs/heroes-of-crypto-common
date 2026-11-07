@@ -181,8 +181,8 @@ describe("situational artifact selection v2", () => {
         expect(policy.pickArtifactT2(offered, weakBattery)).toBe(T2.QUIVER_OF_ECHOES);
         expect(v2.pickArtifactT2(offered, weakBattery)).toBe(T2.CROWN_OF_COMMAND);
         expect(v2.pickArtifactT2(offered, ranged)).toBe(T2.QUIVER_OF_ECHOES);
-        expect(tier2ArtifactFitScoreV2(T2.QUIVER_OF_ECHOES, [C.GARGANTUAN])).toBe(70);
-        expect(tier2ArtifactFitScoreV2(T2.QUIVER_OF_ECHOES, [C.ARBALESTER])).toBe(90);
+        expect(tier2ArtifactFitScoreV2(T2.QUIVER_OF_ECHOES, [C.GARGANTUAN])).toBe(67.5);
+        expect(tier2ArtifactFitScoreV2(T2.QUIVER_OF_ECHOES, [C.ARBALESTER])).toBe(85);
     });
 
     test("values repeated Rime rolls but never invents guaranteed connected targets for Gravechain", () => {

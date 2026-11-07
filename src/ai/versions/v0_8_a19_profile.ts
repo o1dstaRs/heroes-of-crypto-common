@@ -174,8 +174,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        // Re-pinned for decision-scoped Smoke damage reuse and exact zero-prevention early exits.
-        sha256: "569cce67764aafa1e4ccc0645ccf3c742834c27141bc08c6692bae829b69e051" as const,
+        // Re-pinned for ranged Deep Wounds stacking across native volleys and Quiver of Echoes.
+        sha256: "d103524159519019204a71217cdea05b959847e77c316df5f7b92585cc971e26" as const,
     }),
     Object.freeze({
         role: "last-fuse-estimates" as const,
@@ -190,7 +190,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "ranged-shields" as const,
         source: "src/ai/ranged_shield_estimate.ts" as const,
-        sha256: "2c7b63f0ba3460fd4a877bdc9144878539884a18ae007e9e085cb98b5b8ade0d" as const,
+        sha256: "889d2ec21163edf614cfdf69657dc4ae5f43b7f15ade55f8f3cfb91935cab10d" as const,
     }),
     Object.freeze({
         role: "selection-bounds" as const,
