@@ -1,10 +1,10 @@
 # v0.9 training against current A19 R2
 
-## GPU utilization and queued full-policy fit — November 7, 2026 UTC
+## GPU utilization and completed full-policy fit — November 7, 2026 UTC
 
-The user emphasized using the RDNA card's capacity. The current experiment
-spends most of its time producing full-game continuation labels on the CPU;
-the GPU is idle during that stage. Its 130-parameter head-only fits also leave
+The user emphasized using the RDNA card's capacity. The experiment
+spent most of its time producing full-game continuation labels on the CPU;
+the GPU was idle during that stage. Its 130-parameter head-only fits also leave
 most GPU compute unused. Filling VRAM is not required for high compute usage:
 the measured full-policy update windows below used under 600 MiB of VRAM.
 
@@ -48,7 +48,7 @@ are unchanged. Both complete models are snapshotted and restored together, with
 shape, finite-value and frozen-weight checks before restoration.
 
 The actual full-policy gradients matched CPU PyTorch within `1.431e-6`;
-the first clipped SGD update matched within `7.451e-9`. The exact queued
+the first clipped SGD update matched within `7.451e-9`. The exact registered
 backend also passed full checkpoint restoration and eight eager/compiled
 updates with **zero parameter and policy differences**.
 
@@ -73,12 +73,13 @@ Evidence is preserved under local study
 `v09-rdna-utilization-20261107T073439Z`. Registration SHA:
 `db0e1b5f3b888200af2da9aaae90f5ccb55dc680c4d19db489357d51954c2acd`.
 
-### Queued real-data full-policy experiment
+### Completed real-data full-policy experiment
 
 The separate source-sealed campaign `v09-rdna-full-policy-20261107T075127Z`
-passed its exact GPU/software preflight and is waiting for the parent's complete
-admitted dataset and completed GPU fit. It never edits, pauses or replaces that
-experiment. Its 12-hour cutoff is **19:51:28 UTC on November 7**. Registration SHA:
+passed its exact GPU/software preflight, waited for the parent's complete
+admitted dataset and GPU fit, and finished its own development test. It never
+edited, paused or replaced that experiment. Its registered 12-hour cutoff was
+**19:51:28 UTC on November 7**. Registration SHA:
 `f86e35cddbf9cf93db0206a14ca3bd001311708a61b2bcd065c87ff535859d2c`;
 archive SHA:
 `36f1f6a41a98dd7fdea197f496b19ff2e966a551cea5f09864a4fd232312466a`.
@@ -100,6 +101,71 @@ CPU evaluation waits until the parent's evaluation finishes, preserving its
 worker budget. Production timing and activation remain separate. No throughput
 probe has opened a strength bank or established a new win-rate gain.
 
+The parent completed all 972 scenarios and **18,224 paired continuations**.
+It admitted 541 training / 259 validation roots, of which 118 / 69 had marginal
+score contrast, and 2,591 / 1,296 authentic warm rows. Four head-only fits
+completed in 282.94 seconds; none produced a validation-eligible finalist.
+
+The full-policy child completed 340 updates in 58.69 fit-loop seconds and
+70.02 seconds including loading/preparation/export. Peak sampled VRAM was
+2,149,126,144 bytes, and peak available temperature was 53 C. Epoch 39 satisfied
+the fixed constraints: validation loss 6.79534 → 6.66998, teacher CE 1.20424 →
+1.21842, one changed validation choice, zero unknown choices and zero mean
+recorded-label gain. Its complete pair SHA is
+`675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68`.
+
+CPU export verification passed 128 references with maximum error `3.143e-6`.
+All 48 warm replay pairs and 12 candidate smoke games passed. The independent
+development bank then completed:
+
+| Games | Wins | Draws | Losses | Draw-aware score | Whole-board 95% interval |
+| ----: | ---: | ----: | -----: | ---------------: | ------------------------ |
+|   864 |  445 |    10 |    409 |           52.08% | 49.59–54.63%             |
+
+The point estimate is above the reference, but the interval includes 50% and
+the preregistered 55% development threshold failed. This is not an established
+strength gain. The separate 3,132-game confirmation remains unopened; no model
+is promoted. Both study jobs are complete. An independent local reconstruction
+of all 216 raw boards reproduced the outcome counts and both bootstrap endpoints
+exactly.
+
+### Real-recipe GPU telemetry replay
+
+After completion, one measurement-only replay ran the same complete 340-update
+recipe with every export marked functional and no finalist or strength games.
+Both selected models' weight dictionaries exactly match the originals, and the
+same epoch 39 was selected. One-second read-only telemetry attributed every
+sample to the replay's KFD process.
+
+| Actual real-data replay window | Whole replay | Updates after first checkpoint |
+| ------------------------------ | -----------: | -----------------------------: |
+| Wall seconds                   |        65.01 |                          38.57 |
+| Available GPU busy samples     |           64 |                             38 |
+| Average GPU busy time          |       59.64% |                     **94.16%** |
+| Peak GPU busy time             |         100% |                           100% |
+| Average package power          |      167.1 W |                    **257.8 W** |
+| Peak package power             |        299 W |                          299 W |
+| Peak available temperature     |         51 C |                           51 C |
+
+The full fitter reported 64.94 total seconds and 54.46 fit-loop seconds in the
+replay. The whole window includes preparation and compilation; the later update
+window includes normal checkpoint/validation work. This verifies high GPU usage
+while the richer learner updates, not continuous GPU usage during CPU battle
+generation. The source-sealed replay is `v09-full-policy-timing-replay-20261107T170758Z`;
+its `hardware-replay-summary.json` records the weight equality and exact windows.
+Raw device counters, process identities and campaign phases are retained by the
+read-only `v09-rdna-monitor-20261107` service, stopped after the completed replay.
+Missing counters remain missing.
+
+The completed dataset, admission proof, all five fit receipts, selected complete
+pair, all raw development boards and telemetry were copied locally under
+`game/core/tmp/v09-rdna-completed-readout-20261107`. Archive SHA
+`507bb6f48bd45ba99505ef37a4b1649da4465b0e4926e10b8d77ec0ff380e87a`
+and admitted training-data SHA
+`fd797a1493468a23ef0b5d64b10e26d49e55012dd19fec1c8e552c413bcc9126`
+were independently verified after copying. Normal generated evidence remains
+outside Git.
+
 ## Broader joint-head campaign — November 7, 2026 UTC
 
 The user requested a review from all angles and continued training for measured
@@ -109,7 +175,8 @@ window ends at **18:57:25 UTC on November 7**. Its registration SHA is
 `4e72480f0f8ce771430e197950b66022a827d89a4d87f5503dd543b8730747cc`;
 the uploaded archive SHA is
 `674cf1b195ed490539017dffdc0de0d49c83ce2b4e1c9e89b4bc59f633d3d991`.
-This is an in-progress experiment, not a newly qualified model.
+The acquisition and four head fits are complete; no head-only candidate passed
+validation admission. The full-policy child result is reported above.
 
 ### Questions the experiment separates
 
@@ -176,14 +243,15 @@ The current default remains locked v0.9 draft plus qualified A19 combat.
 Repository verification for the harness change passed lint, TypeScript checking
 and **7,500 common tests**. Ordinary run data and models remain outside Git.
 
-The live campaign passed its Linux controls and trainer preflight before starting
+The campaign passed its Linux controls and trainer preflight before starting
 fresh acquisition. Mac and Linux control receipts are identical: 12 cases each
 reproduce stock, observed capture and same-future continuation games, including
 788 restoration checks. The exact four-fit trainer completed 160 functional
 updates in **38.25 seconds**, using a sampled peak of **162.1 MiB VRAM**. None of
 those diagnostic fits satisfied checkpoint eligibility, and none can consume
-strength games. These results verify the new trainer's execution; fresh-data
-training and match-strength results are still pending.
+strength games. These results verified the trainer before real-data execution.
+The completed acquisition, head-fit rejection and separate full-policy match
+results are reported above.
 
 ## Joint-head training on the 9800X3D RDNA GPU — November 7, 2026 UTC
 
