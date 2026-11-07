@@ -63,6 +63,29 @@ def served_log_policy(left: Tensor, right: Tensor, legal: Tensor) -> Tensor:
     return maximum + ((a - maximum).exp() + (b - maximum).exp()).log() - math.log(2)
 
 
+def clipped_parameter_gradients(loss: Tensor, parameters: list[Tensor], *, maximum_norm: float = 1.,
+                                epsilon: float = 1e-6) -> Tensor:
+    """Overwrite only selected FP32 gradients and clip on their device, without host copies.
+
+    Tinygrad 0.14 backward() targets all live floating tensors, including board
+    inputs. Explicit targets avoid unused input gradients and boolean-mask paths.
+    The returned norm is lazy; realize diagnostics together with optimizer updates.
+    This does not accumulate gradients or choose a training/promotion recipe.
+    """
+    if not parameters or len({id(p) for p in parameters}) != len(parameters):
+        raise ValueError("declare unique trainable Tinygrad parameters")
+    if any(not p.is_param or p.dtype != dtypes.float32 or p.device != parameters[0].device for p in parameters):
+        raise ValueError("clipping requires trainable float32 parameters on one device")
+    if not math.isfinite(maximum_norm) or maximum_norm <= 0 or not math.isfinite(epsilon) or epsilon <= 0:
+        raise ValueError("invalid Tinygrad gradient-clipping bounds")
+    gradients = loss.gradient(*parameters)
+    norm = Tensor.stack(*[gradient.square().sum() for gradient in gradients]).sum().sqrt()
+    coefficient = (maximum_norm / (norm + epsilon)).minimum(1)
+    for parameter, gradient in zip(parameters, gradients):
+        parameter.grad = gradient * coefficient
+    return norm
+
+
 class TinyA19HeadPair:
     def __init__(self, student: dict[str, Any], partner: dict[str, Any], widths: tuple[int, int, int],
                  *, device: str, train_members: str = "joint") -> None:

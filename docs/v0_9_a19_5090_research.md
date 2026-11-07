@@ -1,5 +1,105 @@
 # v0.9 training against current A19 R2
 
+## GPU utilization and queued full-policy fit — November 7, 2026 UTC
+
+The user emphasized using the RDNA card's capacity. The current experiment
+spends most of its time producing full-game continuation labels on the CPU;
+the GPU is idle during that stage. Its 130-parameter head-only fits also leave
+most GPU compute unused. Filling VRAM is not required for high compute usage:
+the measured full-policy update windows below used under 600 MiB of VRAM.
+
+### Verified throughput changes
+
+`clipped_parameter_gradients()` requests derivatives only for selected FP32
+parameters and computes global clipping on their device. Tinygrad 0.14's
+ordinary `backward()` requests gradients for every live floating tensor,
+including board inputs; the full-policy probe originally failed while attempting
+to differentiate a boolean army mask. Explicit parameter targets remove that
+invalid path and unused input gradients. They also remove per-update gradient
+copies to NumPy and back. The original registered head experiment is unchanged.
+
+A separate, source-sealed probe compared the host-clipped loop, explicit GPU
+gradients/clipping, and the same GPU optimizer captured with `TinyJit`. Three
+counterbalanced rounds each used two warmup updates and 64 timed updates, with
+device synchronization on both sides of the timed window.
+
+| Head-update loop                    | Median seconds for 64 updates |
+| ----------------------------------- | ----------------------------: |
+| Existing host clipping/backward     |                       13.3501 |
+| Explicit gradients and GPU clipping |                        3.8614 |
+| GPU loop with compiled replay       |                       0.03995 |
+
+The **334.2 times** ratio applies only to this small, steady-state update loop.
+It excludes data acquisition, feature preparation, compilation, validation and
+exports, and is not a whole-campaign speedup. GPU and compiled replay produced
+bit-identical parameters in every round. Against the host-clipped reference,
+non-bias weights differed by at most `4.459e-5`, normalized policies by
+`8.584e-6`, and all 114 applicable serving-choice comparisons agreed. Two scalar
+policy biases drifted by up to 0.03995 under rounded near-zero Adam gradients;
+each cancels from its member's softmax. These are numerically close fits rather
+than byte-identical exports. The original failed strict parameter comparison
+and its diagnostic receipt remain preserved.
+
+`FullA19Pair` trains **500,418 existing policy-path parameters**, including both
+original encoders. Auxiliary-head weights remain frozen. Inputs and hidden
+activations are recomputed with the current weights; there is no frozen-feature
+cache. The serving architecture, native observation contract and search budget
+are unchanged. Both complete models are snapshotted and restored together, with
+shape, finite-value and frozen-weight checks before restoration.
+
+The actual full-policy gradients matched CPU PyTorch within `1.431e-6`;
+the first clipped SGD update matched within `7.451e-9`. The exact queued
+backend also passed full checkpoint restoration and eight eager/compiled
+updates with **zero parameter and policy differences**.
+
+| Short full-policy update window | Batch 64 | Batch 512 |
+| ------------------------------- | -------: | --------: |
+| Timed updates                   |      256 |       256 |
+| Updates/second                  |   109.65 |     61.87 |
+| Sampled average GPU busy time   |    93.9% |     88.7% |
+| Sampled average package power   |  179.5 W |   184.0 W |
+| Peak available temperature      |     34 C |      36 C |
+
+The probe peaked at 198 W and 558.1 MiB sampled VRAM. These short windows
+repeated the 19 exposed historical inputs for throughput; they are not new
+independent training data or evidence of stronger play. All arithmetic remained
+Float32 with `TC=0` and TF32 disabled. This is measured FP32 workload utilization,
+not qualification of peak matrix-accelerator throughput. The full 166-second
+probe includes CPU-heavy preparation and host-reference loops, so its overall
+GPU utilization is much lower than the two update windows.
+
+Evidence is preserved under local study
+`v09-rdna-utilization-20261107/benchmark-20261107T073439Z` and node study
+`v09-rdna-utilization-20261107T073439Z`. Registration SHA:
+`db0e1b5f3b888200af2da9aaae90f5ccb55dc680c4d19db489357d51954c2acd`.
+
+### Queued real-data full-policy experiment
+
+The separate source-sealed campaign `v09-rdna-full-policy-20261107T075127Z`
+passed its exact GPU/software preflight and is waiting for the parent's complete
+admitted dataset and completed GPU fit. It never edits, pauses or replaces that
+experiment. Its 12-hour cutoff is **19:51:28 UTC on November 7**. Registration SHA:
+`f86e35cddbf9cf93db0206a14ca3bd001311708a61b2bcd065c87ff535859d2c`;
+archive SHA:
+`36f1f6a41a98dd7fdea197f496b19ff2e966a551cea5f09864a4fd232312466a`.
+
+One fixed full-policy recipe uses AdamW learning rate 0.00001, weight decay
+0.001, FP32 GPU clipping at one and compiled updates. Every update uses the
+complete training-root and warm-training banks. Score scale 0.1, root KL 0.2,
+warm KL one, teacher CE weight 0.05, validation improvement 0.005, teacher CE
+tolerance 0.03 and margin one remain fixed. Checkpoints require observed labels
+for every served validation choice, nonnegative label gain and changed decisions.
+Whole-model snapshots preserve the selected epoch's encoders as well as heads.
+
+Only one eligible finalist can run, with at least 96 Bun numerical/decision
+references, 48 warm A/A replay pairs and 12 closed-fixture candidate smoke games.
+Its separate **864-game development** and **3,132-game confirmation** banks
+exclude the parent's banks and earlier studies. The existing 55% development /
+52% confirmation score thresholds and positive whole-board lower bounds apply.
+CPU evaluation waits until the parent's evaluation finishes, preserving its
+worker budget. Production timing and activation remain separate. No throughput
+probe has opened a strength bank or established a new win-rate gain.
+
 ## Broader joint-head campaign — November 7, 2026 UTC
 
 The user requested a review from all angles and continued training for measured
