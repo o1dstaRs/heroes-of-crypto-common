@@ -49,6 +49,82 @@ required separately. A positive result does not automatically activate or
 deploy this research pair. The GPU fit is already complete; this stage needs
 battles rather than extra VRAM allocation.
 
+## GPU DRAM capacity and useful training throughput — November 7, 2026 UTC
+
+The user also emphasized GPU DRAM. Capacity allocation and memory activity are
+separate [driver counters](https://docs.kernel.org/gpu/amdgpu/thermal.html).
+The complete admitted root and warm observation banks, including validation,
+need **189,050,067 bytes (180.3 MiB)** for their padded inputs and baseline
+policies. Both original models contain 517,190 total parameters; their FP32
+weights, trainable gradients and Adam moments need about **8,073,776 bytes**.
+Most of the roughly 2 GiB real-fit footprint is intermediate activations and
+runtime buffers. All current input banks already remain on the GPU.
+
+The training banks fill only 26.2–26.8% of padded candidate slots. A separate
+functional probe groups rows by candidate-count ceilings `[4, 8, 16, 32]` and
+flattens dense-layer batch dimensions into a two-dimensional matrix multiply.
+The active training banks retain every row, target and candidate while reducing
+allocated candidate slots from 80,891 to 28,499. The combined objective retains
+the original informative-root weighting, row-weighted regularizers and teacher
+CE, followed by one global clipping operation and one AdamW update per complete
+bank. It does not step the optimizer separately for each bucket.
+
+The source-sealed study `v09-rdna-memory-20261107T215719Z`, from research source
+`ecbedb4e`, completed three paired rounds in counterbalanced order. Each mode
+performed two warmup updates and 64 synchronized timed updates on the complete
+real corpus. Both layouts and their reference banks were resident throughout.
+
+| Training layout | Median seconds / 64 updates | Updates/second | Average VRAM busy during timed windows |
+| --------------- | --------------------------: | -------------: | -------------------------------------: |
+| Original padded |                     7.06879 |           9.05 |                                  5.02% |
+| Bucketed + flat |                     5.50921 |          11.62 |                                  3.08% |
+
+The compact path delivers **28.3% more steady-state updates/second**, or 22.1%
+less timed update wall time. This excludes packing, compilation, numerical
+verification, checkpointing and exports; it is not a whole-fit or whole-campaign
+speedup. GPU busy time stayed around 89–90% for both paths, while VRAM activity
+was low. The current fit therefore does not saturate DRAM bandwidth. Reducing
+unnecessary work improves useful throughput even as memory activity falls.
+
+Initial clipped gradients differed by at most `5.960e-8`; initial validation
+log policies differed by `1.907e-6`. After all 66 updates in every round,
+root-validation and warm-validation log policies still differed by at most
+`1.907e-6`, and all 259 margin-one root-validation choices matched. Maximum
+parameter difference was `1.125e-5`, so these are numerically close trajectories,
+not bit-identical checkpoints. No model was exported, selected or activated,
+and no strength games were consumed. A future trained export still needs its
+own parity, full-game and production-timing qualification.
+
+A separate short bandwidth calibration in the same probe read and wrote
+274,877,906,944 payload bytes in 0.46289 seconds: **593.8 GB/s effective payload
+throughput**. The buffers were two 256 MiB UInt32 arrays; every output element
+matched the CPU reference. Two telemetry samples reported 92.5% mean / 93% peak
+VRAM busy, with about 615 MiB total driver-reported VRAM allocation. This short
+calibration demonstrates high memory activity without filling capacity; it is
+not a sustained training-bandwidth result or a test of all 32 GiB of memory.
+The six timed training windows reached **52 C memory temperature**, 49 C edge
+and 70 C junction.
+
+Registration SHA:
+`2a4af07b675a46e7a6498b5ee23f77cb892b87549d03729a608b4e0c44e47c34`;
+capsule SHA:
+`a6a24b34e7ba415e414c46a4d6d3f476f0a089bb3b53db07c3f35b05576f0e4d`.
+All inputs, raw telemetry and journals are retained in evidence archive
+`v09-rdna-memory-evidence-20261107T220431Z.tar.gz`, SHA
+`28653140429f6e49040e46c066ff57fccae61bde69c328d7166b0d8370610095`.
+This includes the first probe's CPU timeline timeout during per-gradient host
+copies and a subsequent API-mismatch attempt that stopped before measurement.
+The completed probe realizes gradients together before a concatenated host copy.
+Kernel logs showed no GPU fault or reset, and the device returned to idle after
+each terminated attempt. The fixed 6,048-game evaluation remains separate.
+
+The spare capacity can support a much larger independent replay corpus, bounded
+training batches and controlled candidate fits. Increasing resident examples
+requires additional independently generated data; repeating the existing bank
+does not add evidence. Preserve the unchanged serving architecture and live
+compute budget while using this measured packing method in subsequent isolated
+fits. Generated evidence and the executable probe remain outside Git.
+
 ## GPU utilization and completed full-policy fit — November 7, 2026 UTC
 
 The user emphasized using the RDNA card's capacity. The experiment
