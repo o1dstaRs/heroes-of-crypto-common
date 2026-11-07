@@ -28,6 +28,8 @@ export interface IEffectApplicationRecord {
     sourceUnitId?: string;
     /** A debuff that ROLLED but was resisted — recorded so the log can say the target shrugged it off. */
     resisted?: boolean;
+    /** The passive that actually blocked this application, rather than a generic resistance roll. */
+    resistedBy?: "Madness";
 }
 
 // System/marker state the seeding and refresh machinery re-applies over and over — never player-visible
@@ -70,6 +72,7 @@ export type IEmberCovenantAbsorbRecord = IWaterShieldAbsorbRecord;
 
 let captureActive = false;
 let records: IEffectApplicationRecord[] = [];
+let pairedResistanceRecords = new WeakSet<IEffectApplicationRecord>();
 let waterShieldAbsorbs: IWaterShieldAbsorbRecord[] = [];
 let emberCovenantAbsorbs: IEmberCovenantAbsorbRecord[] = [];
 
@@ -77,6 +80,7 @@ let emberCovenantAbsorbs: IEmberCovenantAbsorbRecord[] = [];
 export const beginEffectApplicationCapture = (): void => {
     captureActive = true;
     records = [];
+    pairedResistanceRecords = new WeakSet();
     waterShieldAbsorbs = [];
     emberCovenantAbsorbs = [];
 };
@@ -112,6 +116,7 @@ export const endEffectApplicationCapture = (): IEffectApplicationRecord[] => {
     captureActive = false;
     const out = records;
     records = [];
+    pairedResistanceRecords = new WeakSet();
     return out;
 };
 
@@ -119,6 +124,22 @@ export const endEffectApplicationCapture = (): IEffectApplicationRecord[] => {
 export const recordEffectApplication = (record: IEffectApplicationRecord): void => {
     if (!captureActive || isEffectApplicationNoise(record.name)) {
         return;
+    }
+    if (record.resisted) {
+        const existing = records.find(
+            (entry) =>
+                entry.resisted &&
+                entry.unitId === record.unitId &&
+                entry.name === record.name &&
+                entry.kind === record.kind &&
+                Boolean(entry.resistedBy) !== Boolean(record.resistedBy) &&
+                !pairedResistanceRecords.has(entry),
+        );
+        if (existing) {
+            existing.resistedBy ??= record.resistedBy;
+            pairedResistanceRecords.add(existing);
+            return;
+        }
     }
     records.push(record);
 };

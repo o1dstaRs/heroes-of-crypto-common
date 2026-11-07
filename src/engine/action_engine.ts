@@ -3004,7 +3004,10 @@ export class GameActionEngine {
             }
             // Shrugging off a MIND spell is a resist and reads as one; say so. An already-applied spell is
             // not a resist — it stays silent, as the "suffers" line for it was already written.
-            if (spell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance()) {
+            if (
+                spell.getPowerType() === SpellPowerType.MIND &&
+                debuffTarget.hasMindAttackResistance(spell.getName(), "debuff")
+            ) {
                 this.context.sceneLog.updateLog(`${debuffTarget.getName()} resisted from ${spell.getName()}`);
                 recordEffectApplication({
                     unitId: debuffTarget.getId(),
@@ -3031,7 +3034,10 @@ export class GameActionEngine {
             if (
                 SpellHelper.isMirrored(debuffTarget) &&
                 !SpellHelper.hasAlreadyAppliedSpell(caster, spell) &&
-                !(spell.getPowerType() === SpellPowerType.MIND && caster.hasMindAttackResistance())
+                !(
+                    spell.getPowerType() === SpellPowerType.MIND &&
+                    caster.hasMindAttackResistance(spell.getName(), "debuff")
+                )
             ) {
                 caster.applyDebuff(spell, undefined, undefined, true);
                 this.context.sceneLog.updateLog(

@@ -54,7 +54,10 @@ export function processBlindnessAbility(
         }
 
         if (
-            !(blindnessAbility.getType() === AbilityType.MIND && targetUnit.hasMindAttackResistance()) &&
+            !(
+                blindnessAbility.getType() === AbilityType.MIND &&
+                targetUnit.hasMindAttackResistance(blindnessEffect.getName())
+            ) &&
             targetUnit.applyEffect(blindnessEffect)
         ) {
             sceneLog.updateLog(`${targetUnit.getName()} is blind for ${HoCLib.getLapString(laps)}`);

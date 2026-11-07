@@ -54,7 +54,7 @@ export function processAggrAbility(
         }
 
         if (
-            !(aggrAbility.getType() === AbilityType.MIND && targetUnit.hasMindAttackResistance()) &&
+            !(aggrAbility.getType() === AbilityType.MIND && targetUnit.hasMindAttackResistance(aggrEffect.getName())) &&
             targetUnit.applyEffect(aggrEffect)
         ) {
             sceneLog.updateLog(
