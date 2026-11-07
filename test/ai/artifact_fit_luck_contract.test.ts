@@ -149,7 +149,7 @@ describe("artifact draft luck matches the combat roster", () => {
         expect(() => resolveSetupPolicy(ARTIFACT_FIT_SETUP_PREFIX_V4)).toThrow();
     });
 
-    test("combines faction luck with Cursed Ward when choosing connected control", () => {
+    test("rejects retired control artifacts regardless of faction luck and Cursed Ward", () => {
         const own = [C.ARBALESTER, C.FAIRY, C.WYVERN, C.ELF, C.ZENA];
         const offered = [T2.BERSERKERS_BOND, T2.LAVA_STRIDERS, T2.GRAVECHAIN];
         const context = createTier2ArtifactDecisionContext({
@@ -158,10 +158,10 @@ describe("artifact draft luck matches the combat roster", () => {
         });
         const base = "conditional-v1:sniper+t2a19";
         expect(resolveSetupPolicy(`${ARTIFACT_FIT_SETUP_PREFIX_V3}${base}`).pickArtifactT2(offered, own, context)).toBe(
-            T2.BERSERKERS_BOND,
+            T2.LAVA_STRIDERS,
         );
         expect(resolveSetupPolicy(`${ARTIFACT_FIT_SETUP_PREFIX_V4}${base}`).pickArtifactT2(offered, own, context)).toBe(
-            T2.GRAVECHAIN,
+            T2.LAVA_STRIDERS,
         );
     });
 });

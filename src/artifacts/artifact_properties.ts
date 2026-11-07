@@ -45,6 +45,7 @@ export enum Tier1Artifact {
     TOME_OF_AMPLIFICATION = 14, // +35% power to non-healing castable buffs allied units apply to allies
     // Was Tier 2 id 11. That id stays addressable for saved games; new drafts pick this one.
     RIME_CHARM = 15, // 30% plus the attacking unit's current luck to slow a target for 3 laps
+    BERSERKERS_BOND = 16, // +3 attack / -1 defense (flat)
 }
 
 export enum Tier2Artifact {
@@ -77,6 +78,9 @@ export enum Tier2Artifact {
 export const DISABLED_TIER1_ARTIFACT_IDS: ReadonlySet<Tier1Artifact> = new Set([Tier1Artifact.BROKEN_AEGIS]);
 export const DISABLED_TIER2_ARTIFACT_IDS: ReadonlySet<Tier2Artifact> = new Set([
     Tier2Artifact.HOLY_CROSS,
+    Tier2Artifact.BERSERKERS_BOND,
+    Tier2Artifact.GRAVECHAIN,
+    Tier2Artifact.LAST_FUSE,
     Tier2Artifact.TOME_OF_AMPLIFICATION,
     Tier2Artifact.RIME_CHARM,
 ]);
@@ -103,6 +107,7 @@ export const ToTier1Artifact: { [key: string]: Tier1Artifact } = {
     "13": Tier1Artifact.MAGES_RING,
     "14": Tier1Artifact.TOME_OF_AMPLIFICATION,
     "15": Tier1Artifact.RIME_CHARM,
+    "16": Tier1Artifact.BERSERKERS_BOND,
 };
 
 export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
@@ -233,6 +238,16 @@ const t2 = (
 });
 
 export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
+    [Tier1Artifact.BERSERKERS_BOND]: {
+        ...t1(
+            Tier1Artifact.BERSERKERS_BOND,
+            "berserkers_bond",
+            "Berserker's Bond",
+            "Berserkers Bond",
+            "Cursed: +{} attack but -[] defense for the whole army.",
+        ),
+        imageKey: "artifact_t2_berserkers_bond_256",
+    },
     [Tier1Artifact.NO_ARTIFACT]: t1(Tier1Artifact.NO_ARTIFACT, "none", "None", "", "No artifact."),
     [Tier1Artifact.VETERAN_HELM]: t1(
         Tier1Artifact.VETERAN_HELM,

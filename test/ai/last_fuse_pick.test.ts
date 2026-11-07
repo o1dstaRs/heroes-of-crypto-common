@@ -20,12 +20,12 @@ const v5 = resolveSetupPolicy(`${ARTIFACT_FIT_SETUP_PREFIX_V5}${base}`);
 const context = (enemy: readonly number[]) => createTier2ArtifactDecisionContext({ publicOpponentCreatureIds: enemy });
 
 describe("Last Fuse draft plan v5", () => {
-    test("takes Last Fuse as melee protection for shooters, while historical v4 still takes Crown", () => {
+    test("excludes retired Last Fuse in both v5 and v4 draft policies", () => {
         const offers = [T2.CROWN_OF_COMMAND, T2.LAST_FUSE];
         expect(resolveSetupPolicy(`artifact-fit-v4:${base}`).pickArtifactT2(offers, shooters, context(melee))).toBe(
             T2.CROWN_OF_COMMAND,
         );
-        expect(v5.pickArtifactT2(offers, shooters, context(melee))).toBe(T2.LAST_FUSE);
+        expect(v5.pickArtifactT2(offers, shooters, context(melee))).toBe(T2.CROWN_OF_COMMAND);
     });
 
     test("does not infer a whole melee army from one reveal or buy a contact plan for a ranged duel", () => {
@@ -50,7 +50,7 @@ describe("Last Fuse draft plan v5", () => {
             T2.QUIVER_OF_ECHOES,
         );
         expect(v5.pickArtifactT2([T2.CROWN_OF_COMMAND], shooters, context(melee))).toBe(T2.CROWN_OF_COMMAND);
-        expect(v5.pickArtifactT2([T2.LAST_FUSE], shooters, context(shooters))).toBe(T2.LAST_FUSE);
+        expect(v5.pickArtifactT2([T2.LAST_FUSE], shooters, context(shooters))).toBe(T2.NO_ARTIFACT);
         expect(v5.pickArtifactT2([], shooters)).toBe(T2.NO_ARTIFACT);
     });
 

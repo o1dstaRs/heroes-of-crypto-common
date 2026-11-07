@@ -16,7 +16,9 @@ import {
     ArtifactTier,
     formatArtifactDescription,
     getArtifactProperties,
+    Tier1Artifact,
     Tier2Artifact,
+    ToTier1Artifact,
 } from "../../src/artifacts/artifact_properties";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -25,10 +27,14 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 const ATTACK = ARTIFACT_POWER.BERSERKERS_BOND_ATTACK;
 const DEFENSE_PENALTY = ARTIFACT_POWER.BERSERKERS_BOND_DEFENSE_PENALTY;
 
-const bondUnit = (armor = 10) => {
+const bondUnit = (armor = 10, tier = ArtifactTier.TIER_1) => {
     const { grid, unitsHolder } = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, ArtifactTier.TIER_2, Tier2Artifact.BERSERKERS_BOND);
+    fightProperties.setArtifactPerTeam(
+        PBTypes.TeamVals.LEFT,
+        tier,
+        tier === ArtifactTier.TIER_1 ? Tier1Artifact.BERSERKERS_BOND : Tier2Artifact.BERSERKERS_BOND,
+    );
     const unit = createTestUnit({ name: "Bond Bearer", team: PBTypes.TeamVals.LEFT, armor, attack: 10 });
     placeUnit(grid, unitsHolder, unit, { x: 2, y: 2 });
     const baseAttack = unit.getUnitProperties().base_attack;
@@ -48,6 +54,22 @@ describe("Berserker's Bond", () => {
     it("is +3 attack / -1 defense (owner call 2026-09-13, was -2 defense)", () => {
         expect(ATTACK).toBe(3);
         expect(DEFENSE_PENALTY).toBe(1);
+    });
+
+    it("decodes the new Tier-1 id and retains old saved Tier-2 effects", () => {
+        expect(ToTier1Artifact["16"]).toBe(Tier1Artifact.BERSERKERS_BOND);
+        const { unit, baseAttack, baseArmor } = bondUnit(10, ArtifactTier.TIER_2);
+        expect(unit.getBaseAttack()).toBe(baseAttack + ATTACK);
+        expect(unit.getBaseArmor()).toBe(baseArmor - DEFENSE_PENALTY);
+    });
+
+    it("removes the Tier-1 effect when deselected", () => {
+        const { unit, unitsHolder, fightProperties, baseAttack, baseArmor } = bondUnit();
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, ArtifactTier.TIER_1, Tier1Artifact.NO_ARTIFACT);
+        unitsHolder.applyArtifacts(fightProperties);
+        unitsHolder.refreshStackPowerForAllUnits();
+        expect(unit.getBaseAttack()).toBe(baseAttack);
+        expect(unit.getBaseArmor()).toBe(baseArmor);
     });
 
     it("adds the attack and takes the defense from the whole army", () => {
@@ -78,7 +100,7 @@ describe("Berserker's Bond", () => {
 
     it("states both numbers on the artifact card", () => {
         const description = formatArtifactDescription(
-            getArtifactProperties(ArtifactTier.TIER_2, Tier2Artifact.BERSERKERS_BOND),
+            getArtifactProperties(ArtifactTier.TIER_1, Tier1Artifact.BERSERKERS_BOND),
         );
 
         expect(description).toContain(`+${ATTACK} attack`);

@@ -27,7 +27,7 @@ describe("ranked AI uses scouting to draft", () => {
         for (const doctrine of [Doctrine.SEE_ALL, Doctrine.THREE_REVEALS]) {
             let checked = false;
             resolveRankedDraftPick(
-                291,
+                761,
                 genome,
                 genome,
                 { left: setup, right: setup, leftDoctrine: doctrine },

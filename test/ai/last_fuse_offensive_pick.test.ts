@@ -23,11 +23,11 @@ const previous = resolveSetupPolicy(`artifact-fit-v5:${base}`);
 const context = (publicOpponentCreatureIds: readonly number[]) =>
     createTier2ArtifactDecisionContext({ publicOpponentCreatureIds });
 
-test("Last Fuse rewards ranged executions without requiring the enemy to approach", () => {
+test("retired Last Fuse is rejected even for ranged execution rosters", () => {
     const offers = [T2.CROWN_OF_COMMAND, T2.LAST_FUSE];
     expect(previous.pickArtifactT2(offers, shooters, context(shooters))).toBe(T2.CROWN_OF_COMMAND);
-    expect(current.pickArtifactT2(offers, shooters, context(shooters))).toBe(T2.LAST_FUSE);
-    expect(current.pickArtifactT2(offers, shooters, context(melee))).toBe(T2.LAST_FUSE);
+    expect(current.pickArtifactT2(offers, shooters, context(shooters))).toBe(T2.CROWN_OF_COMMAND);
+    expect(current.pickArtifactT2(offers, shooters, context(melee))).toBe(T2.CROWN_OF_COMMAND);
     expect(current.pickArtifactT2([T2.QUIVER_OF_ECHOES, T2.LAST_FUSE], shooters, context(melee))).toBe(
         T2.QUIVER_OF_ECHOES,
     );

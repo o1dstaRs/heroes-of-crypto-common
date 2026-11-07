@@ -22,8 +22,8 @@ import {
     ARTIFACT_POWER as AP,
     BROKEN_AEGIS_BREAK_CHANCE,
     BROKEN_AEGIS_MISS_CHANCE,
-    TIER1_ARTIFACT_LIST,
-    TIER2_ARTIFACT_LIST,
+    TIER1_ARTIFACTS,
+    TIER2_ARTIFACTS,
     Tier1Artifact,
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
@@ -519,7 +519,7 @@ export class UnitsHolder {
         }
 
         // All stat-artifact buff names, for cleanup on every recompute (deselect / re-pick must be clean).
-        const artifactBuffNames = [...TIER1_ARTIFACT_LIST, ...TIER2_ARTIFACT_LIST]
+        const artifactBuffNames = [...Object.values(TIER1_ARTIFACTS), ...Object.values(TIER2_ARTIFACTS)]
             .map((props) => props.buffName)
             .filter((name) => name.length > 0);
 
@@ -721,6 +721,15 @@ export class UnitsHolder {
                     break;
                 case Tier1Artifact.TOME_OF_AMPLIFICATION:
                     applyArtifactBuff("Tome of Amplification", AP.TOME_BUFF_POWER_PERCENT);
+                    break;
+                case Tier1Artifact.BERSERKERS_BOND:
+                    applyDualArtifact(
+                        "Berserkers Bond",
+                        "+{} attack for the whole army.",
+                        "-{} defense for the whole army.",
+                        AP.BERSERKERS_BOND_ATTACK,
+                        AP.BERSERKERS_BOND_DEFENSE_PENALTY,
+                    );
                     break;
                 case Tier1Artifact.RIME_CHARM:
                     applyArtifactBuff("Rime Charm", AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS);

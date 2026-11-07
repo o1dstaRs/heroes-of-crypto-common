@@ -32,9 +32,9 @@ const context = (enemy: readonly number[], tier1?: number) =>
 
 describe("current artifact AI fit", () => {
     test("prefers extra attacks for shooters and avoids buying them for a melee army", () => {
-        const offered = [T2.QUIVER_OF_ECHOES, T2.LAST_FUSE];
+        const offered = [T2.QUIVER_OF_ECHOES, T2.CROWN_OF_COMMAND];
         expect(policy.pickArtifactT2(offered, ranged)).toBe(T2.QUIVER_OF_ECHOES);
-        expect(policy.pickArtifactT2(offered, [C.BEHEMOTH, C.ABOMINATION, C.CRUSADER])).toBe(T2.LAST_FUSE);
+        expect(policy.pickArtifactT2(offered, [C.BEHEMOTH, C.ABOMINATION, C.CRUSADER])).toBe(T2.CROWN_OF_COMMAND);
     });
 
     test("values one bonus volley rather than multiplying Gargantuan's two native attacks", () => {
@@ -56,9 +56,11 @@ describe("current artifact AI fit", () => {
         expect(policy.pickArtifactT2(offered, ranged, context([C.HEALER, C.SATYR]))).toBe(T2.CROWN_OF_COMMAND);
     });
 
-    test("pairs Gravechain with ranged control and prices the owner's movement curse", () => {
+    test("rejects retired Gravechain while retaining its historical scoring", () => {
         const enemy = [...melee, C.BEHEMOTH];
-        expect(policy.pickArtifactT2([T2.CROWN_OF_COMMAND, T2.GRAVECHAIN], ranged, context(enemy))).toBe(T2.GRAVECHAIN);
+        expect(policy.pickArtifactT2([T2.CROWN_OF_COMMAND, T2.GRAVECHAIN], ranged, context(enemy))).toBe(
+            T2.CROWN_OF_COMMAND,
+        );
         expect(policy.pickArtifactT2([T2.TITAN_PLATE, T2.GRAVECHAIN], melee, context(enemy))).toBe(T2.TITAN_PLATE);
         expect(tier2ArtifactFitScore(T2.GRAVECHAIN, ranged, context(enemy))).toBeGreaterThan(
             tier2ArtifactFitScore(T2.GRAVECHAIN, melee, context(enemy)),
@@ -104,9 +106,12 @@ describe("current artifact AI fit", () => {
     });
 
     test("never redrafts retired Tier-2 versions of the moved items", () => {
-        expect(policy.pickArtifactT2([T2.TOME_OF_AMPLIFICATION, T2.RIME_CHARM, T2.GRAVECHAIN], ranged)).toBe(
-            T2.GRAVECHAIN,
-        );
+        expect(
+            policy.pickArtifactT2(
+                [T2.TOME_OF_AMPLIFICATION, T2.RIME_CHARM, T2.GRAVECHAIN, T2.LAST_FUSE, T2.BERSERKERS_BOND],
+                ranged,
+            ),
+        ).toBe(T2.NO_ARTIFACT);
         expect(policy.pickArtifactT2([T2.TOME_OF_AMPLIFICATION, T2.RIME_CHARM], ranged)).toBe(T2.NO_ARTIFACT);
     });
 

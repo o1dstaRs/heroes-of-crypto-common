@@ -11,6 +11,20 @@ import {
 import { LIVE_TIER1_ARTIFACT_IDS, LIVE_TIER2_ARTIFACT_IDS } from "../../src/picks/pick_sim";
 
 describe("disabled artifacts", () => {
+    test("moves Berserker's Bond to Tier 1 and retires Last Fuse and Gravechain", () => {
+        expect(LIVE_TIER1_ARTIFACT_IDS).toContain(Tier1Artifact.BERSERKERS_BOND);
+        expect(TIER1_ARTIFACT_LIST.find((artifact) => artifact.id === Tier1Artifact.BERSERKERS_BOND)?.imageKey).toBe(
+            "artifact_t2_berserkers_bond_256",
+        );
+        for (const id of [Tier2Artifact.BERSERKERS_BOND, Tier2Artifact.GRAVECHAIN, Tier2Artifact.LAST_FUSE]) {
+            expect(DISABLED_TIER2_ARTIFACT_IDS.has(id)).toBe(true);
+            expect(LIVE_TIER2_ARTIFACT_IDS).not.toContain(id);
+            expect(TIER2_ARTIFACT_LIST.map((artifact) => artifact.id)).not.toContain(id);
+        }
+        expect(TIER1_ARTIFACT_LIST).toHaveLength(15);
+        expect(TIER2_ARTIFACT_LIST).toHaveLength(11);
+    });
+
     test("keeps Broken Aegis and Holy Cross out of every live draft pool", () => {
         expect(DISABLED_TIER1_ARTIFACT_IDS.has(Tier1Artifact.BROKEN_AEGIS)).toBe(true);
         expect(DISABLED_TIER2_ARTIFACT_IDS.has(Tier2Artifact.HOLY_CROSS)).toBe(true);

@@ -87,10 +87,13 @@ function rolls(values: number[]) {
     return () => draw / 2;
 }
 
-test("new Tier-2 wire id is draftable, and the slow belongs to Death", () => {
+test("retired Tier-2 wire id remains readable, and the slow belongs to Death", () => {
     expect(ToTier2Artifact["16"]).toBe(Tier2Artifact.GRAVECHAIN);
-    expect(LIVE_TIER2_ARTIFACT_IDS).toContain(Tier2Artifact.GRAVECHAIN);
-    expect(TIER2_ARTIFACT_LIST.find((artifact) => artifact.id === 16)?.imageKey).toBe("artifact_t2_gravechain_256");
+    expect(LIVE_TIER2_ARTIFACT_IDS).not.toContain(Tier2Artifact.GRAVECHAIN);
+    expect(TIER2_ARTIFACT_LIST.find((artifact) => artifact.id === 16)).toBeUndefined();
+    expect(getArtifactProperties(ArtifactTier.TIER_2, Tier2Artifact.GRAVECHAIN).imageKey).toBe(
+        "artifact_t2_gravechain_256",
+    );
     const description = formatArtifactDescription(getArtifactProperties(ArtifactTier.TIER_2, Tier2Artifact.GRAVECHAIN));
     expect(description).toContain("50%");
     expect(description).toContain("25% for 3 laps");

@@ -91,10 +91,13 @@ function cluster(eventMode?: "headless") {
     return { ...f, killer, victim, neighbor };
 }
 
-test("Tier-2 id 17 is draftable and describes enemy kills without friendly damage", () => {
+test("retired Tier-2 id 17 remains readable and describes enemy kills without friendly damage", () => {
     expect(ToTier2Artifact["17"]).toBe(Tier2Artifact.LAST_FUSE);
-    expect(LIVE_TIER2_ARTIFACT_IDS).toContain(Tier2Artifact.LAST_FUSE);
-    expect(TIER2_ARTIFACT_LIST.find((artifact) => artifact.id === 17)?.imageKey).toBe("artifact_t2_last_fuse_256");
+    expect(LIVE_TIER2_ARTIFACT_IDS).not.toContain(Tier2Artifact.LAST_FUSE);
+    expect(TIER2_ARTIFACT_LIST.find((artifact) => artifact.id === 17)).toBeUndefined();
+    expect(getArtifactProperties(ArtifactTier.TIER_2, Tier2Artifact.LAST_FUSE).imageKey).toBe(
+        "artifact_t2_last_fuse_256",
+    );
     expect(lastFuseDamage(500, 1)).toBe(125);
     expect(lastFuseDamage(1, 1)).toBe(25);
     const description = formatArtifactDescription(getArtifactProperties(ArtifactTier.TIER_2, Tier2Artifact.LAST_FUSE));

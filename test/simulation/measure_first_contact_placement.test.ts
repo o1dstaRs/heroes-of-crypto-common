@@ -89,7 +89,9 @@ describe("first-contact research design", () => {
         expect(decisions).toBeGreaterThan(0);
         expect(turns).toBeGreaterThan(0);
         const { elapsedMs: _a, ...a } = original;
+        void _a;
         const { elapsedMs: _b, ...b } = observed;
+        void _b;
         expect(a).toEqual(b);
     });
     test("the new candidate crosses all nine budget pairings and stays a distinct experiment", () => {
@@ -138,7 +140,9 @@ describe("first-contact research design", () => {
         expect(first.groundMeleeStacks).toBe(control.groundMeleeStacks);
         expect(first.groundMeleeStacks).toBeGreaterThanOrEqual(2);
         const { elapsedMs: _first, ...a } = first;
+        void _first;
         const { elapsedMs: _second, ...b } = second;
+        void _second;
         expect(a).toEqual(b);
     });
     test("the congestion proposal is invariant to hidden enemy deployment changes", () => {
@@ -249,7 +253,7 @@ describe("first-contact research design", () => {
     test("a changed real-engine case is reproducible and completes without rejected actions", () => {
         const job = {
             cohort: "ranked-draft" as const,
-            pair: 18,
+            pair: 4,
             map: 1 as const,
             side: "green" as const,
             formation: "current" as const,
@@ -264,7 +268,9 @@ describe("first-contact research design", () => {
         expect(a.rejected + a.opponentRejected).toBe(0);
         expect(a.endReason).toBe("elimination");
         const { elapsedMs: _a, ...first } = a;
+        void _a;
         const { elapsedMs: _b, ...second } = b;
+        void _b;
         expect(first).toEqual(second);
     });
     test("records real melee contact in a headless fight", () => {
