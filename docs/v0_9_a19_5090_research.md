@@ -1,5 +1,124 @@
 # v0.9 training against current A19 R2
 
+## Joint-head training on the 9800X3D RDNA GPU — November 7, 2026 UTC
+
+The user requested a Tinygrad training path on the 9800X3D node. A source-pinned
+functional fit now runs on its discrete **RDNA4 `gfx1201` GPU**, PCI `1002:7551`,
+with 32 GB class VRAM. The host was running another CPU experiment, so the GPU
+canary used one compiler/BLAS thread and a separate limited research process.
+Tinygrad was installed into a fresh research environment; live Heroes services,
+system packages and driver bindings were not changed. The ordinary KFD interface
+used the existing amdgpu driver. [Tinygrad documents this interface separately
+from its PCI driver](https://docs.tinygrad.org/runtime/#amd-interfaces).
+
+The pinned backend is Tinygrad **0.14.0**, commit
+`e4131331cf172545f91f91797edfad61e94e25ea`, with NumPy 2.4.4 and LLVM through
+`DEV=KFD:0+AMD:LLVM`. Tensor cores and TF32 were disabled for this Float32 check.
+Puffalo's authenticated SSH check still timed out. The Mac's Tailscale client was
+running under the expected account and contained the exact shared peer; no
+remote outage or new 5090 job status is inferred from that observation.
+
+### What the joint backend changes
+
+`A19PolicyHeadPair` and `TinyA19HeadPair` can train the original two policy heads
+together: **130 parameters**, with both original backbones frozen. A matched
+student-only mode retains 65 trainable parameters and checks the entire partner
+for changes. The Tinygrad backend computes frozen candidate encodings once and
+fits the heads from that cache. It does not reuse a frozen cache for a feature
+adapter, add layers, lower margin one, or change the arithmetic ensemble rule.
+Both exported members use the ordinary original-width A19 CPU architecture.
+
+The Torch implementation snapshots and restores both complete members together,
+validates frozen parameters before restoration, and preserves CPU and CUDA RNG
+state during CPU construction. A deterministic capability test trains actual
+A19 policy heads on a two-action fixture: the student-only control remains
+below the serving threshold imposed by its frozen partner; the joint model
+crosses that same threshold. This is a capability example, not a gameplay result.
+
+The backend-independent `a19_feature_pair_format.py` binds both complete files,
+their policy-head fingerprints, input/source hashes, recipe and checkpoint epoch.
+The Bun loader verifies those identities and keeps pair construction outside
+per-decision prediction. The new finalist format omits the legacy `modelSha256`
+key, so a single-model evaluator fails rather than silently substituting the old
+partner. Functional fixtures and unchanged pairs are rejected by the strength
+loading path. None of these research modules is installed by the shipped factory.
+
+### Completed real-input canary
+
+The data are the **already exposed historical pilot**: 19 training roots, 14
+diagnostic validation roots, eight futures per labeled action, and 128 separately
+sampled warm A19 observations. Only seven roots in each pilot split have marginal
+score contrast. Historical requested-phase fallback cases remain visible. This
+does not meet the larger training-data readiness gate and cannot select a
+strength finalist. No validation result selected a checkpoint; all 64 updates
+were fixed before the run.
+
+The recipe used AdamW learning rate 0.003, weight decay 0.001, global gradient
+clipping at one, score scale 0.1, root KL weight 0.2 and warm KL weight one.
+Warm KL is a functional preservation check; it does not replace the full
+qualified teacher-CE preservation bank. The ordinary research data, matched-fit,
+fresh-match and production-timing gates still apply to any later candidate.
+
+| Check                                                                               | Result                                           |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Maximum Tinygrad/PyTorch forward difference                                         | `4.054e-6`                                       |
+| Initial real serving decisions checked                                              | 33, all equal                                    |
+| Maximum head-gradient difference                                                    | `3.726e-7`                                       |
+| First clipped SGD update difference                                                 | Exactly zero                                     |
+| Actual joint AdamW updates                                                          | 64                                               |
+| Fit-loop wall time                                                                  | 7.09 seconds                                     |
+| Reported canary execution, including GPU setup/parity/export after source admission | 18.44 seconds                                    |
+| Peak sampled device VRAM                                                            | 147.5 MiB, including the pre-existing allocation |
+| Peak available temperature reading                                                  | 29 C                                             |
+
+An initial attempt stopped before GPU allocation because the idle driver's
+temperature read returned `EBUSY`. Its receipt remains preserved. The successful
+attempt records unavailable samples explicitly and enforces the bound whenever
+the counter is available; it recorded one unavailable idle sample. The recipe
+and training inputs were unchanged.
+
+| Pilot diagnostic                            |  Before |   After |
+| ------------------------------------------- | ------: | ------: |
+| Training score-difference loss              | 9.24773 | 6.29894 |
+| Diagnostic validation score-difference loss | 7.96637 | 6.42133 |
+
+The trained pair changes two training and four validation gate decisions, with
+zero unlabeled choices. Average recorded-label gain is +2.63 points on training
+and **zero on validation**. These are reused-label diagnostics. Lower loss and
+an exposed pilot do not demonstrate a stronger combat AI; no strength bank was
+opened and no model was promoted.
+
+### Export and inference checks
+
+The actual Radeon-trained checkpoint passed **65 Bun numerical cases** with a
+maximum discrepancy of `1.916e-6`; all 33 applicable margin-one decisions matched.
+Twelve warm-start A/A pairs (24 complete game replays) reproduced every record,
+event and turn digest. There were 226 exact warm neural-prediction checks and
+542 restoration checks. Attempting to load the functional checkpoint for strength
+games was explicitly rejected.
+
+Four counterbalanced local M4 timing rounds replayed 1,990 real decision inputs
+per arm after preloading models. Original mean inference time was 2,664.88 ms,
+warm pair 2,660.57 ms and trained pair 2,656.73 ms: ratio **0.997**, effectively
+unchanged. All 1,990 warm predictions were bit-exact. This is a model-only local
+diagnostic, not production whole-turn timing. The pair adds no serving operators;
+any later integration must preload both members before the turn budget starts.
+The Radeon makes these head fits practical; battle search and continuation-label
+generation still require separately budgeted CPU work.
+
+The successful registration is
+`cc888fa1fbc83d0a5a9c339e1fa1584ba05eef246218b4f4a5633d17ae808d7d`;
+the complete trained pair is
+`5430dcafd000b86d250a51cc24370bb77365afe883a47d8e14a9d105474a6132`.
+Generated evidence stays outside Git under client `game/core/tmp`, with local
+study `v09-rdna-canary-20261107T060856Z` and node research study
+`v09-rdna-tinygrad-20261107T0545Z-1wRmfX`. The failed initial attempt is separate.
+The current default remains locked v0.9 draft plus qualified A19 combat.
+
+Repository verification passed lint, TypeScript checking, all **7,498 common
+tests** and **52 Python research tests**. The Python checks include the joint-head
+capability, frozen-member controls, atomic checkpoint restoration and pair export.
+
 ## Frozen-member ceiling and marginal-score objective — November 7, 2026 UTC
 
 Local research found two constraints in the training problem. Neither is a new
