@@ -22,7 +22,7 @@ import {
     premiumAugmentPlanId,
     type IPremiumAugmentPlan,
 } from "../ai/setup/premium_augment_plans";
-import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, lstatSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { arch, availableParallelism, cpus, platform, release, totalmem } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
@@ -31,6 +31,12 @@ import { createGzip, type Gzip } from "node:zlib";
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { V08_A13_PROFILE } from "../ai/versions/v0_8_a13_profile";
 import { buildV08A19SearchEnvironment, V08_A19_PROFILE } from "../ai/versions/v0_8_a19_profile";
+import { V09_MODEL_ID, V09_MODEL_PROMOTED, V09_MODEL_SHA256 } from "../ai/versions/v0_9_artifact";
+import {
+    V09_DEFAULT_DRAFT_BASE_POLICY_SPEC,
+    V09_DEFAULT_DRAFT_MODEL_ID,
+    V09_DEFAULT_DRAFT_MODEL_SHA256,
+} from "../ai/setup/doctrine_draft_policy";
 import {
     AI_META_COHORT_DESCRIPTIONS,
     AI_META_COHORTS,
@@ -62,7 +68,11 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "./ai_meta_cohorts_core";
-import { AI_META_REGISTERED_VERSION_STRATEGY_PROFILE, type AiMetaStrategyProfileId } from "./ai_meta_strategy_profile";
+import {
+    AI_META_NATIVE_V09_STRATEGY_PROFILE,
+    AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+    type AiMetaStrategyProfileId,
+} from "./ai_meta_strategy_profile";
 import {
     AI_META_UNIT_INTERACTION_SCHEMA,
     AiMetaUnitInteractionCollector,
@@ -73,6 +83,7 @@ import { captureGitSourceStatus } from "./git_source_status";
 import { fingerprintSourceTree } from "./source_tree_fingerprint";
 import { AI_META_EVIDENCE_SCHEMA } from "./ai_meta_evidence";
 import { AI_META_OFFLINE_SEARCH_ENVIRONMENT } from "./ai_meta_search_budget";
+import { aiMetaOutputContract, finalizeAiMetaOutputs } from "./ai_meta_outputs";
 
 interface ICountedOutcome {
     score: number;
@@ -739,7 +750,7 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
-export type AiMetaFightProfileId = "a13" | "a19" | "a19-work";
+export type AiMetaFightProfileId = "a13" | "a19" | "a19-work" | "v09-native" | "v09-draft-a19-work";
 
 export interface IAiMetaFightProfile {
     id: AiMetaFightProfileId;
@@ -747,6 +758,9 @@ export interface IAiMetaFightProfile {
     provenance: Readonly<Record<string, unknown>>;
     workerEnvironment: Readonly<Record<string, string>>;
     strategyProfileId: AiMetaStrategyProfileId;
+    fightVersion?: string;
+    nativeV09?: boolean;
+    lockedV09Draft?: boolean;
     /** Finite search operation budgets decide every move instead of wall-clock deadlines (host-independent). */
     offlineDeterministicWork?: boolean;
 }
@@ -761,6 +775,50 @@ const definedEnvironment = (
     );
 
 const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFightProfile>> = Object.freeze({
+    "v09-draft-a19-work": Object.freeze({
+        id: "v09-draft-a19-work",
+        title: "Heroes of Crypto — Locked v0.9 Draft + A19 Combat Meta Cohorts",
+        fightVersion: "v0.8",
+        lockedV09Draft: true,
+        provenance: Object.freeze({
+            ...V08_A19_PROFILE,
+            name: "v0.9-draft+v0.8-a19-work",
+            draftModelId: V09_DEFAULT_DRAFT_MODEL_ID,
+            draftModelSha256: V09_DEFAULT_DRAFT_MODEL_SHA256,
+            draftBase: V09_DEFAULT_DRAFT_BASE_POLICY_SPEC,
+            draftArtifactFitVersion: 6,
+            searchBudget: "offline-deterministic-work",
+            offlineSearchEnvironment: AI_META_OFFLINE_SEARCH_ENVIRONMENT,
+            workerOverride: "V08_A19_SEARCH=1; searchOfflineDeterministicWork=true",
+        }),
+        workerEnvironment: definedEnvironment({ ...buildV08A19SearchEnvironment(), V08_A19_SEARCH: "1" }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+        offlineDeterministicWork: true,
+    }),
+    "v09-native": Object.freeze({
+        id: "v09-native",
+        title: "Heroes of Crypto — Native v0.9 AI Meta Balance Cohorts",
+        fightVersion: "v0.9",
+        nativeV09: true,
+        provenance: Object.freeze({
+            name: "v0.9-native",
+            schema: "hoc.native-v0_9-meta.v1",
+            productionVersion: "v0.9",
+            combatModelId: V09_MODEL_ID,
+            combatModelSha256: V09_MODEL_SHA256,
+            combatModelPromoted: V09_MODEL_PROMOTED,
+            draftModelId: V09_DEFAULT_DRAFT_MODEL_ID,
+            draftModelSha256: V09_DEFAULT_DRAFT_MODEL_SHA256,
+            draftBase: V09_DEFAULT_DRAFT_BASE_POLICY_SPEC,
+            liveSetupReference: "artifact-fit-v6:v07-nonfight-4eda84635fe7",
+            draftArtifactFitVersion: 6,
+            searchBudget: "native-no-search",
+            workerOverride: "none; native v0.9 on both seats",
+        }),
+        workerEnvironment: Object.freeze({}),
+        strategyProfileId: AI_META_NATIVE_V09_STRATEGY_PROFILE,
+        offlineDeterministicWork: true,
+    }),
     a13: Object.freeze({
         id: "a13",
         title: "Heroes of Crypto — v0.8+a13 AI Meta Balance Cohorts",
@@ -952,7 +1010,11 @@ export async function runAiMetaWorkerPool(
             }
             const worker = new Worker(workerUrl, {
                 workerData: {
-                    options,
+                    options: {
+                        ...options,
+                        nativeV09: fightProfile.nativeV09 ?? options.nativeV09,
+                        lockedV09Draft: fightProfile.lockedV09Draft ?? options.lockedV09Draft,
+                    },
                     strategyProfileId: fightProfile.strategyProfileId,
                     offlineDeterministicWork: fightProfile.offlineDeterministicWork === true,
                 },
@@ -1138,10 +1200,18 @@ function writeSummary(
             requestedCohorts,
             totalGames: qualities.reduce((sum, quality) => sum + quality.games, 0),
             totalPairs: qualities.reduce((sum, quality) => sum + quality.pairs, 0),
+            outputContract: {
+                schema: "ai-meta-outputs-v1",
+                mode: process.env.AI_META_OUTPUT_MODE ?? "premium",
+                required:
+                    (process.env.AI_META_OUTPUT_MODE ?? "premium") === "premium"
+                        ? ["premium.sqlite", "premium-readiness.json", "ai-meta.outputs.json"]
+                        : [],
+            },
             baseSeed,
             concurrency,
             parallelCohorts,
-            fightVersion: AI_META_FIGHT_VERSION,
+            fightVersion: fightProfile.fightVersion ?? AI_META_FIGHT_VERSION,
             fightProfile: {
                 ...fightProfile.provenance,
                 // The sharded merger compares this object: captures and legacy runs must not be mixed.
@@ -1151,7 +1221,8 @@ function writeSummary(
                       ? AI_META_EVIDENCE_SCHEMA
                       : null,
                 studyProfile: aiMetaStudyFromEnvironment() ?? "legacy-oracle",
-                draftExplorationRate: aiMetaStudyFromEnvironment() ? 0.2 : 0,
+                draftExplorationRate:
+                    aiMetaStudyFromEnvironment() && !fightProfile.nativeV09 && !fightProfile.lockedV09Draft ? 0.2 : 0,
                 artifactExplorationRate: process.env.AI_META_ARTIFACT_UNIFORM === "1" ? 1 : AI_META_EXPLORATION_RATE,
             },
             selectionPolicy: aiMetaStudyFromEnvironment() ?? AI_META_POLICY,
@@ -1159,6 +1230,9 @@ function writeSummary(
                 spec: aiMetaStudyFromEnvironment() ? PREMIUM_META_DRAFT_SPEC : AI_META_RANKED_DRAFT_POLICY_SPEC,
                 sequence: "live-ranked-pick-v1",
                 visibility: "own prior picks plus legitimately revealed opponent identities",
+                ...(fightProfile.nativeV09 || fightProfile.lockedV09Draft
+                    ? { modelId: V09_DEFAULT_DRAFT_MODEL_ID, sequentialBundles: true }
+                    : {}),
             },
             explorationRate: AI_META_EXPLORATION_RATE,
             evidenceCollection:
@@ -1316,8 +1390,10 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "<fight-profile=a13|a19|a19-work> [pair-start=0] [pair-count=all]. " +
-    "Set AI_META_COLLECT_EVIDENCE=1 for legacy evidence capture, or AI_META_STUDY_PROFILE=premium-ranked-v3 for ranked-side coverage with public setup and capture (requires a19-work).";
+    "<fight-profile=a13|a19|a19-work|v09-native|v09-draft-a19-work> [pair-start=0] [pair-count=all]. " +
+    "Defaults to premium-ranked-v3 capture and an audited premium.sqlite (a19-work or v09-draft-a19-work). " +
+    "Outcome-only research requires AI_META_OUTPUT_MODE=legacy-oracle explicitly. " +
+    "Sharded drivers set AI_META_SHARD=1 and finalize the merged study with ai_meta_outputs.ts.";
 
 export function validateAiMetaGamesPerCohort(games: number, premiumStudy = false): void {
     const mapCycleGames = premiumStudy ? AI_META_GAMES_PER_MATCHUP : AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;
@@ -1333,6 +1409,11 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         console.log(AI_META_USAGE);
         return;
     }
+    if (argv.length > 9) throw new Error(AI_META_USAGE);
+    const fightProfile = resolveAiMetaFightProfile(argv[6]);
+    const outputContract = aiMetaOutputContract(fightProfile.id, process.env);
+    if (outputContract.studyProfile) process.env.AI_META_STUDY_PROFILE = outputContract.studyProfile;
+    if (outputContract.collectEvidence) process.env.AI_META_COLLECT_EVIDENCE = "1";
     const gamesPerCohort = Number(argv[0] ?? 150_000);
     validateAiMetaGamesPerCohort(gamesPerCohort, Boolean(aiMetaStudyFromEnvironment()));
     const baseSeed = Number(argv[1] ?? 85_000_717);
@@ -1349,13 +1430,8 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         }
         return value as AiMetaCohort;
     });
+    if (new Set(cohorts).size !== cohorts.length) throw new Error("Duplicate cohorts are not allowed");
     const parallelCohorts = Math.min(Number(argv[5] ?? Math.min(3, cohorts.length)), cohorts.length, concurrency);
-    const fightProfile = resolveAiMetaFightProfile(argv[6]);
-    if (aiMetaStudyFromEnvironment()) {
-        if (process.env.AI_META_ARTIFACT_UNIFORM === "1")
-            throw new Error("Premium study fixes exploration; unset AI_META_ARTIFACT_UNIFORM");
-        process.env.AI_META_COLLECT_EVIDENCE = "1";
-    }
     if (process.env.AI_META_COLLECT_EVIDENCE === "1" && !fightProfile.offlineDeterministicWork) {
         throw new Error("AI_META_COLLECT_EVIDENCE=1 requires the a19-work fight profile");
     }
@@ -1381,6 +1457,8 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
     if (!completePairWindow && (cohorts.length !== 1 || parallelCohorts !== 1)) {
         throw new Error("A sliced AI-meta invocation must contain exactly one cohort and parallelCohorts=1");
     }
+    if (existsSync(outDir) && (lstatSync(outDir).isSymbolicLink() || readdirSync(outDir).length))
+        throw new Error(`Refusing non-empty or symlink output directory: ${outDir}`);
     mkdirSync(outDir, { recursive: true });
     const summaryPath = join(outDir, "ai-meta.summary.json");
     const startedAt = new Date().toISOString();
@@ -1404,6 +1482,8 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
     console.log(
         `Policy ${aiMetaStudyFromEnvironment() ?? AI_META_POLICY}; exploration ${(AI_META_EXPLORATION_RATE * 100).toFixed(0)}% per setup component.`,
     );
+    if (outputContract.mode === "legacy-oracle")
+        console.log("Explicit legacy-oracle run: no Premium SQLite will be generated.");
 
     for (let offset = 0; offset < cohorts.length; offset += parallelCohorts) {
         assertAiMetaSourceIdentity(runIdentity);
@@ -1447,9 +1527,12 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         );
     }
 
+    const shard = process.env.AI_META_SHARD === "1" || !completePairWindow;
+    const finalizePremium = !shard && outputContract.mode === "premium";
+    const capturedPath = finalizePremium ? join(outDir, "ai-meta.captured-summary.json") : summaryPath;
     writeSummary(
-        summaryPath,
-        completePairWindow,
+        capturedPath,
+        !shard,
         startedAt,
         cohorts,
         gamesPerCohort,
@@ -1463,7 +1546,15 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         qualities,
         aggregation,
     );
-    console.log(`\nComplete: ${qualities.reduce((sum, quality) => sum + quality.games, 0).toLocaleString()} fights.`);
+    if (finalizePremium) {
+        console.log("Capture finished; building and auditing Premium SQLite before completing the batch.");
+        const outputs = await finalizeAiMetaOutputs(capturedPath, { publishSummaryPath: summaryPath });
+        console.log(`Premium snapshot: ${join(outDir, outputs.snapshot.path)} (${outputs.snapshot.status})`);
+    }
+    console.log(
+        `\n${shard ? "Shard captured (merge/finalization required)" : "Complete"}: ` +
+            `${qualities.reduce((sum, quality) => sum + quality.games, 0).toLocaleString()} fights.`,
+    );
     console.log(`Summary: ${summaryPath}`);
 }
 

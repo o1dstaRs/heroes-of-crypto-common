@@ -9,6 +9,9 @@ interface IShieldedVolleyEstimate {
     echoChance: number;
     spendsOnHitOnly: boolean;
     throughShot: boolean;
+    shield?: boolean;
+    /** Reprice later hits when Deep Wounds was applied by an earlier unabsorbed volley. */
+    damageAfterHits?: (secondVolley: boolean, landedHits: number) => number;
 }
 
 interface IVolleyState {
@@ -16,20 +19,23 @@ interface IVolleyState {
     shield: boolean;
     spent: number;
     probability: number;
+    landedHits: number;
 }
 
 /**
  * Water Shield absorbs the first positive landed hit, not the whole attack action. Keep its state
  * alongside ammunition across native volleys and the one possible Echo. Damage inputs retain the
- * caller's ordinary per-volley estimate; shield consumption, misses and shot budgets are discrete.
+ * caller's ordinary per-volley estimate; shield consumption, misses, wounds and shot budgets are discrete.
  */
 export function estimateShieldedRangedDamage(
     unit: Unit,
     ammunitionTarget: Unit | undefined,
     estimate: IShieldedVolleyEstimate,
 ): number {
-    let states: IVolleyState[] = [{ damage: 0, shield: true, spent: 0, probability: 1 }];
-    const volley = (damage: number, chance = 1, spendsArrow = true): void => {
+    let states: IVolleyState[] = [
+        { damage: 0, shield: estimate.shield ?? true, spent: 0, probability: 1, landedHits: 0 },
+    ];
+    const volley = (baseDamage: number, secondVolley = false, chance = 1, spendsArrow = true): void => {
         const next: IVolleyState[] = [];
         for (const state of states) {
             if (state.damage >= estimate.hp || unit.projectRangeShotsAfterVolleys(ammunitionTarget, state.spent) <= 0) {
@@ -37,6 +43,7 @@ export function estimateShieldedRangedDamage(
                 continue;
             }
             if (chance < 1) next.push({ ...state, probability: state.probability * (1 - chance) });
+            const damage = estimate.damageAfterHits?.(secondVolley, state.landedHits) ?? baseDamage;
             for (const [hit, probability] of [
                 [false, 1 - estimate.hitChance],
                 [true, estimate.hitChance],
@@ -49,13 +56,14 @@ export function estimateShieldedRangedDamage(
                     shield: state.shield && !positive,
                     spent: state.spent + Number(spendsArrow && (hit || !estimate.spendsOnHitOnly)),
                     probability: weight,
+                    landedHits: state.landedHits + Number(hit && !(positive && state.shield)),
                 });
             }
         }
         states = next;
     };
     volley(estimate.firstDamage);
-    if (estimate.nativeSecondVolley) volley(estimate.secondDamage, 1, !estimate.throughShot);
-    if (estimate.echoChance > 0) volley(estimate.firstDamage, estimate.echoChance);
+    if (estimate.nativeSecondVolley) volley(estimate.secondDamage, true, 1, !estimate.throughShot);
+    if (estimate.echoChance > 0) volley(estimate.firstDamage, false, estimate.echoChance);
     return states.reduce((sum, state) => sum + state.probability * state.damage, 0);
 }

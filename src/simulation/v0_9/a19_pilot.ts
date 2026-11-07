@@ -17,16 +17,21 @@ import { exitCompletedWorkerCli } from "../completed_worker_cli";
 import { PersistentWorkerPool, startPersistentWorker } from "../persistent_worker_pool";
 import { playRankedDraftGame, rankedDraftStrengthCandidate, type IRankedDraftGameRecord } from "../ranked_draft_eval";
 import { SearchDriver } from "../search_driver";
+import { getA19NeuralModel } from "../a19_neural_model";
+import { A19_NEURAL_POLICY } from "../../ai/versions/v0_8_a19_neural_policy";
+import { withV09A19NeuralTeacher } from "./a19_teacher_correction";
 import { fingerprintV09 } from "./protocol";
 import { withV09A19Recording, type IV09A19TrainingDecision } from "./a19_pilot_recording";
 import { withV09RootRestoreAudit } from "./a19_root_restore";
 import { V09_A19_OBSERVATION_CONTRACT, V09_A19_OBSERVATION_SHA256 } from "./a19_observation";
 import { assertV09OutputIsolation } from "./supervisor";
+import { assertV09DoctrineSetup, v09DoctrineBoard, type V09A19DoctrinePopulation } from "./a19_doctrine_population";
 import {
     buildV09A19PilotManifest,
     readV09PilotSource,
     validateV09A19PilotManifest,
     v09PilotBoardStatistics,
+    v09DoctrineStatistics,
     V09_A19_PILOT_STAGES,
     type IV09A19PilotManifest,
     type V09A19PilotStage,
@@ -89,6 +94,7 @@ interface IPilotGame {
     trajectorySha256: string;
     driverCounts: IV09PilotDriverCounts;
     rootRestorationChecks: number;
+    teacherNeural?: { decisions: number; inferred: number; corrected: number };
     training?: { decisions: IV09A19TrainingDecision[]; sampledWithoutCompleteEvidence: number };
 }
 
@@ -130,6 +136,7 @@ export function runV09PilotBoard(task: IPilotTask): IV09PilotBoard {
         const trajectory = createHash("sha256");
         let driverCounts: IV09PilotDriverCounts | undefined;
         let rootRestorationChecks = 0;
+        let teacherNeural: IPilotGame["teacherNeural"];
         let training: IPilotGame["training"];
         const record = playRankedDraftGame(
             genome,
@@ -148,13 +155,13 @@ export function runV09PilotBoard(task: IPilotTask): IV09PilotBoard {
                 candidateSearchEnvOverrides: candidate,
                 candidateSetupPolicySpec: manifest.profile.setup,
                 opponentSetupPolicySpec: manifest.profile.setup,
-                candidateDoctrinePolicy: "see-none",
-                opponentDoctrinePolicy: "see-none",
+                ...v09DoctrineBoard(board, manifest.doctrinePopulation, stage === "aa"),
             },
             caseIndex,
             0,
             {
                 matchRunner: (config: IMatchConfig): IMatchResult => {
+                    if (manifest.doctrinePopulation) assertV09DoctrineSetup(config, board, stage === "aa");
                     const candidateTeam = config.searchEnvOverrideTeams?.[0];
                     if (candidateTeam === undefined) throw new Error("Pilot candidate has no physical seat");
                     const execute = () =>
@@ -168,13 +175,30 @@ export function runV09PilotBoard(task: IPilotTask): IV09PilotBoard {
                         });
                     const restored = withV09RootRestoreAudit(() =>
                         withV09PilotDriverAudit(candidateTeam, manifest.baseline, candidate, () => {
-                            if (!recording) return execute();
-                            const collected = withV09A19Recording(candidateTeam, config.seed, execute);
-                            training = {
-                                decisions: collected.decisions,
-                                sampledWithoutCompleteEvidence: collected.sampledWithoutCompleteEvidence,
+                            const recorded = () => {
+                                if (!recording) return execute();
+                                const collected = withV09A19Recording(candidateTeam, config.seed, execute);
+                                training = {
+                                    decisions: collected.decisions,
+                                    sampledWithoutCompleteEvidence: collected.sampledWithoutCompleteEvidence,
+                                };
+                                return collected.value;
                             };
-                            return collected.value;
+                            if (stage !== "aa" && manifest.teacherPreset === "precise-r8-neural") {
+                                const corrected = withV09A19NeuralTeacher(
+                                    {
+                                        team: candidateTeam,
+                                        model: getA19NeuralModel(),
+                                        minimumLogitGain: A19_NEURAL_POLICY.minimumLogitGain,
+                                        actionFamily: A19_NEURAL_POLICY.actionFamily,
+                                    },
+                                    recorded,
+                                );
+                                const { decisions, inferred, corrected: changes } = corrected.statistics;
+                                teacherNeural = { decisions, inferred, corrected: changes };
+                                return corrected.value;
+                            }
+                            return recorded();
                         }),
                     );
                     const checked = restored.value;
@@ -190,11 +214,18 @@ export function runV09PilotBoard(task: IPilotTask): IV09PilotBoard {
             throw new Error("Pilot did not exercise both search profiles");
         if (rootRestorationChecks !== driverCounts.baseline + driverCounts.candidate)
             throw new Error("Pilot did not verify every actual searched root");
+        if (
+            stage !== "aa" &&
+            manifest.teacherPreset === "precise-r8-neural" &&
+            teacherNeural?.decisions !== driverCounts.candidate
+        )
+            throw new Error("Neural R8 teacher did not observe every candidate root");
         if (training) for (const decision of training.decisions) decision.outcome = score(record);
         games.push({
             record,
             driverCounts,
             rootRestorationChecks,
+            ...(teacherNeural ? { teacherNeural } : {}),
             trajectorySha256: trajectory.digest("hex"),
             ...(training ? { training } : {}),
         });
@@ -265,6 +296,9 @@ export function validateV09PilotBoard(row: IV09PilotBoard, task: IPilotTask): vo
                           ? "win"
                           : "loss") ||
                 game.driverCounts.baseline < 1 ||
+                (task.stage !== "aa" &&
+                    task.manifest.teacherPreset === "precise-r8-neural" &&
+                    game.teacherNeural?.decisions !== game.driverCounts.candidate) ||
                 game.driverCounts.candidate < 1,
         )
     )
@@ -295,6 +329,14 @@ function completedStage(directory: string, manifest: IV09A19PilotManifest, stage
     );
     if (
         fingerprintV09(statistics) !== fingerprintV09(summary.statistics) ||
+        (manifest.doctrinePopulation &&
+            fingerprintV09(summary.doctrines) !==
+                fingerprintV09(
+                    v09DoctrineStatistics(
+                        rows.map((row) => row.score),
+                        hashSimulationParts("v09-pilot-ci", manifest.seed, stage),
+                    ),
+                )) ||
         fingerprintV09(rows.map((row) => row.boardSha256)) !== fingerprintV09(summary.boardHashes)
     )
         throw new Error("Pilot stage summary does not match its raw independent boards");
@@ -415,6 +457,14 @@ export async function runV09A19PilotStage(
             complete: true,
             promoted: false,
             statistics,
+            ...(manifest.doctrinePopulation
+                ? {
+                      doctrines: v09DoctrineStatistics(
+                          rows.map((row) => row.score),
+                          hashSimulationParts("v09-pilot-ci", manifest.seed, stage),
+                      ),
+                  }
+                : {}),
             teacherPassedScreen:
                 stage === "teacher_screen" &&
                 statistics.lower95 !== null &&
@@ -456,6 +506,7 @@ async function main(): Promise<void> {
             "server-root": { type: "string" },
             "source-commit": { type: "string" },
             "teacher-preset": { type: "string", default: "wide-r4" },
+            "doctrine-population": { type: "string" },
             seed: { type: "string", default: "2026102561" },
             workers: { type: "string", default: "1" },
             stage: { type: "string", default: "smoke" },
@@ -492,6 +543,7 @@ async function main(): Promise<void> {
             runtime: Bun.version,
             protectedV08Roots: values["protect-v08-root"].map((root) => resolve(root)),
             teacherPreset: values["teacher-preset"] as V09A19TeacherPreset,
+            doctrinePopulation: values["doctrine-population"] as V09A19DoctrinePopulation | undefined,
         });
         atomicJson(join(directory, "manifest.json"), manifest);
         process.stdout.write(JSON.stringify({ manifestSha256: manifest.manifestSha256, directory }) + "\n");

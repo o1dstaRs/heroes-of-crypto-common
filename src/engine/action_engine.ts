@@ -852,7 +852,7 @@ export class GameActionEngine {
             return this.reject("attack_not_available");
         }
         const target = isFreeAim ? undefined : this.context.unitsHolder.getAllUnits().get(action.targetId);
-        if (!isFreeAim && !target) {
+        if (!isFreeAim && (!target || target.isDead())) {
             return this.reject("unit_not_found");
         }
         if (!this.context.attackHandler) {

@@ -100,7 +100,7 @@ afterEach(() => {
 });
 
 describe("v0.9 fixed-point runtime", () => {
-    test("registers the inert candidate without changing the latest or default v0.8", () => {
+    test("keeps native v0.9 explicit while A19 remains the combat default", () => {
         expect(AI_VERSIONS).toContain("v0.9");
         expect(LATEST_AI_VERSION).toBe("v0.8");
         expect(DEFAULT_AI_VERSION).toBe("v0.8");

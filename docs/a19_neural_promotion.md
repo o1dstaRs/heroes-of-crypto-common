@@ -1,0 +1,21 @@
+# A19 neural ensemble: user adoption
+
+On November 1, 2026, the user explicitly requested: “Lock it in, route so it is default model for AI right now.” The two-fit primary-tie correction is adopted through the shared default A19 factory and the authoritative ranked bot factory. The wire version remains `v0.8`; the server revision is `a19-neural-ensemble-r2-v1`.
+
+The complete rule is fixed: run ordinary complementary H64/R2, then consider only fully evaluated exact primary maxima. Equally mix the two fitted policy distributions over the original complete entering catalog. Replace stock only when the log-probability gain reaches one. There are no unit, map, artifact, last-charge or learned-veto filters, and no additional rollouts.
+
+The adopted exports are batch256-v2 (`62cc88449b439a207dac22bdcf8e455a0ce65b0cbdf3581da4caf912bf7ef462`) and lr0003-v1 (`509a61a4a94db1b7c30bc17ef5fc95945b34c45e9fa6766051eff0590aa3eb44`). Their original training metadata is preserved. Runtime JSON packages store the original IEEE float32 weights losslessly as little-endian base64 tensors. `scripts/pack_a19_model.ts` verifies the original export hash and rejects any numerical conversion. All 128 independent PyTorch reference observations reproduce the accepted ensemble, with maximum error 1.3932e-6 and zero ranking mismatches.
+
+Native policy, search, encoding, both models, selection and cloning share the native-start 1000ms allowance, with a 25ms inference reserve and 1500ms breaker. Missing timestamps, invalid predictions and late inference preserve completed stock. Production hooks belong to one driver instance and are restored synchronously; they never modify `SearchDriver.prototype`. Models are bundled and cached locally. The public profile seals the same material-tie arbitration and certified selection bounds used in the measured ranked policy. The a13 rollback and older strategy versions remain available. Human Premium suggestions explicitly retain their established R2 advice policy; autonomous ranked and local AI use the neural default.
+
+## Evidence and remaining uncertainty
+
+The completed 192-board study contains 3,072 games, including the single-model control. The ensemble's 768 games against R2 score 54.6875%, with a whole-board 95% interval of 52.6042–56.8359%. Its 768 games against R4 score 52.6042%, interval 50.0000–55.1432%. Its paired gain over the unshipped single model is 0.3906 points, interval −0.6510 to +1.4648. That study failed its additional novelty criterion and remains closed; this user adoption does not mark it passed.
+
+The new-engine 84-game admission passes 48 exact pairs and 4,128 root restorations. The packed production adapter also reproduces the frozen correction policy through complete real-engine games; model-fault and late-inference controls retain full stock trajectories.
+
+The fixed 144-game production CPU study stopped at its registered 30-minute cap after 93 complete timing games. Its 57 candidate games contain 1,380 decisions, 177 corrections, zero model errors and zero inference overruns; observed p99 is 1,004ms and maximum 1,304ms. Its 36 stock games contain 834 decisions, p99 1,038ms and maximum 1,200ms. These are incomplete, unmatched timing samples and do not qualify the registered cost comparison. No live games ran during the guarded scratch benchmark, and the benchmark changed no service configuration.
+
+The 6,000-game qualification and confirmation banks remain unopened. Legally preferred Black Dragon and funded budget coverage have not been repeated for this exact default. The previous single-model Black Dragon map-floor failure remains a failed study. The original 55% learner goal is not reclassified as achieved. Current mainline also contains the newer Satyr/Wolf Rider blessings and Thunderbird health change; the historical strength estimates retain their frozen source identities.
+
+Adoption is the user's explicit release decision based on the measured improvement over production, with these remaining uncertainties recorded. Future research should use fresh fixed banks and retain both helpful and harmful outcomes. Default-routing, fallback, browser build, instance isolation and source/model identity checks must remain passing.

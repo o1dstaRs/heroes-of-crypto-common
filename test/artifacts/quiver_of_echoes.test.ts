@@ -3,6 +3,7 @@ import {
     ArtifactTier,
     formatArtifactDescription,
     getArtifactProperties,
+    Tier1Artifact,
     Tier2Artifact,
     TIER2_ARTIFACT_LIST,
     ToTier2Artifact,
@@ -84,11 +85,11 @@ test("is draftable with a new wire id and honest base description", () => {
     expect(TIER2_ARTIFACT_LIST.some((item) => item.id === Tier2Artifact.QUIVER_OF_ECHOES)).toBe(true);
     expect(
         formatArtifactDescription(getArtifactProperties(ArtifactTier.TIER_2, Tier2Artifact.QUIVER_OF_ECHOES)),
-    ).toContain("40% chance to make one extra attack");
+    ).toContain("35% chance to make one extra attack");
 });
 test("buffs allied ranged units only, recomputes once, and clears on deselection", () => {
     const { shooter, target, ally, fight, unitsHolder } = fixture();
-    expect(shooter.getBonusRangedAttackChance()).toBe(40);
+    expect(shooter.getBonusRangedAttackChance()).toBe(35);
     expect(target.getBuff("Quiver of Echoes")).toBeUndefined();
     expect(ally.getBuff("Quiver of Echoes")).toBeUndefined();
     unitsHolder.applyArtifacts(fight);
@@ -105,9 +106,9 @@ test("uses current positive or negative luck and displays the actual chance", ()
         props.luck = luck;
         props.luck_mod = 0;
         unitsHolder.refreshStackPowerForAllUnits();
-        expect(shooter.getBonusRangedAttackChance()).toBe(40 + luck);
+        expect(shooter.getBonusRangedAttackChance()).toBe(35 + luck);
         expect(props.applied_buffs_descriptions[props.applied_buffs.indexOf("Quiver of Echoes")]).toContain(
-            `a ${40 + luck}% chance`,
+            `a ${35 + luck}% chance`,
         );
         expect(props.applied_buffs_descriptions[props.applied_buffs.indexOf("Quiver of Echoes")]).not.toContain("luck");
     }
@@ -179,7 +180,7 @@ test("AI values the probabilistic volley without promising a guaranteed hit", ()
     const echo = evaluate();
     shooter.deleteBuff("Quiver of Echoes");
     const ordinary = evaluate();
-    expect(echo.value).toBeCloseTo(ordinary.value * 1.4, 6);
+    expect(echo.value).toBeCloseTo(ordinary.value * 1.35, 6);
     expect(echo.kill).toBe(0);
 });
 
@@ -187,7 +188,7 @@ test("hover damage includes the possible extra attack only at its upper bound an
     const { shooter, target } = fixture();
     const input = { attacker: shooter, target, synergyAbilityPowerIncrease: 0, divisor: 1 };
     const projection = projectDoubleShotAttack(input);
-    expect(projection.bonusChance).toBe(40);
+    expect(projection.bonusChance).toBe(35);
     expect(projection.total.min).toBe(projection.first.min);
     expect(projection.total.max).toBe(projection.first.max * 2);
     shooter.getUnitProperties().range_shots = 1;
@@ -206,6 +207,147 @@ test("stops when the first attack kills the only target", () => {
     expect(result.animationData).toHaveLength(1);
     expect(damage.rangedVolleyCount).toBeUndefined();
 });
+
+for (const echo of [false, true]) {
+    for (const [kind, abilities, area] of [
+        ["Double Shot", ["Double Shot"], false],
+        ["Double Throw", ["Area Throw", "Double Throw"], true],
+        ["piercing Double Shot", ["Through Shot", "Crafted Double Shot"], false],
+    ] as const) {
+        test(`${kind} stops after killing every target, Quiver=${echo}`, () => {
+            const { shooter, target, fire } = fixture([...abilities]);
+            if (!echo) shooter.deleteBuff("Quiver of Echoes");
+            target.getUnitProperties().amount_alive = 1;
+            target.getUnitProperties().hp = 1;
+            setDeterministicRandomSource(() => 0);
+            const { result } = fire(area);
+            expect(target.isDead()).toBe(true);
+            expect(result.animationData).toHaveLength(1);
+            expect(shooter.getRangeShots()).toBe(19);
+        });
+
+        test(`${kind} does not emit a follow-up without ammunition, Quiver=${echo}`, () => {
+            const { shooter, fire } = fixture([...abilities], 1);
+            if (!echo) shooter.deleteBuff("Quiver of Echoes");
+            setDeterministicRandomSource(() => 0);
+            expect(fire(area).result.animationData).toHaveLength(1);
+            expect(shooter.getRangeShots()).toBe(0);
+        });
+
+        test(`${kind} rejects an already-dead requested target, Quiver=${echo}`, () => {
+            const { shooter, target, fight, grid, unitsHolder, attackHandler } = fixture([...abilities]);
+            if (!echo) shooter.deleteBuff("Quiver of Echoes");
+            target.getUnitProperties().amount_alive = 0;
+            target.getUnitProperties().hp = 0;
+            fight.startFight();
+            const engine = new GameActionEngine({
+                fightProperties: fight,
+                grid,
+                unitsHolder,
+                attackHandler,
+                moveHandler: new MoveHandler(grid.getSettings(), grid, unitsHolder),
+                sceneLog: new SceneLogMock(),
+                getCurrentActiveUnitId: () => shooter.getId(),
+            });
+            const result = engine.apply({
+                type: "range_attack",
+                attackerId: shooter.getId(),
+                targetId: target.getId(),
+            });
+            expect(result.completed).toBe(false);
+            expect(result.events.some((event) => event.type === "unit_attacked")).toBe(false);
+            expect(shooter.getRangeShots()).toBe(20);
+        });
+    }
+}
+
+for (const area of [false, true]) {
+    test(`${area ? "area" : "piercing"} follow-ups keep living victims and skip an earlier kill`, () => {
+        const abilities = area ? ["Area Throw", "Double Throw"] : ["Through Shot", "Crafted Double Shot"];
+        const { shooter, target, grid, unitsHolder, attackHandler } = fixture(abilities);
+        target.getUnitProperties().amount_alive = 1;
+        target.getUnitProperties().hp = 1;
+        const survivor = createTestUnit({ name: "Survivor", team: RIGHT, maxHp: 100_000, amountAlive: 10 });
+        placeUnit(grid, unitsHolder, survivor, area ? { x: 8, y: 3 } : { x: 10, y: 2 });
+        const damage = createVisibleDamage(target);
+        setDeterministicRandomSource(() => 0);
+        const result = attackHandler.handleRangeAttack(
+            unitsHolder,
+            area ? [1] : [1, 1],
+            1,
+            damage,
+            shooter,
+            area ? [[target, survivor]] : [[target], [survivor]],
+            undefined,
+            target.getPosition(),
+            area,
+        );
+        expect(target.isDead()).toBe(true);
+        expect(survivor.isDead()).toBe(false);
+        expect(result.animationData).toHaveLength(3);
+        expect(damage.splash?.filter((hit) => hit.unitId === target.getId())).toHaveLength(1);
+        expect(damage.splash?.filter((hit) => hit.unitId === survivor.getId())).toHaveLength(3);
+        expect(result.animationData?.slice(1).every((shot) => shot.affectedUnit === survivor)).toBe(true);
+    });
+}
+
+test("a lethal counter stops Gargantuan's later throws", () => {
+    const { shooter, target, fire } = fixture(["Area Throw", "Double Throw"], 20, 0, undefined, true);
+    target.getUnitProperties().attack_damage_min = 100_000;
+    target.getUnitProperties().attack_damage_max = 100_000;
+    setDeterministicRandomSource(() => 0);
+    const { result } = fire(true, true);
+    expect(shooter.isDead()).toBe(true);
+    expect(result.animationData?.filter((shot) => shot.fromPosition?.x === shooter.getPosition().x)).toHaveLength(1);
+});
+
+test("piercing echoes apply Wounding Charm once per surviving victim per volley", () => {
+    const { shooter, target, unitsHolder, fight, fire } = fixture(["Through Shot", "Crafted Double Shot"]);
+    fight.setArtifactPerTeam(LEFT, 1, Tier1Artifact.WOUNDING_CHARM);
+    unitsHolder.applyArtifacts(fight);
+    unitsHolder.refreshStackPowerForAllUnits();
+    setDeterministicRandomSource(() => 0);
+    const { result, damage } = fire();
+    expect(result.animationData).toHaveLength(3);
+    const wounds = damage.deepWounds?.filter((entry) => entry.unitId === target.getId()) ?? [];
+    expect(wounds).toHaveLength(3);
+    expect(target.getEffect("Deep Wounds")?.getPower()).toBe(wounds[2].power);
+    expect(shooter.getRangeShots()).toBeGreaterThan(0);
+});
+
+test("a ranged counter applies Wounding Charm once on its actual victim", () => {
+    const { shooter, unitsHolder, fight, fire } = fixture([], 20, 0, undefined, true);
+    fight.setArtifactPerTeam(RIGHT, 1, Tier1Artifact.WOUNDING_CHARM);
+    unitsHolder.applyArtifacts(fight);
+    unitsHolder.refreshStackPowerForAllUnits();
+    setDeterministicRandomSource(() => 0);
+    const { damage } = fire(false, true);
+    expect(damage.deepWounds?.filter((entry) => entry.unitId === shooter.getId())).toHaveLength(1);
+    expect(shooter.getEffect("Deep Wounds")?.getPower()).toBeGreaterThan(0);
+});
+
+test.each([{ abilities: [] }, { abilities: ["Area Throw"] }, { abilities: ["Through Shot"] }])(
+    "ranged targeting ignores dead interceptors and splash victims: %j",
+    ({ abilities }) => {
+        const { shooter, target, grid, unitsHolder, attackHandler } = fixture(abilities);
+        const corpse = createTestUnit({ name: "Corpse", team: RIGHT });
+        const deadNeighbor = createTestUnit({ name: "Dead neighbor", team: RIGHT });
+        placeUnit(grid, unitsHolder, corpse, { x: 5, y: 2 });
+        placeUnit(grid, unitsHolder, deadNeighbor, { x: 8, y: 3 });
+        corpse.getUnitProperties().amount_alive = 0;
+        deadNeighbor.getUnitProperties().amount_alive = 0;
+        const evaluation = attackHandler.evaluateRangeAttack(
+            unitsHolder.getAllUnits(),
+            shooter,
+            shooter.getPosition(),
+            target.getPosition(),
+            abilities.includes("Through Shot"),
+            false,
+            abilities.includes("Area Throw"),
+        );
+        expect(evaluation.affectedUnits.flat().map((unit) => unit.getId())).toEqual([target.getId()]);
+    },
+);
 
 for (const [x, y] of [
     [1, 0],
@@ -285,10 +427,10 @@ test("a crafted double attack cannot echo after exhausting its two arrows", () =
 });
 
 for (const [roll, count] of [
-    [46, 2],
-    [47, 1],
+    [41, 2],
+    [42, 1],
 ]) {
-    test(`a +7 luck shooter uses the exact 47% boundary at roll ${roll}`, () => {
+    test(`a +7 luck shooter uses the exact 42% boundary at roll ${roll}`, () => {
         const { fire } = fixture([], 20, 7);
         let draw = 0;
         setDeterministicRandomSource(() => (draw++ % 2 === 0 ? 0 : roll / 0x100000000));

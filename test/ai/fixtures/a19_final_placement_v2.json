@@ -1,0 +1,3102 @@
+{
+    "schema": "hoc-placement-v2-serving-fixture-v1",
+    "registrationSha256": "a613ca1f0c346f21d0d8e09edddac288eefcfaca01d492173809ba32ac5e3f91",
+    "exportSha256": "4bb2199fb9af3212a17dfaef6d73de14fb174f1c4ff8699eda96c3a4a2a3554a",
+    "selection": "First case per registered map/pick-seat/physical-seat stratum, plus first nonzero-reference retained/changed cases; no outcome selection.",
+    "cases": [
+        {
+            "family": "global-confirm-0",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000001",
+                        "creature": 33,
+                        "name": "Arbalester",
+                        "amount": 124,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 4,
+                        "range": 5,
+                        "steps": 3,
+                        "initiative": 2,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000002",
+                        "creature": 31,
+                        "name": "Peasant",
+                        "amount": 200,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": true,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 8,
+                        "damage": 3,
+                        "range": 0,
+                        "steps": 4,
+                        "initiative": 2,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000003",
+                        "creature": 15,
+                        "name": "Nomad",
+                        "amount": 26,
+                        "width": 2,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 24,
+                        "damage": 8,
+                        "range": 0,
+                        "steps": 5.2,
+                        "initiative": 7.5,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000004",
+                        "creature": 24,
+                        "name": "Elf",
+                        "amount": 26,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 14,
+                        "damage": 7,
+                        "range": 7.75,
+                        "steps": 2.93,
+                        "initiative": 4,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000005",
+                        "creature": 50,
+                        "name": "Zena",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 55,
+                        "damage": 24,
+                        "range": 6,
+                        "steps": 4.7,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000006",
+                        "creature": 40,
+                        "name": "Angel",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 180,
+                        "damage": 65,
+                        "range": 0,
+                        "steps": 8.8,
+                        "initiative": 7.7,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [5, 12, 17, 25, 47, 57],
+                "enemyKits": [
+                    "Endless Quiver Petrifying Gaze",
+                    "AI Driven Double Punch",
+                    "Large Caliber",
+                    "Disguise Aura Deep Wounds Level 2",
+                    "Guiding Winds Aura Hamstring",
+                    "Tome of Elements Magic Reflection"
+                ],
+                "map": 1,
+                "artifacts": [2, 15],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": true,
+                "legal": [
+                    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
+                    44, 45, 46, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 1,
+                    "y": 13
+                },
+                {
+                    "x": 2,
+                    "y": 2
+                },
+                {
+                    "x": 2,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 9
+                },
+                {
+                    "x": 1,
+                    "y": 12
+                },
+                {
+                    "x": 2,
+                    "y": 11
+                }
+            ],
+            "reference": 6,
+            "referencePositions": [
+                {
+                    "x": 1,
+                    "y": 6
+                },
+                {
+                    "x": 3,
+                    "y": 6
+                },
+                {
+                    "x": 3,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 9
+                },
+                {
+                    "x": 1,
+                    "y": 11
+                },
+                {
+                    "x": 2,
+                    "y": 3
+                }
+            ],
+            "chosen": 6,
+            "scores": [
+                0.30874320808519023, 0.41253889510638037, 0.45279971275850556, 0.18623915664503612, 0.4781049564232886,
+                0.2830649825629972, 0.5020685525914174, 0.3567097338519023
+            ],
+            "positions": [
+                {
+                    "x": 1,
+                    "y": 6
+                },
+                {
+                    "x": 3,
+                    "y": 6
+                },
+                {
+                    "x": 3,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 9
+                },
+                {
+                    "x": 1,
+                    "y": 11
+                },
+                {
+                    "x": 2,
+                    "y": 3
+                }
+            ],
+            "featureSha256": [
+                "31d29cc7dcea63bbec8c6d379c2af9c87cef957759231345cf44c566cd40e862",
+                "011c50a249e5403b8005d16c0dbc5163f6a652f3ccbfecaa36c70d117efb2d5b",
+                "5b519f61a642bf68deeeefd80392c823403b1d5aad00c80e151ed8d563f2b035",
+                "a47fb2a413b92b23828b76c2057a208829a1296eb9d677a36124c20ed2990f98",
+                "d3dbb6984d8556b8cd7cf206bbe4519271d8d5eaeae0f5a7395f6197ad031017",
+                "d0048b3aa3bf03353861d4a13491543f6d51bd24d59e4310fb933e8ec60ad045",
+                "2c70fa50f1918a75b934c1019f457cebd567deedfd62611d8c3b4624aafc613e",
+                "070c89d890d6bd60eca86a337d612eb5816e167ebe9a3c9cb023883b790e15f4"
+            ]
+        },
+        {
+            "family": "global-confirm-1",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000001",
+                        "creature": 31,
+                        "name": "Peasant",
+                        "amount": 200,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": true,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 8,
+                        "damage": 3,
+                        "range": 0,
+                        "steps": 4,
+                        "initiative": 2,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000002",
+                        "creature": 1,
+                        "name": "Orc",
+                        "amount": 100,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 5,
+                        "range": 5.3,
+                        "steps": 3,
+                        "initiative": 4,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000003",
+                        "creature": 34,
+                        "name": "Valkyrie",
+                        "amount": 29,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": true,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 20,
+                        "damage": 7,
+                        "range": 0,
+                        "steps": 7.3,
+                        "initiative": 7,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000004",
+                        "creature": 4,
+                        "name": "Troll",
+                        "amount": 25,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 40,
+                        "damage": 16,
+                        "range": 0,
+                        "steps": 2,
+                        "initiative": 2,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000005",
+                        "creature": 50,
+                        "name": "Zena",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 55,
+                        "damage": 24,
+                        "range": 6,
+                        "steps": 4.7,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000006",
+                        "creature": 57,
+                        "name": "Magic Dragon",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 150,
+                        "damage": 42,
+                        "range": 0,
+                        "steps": 3.4,
+                        "initiative": 2.4,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [17, 22, 24, 39, 49, 52],
+                "enemyKits": [
+                    "Large Caliber",
+                    "Shadow Touch Small Specie",
+                    "Double Shot",
+                    "Mechanism No Melee Through Shot",
+                    "Book of Chaos",
+                    "Earth Element Vine Throw In Its Own World"
+                ],
+                "map": 3,
+                "artifacts": [1, 8],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": true,
+                "legal": [
+                    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
+                    44, 45, 46, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 3,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 6
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 2,
+                    "y": 11
+                }
+            ],
+            "reference": 7,
+            "referencePositions": [
+                {
+                    "x": 3,
+                    "y": 11
+                },
+                {
+                    "x": 1,
+                    "y": 9
+                },
+                {
+                    "x": 3,
+                    "y": 1
+                },
+                {
+                    "x": 2,
+                    "y": 13
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 2,
+                    "y": 11
+                }
+            ],
+            "chosen": 2,
+            "scores": [
+                0.491321667004875, 0.4635228966486606, 0.5709666238290859, 0.3204967569068344, 0.4499759274240748,
+                0.38410457387405605, 0.4583388188574248, 0.40641117104762686
+            ],
+            "positions": [
+                {
+                    "x": 3,
+                    "y": 1
+                },
+                {
+                    "x": 3,
+                    "y": 9
+                },
+                {
+                    "x": 1,
+                    "y": 9
+                },
+                {
+                    "x": 1,
+                    "y": 4
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 2,
+                    "y": 13
+                }
+            ],
+            "featureSha256": [
+                "ec9e6a60bc9e8d7b69c3fbb2145ffc1961a7505c1f6d0b3c7b8f17a5cbabe601",
+                "0b7439685df33a384030776faf7bbd9f5c71adee7390e3c3bf0974af7627074d",
+                "0a37a7c00dabd517ca3f3fbfd6eeb2142179391bbfa3e80266c60200c19d4c84",
+                "023a93a2ae30ba588b16a658f5236c787f2545352b85842a204f9f71255ddc90",
+                "76271ce1f60a43d1ca684199e18fb9488ca990b997f2b1f16c4dc879a785c840",
+                "6129f7c90ac0b170f8fa25ce77fb755062faaea72165f987799746484b5c03dd",
+                "4e0db9c9792d1b9f92dcc97be78b843e04f6dd0feb182b6550ce69ec43b1c7b4",
+                "70971c4798afc63e79eade6748e280a746cffca6446c20f0a04ff02d5c9be0b5"
+            ]
+        },
+        {
+            "family": "global-confirm-2",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000001",
+                        "creature": 47,
+                        "name": "Dryad",
+                        "amount": 91,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": true,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 6,
+                        "range": 6.5,
+                        "steps": 4,
+                        "initiative": 3.8,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000002",
+                        "creature": 49,
+                        "name": "Wandering Mage",
+                        "amount": 139,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 6,
+                        "damage": 3,
+                        "range": 0,
+                        "steps": 4.2,
+                        "initiative": 2.3,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000003",
+                        "creature": 34,
+                        "name": "Valkyrie",
+                        "amount": 29,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": true,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 20,
+                        "damage": 7,
+                        "range": 0,
+                        "steps": 7.3,
+                        "initiative": 7,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000004",
+                        "creature": 6,
+                        "name": "Beholder",
+                        "amount": 22,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 21,
+                        "damage": 11,
+                        "range": 6.1,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000005",
+                        "creature": 50,
+                        "name": "Zena",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 55,
+                        "damage": 24,
+                        "range": 6,
+                        "steps": 4.7,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000006",
+                        "creature": 39,
+                        "name": "Tsar Cannon",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 200,
+                        "damage": 55,
+                        "range": 6.5,
+                        "steps": 3.2,
+                        "initiative": 3,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [11, 13, 17, 24, 29, 36],
+                "enemyKits": [
+                    "Handyman Piercing Spear Boost Health",
+                    "Wolf Trail Blessing Rapid Charge",
+                    "Large Caliber",
+                    "Double Shot",
+                    "Earth Element Double Throw Area Throw",
+                    "Book of Healing"
+                ],
+                "map": 4,
+                "artifacts": [2, 15],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": true,
+                "legal": [
+                    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
+                    44, 45, 46, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 3,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 12
+                },
+                {
+                    "x": 1,
+                    "y": 4
+                },
+                {
+                    "x": 2,
+                    "y": 2
+                }
+            ],
+            "reference": 6,
+            "referencePositions": [
+                {
+                    "x": 3,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 11
+                },
+                {
+                    "x": 1,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 5
+                },
+                {
+                    "x": 2,
+                    "y": 2
+                }
+            ],
+            "chosen": 6,
+            "scores": [
+                0.8581956856180408, 0.8488766039935534, 0.9277553677003249, 0.6143081196972696, 0.8236655731035514,
+                0.5160788636699474, 0.9888019762712711, 0.709132915504741
+            ],
+            "positions": [
+                {
+                    "x": 3,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 11
+                },
+                {
+                    "x": 1,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 5
+                },
+                {
+                    "x": 2,
+                    "y": 2
+                }
+            ],
+            "featureSha256": [
+                "d2d976484049705c7df75607b503e746f0322f792ef52ff41c800b9a249f03c9",
+                "4835b257dc7265e70733d56c016011cd29033e2398d86fc73e4deba06c031569",
+                "8435d595309089d5cfdb81bd90c3ffca196965c86a6feee287ca8af434338e58",
+                "b7234501830c30bc161cec3c2810a1a1bb4d4ec7524997bb4540e185d685914d",
+                "98390b675af5f79c4591733c1bc803bec6dcb9f6be31322450e7442a6ef47818",
+                "62bc1fb0ef3fc1423d0d84c1b4db168e6887cedad3011cbee9f892a7079b214f",
+                "be2619c27ac2371c04c9bb238c61ac42aa085b2e6f9f90a9cf3259b34777a6c8",
+                "49982f983e33481b0de9fe5e44e107eb694e30de64ae84881284a60e49c25f99"
+            ]
+        },
+        {
+            "family": "global-confirm-3",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000007",
+                        "creature": 12,
+                        "name": "Berserker",
+                        "amount": 109,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": true,
+                        "hp": 14,
+                        "damage": 4,
+                        "range": 0,
+                        "steps": 5.1,
+                        "initiative": 6,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000008",
+                        "creature": 11,
+                        "name": "Centaur",
+                        "amount": 73,
+                        "width": 2,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 10,
+                        "damage": 3,
+                        "range": 4,
+                        "steps": 5.3,
+                        "initiative": 3,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000009",
+                        "creature": 34,
+                        "name": "Valkyrie",
+                        "amount": 29,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": true,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 20,
+                        "damage": 7,
+                        "range": 0,
+                        "steps": 7.3,
+                        "initiative": 7,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000a",
+                        "creature": 6,
+                        "name": "Beholder",
+                        "amount": 22,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 21,
+                        "damage": 11,
+                        "range": 6.1,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000b",
+                        "creature": 17,
+                        "name": "Cyclops",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 72,
+                        "damage": 23,
+                        "range": 6.5,
+                        "steps": 6,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000c",
+                        "creature": 29,
+                        "name": "Gargantuan",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 170,
+                        "damage": 50,
+                        "range": 5,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [32, 35, 47, 50, 55, 57],
+                "enemyKits": [
+                    "Stun Arcane Ward Blessing",
+                    "Aggr Skewer Strike Wardguard",
+                    "Guiding Winds Aura Hamstring",
+                    "Handyman Chakram Rallying Volley Blessing",
+                    "Basic Tome of Battle Magic",
+                    "Tome of Elements Magic Reflection"
+                ],
+                "map": 1,
+                "artifacts": [4, 17],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": false,
+                "legal": [
+                    225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 209, 210, 211, 212, 213, 214,
+                    215, 216, 217, 218, 219, 220, 221, 222, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204,
+                    205, 206
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 12,
+                    "y": 3
+                },
+                {
+                    "x": 14,
+                    "y": 1
+                },
+                {
+                    "x": 12,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                }
+            ],
+            "reference": 0,
+            "referencePositions": [
+                {
+                    "x": 12,
+                    "y": 3
+                },
+                {
+                    "x": 14,
+                    "y": 1
+                },
+                {
+                    "x": 12,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                }
+            ],
+            "chosen": 6,
+            "scores": [
+                0.19637050467246947, 0.18161725771552822, 0.2108393865725514, 0.22976663354517649, 0.058956618038861645,
+                0.13172277670033727, 0.3155207286251188, 0.15712357308049393
+            ],
+            "positions": [
+                {
+                    "x": 12,
+                    "y": 6
+                },
+                {
+                    "x": 14,
+                    "y": 6
+                },
+                {
+                    "x": 13,
+                    "y": 10
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 10
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                }
+            ],
+            "featureSha256": [
+                "6572a124307d015ba6e273966f637d196bda5cd660dc83c3c12be94e0d3bb614",
+                "f77a6d1be532c8642c2e12b5413f5f94aeb15e21abfb27f9e408017660abd8a5",
+                "4a22983275ee2e38159033122fa0cbb5953b3b7f96fa6170b6b172246bd58902",
+                "a9bbb6095f45e3e875f2d6a59bb294f0922e20491e66f4ac2eb964d5b12fbc9b",
+                "bd8300d2982d0862f91d23e7db2b6a693c997efbadf2794a40b1b1c1b4c02de9",
+                "160fde3d74d7c507a1ab257e2f6193cc2283800a0deef35b37758e5737dfff1e",
+                "30f13368042cb3d4a8a206cac580676eff46cc947027fa279dc39bcc4d71def8",
+                "c544e7330c83394d09684717511251cf008032f43083a1b43c5a76d80bc25482"
+            ]
+        },
+        {
+            "family": "global-confirm-4",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000007",
+                        "creature": 1,
+                        "name": "Orc",
+                        "amount": 100,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 5,
+                        "range": 5.3,
+                        "steps": 3,
+                        "initiative": 4,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000008",
+                        "creature": 47,
+                        "name": "Dryad",
+                        "amount": 91,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": true,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 6,
+                        "range": 6.5,
+                        "steps": 4,
+                        "initiative": 3.8,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000009",
+                        "creature": 51,
+                        "name": "Wyvern",
+                        "amount": 31,
+                        "width": 2,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": true,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 20,
+                        "damage": 7,
+                        "range": 0,
+                        "steps": 7.2,
+                        "initiative": 7.3,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000a",
+                        "creature": 6,
+                        "name": "Beholder",
+                        "amount": 22,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 21,
+                        "damage": 11,
+                        "range": 6.1,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000b",
+                        "creature": 17,
+                        "name": "Cyclops",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 72,
+                        "damage": 23,
+                        "range": 6.5,
+                        "steps": 6,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000c",
+                        "creature": 29,
+                        "name": "Gargantuan",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 170,
+                        "damage": 50,
+                        "range": 5,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [5, 12, 24, 49, 50, 57],
+                "enemyKits": [
+                    "Endless Quiver Petrifying Gaze",
+                    "AI Driven Double Punch",
+                    "Double Shot",
+                    "Book of Chaos",
+                    "Handyman Chakram Rallying Volley Blessing",
+                    "Tome of Elements Magic Reflection"
+                ],
+                "map": 3,
+                "artifacts": [1, 15],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": false,
+                "legal": [
+                    225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 209, 210, 211, 212, 213, 214,
+                    215, 216, 217, 218, 219, 220, 221, 222, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204,
+                    205, 206
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 14,
+                    "y": 1
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 13,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 12
+                }
+            ],
+            "reference": 1,
+            "referencePositions": [
+                {
+                    "x": 14,
+                    "y": 1
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 13,
+                    "y": 9
+                },
+                {
+                    "x": 14,
+                    "y": 3
+                },
+                {
+                    "x": 14,
+                    "y": 6
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                }
+            ],
+            "chosen": 3,
+            "scores": [
+                0.8274413184042171, 0.7189834178107066, 0.6603512460731612, 0.882668491268803, 0.685667054538648,
+                0.7196773463196522, 0.8787678791242297, 0.6565394480636925
+            ],
+            "positions": [
+                {
+                    "x": 14,
+                    "y": 1
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 13,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 7
+                }
+            ],
+            "featureSha256": [
+                "f259e423d8d6da11179b90a94918fd0664a6fe1712b05fa8bfde41cea232659b",
+                "9430788b8f5765790014551f9fb95582e48f13a74d699b70c0fe4d599e4cc66f",
+                "cbab1b533866184095f8ee53dc577705053fc624c1185e210c622d5029f8081c",
+                "3c2f65000ab0d52e8ad5db8800e5f45d9866e40f46a685bbd2a7c79005acddd5",
+                "b200da000c722f7105b2641e2bf0aeb2efbdd9ca0ce9ce695366565e384e6ffc",
+                "0d317986fc3a34efa7d1a3dc5d3e21bc1547c0714ec8db26c0fa1353b8a3824e",
+                "3885f47563f4bdfd192d942c86ffc8982d148488562e88f5e300796f9d0b2309",
+                "49cf0ee1a5314d22d45c1d4116026375f8507fc5a208c45e7cea71a6e3b86473"
+            ]
+        },
+        {
+            "family": "global-confirm-5",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000007",
+                        "creature": 49,
+                        "name": "Wandering Mage",
+                        "amount": 139,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 6,
+                        "damage": 3,
+                        "range": 0,
+                        "steps": 4.2,
+                        "initiative": 2.3,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000008",
+                        "creature": 11,
+                        "name": "Centaur",
+                        "amount": 73,
+                        "width": 2,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 10,
+                        "damage": 3,
+                        "range": 4,
+                        "steps": 5.3,
+                        "initiative": 3,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000009",
+                        "creature": 53,
+                        "name": "Manticore",
+                        "amount": 27,
+                        "width": 2,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 20,
+                        "damage": 7,
+                        "range": 0,
+                        "steps": 7.6,
+                        "initiative": 7.3,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000a",
+                        "creature": 6,
+                        "name": "Beholder",
+                        "amount": 22,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 21,
+                        "damage": 11,
+                        "range": 6.1,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000b",
+                        "creature": 17,
+                        "name": "Cyclops",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 72,
+                        "damage": 23,
+                        "range": 6.5,
+                        "steps": 6,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000c",
+                        "creature": 57,
+                        "name": "Magic Dragon",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 150,
+                        "damage": 42,
+                        "range": 0,
+                        "steps": 3.4,
+                        "initiative": 2.4,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [12, 25, 43, 47, 50, 55],
+                "enemyKits": [
+                    "AI Driven Double Punch",
+                    "Disguise Aura Deep Wounds Level 2",
+                    "AI Driven Magic Shield Boar Saliva",
+                    "Guiding Winds Aura Hamstring",
+                    "Handyman Chakram Rallying Volley Blessing",
+                    "Basic Tome of Battle Magic"
+                ],
+                "map": 4,
+                "artifacts": [15, 5],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": false,
+                "legal": [
+                    225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 209, 210, 211, 212, 213, 214,
+                    215, 216, 217, 218, 219, 220, 221, 222, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204,
+                    205, 206
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 14,
+                    "y": 12
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 13,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 3
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                }
+            ],
+            "reference": 6,
+            "referencePositions": [
+                {
+                    "x": 14,
+                    "y": 8
+                },
+                {
+                    "x": 14,
+                    "y": 9
+                },
+                {
+                    "x": 13,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 3
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                }
+            ],
+            "chosen": 6,
+            "scores": [
+                0.578992547174985, 0.5399621442710328, 0.5187197718728266, 0.6126638111934368, 0.593138266887007,
+                0.578992547174985, 0.6300582495665472, 0.44062899173734593
+            ],
+            "positions": [
+                {
+                    "x": 14,
+                    "y": 8
+                },
+                {
+                    "x": 14,
+                    "y": 9
+                },
+                {
+                    "x": 13,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 3
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                }
+            ],
+            "featureSha256": [
+                "8bb979f36670033d2f12d134f5c68a776875e2584c3845600a03ad1f6d3b609b",
+                "e645db863a6f7d5c08601779afb8ffa8f22a0b56f442f134ff47dfe3bd7f70cc",
+                "cfa0ba74ca16b9388878b914887dccdac799171e641e10a8a483626b369100b7",
+                "0bba7074b223f280b4f619dd7a4ebf396ccfdc49b7663582c56ca70710ac9793",
+                "e06562f2ab002c5ca767ff4e15f9d9873f4ef82b97b8159816e097addf7ad064",
+                "8bb979f36670033d2f12d134f5c68a776875e2584c3845600a03ad1f6d3b609b",
+                "f9978a0213e6f8003e8b969ce89ff4965c96deefc96c899dce61a95927662366",
+                "3d84a64f66ccbb8fd286c790a96669a9d5a5b11a7bd8b8472fdd5248fd0693ee"
+            ]
+        },
+        {
+            "family": "global-confirm-6",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000007",
+                        "creature": 22,
+                        "name": "Fairy",
+                        "amount": 139,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 7,
+                        "damage": 3,
+                        "range": 0,
+                        "steps": 8,
+                        "initiative": 6.6,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000008",
+                        "creature": 47,
+                        "name": "Dryad",
+                        "amount": 91,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": true,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 6,
+                        "range": 6.5,
+                        "steps": 4,
+                        "initiative": 3.8,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000009",
+                        "creature": 55,
+                        "name": "Battle Mage",
+                        "amount": 50,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 12,
+                        "damage": 5,
+                        "range": 0,
+                        "steps": 3.4,
+                        "initiative": 2.1,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000a",
+                        "creature": 35,
+                        "name": "Pikeman",
+                        "amount": 23,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 27,
+                        "damage": 10,
+                        "range": 0,
+                        "steps": 4.1,
+                        "initiative": 5,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000b",
+                        "creature": 50,
+                        "name": "Zena",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 55,
+                        "damage": 24,
+                        "range": 6,
+                        "steps": 4.7,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000c",
+                        "creature": 40,
+                        "name": "Angel",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 180,
+                        "damage": 65,
+                        "range": 0,
+                        "steps": 8.8,
+                        "initiative": 7.7,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [2, 6, 17, 24, 29, 32],
+                "enemyKits": [
+                    "Backstab Dodge",
+                    "Spit Ball",
+                    "Large Caliber",
+                    "Double Shot",
+                    "Earth Element Double Throw Area Throw",
+                    "Stun Arcane Ward Blessing"
+                ],
+                "map": 1,
+                "artifacts": [7, 5],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": false,
+                "legal": [
+                    225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 209, 210, 211, 212, 213, 214,
+                    215, 216, 217, 218, 219, 220, 221, 222, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204,
+                    205, 206
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 12,
+                    "y": 11
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 12
+                },
+                {
+                    "x": 13,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 9
+                },
+                {
+                    "x": 14,
+                    "y": 11
+                }
+            ],
+            "reference": 2,
+            "referencePositions": [
+                {
+                    "x": 12,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 1
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 12,
+                    "y": 10
+                },
+                {
+                    "x": 14,
+                    "y": 9
+                },
+                {
+                    "x": 14,
+                    "y": 6
+                }
+            ],
+            "chosen": 1,
+            "scores": [
+                0.4165012791348754, 0.7644362414175476, 0.6619627671279082, 0.3117749499879887, 0.6632027834982936,
+                0.42461093276851625, 0.7011171488222414, 0.46490659122590183
+            ],
+            "positions": [
+                {
+                    "x": 12,
+                    "y": 7
+                },
+                {
+                    "x": 14,
+                    "y": 10
+                },
+                {
+                    "x": 14,
+                    "y": 1
+                },
+                {
+                    "x": 12,
+                    "y": 10
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                },
+                {
+                    "x": 14,
+                    "y": 4
+                }
+            ],
+            "featureSha256": [
+                "114457970f944dae8dfb6039a5a195d63a971bbfc92bb49bb376190207aa744c",
+                "3001935fafe70b4a26bb7d06b6e1aaf2ade07e785c09feb662b5aba411aa8176",
+                "d76fb2baa22464098d850e1cfcd525f5b9b73409fa6594a97b5957dac5e054ee",
+                "a3a1133a073939be361d3b7ae871666268a7d5a04aacddcb7fbbe3c116080e54",
+                "406d37d1b8ae567d74a2cf18fa974b91d2eebe78d4291d8a2b3706b4652854e4",
+                "0c3a3259f1112fa1a5e444caf22340f5b2881795d90417924bf7579aa672612a",
+                "1e08fbe2a643800a2e305b943a4f834600f18b2fa1c85ae67d0901e048e47f76",
+                "a2a05cb3006c23707dd5be42f4a5e29267edcb646d961e9941af38aeddd0b263"
+            ]
+        },
+        {
+            "family": "global-confirm-7",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000007",
+                        "creature": 22,
+                        "name": "Fairy",
+                        "amount": 139,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 7,
+                        "damage": 3,
+                        "range": 0,
+                        "steps": 8,
+                        "initiative": 6.6,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000008",
+                        "creature": 49,
+                        "name": "Wandering Mage",
+                        "amount": 138,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 6,
+                        "damage": 3,
+                        "range": 0,
+                        "steps": 4.2,
+                        "initiative": 2.3,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000009",
+                        "creature": 6,
+                        "name": "Beholder",
+                        "amount": 22,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 21,
+                        "damage": 11,
+                        "range": 6.1,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000a",
+                        "creature": 24,
+                        "name": "Elf",
+                        "amount": 25,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 14,
+                        "damage": 7,
+                        "range": 7.75,
+                        "steps": 2.93,
+                        "initiative": 4,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000b",
+                        "creature": 17,
+                        "name": "Cyclops",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 72,
+                        "damage": 23,
+                        "range": 6.5,
+                        "steps": 6,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000c",
+                        "creature": 43,
+                        "name": "Frenzied Boar",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": true,
+                        "hp": 220,
+                        "damage": 90,
+                        "range": 0,
+                        "steps": 7,
+                        "initiative": 6.5,
+                        "level": 4
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000d",
+                        "creature": 49,
+                        "name": "Wandering Mage",
+                        "amount": 1,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 6,
+                        "damage": 3,
+                        "range": 0,
+                        "steps": 4.2,
+                        "initiative": 2.3,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000e",
+                        "creature": 24,
+                        "name": "Elf",
+                        "amount": 1,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 14,
+                        "damage": 7,
+                        "range": 7.75,
+                        "steps": 2.93,
+                        "initiative": 4,
+                        "level": 2
+                    }
+                ],
+                "enemyIds": [5, 40, 46, 47, 54, 55],
+                "enemyKits": [
+                    "Endless Quiver Petrifying Gaze",
+                    "Resurrection Arrows Wingshield Blessing Angelic Host Blessing",
+                    "Water Element Water Shield",
+                    "Guiding Winds Aura Hamstring",
+                    "Magic Shield Borrowed Grace Absolving Arrow",
+                    "Basic Tome of Battle Magic"
+                ],
+                "map": 3,
+                "artifacts": [1, 15],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": false,
+                "legal": [
+                    225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 209, 210, 211, 212, 213, 214,
+                    215, 216, 217, 218, 219, 220, 221, 222, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204,
+                    205, 206
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 12,
+                    "y": 12
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 1
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                },
+                {
+                    "x": 13,
+                    "y": 14
+                },
+                {
+                    "x": 12,
+                    "y": 8
+                },
+                {
+                    "x": 14,
+                    "y": 3
+                }
+            ],
+            "reference": 6,
+            "referencePositions": [
+                {
+                    "x": 12,
+                    "y": 11
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 1
+                },
+                {
+                    "x": 14,
+                    "y": 11
+                },
+                {
+                    "x": 14,
+                    "y": 6
+                },
+                {
+                    "x": 13,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 8
+                },
+                {
+                    "x": 14,
+                    "y": 3
+                }
+            ],
+            "chosen": 5,
+            "scores": [
+                0.506564197291145, 0.6225231151324677, 0.5471543408712038, 0.49083954252071843, 0.533865673548412,
+                0.6329610324102204, 0.5791016128443747, 0.3507454504655502
+            ],
+            "positions": [
+                {
+                    "x": 12,
+                    "y": 12
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 1
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                },
+                {
+                    "x": 14,
+                    "y": 13
+                },
+                {
+                    "x": 13,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 10
+                },
+                {
+                    "x": 14,
+                    "y": 3
+                }
+            ],
+            "featureSha256": [
+                "a652c97ea69ea3d3d3535a0b6c96ea3a34ca3640a3fba8fda77d09146a856acc",
+                "1d233aeed7e0134c97de41978b0e598c9a36cbce0ae08f3cee7f8652fc3d0525",
+                "06a1dfec67c62d55cfcc6642f765ade39b6bcb4869937e54a8c5344d89c8cde6",
+                "421588de1ab175759df3217bf61414cc728f0d9da743d79c5b2cd60c30a00c34",
+                "a91902175730394f3dadb0d9cf2e0346a634753f88d21484ac5d0d2b9d89b1f4",
+                "4b84787ae9ead706d02cd128e5f564fc16f4e14480a5ba32069bdd81962953c3",
+                "67ea13106e994569a1b77a94d8bfecc4e96b755fbfd26bb65662cb6f4f9302f7",
+                "3956138a2c03f2a458b24f1795aeeb9b5df01baf82577c1a6be6c3098a30161e"
+            ]
+        },
+        {
+            "family": "global-confirm-8",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000007",
+                        "creature": 1,
+                        "name": "Orc",
+                        "amount": 100,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 5,
+                        "range": 5.3,
+                        "steps": 3,
+                        "initiative": 4,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000008",
+                        "creature": 47,
+                        "name": "Dryad",
+                        "amount": 91,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": true,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 6,
+                        "range": 6.5,
+                        "steps": 4,
+                        "initiative": 3.8,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000009",
+                        "creature": 55,
+                        "name": "Battle Mage",
+                        "amount": 50,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 12,
+                        "damage": 5,
+                        "range": 0,
+                        "steps": 3.4,
+                        "initiative": 2.1,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000a",
+                        "creature": 5,
+                        "name": "Medusa",
+                        "amount": 24,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 19,
+                        "damage": 9,
+                        "range": 6.5,
+                        "steps": 3.9,
+                        "initiative": 3,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000b",
+                        "creature": 50,
+                        "name": "Zena",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 55,
+                        "damage": 24,
+                        "range": 6,
+                        "steps": 4.7,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-00000000000c",
+                        "creature": 39,
+                        "name": "Tsar Cannon",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 200,
+                        "damage": 55,
+                        "range": 6.5,
+                        "steps": 3.2,
+                        "initiative": 3,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [6, 11, 17, 26, 29, 31],
+                "enemyKits": [
+                    "Spit Ball",
+                    "Handyman Piercing Spear Boost Health",
+                    "Large Caliber",
+                    "Forest Spellbook Sylvan Focus Blessing",
+                    "Earth Element Double Throw Area Throw",
+                    "Bitter Experience Absorb Penalties Aura"
+                ],
+                "map": 4,
+                "artifacts": [4, 17],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": false,
+                "legal": [
+                    225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 209, 210, 211, 212, 213, 214,
+                    215, 216, 217, 218, 219, 220, 221, 222, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204,
+                    205, 206
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 12
+                },
+                {
+                    "x": 14,
+                    "y": 8
+                },
+                {
+                    "x": 14,
+                    "y": 4
+                },
+                {
+                    "x": 14,
+                    "y": 10
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                }
+            ],
+            "reference": 0,
+            "referencePositions": [
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 14,
+                    "y": 12
+                },
+                {
+                    "x": 14,
+                    "y": 8
+                },
+                {
+                    "x": 14,
+                    "y": 4
+                },
+                {
+                    "x": 14,
+                    "y": 10
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                }
+            ],
+            "chosen": 2,
+            "scores": [
+                0.6316311245851104, 0.6734235470875045, 0.7537255446743433, 0.32376039493653586, 0.6867311469942344,
+                0.3208615326258155, 0.7514356360712496, 0.48630113087762566
+            ],
+            "positions": [
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 13,
+                    "y": 11
+                },
+                {
+                    "x": 14,
+                    "y": 8
+                },
+                {
+                    "x": 12,
+                    "y": 14
+                },
+                {
+                    "x": 13,
+                    "y": 5
+                },
+                {
+                    "x": 14,
+                    "y": 2
+                }
+            ],
+            "featureSha256": [
+                "9c6a1e2e20de1e3f37c21dafae341067ba2a4e77371d94f1e1f1bf68da8e7233",
+                "dca2bf8e9bc748033b30530e805d8bbd8ea22fb05f840e10cdd03cf56e7a71f8",
+                "0d39dd5cba1070570c118df5d6135961bef4326c91aadc58da42c4fe6483e215",
+                "b40f7ae7d254250797f0484b28bf4780960def35fc6cb9fc91841e5a83d8fff8",
+                "6fddec997f145504ea7645be06d5b8d316c3b3147b2778193c5bfd027b9047ab",
+                "2c29747f6bbb8dbb678d0e3ff1fcb3d8558cc7c2b24cd603cbf264b3ccd02bb5",
+                "aae27f1cf2ff646ee7c921c15c3c72c574a0567986ca929da1bf6a6e3acdf569",
+                "ab0d00003e386234b2e1778527e51316f2b31865b96eae4e0267c7bc6b630ae6"
+            ]
+        },
+        {
+            "family": "global-confirm-9",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000001",
+                        "creature": 22,
+                        "name": "Fairy",
+                        "amount": 139,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 7,
+                        "damage": 3,
+                        "range": 0,
+                        "steps": 8,
+                        "initiative": 6.6,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000002",
+                        "creature": 1,
+                        "name": "Orc",
+                        "amount": 100,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 5,
+                        "range": 5.3,
+                        "steps": 3,
+                        "initiative": 4,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000003",
+                        "creature": 34,
+                        "name": "Valkyrie",
+                        "amount": 29,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": true,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 20,
+                        "damage": 7,
+                        "range": 0,
+                        "steps": 7.3,
+                        "initiative": 7,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000004",
+                        "creature": 5,
+                        "name": "Medusa",
+                        "amount": 24,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 19,
+                        "damage": 9,
+                        "range": 6.5,
+                        "steps": 3.9,
+                        "initiative": 3,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000005",
+                        "creature": 17,
+                        "name": "Cyclops",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 72,
+                        "damage": 23,
+                        "range": 6.5,
+                        "steps": 6,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000006",
+                        "creature": 29,
+                        "name": "Gargantuan",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 170,
+                        "damage": 50,
+                        "range": 5,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [6, 13, 39, 47, 50, 55],
+                "enemyKits": [
+                    "Spit Ball",
+                    "Wolf Trail Blessing Rapid Charge",
+                    "Mechanism No Melee Through Shot",
+                    "Guiding Winds Aura Hamstring",
+                    "Handyman Chakram Rallying Volley Blessing",
+                    "Basic Tome of Battle Magic"
+                ],
+                "map": 1,
+                "artifacts": [9, 5],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": true,
+                "legal": [
+                    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
+                    44, 45, 46, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 3,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 3,
+                    "y": 13
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 2
+                },
+                {
+                    "x": 2,
+                    "y": 13
+                }
+            ],
+            "reference": 0,
+            "referencePositions": [
+                {
+                    "x": 3,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 3,
+                    "y": 13
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 2
+                },
+                {
+                    "x": 2,
+                    "y": 13
+                }
+            ],
+            "chosen": 1,
+            "scores": [
+                0.2573274815113063, 0.3179923312255151, 0.2891870373388783, 0.27293854983329063, 0.27812534201012645,
+                0.1513748052806584, 0.26603784923140755, 0.057296934955251275
+            ],
+            "positions": [
+                {
+                    "x": 3,
+                    "y": 5
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 1,
+                    "y": 5
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 8
+                },
+                {
+                    "x": 2,
+                    "y": 12
+                }
+            ],
+            "featureSha256": [
+                "485bba8f3708e07a2327a4b5f64fc0821fb26fde9ad066b2b258d97785b0cacd",
+                "ba8158f079bcd037394853be531a6aa988a1c7788013c9dd6a33118e6e2ea5fb",
+                "3fc8c202d613b661a608d53fa424a7c25fe4b4c7e2863611f293574b917f052a",
+                "1910e58ca5dd27d171d191e915383b65f03a28e7cf57ed496cd969cccf8ccd16",
+                "325e75cfdfd8d7d6630e1579a9deabc6291199972f12a45d0d8437bf6c6dce3c",
+                "a2a88725461a4f0c32715c831c39ca937bbb84a1fec5b058697763c713d97c89",
+                "740d7a3ea18474a572ebd299e29c2dc9770204415367c31034993efa36abf3f7",
+                "f0be95126ed7d5c95caf9f7288744fc249da69e822b97ad73a064b77289a3001"
+            ]
+        },
+        {
+            "family": "global-confirm-10",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000001",
+                        "creature": 47,
+                        "name": "Dryad",
+                        "amount": 91,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": true,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 6,
+                        "range": 6.5,
+                        "steps": 4,
+                        "initiative": 3.8,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000002",
+                        "creature": 3,
+                        "name": "Troglodyte",
+                        "amount": 125,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 11,
+                        "damage": 3,
+                        "range": 0,
+                        "steps": 3,
+                        "initiative": 5,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000003",
+                        "creature": 26,
+                        "name": "Satyr",
+                        "amount": 36,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": true,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 15,
+                        "damage": 5,
+                        "range": 0,
+                        "steps": 3.9,
+                        "initiative": 4,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000004",
+                        "creature": 6,
+                        "name": "Beholder",
+                        "amount": 22,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 21,
+                        "damage": 11,
+                        "range": 6.1,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000005",
+                        "creature": 17,
+                        "name": "Cyclops",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 72,
+                        "damage": 23,
+                        "range": 6.5,
+                        "steps": 6,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000006",
+                        "creature": 29,
+                        "name": "Gargantuan",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 170,
+                        "damage": 50,
+                        "range": 5,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [1, 24, 32, 50, 55, 57],
+                "enemyKits": [
+                    "Stun",
+                    "Double Shot",
+                    "Stun Arcane Ward Blessing",
+                    "Handyman Chakram Rallying Volley Blessing",
+                    "Basic Tome of Battle Magic",
+                    "Tome of Elements Magic Reflection"
+                ],
+                "map": 3,
+                "artifacts": [15, 17],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": true,
+                "legal": [
+                    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
+                    44, 45, 46, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 3,
+                    "y": 3
+                },
+                {
+                    "x": 1,
+                    "y": 13
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 2
+                },
+                {
+                    "x": 2,
+                    "y": 12
+                }
+            ],
+            "reference": 0,
+            "referencePositions": [
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 3,
+                    "y": 3
+                },
+                {
+                    "x": 1,
+                    "y": 13
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 2
+                },
+                {
+                    "x": 2,
+                    "y": 12
+                }
+            ],
+            "chosen": 3,
+            "scores": [
+                0.15979372825239274, 0.15641308461287315, 0.18007989423306028, 0.2718221549681453, 0.16176686452933547,
+                0.04530517106542335, 0.24182855521280983, 0.1684165902570752
+            ],
+            "positions": [
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 2,
+                    "y": 2
+                },
+                {
+                    "x": 1,
+                    "y": 13
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 8
+                },
+                {
+                    "x": 2,
+                    "y": 7
+                }
+            ],
+            "featureSha256": [
+                "7fe166296e7d99231f00c8e0d93a6d70a877f988409d29611e0fd81ae8297625",
+                "23d18ef28af4405298d029e7a8602d536e459a564f1f32ff0951cc10fc682513",
+                "ac1b3354b10b8a67b4b03881542aa6f092c7c5957f0c4b7e69287bfc88437532",
+                "6d1e6738f99df64375238a3d2df7c82824ba76a627e333fe945cc8ee425a0391",
+                "dee4261d411b0e4d3acfb7c8ccead953a4cfea31b0a11162e6c21f5cfcbb572d",
+                "2c32ee3170e52763cc67c023a8ce91c1b924693524ed09a012b0d63dccb891f1",
+                "746b8373ae63fea42c13970312eb6c3dae3ec3583c29bcb5626e3586d558f590",
+                "2604e4ada012b510939f5ed1eb92869edda8a781a2da7c1b01041247f26a692b"
+            ]
+        },
+        {
+            "family": "global-confirm-11",
+            "input": {
+                "bodies": [
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000001",
+                        "creature": 46,
+                        "name": "Mermaid",
+                        "amount": 91,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 11,
+                        "damage": 4,
+                        "range": 0,
+                        "steps": 4.5,
+                        "initiative": 5,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000002",
+                        "creature": 1,
+                        "name": "Orc",
+                        "amount": 100,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 9,
+                        "damage": 5,
+                        "range": 5.3,
+                        "steps": 3,
+                        "initiative": 4,
+                        "level": 1
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000003",
+                        "creature": 51,
+                        "name": "Wyvern",
+                        "amount": 31,
+                        "width": 2,
+                        "height": 1,
+                        "ranged": false,
+                        "caster": false,
+                        "healer": false,
+                        "aura": true,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 20,
+                        "damage": 7,
+                        "range": 0,
+                        "steps": 7.2,
+                        "initiative": 7.3,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000004",
+                        "creature": 6,
+                        "name": "Beholder",
+                        "amount": 22,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": true,
+                        "driven": false,
+                        "hp": 21,
+                        "damage": 11,
+                        "range": 6.1,
+                        "steps": 4.5,
+                        "initiative": 4,
+                        "level": 2
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000005",
+                        "creature": 54,
+                        "name": "Monk",
+                        "amount": 8,
+                        "width": 1,
+                        "height": 1,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 61,
+                        "damage": 25,
+                        "range": 6.5,
+                        "steps": 4.4,
+                        "initiative": 4,
+                        "level": 3
+                    },
+                    {
+                        "id": "73696d00-0000-4000-8000-000000000006",
+                        "creature": 39,
+                        "name": "Tsar Cannon",
+                        "amount": 2,
+                        "width": 2,
+                        "height": 2,
+                        "ranged": true,
+                        "caster": false,
+                        "healer": false,
+                        "aura": false,
+                        "fly": false,
+                        "driven": false,
+                        "hp": 200,
+                        "damage": 55,
+                        "range": 6.5,
+                        "steps": 3.2,
+                        "initiative": 3,
+                        "level": 4
+                    }
+                ],
+                "enemyIds": [5, 17, 21, 47, 55, 57],
+                "enemyKits": [
+                    "Endless Quiver Petrifying Gaze",
+                    "Large Caliber",
+                    "Double Punch Deep Wounds Level 1",
+                    "Guiding Winds Aura Hamstring",
+                    "Basic Tome of Battle Magic",
+                    "Tome of Elements Magic Reflection"
+                ],
+                "map": 4,
+                "artifacts": [9, 17],
+                "doctrine": 3,
+                "augments": [
+                    {
+                        "kind": "Sniper",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Armor",
+                        "value": 3
+                    },
+                    {
+                        "kind": "Might",
+                        "value": 1
+                    }
+                ],
+                "left": true,
+                "legal": [
+                    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
+                    44, 45, 46, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62
+                ]
+            },
+            "baseline": [
+                {
+                    "x": 3,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 3,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 12
+                },
+                {
+                    "x": 1,
+                    "y": 4
+                },
+                {
+                    "x": 2,
+                    "y": 2
+                }
+            ],
+            "reference": 3,
+            "referencePositions": [
+                {
+                    "x": 3,
+                    "y": 8
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 3,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 3
+                },
+                {
+                    "x": 1,
+                    "y": 4
+                },
+                {
+                    "x": 2,
+                    "y": 13
+                }
+            ],
+            "chosen": 2,
+            "scores": [
+                0.44888627840643597, 0.49930341574427833, 0.6023653467769886, 0.2949161370434735, 0.41459715807699726,
+                0.33668219039491976, 0.5183170712066009, 0.33310192309778963
+            ],
+            "positions": [
+                {
+                    "x": 3,
+                    "y": 14
+                },
+                {
+                    "x": 1,
+                    "y": 14
+                },
+                {
+                    "x": 2,
+                    "y": 4
+                },
+                {
+                    "x": 1,
+                    "y": 7
+                },
+                {
+                    "x": 1,
+                    "y": 11
+                },
+                {
+                    "x": 2,
+                    "y": 2
+                }
+            ],
+            "featureSha256": [
+                "a5ff776ce5772176982613d6e35aed3a0b835eec03d3442f8ff7f4546ebe75e7",
+                "16f3ffb518501c95fb0dc07d7f29bb753a45b4fc49865d5a7d8fa521ec1b94af",
+                "93bdbae1f9a91c4425e7f86c7ef4d735e91311f284da7338e9f777d8be3b8367",
+                "89a6552ad331ef4e3b605dc6f6a02eff5db02cb1b5c994e65e3a561796f6b650",
+                "a71ff8b36a4e9457f6b6bfd54d8b419545f2c4f50de4218671b19e35b6253fe9",
+                "578e32bbe592833e6d7bfd2c7d5be69be1aa56ef056a3ca3cff7777160820441",
+                "7e9b79c4b9523bc7753056008605833e21a5376aa30c121c5b741c31727f6dd8",
+                "10ae84330160bee6a179169d0024e7822636782491bff274467f0141cad4c57b"
+            ]
+        }
+    ]
+}

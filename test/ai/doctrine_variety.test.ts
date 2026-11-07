@@ -20,4 +20,20 @@ describe("ranked AI doctrine variety", () => {
         expect(pickRankedAIDoctrine(context)).toBe(pickRankedAIDoctrine(context));
         expect(RANKED_AI_DOCTRINE_CHOICES).toContain(pickRankedAIDoctrine(context));
     });
+
+    test("allocates approximately a third of match seats to each doctrine", () => {
+        for (const version of ["v0.4", "v0.6", "v0.7", "v0.8", "v0.9"]) {
+            const counts = new Map<Doctrine, number>();
+            for (let match = 0; match < 10_000; match++) {
+                for (const team of [1, 2]) {
+                    const doctrine = pickRankedAIDoctrine({ matchId: `match-${match}`, team, aiVersion: version });
+                    counts.set(doctrine, (counts.get(doctrine) ?? 0) + 1);
+                }
+            }
+            for (const doctrine of RANKED_AI_DOCTRINE_CHOICES) {
+                expect(counts.get(doctrine)! / 20_000).toBeGreaterThan(0.31);
+                expect(counts.get(doctrine)! / 20_000).toBeLessThan(0.36);
+            }
+        }
+    });
 });

@@ -7,6 +7,7 @@ import {
 } from "../ai/setup/premium_augment_plans";
 import { enumerateFullBudgetAugmentPlans } from "../ai/setup/setup_ship";
 import { getUpgradePoints, type Doctrine } from "../doctrines/doctrine_properties";
+import { V09_DEFAULT_DRAFT_BASE_POLICY_SPEC, V09_DEFAULT_DRAFT_MODEL_ID } from "../ai/setup/doctrine_draft_policy";
 import {
     PREMIUM_META_FULL_AUGMENTS_STUDY,
     PREMIUM_META_FULL_AUGMENTS_SCHEMA,
@@ -21,6 +22,7 @@ import {
     createPickSimState,
     getPickTeamView,
     getKnownOpponentCreatures,
+    getPickScoutingContext,
     getVisibleCreatureChoices,
     transitionServerPersistedPickSim,
     isPickSimComplete,
@@ -228,19 +230,24 @@ function validatePremiumDraft(record: IAiMetaPairRecord): void {
     const evidence = record.evidence!;
     const draft = evidence.rankedDraft;
     if (!draft) return;
+    const nativeV09 = draft.policy === `${V09_DEFAULT_DRAFT_BASE_POLICY_SPEC}+${V09_DEFAULT_DRAFT_MODEL_ID}`;
     const rng = makeRng(draft.seed);
     const randomInt = (max: number) => Math.floor(rng() * max);
     let state = createPickSimState(randomInt);
     let phaseStart = state;
     for (const [index, decision] of draft.decisions.entries()) {
         if (state.phaseSequence !== phaseStart.phaseSequence) phaseStart = state;
-        const observed = [0, 1, 8].includes(state.phaseSequence) ? phaseStart : state;
+        const observed = (nativeV09 ? [0, 8] : [0, 1, 8]).includes(state.phaseSequence) ? phaseStart : state;
         const own = decision.action.team === PBTypes.TeamVals.LEFT ? observed.left : observed.right;
         const expected = {
             ...getPickTeamView(observed, decision.action.team),
             availableCreatureIds: getVisibleCreatureChoices(observed, decision.action.team),
             revealedOpponentSlots: [...own.revealedOpponentSlots],
-            revealedMap: observed.phaseSequence >= 6 ? record.map : null,
+            revealedMap: nativeV09
+                ? (getPickScoutingContext(observed, decision.action.team, record.map).map ?? null)
+                : observed.phaseSequence >= 6
+                  ? record.map
+                  : null,
             synergyVariants: evidence.synergyVariants,
         };
         if (decision.index !== index || JSON.stringify(decision.observation) !== JSON.stringify(expected))
@@ -258,7 +265,10 @@ function validatePremiumDraft(record: IAiMetaPairRecord): void {
             JSON.stringify(decision.choice?.candidates.map(({ key }) => Number(key))) !== JSON.stringify(offered) ||
             decision.choice?.candidates.some(
                 ({ probability, score }) =>
-                    !Number.isFinite(probability) || probability <= 0 || probability > 1 || !Number.isFinite(score),
+                    !Number.isFinite(probability) ||
+                    (nativeV09 ? probability < 0 : probability <= 0) ||
+                    probability > 1 ||
+                    !Number.isFinite(score),
             )
         )
             throw new Error("Premium draft candidates differ from visible offers");

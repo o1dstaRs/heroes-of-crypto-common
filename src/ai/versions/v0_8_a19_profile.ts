@@ -9,8 +9,11 @@
  * -----------------------------------------------------------------------------
  */
 
+import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
+
 import { StrategyV0_8 } from "./v0_8";
 import { V08_A19_SCORED_ARBITRATION_POLICY } from "./v0_8_a19_scored_arbitration";
+import { A19_NEURAL_POLICY } from "./v0_8_a19_neural_policy";
 import {
     buildV08A13SearchEnvironment,
     V08_A13_GENOME,
@@ -53,8 +56,10 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - complementary R2 adopted by explicit user instruction on 2026-10-25: 37.86% less offline fight time,
  *     48.91% score against R4 over 6,000 games (95% interval 47.33–50.50%). The user accepted the remaining
  *     strength uncertainty; this does not establish the earlier 48% non-inferiority floor or live latency.
+ *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
+ *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v4" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v6" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -92,6 +97,7 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "1",
     // Hydra's capped catalog prices the complete radial impact, shared shields and Devour recovery.
     SEARCH_A19_LIGHTNING_SPIN_COVERAGE: "1",
+    SEARCH_A19_NEURAL_TIES: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -120,7 +126,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8078c75f34a4030ad5c767c" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "4446fbda753ccb0602324d3b2f3698b0e63f20a6beb4e7c5d69a90910026df32" as const;
+    "5f298494ab93fde4fcb682c33df268f28cac1793ff61f0203c7e9e93ad96d890" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -168,8 +174,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        // Re-pinned for decision-scoped Smoke damage reuse and exact zero-prevention early exits.
-        sha256: "569cce67764aafa1e4ccc0645ccf3c742834c27141bc08c6692bae829b69e051" as const,
+        // Re-pinned for legal Satyr reinforcement when an existing wolf stack needs no spawn space.
+        sha256: "e70c4d91c2386ed9651245825119722af540a14f71e7dd216454452ef24626c5" as const,
     }),
     Object.freeze({
         role: "last-fuse-estimates" as const,
@@ -184,7 +190,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "ranged-shields" as const,
         source: "src/ai/ranged_shield_estimate.ts" as const,
-        sha256: "2c7b63f0ba3460fd4a877bdc9144878539884a18ae007e9e085cb98b5b8ade0d" as const,
+        sha256: "889d2ec21163edf614cfdf69657dc4ae5f43b7f15ade55f8f3cfb91935cab10d" as const,
     }),
     Object.freeze({
         role: "selection-bounds" as const,
@@ -239,18 +245,98 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "ai-registry-promotion" as const,
         source: "src/ai/index.ts" as const,
-        sha256: "8ab1d21ba39a7aeb52a4a6b33fc4784933f5fdbf4c210a9236e3a6cef8d14eb2" as const,
+        sha256: "69d86f5c7c6a7514612e4c16df0d2d40b789c98ae0ced434c162c01905d00f6b" as const,
     }),
     Object.freeze({
         role: "default-search-factory" as const,
         source: "src/simulation/v0_8_a19_search.ts" as const,
-        sha256: "77d6ffbfbf9a2ad74e2b7a995875ceec71b35bd663831e1f92c7ac337dbff860" as const,
+        sha256: "830047c4327eedcacbedab7804860db794a7db2859451b95fe9f4d078f9fa1c7" as const,
     }),
     Object.freeze({
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
-        // Re-pinned for an explicit research deployment intervention; absent hook preserves routing.
-        sha256: "60b69ddd9f487c477562ebe6f3a19d1a32067a96a2de368e2024f060f012fe55" as const,
+        // Capture native-start timing when the default neural policy is attached.
+        sha256: "4f1211262af0eae8c43484412915c65f1e4c1c2ceda88ff944957577b4b8d9be" as const,
+    }),
+    Object.freeze({
+        role: "neural-policy" as const,
+        source: "src/ai/versions/v0_8_a19_neural_policy.ts" as const,
+        sha256: "69312ffe37e2970365ca412425dd2091966d31fc6b55e86d0bdb01c7c02852e0" as const,
+    }),
+    Object.freeze({
+        role: "neural-adapter" as const,
+        source: "src/simulation/a19_neural.ts" as const,
+        sha256: "d37efcce4a123294b133c71de94bf85ebfcda9c44d0ab62a26d78982cfbae14d" as const,
+    }),
+    Object.freeze({
+        role: "neural-model" as const,
+        source: "src/simulation/a19_neural_model.ts" as const,
+        sha256: "fa0f7ea4277099ebe4de6d51bffdcba886b3e2eca3853fd39b067904ca268f3b" as const,
+    }),
+    Object.freeze({
+        role: "neural-correction" as const,
+        source: "src/simulation/v0_9/a19_correction.ts" as const,
+        sha256: "e0d0368c74b05470aa2490af56706be0a157d0bc998fd9e1e18b4cca54b625b2" as const,
+    }),
+    Object.freeze({
+        role: "neural-observation" as const,
+        source: "src/simulation/v0_9/a19_observation.ts" as const,
+        sha256: "8dd195a919cac26cd6db4336711121b0828aebe88e080404876d0322c1b4f780" as const,
+    }),
+    Object.freeze({
+        role: "neural-inference" as const,
+        source: "src/simulation/v0_9/a19_inference.ts" as const,
+        sha256: "58e622d890ca8f171979906ccb909902dff1da7609cbe132739d5ad31c33b383" as const,
+    }),
+    Object.freeze({
+        role: "neural-batch256-weights" as const,
+        source: "src/ai/models/a19/batch256.json" as const,
+        sha256: "63c07debd0e08debe24482a8cd9d6046e09d0f7fd73292c65b80dbca7f4e1ef3" as const,
+    }),
+    Object.freeze({
+        role: "neural-lr0003-weights" as const,
+        source: "src/ai/models/a19/lr0003.json" as const,
+        sha256: "c0be648360497095958f85af2068fcbf7d79176526feb270935770e6f0c30507" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-adapter" as const,
+        source: "src/ai/placement/adapter.ts" as const,
+        sha256: "2905012efdfd8b23254cf7a8a47606141d0034e86d4583ad8bf4cc5ed7175572" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-proposals" as const,
+        source: "src/ai/placement/layout.ts" as const,
+        sha256: "3a7668426f96442c06d22a183fe7b69125d234bb26333038b82c7c831cf7ff89" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-model" as const,
+        source: "src/ai/placement/model.ts" as const,
+        sha256: "83b406f2e7ed70d249980a7757cff14b3d9102bec1604e1eb22534c5afaddf62" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-seed" as const,
+        source: "src/ai/placement/sha256.ts" as const,
+        sha256: "56dc48b19b3ff674e736335955ff2be55aac7fbf7bde6695da88826670db65c9" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-policy" as const,
+        source: "src/ai/placement/policy.ts" as const,
+        sha256: "0199fa1465ea34f41820ae72d7751153d7c419441e60d80b4783b7e642c5033d" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-weights" as const,
+        source: "src/ai/models/a19/placement_v1.json" as const,
+        sha256: "496842b113847a9ee902cc920daa23d3a2d8970c49353221f08ee34aedf26aa7" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-relations" as const,
+        source: "src/ai/placement/relations.ts" as const,
+        sha256: "a4cac3935c8b92d9ea4742c3e65e316729581a087b961cbe8922a0dd1ef8bce0" as const,
+    }),
+    Object.freeze({
+        role: "final-placement-v2-weights" as const,
+        source: "src/ai/models/a19/placement_v2.json" as const,
+        sha256: "690f77e18625aab335ec4fdee3e686cd42a2a2bd677399c92fe300728431275b" as const,
     }),
 ] as const);
 
@@ -268,6 +354,8 @@ export const V08_A19_PROFILE = Object.freeze({
     degradedBudget: V08_A19_DEGRADED_BUDGET,
     policy: V08_A19_POLICY,
     placementPolicy: V08_A19_PLACEMENT_POLICY,
+    neuralPolicy: A19_NEURAL_POLICY,
+    authoritativeFinalPlacement: A19_LEARNED_FINAL_PLACEMENT_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 
@@ -289,8 +377,9 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT: "0",
         // Only the explicit JSON research override may enable this unqualified candidate.
         SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
-        // Selection-aware tail bounds are an offline, measured research arm. Production stays sealed off.
-        SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "0",
+        SEARCH_A19_MATERIAL_ARBITRATION: "ties",
+        SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1",
+        SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: "1",
         // Adaptive allocation is an offline experiment; live A19 retains uniform sampling.
         SEARCH_A19_ROLLOUT_ALLOCATION: "uniform",
     });

@@ -7,6 +7,12 @@ import type { A19AuditProfile } from "../a19_decision_audit";
 import { hashSimulationParts, makeRng } from "../army";
 import { fingerprintV09 } from "./protocol";
 import { V09_A19_OBSERVATION_SHA256 } from "./a19_observation";
+import {
+    v09DoctrineBoard,
+    v09DoctrineBoardCount,
+    V09_A19_DOCTRINES,
+    type V09A19DoctrinePopulation,
+} from "./a19_doctrine_population";
 
 export const V09_A19_PILOT_SCHEMA = "hoc.ai.v0_9_a19_pilot.v2" as const;
 export const V09_A19_PILOT_STAGES = {
@@ -46,6 +52,7 @@ export const V09_A19_PRECISE_TEACHER = Object.freeze({
 export const V09_A19_TEACHERS = Object.freeze({
     "wide-r4": V09_A19_WIDE_TEACHER,
     "precise-r8": V09_A19_PRECISE_TEACHER,
+    "precise-r8-neural": V09_A19_PRECISE_TEACHER,
 });
 export type V09A19TeacherPreset = keyof typeof V09_A19_TEACHERS;
 
@@ -87,6 +94,7 @@ export interface IV09A19PilotManifest {
     readonly baseline: Record<string, string>;
     readonly teacher: Record<string, string>;
     readonly teacherPreset: V09A19TeacherPreset;
+    readonly doctrinePopulation?: V09A19DoctrinePopulation;
     readonly seed: number;
     readonly stages: Record<V09A19PilotStage, readonly number[]>;
     readonly sourceCommit: string;
@@ -104,6 +112,7 @@ export function buildV09A19PilotManifest(input: {
     runtime: string;
     protectedV08Roots: readonly string[];
     teacherPreset?: V09A19TeacherPreset;
+    doctrinePopulation?: V09A19DoctrinePopulation;
 }): IV09A19PilotManifest {
     if (!Number.isSafeInteger(input.seed) || input.seed < 0 || input.seed > 0xffffffff)
         throw new Error("Pilot seed must be uint32");
@@ -132,7 +141,7 @@ export function buildV09A19PilotManifest(input: {
     const stages = {} as Record<V09A19PilotStage, number[]>;
     for (const [stage, count] of Object.entries(V09_A19_PILOT_STAGES)) {
         const seeds: number[] = [];
-        for (let ordinal = 0; seeds.length < count; ordinal++) {
+        for (let ordinal = 0; seeds.length < v09DoctrineBoardCount(count, input.doctrinePopulation); ordinal++) {
             const seed = hashSimulationParts(V09_A19_PILOT_SCHEMA, input.seed, stage, ordinal);
             // Each draft board consumes three adjacent seed channels. Reserve all of them across phases.
             if (seed <= 0xffffffff - 5 && [0, 1, 2].every((offset) => !seen.has(seed + offset))) {
@@ -154,6 +163,7 @@ export function buildV09A19PilotManifest(input: {
         protectedV08Roots: input.protectedV08Roots,
         baseline,
         teacherPreset,
+        ...(input.doctrinePopulation ? { doctrinePopulation: input.doctrinePopulation } : {}),
         teacher: { ...baseline, ...V09_A19_TEACHERS[teacherPreset] },
         stages,
     };
@@ -196,4 +206,20 @@ export function v09PilotBoardStatistics(scores: readonly number[], seed: number,
         lower95: draws[Math.floor(samples * 0.025)],
         upper95: draws[Math.floor(samples * 0.975)],
     };
+}
+
+/** Keep entire draft/battle-seat blocks together, including in each doctrine subgroup. */
+export function v09DoctrineStatistics(scores: readonly number[], seed: number) {
+    if (!scores.length || scores.length % 27) throw new Error("Incomplete balanced doctrine population");
+    return Object.fromEntries(
+        V09_A19_DOCTRINES.map((doctrine) => [
+            doctrine,
+            v09PilotBoardStatistics(
+                scores.filter(
+                    (_, board) => v09DoctrineBoard(board, "balanced-doctrines-v1").candidateDoctrinePolicy === doctrine,
+                ),
+                hashSimulationParts("v09-doctrine-ci", seed, doctrine),
+            ),
+        ]),
+    );
 }

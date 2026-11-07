@@ -2080,6 +2080,15 @@ export class UnitsHolder {
         registerHelpingHandOwner(unit, this);
         registerEmberCovenantArmy(unit, this);
         if (unit.hasStatusBuffApplied?.(EMBER_COVENANT_BLESSING)) this.emberCovenantTeams.add(unit.getTeam());
+        else if (
+            this.emberCovenantTeams.has(unit.getTeam()) &&
+            !unit.isDead() &&
+            isCellWithinGrid(this.gridSettings, unit.getBaseCell())
+        ) {
+            unit.applyBuff(
+                new Spell({ spellProperties: getSpellConfig("System", EMBER_COVENANT_BLESSING), amount: 1 }),
+            );
+        }
     }
     public decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam: Record<string, number>): void {
         for (const unitNameKey of Object.keys(moraleDecreaseForTheUnitTeam)) {

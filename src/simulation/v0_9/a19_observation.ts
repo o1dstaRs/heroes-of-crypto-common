@@ -13,8 +13,6 @@ import type { Unit } from "../../units/unit";
 import { hashSimulationParts } from "../army";
 import { v09CandidateSignature } from "../../ai/versions/v0_9";
 import { VALUE_FEATURE_NAMES_V2, extractValueFeaturesV2 } from "../value_features";
-import { fingerprintV09 } from "./protocol";
-import spellsJson from "../../configuration/spells.json";
 import { ilCandidateActionMetadata } from "../il_action_features";
 import type { XY } from "../../utils/math";
 
@@ -55,17 +53,99 @@ export const V09_A19_ENTITY_FEATURES = [
     ...Array.from({ length: STATUS_BUCKETS }, (_, index) => `debuffBucket${index}`),
     ...Array.from({ length: STATUS_BUCKETS }, (_, index) => `effectBucket${index}`),
 ] as const;
-export const V09_A19_SPELL_NAMES = Object.freeze(
-    [
-        ...new Set(
-            Object.values(spellsJson).flatMap((section) =>
-                typeof section === "object" && section !== null
-                    ? Object.values(section).map((spell) => (spell as { name: string }).name)
-                    : [],
-            ),
-        ),
-    ].sort(),
-);
+// V2 input columns are part of the trained model format; new game spells require a new contract.
+export const V09_A19_SPELL_NAMES = Object.freeze([
+    "Aegis of the Arcane",
+    "Amulet of Resolve",
+    "Angelic Host Blessing",
+    "Arcane Ward Blessing",
+    "Archmages Ring",
+    "Armor Augment",
+    "Armor Rune",
+    "Arrows Wingshield Blessing",
+    "Battle Roar",
+    "Berserkers Bond",
+    "Blessing",
+    "Broken Aegis",
+    "Castling",
+    "Clover of Fortune",
+    "Courage",
+    "Cowardice",
+    "Craft",
+    "Crown of Command",
+    "Curse",
+    "Cursed Ward",
+    "Dismorale",
+    "Dual Strike Charm",
+    "Dulling Defense",
+    "Ember Covenant Blessing",
+    "Empower",
+    "Empower Augment",
+    "Farsight Quiver",
+    "Fire Strike",
+    "Fire Wall",
+    "Fireball",
+    "Fireforged Sword",
+    "Giants Maul",
+    "Gravebound",
+    "Gravechain",
+    "Hamstrung",
+    "Heal",
+    "Helping Hand",
+    "Hidden",
+    "Holy Cross",
+    "Hunters Longbow",
+    "Iron Plate",
+    "Keen Blade",
+    "Last Fuse",
+    "Lava Striders",
+    "Lightning Strike",
+    "Made of Fire",
+    "Mages Ring",
+    "Magic Mirror",
+    "Mass Heal",
+    "Mass Magic Mirror",
+    "Mass Riot",
+    "Meteor Shower",
+    "Meteorite",
+    "Might Augment",
+    "Miner",
+    "Misfortune",
+    "Morale",
+    "Movement Augment",
+    "Pendant of Vitality",
+    "Quagmire",
+    "Quiver of Echoes",
+    "Rallying Volley Blessing",
+    "Rangebane",
+    "Resurrection",
+    "Rime Charm",
+    "Ring of Fire",
+    "Riot",
+    "Sadness",
+    "Sharpened Weapons Blessing",
+    "Smoke",
+    "Sniper Augment",
+    "Spiritual Armor",
+    "Summon Wolves",
+    "Swift Boots",
+    "Titan Plate",
+    "Tome of Amplification",
+    "Veteran Helm",
+    "Vine Throw",
+    "Visible",
+    "Warding Mane Blessing",
+    "Warlords Edge",
+    "Water Shield",
+    "Weakening Beam",
+    "Weakness",
+    "Weapon Rune",
+    "Whirlpool",
+    "Wild Regeneration",
+    "Wind Flow",
+    "Winged Boots",
+    "Wounding Charm",
+]);
 const GEOMETRY_FEATURES = [
     "moveForward",
     "moveLateral",
@@ -97,7 +177,7 @@ export const V09_A19_OBSERVATION_CONTRACT = {
     geometry: "occupied-cell centroid; actor-forward and lateral; canonical candidate cells",
     terrainUnderUnits: "restore source-bound built-in terrain beneath occupants",
 };
-export const V09_A19_OBSERVATION_SHA256 = fingerprintV09(V09_A19_OBSERVATION_CONTRACT);
+export const V09_A19_OBSERVATION_SHA256 = "8215d66c7477692586be173c382ed40b3dafc2d4161769fef3be8ae7eb418af3";
 
 export interface IV09A19Observation {
     schema: typeof V09_A19_OBSERVATION_SCHEMA;

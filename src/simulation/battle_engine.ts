@@ -94,6 +94,7 @@ import {
 } from "./search_driver";
 import { createV08A13SearchDriver, shouldUseDefaultV08A13Search, withScopedAIEnvironment } from "./v0_8_a13_search";
 import { createV08A19SearchDriver, shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
+import { requiresA19NativeDecisionStart } from "./a19_neural";
 import { footprintCellsForAnchor, footprintLabel } from "./footprint";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { observeCommittedHealth, type IPremiumHealthObservation } from "./ai_meta_health_ledger";
@@ -289,6 +290,8 @@ export interface ITurnExecutionObservation {
 }
 
 export interface IMatchConfig {
+    /** Research-only timing seam; omitted callers retain the existing clock path. */
+    researchCaptureDecisionStart?: boolean;
     greenVersion: string;
     redVersion: string;
     /** Roster for the GREEN team. In a mirrored match the red team gets the same list. */
@@ -1466,6 +1469,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 : undefined;
         const v09ServerPreflightStartedAt =
             config.v09ServerPreflightObserver && strategy.version === "v0.9" ? performance.now() : undefined;
+        if (
+            config.researchCaptureDecisionStart ||
+            (searchApplies && requiresA19NativeDecisionStart(search)) ||
+            (envOverrideSearchApplies && requiresA19NativeDecisionStart(searchEnvOverrideSearch!))
+        )
+            decisionContext.decisionStartedAtMs = performance.now();
         const decided0 = strategy.decideTurn(unit, decisionContext);
         let v09ServerPreflightObservation: IV09ServerPreflightTimingObservation | undefined;
         if (v09ServerPreflightStartedAt !== undefined) {

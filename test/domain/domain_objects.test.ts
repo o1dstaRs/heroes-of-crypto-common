@@ -58,15 +58,15 @@ describe("domain objects", () => {
     it("builds ability spells and aura effects through factories", () => {
         const effectFactory = new EffectFactory();
         const resurrection = new AbilityFactory(effectFactory).makeAbility("Resurrection");
-        const venomAura = new AbilityFactory(effectFactory).makeAbility("Venom Cloud Aura");
+        const aura = new AbilityFactory(effectFactory).makeAbility("Pegasus Might Aura");
 
         expect(effectFactory.makeEffect(null)).toBeUndefined();
         expect(effectFactory.makeAuraEffect(null)).toBeUndefined();
         expect(effectFactory.makeEffect("Stun")?.getName()).toBe("Stun");
-        expect(effectFactory.makeAuraEffect("Venom Cloud")?.getName()).toBe("Venom Cloud");
+        expect(effectFactory.makeAuraEffect("Luck")?.getName()).toBe("Luck");
         expect(resurrection.getSpell()?.getName()).toBe("Resurrection");
-        expect(venomAura.getAuraEffectName()).toBe("Venom Cloud");
-        expect(venomAura.getAuraEffect()?.getName()).toBe("Venom Cloud");
+        expect(aura.getAuraEffectName()).toBe("Pegasus Might");
+        expect(aura.getAuraEffect()?.getName()).toBe("Pegasus Might");
         expect(effectFactory.makeEffect("Missing")).toBeUndefined();
         expect(effectFactory.makeAuraEffect("Missing")).toBeUndefined();
     });

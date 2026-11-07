@@ -60,7 +60,11 @@ test.each([
         apply(source, target, source, { updateLog() {} } as never);
         expect(target.hasEffectActive(name)).toBe(false);
         expect(endEffectApplicationCapture()).toContainEqual({
-            unitId: target.getId(), name, kind: "effect", resisted: true, resistedBy: "Madness",
+            unitId: target.getId(),
+            name,
+            kind: "effect",
+            resisted: true,
+            resistedBy: "Madness",
         });
     } finally {
         endEffectApplicationCapture();

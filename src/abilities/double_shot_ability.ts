@@ -78,16 +78,20 @@ export function processDoubleShotAbility(
     let moraleIncrease = 0;
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
 
+    if (isAOE && !hasChakram) {
+        // Keep the original blast's ammunition cost; a surviving bystander must not add Dense Flesh's surcharge.
+        toUnit = affectedUnits.find((unit) => !unit.isDead()) ?? toUnit;
+    }
+
     if (
         !doubleShotAbility ||
+        fromUnit.isDead() ||
+        toUnit.isDead() ||
+        fromUnit.isSkippingThisTurn() ||
         // The initiating volley may have used the last arrow (or Dense Flesh's entire surcharge).
         // No second disc actually leaves the hand when the quiver cannot fund another volley.
-        (hasChakram && fromUnit.getRangeShots() <= 0) ||
-        ((!isAOE || hasChakram) &&
-            (fromUnit.isDead() ||
-                toUnit.isDead() ||
-                fromUnit.isSkippingThisTurn() ||
-                (fromUnit.getTarget() && fromUnit.getTarget() !== toUnit.getId())))
+        fromUnit.getRangeShots() <= 0 ||
+        ((!isAOE || hasChakram) && fromUnit.getTarget() && fromUnit.getTarget() !== toUnit.getId())
     ) {
         return {
             applied: false,

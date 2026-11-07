@@ -12,6 +12,7 @@
 import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { getDoubleShotAbility, hasDoubleShotAbility, withDualStrikeCharm } from "../abilities/ability_helper";
+import { calculateActiveDeepWoundsEffect, deepWoundsPowerPerHit } from "../abilities/deep_wounds_ability";
 import type { GameAction } from "../engine/actions";
 import { canWaitOnHourglass } from "../engine/hourglass";
 import { projectPostMoveActorAvailability } from "../engine/post_move_actor_availability";
@@ -231,6 +232,7 @@ interface IPreparedRangeCandidateDamage {
     sharedAbilityMultiplier: number;
     bonusVolleyChance: number;
     shotCostOnHitOnly: boolean;
+    deepWoundsPerHit: number;
 }
 
 /** Attacker-only terms shared by every aim considered during one immutable decision. */
@@ -278,6 +280,7 @@ function prepareRangeCandidateDamage(
         sharedAbilityMultiplier,
         bonusVolleyChance: unit.getBonusRangedAttackChance() / 100,
         shotCostOnHitOnly: !isPhysicalAoe && !unit.hasAbilityActive("Chakram"),
+        deepWoundsPerHit: deepWoundsPowerPerHit(unit, attackerAbilityPower),
     };
 }
 
@@ -347,7 +350,7 @@ function evaluatePreparedRangeCandidateDamage(
     let aimTargetDamage = 0;
     const counted = new Set<string>();
     const shieldImpacts: IShieldSequenceImpact[] = [];
-    let shieldSupported = true;
+    let shieldSupported = prepared.deepWoundsPerHit === 0;
     const fightProperties = context.fightProperties;
     // The action spends arrows against its first impact, not independently against every splash victim.
     // Through Shot spends one arrow for the whole line; its native follow-up does not spend another.
@@ -394,8 +397,12 @@ function evaluatePreparedRangeCandidateDamage(
                 1,
                 attackerAmountAlive,
             );
-            const applyEngineVolleyModifiers = (rawDamage: number, volleyMultiplier = 1): number => {
-                let adjusted = Math.floor(rawDamage * prepared.sharedAbilityMultiplier * volleyMultiplier);
+            const initialWoundsPower = calculateActiveDeepWoundsEffect(unit, target);
+            const applyEngineVolleyModifiers = (rawDamage: number, volleyMultiplier = 1, landedHits = 0): number => {
+                const woundsPower = Number((initialWoundsPower + prepared.deepWoundsPerHit * landedHits).toFixed(1));
+                let adjusted = Math.floor(
+                    rawDamage * prepared.sharedAbilityMultiplier * volleyMultiplier * (1 + woundsPower / 100),
+                );
                 if (prepared.isPhysicalAoe) {
                     if (prepared.giantsMaulPower !== undefined) {
                         adjusted = Math.floor(adjusted * (1 + prepared.giantsMaulPower / 100));
@@ -505,7 +512,8 @@ function evaluatePreparedRangeCandidateDamage(
                     }
                 }
             }
-            if (target.willAbsorbIncomingHit(unit)) {
+            const shield = target.willAbsorbIncomingHit(unit);
+            if (shield || prepared.deepWoundsPerHit > 0) {
                 effective = estimateShieldedRangedDamage(unit, ammunitionTarget, {
                     hp,
                     hitChance,
@@ -515,6 +523,18 @@ function evaluatePreparedRangeCandidateDamage(
                     echoChance: prepared.bonusVolleyChance,
                     spendsOnHitOnly: prepared.shotCostOnHitOnly,
                     throughShot: prepared.isThroughShot,
+                    shield,
+                    damageAfterHits:
+                        prepared.deepWoundsPerHit > 0
+                            ? (secondVolley, landedHits) => {
+                                  const multiplier = secondVolley ? prepared.secondVolleyMultiplier : 1;
+                                  return (
+                                      (applyEngineVolleyModifiers(minRaw, multiplier, landedHits) +
+                                          applyEngineVolleyModifiers(maxRaw, multiplier, landedHits)) /
+                                      2
+                                  );
+                              }
+                            : undefined,
                 });
             }
             if (targetTeam === prepared.enemyTeam) {
@@ -3535,6 +3555,12 @@ class CandidateGenerator {
                 );
                 if (cell) {
                     this.pushSpell(spell, undefined, { x: cell.x, y: cell.y });
+                } else if (unitsHolder.getSummonedUnitByName(team, spell.getSummonUnitName())) {
+                    // The engine reinforces an existing friendly summon before checking spawn space.
+                    // A surrounded Satyr can therefore add wolves even when no new 2x1 body fits.
+                    // Keep the original anchored candidate whenever space exists so ordinary search
+                    // choices and deterministic rollout seeds remain unchanged.
+                    this.pushSpell(spell);
                 }
                 continue;
             }

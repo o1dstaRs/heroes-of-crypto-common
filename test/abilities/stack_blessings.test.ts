@@ -16,7 +16,6 @@ import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } 
 const left = PBTypes.TeamVals.LEFT;
 const right = PBTypes.TeamVals.RIGHT;
 const creatures = [
-    ["Life", "Champion", "Tie up the Horses Blessing"],
     ["Nature", "Leprechaun", "Luck Blessing"],
     ["Nature", "Satyr", "Sylvan Focus Blessing"],
     ["Might", "Wolf Rider", "Wolf Trail Blessing"],
@@ -94,7 +93,7 @@ for (const { name, effect, walkingOnly } of STACK_BLESSINGS) {
     });
 }
 
-it("converts the four requested creature cards", () => {
+it("converts the requested Leprechaun, Satyr and Wolf Rider cards", () => {
     for (const [faction, creature, blessing] of creatures) {
         const properties = getCreatureConfig(left, faction, creature, "test_512", 10);
         expect(properties.abilities).toContain(blessing);
@@ -103,7 +102,7 @@ it("converts the four requested creature cards", () => {
     }
 });
 
-it("applies and removes actual movement, luck and magic bonuses without accumulating", () => {
+it("applies and removes actual luck, movement and magic bonuses without accumulating", () => {
     const { grid, unitsHolder } = createCombatTestContext();
     const source = createTestUnit({
         team: left,
@@ -120,7 +119,7 @@ it("applies and removes actual movement, luck and magic bonuses without accumula
         expect(source.getStackPower()).toBe(2);
         expect(ally.getBaseAttack()).toBe(100);
         expect(ally.getBaseArmor()).toBe(100);
-        expect(ally.getSteps()).toBeCloseTo(baseSteps + 1.2);
+        expect(ally.getSteps()).toBeCloseTo(baseSteps + 0.4);
         expect(ally.getLuck()).toBe(4);
         expect(ally.getMagicDamageBonusPercentage()).toBe(6);
         const index = source.getUnitProperties().abilities.indexOf("Sylvan Focus Blessing");
@@ -135,21 +134,8 @@ it("applies and removes actual movement, luck and magic bonuses without accumula
     expect(ally.getMagicDamageBonusPercentage()).toBe(0);
 });
 
-it("caps luck at 10 and preserves the Misfortune cancellation", () => {
-    const { grid, unitsHolder } = createCombatTestContext();
-    const source = createTestUnit({ team: left, abilities: ["Luck Blessing"] });
-    const ally = createTestUnit({ team: left });
-    placeUnit(grid, unitsHolder, source, { x: 1, y: 1 });
-    placeUnit(grid, unitsHolder, ally, { x: 14, y: 14 });
-    unitsHolder.refreshStackPowerForAllUnits();
-    expect(ally.getLuck()).toBe(10);
-    ally.applyDebuff(new Spell({ spellProperties: getSpellConfig("Chaos", "Misfortune"), amount: 1 }));
-    unitsHolder.refreshStackPowerForAllUnits();
-    expect(ally.getLuck()).toBe(0);
-});
-
 for (let tier = 1; tier <= 5; tier++) {
-    it(`projects all four blessings at tier ${tier} and updates after casualties`, () => {
+    it(`projects all stack blessings at tier ${tier} and updates after casualties`, () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const source = createTestUnit({
             team: left,
@@ -165,17 +151,39 @@ for (let tier = 1; tier <= 5; tier++) {
         expect(source.getStackPower()).toBe(tier);
         expect(ally.getBaseAttack()).toBe(100);
         expect(ally.getBaseArmor()).toBe(100);
-        expect(ally.getSteps()).toBeCloseTo(steps + tier * 0.6);
-        expect(ally.getLuck()).toBe(Math.min(10, tier * 2));
+        expect(ally.getSteps()).toBeCloseTo(steps + tier * 0.2);
+        expect(ally.getLuck()).toBe(tier * 2);
         expect(ally.getMagicDamageBonusPercentage()).toBe(tier * 3);
         if (tier > 1) {
             source.applyDamage(200, 0, new SceneLogMock());
             unitsHolder.refreshStackPowerForAllUnits();
             expect(source.getStackPower()).toBe(tier - 1);
             expect(ally.getMagicDamageBonusPercentage()).toBe((tier - 1) * 3);
+            expect(ally.getLuck()).toBe((tier - 1) * 2);
         }
     });
 }
+
+it("preserves Pegasus and Champion as their existing local auras", () => {
+    for (const [faction, creature, aura] of [
+        ["Nature", "Pegasus", "Pegasus Might Aura"],
+        ["Life", "Champion", "Tie up the Horses Aura"],
+    ]) {
+        const properties = getCreatureConfig(left, faction, creature, "test_512", 10);
+        expect(properties.abilities).toContain(aura);
+        expect(getAbilityConfig(aura).aura_effect).not.toBeNull();
+        expect(properties.abilities_auras[properties.abilities.indexOf(aura)]).toBe(true);
+    }
+    expect(getCreatureConfig(left, "Nature", "Pegasus", "test_512", 10).abilities).toEqual([
+        "Pegasus Might Aura",
+        "Pegasus Light",
+    ]);
+    expect(STACK_BLESSINGS.map(({ name }) => name)).toEqual([
+        "Luck Blessing",
+        "Sylvan Focus Blessing",
+        "Wolf Trail Blessing",
+    ]);
+});
 
 it("adds luck to distant allies and the source, respects the cap and cancels Misfortune", () => {
     const { grid, unitsHolder } = createCombatTestContext();

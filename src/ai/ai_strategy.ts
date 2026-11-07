@@ -430,6 +430,8 @@ export type IAIPolicyEvent =
       });
 
 export interface IDecisionContext {
+    /** Optional monotonic start captured before the root native decision, for bounded research search. */
+    decisionStartedAtMs?: number;
     grid: Grid;
     matrix: number[][];
     unitsHolder: UnitsHolder;

@@ -164,12 +164,11 @@ describe("config_provider", () => {
         expect(creature.shot_distance).toBe(6.5);
     });
 
-    // Owner request 2026-10-18: attack 21 -> 22 and damage floor 17 -> 18. The ceiling stays 23.
     it("loads Cyclops's attack profile", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Cyclops", "cyclops_512", 1);
 
         expect(creature.base_attack).toBe(22);
-        expect(creature.attack_damage_min).toBe(18);
+        expect(creature.attack_damage_min).toBe(19);
         expect(creature.attack_damage_max).toBe(23);
     });
 
@@ -223,11 +222,11 @@ describe("config_provider", () => {
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(2.3);
         expect(creature.movement_type).toBe(PBTypes.MovementVals.WALK);
-        // Owner request 2026-10-18: experience 6.1 -> 6.466, six percent more expensive.
-        expect(creature.exp).toBe(6.466);
+        // Owner request 2026-11-03: round the increased XP cost to 7.2.
+        expect(creature.exp).toBe(7.2);
     });
 
-    it("fields fewer Wandering Mages after the six percent experience increase", () => {
+    it("fields 139 Wandering Mages for a 1000 XP budget at 7.2 XP each", () => {
         const creature = getCreatureConfig(
             PBTypes.TeamVals.RIGHT,
             "Chaos",
@@ -237,7 +236,7 @@ describe("config_provider", () => {
             1000,
         );
 
-        expect(creature.amount_alive).toBe(155);
+        expect(creature.amount_alive).toBe(139);
     });
 
     it("preserves Battle Mage's walking movement", () => {
@@ -261,8 +260,8 @@ describe("config_provider", () => {
         expect(creature.max_hp).toBe(500);
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(3.3);
-        // Owner balance pass 2026-09-13: armor 49 -> 45.
-        expect(creature.base_armor).toBe(45);
+        // Owner balance pass 2026-11-05: armor 45 -> 47.
+        expect(creature.base_armor).toBe(47);
         expect(creature.base_attack).toBe(22);
         expect(creature.exp).toBe(1000);
         expect(creature.amount_alive).toBe(1);

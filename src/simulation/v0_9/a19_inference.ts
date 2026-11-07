@@ -17,6 +17,11 @@ export interface IV09A19Prediction {
     valueLogit: number;
 }
 
+export interface IV09A19InferenceOptions {
+    /** Opt-in research cache. Default A19 keeps the uncached path until timing is qualified. */
+    entityCacheRows?: number;
+}
+
 function dense(weights: Record<string, unknown>, name: string, input: number, output: number): IDense {
     const matrix = weights[`${name}.weight`];
     const bias = weights[`${name}.bias`];
@@ -77,6 +82,11 @@ function validateObservation(observation: IV09A19Observation): void {
 }
 
 export class V09A19CpuModel {
+    private readonly entityCache?: Map<string, Float64Array>;
+    private readonly entityCacheRows: number;
+    private entityCacheHits = 0;
+    private entityCacheMisses = 0;
+    private entityCacheEvictions = 0;
     private readonly entity0: IDense;
     private readonly entity2: IDense;
     private readonly terrain: IDense;
@@ -87,7 +97,16 @@ export class V09A19CpuModel {
     private readonly primary: IDense;
     private readonly value0: IDense;
     private readonly value2: IDense;
-    public constructor(raw: unknown, expected: { manifestSha256: string; sourceSha256: string }) {
+    public constructor(
+        raw: unknown,
+        expected: { manifestSha256: string; sourceSha256: string },
+        options: Readonly<IV09A19InferenceOptions> = {},
+    ) {
+        const rows = options.entityCacheRows ?? 0;
+        if (!Number.isInteger(rows) || rows < 0 || rows > 1024)
+            throw new Error("Invalid research entity-cache capacity");
+        this.entityCacheRows = rows;
+        if (rows) this.entityCache = new Map();
         const model = raw as {
             schema?: string;
             promoted?: boolean;
@@ -136,12 +155,47 @@ export class V09A19CpuModel {
         this.value0 = dense(weights, "value.0", 128, 64);
         this.value2 = dense(weights, "value.2", 64, 1);
     }
+    public getEntityCacheStatistics(): Readonly<{
+        capacity: number;
+        size: number;
+        hits: number;
+        misses: number;
+        evictions: number;
+    }> {
+        return {
+            capacity: this.entityCacheRows,
+            size: this.entityCache?.size ?? 0,
+            hits: this.entityCacheHits,
+            misses: this.entityCacheMisses,
+            evictions: this.entityCacheEvictions,
+        };
+    }
+    private encodeEntity(row: readonly number[]): Float64Array {
+        const input = new Float32Array(row);
+        if (!this.entityCache) return apply(this.entity2, apply(this.entity0, input, true), true);
+        // A complete float32 bit-string is collision-free, including signed zero.
+        // IDs, actor indices and assumptions about which unit changed are not keys.
+        const key = String.fromCharCode(...new Uint16Array(input.buffer));
+        const found = this.entityCache.get(key);
+        if (found) {
+            this.entityCache.delete(key);
+            this.entityCache.set(key, found);
+            this.entityCacheHits++;
+            return found;
+        }
+        this.entityCacheMisses++;
+        const encoded = apply(this.entity2, apply(this.entity0, input, true), true);
+        this.entityCache.set(key, encoded);
+        if (this.entityCache.size > this.entityCacheRows) {
+            this.entityCache.delete(this.entityCache.keys().next().value!);
+            this.entityCacheEvictions++;
+        }
+        return encoded;
+    }
     public predict(observation: IV09A19Observation): IV09A19Prediction {
         validateObservation(observation);
         // Torch collate materializes float32 inputs before its forward pass.
-        const encoded = observation.entities.map((row) =>
-            apply(this.entity2, apply(this.entity0, new Float32Array(row), true), true),
-        );
+        const encoded = observation.entities.map((row) => this.encodeEntity(row));
         const pool = (own: boolean): number[] => {
             const selected = encoded.filter((_, index) => observation.entities[index][0] > 0.5 === own);
             if (!selected.length) return Array<number>(96 * 2).fill(0);

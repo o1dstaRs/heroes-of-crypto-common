@@ -31,7 +31,7 @@ describe("tactical stack splitting", () => {
             createTestUnit({
                 name: "Utility",
                 amountAlive: 5,
-                abilities: ["Absorb Penalties Aura"],
+                abilities: ["Pegasus Might Aura"],
                 spells: ["Life:Heal"],
             }),
         );
@@ -86,19 +86,27 @@ describe("tactical stack splitting", () => {
     });
 
     it("uses every extra utility slot for repeated one-model children from the best aura source", () => {
-        const leprechaun = unit({
-            id: "leprechaun-full",
-            identity: "Leprechaun:1",
+        const auraBearer = unit({
+            id: "aura-full",
+            identity: "Aura Bearer:1",
             amount: 20,
             auraUtilityCount: 1,
         });
 
-        expect(planTacticalStackSplits([leprechaun], 10)).toEqual([
-            { sourceUnitId: "leprechaun-full", amount: 1, role: "aura" },
-            { sourceUnitId: "leprechaun-full", amount: 1, role: "aura" },
-            { sourceUnitId: "leprechaun-full", amount: 1, role: "aura" },
-            { sourceUnitId: "leprechaun-full", amount: 1, role: "aura" },
+        expect(planTacticalStackSplits([auraBearer], 10)).toEqual([
+            { sourceUnitId: "aura-full", amount: 1, role: "aura" },
+            { sourceUnitId: "aura-full", amount: 1, role: "aura" },
+            { sourceUnitId: "aura-full", amount: 1, role: "aura" },
+            { sourceUnitId: "aura-full", amount: 1, role: "aura" },
         ]);
+    });
+
+    it("does not treat stack-scaled army luck as a repeatable full-power local aura", () => {
+        const description = tacticalSplitUnitFromUnit(
+            createTestUnit({ name: "Leprechaun", amountAlive: 20, abilities: ["Luck Blessing"] }),
+        );
+        expect(description.auraUtilityCount).toBe(0);
+        expect(planTacticalStackSplits([description], 10).every((split) => split.role !== "aura")).toBe(true);
     });
 
     it("replays Fairy full+1+1 but keeps a one-slot Berserker to one bait child", () => {

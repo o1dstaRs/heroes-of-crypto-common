@@ -85,6 +85,14 @@ describe("A19 R2 learning pilot registration", () => {
         expect(value.teacher.SEARCH_A19_CERTIFIED_SELECTION_BOUNDS).toBe("0");
     });
 
+    test("a neural R8 teacher has a distinct identity with the same precision and catalog budget", () => {
+        const native = buildV09A19PilotManifest({ ...manifest(), teacherPreset: "precise-r8" });
+        const neural = buildV09A19PilotManifest({ ...manifest(), teacherPreset: "precise-r8-neural" });
+        expect(neural.teacher).toEqual(native.teacher);
+        expect(neural.manifestSha256).not.toBe(native.manifestSha256);
+        expect(() => validateV09A19PilotManifest(neural)).not.toThrow();
+    });
+
     test("rejects a stale a13 or R4 opponent even when it still uses the v0.8 version label", () => {
         for (const field of [
             { SEARCH_HORIZON: "12" },

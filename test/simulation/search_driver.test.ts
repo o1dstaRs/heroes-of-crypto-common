@@ -2825,9 +2825,8 @@ describe("search driver — gating, hygiene, determinism", () => {
         setEnv({ ...pureRangedParetoFocusEnvironment, SEARCH_AUDIT: exactAudit });
         const exactHarness = buildBattle(10_315, "v0.8", undefined, pureRangedParetoFocusRoster());
         const exactFixture = positionParetoFocusFixture(exactHarness, { x: 9, y: 10 });
-        // 50 HP remaining puts the no-melee shot in [0.95, 1) of the incumbent. 40 stays under both floors;
-        // 60 clears the exact floor too. Ranged armor now matches melee armor, so the old 100 HP cap does not.
-        exactFixture.noMelee.applyDamage(exactFixture.noMelee.getCumulativeHp() - 50, 0, new SceneLogMock(), false);
+        // With Arbalester's 8 attack, 57 HP puts the no-melee shot in [0.95, 1) of the incumbent.
+        exactFixture.noMelee.applyDamage(exactFixture.noMelee.getCumulativeHp() - 57, 0, new SceneLogMock(), false);
         const exactDriver = exactHarness.makeDriver();
         exactDriver.onFightReady();
         const exactIncumbent = plainAim(exactFixture.actor, exactFixture.primary);
@@ -2847,7 +2846,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         });
         const relaxedHarness = buildBattle(10_315, "v0.8", undefined, pureRangedParetoFocusRoster());
         const relaxedFixture = positionParetoFocusFixture(relaxedHarness, { x: 9, y: 10 });
-        relaxedFixture.noMelee.applyDamage(relaxedFixture.noMelee.getCumulativeHp() - 50, 0, new SceneLogMock(), false);
+        relaxedFixture.noMelee.applyDamage(relaxedFixture.noMelee.getCumulativeHp() - 57, 0, new SceneLogMock(), false);
         const relaxedDriver = relaxedHarness.makeDriver();
         relaxedDriver.onFightReady();
 
@@ -3818,10 +3817,9 @@ describe("search driver — gating, hygiene, determinism", () => {
         const h = buildBattle(10_409, "v0.8", undefined, pureRangedParetoFocusRoster());
         const { actor, primary, noMelee } = positionJitFocusFixture(h);
         primary.grantStolenAbility("No Melee");
-        // Five bodies leave 45 HP: still an immediate kill, and close enough to the uncapped incumbent shot
-        // to clear the preregistered aggregate-damage floor. Six or more survive one shot once ranged armor
-        // matches melee armor, so the redirect is no longer offered.
-        primary.setAmountAlive(5);
+        // Six bodies leave 54 HP: an immediate kill at 8 attack, close enough to the uncapped incumbent
+        // shot to clear the preregistered aggregate-damage floor. Seven survive the shot.
+        primary.setAmountAlive(6);
         const driver = h.makeDriver();
         driver.onFightReady();
         const incumbent = jitAim(actor, noMelee);

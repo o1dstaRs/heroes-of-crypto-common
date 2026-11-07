@@ -1,13 +1,11 @@
 import { expect, test } from "bun:test";
 
-import { AbilityFactory } from "../../src/abilities/ability_factory";
 import { AbilityType } from "../../src/abilities/ability_properties";
 import { getAbilityConfig, getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
-import { Unit } from "../../src/units/unit";
-import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
+import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
 const team = PBTypes.TeamVals.LEFT;
 const aura = "Pegasus Might Aura";
@@ -57,33 +55,4 @@ test.each([1, 2, 3, 4, 5])("Pegasus grants the same nearby +2 attack and armor a
     unitsHolder.refreshStackPowerForAllUnits();
     expect(near.getBaseAttack()).toBe(100);
     expect(near.getBaseArmor()).toBe(100);
-});
-
-test("pre-release Pegasus blessing saves restore the aura and discard the retired global marker", () => {
-    const properties = getCreatureConfig(team, "Nature", "Pegasus", "test_512", 10);
-    properties.abilities[0] = "Pegasus Might Blessing";
-    properties.abilities_auras[0] = false;
-    properties.abilities_stack_powered[0] = true;
-    properties.aura_effects = [];
-    properties.applied_buffs.push("Pegasus Might Blessing");
-    properties.applied_buffs_descriptions.push("Retired global bonus");
-    properties.applied_buffs_powers.push(2);
-    properties.applied_buffs_laps.push(15);
-    const effects = new EffectFactory();
-    const restored = Unit.createUnit(
-        properties,
-        testGridSettings,
-        team,
-        properties.unit_type,
-        new AbilityFactory(effects),
-        effects,
-        false,
-    );
-    expect(restored.getUnitProperties().abilities).toEqual([aura, "Pegasus Light"]);
-    expect(restored.getUnitProperties().abilities_auras[0]).toBe(true);
-    expect(restored.getAuraEffects().map((effect) => effect.getName())).toEqual(["Pegasus Might"]);
-    expect(restored.getUnitProperties().applied_buffs).not.toContain("Pegasus Might Blessing");
-    expect(restored.getUnitProperties().applied_buffs).toHaveLength(
-        restored.getUnitProperties().applied_buffs_powers.length,
-    );
 });

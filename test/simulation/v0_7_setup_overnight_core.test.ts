@@ -85,6 +85,7 @@ describe("v0.7 setup overnight search core", () => {
             "mage",
             "melee-magic",
         ]);
+        expect(setupDiagnosticTags([C.PEGASUS])).toContain("aura-heavy");
         expect(shippedNonFightPolicy().placementAugmentTiming).toBe("setup-before-placement");
     });
 

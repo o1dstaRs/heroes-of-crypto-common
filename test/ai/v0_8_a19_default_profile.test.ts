@@ -89,7 +89,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v4",
+            schema: "hoc.v0_8_a19_production_profile.v6",
             candidateId: "a19",
             productionVersion: "v0.8",
             researchOnly: false,
@@ -120,7 +120,7 @@ describe("v0.8+A19 production profile", () => {
             V07_PLACEMENT_REVEAL: "on",
             V08_AGGRESSIVE: "1",
             ...V08_A19_SEARCH_RULES,
-            SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "0",
+            SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1",
             SEARCH_A19_ROLLOUT_ALLOCATION: "uniform",
         });
         for (const value of Object.values(V08_A19_SEARCH_RULES)) expect(value).toBe("1");
@@ -141,6 +141,8 @@ describe("v0.8+A19 production profile", () => {
                     "SEARCH_DECISION_DEADLINE_MS",
                     "SEARCH_CIRCUIT_BREAKER_MS",
                     "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
+                    "SEARCH_A19_CERTIFIED_TIGHT_BOUNDS",
+                    "SEARCH_A19_MATERIAL_ARBITRATION",
                     "SEARCH_A19_ROLLOUT_ALLOCATION",
                 ].includes(key)
             ) {
@@ -205,14 +207,14 @@ describe("v0.8+A19 production profile", () => {
         );
     });
 
-    it("seals certified selection bounds off and requires the explicit research override", () => {
+    it("seals the measured selection bounds on and retains an explicit rollback", () => {
         process.env.SEARCH_A19_CERTIFIED_SELECTION_BOUNDS = "1";
         const match = { greenVersion: "v0.8", redVersion: "v0.8" };
         const stock = createV08A19SearchDriver({} as ILookaheadDeps, match);
-        expect((stock as unknown as { certifiedSelectionBounds: boolean }).certifiedSelectionBounds).toBe(false);
-        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1" });
+        expect((stock as unknown as { certifiedSelectionBounds: boolean }).certifiedSelectionBounds).toBe(true);
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "0" });
         const research = createV08A19SearchDriver({} as ILookaheadDeps, match);
-        expect((research as unknown as { certifiedSelectionBounds: boolean }).certifiedSelectionBounds).toBe(true);
+        expect((research as unknown as { certifiedSelectionBounds: boolean }).certifiedSelectionBounds).toBe(false);
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "yes" });
         expect(() => createV08A19SearchDriver({} as ILookaheadDeps, match)).toThrow(
             "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS must be 0 or 1",
@@ -269,6 +271,22 @@ describe("v0.8+A19 production profile", () => {
             "ai-registry-promotion",
             "default-search-factory",
             "default-search-routing",
+            "neural-policy",
+            "neural-adapter",
+            "neural-model",
+            "neural-correction",
+            "neural-observation",
+            "neural-inference",
+            "neural-batch256-weights",
+            "neural-lr0003-weights",
+            "final-placement-adapter",
+            "final-placement-proposals",
+            "final-placement-model",
+            "final-placement-seed",
+            "final-placement-policy",
+            "final-placement-weights",
+            "final-placement-relations",
+            "final-placement-v2-weights",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));

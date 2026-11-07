@@ -360,7 +360,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties = structuredClone(unitProperties);
         this.normalizeLegacyRallyingVolley();
         this.normalizeLegacySharpenedWeapons();
-        this.normalizeLegacyPegasusMight();
         this.normalizeLegacyStackBlessings();
         this.stripRetiredLeatherArmor();
         this.initialUnitProperties = structuredClone(this.unitProperties);
@@ -395,34 +394,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.parseAbilities(addConfiguredAbilitySpells);
         this.unitProperties.spell_entries_authoritative = true;
         this.parseAuraEffects();
-    }
-    private normalizeLegacyPegasusMight(): void {
-        const properties = this.unitProperties;
-        const retiredName = "Pegasus Might Blessing";
-        if (
-            !properties.abilities.includes(retiredName) &&
-            !properties.applied_buffs.includes(retiredName) &&
-            !properties.stolen_abilities?.includes(retiredName) &&
-            !properties.artifact_granted_abilities?.includes(retiredName)
-        )
-            return;
-        for (let i = 0; i < properties.abilities.length; i++) {
-            if (properties.abilities[i] !== retiredName) continue;
-            const config = getAbilityConfig("Pegasus Might Aura");
-            properties.abilities[i] = config.name;
-            properties.abilities_descriptions[i] = config.desc.join("\n").replace(/\{\}/g, config.power.toString());
-            properties.abilities_stack_powered[i] = config.stack_powered;
-            properties.abilities_auras[i] = true;
-        }
-        for (let i = properties.applied_buffs.length - 1; i >= 0; i--) {
-            if (properties.applied_buffs[i] !== retiredName) continue;
-            properties.applied_buffs.splice(i, 1);
-            properties.applied_buffs_descriptions.splice(i, 1);
-            properties.applied_buffs_powers.splice(i, 1);
-            properties.applied_buffs_laps.splice(i, 1);
-        }
-        properties.stolen_abilities = properties.stolen_abilities?.map(canonicalStackBlessingName);
-        properties.artifact_granted_abilities = properties.artifact_granted_abilities?.map(canonicalStackBlessingName);
     }
     private normalizeLegacyStackBlessings(): void {
         const properties = this.unitProperties;
@@ -3857,8 +3828,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             if (this.hasDebuffActive("Misfortune")) {
                 // Misfortune bottoms luck out at -10 — UNLESS the target is actively luck-buffed, in which
                 // case the two CANCEL to exactly 0 rather than stacking into a double penalty. Qualifying
-                // sources are the Leprechaun's Luck Aura (it arrives as a "Luck Aura" buff, the same one
-                // that raises the max-luck sentinel below) and the Clover of Fortune artifact. "Fortune" is
+                // sources are Luck Blessing, legacy Luck Aura buffs and the Clover of Fortune artifact. "Fortune" is
                 // matched by name as well, so a future luck buff under that name is covered without another
                 // edit here. luck_mod is zeroed either way, so the result cannot be lifted back by per-turn
                 // rolls, synergy or artifact luck. See the Sadness block below for the morale equivalent.
@@ -4263,7 +4233,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.steps_mod += wolfTrailBlessing.getPower();
         }
         if (!this.canFly()) {
-            const tieUpTheHorsesAuraEffect = statBuffs.get("Tie up the Horses Blessing");
+            const tieUpTheHorsesAuraEffect = this.getAppliedAuraEffect("Tie up the Horses Aura");
             if (tieUpTheHorsesAuraEffect) {
                 this.unitProperties.steps_mod += tieUpTheHorsesAuraEffect.getPower();
             }

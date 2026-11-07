@@ -10,7 +10,10 @@
  */
 
 import { Tier1Artifact, Tier2Artifact } from "../../artifacts/artifact_properties";
+import { PBTypes } from "../../generated/protobuf/v1/types";
+import type { IDraftScoutingContext } from "../../picks/draft_visibility";
 import type { ArtifactFitVersion } from "./artifact_fit";
+import { draftContextAfterCreature, draftFutureSlots } from "./draft_continuations";
 import { dualStrikeDraftAffinity } from "./dual_strike_fit";
 import { lastFuseDraftContact, lastFuseIncomingMeleeShare, lastFuseExecutionAccess } from "./last_fuse_fit";
 import {
@@ -31,7 +34,11 @@ import {
     pickRankedDraftVarietyCreature,
     type RankedDraftVarietyPolicyId,
 } from "./draft_variety";
-import { rankedDraftStrengthScore, type RankedDraftStrengthPolicyId } from "./draft_strength_prior";
+import {
+    rankedDraftMapAdjustmentScore,
+    rankedDraftStrengthScore,
+    type RankedDraftStrengthPolicyId,
+} from "./draft_strength_prior";
 import type { RankedDraftSynergyVariants } from "./draft_synergy_variants";
 
 export type DraftBundle = readonly [number, number, number];
@@ -59,6 +66,8 @@ export interface IDraftCoherenceContext {
     revealedGridType?: number;
     /** The game's synergy variants (public from the first draft screen); read only by `-sv` strength policies. */
     synergyVariants?: RankedDraftSynergyVariants;
+    /** Only the acting seat's visible map/bans and remaining picks, projected by the draft reducer. */
+    scouting?: Readonly<IDraftScoutingContext>;
 }
 
 /** Keep replay-derived build fit influential without making it lexicographically stronger than the genome. */
@@ -99,6 +108,20 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
     if (!info) return 0;
 
     let affinity = 0;
+    // Modest mobility fit also covers starters: the fitted per-map evidence only covers levels 3 and 4.
+    const map = context.scouting?.map;
+    if (map === PBTypes.GridVals.LAVA_CENTER || map === PBTypes.GridVals.WATER_CENTER) {
+        if (
+            (map === PBTypes.GridVals.LAVA_CENTER && info.abilities.includes("Made of Fire")) ||
+            (map === PBTypes.GridVals.WATER_CENTER && info.abilities.includes("Made of Water"))
+        )
+            affinity += 0.24;
+        else if (info.canFly) affinity += 0.16;
+        else if (info.melee) affinity -= 0.16 * Math.min(1, 4 / Math.max(1, info.movementSteps ?? 4));
+    } else if (map === PBTypes.GridVals.BLOCK_CENTER) {
+        if (info.canFly) affinity += 0.12;
+        else if (info.melee && info.footprintWidth * info.footprintHeight > 1) affinity -= 0.12;
+    }
     const ringBeneficiary =
         (context.artifactFitVersion ?? 1) >= 3 ? info.dealsMagicDamage : info.rangedSpellDamage || info.magicAttack;
     if (context.tier1ArtifactId === Tier1Artifact.DUAL_STRIKE_CHARM && (context.artifactFitVersion ?? 1) >= 7) {
@@ -227,12 +250,11 @@ const bestScoreIndex = (scores: readonly number[]): number => {
     return bestIndex;
 };
 
-export function pickCoherentDraftCreature(
+function scoreCoherentDraftCreatures(
     available: readonly number[],
     baseScore: (creatureId: number) => number,
     context: IDraftCoherenceContext,
-): number | undefined {
-    if (!available.length) return undefined;
+): number[] {
     const baseScores = available.map(baseScore);
     const affinities = available.map(
         (creatureId) =>
@@ -243,7 +265,69 @@ export function pickCoherentDraftCreature(
             // Divided back out of the overlay weight so the final score moves by exactly weight x lift.
             rankedDraftStrengthScore(creatureId, context.draftStrengthPolicy, context) / DRAFT_COHERENCE_WEIGHT,
     );
-    const scores = applyDraftCoherenceOverlay(baseScores, affinities);
+    return applyDraftCoherenceOverlay(baseScores, affinities).map(
+        (score, index) =>
+            score +
+            (context.scouting
+                ? rankedDraftMapAdjustmentScore(available[index], context.draftStrengthPolicy, context.scouting.map)
+                : 0),
+    );
+}
+
+/** Greedy possible continuation, never an assertion about hidden picks or unopened bans. */
+function draftContinuationValue(baseScore: (creatureId: number) => number, context: IDraftCoherenceContext): number {
+    if (!context.scouting) return 0;
+    let scouting = context.scouting;
+    const ownCreatureIds = [...context.ownCreatureIds];
+    let total = 0;
+    let count = 0;
+    for (const level of context.scouting.remainingPickLevels) {
+        const available =
+            draftFutureSlots(ownCreatureIds, context.knownOpponentCreatureIds ?? [], scouting).find(
+                (slot) => slot.level === level,
+            )?.creatureIds ?? [];
+        if (!available.length) continue;
+        const scores = scoreCoherentDraftCreatures(available, baseScore, {
+            ...context,
+            ownCreatureIds,
+            scouting,
+            revealedGridType: scouting.map,
+        });
+        const best = bestScoreIndex(scores);
+        total += scores[best];
+        count += 1;
+        ownCreatureIds.push(available[best]);
+        scouting = draftContextAfterCreature(scouting, available[best]);
+    }
+    return count ? total / count : 0;
+}
+
+/** Keep future build potential a bounded close-choice signal alongside the existing strength scorer. */
+function applyDraftContinuation(scores: readonly number[], continuations: readonly number[]): number[] {
+    const floor = Math.min(...continuations);
+    return scores.map((score, index) => score + Math.min(0.12, 0.15 * (continuations[index] - floor)));
+}
+
+export function pickCoherentDraftCreature(
+    available: readonly number[],
+    baseScore: (creatureId: number) => number,
+    context: IDraftCoherenceContext,
+    continuationBaseScore: (creatureId: number) => number = baseScore,
+): number | undefined {
+    if (!available.length) return undefined;
+    const immediate = scoreCoherentDraftCreatures(available, baseScore, context);
+    const scores = context.scouting
+        ? applyDraftContinuation(
+              immediate,
+              available.map((creatureId) =>
+                  draftContinuationValue(continuationBaseScore, {
+                      ...context,
+                      ownCreatureIds: [...context.ownCreatureIds, creatureId],
+                      scouting: draftContextAfterCreature(context.scouting!, creatureId),
+                  }),
+              ),
+          )
+        : immediate;
     if (isRankedDraftVarietyPolicy(context.draftVarietyPolicy)) {
         return pickRankedDraftVarietyCreature(available, scores, context);
     }
@@ -255,7 +339,7 @@ export function draftBundleCoherenceAffinity(
     [level1, level2, artifactId]: DraftBundle,
     options: Pick<
         IDraftCoherenceContext,
-        "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants" | "artifactFitVersion"
+        "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants" | "artifactFitVersion" | "scouting"
     > = {},
 ): number {
     const creatures = [level1, level2] as const;
@@ -286,7 +370,7 @@ export function pickCoherentDraftBundle(
     artifactScore: (artifactId: number, ownCreatureIds: readonly number[]) => number,
     options: Pick<
         IDraftCoherenceContext,
-        "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants" | "artifactFitVersion"
+        "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants" | "artifactFitVersion" | "scouting"
     > = {},
 ): number {
     if (!bundles.length) return 0;
@@ -301,12 +385,27 @@ export function pickCoherentDraftBundle(
             (rankedDraftStrengthScore(bundle[0], options.draftStrengthPolicy, {
                 ownCreatureIds: [],
                 synergyVariants: options.synergyVariants,
+                revealedGridType: options.scouting?.map,
             }) +
                 rankedDraftStrengthScore(bundle[1], options.draftStrengthPolicy, {
                     ownCreatureIds: [bundle[0]],
                     synergyVariants: options.synergyVariants,
+                    revealedGridType: options.scouting?.map,
                 })) /
                 DRAFT_COHERENCE_WEIGHT,
     );
-    return bestScoreIndex(applyDraftCoherenceOverlay(baseScores, affinities));
+    const scores = applyDraftCoherenceOverlay(baseScores, affinities);
+    if (!options.scouting) return bestScoreIndex(scores);
+    return bestScoreIndex(
+        applyDraftContinuation(
+            scores,
+            bundles.map(([level1, level2, artifactId]) =>
+                draftContinuationValue(creatureScore, {
+                    ...options,
+                    ownCreatureIds: [level1, level2],
+                    tier1ArtifactId: artifactId,
+                }),
+            ),
+        ),
+    );
 }

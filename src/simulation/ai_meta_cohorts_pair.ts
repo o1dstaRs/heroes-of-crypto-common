@@ -20,7 +20,11 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "./ai_meta_cohorts_core";
-import { createAiMetaMatchStrategyOverrides, type AiMetaStrategyProfileId } from "./ai_meta_strategy_profile";
+import {
+    AI_META_NATIVE_V09_STRATEGY_PROFILE,
+    createAiMetaMatchStrategyOverrides,
+    type AiMetaStrategyProfileId,
+} from "./ai_meta_strategy_profile";
 import { materializeReplayAbSplits } from "./ranked_replay_tactics_ab_core";
 import { deterministicSimulationId } from "./army";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -108,6 +112,8 @@ export function playMetaPair(
     strategyProfileId: AiMetaStrategyProfileId,
     offlineDeterministicWork = false,
 ): IAiMetaPairRecord {
+    if ((strategyProfileId === AI_META_NATIVE_V09_STRATEGY_PROFILE) !== Boolean(options.nativeV09))
+        throw new Error("Native v0.9 combat and draft profile must be selected together");
     if (options.collectEvidence && !offlineDeterministicWork) {
         throw new Error("AI meta evidence requires a19-work: recording must not change a wall-clock search budget");
     }
@@ -251,12 +257,13 @@ function playMetaPairInner(
     const prepared = prepareMetaPair(options, pair);
     const synergyVariants = aiMetaSynergyVariantsForPair(prepared.setupSeed, prepared.combatSeed);
     // Finite search budgets replace the live move deadline, so outcomes stop depending on host speed and load.
-    const searchBudget = offlineDeterministicWork
-        ? {
-              searchOfflineDeterministicWork: true,
-              researchA19BaseSearchEnvironment: AI_META_OFFLINE_SEARCH_ENVIRONMENT,
-          }
-        : {};
+    const searchBudget =
+        offlineDeterministicWork && !options.nativeV09
+            ? {
+                  searchOfflineDeterministicWork: true,
+                  researchA19BaseSearchEnvironment: AI_META_OFFLINE_SEARCH_ENVIRONMENT,
+              }
+            : {};
     FightStateManager.getInstance();
     const aConfig = {
         ...aiMetaMatchConfig(

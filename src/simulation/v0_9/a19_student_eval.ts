@@ -17,6 +17,7 @@ import { isMainThread, workerData } from "node:worker_threads";
 import type { RankedDraftStrengthPolicyId } from "../../ai/setup/draft_strength_prior";
 import { runMatch, type IMatchConfig, type IMatchResult } from "../battle_engine";
 import { hashSimulationParts } from "../army";
+import { assertV09DoctrineSetup, v09DoctrineBoard } from "./a19_doctrine_population";
 import { exitCompletedWorkerCli } from "../completed_worker_cli";
 import { PersistentWorkerPool, startPersistentWorker } from "../persistent_worker_pool";
 import {
@@ -28,7 +29,12 @@ import {
 import { withV09A19Correction } from "./a19_correction";
 import { V09A19CpuModel } from "./a19_inference";
 import { withV09PilotDriverAudit } from "./a19_pilot";
-import { readV09PilotSource, v09PilotBoardStatistics, type IV09A19PilotManifest } from "./a19_pilot_protocol";
+import {
+    readV09PilotSource,
+    v09PilotBoardStatistics,
+    v09DoctrineStatistics,
+    type IV09A19PilotManifest,
+} from "./a19_pilot_protocol";
 import { fingerprintV09 } from "./protocol";
 import { assertV09OutputIsolation } from "./supervisor";
 import {
@@ -122,9 +128,14 @@ export function runV09StudentBoard(task: IStudentTask): IStudentBoard {
         throw new Error("Student board outside the registered bank");
     const seed = seeds[board],
         map = [1, 3, 4][board % 3];
-    const candidate = manifest.parent.baseline;
+    // A newly trained correction replaces the shipped correction on its seat. It must never stack atop it.
+    const candidate = manifest.parent.doctrinePopulation
+        ? { ...manifest.parent.baseline, SEARCH_A19_NEURAL_TIES: "0" }
+        : manifest.parent.baseline;
     const opponent =
-        stage === "secondary_r4" ? { ...candidate, SEARCH_ROLLOUTS: "4", SEARCH_A19_COMPLEMENTARY_R2: "0" } : candidate;
+        stage === "secondary_r4"
+            ? { ...manifest.parent.baseline, SEARCH_ROLLOUTS: "4", SEARCH_A19_COMPLEMENTARY_R2: "0" }
+            : manifest.parent.baseline;
     const genome = rankedDraftStrengthCandidate(manifest.parent.profile.draft as RankedDraftStrengthPolicyId);
     const model = studentModel(directory, manifest);
     const play = (caseIndex: number, enabled: boolean): IStudentGame => {
@@ -147,13 +158,13 @@ export function runV09StudentBoard(task: IStudentTask): IStudentBoard {
                 candidateSearchEnvOverrides: candidate,
                 candidateSetupPolicySpec: manifest.parent.profile.setup,
                 opponentSetupPolicySpec: manifest.parent.profile.setup,
-                candidateDoctrinePolicy: "see-none",
-                opponentDoctrinePolicy: "see-none",
+                ...v09DoctrineBoard(board, manifest.parent.doctrinePopulation),
             },
             caseIndex,
             0,
             {
                 matchRunner: (config: IMatchConfig): IMatchResult => {
+                    if (manifest.parent.doctrinePopulation) assertV09DoctrineSetup(config, board);
                     const team = config.searchEnvOverrideTeams?.[0];
                     if (team === undefined) throw new Error("Student candidate lacks its physical seat");
                     const result = withV09PilotDriverAudit(team, opponent, candidate, () =>
@@ -162,6 +173,7 @@ export function runV09StudentBoard(task: IStudentTask): IStudentBoard {
                                 team,
                                 model: enabled && manifest.mode === "correction" ? model : null,
                                 minimumLogitGain: manifest.minimumLogitGain,
+                                ...(manifest.parent.doctrinePopulation ? { actionFamily: "all" as const } : {}),
                             },
                             () =>
                                 runMatch({
@@ -280,6 +292,14 @@ function summaryOf(directory: string, manifest: IV09A19StudentManifest, stage: V
         promoted: false,
         diagnosticOnly: manifest.diagnosticOnly || stage === "smoke",
         statistics,
+        ...(manifest.parent.doctrinePopulation
+            ? {
+                  doctrines: v09DoctrineStatistics(
+                      rows.map((row) => row.score),
+                      hashSimulationParts("v09-student-ci", 2026102663, stage),
+                  ),
+              }
+            : {}),
         wins: games.filter((game) => game.record.candidateResult === "win").length,
         losses: games.filter((game) => game.record.candidateResult === "loss").length,
         draws: games.filter((game) => game.record.candidateResult === "draw").length,

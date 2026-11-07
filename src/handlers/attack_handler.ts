@@ -1959,6 +1959,13 @@ export class AttackHandler {
                 // aimed unit included — rolling them here too gave the aimed unit a second chance at each.
                 const splashLanded = !!aoeRangeAttackResult?.landed;
                 if (!splashLanded) {
+                    AllAbilities.processDeepWoundsAbility(
+                        attackerUnit,
+                        targetUnit,
+                        attackerUnit,
+                        this.sceneLog,
+                        damageForAnimation,
+                    );
                     AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 }
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -2072,6 +2079,13 @@ export class AttackHandler {
                     // Same rule for the return shot: a dodged/missed counter lands no on-hit effects
                     // (mirrors the melee response path's isResponseMissed gate). A counter absorbed by
                     // the victim's Water Shield lands none either.
+                    AllAbilities.processDeepWoundsAbility(
+                        targetUnit,
+                        rangeResponseUnit,
+                        attackerUnit,
+                        this.sceneLog,
+                        damageForAnimation,
+                    );
                     AllAbilities.processStunAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processStunAuraOnHit(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processFreezeAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
@@ -2315,6 +2329,13 @@ export class AttackHandler {
                 );
             }
             if (!targetUnit.isDead() && secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
+                AllAbilities.processDeepWoundsAbility(
+                    attackerUnit,
+                    targetUnit,
+                    attackerUnit,
+                    this.sceneLog,
+                    damageForAnimation,
+                );
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -4323,6 +4344,10 @@ export class AttackHandler {
                 }
                 continue;
             }
+            // Death can precede removal from the grid during an exchange. Corpses cannot intercept later arrows.
+            if (possibleUnit.isDead()) {
+                continue;
+            }
 
             if (attackerUnit) {
                 if (attackerUnit.getTeam() === possibleUnit.getTeam()) {
@@ -4365,7 +4390,7 @@ export class AttackHandler {
                         }
 
                         const possibleUnit = allUnits.get(possibleUnitId);
-                        if (!possibleUnit) {
+                        if (!possibleUnit || possibleUnit.isDead()) {
                             continue;
                         }
 

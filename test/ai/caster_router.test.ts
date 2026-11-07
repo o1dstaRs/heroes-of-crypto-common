@@ -633,7 +633,7 @@ describe("v0.7 baked caster salvage", () => {
         // This exercises the caster router's AURA arm, which only opens for an army where every stack carries
         // an aura. Angel stopped supplying its own when Arrows Wingshield became a board-wide blessing, so the
         // precondition is now stated outright instead of riding on the Angel's kit.
-        angel.grantAbility("Flesh Shield Aura");
+        angel.grantAbility("Pegasus Might Aura");
         const auraAlly = createTestUnit({
             team: LEFT,
             name: "High-value aura ally",

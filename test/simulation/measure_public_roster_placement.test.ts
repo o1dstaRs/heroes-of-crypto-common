@@ -138,6 +138,7 @@ describe("public-roster placement measurement", () => {
             "mage",
             "melee-magic",
         ]);
+        expect(publicRosterPlacementRosterTargets([C.PEGASUS])).toContain("aura-heavy");
         expect(publicRosterPlacementRosterTargets([C.SQUIRE])).toEqual(["natural", "melee-other"]);
         expect(publicRosterPlacementRosterTargets([C.SCAVENGER])).toEqual(["natural", "melee-other"]);
     });

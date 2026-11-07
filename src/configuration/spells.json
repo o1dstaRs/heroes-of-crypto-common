@@ -1164,33 +1164,12 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
-        "Tie up the Horses Blessing": {
-            "name": "Tie up the Horses Blessing",
-            "level": 0,
-            "desc": [
-                "Tie up the Horses Blessing: all non-flying allies gain +{} movement distance.",
-                "Active while an allied source is alive; only the strongest source applies."
-            ],
-            "target": "ALL_ALLIES",
-            "power": 2,
-            "power_type": "COMMON",
-            "element": "",
-            "multiplier_type": "NO_MULTIPLIER",
-            "laps": 15,
-            "is_buff": true,
-            "self_cast_allowed": false,
-            "self_debuff_applies": false,
-            "minimal_caster_stack_power": 1,
-            "conflicts_with": [],
-            "is_giftable": false,
-            "maximum_gift_level": 0
-        },
         "Luck Blessing": {
             "name": "Luck Blessing",
             "level": 0,
             "desc": [
                 "Luck Blessing: all allies gain +{} luck (total luck is capped at 10).",
-                "Active while an allied source is alive; only the strongest source applies."
+                "Active while an allied source is alive and not Broken; only the strongest source applies."
             ],
             "target": "ALL_ALLIES",
             "power": 10,
@@ -1622,7 +1601,7 @@
             "name": "Misfortune",
             "level": 2,
             "desc": [
-                "Drops the affected unit's luck to its minimum. A luck-buffed target (Luck Aura, Clover of Fortune) is reduced to 0 instead.",
+                "Drops the affected unit's luck to its minimum. A luck-buffed target (Luck Blessing, Clover of Fortune) is reduced to 0 instead.",
                 "Lasts 3 laps."
             ],
             "target": "ANY_ENEMY",

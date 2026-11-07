@@ -161,11 +161,20 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Previous digest: 8e856328c77432416e1e39f2257b0c544f9290bae9d143428d57cde36912d228.
 // Re-pinned 2026-10-24: Crusader damage 12-20 -> 13-20. Two isolated runs reproduce this digest.
 // Previous digest: 6a4b3e3de96be982e1ac7fa11e65b5b2557b0783c61efc0ade946d682552d03b.
-// Re-pinned 2026-11-07 for main's Luck Blessing refresh order: dependent blessings read the
-// updated source luck in the same refresh. The original branch reproduces the previous digest;
-// two corrected runs agree. Historical training/checkpoint evidence remains unchanged.
-// Previous digest: aa90a0564c400d9b7ab220e885444a03db69889297925b7bdb533ea0bb26785a.
-const EXPECTED_REPLAY_SHA256 = "e7dcf4a2abd6f7a9781d4ef25835f55f7427cc456d43c1ff4e8fd896e57ee1cf";
+// Re-pinned 2026-11-03 for the requested Arbalester attack, Crusader armor, Wandering Mage XP and
+// Leprechaun army blessing changes. Two isolated runs agree, with zero rejected actions in all eight fights.
+// Previous digest: 7dae00c1d34d6ff3f18a1629ca5e9010c81d6f981e00d48290d77c50e14f1573.
+// Re-pinned 2026-11-04 for the requested Crusader damage increase from 13-20 to 15-20.
+// Two isolated runs agree. Previous digest: fa5b3e2df22860366e14f423cf2db7ceb264ebdadf180971344ae9738bae650d.
+// Re-pinned 2026-11-05 for the requested Battle Mage health reduction from 12 to 11.
+// The 12 HP control reproduces the previous digest. Two isolated 11 HP runs agree with zero rejected
+// actions; only the pair at seed 2147598935 changes.
+// Previous digest: b41a67d7a59270b3fd6054d08db2cca146ec58623638a2a9fe93a00f6c26e321.
+// Re-pinned 2026-11-05 for Abomination armor 45 -> 47, Healer 12 -> 13 and Blacksmith 10 -> 11.
+// An in-memory old-armor control reproduces the previous digest; two new-armor runs agree with zero
+// rejected actions across all eight fights. The Battle Mage health change above remains included.
+// Previous digest: 38bdbe1d4e533c937285d6abd9abd3cc0ea66d89a6b0b8200c7d0ed6d96680e2.
+const EXPECTED_REPLAY_SHA256 = "a0402edc4096ef6abcb089494176996c3970d99934c70d6f1fb0719b2a8afacf";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

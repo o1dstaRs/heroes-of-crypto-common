@@ -94,6 +94,14 @@ describe("ranked draft candidate augment override", () => {
         }
     });
 
+    it("rejects nonexistent Placement and Movement levels in parsed and direct plans", () => {
+        for (const kind of ["Placement", "Movement"] as const) {
+            expect(parseRankedDraftAugmentOverride(`${kind}:2`)).toEqual([{ kind, value: 2 }]);
+            expect(() => parseRankedDraftAugmentOverride(`${kind}:3`)).toThrow(RangeError);
+            expect(() => playPanel({ ...base, candidateAugmentsOverride: [{ kind, value: 3 }] })).toThrow(RangeError);
+        }
+    });
+
     it("replaces only the candidate's augments and records both plans", () => {
         const plain = playPanel(base);
         const forced = playPanel({ ...base, candidateAugmentsOverride: plan });

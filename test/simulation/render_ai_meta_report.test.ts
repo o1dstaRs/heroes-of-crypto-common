@@ -10,7 +10,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +20,93 @@ import { renderAiMetaReport } from "../../src/simulation/render_ai_meta_report";
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
 describe("render_ai_meta_report", () => {
+    test("puts actual run dates and measured duration in the compact header", () => {
+        const html = renderAiMetaReport({
+            generatedAt: "2026-11-05T07:04:34.858Z",
+            provenance: {
+                fightVersion: "v0.8",
+                fightProfile: { candidateId: "a19", search: { horizon: 64, rollouts: 2 } },
+                timing: {
+                    startedAt: "2026-11-04T17:01:08Z",
+                    finishedAt: "2026-11-05T07:04:11.494Z",
+                    wallSeconds: 50582.687,
+                },
+            },
+            cohorts: [{ cohort: "ranked-draft", games: 4002 }],
+            rankings: {},
+        });
+        const header = html.slice(html.indexOf('<header id="report-top"'), html.indexOf("</header>"));
+        expect(header).toContain("v0.8 + A19");
+        expect(header).toContain("H64 / R2 search");
+        expect(header).toContain("Run dates and duration");
+        expect(header).toContain('datetime="2026-11-04T17:01:08.000Z"');
+        expect(header).toContain('datetime="2026-11-05T07:04:11.494Z"');
+        expect(header).toContain('datetime="2026-11-05T07:04:34.858Z"');
+        expect(header).toContain("14h 3m 3s");
+        expect(header).toContain("2026-11-04 17:01 UTC");
+        expect(html).toContain('timeZoneName:"short"');
+    });
+
+    test("missing run times stay explicit instead of becoming invalid dates or invented durations", () => {
+        const html = renderAiMetaReport({ rankings: {} });
+        const header = html.slice(html.indexOf('<header id="report-top"'), html.indexOf("</header>"));
+        expect(header).toContain("Not reported");
+        const metadata = header.match(/<dl class="run-meta"[\s\S]*?<\/dl>/)![0];
+        expect(metadata).not.toContain("Invalid Date");
+        expect(metadata).not.toContain("NaN");
+        expect(metadata).not.toContain("0h 0m 0s");
+    });
+
+    test("embeds canonical synergy icons and re-tiered artifact art without changing recorded image identities", () => {
+        const root = mkdtempSync(resolve(tmpdir(), "hoc-report-icons-"));
+        const images = resolve(root, "canonical-images");
+        const siteArtifacts = resolve(root, "site/public/assets/images/artifacts");
+        mkdirSync(images, { recursive: true });
+        mkdirSync(siteArtifacts, { recursive: true });
+        const bytes = Buffer.from("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA", "base64");
+        writeFileSync(resolve(images, "synergy_morale_256.webp"), bytes);
+        writeFileSync(resolve(siteArtifacts, "artifact_t1_tome_of_amplification_256.webp"), bytes);
+        writeFileSync(resolve(siteArtifacts, "artifact_t1_rime_charm_256.webp"), bytes);
+        try {
+            const html = renderAiMetaReport(
+                {
+                    rankings: {
+                        synergies: [{ key: "Life:2:2", name: "Life · Morale & Luck · L2", pairs: 100, scoreRate: 0.5 }],
+                        artifactsT1: [
+                            {
+                                key: "tome",
+                                name: "Tome of Amplification",
+                                imageKey: "artifact_t2_tome_of_amplification_256",
+                                pairs: 100,
+                                scoreRate: 0.5,
+                            },
+                            {
+                                key: "rime",
+                                name: "Rime Charm",
+                                imageKey: "artifact_t2_rime_charm_256",
+                                pairs: 100,
+                                scoreRate: 0.5,
+                            },
+                        ],
+                    },
+                },
+                { repositoryRoot: root, imagesDirectory: images },
+            );
+            const embedded = JSON.parse(
+                html.match(/<script type="application\/json" id="report-data">([\s\S]*?)<\/script>/)![1],
+            );
+            for (const id of [
+                "synergy_morale_256",
+                "artifact_t2_tome_of_amplification_256",
+                "artifact_t2_rime_charm_256",
+            ])
+                expect(embedded.assets[id]).toBe(`data:image/webp;base64,${bytes.toString("base64")}`);
+            expect(embedded.rows.filter((row: { category: string }) => row.category === "artifactsT1")).toHaveLength(2);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
     test("shows elapsed wall time separately from overlapping shard durations", () => {
         const html = renderAiMetaReport({
             provenance: {

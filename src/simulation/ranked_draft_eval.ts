@@ -47,6 +47,14 @@ import {
 import { buildV08A19SearchEnvironment } from "../ai/versions/v0_8_a19_profile";
 import { V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
 import { pickRankedAIDoctrine } from "../ai/setup/doctrine_variety";
+import {
+    ArmorAugment,
+    EmpowerAugment,
+    MightAugment,
+    MovementAugment,
+    PlacementAugment,
+    SniperAugment,
+} from "../augments/augment_properties";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import * as GridConstants from "../grid/grid_constants";
 import { Doctrine, getUpgradePoints } from "../doctrines/doctrine_properties";
@@ -257,7 +265,16 @@ const RANKED_DRAFT_AUGMENT_KINDS: readonly ISetupAugment["kind"][] = [
     "Movement",
 ];
 
-/** Check an augment plan: known kinds, each once, levels 1..3, at most the largest doctrine budget (7 points). */
+const RANKED_DRAFT_AUGMENT_MAX_LEVEL: Readonly<Record<ISetupAugment["kind"], number>> = {
+    Placement: PlacementAugment.LEVEL_3,
+    Armor: ArmorAugment.LEVEL_3,
+    Might: MightAugment.LEVEL_3,
+    Empower: EmpowerAugment.LEVEL_3,
+    Sniper: SniperAugment.LEVEL_3,
+    Movement: MovementAugment.LEVEL_2,
+};
+
+/** Check known unique kinds, their legal level ceilings, and the largest doctrine budget (7 points). */
 export function validateRankedDraftAugmentOverride(plan: readonly ISetupAugment[]): ISetupAugment[] {
     const kinds = new Set<string>();
     let total = 0;
@@ -265,8 +282,9 @@ export function validateRankedDraftAugmentOverride(plan: readonly ISetupAugment[
         if (!RANKED_DRAFT_AUGMENT_KINDS.includes(augment.kind) || kinds.has(augment.kind)) {
             throw new RangeError(`augment override: unknown or repeated kind ${augment.kind}`);
         }
-        if (!Number.isInteger(augment.value) || augment.value < 1 || augment.value > 3) {
-            throw new RangeError(`augment override: ${augment.kind} level must be 1..3`);
+        const maximumLevel = RANKED_DRAFT_AUGMENT_MAX_LEVEL[augment.kind];
+        if (!Number.isInteger(augment.value) || augment.value < 1 || augment.value > maximumLevel) {
+            throw new RangeError(`augment override: ${augment.kind} level must be 1..${maximumLevel}`);
         }
         kinds.add(augment.kind);
         total += augment.value;
@@ -538,10 +556,13 @@ interface INormalizedOptions {
 }
 
 interface IRankedDraftGameDependencies {
+    liveSequentialBundles?: boolean;
     matchRunner: (config: IMatchConfig) => IMatchResult;
     /** Offline research only; called for the candidate at the real, public Tier-2 decision. */
     researchCandidateTier2Choice?: ResearchRankedTier2Choice;
     researchCandidateDraftChoices?: IRankedDraftResearchChoices;
+    /** A separate stateful policy per opponent seat; needed for matched default-vs-default combat research. */
+    researchOpponentDraftChoices?: IRankedDraftResearchChoices;
 }
 
 const DEFAULT_DEPENDENCIES: IRankedDraftGameDependencies = { matchRunner: runMatch };
@@ -930,6 +951,8 @@ export interface IRankedDraftSetupPolicySpecs {
 }
 
 export interface IRankedDraftPickRules {
+    /** Match the authoritative both-seat writer order; old registered panels keep simultaneous decisions. */
+    liveSequentialBundles?: boolean;
     /** Pick creatures exactly as the ranked server does (faction-diversity tax included). */
     liveDraftRules?: boolean;
     /** Replace each bundle/creature decision with a uniform legal choice at this rate. */
@@ -1041,6 +1064,7 @@ export function resolveRankedDraftPick(
         revealedGridType?: number,
         tier2ArtifactId?: number,
         artifactFitVersion: ArtifactFitVersion = 1,
+        scoutingContext?: Readonly<IDraftScoutingContext>,
     ): number | undefined =>
         rules.liveDraftRules
             ? pickRankedLiveDraftCreature(
@@ -1053,6 +1077,7 @@ export function resolveRankedDraftPick(
                   rules.synergyVariants,
                   tier2ArtifactId,
                   artifactFitVersion,
+                  scoutingContext,
               )
             : pickDraftGenomeCreature(
                   genome,
@@ -1143,6 +1168,7 @@ export function resolveRankedDraftPick(
                   state.left.bundles,
                   rules.synergyVariants,
                   artifactFitVersionForSetupSpec(leftSetupPolicy.spec),
+                  getPickScoutingContext(state, LEFT, rules.gridType),
               )
             : pickCoherentDraftBundle(
                   state.left.bundles,
@@ -1168,6 +1194,7 @@ export function resolveRankedDraftPick(
                   state.right.bundles,
                   rules.synergyVariants,
                   artifactFitVersionForSetupSpec(rightSetupPolicy.spec),
+                  getPickScoutingContext(state, RIGHT, rules.gridType),
               )
             : pickCoherentDraftBundle(
                   state.right.bundles,
@@ -1186,8 +1213,9 @@ export function resolveRankedDraftPick(
                   },
               ));
     const chosenLeftBundle = researchBundle(LEFT, leftBundle);
+    if (rules.liveSequentialBundles) accept({ type: "select_bundle", team: LEFT, bundleIndex: chosenLeftBundle });
     const chosenRightBundle = researchBundle(RIGHT, rightBundle);
-    accept({ type: "select_bundle", team: LEFT, bundleIndex: chosenLeftBundle });
+    if (!rules.liveSequentialBundles) accept({ type: "select_bundle", team: LEFT, bundleIndex: chosenLeftBundle });
     accept({ type: "select_bundle", team: RIGHT, bundleIndex: chosenRightBundle });
 
     let transitions = 0;
@@ -1259,6 +1287,7 @@ export function resolveRankedDraftPick(
                             ? own.tier2Artifact
                             : undefined,
                         artifactFitVersionForSetupSpec((team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec),
+                        getPickScoutingContext(state, team, rules.gridType),
                     );
         if (creatureId === undefined) {
             throw new Error(`Ranked draft creature policy found no visible L${phase.creatureLevel} creature`);
@@ -1520,10 +1549,16 @@ export function playRankedDraftGame(
         },
         {
             ...rankedDraftPickRules(options, gridType, synergyVariants),
-            ...(dependencies.researchCandidateDraftChoices
+            liveSequentialBundles: dependencies.liveSequentialBundles,
+            ...(dependencies.researchCandidateDraftChoices || dependencies.researchOpponentDraftChoices
                 ? {
                       researchDraftChoicesByTeam: {
-                          [candidatePickedLeft ? LEFT : RIGHT]: dependencies.researchCandidateDraftChoices,
+                          ...(dependencies.researchCandidateDraftChoices
+                              ? { [candidatePickedLeft ? LEFT : RIGHT]: dependencies.researchCandidateDraftChoices }
+                              : {}),
+                          ...(dependencies.researchOpponentDraftChoices
+                              ? { [candidatePickedLeft ? RIGHT : LEFT]: dependencies.researchOpponentDraftChoices }
+                              : {}),
                       },
                   }
                 : {}),

@@ -10,6 +10,7 @@
  */
 
 import { AbilityPowerType } from "../abilities/ability_properties";
+import { calculateActiveDeepWoundsEffect, deepWoundsPowerPerHit } from "../abilities/deep_wounds_ability";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { AttackType } from "../generated/protobuf/v1/types_gen";
 import type { Unit } from "../units/unit";
@@ -101,6 +102,7 @@ export function resolveAttackDamageChain({
     abilityMultiplier = 1,
     attackRate,
     amountAliveOverride,
+    priorHits = 0,
 }: IAttackDamageProjectionInput): IAttackDamageChain {
     const isRangeAttack = attackType === PBTypes.AttackVals.RANGE;
     const rate = attackRate ?? attacker.getAttack();
@@ -143,17 +145,14 @@ export function resolveAttackDamageChain({
     // stacked "Deep Wounds" effect from a prior hit, this strike deals that % more damage. (calculate-
     // ActiveDeepWoundsEffect encoded this but was never wired into damage — this is where it applies, so it
     // works in ranked and sandbox alike since both run this same path.)
-    let deepWoundsMultiplier = 1;
-    const deepWoundsPower = target.getEffect("Deep Wounds")?.getPower() ?? 0;
-    if (
-        deepWoundsPower > 0 &&
-        (attacker.getAbility("Deep Wounds Level 0") ||
-            attacker.getAbility("Deep Wounds Level 1") ||
-            attacker.getAbility("Deep Wounds Level 2") ||
-            attacker.getAbility("Deep Wounds Level 3"))
-    ) {
-        deepWoundsMultiplier = 1 + deepWoundsPower / 100;
+    let deepWoundsPower = calculateActiveDeepWoundsEffect(attacker, target);
+    if (isRangeAttack && priorHits > 0) {
+        const exposedHits = Math.max(0, priorHits - Number(target.willAbsorbIncomingHit(attacker)));
+        deepWoundsPower = Number(
+            (deepWoundsPower + exposedHits * deepWoundsPowerPerHit(attacker, synergyAbilityPowerIncrease)).toFixed(1),
+        );
     }
+    const deepWoundsMultiplier = 1 + deepWoundsPower / 100;
 
     return {
         rollMin,
@@ -192,7 +191,11 @@ export function reachableTopRoll(chain: IAttackDamageChain): number {
 
 /** Band (no kills) of the damage this attack can deal: both ends are values the engine can actually produce. */
 export function projectAttackDamageBand(input: IAttackDamageProjectionInput): { min: number; max: number } {
-    if (input.target.willEmberCovenantBlock(input.attacker) && (input.priorHits ?? 0) <= 0) return { min: 0, max: 0 };
+    const absorbed =
+        input.attackType === PBTypes.AttackVals.RANGE
+            ? input.target.willAbsorbIncomingHit(input.attacker)
+            : input.target.willEmberCovenantBlock(input.attacker);
+    if (absorbed && (input.priorHits ?? 0) <= 0) return { min: 0, max: 0 };
     const chain = resolveAttackDamageChain(input);
     if (chain.outOfShots) {
         return { min: 0, max: 0 };

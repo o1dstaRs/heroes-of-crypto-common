@@ -55,6 +55,7 @@ export {
     RANKED_SETUP_POLICY_V0,
 } from "./ranked_profile";
 export type { IRankedAIProfile, IRankedAISetupPolicy } from "./ranked_profile";
+export { V09_LEARNED_FINAL_PLACEMENT_POLICY } from "./placement/policy";
 export { pickRankedAIDoctrine, RANKED_AI_DOCTRINE_CHOICES } from "./setup/doctrine_variety";
 export type { IRankedAIDoctrineChoiceContext } from "./setup/doctrine_variety";
 
@@ -228,9 +229,9 @@ export const LATEST_AI_VERSION: string = STRATEGIES[STRATEGIES.length - 1].versi
  * (non-LLM) AI opponent. Kept separate from LATEST_AI_VERSION so in-development versions (e.g. v0.4)
  * can be registered and tournament-tested without shipping them to live games.
  *
- * v0.8+A19 is the shipped default. Its registered strategy adds the qualified A19 placement composition around
- * the native v0.8 combat policy, while search-capable runtimes complete it with the matching H64 A19 profile.
- * The public version remains v0.8 so persisted AI seats and replays remain compatible.
+ * The user selected the locked v0.9 draft together with v0.8+A19 combat. Authoritative draft hosts bind
+ * that checkpoint to default seats; combat keeps the qualified A19 strategy and matching search profile.
+ * Native v0.9 remains explicitly selectable research, with its untrained combat artifact unchanged.
  */
 export const DEFAULT_AI_VERSION = V08_A19_PRODUCTION_VERSION;
 

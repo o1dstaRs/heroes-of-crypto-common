@@ -1,5 +1,836 @@
 # v0.9 training against current A19 R2
 
+## Fresh overall-strength test — November 7, 2026 UTC
+
+The user considers a repeatable two-point advantage valuable. The completed
+52.08% development score is therefore a reason to test this fixed checkpoint
+more precisely, while retaining the original failed 55% study and its unopened
+3,132-game confirmation bank unchanged. This is a separately registered overall
+test on the current engine, which includes the ranged echo/Quiver fixes in
+`f0394f73` made after the training source `005805a5`.
+
+Study `v09-current-overall-test-20261107T211035Z` was registered before play and
+launched at **21:19:14 UTC** on the shared 9800X3D host. It freezes common
+`77af0770c79d5d1e5f8ea9c62bd648f1dc9743b1` and the unchanged full-policy pair
+`675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68`.
+Registration SHA:
+`ae470d04bc5978626ea901c512a273d3f17c49d0c6f60949673d41bd71c0143e`;
+uploaded source/model archive SHA:
+`8045cbb006eac12c488859d9773c0a630c704def5c37fff731fa77fc955c26bf`.
+
+The fixed bank contains **1,512 new boards / 6,048 games**, with four physical
+and draft-seat mirrors per board. Each of the three maps and nine doctrine
+matchups has 56 boards. Both seats use their own locked-V3 draft policy,
+authoritative sequential bundle visibility and the complete deterministic
+A19 H64/R2 search. Only the candidate's existing neural correction weights
+change. Previously registered seed channels, including unopened banks, are
+excluded. There is one candidate, no refitting, no subgroup selection and no
+optional stopping.
+
+The question is whether this fixed pair has an overall advantage on the
+current engine: its 10,000-sample, map-stratified whole-board bootstrap must
+have a **95% lower bound above 50%**. The result will be reported regardless of
+its sign. The four games within a board remain one bootstrap cluster. This
+does not retrospectively pass the old 55% gate or qualify native v0.9 combat.
+
+Before fresh games, repeat the 128-reference numerical check, observation and
+continuation parity, 48 exact warm A/A replay pairs and 12 closed-fixture
+candidate smoke games on the frozen current source. Local numerical parity
+passed with maximum error `3.143e-6`. The current-source engine suite passed
+7,543 tests in the sandbox; its sole process-identity failure passed with all
+18 tests in that file when rerun outside the sandbox. Linux replay admission
+still runs separately before the fresh bank.
+
+The CPU-only test uses eight workers at nice 10, a 24 GiB process-group memory
+limit and a six-hour registered window. Existing host services and other
+research jobs remain running. Architecture and search work are unchanged;
+quiet production whole-turn timing within 1.10 times the reference is still
+required separately. A positive result does not automatically activate or
+deploy this research pair. The GPU fit is already complete; this stage needs
+battles rather than extra VRAM allocation.
+
+## GPU utilization and completed full-policy fit — November 7, 2026 UTC
+
+The user emphasized using the RDNA card's capacity. The experiment
+spent most of its time producing full-game continuation labels on the CPU;
+the GPU was idle during that stage. Its 130-parameter head-only fits also leave
+most GPU compute unused. Filling VRAM is not required for high compute usage:
+the measured full-policy update windows below used under 600 MiB of VRAM.
+
+### Verified throughput changes
+
+`clipped_parameter_gradients()` requests derivatives only for selected FP32
+parameters and computes global clipping on their device. Tinygrad 0.14's
+ordinary `backward()` requests gradients for every live floating tensor,
+including board inputs; the full-policy probe originally failed while attempting
+to differentiate a boolean army mask. Explicit parameter targets remove that
+invalid path and unused input gradients. They also remove per-update gradient
+copies to NumPy and back. The original registered head experiment is unchanged.
+
+A separate, source-sealed probe compared the host-clipped loop, explicit GPU
+gradients/clipping, and the same GPU optimizer captured with `TinyJit`. Three
+counterbalanced rounds each used two warmup updates and 64 timed updates, with
+device synchronization on both sides of the timed window.
+
+| Head-update loop                    | Median seconds for 64 updates |
+| ----------------------------------- | ----------------------------: |
+| Existing host clipping/backward     |                       13.3501 |
+| Explicit gradients and GPU clipping |                        3.8614 |
+| GPU loop with compiled replay       |                       0.03995 |
+
+The **334.2 times** ratio applies only to this small, steady-state update loop.
+It excludes data acquisition, feature preparation, compilation, validation and
+exports, and is not a whole-campaign speedup. GPU and compiled replay produced
+bit-identical parameters in every round. Against the host-clipped reference,
+non-bias weights differed by at most `4.459e-5`, normalized policies by
+`8.584e-6`, and all 114 applicable serving-choice comparisons agreed. Two scalar
+policy biases drifted by up to 0.03995 under rounded near-zero Adam gradients;
+each cancels from its member's softmax. These are numerically close fits rather
+than byte-identical exports. The original failed strict parameter comparison
+and its diagnostic receipt remain preserved.
+
+`FullA19Pair` trains **500,418 existing policy-path parameters**, including both
+original encoders. Auxiliary-head weights remain frozen. Inputs and hidden
+activations are recomputed with the current weights; there is no frozen-feature
+cache. The serving architecture, native observation contract and search budget
+are unchanged. Both complete models are snapshotted and restored together, with
+shape, finite-value and frozen-weight checks before restoration.
+
+The actual full-policy gradients matched CPU PyTorch within `1.431e-6`;
+the first clipped SGD update matched within `7.451e-9`. The exact registered
+backend also passed full checkpoint restoration and eight eager/compiled
+updates with **zero parameter and policy differences**.
+
+| Short full-policy update window | Batch 64 | Batch 512 |
+| ------------------------------- | -------: | --------: |
+| Timed updates                   |      256 |       256 |
+| Updates/second                  |   109.65 |     61.87 |
+| Sampled average GPU busy time   |    93.9% |     88.7% |
+| Sampled average package power   |  179.5 W |   184.0 W |
+| Peak available temperature      |     34 C |      36 C |
+
+The probe peaked at 198 W and 558.1 MiB sampled VRAM. These short windows
+repeated the 19 exposed historical inputs for throughput; they are not new
+independent training data or evidence of stronger play. All arithmetic remained
+Float32 with `TC=0` and TF32 disabled. This is measured FP32 workload utilization,
+not qualification of peak matrix-accelerator throughput. The full 166-second
+probe includes CPU-heavy preparation and host-reference loops, so its overall
+GPU utilization is much lower than the two update windows.
+
+Evidence is preserved under local study
+`v09-rdna-utilization-20261107/benchmark-20261107T073439Z` and node study
+`v09-rdna-utilization-20261107T073439Z`. Registration SHA:
+`db0e1b5f3b888200af2da9aaae90f5ccb55dc680c4d19db489357d51954c2acd`.
+
+### Completed real-data full-policy experiment
+
+The separate source-sealed campaign `v09-rdna-full-policy-20261107T075127Z`
+passed its exact GPU/software preflight, waited for the parent's complete
+admitted dataset and GPU fit, and finished its own development test. It never
+edited, paused or replaced that experiment. Its registered 12-hour cutoff was
+**19:51:28 UTC on November 7**. Registration SHA:
+`f86e35cddbf9cf93db0206a14ca3bd001311708a61b2bcd065c87ff535859d2c`;
+archive SHA:
+`36f1f6a41a98dd7fdea197f496b19ff2e966a551cea5f09864a4fd232312466a`.
+
+One fixed full-policy recipe uses AdamW learning rate 0.00001, weight decay
+0.001, FP32 GPU clipping at one and compiled updates. Every update uses the
+complete training-root and warm-training banks. Score scale 0.1, root KL 0.2,
+warm KL one, teacher CE weight 0.05, validation improvement 0.005, teacher CE
+tolerance 0.03 and margin one remain fixed. Checkpoints require observed labels
+for every served validation choice, nonnegative label gain and changed decisions.
+Whole-model snapshots preserve the selected epoch's encoders as well as heads.
+
+Only one eligible finalist can run, with at least 96 Bun numerical/decision
+references, 48 warm A/A replay pairs and 12 closed-fixture candidate smoke games.
+Its separate **864-game development** and **3,132-game confirmation** banks
+exclude the parent's banks and earlier studies. The existing 55% development /
+52% confirmation score thresholds and positive whole-board lower bounds apply.
+CPU evaluation waits until the parent's evaluation finishes, preserving its
+worker budget. Production timing and activation remain separate. No throughput
+probe has opened a strength bank or established a new win-rate gain.
+
+The parent completed all 972 scenarios and **18,224 paired continuations**.
+It admitted 541 training / 259 validation roots, of which 118 / 69 had marginal
+score contrast, and 2,591 / 1,296 authentic warm rows. Four head-only fits
+completed in 282.94 seconds; none produced a validation-eligible finalist.
+
+The full-policy child completed 340 updates in 58.69 fit-loop seconds and
+70.02 seconds including loading/preparation/export. Peak sampled VRAM was
+2,149,126,144 bytes, and peak available temperature was 53 C. Epoch 39 satisfied
+the fixed constraints: validation loss 6.79534 → 6.66998, teacher CE 1.20424 →
+1.21842, one changed validation choice, zero unknown choices and zero mean
+recorded-label gain. Its complete pair SHA is
+`675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68`.
+
+CPU export verification passed 128 references with maximum error `3.143e-6`.
+All 48 warm replay pairs and 12 candidate smoke games passed. The independent
+development bank then completed:
+
+| Games | Wins | Draws | Losses | Draw-aware score | Whole-board 95% interval |
+| ----: | ---: | ----: | -----: | ---------------: | ------------------------ |
+|   864 |  445 |    10 |    409 |           52.08% | 49.59–54.63%             |
+
+The point estimate is above the reference, but the interval includes 50% and
+the preregistered 55% development threshold failed. This is not an established
+strength gain. The separate 3,132-game confirmation remains unopened; no model
+is promoted. Both study jobs are complete. An independent local reconstruction
+of all 216 raw boards reproduced the outcome counts and both bootstrap endpoints
+exactly.
+
+### Real-recipe GPU telemetry replay
+
+After completion, one measurement-only replay ran the same complete 340-update
+recipe with every export marked functional and no finalist or strength games.
+Both selected models' weight dictionaries exactly match the originals, and the
+same epoch 39 was selected. One-second read-only telemetry attributed every
+sample to the replay's KFD process.
+
+| Actual real-data replay window | Whole replay | Updates after first checkpoint |
+| ------------------------------ | -----------: | -----------------------------: |
+| Wall seconds                   |        65.01 |                          38.57 |
+| Available GPU busy samples     |           64 |                             38 |
+| Average GPU busy time          |       59.64% |                     **94.16%** |
+| Peak GPU busy time             |         100% |                           100% |
+| Average package power          |      167.1 W |                    **257.8 W** |
+| Peak package power             |        299 W |                          299 W |
+| Peak available temperature     |         51 C |                           51 C |
+
+The full fitter reported 64.94 total seconds and 54.46 fit-loop seconds in the
+replay. The whole window includes preparation and compilation; the later update
+window includes normal checkpoint/validation work. This verifies high GPU usage
+while the richer learner updates, not continuous GPU usage during CPU battle
+generation. The source-sealed replay is `v09-full-policy-timing-replay-20261107T170758Z`;
+its `hardware-replay-summary.json` records the weight equality and exact windows.
+Raw device counters, process identities and campaign phases are retained by the
+read-only `v09-rdna-monitor-20261107` service, stopped after the completed replay.
+Missing counters remain missing.
+
+The completed dataset, admission proof, all five fit receipts, selected complete
+pair, all raw development boards and telemetry were copied locally under
+`game/core/tmp/v09-rdna-completed-readout-20261107`. Archive SHA
+`507bb6f48bd45ba99505ef37a4b1649da4465b0e4926e10b8d77ec0ff380e87a`
+and admitted training-data SHA
+`fd797a1493468a23ef0b5d64b10e26d49e55012dd19fec1c8e552c413bcc9126`
+were independently verified after copying. Normal generated evidence remains
+outside Git.
+
+## Broader joint-head campaign — November 7, 2026 UTC
+
+The user requested a review from all angles and continued training for measured
+combat gains. A new bounded campaign is registered on the 9800X3D/RDNA host as
+`v09-joint-training-20261107T065723Z`, using source **`005805a5`**. The 12-hour
+window ends at **18:57:25 UTC on November 7**. Its registration SHA is
+`4e72480f0f8ce771430e197950b66022a827d89a4d87f5503dd543b8730747cc`;
+the uploaded archive SHA is
+`674cf1b195ed490539017dffdc0de0d49c83ce2b4e1c9e89b4bc59f633d3d991`.
+The acquisition and four head fits are complete; no head-only candidate passed
+validation admission. The full-policy child result is reported above.
+
+### Questions the experiment separates
+
+| Angle               | Finding and registered response                                                                                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model capacity      | A frozen ensemble member can make a correction unattainable. Compare joint heads with matched single-head controls, preserving both original backbones.                                                               |
+| Objective alignment | Fit marginal terminal-score differences with equal informative-root weights. Retain the real margin-one selector and original arithmetic ensemble.                                                                    |
+| Data coverage       | The old Radeon pilot had 19/14 roots from six targeted creatures. Collect fresh, untargeted ranked drafts across all nine doctrine matchups, three maps, three requested battle phases and both physical/draft seats. |
+| Labels and noise    | Keep eight shared futures for every retained action, including draws. Record missing roots without refills. Report both reused-label oracle gain and four-by-four cross-world diagnostic gain.                        |
+| Preservation        | Sample actual full-catalog A19 choices before outcomes. Fit with warm KL and teacher CE; require complete warm-validation CE to remain within 0.03 of its original value.                                             |
+| Selection           | Use separate family-level training, validation, development and confirmation banks. Four fixed fits may produce only one validation-locked complete pair. No subgroup rescue or fallback finalist.                    |
+| Opponent and draft  | Both combat seats use independent locked-V3 draft policies with authoritative sequential bundle visibility. This removes the older screen's fixed-previous-draft limitation.                                          |
+| Serving cost        | Train existing weights only: 65 or 130 parameters. No layers or search work are added. Quiet production whole-turn timing within 1.10 times the reference remains a separate gate.                                    |
+
+The research harness now accepts `researchOpponentDraftChoices` alongside the
+candidate hook. Each seat receives its own public context and retains its own
+state through collision retries. Tests exercise both physical mirrors and both
+draft seats, prove exact no-op setup/record parity, and reject an illegal
+opponent-only choice. Existing callers retain their original behavior.
+
+### Fixed acquisition and fit design
+
+The bank contains **648 training scenarios and 324 validation scenarios**. Its
+81 map/doctrine/phase strata each have eight training and four validation
+scenarios, balancing the four physical/draft assignments. One eligible root is
+selected by an outcome-blind hash within the requested phase; no focal creature
+is forced into the draft. Retain at most three eligible actions, including the
+actual baseline decision, native searched choice when different and a distinct
+action family when available. Every retained action receives all eight complete
+continuations. Unobserved alternatives receive no invented outcome.
+
+GPU training requires at least 300/128 usable training/validation roots, 96/32
+marginal-score-informative roots and 512/256 authentic warm rows. These counts
+are gates, not claims about data already collected. The immutable historical
+functional fixture separately runs the exact four-fit trainer before the label
+budget is spent. Its proxy warm argmax targets are diagnostic, all its exports
+remain marked functional, and it cannot lock a strength finalist.
+
+The four real-data recipes cross learning rates 0.003/0.01 with student/joint
+heads. They share initialization, AdamW weight decay 0.001, score scale 0.1,
+root KL weight 0.2, warm KL weight one, teacher CE weight 0.05 and clipping at
+one. Frozen encodings are reusable only because both original backbones remain
+frozen. The cap is 600 updates per fit, with checks every ten updates, at least
+40 updates and patience 60. Checkpoint eligibility requires validation loss to
+improve by at least 0.005, the warm CE bound, zero unlabeled served validation
+choices, nonnegative recorded-label gain and at least one changed decision.
+Validation may select the checkpoint; it cannot open multiple strength trials.
+
+The one selected pair must pass at least 96 Bun numerical/decision references
+and 48 complete warm-start A/A replay pairs. Its development bank has **864
+games**. Confirmation's separate **3,132 games** stay closed unless development
+scores at least 55% with a whole-board 95% lower bound above 50%. Confirmation
+requires at least 52% and a lower bound above 50%. Both banks balance maps,
+doctrines, physical sides and draft seats. The registered map-stratified
+bootstrap resamples complete four-game boards, never individual battles.
+
+This route learns corrections on top of full A19 search. It does not train or
+activate the native v0.9 anchor artifact. A positive baseline comparison would
+still leave general opponent-pool robustness and production timing to verify.
+Later changes to balance or combat code require explicit transfer evaluation;
+the shared working tree's uncommitted gameplay edits are outside this capsule.
+The current default remains locked v0.9 draft plus qualified A19 combat.
+
+Repository verification for the harness change passed lint, TypeScript checking
+and **7,500 common tests**. Ordinary run data and models remain outside Git.
+
+The campaign passed its Linux controls and trainer preflight before starting
+fresh acquisition. Mac and Linux control receipts are identical: 12 cases each
+reproduce stock, observed capture and same-future continuation games, including
+788 restoration checks. The exact four-fit trainer completed 160 functional
+updates in **38.25 seconds**, using a sampled peak of **162.1 MiB VRAM**. None of
+those diagnostic fits satisfied checkpoint eligibility, and none can consume
+strength games. These results verified the trainer before real-data execution.
+The completed acquisition, head-fit rejection and separate full-policy match
+results are reported above.
+
+## Joint-head training on the 9800X3D RDNA GPU — November 7, 2026 UTC
+
+The user requested a Tinygrad training path on the 9800X3D node. A source-pinned
+functional fit now runs on its discrete **RDNA4 `gfx1201` GPU**, PCI `1002:7551`,
+with 32 GB class VRAM. The host was running another CPU experiment, so the GPU
+canary used one compiler/BLAS thread and a separate limited research process.
+Tinygrad was installed into a fresh research environment; live Heroes services,
+system packages and driver bindings were not changed. The ordinary KFD interface
+used the existing amdgpu driver. [Tinygrad documents this interface separately
+from its PCI driver](https://docs.tinygrad.org/runtime/#amd-interfaces).
+
+The pinned backend is Tinygrad **0.14.0**, commit
+`e4131331cf172545f91f91797edfad61e94e25ea`, with NumPy 2.4.4 and LLVM through
+`DEV=KFD:0+AMD:LLVM`. Tensor cores and TF32 were disabled for this Float32 check.
+Puffalo's authenticated SSH check still timed out. The Mac's Tailscale client was
+running under the expected account and contained the exact shared peer; no
+remote outage or new 5090 job status is inferred from that observation.
+
+### What the joint backend changes
+
+`A19PolicyHeadPair` and `TinyA19HeadPair` can train the original two policy heads
+together: **130 parameters**, with both original backbones frozen. A matched
+student-only mode retains 65 trainable parameters and checks the entire partner
+for changes. The Tinygrad backend computes frozen candidate encodings once and
+fits the heads from that cache. It does not reuse a frozen cache for a feature
+adapter, add layers, lower margin one, or change the arithmetic ensemble rule.
+Both exported members use the ordinary original-width A19 CPU architecture.
+
+The Torch implementation snapshots and restores both complete members together,
+validates frozen parameters before restoration, and preserves CPU and CUDA RNG
+state during CPU construction. A deterministic capability test trains actual
+A19 policy heads on a two-action fixture: the student-only control remains
+below the serving threshold imposed by its frozen partner; the joint model
+crosses that same threshold. This is a capability example, not a gameplay result.
+
+The backend-independent `a19_feature_pair_format.py` binds both complete files,
+their policy-head fingerprints, input/source hashes, recipe and checkpoint epoch.
+The Bun loader verifies those identities and keeps pair construction outside
+per-decision prediction. The new finalist format omits the legacy `modelSha256`
+key, so a single-model evaluator fails rather than silently substituting the old
+partner. Functional fixtures and unchanged pairs are rejected by the strength
+loading path. None of these research modules is installed by the shipped factory.
+
+### Completed real-input canary
+
+The data are the **already exposed historical pilot**: 19 training roots, 14
+diagnostic validation roots, eight futures per labeled action, and 128 separately
+sampled warm A19 observations. Only seven roots in each pilot split have marginal
+score contrast. Historical requested-phase fallback cases remain visible. This
+does not meet the larger training-data readiness gate and cannot select a
+strength finalist. No validation result selected a checkpoint; all 64 updates
+were fixed before the run.
+
+The recipe used AdamW learning rate 0.003, weight decay 0.001, global gradient
+clipping at one, score scale 0.1, root KL weight 0.2 and warm KL weight one.
+Warm KL is a functional preservation check; it does not replace the full
+qualified teacher-CE preservation bank. The ordinary research data, matched-fit,
+fresh-match and production-timing gates still apply to any later candidate.
+
+| Check                                                                               | Result                                           |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Maximum Tinygrad/PyTorch forward difference                                         | `4.054e-6`                                       |
+| Initial real serving decisions checked                                              | 33, all equal                                    |
+| Maximum head-gradient difference                                                    | `3.726e-7`                                       |
+| First clipped SGD update difference                                                 | Exactly zero                                     |
+| Actual joint AdamW updates                                                          | 64                                               |
+| Fit-loop wall time                                                                  | 7.09 seconds                                     |
+| Reported canary execution, including GPU setup/parity/export after source admission | 18.44 seconds                                    |
+| Peak sampled device VRAM                                                            | 147.5 MiB, including the pre-existing allocation |
+| Peak available temperature reading                                                  | 29 C                                             |
+
+An initial attempt stopped before GPU allocation because the idle driver's
+temperature read returned `EBUSY`. Its receipt remains preserved. The successful
+attempt records unavailable samples explicitly and enforces the bound whenever
+the counter is available; it recorded one unavailable idle sample. The recipe
+and training inputs were unchanged.
+
+| Pilot diagnostic                            |  Before |   After |
+| ------------------------------------------- | ------: | ------: |
+| Training score-difference loss              | 9.24773 | 6.29894 |
+| Diagnostic validation score-difference loss | 7.96637 | 6.42133 |
+
+The trained pair changes two training and four validation gate decisions, with
+zero unlabeled choices. Average recorded-label gain is +2.63 points on training
+and **zero on validation**. These are reused-label diagnostics. Lower loss and
+an exposed pilot do not demonstrate a stronger combat AI; no strength bank was
+opened and no model was promoted.
+
+### Export and inference checks
+
+The actual Radeon-trained checkpoint passed **65 Bun numerical cases** with a
+maximum discrepancy of `1.916e-6`; all 33 applicable margin-one decisions matched.
+Twelve warm-start A/A pairs (24 complete game replays) reproduced every record,
+event and turn digest. There were 226 exact warm neural-prediction checks and
+542 restoration checks. Attempting to load the functional checkpoint for strength
+games was explicitly rejected.
+
+Four counterbalanced local M4 timing rounds replayed 1,990 real decision inputs
+per arm after preloading models. Original mean inference time was 2,664.88 ms,
+warm pair 2,660.57 ms and trained pair 2,656.73 ms: ratio **0.997**, effectively
+unchanged. All 1,990 warm predictions were bit-exact. This is a model-only local
+diagnostic, not production whole-turn timing. The pair adds no serving operators;
+any later integration must preload both members before the turn budget starts.
+The Radeon makes these head fits practical; battle search and continuation-label
+generation still require separately budgeted CPU work.
+
+The successful registration is
+`cc888fa1fbc83d0a5a9c339e1fa1584ba05eef246218b4f4a5633d17ae808d7d`;
+the complete trained pair is
+`5430dcafd000b86d250a51cc24370bb77365afe883a47d8e14a9d105474a6132`.
+Generated evidence stays outside Git under client `game/core/tmp`, with local
+study `v09-rdna-canary-20261107T060856Z` and node research study
+`v09-rdna-tinygrad-20261107T0545Z-1wRmfX`. The failed initial attempt is separate.
+The current default remains locked v0.9 draft plus qualified A19 combat.
+
+Repository verification passed lint, TypeScript checking, all **7,498 common
+tests** and **52 Python research tests**. The Python checks include the joint-head
+capability, frozen-member controls, atomic checkpoint restoration and pair export.
+
+## Frozen-member ceiling and marginal-score objective — November 7, 2026 UTC
+
+Local research found two constraints in the training problem. Neither is a new
+strength result. No model was trained or promoted in this cycle; the locked
+v0.9 draft plus A19 combat remains the default.
+
+### An unchanged ensemble member can make a correction impossible
+
+Let `f` be the frozen member's complete-catalog probability distribution, `s`
+an arbitrarily capable replacement student's distribution, and `q = (f + s)/2`
+the served ensemble. For a nonnative action `a` and native action `n`,
+
+```text
+q(a) / q(n) <= (1 + f(a)) / f(n)
+maximum log gain = log(1 + f(a)) - log(f(n))
+```
+
+This is a supremum over every possible student distribution, attained in the
+one-hot limit on `a`. A frozen architecture and trust constraints can reduce its
+achievable set further. If the bound is below margin one, improving that action's
+training loss cannot make the deployed selector choose it. Native remains a
+possible fallback. Normalizing only the eligible subset changes `f` and gives
+the wrong ceiling for the shipped arithmetic ensemble.
+
+`fixed_partner_gate_ceiling()` measures this bound with Float64 arithmetic and
+a conservative 0.000001 numerical buffer before declaring an action blocked.
+The trainer now records the fixed partner's capacity once per split, including
+blocked eligible actions, blocked label improvements and reused-label oracle
+ceilings. This diagnostic never filters training roots or substitutes for action
+quality. The recorded baseline must remain possible under the bound.
+
+The admitted historical 84-scenario pilot reproduced all 33 retained baseline
+predictions exactly with the promoted weights. Using batch256 as the frozen
+partner, as in the existing feature fits:
+
+| Split      | Usable roots | Eligible nonnative actions | Blocked actions | Actions improving over recorded baseline in labels | Blocked improvements |
+| ---------- | -----------: | -------------------------: | --------------: | -------------------------------------------------: | -------------------: |
+| Train      |           19 |                         78 |              28 |                                                  6 |                    2 |
+| Validation |           14 |                         57 |              10 |                                                  4 |                    0 |
+
+This constrains the training signal in this small selected pilot. It does not
+explain the failed held-out result: none of its four better validation labels
+was structurally blocked. Reversing which member is frozen blocks one of six
+training improvements and none of four validation improvements. Jointly fitting
+both existing policy heads can remove this particular fixed-member obstruction
+without adding a serving operator, but no such trained model is claimed here.
+
+### World-pair preference is different from a mean-score target
+
+Even draw-magnitude preference weighting still depends on how futures are paired.
+Consider the same action A with scores `11111000` and action B with three wins:
+
+| B's paired order | Mean A | Mean B | Favorable / unfavorable comparisons | Pair-loss optimal logit gap |
+| ---------------- | -----: | -----: | ----------------------------------: | --------------------------- |
+| `11100000`       |  0.625 |  0.375 |                               2 / 0 | Positive infinity           |
+| `00000111`       |  0.625 |  0.375 |                               5 / 3 | `log(5/3) = 0.510826`       |
+
+At the serving threshold of one, the first arrangement's preference gradient
+raises A and the second lowers it. The marginal score gain is 0.25 in both.
+These permutations demonstrate a property of the objective; they are not new
+valid common-RNG worlds or evidence that the original paired collector is wrong.
+Pairing remains valuable for estimating uncertainty in score differences.
+
+Exhaustively rearranging the archived pilot's native labels finds threshold
+sensitivity in one of five positive training comparisons and two of three
+positive validation comparisons, spanning one family in each split. Those
+conditional counts are not population estimates or gameplay gains.
+
+The opt-in `pairLossObjective: "score-difference"` instead fits squared error
+between served logit differences and scaled marginal terminal-score differences,
+averaged equally over informative roots. All recorded labeled actions remain;
+unknown actions receive no target, and roots with equal marginal means contribute
+zero gradient. The original `"paired-preference"` objective remains the default.
+The new registration must explicitly choose `pairLossWeighting: "roots"` and a
+finite positive `pairScoreScale`; a preference-weight modifier is rejected.
+For example, scale 0.1 makes an exactly fitted logit gap of one represent ten
+match-score points. This is an illustrative scale, not a selected fit recipe.
+Loss values from this objective are not directly comparable with preference CE.
+Existing matched-recipe, teacher-preservation, observed-choice, fresh-game and
+production-timing gates still apply. The frozen-member ceiling also still applies.
+
+CPU functional tests cover the impossible-choice example, attainable bound,
+complete-catalog normalization, padding, permutations, equal-root weighting,
+explicit scale, unchanged marginal scores and invalid recipe admission. An actual
+row probe compared 66 Python ceilings against independent Bun references with a
+maximum discrepancy of `8.89e-16`. Loss and gradient were exactly unchanged after
+independently permuting each action's futures on all 33 real rows. These checks
+establish implementation properties, not learned-model strength.
+
+### Fixed consensus ablation: failed development gate
+
+A separate prospectively registered ablation retained an existing A19 neural
+correction only when both original model members supported that same action at
+individual logit margin one. Otherwise it returned the native searched decision.
+It proposed no new corrections, changed no weights and added no rollouts.
+
+The immutable engine was `babdd2ab`, with the same combat decision rule as
+`9ccf9207`, using registered draft `ranked-unit-strength-a19-side-v4-w16-r4` and
+setup `artifact-fit-v6:conditional-v1:sniper+t2a19`. This combat screen holds its
+draft policy fixed; it is not a qualification of the separately bound locked-V3
+production draft. Three maps, all nine doctrine pairs, physical sides and draft
+seats were balanced. Admission completed 36 games, with 12 stock/reference pairs,
+12 candidate control games, five exercised vetoes and 906 restoration checks.
+
+| Games | Boards | Wins | Draws | Losses | Draw-aware score | Whole-board 95% interval |
+| ----: | -----: | ---: | ----: | -----: | ---------------: | ------------------------ |
+|   864 |    216 |  412 |     9 |    443 |           48.21% | 45.83–50.64%             |
+
+The candidate made 16,361 neural calls and vetoed 529 of 2,839 original proposals
+along its own trajectories. There were zero rejected actions. It failed the
+registered 55% score / positive lower-bound gate. The separate 6,048-game bank
+remains unopened, and timing is unqualified. Do not rescue the rule with a
+posthoc subgroup or weaker margin.
+
+Generated evidence stays ignored under the client's `game/core/tmp`, in
+`v09-local-consensus-20261107T002732Z` and
+`v09-combat-current-a19-20261106`. Consensus registration identity:
+`e0c2bb4f5bd609ddbb3b262f86e2f515e2e83ca0506b816c025abc18b91ca5f1`.
+The 33-row archived-input identity is
+`7132fd2ed1f3788e24857b61fad0453e66a8732efe2cccfe2356ca9bb29da88a`.
+
+## Local pooling, exact reuse and objective audit — November 6, 2026 UTC
+
+This cycle runs locally against the immutable `9ccf9207` engine, with its complete
+shipped A19 combat, two neural members, live ranked draft/setup, sideboard,
+doctrines, splits and synergies. Subsequent shared-working-tree balance edits are
+outside this experiment. The user-selected locked v0.9 draft plus A19 combat
+remains the default. None of the changes below promotes a combat checkpoint.
+These local combat screens hold the registered draft policy fixed; they do not
+qualify the separately bound locked-V3 production draft.
+
+### Eligible mean-logit pool: failed strength gate
+
+The research helper `a19_eligible_logit_pool.ts` averages the two members' raw
+logits and evaluates only candidates in the exact, completely scored primary
+tie. It retains margin one and the original model weights. Mean-logit differences
+equal differences from a geometric probability pool, so unevaluated candidate
+partition functions cancel. **This changes the decision policy:** A19's shipped
+arithmetic probability pool cannot in general discard those partition functions.
+Do not present this as equivalent pruning of the shipped ensemble.
+
+Admission passed 48 complete games: 12 stock/reference pairs and 12
+full-catalog/subset pairs, with 1,126 exact candidate-logit checks and 1,776
+restoration checks. Development then completed 864 games on 216 boards, balanced
+over three maps and all nine own/opponent doctrine combinations. Physical side
+and draft seat remain paired within each board.
+
+| Candidate                | Wins | Draws | Losses | Draw-aware score | Whole-board 95% interval |
+| ------------------------ | ---: | ----: | -----: | ---------------: | ------------------------ |
+| Eligible mean-logit pool |  414 |    18 |    432 |           48.96% | 47.05–50.93%             |
+
+There were no rejected actions. Candidate scoring work fell from 220,888 to
+156,196 model-row evaluations, a 29.29% reduction. That structural saving is not
+a measured end-to-end runtime improvement. The registered 55% development gate
+failed; the separate 6,048-game confirmation bank remains unopened. The research
+helper is opt-in and is not imported by a shipped AI factory.
+
+### Exact entity-encoding reuse: opt-in performance research
+
+`V09A19CpuModel` accepts `entityCacheRows`, default zero. A nonzero research
+capacity caches only the two entity-encoding layers, using every input's complete
+Float32 bit string, including signed zero. It never keys by creature ID or guesses
+which units changed. Each model owns a separate bounded LRU; team pooling, actor
+selection, globals, terrain and target selection are recomputed. Capacity is
+limited to 1,024 rows. `unpackA19Model()` forwards the optional setting; the
+promoted factory supplies none, preserving the uncached path.
+
+At capacity 512, 108 A/A complete-match pairs (216 games) across three maps and
+all nine doctrine combinations reproduced every match record and event/turn
+digest. All 1,990 instrumented neural predictions matched both frozen original
+and cache-disabled outputs exactly; 4,963 engine-restoration checks passed.
+Unit regressions additionally cover input changes, entity permutations,
+independent models, eviction, signed zero and invalid inputs.
+
+Four counterbalanced model-only timing rounds replayed all 1,990 actual decision
+observations chronologically, with fresh model instances per pass and no
+manufactured adjacent duplicates. Original mean wall time was 2,612.43 ms,
+cache-disabled 2,585.69 ms and cached 2,263.10 ms. Cached inference used **13.37%
+less wall time and 13.04% less CPU time**. Real-game cache hit rate was 39.86%.
+Every timed pass had the same output checksum. These local M4 measurements do not
+establish a production whole-turn speedup or a strength gain; default capacity
+remains zero pending the relevant timing gate.
+
+A supplemental complete-game replay used 12 already-controlled games in each
+arm, twice in counterbalanced order (48 replays). Every trajectory still matched.
+Original mean wall time was 23.604 seconds versus 22.454 seconds cached, an
+observed 4.87% reduction on this small replay. Neural prediction occupied only
+2.69% of original wall time: its measured 168 ms saving accounts directly for
+about 0.71% of original total time. Do not attribute the larger whole-game wall
+difference entirely to saved matrix work, or generalize two passes into a
+production performance guarantee. This cache alone does not fund materially
+deeper whole-turn search.
+
+### Draw-aware training payoff and limited archived-label audit
+
+`paired_root_loss()` now supports `payoff_weighting="magnitude"`, registered by
+the trainer as `pairPayoffWeighting: "magnitude"`. The historical `"sign"` mode
+remains the default. A win/loss difference receives twice the weight of a
+draw/loss difference. In a closed eight-world example, action A wins four
+comparisons by 0.5, loses three by 1 and ties once: counting favorable worlds
+prefers A although its expected score is 0.125 lower. Magnitude weighting corrects
+that gradient. Both weighting modes are exactly identical on binary terminal
+data. Fractional normalization preserves a full informative-root contribution
+when only one draw/loss contrast exists. Receipts distinguish integer non-tied
+comparison counts from effective payoff weight. No new fit is claimed here.
+
+A separate functional counterexample demonstrates that arithmetic ensemble
+pair-loss can improve by raising an unlabeled student's logit: changing its
+softmax normalizer changes the members' relative influence without changing either
+compared student logit. Mean-logit differences remove this particular gradient
+shortcut. This is a property of the objective, not evidence that it caused a
+previous candidate's regression, and it does not rescue the failed pooling trial.
+
+The available archived 84-scenario coverage pilot contains 768 paired
+continuation games, 19 usable training roots and 14 validation roots. All input
+hashes were verified. Only eight training and seven validation roots had terminal
+contrast. Selecting and evaluating on the same eight futures optimistically
+estimated +8.22 and +4.91 score points. Averaging all 70 four/four world splits
+reduced these estimates to +4.92 and +2.50 points; the conditional root-bootstrap
+validation interval is -1.63 to +8.11. These are local oracle diagnostics on a
+small, selected pilot, not a learned policy or gameplay win-rate improvement.
+Seven usable roots in each split had the historical requested-phase fallback,
+already excluded by the later strict collector. No sign/payoff preference
+reversal occurred in this tiny pilot; it cannot establish how common the
+counterexample is in the larger remote training corpus.
+
+Generated observations, full manifests and results remain ignored under the
+client's `game/core/tmp`. The local study suffixes are
+`v09-local-eligible-pool-20261106T191707Z` and
+`v09-local-entity-cache-20261106T193749Z`. Pooling registration identity:
+`fbf8d4224e44a665349983a86c7afcec3d89c0a30b984d3b7f6501f3840b1f51`.
+The original frozen source archive identity is
+`d8954461a5c648e2efd1425361188c19ca35cf8dfdae790c70fb6fcea234115a`.
+
+## Current-A19 transfer and independent-root objective — November 6, 2026 UTC
+
+The user authorized continued combat research on the RTX 5090. The target is a
+measured improvement over the complete A19 controller, including its shipped
+two-model neural correction and placement, within the original decision compute
+budget or at most 10% more. Research results retain their actual engine identity.
+
+| Completed candidate                              | Opponent engine       | Games | Draw-aware score | Whole-board 95% interval |
+| ------------------------------------------------ | --------------------- | ----: | ---------------: | ------------------------ |
+| Previously locked next-fit checkpoint `e03eda8d` | Current `d62f5ae` A19 |   864 |           50.17% | 47.86–52.55%             |
+| Strict feature-adapter finalist `99a5a03d`       | Frozen `d0fb4437` A19 |   768 |           47.79% | 46.09–49.48%             |
+
+Neither candidate passed its development gate. Their confirmation banks remain
+unopened, and neither artifact is promoted. The current-engine transfer passed
+128 CPU prediction references, candidate/entity permutation checks, 12 complete
+warm-start control games and 1,208 restoration checks before strength evaluation;
+its maximum prediction discrepancy was below 0.000002. The older checkpoint has
+no named Luck Blessing feature columns. Its trained column meanings are preserved
+explicitly; current public status information still reaches the unchanged base
+observation. This compatibility projection is part of that transfer experiment.
+
+The strict acquisition completed all 1,536 registered scenarios and 13,464 paired
+continuation battles, preserving missing roots without refills or outcome
+filtering. Its 593 usable roots produced 383 training and 210 validation rows,
+with all eight futures retained for each labeled action. Four matched rank-zero
+and rank-four fits completed on the approved 5090 in 96.88 seconds of fit-stage
+wall time. The validation-selected rank-four model reduced comparison-weighted
+loss from 0.64222 to 0.62610, while average informative-root loss worsened from
+0.63249 to 0.63391. Only 58 validation roots had non-tied terminal comparisons.
+This disagreement motivates a new objective experiment; it does not establish
+the cause of the full-game regression.
+
+The research trainer now supports an explicit `pairLossWeighting: "roots"`
+registration. It gives each informative decision one unit of loss weight while
+retaining its paired worlds and action comparisons inside that decision. The
+original comparison-weighted mode remains the default. Both losses are recorded
+in receipts. Root-weighted checkpoint selection additionally requires observed
+labels for every served gate choice and nonnegative average paired terminal gain
+against the recorded baseline choice. Unknown catalog choices receive no invented
+outcome. Confidence margin one, warm-teacher CE tolerance 0.03, minimum validation
+improvement 0.005 and the four matched recipes remain fixed.
+
+The new cycle reuses the sealed completed labels and qualified initialization;
+its 34 CPU functional tests and fresh gradient/fold/inference admission passed.
+One validation-locked finalist may enter a new balanced-doctrine current-engine
+comparison: 864 development games, then 3,132 untouched games only after at least
+55% score with the lower whole-board 95% bound above 50%. Previous development
+banks are excluded. Production timing remains a separate model-bound gate on a
+quiet production CPU. This research patch changes no shipped combat profile.
+
+## Completed 5090 sweep and iteration speedups — November 2, 2026 UTC
+
+The registered 192-teacher sweep, four student development evaluations and both
+queued GPU experiment jobs completed. **The best new student won 53.52% of its
+768 development games against the frozen A19 R2 baseline. The previous reference
+won 54.04%; this sweep did not establish a stronger replacement or reach the 75%
+win-rate target.** No model was promoted and the untouched student banks remain
+sealed. These results use the frozen research engine, not subsequent mainline
+changes.
+
+All GPU work used one RTX 5090. Workers pin the approved device UUID and require
+exactly one visible CUDA device before allocation; sequential GPU jobs hold the
+same exclusive lock. Development evaluation is CPU-only. The authorization cutoff
+is November 2, 08:00 UTC; this report does not extend that authorization.
+
+### Game counts and strength
+
+Each new student completed the same 192 development boards with four games per
+board: **768 games per candidate, 3,072 candidate-game evaluations across four
+candidates**. These are paired comparisons on a shared bank, not 3,072 independent
+board setups. Smoke tests and performance replays are separate from this count.
+The 192 teacher fits are training experiments, not 192 additional game banks.
+
+| Student recipe / reference | Wins | Losses | Draws | Raw win rate | Draw-aware score |
+| -------------------------- | ---: | -----: | ----: | -----------: | ---------------: |
+| `cf85d3b9dc37`             |  406 |    352 |    10 |       52.86% |           53.52% |
+| `7e9b9ed69458`             |  411 |    351 |     6 |       53.52% |           53.91% |
+| `ba817b8a5134`             |  401 |    358 |     9 |       52.21% |           52.80% |
+| `8539c26d7c62`             |  404 |    354 |    10 |       52.60% |           53.26% |
+| Prior lower-LR reference   |  415 |    345 |     8 |       54.04% |           54.56% |
+
+Raw win rate is wins / 768; draw-aware score is (wins + half the draws) / 768.
+The best new student's board-bootstrap 95% score interval is 51.95–55.92%.
+The reference interval is 52.73–56.45%. These are score intervals, not raw-win
+intervals or a paired significance test. The numerical difference between the
+two point estimates does not establish which model is stronger. The separate
+6,000-game primary and 3,000-game R4 student confirmation banks were not opened.
+
+### Validated CPU evaluation layout
+
+Six counterbalanced arms replayed the same 64 games: one pool of four, one pool
+of eight, two pools of four, then the reverse order. All 384 replayed game records
+and trajectories matched after excluding timing fields. Mean wall times were
+321.326 seconds, 204.130 seconds and 192.886 seconds respectively. Two four-worker
+pools used **39.97% less wall time than one four-worker pool** and 5.51% less than
+one eight-worker pool. The former comparison uses twice as many simulation
+workers; the latter keeps the same eight-worker total.
+
+A separate complete 192-board / 768-game run with two four-worker pools took
+1,710.010 seconds (28.50 minutes), with all records and trajectories matching the
+reference. There is no fresh full-bank four-worker timing to pair with that
+absolute duration. A subsequent new student's development shards took 28.22
+minutes before the summary merge. Timing replays add no independent strength
+evidence.
+
+The reusable `python/a19_development_controller.py` now defaults to two processes
+with four workers each and caps development at eight workers. The smoke stage
+uses one pool with at most three workers, preserving all three boards. The native
+evaluator still validates the original manifest, owns disjoint board ranges and
+merges the complete bank. Export, simulation and summary subprocesses have empty
+CUDA visibility; simulation children use one Bun GC marker. Existing resource
+admission, yielding, accepted-board recovery and confirmation isolation remain.
+This default is justified for the measured Puffalo development workload, not as a
+general claim that two pools are fastest on every host.
+
+### Shorter stopping and GPU backend experiments
+
+The fixed candidate rule uses at least 16 epochs, patience 12 and minimum
+validation improvement 0.0001. It retained the selected checkpoint on all 64
+previously untouched recipe histories. Their observed prefixes estimate 37.42%
+less active fitting time. This is a counterfactual estimate, not measured whole-job
+speed. A more aggressive 12-epoch / patience-eight rule changed two selections in
+the 96-fit exploratory bank and was rejected.
+
+Three actual shortened reruns, one each at 6.1M, 32.8M and 94.4M parameters,
+reproduced every selected weight tensor bit-for-bit and validation exactly. They
+used 415.036 seconds of active fitting in total versus 762.075 seconds in their
+historical originals: **45.54% less active fitting time**. Batch sizes were reused
+from the matching originals and the original learning-rate horizon was preserved.
+This is not a fresh paired end-to-end benchmark. Do not change stopping defaults
+for a different corpus or architecture based on this result.
+
+The portable `python/a19_early_stop_replay.py` reproduces the read-only history
+analysis without importing Torch, fitting a model or changing any checkpoint. It
+rejects inconsistent histories, recipe/checkpoint mismatches and nonfinite
+metrics. Rejected histories prevent an all-checkpoints-preserved result. Supply
+an exported evidence object containing `registration` and completed `teachers`
+with their epoch histories, and a rule registration bound to the original sweep:
+
+```bash
+python3 src/simulation/v0_9/python/a19_early_stop_replay.py \
+    --evidence "$HOC_V09_EVIDENCE" \
+    --registration "$HOC_V09_STOP_RULE" \
+    --out "$HOC_V09_REPLAY_RESULT"
+python3 -m unittest discover -s src/simulation/v0_9/python -p 'test_a19_early_stop_replay.py'
+python3 -m unittest discover -s src/simulation/v0_9/python -p 'test_a19_development_controller.py'
+```
+
+The short backend probe used eight reversed-order arms, batch 2,048 and a 32.8M
+teacher, with two warmup and 12 measured steps per arm. BF16 math and BF16 fused
+attention achieved 1.411× and 1.567× the native training-step throughput. Weights
+and optimizer state remained FP32. These are short-probe results; BF16 still needs
+complete-fit and game-quality validation and is not enabled by this change.
+Both compiled arms failed because the host lacked Python 3.12 `Python.h`; the six
+other arms completed. A completed experiment job does not mean every backend
+passed.
+
+Source-bound evidence identities:
+
+- Original sweep: `d14553089ce0b36300c159025b189eb3c7ae8c4c97746f210610830bfb638c1a`.
+- Frozen evaluation source: `71c2547c12b797e9d88cd319a7cefb2a8a5ea8a9690b1fa883f594c0c5388470`.
+- Prospective stopping admission: `d443d2c0bb7455ba2b82064e590ca91885e9721a36e4c5a5ab35147866325ef2`.
+- Shortened-fit registration: `1332b8b80dd00e6b3caa3144c38b9c0e55c6ef09ba6b0bbac3e0d3736ee61d3f`.
+- Backend-probe registration: `7120cd30bbfe9b408c0609c5a3dbdc0fa61ee3b803a56101e664ee9b9062795a`.
+- Completion evidence file: `d840118ea5c5bbe426924801b4342060a8a8085faf7ea34ac99f793e5af28852`.
+
+The campaign-relative evidence directories are `overnight-12h-20261101`,
+`next-iteration-performance-20261101`, and `speedup-trial-20261101`. Generated
+models, raw games, histories and result JSON stay outside Git. Local research
+receipts remain under `game/core/tmp/v09-independent-20261027` in the client
+checkout. The sections below preserve the earlier campaign history and original
+qualification requirements; they are not a claim that the newly tested models
+passed production qualification.
+
+## Earlier campaign history — October 27–28, 2026 UTC
+
 Research plan updated on 2026-10-27 UTC. Target: train on Puffalo's approved RTX 5090 and beat the current complementary-R2 A19 controller. **Two repaired-source 5090 fits completed. The fixed all-family correction scores 53.58% on 768 development games (95% board interval 51.69–55.53%); untouched confirmation and production timing remain unqualified. Independent research and further bounded training are authorized through Sunday, November 1 at 11:59 p.m. Pacific.** No research artifact is promoted automatically.
 
 The first budget is a 48-hour proof of progress. Report CPU actor time, learner time and time waiting for GPU access separately. GPU visibility and SSH access have returned. The approved UUID-pinned CUDA device identifies as RTX 5090. Earlier OS-blocked visibility and subsequent SSH timeouts are historical observations.

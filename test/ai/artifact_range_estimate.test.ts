@@ -4,7 +4,7 @@ import { hasDoubleShotAbility } from "../../src/abilities/ability_helper";
 import type { IDecisionContext } from "../../src/ai/ai_strategy";
 import { enumerateCandidates, evaluateRangeCandidateDamage } from "../../src/ai/candidates";
 import { selectV08DirectCombatCandidate, selectV08SplashRangedCandidate } from "../../src/ai/versions/v0_8";
-import { Tier2Artifact } from "../../src/artifacts/artifact_properties";
+import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { getEffectConfig, getSpellConfig } from "../../src/configuration/config_provider";
 import { Effect } from "../../src/effects/effect";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
@@ -37,6 +37,7 @@ function scenario(
         shield?: "primary" | "secondary" | "both";
         fire?: boolean;
         damage?: number;
+        wounding?: boolean;
     } = {},
 ) {
     const { rolls, team = LEFT, direction = { x: 1, y: 0 } } = options;
@@ -92,10 +93,11 @@ function scenario(
             : { x: primaryCell.x + direction.x * 2, y: primaryCell.y + direction.y * 2 },
     );
     const fight = FightStateManager.getInstance().getFightProperties();
+    if (options.wounding) fight.setArtifactPerTeam(team, 1, Tier1Artifact.WOUNDING_CHARM);
     if (echo) {
         fight.setArtifactPerTeam(team, 2, Tier2Artifact.QUIVER_OF_ECHOES);
-        combat.unitsHolder.applyArtifacts(fight);
     }
+    if (echo || options.wounding) combat.unitsHolder.applyArtifacts(fight);
     if (options.endless) combat.unitsHolder.refreshStackPowerForAllUnits();
     primary.trySeedWaterShield();
     secondary.trySeedWaterShield();
@@ -183,6 +185,17 @@ afterEach(() => setDeterministicRandomSource(undefined));
 describe("artifact ranged estimates follow the resolver's ammunition rules", () => {
     for (const kind of ["ordinary", "area", "through"] as const) {
         for (const double of [false, true]) {
+            test.each([undefined, "both"] as const)(`${kind} Wounding Charm, double=${double}, shield=%s`, (shield) => {
+                const base = scenario(kind, 20, "none", double, false, { wounding: true, shield });
+                const echo = scenario(kind, 20, "none", double, true, { wounding: true, shield });
+                expect(base.estimate).toBeCloseTo(base.actual, 8);
+                expect(echo.estimate).toBeCloseTo(base.actual * (1 - echo.chance) + echo.actual * echo.chance, 8);
+            });
+        }
+    }
+
+    for (const kind of ["ordinary", "area", "through"] as const) {
+        for (const double of [false, true]) {
             for (const shield of ["primary", "secondary", "both"] as const) {
                 test.each([1, 2, 3])(`${kind} shield=${shield}, double=${double}, %i arrows`, (shots) => {
                     const base = scenario(kind, shots, "primary", double, false, { shield });
@@ -205,6 +218,31 @@ describe("artifact ranged estimates follow the resolver's ammunition rules", () 
                         const result = scenario("ordinary", shots, "primary", double, true, {
                             rolls,
                             shield: "primary",
+                        });
+                        estimate = result.estimate;
+                        return result.actual;
+                    } catch (error) {
+                        if (!(error instanceof NeedsRoll)) throw error;
+                        return 0.5 * resolve([...rolls, 0]) + 0.5 * resolve([...rolls, 99]);
+                    }
+                };
+                expect(resolve([])).toBeCloseTo(estimate, 8);
+            },
+        );
+    }
+
+    for (const shield of [undefined, "primary"] as const) {
+        test.each([1, 2, 3])(
+            `Wounding Charm tracks misses and surviving ammunition, shield=${shield}, %i arrows`,
+            (shots) => {
+                let estimate = 0;
+                const resolve = (rolls: number[]): number => {
+                    expect(rolls.length).toBeLessThan(10);
+                    try {
+                        const result = scenario("ordinary", shots, "primary", true, true, {
+                            rolls,
+                            shield,
+                            wounding: true,
                         });
                         estimate = result.estimate;
                         return result.actual;
