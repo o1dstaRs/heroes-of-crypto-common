@@ -561,6 +561,8 @@ interface IRankedDraftGameDependencies {
     /** Offline research only; called for the candidate at the real, public Tier-2 decision. */
     researchCandidateTier2Choice?: ResearchRankedTier2Choice;
     researchCandidateDraftChoices?: IRankedDraftResearchChoices;
+    /** A separate stateful policy per opponent seat; needed for matched default-vs-default combat research. */
+    researchOpponentDraftChoices?: IRankedDraftResearchChoices;
 }
 
 const DEFAULT_DEPENDENCIES: IRankedDraftGameDependencies = { matchRunner: runMatch };
@@ -1548,10 +1550,15 @@ export function playRankedDraftGame(
         {
             ...rankedDraftPickRules(options, gridType, synergyVariants),
             liveSequentialBundles: dependencies.liveSequentialBundles,
-            ...(dependencies.researchCandidateDraftChoices
+            ...(dependencies.researchCandidateDraftChoices || dependencies.researchOpponentDraftChoices
                 ? {
                       researchDraftChoicesByTeam: {
-                          [candidatePickedLeft ? LEFT : RIGHT]: dependencies.researchCandidateDraftChoices,
+                          ...(dependencies.researchCandidateDraftChoices
+                              ? { [candidatePickedLeft ? LEFT : RIGHT]: dependencies.researchCandidateDraftChoices }
+                              : {}),
+                          ...(dependencies.researchOpponentDraftChoices
+                              ? { [candidatePickedLeft ? RIGHT : LEFT]: dependencies.researchOpponentDraftChoices }
+                              : {}),
                       },
                   }
                 : {}),
