@@ -101,6 +101,24 @@ def check_gpu_environment() -> None:
     require(os.environ.get("CUDA_VISIBLE_DEVICES") == GPU_UUID, "Set the approved RTX 5090 UUID before GPU training")
 
 
+def check_pair_objective(reg: dict[str, Any]) -> dict[str, Any]:
+    """Validate the complete loss recipe before Torch/CUDA or output creation."""
+    weighting = reg.get("pairLossWeighting", "comparisons")
+    require(weighting in ["comparisons", "roots"], "Unknown paired-root objective")
+    payoff = reg.get("pairPayoffWeighting", "sign")
+    require(payoff in ["sign", "magnitude"], "Unknown paired-root payoff objective")
+    objective = reg.get("pairLossObjective", "paired-preference")
+    require(objective in ["paired-preference", "score-difference"], "Unknown paired-root loss objective")
+    scale = reg.get("pairScoreScale")
+    if objective == "score-difference":
+        require(weighting == "roots" and payoff == "sign", "Score differences require equal roots and no preference-weight modifier")
+        require(type(scale) in [int, float] and math.isfinite(scale) and scale > 0,
+                "Register a finite positive score-difference scale")
+    else:
+        require(scale is None, "Score scale only applies to the score-difference objective")
+    return {"weighting": weighting, "payoffWeighting": payoff, "objective": objective, "scoreScale": scale}
+
+
 def check_fit_design(reg: dict[str, Any]) -> None:
     recipes = reg["recipes"]
     require(len(recipes) == reg["maximumFits"] == 4, "Four matched preregistered recipes required")

@@ -6,7 +6,7 @@ import torch
 from torch.nn import functional as F
 
 from a19_model import A19ProposalModel
-from a19_feature_adapter import (A19FeatureAdapterModel, paired_gate_gain, paired_root_loss, roots_with_terminal_contrast,
+from a19_feature_adapter import (A19FeatureAdapterModel, fixed_partner_gate_ceiling, paired_gate_gain, paired_root_loss, paired_score_difference_loss, roots_with_terminal_contrast,
                                  served_gate_choices, served_policy)
 
 torch.set_num_threads(2)
@@ -230,6 +230,126 @@ class FeatureAdapterTests(unittest.TestCase):
         self.assertGreater(float(utility_gradient[0, 0]), 0, "utility preference correctly lowers A")
         self.assertEqual(int(details["nonTiedComparisons"]), 7)
         self.assertEqual(float(details["effectiveComparisonWeight"]), 5)
+
+    def test_fixed_partner_can_make_a_correction_impossible_for_any_student(self):
+        fixed = torch.tensor([[8., 0.]], dtype=torch.float64)
+        legal = torch.ones(1, 2, dtype=torch.bool)
+        native, eligible = torch.tensor([0]), torch.tensor([[0, 1]])
+        capacity = fixed_partner_gate_ceiling(fixed, legal, native, eligible)
+        self.assertEqual(capacity["blocked"].tolist(), [[False, True]])
+        # Even a numerically one-hot perfect student cannot cross margin one.
+        student = torch.tensor([[-80., 80.]], dtype=torch.float64)
+        served = served_policy(student, fixed, legal)
+        gain = float(served[0, 1] - served[0, 0])
+        self.assertAlmostEqual(gain, float(capacity["maximumLogitGain"][0, 1]), places=12)
+        self.assertLess(gain, 1)
+        self.assertEqual(int(served_gate_choices(served, native, eligible)[0]), 0)
+        # Updating both existing members removes this ceiling, without an extra
+        # serving operator or a lower confidence margin. This is not a trained fit.
+        joint = served_policy(student, student, legal)
+        self.assertEqual(int(served_gate_choices(joint, native, eligible)[0]), 1)
+
+    def test_gate_ceiling_bounds_random_students_and_respects_the_complete_catalog(self):
+        fixed = torch.tensor([[0., .2, -1., 4.], [1., -1., .5, 2.]], dtype=torch.float64)
+        legal = torch.ones_like(fixed, dtype=torch.bool)
+        native, eligible = torch.tensor([0, 2]), torch.tensor([[0, 1, -1], [2, 0, 1]])
+        ceiling = fixed_partner_gate_ceiling(fixed, legal, native, eligible)
+        reduced = fixed_partner_gate_ceiling(fixed[0:1, :2], legal[0:1, :2], torch.tensor([0]), torch.tensor([[0, 1]]))
+        self.assertGreater(float(ceiling["maximumLogitGain"][0, 1]), float(reduced["maximumLogitGain"][0, 1]))
+        for _ in range(16):
+            student = torch.randn_like(fixed) * 10
+            mixed = served_policy(student, fixed, legal)
+            gains = mixed - mixed.gather(1, native[:, None])
+            self.assertTrue((gains[ceiling["eligible"]] <= ceiling["maximumLogitGain"][ceiling["eligible"]] + 1e-12).all())
+        self.assertTrue(torch.isneginf(ceiling["maximumLogitGain"][~ceiling["eligible"]]).all())
+
+    def test_gate_ceiling_retains_native_and_handles_padding_and_large_logits(self):
+        fixed = torch.tensor([[10000., 10000., float("nan")]], dtype=torch.float64)
+        legal = torch.tensor([[True, True, False]])
+        result = fixed_partner_gate_ceiling(fixed, legal, torch.tensor([1]), torch.tensor([[1, 0, -1, -1]]))
+        self.assertEqual(result["eligible"].tolist(), [[True, True, False]])
+        self.assertEqual(result["blocked"].tolist(), [[False, False, False]])
+        self.assertAlmostEqual(float(result["maximumLogitGain"][0, 0]), float(torch.log(torch.tensor(3., dtype=torch.float64))), places=12)
+        self.assertEqual(float(result["maximumLogitGain"][0, 1]), 0)
+        for eligible in [torch.tensor([[1, 1]]), torch.tensor([[0, 2]]), torch.tensor([[0, -1]]), torch.tensor([[1, 3]])]:
+            with self.assertRaises(ValueError):
+                fixed_partner_gate_ceiling(fixed, legal, torch.tensor([1]), eligible)
+        with self.assertRaises(ValueError):
+            fixed_partner_gate_ceiling(fixed, legal, torch.tensor([1]), torch.tensor([[1, 0]]), minimum_gain=0)
+
+    def test_identical_marginal_scores_can_give_opposite_preference_gradients_at_the_gate(self):
+        returns = torch.tensor([[[1., 1., 1., 1., 1., 0., 0., 0.],
+                                 [1., 1., 1., 0., 0., 0., 0., 0.]]])
+        permuted = returns.clone()
+        permuted[0, 1] = torch.tensor([0., 0., 0., 0., 0., 1., 1., 1.])
+        self.assertTrue(torch.equal(returns.mean(-1), permuted.mean(-1)))
+        policy = torch.tensor([[1., 0.]], requires_grad=True)
+        actions, mask = torch.tensor([[0, 1]]), torch.ones(1, 2, dtype=torch.bool)
+        left, _ = paired_root_loss(policy, actions, returns, mask, weighting="roots", payoff_weighting="magnitude")
+        right, _ = paired_root_loss(policy, actions, permuted, mask, weighting="roots", payoff_weighting="magnitude")
+        self.assertLess(float(torch.autograd.grad(left, policy)[0][0, 0]), 0)
+        self.assertGreater(float(torch.autograd.grad(right, policy)[0][0, 0]), 0)
+        # The direct score-gap objective has identical loss and gradient.
+        first, _ = paired_score_difference_loss(policy, actions, returns, mask, score_scale=.1)
+        second, _ = paired_score_difference_loss(policy, actions, permuted, mask, score_scale=.1)
+        self.assertTrue(torch.equal(first, second))
+        self.assertTrue(torch.equal(torch.autograd.grad(first, policy)[0], torch.autograd.grad(second, policy)[0]))
+
+    def test_score_gap_objective_has_explicit_scale_and_equal_root_weight(self):
+        policy = torch.tensor([[2.5, 0.], [0., 0.]], requires_grad=True)
+        actions, mask = torch.tensor([[0, 1]] * 2), torch.ones(2, 2, dtype=torch.bool)
+        returns = torch.tensor([[[1., 1., 1., 1., 1., 0., 0., 0.], [1., 1., 1., 0., 0., 0., 0., 0.]],
+                                [[1.] * 8, [0.] * 8]])
+        loss, details = paired_score_difference_loss(policy, actions, returns, mask, score_scale=.1)
+        self.assertEqual(float(loss.detach()), 50)
+        self.assertEqual(details["perRootLoss"].tolist(), [0., 100.])
+        repeated, _ = paired_score_difference_loss(policy, actions, returns.repeat_interleave(2, -1), mask, score_scale=.1)
+        self.assertTrue(torch.equal(loss, repeated))
+        self.assertTrue(torch.equal(torch.autograd.grad(loss, policy)[0], torch.autograd.grad(repeated, policy)[0]))
+        integral, _ = paired_score_difference_loss(policy, actions, returns.to(torch.int64), mask, score_scale=.1)
+        self.assertTrue(torch.equal(loss, integral))
+        for scale in [0, -1, float("inf"), float("nan")]:
+            with self.assertRaisesRegex(ValueError, "scale"):
+                paired_score_difference_loss(policy, actions, returns, mask, score_scale=scale)
+
+    def test_score_gap_objective_ignores_unknown_actions_padding_and_equal_marginal_roots(self):
+        policy = torch.tensor([[1., 2., 30.]], requires_grad=True)
+        actions, mask = torch.tensor([[0, 1, -1]]), torch.tensor([[True, True, False]])
+        returns = torch.tensor([[[1., 0.], [0., 1.], [float("nan")] * 2]])
+        zero, details = paired_score_difference_loss(policy, actions, returns, mask, score_scale=.2)
+        self.assertEqual(float(zero.detach()), 0)
+        self.assertEqual(int(details["informativeRoots"]), 0)
+        zero.backward()
+        self.assertTrue(policy.grad.eq(0).all())
+        policy.grad = None
+        returns[0, 0] = 1
+        loss, _ = paired_score_difference_loss(policy, actions, returns, mask, score_scale=.2)
+        loss.backward()
+        self.assertEqual(float(policy.grad[0, 2]), 0)
+
+    def test_score_gap_gradients_reach_the_actual_adapter_and_preserve_export(self):
+        model = self.model()
+        with torch.no_grad():
+            fixed = self.old(self.entities[:, :, :9], *self.inputs[1:])[0]
+        actions, mask = torch.tensor([[0, 1]] * 2), torch.ones(2, 2, dtype=torch.bool)
+        returns = torch.tensor([[[1.] * 8, [0.] * 8], [[0.] * 8, [1.] * 8]])
+        def objective():
+            return paired_score_difference_loss(served_policy(model(*self.inputs)[0], fixed, self.legal),
+                                                actions, returns, mask, score_scale=.1)[0]
+        optimizer = torch.optim.SGD([p for p in model.parameters() if p.requires_grad], lr=.001)
+        before = objective()
+        optimizer.zero_grad()
+        before.backward()
+        self.assertGreater(float(model.entity[0].up.grad.abs().sum()), 0)
+        self.assertGreater(float(model.policy.weight.grad.abs().sum()), 0)
+        self.assertTrue(all(p.grad is None for p in self.old.parameters()))
+        torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad], 1.)
+        optimizer.step()
+        self.assertLess(float(objective().detach()), float(before.detach()))
+        model.check_frozen_parameters()
+        folded = model.folded_model()
+        for actual, expected in zip(folded(*self.inputs), model(*self.inputs)):
+            torch.testing.assert_close(actual, expected, atol=2e-6, rtol=2e-5)
 
     def test_single_half_score_contrast_retains_one_full_root_weight(self):
         policy = torch.tensor([[0., 2.]], requires_grad=True)

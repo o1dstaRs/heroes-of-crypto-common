@@ -1,5 +1,126 @@
 # v0.9 training against current A19 R2
 
+## Frozen-member ceiling and marginal-score objective — November 7, 2026 UTC
+
+Local research found two constraints in the training problem. Neither is a new
+strength result. No model was trained or promoted in this cycle; the locked
+v0.9 draft plus A19 combat remains the default.
+
+### An unchanged ensemble member can make a correction impossible
+
+Let `f` be the frozen member's complete-catalog probability distribution, `s`
+an arbitrarily capable replacement student's distribution, and `q = (f + s)/2`
+the served ensemble. For a nonnative action `a` and native action `n`,
+
+```text
+q(a) / q(n) <= (1 + f(a)) / f(n)
+maximum log gain = log(1 + f(a)) - log(f(n))
+```
+
+This is a supremum over every possible student distribution, attained in the
+one-hot limit on `a`. A frozen architecture and trust constraints can reduce its
+achievable set further. If the bound is below margin one, improving that action's
+training loss cannot make the deployed selector choose it. Native remains a
+possible fallback. Normalizing only the eligible subset changes `f` and gives
+the wrong ceiling for the shipped arithmetic ensemble.
+
+`fixed_partner_gate_ceiling()` measures this bound with Float64 arithmetic and
+a conservative 0.000001 numerical buffer before declaring an action blocked.
+The trainer now records the fixed partner's capacity once per split, including
+blocked eligible actions, blocked label improvements and reused-label oracle
+ceilings. This diagnostic never filters training roots or substitutes for action
+quality. The recorded baseline must remain possible under the bound.
+
+The admitted historical 84-scenario pilot reproduced all 33 retained baseline
+predictions exactly with the promoted weights. Using batch256 as the frozen
+partner, as in the existing feature fits:
+
+| Split      | Usable roots | Eligible nonnative actions | Blocked actions | Actions improving over recorded baseline in labels | Blocked improvements |
+| ---------- | -----------: | -------------------------: | --------------: | -------------------------------------------------: | -------------------: |
+| Train      |           19 |                         78 |              28 |                                                  6 |                    2 |
+| Validation |           14 |                         57 |              10 |                                                  4 |                    0 |
+
+This constrains the training signal in this small selected pilot. It does not
+explain the failed held-out result: none of its four better validation labels
+was structurally blocked. Reversing which member is frozen blocks one of six
+training improvements and none of four validation improvements. Jointly fitting
+both existing policy heads can remove this particular fixed-member obstruction
+without adding a serving operator, but no such trained model is claimed here.
+
+### World-pair preference is different from a mean-score target
+
+Even draw-magnitude preference weighting still depends on how futures are paired.
+Consider the same action A with scores `11111000` and action B with three wins:
+
+| B's paired order | Mean A | Mean B | Favorable / unfavorable comparisons | Pair-loss optimal logit gap |
+| ---------------- | -----: | -----: | ----------------------------------: | --------------------------- |
+| `11100000`       |  0.625 |  0.375 |                               2 / 0 | Positive infinity           |
+| `00000111`       |  0.625 |  0.375 |                               5 / 3 | `log(5/3) = 0.510826`       |
+
+At the serving threshold of one, the first arrangement's preference gradient
+raises A and the second lowers it. The marginal score gain is 0.25 in both.
+These permutations demonstrate a property of the objective; they are not new
+valid common-RNG worlds or evidence that the original paired collector is wrong.
+Pairing remains valuable for estimating uncertainty in score differences.
+
+Exhaustively rearranging the archived pilot's native labels finds threshold
+sensitivity in one of five positive training comparisons and two of three
+positive validation comparisons, spanning one family in each split. Those
+conditional counts are not population estimates or gameplay gains.
+
+The opt-in `pairLossObjective: "score-difference"` instead fits squared error
+between served logit differences and scaled marginal terminal-score differences,
+averaged equally over informative roots. All recorded labeled actions remain;
+unknown actions receive no target, and roots with equal marginal means contribute
+zero gradient. The original `"paired-preference"` objective remains the default.
+The new registration must explicitly choose `pairLossWeighting: "roots"` and a
+finite positive `pairScoreScale`; a preference-weight modifier is rejected.
+For example, scale 0.1 makes an exactly fitted logit gap of one represent ten
+match-score points. This is an illustrative scale, not a selected fit recipe.
+Loss values from this objective are not directly comparable with preference CE.
+Existing matched-recipe, teacher-preservation, observed-choice, fresh-game and
+production-timing gates still apply. The frozen-member ceiling also still applies.
+
+CPU functional tests cover the impossible-choice example, attainable bound,
+complete-catalog normalization, padding, permutations, equal-root weighting,
+explicit scale, unchanged marginal scores and invalid recipe admission. An actual
+row probe compared 66 Python ceilings against independent Bun references with a
+maximum discrepancy of `8.89e-16`. Loss and gradient were exactly unchanged after
+independently permuting each action's futures on all 33 real rows. These checks
+establish implementation properties, not learned-model strength.
+
+### Fixed consensus ablation: failed development gate
+
+A separate prospectively registered ablation retained an existing A19 neural
+correction only when both original model members supported that same action at
+individual logit margin one. Otherwise it returned the native searched decision.
+It proposed no new corrections, changed no weights and added no rollouts.
+
+The immutable engine was `babdd2ab`, with the same combat decision rule as
+`9ccf9207`, using registered draft `ranked-unit-strength-a19-side-v4-w16-r4` and
+setup `artifact-fit-v6:conditional-v1:sniper+t2a19`. This combat screen holds its
+draft policy fixed; it is not a qualification of the separately bound locked-V3
+production draft. Three maps, all nine doctrine pairs, physical sides and draft
+seats were balanced. Admission completed 36 games, with 12 stock/reference pairs,
+12 candidate control games, five exercised vetoes and 906 restoration checks.
+
+| Games | Boards | Wins | Draws | Losses | Draw-aware score | Whole-board 95% interval |
+| ----: | -----: | ---: | ----: | -----: | ---------------: | ------------------------ |
+|   864 |    216 |  412 |     9 |    443 |           48.21% | 45.83–50.64%             |
+
+The candidate made 16,361 neural calls and vetoed 529 of 2,839 original proposals
+along its own trajectories. There were zero rejected actions. It failed the
+registered 55% score / positive lower-bound gate. The separate 6,048-game bank
+remains unopened, and timing is unqualified. Do not rescue the rule with a
+posthoc subgroup or weaker margin.
+
+Generated evidence stays ignored under the client's `game/core/tmp`, in
+`v09-local-consensus-20261107T002732Z` and
+`v09-combat-current-a19-20261106`. Consensus registration identity:
+`e0c2bb4f5bd609ddbb3b262f86e2f515e2e83ca0506b816c025abc18b91ca5f1`.
+The 33-row archived-input identity is
+`7132fd2ed1f3788e24857b61fad0453e66a8732efe2cccfe2356ca9bb29da88a`.
+
 ## Local pooling, exact reuse and objective audit — November 6, 2026 UTC
 
 This cycle runs locally against the immutable `9ccf9207` engine, with its complete
@@ -7,6 +128,8 @@ shipped A19 combat, two neural members, live ranked draft/setup, sideboard,
 doctrines, splits and synergies. Subsequent shared-working-tree balance edits are
 outside this experiment. The user-selected locked v0.9 draft plus A19 combat
 remains the default. None of the changes below promotes a combat checkpoint.
+These local combat screens hold the registered draft policy fixed; they do not
+qualify the separately bound locked-V3 production draft.
 
 ### Eligible mean-logit pool: failed strength gate
 

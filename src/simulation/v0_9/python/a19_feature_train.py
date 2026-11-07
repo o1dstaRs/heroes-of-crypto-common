@@ -13,7 +13,7 @@ import signal
 import subprocess
 import time
 
-from a19_feature_admission import (GPU_UUID, GIB, admit_gpu, check_fit_design, check_gpu_environment, check_memory, gpu_snapshot,
+from a19_feature_admission import (GPU_UUID, GIB, admit_gpu, check_fit_design, check_pair_objective, check_gpu_environment, check_memory, gpu_snapshot,
                                    check_window, load_registration, memory_snapshot, read, require, sha, verify_files)
 from a19_feature_data import validate_scenarios
 
@@ -30,10 +30,9 @@ def train(registration_path: Path) -> None:
     reg, auth = load_registration(registration_path)
     root = registration_path.resolve().parent
     check_fit_design(reg)
-    weighting = reg.get("pairLossWeighting", "comparisons")
-    require(weighting in ["comparisons", "roots"], "Unknown paired-root objective")
-    payoff_weighting = reg.get("pairPayoffWeighting", "sign")
-    require(payoff_weighting in ["sign", "magnitude"], "Unknown paired-root payoff objective")
+    objective_registration = check_pair_objective(reg)
+    weighting, payoff_weighting = objective_registration["weighting"], objective_registration["payoffWeighting"]
+    pair_objective, score_scale = objective_registration["objective"], objective_registration["scoreScale"]
     checks = read(root / reg["preflightReceipt"])
     require(checks["passed"] and checks["featurePathGradientPassed"] and checks["exportGateParityPassed"]
             and checks["strictCollectorPassed"], "Source-bound functional preflights required")
@@ -46,7 +45,7 @@ def train(registration_path: Path) -> None:
     import torch
     from torch.nn import functional as F
     from a19_model import A19ProposalModel
-    from a19_feature_adapter import (A19FeatureAdapterModel, paired_gate_gain, paired_root_loss,
+    from a19_feature_adapter import (A19FeatureAdapterModel, fixed_partner_gate_ceiling, paired_gate_gain, paired_root_loss, paired_score_difference_loss,
                                      roots_with_terminal_contrast, served_gate_choices, served_policy)
     torch.set_num_threads(2)
     torch.set_num_interop_threads(1)
@@ -76,6 +75,10 @@ def train(registration_path: Path) -> None:
     validate_scenarios(packs["train"]["scenarioTasks"] + packs["validation"]["scenarioTasks"], set())
     # Repeated world/action comparisons never satisfy a root-family readiness count.
     informative_train = roots_with_terminal_contrast(packs["train"]["returns"], packs["train"]["mask"])
+    if pair_objective == "score-difference":
+        mask = packs["train"]["mask"]
+        means = torch.where(mask[:, :, None], packs["train"]["returns"], 0).mean(-1)
+        informative_train = (means.masked_fill(~mask, -torch.inf).amax(-1) - means.masked_fill(~mask, torch.inf).amin(-1)) > 0
     require(int(informative_train.sum()) >= reg["minimumInformativeTrainRoots"], "Insufficient training information")
     require(not set(manifest["warmTrain"]["families"]) & set(manifest["warmValidation"]["families"]),
             "Warm teacher families overlap")
@@ -107,6 +110,38 @@ def train(registration_path: Path) -> None:
             pack[key] = [x.to("cuda") for x in pack[key]]
         for key in ["legal", "actions", "returns", "mask", "baseline", "eligibleOrder", "native", "baselineChoice"]:
             pack[key] = pack[key].to("cuda")
+
+    # The partner is immutable across every recipe. Measure its structural gate
+    # ceiling once; never filter roots or invent outcomes from this diagnostic.
+    gate_ceiling_reports = {}
+    with torch.no_grad():
+        for split in ["train", "validation"]:
+            pack = packs[split]
+            fixed = partner(pack["inputs"][0][:, :, :189], *pack["inputs"][1:])[0]
+            capacity = fixed_partner_gate_ceiling(fixed, pack["legal"], pack["native"], pack["eligibleOrder"])
+            require(bool((capacity["eligible"].gather(1, pack["actions"].clamp_min(0)) | ~pack["mask"]).all()),
+                    "Gate-ceiling labels must be eligible primary ties")
+            blocked = capacity["blocked"].gather(1, pack["actions"].clamp_min(0)) & pack["mask"]
+            baseline = (pack["actions"] == pack["baselineChoice"][:, None]) & pack["mask"]
+            require(bool((baseline.sum(-1) == 1).all()), "Gate ceiling needs the recorded baseline label")
+            require(not bool((blocked & baseline).any()), "Recorded served action violates frozen-partner ceiling")
+            means = torch.where(pack["mask"][:, :, None], pack["returns"], 0).mean(-1)
+            baseline_mean = (means * baseline).sum(-1, keepdim=True)
+            gain = means - baseline_mean
+            improving = (gain > 0) & pack["mask"]
+            oracle = gain.masked_fill(~pack["mask"], -torch.inf).amax(-1)
+            bounded_oracle = gain.masked_fill(~pack["mask"] | blocked, -torch.inf).amax(-1)
+            native_mask = torch.arange(pack["legal"].shape[1], device=pack["native"].device)[None, :] == pack["native"][:, None]
+            nonnative = capacity["eligible"] & ~native_mask
+            gate_ceiling_reports[split] = {
+                "roots": pack["rows"], "eligibleNonNativeActions": int(nonnative.sum()),
+                "blockedEligibleActions": int(capacity["blocked"].sum()),
+                "allNonNativeBlockedRoots": int(((capacity["blocked"] | ~nonnative).all(-1) & nonnative.any(-1)).sum()),
+                "observedImprovingActions": int(improving.sum()), "blockedImprovingActions": int((blocked & improving).sum()),
+                "allImprovingBlockedRoots": int(((blocked | ~improving).all(-1) & improving.any(-1)).sum()),
+                "sameWorldLabelOracleGain": float(oracle.mean()), "fixedPartnerLabelOracleGainCeiling": float(bounded_oracle.mean()),
+                "scope": "Reused-world diagnostic on recorded labels; not held-out strength or an action-quality filter"}
+            del fixed, capacity, blocked, baseline, means, baseline_mean, gain, improving, oracle, bounded_oracle, native_mask, nonnative
 
     def check_budget():
         nonlocal last_gpu_check
@@ -140,8 +175,11 @@ def train(registration_path: Path) -> None:
         with torch.no_grad():
             fixed = partner(pack["inputs"][0][:, :, :189], *pack["inputs"][1:])[0]
         policy = served_policy(student, fixed, pack["legal"])
-        loss, details = paired_root_loss(policy, pack["actions"], pack["returns"], pack["mask"],
-                                         weighting=weighting, payoff_weighting=payoff_weighting)
+        if pair_objective == "score-difference":
+            loss, details = paired_score_difference_loss(policy, pack["actions"], pack["returns"], pack["mask"], score_scale=score_scale)
+        else:
+            loss, details = paired_root_loss(policy, pack["actions"], pack["returns"], pack["mask"],
+                                             weighting=weighting, payoff_weighting=payoff_weighting)
         return loss, trust(policy, pack["baseline"], pack["legal"]), policy, details
 
     @torch.no_grad()
@@ -160,6 +198,8 @@ def train(registration_path: Path) -> None:
             ce += float(F.nll_loss(probability, columns[10])) * len(columns[10])
         return {"pairLoss": float(loss), "pairLossWeighting": weighting,
                 "pairPayoffWeighting": payoff_weighting,
+                "pairLossObjective": pair_objective, "pairScoreScale": score_scale,
+                "fixedPartnerGateCeiling": gate_ceiling_reports["validation"],
                 "comparisonWeightedLoss": float(details["comparisonWeightedLoss"]),
                 "equalInformativeRootLoss": float(details["equalInformativeRootLoss"]),
                 "nonTiedComparisons": int(details["nonTiedComparisons"]),
@@ -189,7 +229,7 @@ def train(registration_path: Path) -> None:
         tick = time.monotonic()
         destination = out / str(recipe["ordinal"])
         destination.mkdir()
-        exclusive(destination / "initial.json", before)
+        exclusive(destination / "initial.json", {**before, "trainingFixedPartnerGateCeiling": gate_ceiling_reports["train"]})
         for epoch in range(reg["maximumEpochs"]):
             check_budget()
             generator = torch.Generator(device="cpu").manual_seed(recipe["batchSeed"] + epoch)
@@ -265,6 +305,7 @@ def train(registration_path: Path) -> None:
         del cpu, unfolded_cpu, partner_cpu, references
         proof = {"complete": True, "recipe": recipe, "pairLossWeighting": weighting,
                  "pairPayoffWeighting": payoff_weighting,
+                 "pairLossObjective": pair_objective, "pairScoreScale": score_scale,
                  "before": before, "best": best, "bestEpoch": best_epoch,
                  "weightsUpdated": best_epoch >= 0, "pairImprovement": before["pairLoss"] - best["pairLoss"],
                  "modelFileSha256": sha(destination / "model.json"), "activeSeconds": time.monotonic() - tick,
@@ -280,7 +321,8 @@ def train(registration_path: Path) -> None:
         winner = min(eligible, key=lambda p: (p["best"]["pairLoss"], p["modelFileSha256"]))
         exclusive(out / "finalist-lock.json", {"ordinal": winner["recipe"]["ordinal"], "modelSha256": winner["modelFileSha256"],
                   "selection": "Validation locked before any development games; no fallback finalist",
-                  "pairLossWeighting": weighting, "pairPayoffWeighting": payoff_weighting, "promotion": False})
+                  "pairLossWeighting": weighting, "pairPayoffWeighting": payoff_weighting,
+                  "pairLossObjective": pair_objective, "pairScoreScale": score_scale, "promotion": False})
     exclusive(out / "complete.json", {"complete": True, "fits": proofs, "updatedCandidates": len(eligible),
               "newStrengthGames": 0, "promotion": False, "elapsedSeconds": time.monotonic() - started})
 
@@ -293,6 +335,7 @@ def main():
     reg, _ = load_registration(args.registration)
     root = args.registration.resolve().parent
     require(sha(Path(__file__)) == reg["trainerSha256"], "Trainer source changed")
+    check_pair_objective(reg)
     def stop(*_):
         raise InterruptedError("Owned feature trainer interrupted")
     signal.signal(signal.SIGINT, stop)

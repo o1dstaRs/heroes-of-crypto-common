@@ -6,9 +6,10 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
-from a19_feature_admission import GPU_UUID, check_fit_design, sha, verify_files
+from a19_feature_admission import GPU_UUID, check_fit_design, check_pair_objective, sha, verify_files
 
 
 class FeatureTrainerAdmissionTests(unittest.TestCase):
@@ -32,6 +33,21 @@ class FeatureTrainerAdmissionTests(unittest.TestCase):
             changed["recipes"][1][field] = value
             with self.subTest(recipeField=field), self.assertRaises(ValueError):
                 check_fit_design(changed)
+
+    def test_pair_objective_defaults_and_registered_score_scale(self):
+        self.assertEqual(check_pair_objective({}), {"weighting": "comparisons", "payoffWeighting": "sign",
+                                                  "objective": "paired-preference", "scoreScale": None})
+        self.assertEqual(check_pair_objective({"pairLossWeighting": "roots", "pairPayoffWeighting": "magnitude"})["objective"], "paired-preference")
+        config = {"pairLossWeighting": "roots", "pairLossObjective": "score-difference", "pairScoreScale": .1}
+        self.assertEqual(check_pair_objective(config)["scoreScale"], .1)
+        for field, value in [("pairLossObjective", "unknown"), ("pairScoreScale", None), ("pairScoreScale", 0),
+                             ("pairScoreScale", -1), ("pairScoreScale", float("nan")), ("pairScoreScale", float("inf")),
+                             ("pairScoreScale", True), ("pairScoreScale", ".1"), ("pairLossWeighting", "comparisons"),
+                             ("pairPayoffWeighting", "magnitude")]:
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                check_pair_objective({**config, field: value})
+        with self.assertRaises(ValueError):
+            check_pair_objective({"pairScoreScale": .1})
 
     def test_mutated_source_is_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -71,6 +87,25 @@ class FeatureTrainerAdmissionTests(unittest.TestCase):
             self.assertIn("remaining authorization", result.stderr)
             self.assertNotIn("torch", result.stderr)
             self.assertEqual({p.name for p in root.iterdir()}, {"authorization.json", "registration.json"})
+
+    def test_unscaled_score_objective_refused_before_torch_or_lease_creation(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            auth = root / "authorization.json"
+            auth.write_text(json.dumps({"authorized": True, "approvedGpuUuid": GPU_UUID,
+                                        "maximumGpus": 1, "promotionAllowed": False, "stopAtUnix": time.time() + 3600}))
+            trainer = Path(__file__).with_name("a19_feature_train.py")
+            reg = root / "registration.json"
+            reg.write_text(json.dumps({**self.design, "schema": "hoc.ai.a19.feature-cycle.v1", "promotionAllowed": False,
+                                       "authorization": auth.name, "authorizationSha256": sha(auth), "fitBudgetSeconds": 900,
+                                       "files": {auth.name: sha(auth)}, "trainerSha256": sha(trainer), "gpuLease": "gpu.lock",
+                                       "pairLossWeighting": "roots", "pairLossObjective": "score-difference"}))
+            result = subprocess.run([sys.executable, str(trainer), "--registration", str(reg)], text=True, capture_output=True,
+                                    env={**os.environ, "CUDA_VISIBLE_DEVICES": GPU_UUID}, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Register a finite positive", result.stderr)
+            self.assertNotIn("torch", result.stderr)
+            self.assertEqual({p.name for p in root.iterdir()}, {auth.name, reg.name})
 
 
 if __name__ == "__main__":

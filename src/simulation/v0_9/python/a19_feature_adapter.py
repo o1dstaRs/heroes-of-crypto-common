@@ -150,11 +150,59 @@ def served_gate_choices(policy: Tensor, native: Tensor, eligible_order: Tensor,
     return torch.where(gain >= minimum_gain, best, native)
 
 
+def fixed_partner_gate_ceiling(partner_logits: Tensor, legal: Tensor, native: Tensor,
+                              eligible_order: Tensor, minimum_gain: float = 1.) -> dict[str, Tensor]:
+    """Diagnostic upper bound with an arbitrary replacement student distribution.
+
+    If f is the frozen member and s the trainable member, q=(f+s)/2.
+    For nonnative action a and native n, q(a)/q(n) <= (1+f(a))/f(n).
+    A student constrained by architecture or trust loss can do worse, never better.
+    This is a gate-capacity audit, not an action-quality label or a serving rule.
+    """
+    if not math.isfinite(minimum_gain) or minimum_gain <= 0:
+        raise ValueError("invalid fixed-partner gate margin")
+    if partner_logits.ndim != 2 or legal.shape != partner_logits.shape or legal.dtype != torch.bool:
+        raise ValueError("invalid fixed-partner legal catalog")
+    if not bool(legal.any(-1).all()) or not bool(torch.isfinite(partner_logits[legal]).all()):
+        raise ValueError("fixed partner needs finite legal logits")
+    if native.dtype != torch.int64 or native.shape != partner_logits.shape[:1] or eligible_order.dtype != torch.int64 or eligible_order.ndim != 2 or eligible_order.shape[0] != len(native):
+        raise ValueError("invalid fixed-partner gate indices")
+    valid = eligible_order >= 0
+    if not bool(((native >= 0) & (native < partner_logits.shape[1])).all()) or not bool(valid.any(-1).all()) or not bool((eligible_order[valid] < partner_logits.shape[1]).all()):
+        raise ValueError("fixed-partner gate index outside catalog")
+    catalog = torch.arange(partner_logits.shape[1], device=partner_logits.device)
+    counts = ((eligible_order[:, :, None] == catalog[None, None, :]) & valid[:, :, None]).sum(1)
+    eligible = counts > 0
+    if bool((counts > 1).any()) or bool((eligible & ~legal).any()) or not bool(eligible.gather(1, native[:, None]).all()):
+        raise ValueError("fixed-partner eligibility must contain legal distinct actions and native")
+    # Match the serving softmax's finite padding sentinel. Use float64 for the
+    # ceiling and leave a 1e-6 buffer before declaring any alternative blocked.
+    frozen = F.log_softmax(partner_logits.detach().double().masked_fill(~legal, -1e9), -1)
+    native_logp = frozen.gather(1, native[:, None])
+    ceiling = torch.logaddexp(torch.zeros_like(frozen), frozen) - native_logp
+    is_native = catalog[None, :] == native[:, None]
+    ceiling = ceiling.masked_fill(is_native, 0).masked_fill(~eligible, -torch.inf)
+    blocked = eligible & ~is_native & (ceiling < minimum_gain - 1e-6)
+    return {"maximumLogitGain": ceiling, "blocked": blocked, "eligible": eligible}
+
+
 def roots_with_terminal_contrast(returns: Tensor, mask: Tensor) -> Tensor:
     """Compare actions within the SAME world; ignore padded/unlabeled actions."""
     maximum = returns.masked_fill(~mask[:, :, None], -torch.inf).amax(1)
     minimum = returns.masked_fill(~mask[:, :, None], torch.inf).amin(1)
     return ((maximum - minimum) > 0).any(-1)
+
+
+def _validate_paired_root_inputs(policy: Tensor, actions: Tensor, returns: Tensor, mask: Tensor) -> None:
+    if returns.ndim != 3 or returns.shape[:2] != actions.shape or mask.shape != actions.shape:
+        raise ValueError("paired root shape mismatch")
+    if mask.dtype != torch.bool or not bool((mask.sum(-1) >= 2).all()):
+        raise ValueError("each root needs two labeled actions")
+    if not bool(torch.isfinite(returns[mask]).all()) or not bool(
+            ((returns[mask] == 0) | (returns[mask] == .5) | (returns[mask] == 1)).all()):
+        raise ValueError("returns must be completed-game scores")
+    if not bool(((actions[mask] >= 0) & (actions[mask] < policy.shape[1])).all()):
+        raise ValueError("labeled action outside legal catalog")
 
 
 def paired_root_loss(policy: Tensor, actions: Tensor, returns: Tensor, mask: Tensor,
@@ -173,15 +221,7 @@ def paired_root_loss(policy: Tensor, actions: Tensor, returns: Tensor, mask: Ten
         raise ValueError("unknown paired-root loss weighting")
     if payoff_weighting not in ["sign", "magnitude"]:
         raise ValueError("unknown paired-root payoff weighting")
-    if returns.ndim != 3 or returns.shape[:2] != actions.shape or mask.shape != actions.shape:
-        raise ValueError("paired root shape mismatch")
-    if mask.dtype != torch.bool or not bool((mask.sum(-1) >= 2).all()):
-        raise ValueError("each root needs two labeled actions")
-    if not bool(torch.isfinite(returns[mask]).all()) or not bool(
-            ((returns[mask] == 0) | (returns[mask] == .5) | (returns[mask] == 1)).all()):
-        raise ValueError("returns must be completed-game scores")
-    if not bool(((actions[mask] >= 0) & (actions[mask] < policy.shape[1])).all()):
-        raise ValueError("labeled action outside legal catalog")
+    _validate_paired_root_inputs(policy, actions, returns, mask)
     safe_actions = torch.where(mask, actions, torch.zeros_like(actions))
     chosen = policy.gather(1, safe_actions)
     logits = chosen[:, :, None] - chosen[:, None, :]
@@ -210,6 +250,46 @@ def paired_root_loss(policy: Tensor, actions: Tensor, returns: Tensor, mask: Ten
                    "comparisonWeightedLoss": total.detach(),
                    "equalInformativeRootLoss": equal_root.detach(),
                    "perRootLoss": root_loss.detach(), "perRootComparisonWeight": root_weight.detach()}
+
+
+def paired_score_difference_loss(policy: Tensor, actions: Tensor, returns: Tensor, mask: Tensor,
+                                 *, score_scale: float) -> tuple[Tensor, dict[str, Tensor]]:
+    """Equal-root squared error for explicitly scaled mean terminal-score gaps.
+
+    Loss and gradient depend on each action's marginal scores, so rearranging
+    its future labels cannot change the objective. Pairing still matters when
+    estimating uncertainty. Scale is a prospective recipe choice: at scale .1,
+    an exactly fitted logit gap of one represents ten match-score points.
+    """
+    if not math.isfinite(score_scale) or score_scale <= 0:
+        raise ValueError("score difference scale must be finite and positive")
+    _validate_paired_root_inputs(policy, actions, returns, mask)
+    if returns.shape[-1] == 0:
+        raise ValueError("score differences need completed futures")
+    safe_returns = torch.where(mask[:, :, None], returns, torch.zeros_like(returns)).to(policy.dtype)
+    means = safe_returns.mean(-1)
+    informative = (means.masked_fill(~mask, -torch.inf).amax(-1) -
+                   means.masked_fill(~mask, torch.inf).amin(-1)) > 0
+    valid = (mask[:, :, None] & mask[:, None, :]).triu(1)
+    included = valid & informative[:, None, None]
+    chosen = policy.gather(1, torch.where(mask, actions, torch.zeros_like(actions)))
+    logits = chosen[:, :, None] - chosen[:, None, :]
+    target = (means[:, :, None] - means[:, None, :]) / score_scale
+    if not bool(torch.isfinite(target[valid]).all()):
+        raise ValueError("score difference targets overflowed the policy dtype")
+    losses = (logits - target).square() * included
+    weight = included.sum((-1, -2))
+    per_root = losses.sum((-1, -2)) / weight.clamp_min(1)
+    equal_root = per_root.sum() / informative.sum().clamp_min(1)
+    total_weight = weight.sum()
+    comparisons = losses.sum() / total_weight.clamp_min(1)
+    non_tied = ((safe_returns[:, :, None, :] != safe_returns[:, None, :, :]).sum(-1) * valid).sum()
+    return equal_root, {"nonTiedComparisons": non_tied.detach(),
+                       "effectiveComparisonWeight": total_weight.detach(),
+                       "informativeRoots": informative.sum().detach(),
+                       "comparisonWeightedLoss": comparisons.detach(),
+                       "equalInformativeRootLoss": equal_root.detach(),
+                       "perRootLoss": per_root.detach(), "perRootComparisonWeight": weight.detach()}
 
 
 def paired_gate_gain(choices: Tensor, baseline: Tensor, actions: Tensor,
