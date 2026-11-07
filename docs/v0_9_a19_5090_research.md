@@ -1,5 +1,116 @@
 # v0.9 training against current A19 R2
 
+## Local pooling, exact reuse and objective audit — November 6, 2026 UTC
+
+This cycle runs locally against the immutable `9ccf9207` engine, with its complete
+shipped A19 combat, two neural members, live ranked draft/setup, sideboard,
+doctrines, splits and synergies. Subsequent shared-working-tree balance edits are
+outside this experiment. The user-selected locked v0.9 draft plus A19 combat
+remains the default. None of the changes below promotes a combat checkpoint.
+
+### Eligible mean-logit pool: failed strength gate
+
+The research helper `a19_eligible_logit_pool.ts` averages the two members' raw
+logits and evaluates only candidates in the exact, completely scored primary
+tie. It retains margin one and the original model weights. Mean-logit differences
+equal differences from a geometric probability pool, so unevaluated candidate
+partition functions cancel. **This changes the decision policy:** A19's shipped
+arithmetic probability pool cannot in general discard those partition functions.
+Do not present this as equivalent pruning of the shipped ensemble.
+
+Admission passed 48 complete games: 12 stock/reference pairs and 12
+full-catalog/subset pairs, with 1,126 exact candidate-logit checks and 1,776
+restoration checks. Development then completed 864 games on 216 boards, balanced
+over three maps and all nine own/opponent doctrine combinations. Physical side
+and draft seat remain paired within each board.
+
+| Candidate                | Wins | Draws | Losses | Draw-aware score | Whole-board 95% interval |
+| ------------------------ | ---: | ----: | -----: | ---------------: | ------------------------ |
+| Eligible mean-logit pool |  414 |    18 |    432 |           48.96% | 47.05–50.93%             |
+
+There were no rejected actions. Candidate scoring work fell from 220,888 to
+156,196 model-row evaluations, a 29.29% reduction. That structural saving is not
+a measured end-to-end runtime improvement. The registered 55% development gate
+failed; the separate 6,048-game confirmation bank remains unopened. The research
+helper is opt-in and is not imported by a shipped AI factory.
+
+### Exact entity-encoding reuse: opt-in performance research
+
+`V09A19CpuModel` accepts `entityCacheRows`, default zero. A nonzero research
+capacity caches only the two entity-encoding layers, using every input's complete
+Float32 bit string, including signed zero. It never keys by creature ID or guesses
+which units changed. Each model owns a separate bounded LRU; team pooling, actor
+selection, globals, terrain and target selection are recomputed. Capacity is
+limited to 1,024 rows. `unpackA19Model()` forwards the optional setting; the
+promoted factory supplies none, preserving the uncached path.
+
+At capacity 512, 108 A/A complete-match pairs (216 games) across three maps and
+all nine doctrine combinations reproduced every match record and event/turn
+digest. All 1,990 instrumented neural predictions matched both frozen original
+and cache-disabled outputs exactly; 4,963 engine-restoration checks passed.
+Unit regressions additionally cover input changes, entity permutations,
+independent models, eviction, signed zero and invalid inputs.
+
+Four counterbalanced model-only timing rounds replayed all 1,990 actual decision
+observations chronologically, with fresh model instances per pass and no
+manufactured adjacent duplicates. Original mean wall time was 2,612.43 ms,
+cache-disabled 2,585.69 ms and cached 2,263.10 ms. Cached inference used **13.37%
+less wall time and 13.04% less CPU time**. Real-game cache hit rate was 39.86%.
+Every timed pass had the same output checksum. These local M4 measurements do not
+establish a production whole-turn speedup or a strength gain; default capacity
+remains zero pending the relevant timing gate.
+
+A supplemental complete-game replay used 12 already-controlled games in each
+arm, twice in counterbalanced order (48 replays). Every trajectory still matched.
+Original mean wall time was 23.604 seconds versus 22.454 seconds cached, an
+observed 4.87% reduction on this small replay. Neural prediction occupied only
+2.69% of original wall time: its measured 168 ms saving accounts directly for
+about 0.71% of original total time. Do not attribute the larger whole-game wall
+difference entirely to saved matrix work, or generalize two passes into a
+production performance guarantee. This cache alone does not fund materially
+deeper whole-turn search.
+
+### Draw-aware training payoff and limited archived-label audit
+
+`paired_root_loss()` now supports `payoff_weighting="magnitude"`, registered by
+the trainer as `pairPayoffWeighting: "magnitude"`. The historical `"sign"` mode
+remains the default. A win/loss difference receives twice the weight of a
+draw/loss difference. In a closed eight-world example, action A wins four
+comparisons by 0.5, loses three by 1 and ties once: counting favorable worlds
+prefers A although its expected score is 0.125 lower. Magnitude weighting corrects
+that gradient. Both weighting modes are exactly identical on binary terminal
+data. Fractional normalization preserves a full informative-root contribution
+when only one draw/loss contrast exists. Receipts distinguish integer non-tied
+comparison counts from effective payoff weight. No new fit is claimed here.
+
+A separate functional counterexample demonstrates that arithmetic ensemble
+pair-loss can improve by raising an unlabeled student's logit: changing its
+softmax normalizer changes the members' relative influence without changing either
+compared student logit. Mean-logit differences remove this particular gradient
+shortcut. This is a property of the objective, not evidence that it caused a
+previous candidate's regression, and it does not rescue the failed pooling trial.
+
+The available archived 84-scenario coverage pilot contains 768 paired
+continuation games, 19 usable training roots and 14 validation roots. All input
+hashes were verified. Only eight training and seven validation roots had terminal
+contrast. Selecting and evaluating on the same eight futures optimistically
+estimated +8.22 and +4.91 score points. Averaging all 70 four/four world splits
+reduced these estimates to +4.92 and +2.50 points; the conditional root-bootstrap
+validation interval is -1.63 to +8.11. These are local oracle diagnostics on a
+small, selected pilot, not a learned policy or gameplay win-rate improvement.
+Seven usable roots in each split had the historical requested-phase fallback,
+already excluded by the later strict collector. No sign/payoff preference
+reversal occurred in this tiny pilot; it cannot establish how common the
+counterexample is in the larger remote training corpus.
+
+Generated observations, full manifests and results remain ignored under the
+client's `game/core/tmp`. The local study suffixes are
+`v09-local-eligible-pool-20261106T191707Z` and
+`v09-local-entity-cache-20261106T193749Z`. Pooling registration identity:
+`fbf8d4224e44a665349983a86c7afcec3d89c0a30b984d3b7f6501f3840b1f51`.
+The original frozen source archive identity is
+`d8954461a5c648e2efd1425361188c19ca35cf8dfdae790c70fb6fcea234115a`.
+
 ## Current-A19 transfer and independent-root objective — November 6, 2026 UTC
 
 The user authorized continued combat research on the RTX 5090. The target is a

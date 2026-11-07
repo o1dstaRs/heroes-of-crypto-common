@@ -271,7 +271,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "neural-model" as const,
         source: "src/simulation/a19_neural_model.ts" as const,
-        sha256: "29d0cb24082df024959221998db27fa018b76868c2b938a2312025524a049b22" as const,
+        sha256: "fa0f7ea4277099ebe4de6d51bffdcba886b3e2eca3853fd39b067904ca268f3b" as const,
     }),
     Object.freeze({
         role: "neural-correction" as const,
@@ -286,7 +286,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "neural-inference" as const,
         source: "src/simulation/v0_9/a19_inference.ts" as const,
-        sha256: "3c15122bbadfee4bd8f3ba041211ad39dce607324ad0a5911067c96d02287d03" as const,
+        sha256: "58e622d890ca8f171979906ccb909902dff1da7609cbe132739d5ad31c33b383" as const,
     }),
     Object.freeze({
         role: "neural-batch256-weights" as const,

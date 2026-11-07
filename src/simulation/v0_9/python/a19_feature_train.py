@@ -32,6 +32,8 @@ def train(registration_path: Path) -> None:
     check_fit_design(reg)
     weighting = reg.get("pairLossWeighting", "comparisons")
     require(weighting in ["comparisons", "roots"], "Unknown paired-root objective")
+    payoff_weighting = reg.get("pairPayoffWeighting", "sign")
+    require(payoff_weighting in ["sign", "magnitude"], "Unknown paired-root payoff objective")
     checks = read(root / reg["preflightReceipt"])
     require(checks["passed"] and checks["featurePathGradientPassed"] and checks["exportGateParityPassed"]
             and checks["strictCollectorPassed"], "Source-bound functional preflights required")
@@ -138,7 +140,8 @@ def train(registration_path: Path) -> None:
         with torch.no_grad():
             fixed = partner(pack["inputs"][0][:, :, :189], *pack["inputs"][1:])[0]
         policy = served_policy(student, fixed, pack["legal"])
-        loss, details = paired_root_loss(policy, pack["actions"], pack["returns"], pack["mask"], weighting=weighting)
+        loss, details = paired_root_loss(policy, pack["actions"], pack["returns"], pack["mask"],
+                                         weighting=weighting, payoff_weighting=payoff_weighting)
         return loss, trust(policy, pack["baseline"], pack["legal"]), policy, details
 
     @torch.no_grad()
@@ -156,9 +159,11 @@ def train(registration_path: Path) -> None:
             probability = served_policy(model(*columns[:7])[0], fixed, columns[11])
             ce += float(F.nll_loss(probability, columns[10])) * len(columns[10])
         return {"pairLoss": float(loss), "pairLossWeighting": weighting,
+                "pairPayoffWeighting": payoff_weighting,
                 "comparisonWeightedLoss": float(details["comparisonWeightedLoss"]),
                 "equalInformativeRootLoss": float(details["equalInformativeRootLoss"]),
                 "nonTiedComparisons": int(details["nonTiedComparisons"]),
+                "effectiveComparisonWeight": float(details["effectiveComparisonWeight"]),
                 "informativeRoots": int(details["informativeRoots"]), "kl": float(kl),
                 "warmTeacherCE": ce / warm["rows"],
                 "changedGateChoices": int((choices != pack["baselineChoice"]).sum()),
@@ -259,6 +264,7 @@ def train(registration_path: Path) -> None:
                   "maximumFoldError": fold_error, "foldGateMismatches": 0, "rows": references})
         del cpu, unfolded_cpu, partner_cpu, references
         proof = {"complete": True, "recipe": recipe, "pairLossWeighting": weighting,
+                 "pairPayoffWeighting": payoff_weighting,
                  "before": before, "best": best, "bestEpoch": best_epoch,
                  "weightsUpdated": best_epoch >= 0, "pairImprovement": before["pairLoss"] - best["pairLoss"],
                  "modelFileSha256": sha(destination / "model.json"), "activeSeconds": time.monotonic() - tick,
@@ -274,7 +280,7 @@ def train(registration_path: Path) -> None:
         winner = min(eligible, key=lambda p: (p["best"]["pairLoss"], p["modelFileSha256"]))
         exclusive(out / "finalist-lock.json", {"ordinal": winner["recipe"]["ordinal"], "modelSha256": winner["modelFileSha256"],
                   "selection": "Validation locked before any development games; no fallback finalist",
-                  "pairLossWeighting": weighting, "promotion": False})
+                  "pairLossWeighting": weighting, "pairPayoffWeighting": payoff_weighting, "promotion": False})
     exclusive(out / "complete.json", {"complete": True, "fits": proofs, "updatedCandidates": len(eligible),
               "newStrengthGames": 0, "promotion": False, "elapsedSeconds": time.monotonic() - started})
 

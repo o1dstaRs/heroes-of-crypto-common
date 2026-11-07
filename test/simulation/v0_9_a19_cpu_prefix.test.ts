@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { V09A19CpuModel } from "../../src/simulation/v0_9/a19_inference";
+import { V09A19CpuModel, type IV09A19InferenceOptions } from "../../src/simulation/v0_9/a19_inference";
 import {
     V09_A19_OBSERVATION_CONTRACT as contract,
     V09_A19_OBSERVATION_SHA256,
@@ -7,7 +7,7 @@ import {
 } from "../../src/simulation/v0_9/a19_observation";
 
 const identity = { manifestSha256: "a".repeat(64), sourceSha256: "b".repeat(64) };
-function model(seed: number): V09A19CpuModel {
+function model(seed: number, options?: IV09A19InferenceOptions): V09A19CpuModel {
     const weights: Record<string, number[] | number[][]> = {};
     const layers: [string, number, number][] = [
         ["entity.0", contract.entities.length, 96],
@@ -42,6 +42,7 @@ function model(seed: number): V09A19CpuModel {
             weights,
         },
         identity,
+        options,
     );
 }
 function observation(entities: number, candidates: number, phase = 0): IV09A19Observation {
@@ -156,4 +157,59 @@ test("candidate validation still rejects malformed targets and non-finite featur
     const bad = structuredClone(input);
     bad.candidates[0].features[0] = NaN;
     expect(() => predictor.predict(bad)).toThrow();
+});
+
+test("optional entity caching preserves the frozen predictions through changes and permutations", () => {
+    const cached = model(7, { entityCacheRows: 32 });
+    const reference = model(7);
+    const input = observation(5, 10);
+    expect(cached.predict(input)).toEqual(golden[1]);
+    expect(cached.predict(input)).toEqual(reference.predict(input));
+    expect(cached.getEntityCacheStatistics().hits).toBeGreaterThanOrEqual(5);
+    for (let phase = 0; phase < 5; phase++) {
+        const next = observation(5, 10, phase);
+        expect(cached.predict(next)).toEqual(reference.predict(next));
+        const reversed = [...next.entities.keys()].reverse();
+        const inverse = reversed.map((_, index) => reversed.indexOf(index));
+        const permuted = {
+            ...next,
+            entities: reversed.map((index) => next.entities[index]),
+            entityIds: reversed.map((index) => next.entityIds[index]),
+            actorIndex: inverse[next.actorIndex],
+            candidates: next.candidates.map((candidate) => ({
+                ...candidate,
+                targetIndex: candidate.targetIndex < 0 ? -1 : inverse[candidate.targetIndex],
+            })),
+        };
+        expect(cached.predict(permuted)).toEqual(reference.predict(permuted));
+    }
+    const changed = structuredClone(input);
+    changed.entities[2][4] += 0.25;
+    expect(cached.predict(changed)).toEqual(reference.predict(changed));
+    expect(cached.predict(input)).toEqual(golden[1]);
+});
+
+test("entity caches are bounded per model and eviction retains exact outputs", () => {
+    const cached = model(7, { entityCacheRows: 2 });
+    for (let phase = 0; phase < 4; phase++)
+        expect(cached.predict(observation(5, 10, phase))).toEqual(model(7).predict(observation(5, 10, phase)));
+    expect(cached.getEntityCacheStatistics().size).toBe(2);
+    expect(cached.getEntityCacheStatistics().evictions).toBeGreaterThan(0);
+    const independent = model(11, { entityCacheRows: 32 });
+    expect(independent.predict(observation(6, 12, 2))).toEqual(golden[3]);
+    expect(model(7).getEntityCacheStatistics()).toEqual({ capacity: 0, size: 0, hits: 0, misses: 0, evictions: 0 });
+});
+
+test("float32 cache keys neither alias signed zero nor bypass input validation", () => {
+    const cached = model(7, { entityCacheRows: 32 });
+    const input = observation(1, 1);
+    input.entities[0][4] = 0;
+    cached.predict(input);
+    input.entities[0][4] = -0;
+    expect(cached.predict(input)).toEqual(model(7).predict(input));
+    expect(cached.getEntityCacheStatistics().misses).toBe(2);
+    input.entities[0][4] = NaN;
+    expect(() => cached.predict(input)).toThrow();
+    for (const capacity of [-1, 1025, 0.5, NaN, Infinity])
+        expect(() => model(7, { entityCacheRows: capacity })).toThrow("Invalid research entity-cache capacity");
 });

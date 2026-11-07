@@ -195,6 +195,9 @@ class FeatureAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unknown paired-root"):
             paired_root_loss(policy, torch.tensor([[0, 1], [1, 2]]),
                              torch.zeros(2, 2, 8), torch.ones(2, 2, dtype=torch.bool), weighting="auto")
+        with self.assertRaisesRegex(ValueError, "unknown paired-root payoff"):
+            paired_root_loss(policy, torch.tensor([[0, 1], [1, 2]]),
+                             torch.zeros(2, 2, 8), torch.ones(2, 2, dtype=torch.bool), payoff_weighting="auto")
 
     def test_served_paired_gain_requires_observed_action_and_baseline(self):
         actions = torch.tensor([[4, 2, -1], [1, 3, -1]])
@@ -210,6 +213,63 @@ class FeatureAdapterTests(unittest.TestCase):
         zero, known = paired_gate_gain(torch.tensor([4, 3]), torch.tensor([4, 3]), actions, returns, mask)
         self.assertTrue(known.all())
         self.assertTrue(zero.eq(0).all())
+
+    def test_draw_aware_utility_can_reverse_a_majority_of_pairwise_wins(self):
+        # A wins four worlds by .5 and loses three worlds by1. Its expected
+        # score is worse, despite winning a majority of the seven comparisons.
+        returns = torch.tensor([[[.5, .5, .5, .5, 0., 0., 0., .5],
+                                 [0., 0., 0., 0., 1., 1., 1., .5]]])
+        policy = torch.zeros(1, 2, requires_grad=True)
+        actions, mask = torch.tensor([[0, 1]]), torch.ones(1, 2, dtype=torch.bool)
+        sign, _ = paired_root_loss(policy, actions, returns, mask)
+        sign_gradient = torch.autograd.grad(sign, policy)[0]
+        utility, details = paired_root_loss(policy, actions, returns, mask, payoff_weighting="magnitude")
+        utility_gradient = torch.autograd.grad(utility, policy)[0]
+        self.assertLess(float(returns[0, 0].mean()), float(returns[0, 1].mean()))
+        self.assertLess(float(sign_gradient[0, 0]), 0, "count preference incorrectly raises A")
+        self.assertGreater(float(utility_gradient[0, 0]), 0, "utility preference correctly lowers A")
+        self.assertEqual(int(details["nonTiedComparisons"]), 7)
+        self.assertEqual(float(details["effectiveComparisonWeight"]), 5)
+
+    def test_single_half_score_contrast_retains_one_full_root_weight(self):
+        policy = torch.tensor([[0., 2.]], requires_grad=True)
+        returns = torch.tensor([[[0.] * 8, [.5] + [0.] * 7]])
+        loss, details = paired_root_loss(policy, torch.tensor([[0, 1]]), returns,
+            torch.ones(1, 2, dtype=torch.bool), weighting="roots", payoff_weighting="magnitude")
+        torch.testing.assert_close(loss, F.softplus(policy[0, 0] - policy[0, 1]))
+        self.assertEqual(int(details["nonTiedComparisons"]), 1)
+        self.assertEqual(float(details["effectiveComparisonWeight"]), .5)
+
+    def test_binary_terminal_scores_preserve_the_original_loss_and_gradient(self):
+        policy = torch.tensor([[0., 2.], [1., 0.]], requires_grad=True)
+        returns = torch.tensor([[[0.] * 8, [1., 0.] * 4], [[1.] * 8, [0., 1.] * 4]])
+        for weighting in ["comparisons", "roots"]:
+            original, _ = paired_root_loss(policy, torch.tensor([[0, 1]] * 2), returns,
+                torch.ones(2, 2, dtype=torch.bool), weighting=weighting)
+            corrected, _ = paired_root_loss(policy, torch.tensor([[0, 1]] * 2), returns,
+                torch.ones(2, 2, dtype=torch.bool), weighting=weighting, payoff_weighting="magnitude")
+            self.assertTrue(torch.equal(original, corrected))
+            self.assertTrue(torch.equal(torch.autograd.grad(original, policy)[0],
+                                        torch.autograd.grad(corrected, policy)[0]))
+
+    def test_arithmetic_pool_pair_loss_can_reward_an_unlabeled_action(self):
+        student = torch.zeros(1, 3, requires_grad=True)
+        partner = torch.tensor([[4., 0., -10.]])
+        actions = torch.tensor([[0, 1]])
+        returns = torch.tensor([[[1.] * 8, [0.] * 8]])
+        mask = torch.ones(1, 2, dtype=torch.bool)
+        loss, _ = paired_root_loss(served_policy(student, partner, torch.ones(1, 3, dtype=torch.bool)),
+                                   actions, returns, mask)
+        self.assertLess(float(torch.autograd.grad(loss, student)[0][0, 2]), 0)
+        increased = student.detach().clone()
+        increased[0, 2] = 10
+        lower, _ = paired_root_loss(served_policy(increased, partner, torch.ones(1, 3, dtype=torch.bool)),
+                                    actions, returns, mask)
+        self.assertLess(float(lower), float(loss.detach()))
+        # Mean-logit differences remove this partition-function shortcut.
+        logits = (student + partner) / 2
+        geometric, _ = paired_root_loss(logits, actions, returns, mask)
+        self.assertEqual(float(torch.autograd.grad(geometric, student)[0][0, 2]), 0)
 
     def test_readiness_ignores_padding_and_shared_world_randomness(self):
         returns = torch.tensor([[[.5, .5], [.5, .5], [0., 0.]],

@@ -1,7 +1,7 @@
 import batch256 from "../ai/models/a19/batch256.json";
 import lr0003 from "../ai/models/a19/lr0003.json";
 import { A19_NEURAL_POLICY } from "../ai/versions/v0_8_a19_neural_policy";
-import { V09A19CpuModel, type IV09A19Prediction } from "./v0_9/a19_inference";
+import { V09A19CpuModel, type IV09A19Prediction, type IV09A19InferenceOptions } from "./v0_9/a19_inference";
 import type { IV09A19Observation } from "./v0_9/a19_observation";
 
 interface IPackedModel {
@@ -11,7 +11,11 @@ interface IPackedModel {
     weights: Record<string, { shape: number[]; data: string }>;
 }
 
-export function unpackA19Model(packed: IPackedModel, expectedExport: string): V09A19CpuModel {
+export function unpackA19Model(
+    packed: IPackedModel,
+    expectedExport: string,
+    options?: Readonly<IV09A19InferenceOptions>,
+): V09A19CpuModel {
     if (packed.schema !== "hoc.ai.a19.packed-float32.v1" || packed.exportSha256 !== expectedExport)
         throw new Error("Wrong promoted A19 model package");
     const weights: Record<string, number[] | number[][]> = {};
@@ -41,6 +45,7 @@ export function unpackA19Model(packed: IPackedModel, expectedExport: string): V0
             manifestSha256: A19_NEURAL_POLICY.manifestSha256,
             sourceSha256: A19_NEURAL_POLICY.trainingSourceSha256,
         },
+        options,
     );
 }
 

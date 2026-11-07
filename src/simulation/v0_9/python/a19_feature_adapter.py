@@ -158,7 +158,7 @@ def roots_with_terminal_contrast(returns: Tensor, mask: Tensor) -> Tensor:
 
 
 def paired_root_loss(policy: Tensor, actions: Tensor, returns: Tensor, mask: Tensor,
-                     *, weighting: str = "comparisons"
+                     *, weighting: str = "comparisons", payoff_weighting: str = "sign"
                      ) -> tuple[Tensor, dict[str, Tensor]]:
     """Registered comparison- or equal-root-weighted loss, with both diagnostics.
 
@@ -166,9 +166,13 @@ def paired_root_loss(policy: Tensor, actions: Tensor, returns: Tensor, mask: Ten
     invented action preference. Unknown/unlabeled catalog actions are not negatives.
     Equal-root research prevents more non-tied futures from increasing a root's
     training/validation weight. The original objective remains the default.
+    Magnitude weighting aligns pair preferences with expected draw-aware score:
+    a win-versus-loss difference carries twice a draw-versus-loss difference.
     """
     if weighting not in ["comparisons", "roots"]:
         raise ValueError("unknown paired-root loss weighting")
+    if payoff_weighting not in ["sign", "magnitude"]:
+        raise ValueError("unknown paired-root payoff weighting")
     if returns.ndim != 3 or returns.shape[:2] != actions.shape or mask.shape != actions.shape:
         raise ValueError("paired root shape mismatch")
     if mask.dtype != torch.bool or not bool((mask.sum(-1) >= 2).all()):
@@ -187,14 +191,21 @@ def paired_root_loss(policy: Tensor, actions: Tensor, returns: Tensor, mask: Ten
     valid = (mask[:, :, None] & mask[:, None, :]).triu(1)
     wins = (difference > 0).to(policy.dtype).sum(-1)
     losses = (difference < 0).to(policy.dtype).sum(-1)
+    non_tied = ((wins + losses) * valid).sum()
+    if payoff_weighting == "magnitude":
+        wins = difference.clamp_min(0).sum(-1)
+        losses = (-difference).clamp_min(0).sum(-1)
     weight = (wins + losses) * valid
-    target = wins / (wins + losses).clamp_min(1)
+    mass = wins + losses
+    target = wins / torch.where(mass > 0, mass, torch.ones_like(mass))
     losses_ = F.binary_cross_entropy_with_logits(logits, target, reduction="none") * weight
     root_weight = weight.sum((-1, -2))
-    root_loss = losses_.sum((-1, -2)) / root_weight.clamp_min(1)
-    total = losses_.sum() / root_weight.sum().clamp_min(1)
+    root_loss = losses_.sum((-1, -2)) / torch.where(root_weight > 0, root_weight, torch.ones_like(root_weight))
+    total_weight = root_weight.sum()
+    total = losses_.sum() / torch.where(total_weight > 0, total_weight, torch.ones_like(total_weight))
     equal_root = root_loss.sum() / (root_weight > 0).sum().clamp_min(1)
-    return (equal_root if weighting == "roots" else total), {"nonTiedComparisons": root_weight.sum().detach(),
+    return (equal_root if weighting == "roots" else total), {"nonTiedComparisons": non_tied.detach(),
+                   "effectiveComparisonWeight": total_weight.detach(),
                    "informativeRoots": (root_weight > 0).sum().detach(),
                    "comparisonWeightedLoss": total.detach(),
                    "equalInformativeRootLoss": equal_root.detach(),
