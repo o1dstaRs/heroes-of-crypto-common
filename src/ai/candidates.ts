@@ -3555,6 +3555,12 @@ class CandidateGenerator {
                 );
                 if (cell) {
                     this.pushSpell(spell, undefined, { x: cell.x, y: cell.y });
+                } else if (unitsHolder.getSummonedUnitByName(team, spell.getSummonUnitName())) {
+                    // The engine reinforces an existing friendly summon before checking spawn space.
+                    // A surrounded Satyr can therefore add wolves even when no new 2x1 body fits.
+                    // Keep the original anchored candidate whenever space exists so ordinary search
+                    // choices and deterministic rollout seeds remain unchanged.
+                    this.pushSpell(spell);
                 }
                 continue;
             }

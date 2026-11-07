@@ -174,8 +174,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        // Re-pinned for ranged Deep Wounds stacking across native volleys and Quiver of Echoes.
-        sha256: "d103524159519019204a71217cdea05b959847e77c316df5f7b92585cc971e26" as const,
+        // Re-pinned for legal Satyr reinforcement when an existing wolf stack needs no spawn space.
+        sha256: "e70c4d91c2386ed9651245825119722af540a14f71e7dd216454452ef24626c5" as const,
     }),
     Object.freeze({
         role: "last-fuse-estimates" as const,
