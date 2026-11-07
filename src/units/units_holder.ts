@@ -66,6 +66,12 @@ const WARDING_MANE_BLESSING_BIT = 4;
 const ARROWS_WINGSHIELD_BLESSING_BIT = 8;
 const RALLYING_VOLLEY_BLESSING_BIT = 16;
 const SHARPENED_WEAPONS_BLESSING_BIT = 32;
+const LUCK_DEPENDENT_BLESSINGS: ReadonlySet<string> = new Set([
+    "Sharpened Weapons Blessing",
+    "Arcane Ward Blessing",
+    "Warding Mane Blessing",
+    "Arrows Wingshield Blessing",
+]);
 
 /** The board-wide blessings as seen at the start of one stack-power refresh. */
 interface IBlessingCensus {
@@ -1041,10 +1047,8 @@ export class UnitsHolder {
     }
     /**
      * One pass over the army for all board-wide blessings: each team's strongest living source and which
-     * units already carry each blessing. Everything it reads — death, board position, abilities, Break, luck,
-     * stack power — is untouched by the blessing buffs the refreshes delete and re-apply, so reading it once
-     * equals re-reading it before each refresh. Each refresh used to walk the army twice and probe every unit
-     * with deleteBuff, although most boards carry one blessing at most and most units carry none.
+     * units already carry each blessing. Luck Blessing must be resolved before reusing this census for
+     * luck-dependent blessings. The other blessings do not change any input read here.
      */
     private captureBlessingCensus(): IBlessingCensus {
         const census: IBlessingCensus = {
@@ -1289,14 +1293,47 @@ export class UnitsHolder {
         FightStateManager.getInstance()
             .getFightProperties()
             .setUnitsCalculatedStacksPower(this.gridSettings, this.allUnits);
-        // Refresh position-dependent auras (e.g. Leprechaun's Luck Aura, Disguise/War Anger) before
+        // Refresh position-dependent auras (e.g. Pegasus Might, Disguise/War Anger) before
         // recomputing per-unit stats so adjustBaseStats below sees the current aura buffs. The engine
         // (used authoritatively by the ranked server) only ever called the stack-power refresh, so
         // buff-style auras were silently inactive in ranked; pairing them here matches the sandbox,
         // whose refreshUnits() has always run both. cleanAuraEffects() makes this idempotent.
         this.refreshAuraEffectsIfNeeded();
-        const blessingCensus = this.captureBlessingCensus();
+        let blessingCensus = this.captureBlessingCensus();
+        const luckBlessing = STACK_BLESSING_BY_NAME.get("Luck Blessing")!;
+        const luckPowers = blessingCensus.stackBlessings.get(luckBlessing.name)!;
+        if (hasPositivePower(luckPowers) || blessingCensus.carried & luckBlessing.bit) {
+            this.reapplyTeamBlessing(blessingCensus, luckPowers, luckBlessing.bit, luckBlessing.name);
+            const fight = FightStateManager.getInstance().getFightProperties();
+            // Resolve luck before reading blessing/aura powers. Only sources need this early refresh;
+            // the normal stat pass below updates the rest of the army. adjustBaseStats owns the lap
+            // guard, so the final pass cannot roll luck or grant Unyielding Power a second time.
+            for (const unit of this.getAllUnitsIterator()) {
+                if (
+                    unit.isDead() ||
+                    !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
+                    (!unit.getAuraEffects().length &&
+                        !unit.getUnitProperties().abilities.some((name) => LUCK_DEPENDENT_BLESSINGS.has(name)))
+                ) {
+                    continue;
+                }
+                const team = unit.getTeam();
+                unit.adjustBaseStats(
+                    fight.hasFightStarted(),
+                    fight.getCurrentLap(),
+                    fight.getAdditionalAbilityPowerPerTeam(team),
+                    fight.getAdditionalMovementStepsPerTeam(team),
+                    fight.getAdditionalFlyArmorPerTeam(team),
+                    fight.getAdditionalMoralePerTeam(team),
+                    fight.getAdditionalLuckPerTeam(team),
+                    fight.getStepsMoraleMultiplier(),
+                );
+            }
+            this.refreshAuraEffectsIfNeeded();
+            blessingCensus = this.captureBlessingCensus();
+        }
         for (const { name, bit, walkingOnly } of STACK_BLESSINGS) {
+            if (name === luckBlessing.name) continue;
             this.reapplyTeamBlessing(
                 blessingCensus,
                 blessingCensus.stackBlessings.get(name)!,

@@ -4258,9 +4258,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (skyRunnerAbility) {
             this.unitProperties.steps += this.calculateAbilityCount(skyRunnerAbility, synergyAbilityPowerIncrease);
         }
-        const wolfTrailAuraEffect = statBuffs.get("Wolf Trail Blessing");
-        if (wolfTrailAuraEffect) {
-            this.unitProperties.steps_mod += wolfTrailAuraEffect.getPower();
+        const wolfTrailBlessing = statBuffs.get("Wolf Trail Blessing");
+        if (wolfTrailBlessing) {
+            this.unitProperties.steps_mod += wolfTrailBlessing.getPower();
         }
         if (!this.canFly()) {
             const tieUpTheHorsesAuraEffect = statBuffs.get("Tie up the Horses Blessing");

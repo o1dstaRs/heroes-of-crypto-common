@@ -161,7 +161,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Previous digest: 8e856328c77432416e1e39f2257b0c544f9290bae9d143428d57cde36912d228.
 // Re-pinned 2026-10-24: Crusader damage 12-20 -> 13-20. Two isolated runs reproduce this digest.
 // Previous digest: 6a4b3e3de96be982e1ac7fa11e65b5b2557b0783c61efc0ade946d682552d03b.
-const EXPECTED_REPLAY_SHA256 = "aa90a0564c400d9b7ab220e885444a03db69889297925b7bdb533ea0bb26785a";
+// Re-pinned 2026-11-07 for main's Luck Blessing refresh order: dependent blessings read the
+// updated source luck in the same refresh. The original branch reproduces the previous digest;
+// two corrected runs agree. Historical training/checkpoint evidence remains unchanged.
+// Previous digest: aa90a0564c400d9b7ab220e885444a03db69889297925b7bdb533ea0bb26785a.
+const EXPECTED_REPLAY_SHA256 = "e7dcf4a2abd6f7a9781d4ef25835f55f7427cc456d43c1ff4e8fd896e57ee1cf";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

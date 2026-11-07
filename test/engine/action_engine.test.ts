@@ -2444,13 +2444,25 @@ describe("GameActionEngine", () => {
                 targetPosition: endpoint,
             });
             expect(result.completed).toBe(true);
-            expect(setup.left.getRangeShots()).toBeLessThan(shots);
+            expect(setup.left.getRangeShots()).toBe(shots - 1);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
             expect(result.events.some((event) => event.type === "unit_attacked")).toBe(true);
             if (hit) expect(setup.right.getCumulativeHp()).toBeLessThan(before);
-            else expect(setup.right.getCumulativeHp()).toBe(before);
+            else {
+                expect(setup.right.getCumulativeHp()).toBe(before);
+                expect(result.events).toContainEqual(
+                    expect.objectContaining({
+                        type: "unit_attacked",
+                        attackerId: setup.left.getId(),
+                        targetId: "",
+                        unitIdsDied: [],
+                        animations: [],
+                    }),
+                );
+            }
         });
     }
-    for (const invalid of ["ordinary", "out-of-bounds", "nan", "origin"] as const) {
+    for (const invalid of ["ordinary", "out-of-bounds", "nan", "infinite", "origin"] as const) {
         it(`rejects invalid free ranged intent: ${invalid}`, () => {
             const setup = setupActionFight({
                 leftAttackType: PBTypes.AttackVals.RANGE,
@@ -2464,9 +2476,11 @@ describe("GameActionEngine", () => {
                     ? setup.left.getPosition()
                     : invalid === "nan"
                       ? { x: NaN, y: 100 }
-                      : invalid === "out-of-bounds"
-                        ? { x: 1e9, y: 1e9 }
-                        : setup.right.getPosition();
+                      : invalid === "infinite"
+                        ? { x: 100, y: Infinity }
+                        : invalid === "out-of-bounds"
+                          ? { x: 1e9, y: 1e9 }
+                          : setup.right.getPosition();
             const shots = setup.left.getRangeShots();
             const result = setup.engine.apply({
                 type: "range_attack",
@@ -2476,6 +2490,36 @@ describe("GameActionEngine", () => {
             });
             expect(result.completed).toBe(false);
             expect(setup.left.getRangeShots()).toBe(shots);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
+        });
+    }
+
+    for (const blocked of ["no-ammo", "forced-target", "range-null-field"] as const) {
+        it(`rejects empty-ground Through Shot when blocked by ${blocked}`, () => {
+            const setup = setupActionFight({
+                leftAttackType: PBTypes.AttackVals.RANGE,
+                leftAbilities: ["Through Shot"],
+                leftRangeShots: blocked === "no-ammo" ? 0 : 3,
+                rightCell: { x: 9, y: 3 },
+                supportCell: { x: 2, y: 8 },
+            });
+            setup.left.refreshPossibleAttackTypes(true);
+            if (blocked === "forced-target") setup.left.setTarget(setup.right.getId());
+            if (blocked === "range-null-field") setup.left.applyAuraEffect("Range Null Field Aura", "", false, 0, "");
+            const gs = setup.grid.getSettings();
+            const endpoint = getPositionForCell({ x: 14, y: 12 }, gs.getMinX(), gs.getStep(), gs.getHalfStep());
+            const shots = setup.left.getRangeShots();
+            const hp = setup.right.getCumulativeHp();
+            const result = setup.engine.apply({
+                type: "range_attack",
+                attackerId: setup.left.getId(),
+                targetId: "",
+                targetPosition: endpoint,
+            });
+            expect(result.completed).toBe(false);
+            expect(result.rejectionReason).toBe("attack_not_available");
+            expect(setup.left.getRangeShots()).toBe(shots);
+            expect(setup.right.getCumulativeHp()).toBe(hp);
             expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
         });
     }

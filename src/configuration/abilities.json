@@ -440,7 +440,7 @@
         "name": "Luck Blessing",
         "type": "MASS_BUFF",
         "desc": [
-            "While this unit is alive, all allies gain +{} luck (total luck is capped at 10) anywhere on the battlefield.",
+            "While this unit is alive and not Broken, all allies gain +{} luck anywhere on the battlefield (total luck is capped at 10).",
             "Each stack-power tier grants 20% of base power (20/40/60/80/100%). Only the strongest allied source applies."
         ],
         "power": 10,

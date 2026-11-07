@@ -1,10 +1,11 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
 
 import { AbilityFactory } from "../../src/abilities/ability_factory";
 import { abilityToTextureName, isEquipmentOrMarkerSpellName } from "../../src/abilities/ability_helper";
 import { STACK_BLESSINGS } from "../../src/abilities/stack_blessings";
 import { getAbilityConfig, getCreatureConfig, getSpellConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
+import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
@@ -175,3 +176,88 @@ for (let tier = 1; tier <= 5; tier++) {
         }
     });
 }
+
+it("adds luck to distant allies and the source, respects the cap and cancels Misfortune", () => {
+    const { grid, unitsHolder } = createCombatTestContext();
+    const source = createTestUnit({ team: left, abilities: ["Luck Blessing"], exp: 1, amountAlive: 40, luck: 4 });
+    const ally = createTestUnit({ team: left, exp: 1, amountAlive: 100, luck: 9 });
+    const cursed = createTestUnit({ team: left, luck: 4 });
+    const enemy = createTestUnit({ team: right, luck: 1 });
+    placeUnit(grid, unitsHolder, source, { x: 1, y: 1 });
+    placeUnit(grid, unitsHolder, ally, { x: 14, y: 14 });
+    placeUnit(grid, unitsHolder, cursed, { x: 13, y: 14 });
+    placeUnit(grid, unitsHolder, enemy, { x: 14, y: 12 });
+    cursed.applyDebuff(new Spell({ spellProperties: getSpellConfig("Chaos", "Misfortune"), amount: 1 }));
+    unitsHolder.refreshStackPowerForAllUnits();
+    expect(source.getLuck()).toBe(8);
+    expect(ally.getLuck()).toBe(10);
+    expect(enemy.getLuck()).toBe(1);
+    expect(cursed.getLuck()).toBe(0);
+    expect(cursed.applyLuckShield()).toBe(false);
+    expect(cursed.getLuck()).toBe(0);
+    source.applyEffect(new EffectFactory().makeEffect("Break")!);
+    unitsHolder.refreshStackPowerForAllUnits();
+    expect(source.getLuck()).toBe(4);
+    expect(ally.getLuck()).toBe(9);
+    expect(cursed.getLuck()).toBe(-10);
+});
+
+it("updates luck-dependent blessings in the same refresh when Luck Blessing appears or disappears", () => {
+    const { grid, unitsHolder } = createCombatTestContext();
+    const source = createTestUnit({ team: left, abilities: ["Luck Blessing"], exp: 1, amountAlive: 40 });
+    const names = [
+        "Sharpened Weapons Blessing",
+        "Arcane Ward Blessing",
+        "Warding Mane Blessing",
+        "Arrows Wingshield Blessing",
+    ];
+    const otherSource = createTestUnit({ team: left, abilities: names, exp: 1, amountAlive: 100, luck: 0 });
+    const ally = createTestUnit({ team: left });
+    placeUnit(grid, unitsHolder, source, { x: 1, y: 1 });
+    placeUnit(grid, unitsHolder, otherSource, { x: 3, y: 1 });
+    placeUnit(grid, unitsHolder, ally, { x: 14, y: 14 });
+    for (const luck of [4, 0, 4]) {
+        if (luck) source.deleteEffect("Break");
+        else source.applyEffect(new EffectFactory().makeEffect("Break")!);
+        unitsHolder.refreshStackPowerForAllUnits();
+        expect(otherSource.getLuck()).toBe(luck);
+        for (const name of names) {
+            const base = getAbilityConfig(name).power;
+            const expected =
+                name === "Sharpened Weapons Blessing" || name === "Arcane Ward Blessing"
+                    ? base + luck
+                    : base * (1 + luck / 100);
+            expect(ally.getBuff(name)?.getPower()).toBeCloseTo(expected);
+        }
+    }
+});
+
+it("does not roll luck or apply per-lap growth twice when resolving a blessing source early", () => {
+    const { grid, unitsHolder } = createCombatTestContext();
+    const source = createTestUnit({ team: left, abilities: ["Luck Blessing"], exp: 1, amountAlive: 100 });
+    const squire = createTestUnit({
+        team: left,
+        abilities: ["Arcane Ward Blessing", "Unyielding Power"],
+        exp: 1,
+        amountAlive: 100,
+        maxHp: 100,
+    });
+    placeUnit(grid, unitsHolder, source, { x: 1, y: 1 });
+    placeUnit(grid, unitsHolder, squire, { x: 3, y: 1 });
+    const rolls = spyOn(squire, "randomizeLuckPerTurn");
+    try {
+        FightStateManager.getInstance().getFightProperties().startFight();
+        unitsHolder.refreshStackPowerForAllUnits();
+        const hp = squire.getHp();
+        const attack = squire.getBaseAttack();
+        for (let i = 0; i < 3; i++) unitsHolder.refreshStackPowerForAllUnits();
+        expect(rolls).toHaveBeenCalledTimes(1);
+        expect(squire.getHp()).toBe(hp);
+        expect(squire.getBaseAttack()).toBe(attack);
+        expect(squire.getBuff("Arcane Ward Blessing")?.getPower()).toBe(
+            getAbilityConfig("Arcane Ward Blessing").power + squire.getLuck(),
+        );
+    } finally {
+        rolls.mockRestore();
+    }
+});
