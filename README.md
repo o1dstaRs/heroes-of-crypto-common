@@ -105,27 +105,58 @@ bun run build            # tests + tsc (tsconfig.build.json) -> dist, copy json/
 
 ## Premium evidence collection
 
-The opt-in `premium-ranked-v3` study reuses the seven-cohort runner. It requires
-`a19-work` and enables evidence capture automatically. The default balance study
-retains its existing policy and output format.
+The seven-cohort CLI defaults to `premium-ranked-v3`: full evidence capture **and an
+automatically built, audited `premium.sqlite`**. Select `v09-draft-a19-work` for the
+locked V3 draft plus A19 combat, or `a19-work` for the original A19 draft. The runner
+does not change the selected fight profile. Incompatible profiles, disabled capture
+and conflicting exploration flags fail before fights start.
 
 ```sh
 # Small structural check, with outputs on local storage outside Git.
-AI_META_STUDY_PROFILE=premium-ranked-v3 bun src/simulation/measure_ai_meta_cohorts.ts \
-  6 85000717 sim-out/premium-smoke 1 ranked-draft,uniform-mixed 1 a19-work
-
-# Build an explicitly non-serving development snapshot from that smoke run.
-bun src/simulation/build_premium_evidence_snapshot.ts \
-  sim-out/premium-smoke/ai-meta.summary.json sim-out/premium-smoke/evidence.sqlite --development
+bun src/simulation/measure_ai_meta_cohorts.ts \
+  6 85000717 sim-out/premium-smoke 1 ranked-draft,uniform-mixed 1 v09-draft-a19-work
+# Produces raw archives, ai-meta.summary.json, premium.sqlite,
+# premium-readiness.json and the checksummed ai-meta.outputs.json receipt.
 ```
+
+The automatic snapshot is always labeled **development**. Generation does not
+publish it to Premium, change a serving catalog, or promote a model. Candidate
+admission and publication gates below still apply, even to large batches.
+
+`ai-meta.captured-summary.json` records that the games finished. The public
+`ai-meta.summary.json` stays incomplete until SQLite integrity and the full raw
+evidence/retrieval audit pass. Monitor the process exit and `ai-meta.outputs.json`
+(`complete: true`), not a shard's progress message. Missing capture or any audit
+failure exits nonzero and preserves every game. Retry **only artifact construction**
+after correcting a storage/access problem, without resimulating:
+
+```sh
+bun src/simulation/ai_meta_outputs.ts \
+  sim-out/premium-smoke/ai-meta.captured-summary.json sim-out/premium-smoke/ai-meta.summary.json
+```
+
+This also finalizes an existing fully captured Premium summary; it cannot recover
+unrecorded observations from legacy outcome-only archives. Existing SQLite files
+are reused only after source, provenance, raw-archive and integrity verification;
+different snapshots and completed summaries are never overwritten.
+
+For deliberate historical oracle research, set `AI_META_OUTPUT_MODE=legacy-oracle`
+explicitly. That mode retains the older policy and has no Premium snapshot. Do not
+combine it with `AI_META_STUDY_PROFILE`. Programmatic research callers retain their
+explicit options; CLI defaults do not alter registered worker experiments.
 
 For the baseline, use **10,000 fights per cohort** (70,000 total), all seven cohorts,
 and a frozen clean source revision. Premium also accepts any positive even fight
 count for exact-size pilots (for example 500); its summary records the small map
 remainder explicitly. The legacy study still requires divisibility by six. Choose worker count after checking the host's
-available capacity. Existing process sharding works unchanged; keep the study
-profile environment on every shard. The summary includes the study profile in
-its merge identity, so it cannot be mixed with legacy data.
+available capacity. Sharded drivers set `AI_META_SHARD=1` on every child, including
+windows covering a full single cohort. Children capture evidence but never build
+individual snapshots or report a completed study. Keep the same study/output mode
+on every shard. After verifying exact window coverage and merging, write the complete
+capture to `ai-meta.captured-summary.json`, leave `ai-meta.summary.json` incomplete,
+and call `finalizeAiMetaOutputs()` from `src/simulation/ai_meta_outputs.ts` to build
+one snapshot and publish the completed summary. The summary includes the study
+profile in its merge identity, so it cannot be mixed with legacy data.
 
 Historical `premium-ranked-v1` / `v2` archives cover only the five-axis augment
 catalog (273 allocations); they never sampled paid Empower. They remain readable,
@@ -137,7 +168,8 @@ No suffix in an augment ID means Empower 0; `-E1`, `-E2`, `-E3` encode paid leve
 This profile:
 
 - Uses the ranked live draft selector with the recorded `ranked-unit-strength-a19-side-v4-w16-r4`
-  spec, revealed map, and seeded synergy variants; explores 20% of visible choices.
+  spec, legally revealed map, and seeded synergy variants. `a19-work` explores 20% of
+  visible choices; `v09-draft-a19-work` instead preserves the locked V3 draft decisions.
   It intentionally samples all three doctrines uniformly and skips optional bans.
 - Preserves selected starting-bundle and Tier-2 artifacts. Synthetic cohorts have
   no draft history and keep their separately sampled setup artifacts.
@@ -244,7 +276,7 @@ The reader also supports a CLI:
 
 ```sh
 bun src/simulation/premium_evidence_snapshot.ts \
-  sim-out/premium-smoke/evidence.sqlite "$HOC_EXPECTED_SIM_SOURCE_SHA256" \
+  sim-out/premium-smoke/premium.sqlite "$HOC_EXPECTED_SIM_SOURCE_SHA256" \
   '{"cohort":"ranked-draft","map":1,"partition":"train"}' --development
 ```
 
@@ -261,7 +293,7 @@ Validate coverage and retrieval after a run:
 ```sh
 bun src/simulation/audit_premium_evidence.ts \
   sim-out/premium-smoke/ai-meta.summary.json sim-out/premium-smoke/readiness.json \
-  sim-out/premium-smoke/evidence.sqlite
+  sim-out/premium-smoke/premium.sqlite
 ```
 
 The audit checks source/archive identity, family uniqueness, map/window counts,

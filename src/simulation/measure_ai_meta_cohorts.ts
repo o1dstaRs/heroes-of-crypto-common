@@ -22,7 +22,7 @@ import {
     premiumAugmentPlanId,
     type IPremiumAugmentPlan,
 } from "../ai/setup/premium_augment_plans";
-import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, lstatSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { arch, availableParallelism, cpus, platform, release, totalmem } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
@@ -83,6 +83,7 @@ import { captureGitSourceStatus } from "./git_source_status";
 import { fingerprintSourceTree } from "./source_tree_fingerprint";
 import { AI_META_EVIDENCE_SCHEMA } from "./ai_meta_evidence";
 import { AI_META_OFFLINE_SEARCH_ENVIRONMENT } from "./ai_meta_search_budget";
+import { aiMetaOutputContract, finalizeAiMetaOutputs } from "./ai_meta_outputs";
 
 interface ICountedOutcome {
     score: number;
@@ -1199,6 +1200,14 @@ function writeSummary(
             requestedCohorts,
             totalGames: qualities.reduce((sum, quality) => sum + quality.games, 0),
             totalPairs: qualities.reduce((sum, quality) => sum + quality.pairs, 0),
+            outputContract: {
+                schema: "ai-meta-outputs-v1",
+                mode: process.env.AI_META_OUTPUT_MODE ?? "premium",
+                required:
+                    (process.env.AI_META_OUTPUT_MODE ?? "premium") === "premium"
+                        ? ["premium.sqlite", "premium-readiness.json", "ai-meta.outputs.json"]
+                        : [],
+            },
             baseSeed,
             concurrency,
             parallelCohorts,
@@ -1381,8 +1390,10 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "<fight-profile=a13|a19|a19-work> [pair-start=0] [pair-count=all]. " +
-    "Set AI_META_COLLECT_EVIDENCE=1 for legacy evidence capture, or AI_META_STUDY_PROFILE=premium-ranked-v3 for ranked-side coverage with public setup and capture (requires a19-work).";
+    "<fight-profile=a13|a19|a19-work|v09-native|v09-draft-a19-work> [pair-start=0] [pair-count=all]. " +
+    "Defaults to premium-ranked-v3 capture and an audited premium.sqlite (a19-work or v09-draft-a19-work). " +
+    "Outcome-only research requires AI_META_OUTPUT_MODE=legacy-oracle explicitly. " +
+    "Sharded drivers set AI_META_SHARD=1 and finalize the merged study with ai_meta_outputs.ts.";
 
 export function validateAiMetaGamesPerCohort(games: number, premiumStudy = false): void {
     const mapCycleGames = premiumStudy ? AI_META_GAMES_PER_MATCHUP : AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;
@@ -1398,6 +1409,11 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         console.log(AI_META_USAGE);
         return;
     }
+    if (argv.length > 9) throw new Error(AI_META_USAGE);
+    const fightProfile = resolveAiMetaFightProfile(argv[6]);
+    const outputContract = aiMetaOutputContract(fightProfile.id, process.env);
+    if (outputContract.studyProfile) process.env.AI_META_STUDY_PROFILE = outputContract.studyProfile;
+    if (outputContract.collectEvidence) process.env.AI_META_COLLECT_EVIDENCE = "1";
     const gamesPerCohort = Number(argv[0] ?? 150_000);
     validateAiMetaGamesPerCohort(gamesPerCohort, Boolean(aiMetaStudyFromEnvironment()));
     const baseSeed = Number(argv[1] ?? 85_000_717);
@@ -1414,13 +1430,8 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         }
         return value as AiMetaCohort;
     });
+    if (new Set(cohorts).size !== cohorts.length) throw new Error("Duplicate cohorts are not allowed");
     const parallelCohorts = Math.min(Number(argv[5] ?? Math.min(3, cohorts.length)), cohorts.length, concurrency);
-    const fightProfile = resolveAiMetaFightProfile(argv[6]);
-    if (aiMetaStudyFromEnvironment()) {
-        if (process.env.AI_META_ARTIFACT_UNIFORM === "1")
-            throw new Error("Premium study fixes exploration; unset AI_META_ARTIFACT_UNIFORM");
-        process.env.AI_META_COLLECT_EVIDENCE = "1";
-    }
     if (process.env.AI_META_COLLECT_EVIDENCE === "1" && !fightProfile.offlineDeterministicWork) {
         throw new Error("AI_META_COLLECT_EVIDENCE=1 requires the a19-work fight profile");
     }
@@ -1446,6 +1457,8 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
     if (!completePairWindow && (cohorts.length !== 1 || parallelCohorts !== 1)) {
         throw new Error("A sliced AI-meta invocation must contain exactly one cohort and parallelCohorts=1");
     }
+    if (existsSync(outDir) && (lstatSync(outDir).isSymbolicLink() || readdirSync(outDir).length))
+        throw new Error(`Refusing non-empty or symlink output directory: ${outDir}`);
     mkdirSync(outDir, { recursive: true });
     const summaryPath = join(outDir, "ai-meta.summary.json");
     const startedAt = new Date().toISOString();
@@ -1469,6 +1482,8 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
     console.log(
         `Policy ${aiMetaStudyFromEnvironment() ?? AI_META_POLICY}; exploration ${(AI_META_EXPLORATION_RATE * 100).toFixed(0)}% per setup component.`,
     );
+    if (outputContract.mode === "legacy-oracle")
+        console.log("Explicit legacy-oracle run: no Premium SQLite will be generated.");
 
     for (let offset = 0; offset < cohorts.length; offset += parallelCohorts) {
         assertAiMetaSourceIdentity(runIdentity);
@@ -1512,9 +1527,12 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         );
     }
 
+    const shard = process.env.AI_META_SHARD === "1" || !completePairWindow;
+    const finalizePremium = !shard && outputContract.mode === "premium";
+    const capturedPath = finalizePremium ? join(outDir, "ai-meta.captured-summary.json") : summaryPath;
     writeSummary(
-        summaryPath,
-        completePairWindow,
+        capturedPath,
+        !shard,
         startedAt,
         cohorts,
         gamesPerCohort,
@@ -1528,7 +1546,15 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         qualities,
         aggregation,
     );
-    console.log(`\nComplete: ${qualities.reduce((sum, quality) => sum + quality.games, 0).toLocaleString()} fights.`);
+    if (finalizePremium) {
+        console.log("Capture finished; building and auditing Premium SQLite before completing the batch.");
+        const outputs = await finalizeAiMetaOutputs(capturedPath, { publishSummaryPath: summaryPath });
+        console.log(`Premium snapshot: ${join(outDir, outputs.snapshot.path)} (${outputs.snapshot.status})`);
+    }
+    console.log(
+        `\n${shard ? "Shard captured (merge/finalization required)" : "Complete"}: ` +
+            `${qualities.reduce((sum, quality) => sum + quality.games, 0).toLocaleString()} fights.`,
+    );
     console.log(`Summary: ${summaryPath}`);
 }
 

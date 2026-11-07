@@ -21,6 +21,7 @@ import { summarizePremiumParticipation } from "../../src/simulation/ai_meta_part
 import { summarizePremiumCombatMetrics } from "../../src/simulation/ai_meta_combat_metrics";
 import { summarizePremiumHealth } from "../../src/simulation/ai_meta_health_ledger";
 import { runAiMetaWorkerPool, resolveAiMetaFightProfile } from "../../src/simulation/measure_ai_meta_cohorts";
+import { finalizeAiMetaOutputs } from "../../src/simulation/ai_meta_outputs";
 
 const sourceSha256 = "a".repeat(64);
 let directory: string;
@@ -90,6 +91,59 @@ afterAll(() => {
 });
 
 describe("immutable Premium evidence snapshots", () => {
+    it("completes a batch only with an audited SQLite snapshot, and retries without rerunning games", async () => {
+        const input = save("automatic-outputs", [captured]);
+        const folder = join(directory, "automatic-outputs");
+        const published = join(folder, "ai-meta.summary.json");
+        writeFileSync(published, JSON.stringify({ ...summary, complete: false }));
+        const receipt = await finalizeAiMetaOutputs(input, { publishSummaryPath: published });
+        expect(receipt.complete).toBe(true);
+        expect(receipt.families).toBe(1);
+        expect(receipt.fights).toBe(2);
+        expect(receipt.snapshot.status).toBe("development");
+        expect(receipt.snapshot.capabilities).toContain("committed-health-v1");
+        expect(receipt.published).toBe(false);
+        expect(readFileSync(published, "utf8")).toBe(readFileSync(input, "utf8"));
+        const audit = JSON.parse(readFileSync(join(folder, "premium-readiness.json"), "utf8"));
+        expect(audit.failures).toEqual([]);
+        expect(audit.families).toBe(1);
+        const second = await finalizeAiMetaOutputs(input, { publishSummaryPath: published });
+        expect(second.snapshot.sha256).toBe(receipt.snapshot.sha256);
+        expect(second.snapshot.snapshotId).toBe(receipt.snapshot.snapshotId);
+    });
+
+    it("preserves raw games and leaves the batch incomplete when Premium capture is missing", async () => {
+        const missing = structuredClone(captured);
+        delete missing.evidence;
+        const input = save("missing-automatic-capture", [missing]);
+        const folder = join(directory, "missing-automatic-capture");
+        const published = join(folder, "ai-meta.summary.json");
+        writeFileSync(published, JSON.stringify({ ...summary, complete: false }));
+        const before = readFileSync(join(folder, rawName));
+        await expect(finalizeAiMetaOutputs(input, { publishSummaryPath: published })).rejects.toThrow();
+        expect(JSON.parse(readFileSync(published, "utf8")).complete).toBe(false);
+        expect(JSON.parse(readFileSync(join(folder, "ai-meta.outputs.json"), "utf8")).state).toBe("failed");
+        expect(existsSync(join(folder, "premium.sqlite"))).toBe(false);
+        expect(readFileSync(join(folder, rawName))).toEqual(before);
+    });
+
+    it("refuses partial shards, changed summaries and unrelated existing snapshots", async () => {
+        const partial = save("partial-automatic-outputs", [captured], { ...summary, complete: false });
+        await expect(finalizeAiMetaOutputs(partial)).rejects.toThrow("partial shard");
+        const input = save("unrelated-automatic-outputs", [captured]);
+        const folder = join(directory, "unrelated-automatic-outputs");
+        const unrelated = save("unrelated-source", [captured], {
+            ...summary,
+            provenance: { ...summary.provenance, commonCommit: "another-source" },
+        });
+        await buildPremiumEvidenceSnapshot(unrelated, join(folder, "premium.sqlite"), { development: true });
+        const before = readFileSync(join(folder, "premium.sqlite"));
+        await expect(finalizeAiMetaOutputs(input)).rejects.toThrow("another run");
+        expect(readFileSync(join(folder, "premium.sqlite"))).toEqual(before);
+        writeFileSync(input, JSON.stringify({ ...summary, generatedAt: "changed" }));
+        await expect(finalizeAiMetaOutputs(input)).rejects.toThrow("different summary");
+    });
+
     it("round-trips real battle evidence with family-level support and indexed compound filters", async () => {
         const input = save("roundtrip", [captured]);
         const output = join(directory, "evidence.sqlite");
