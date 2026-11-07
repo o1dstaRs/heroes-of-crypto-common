@@ -1,5 +1,90 @@
 # v0.9 training against current A19 R2
 
+## Broader joint-head campaign — November 7, 2026 UTC
+
+The user requested a review from all angles and continued training for measured
+combat gains. A new bounded campaign is registered on the 9800X3D/RDNA host as
+`v09-joint-training-20261107T065723Z`, using source **`005805a5`**. The 12-hour
+window ends at **18:57:25 UTC on November 7**. Its registration SHA is
+`4e72480f0f8ce771430e197950b66022a827d89a4d87f5503dd543b8730747cc`;
+the uploaded archive SHA is
+`674cf1b195ed490539017dffdc0de0d49c83ce2b4e1c9e89b4bc59f633d3d991`.
+This is an in-progress experiment, not a newly qualified model.
+
+### Questions the experiment separates
+
+| Angle               | Finding and registered response                                                                                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model capacity      | A frozen ensemble member can make a correction unattainable. Compare joint heads with matched single-head controls, preserving both original backbones.                                                               |
+| Objective alignment | Fit marginal terminal-score differences with equal informative-root weights. Retain the real margin-one selector and original arithmetic ensemble.                                                                    |
+| Data coverage       | The old Radeon pilot had 19/14 roots from six targeted creatures. Collect fresh, untargeted ranked drafts across all nine doctrine matchups, three maps, three requested battle phases and both physical/draft seats. |
+| Labels and noise    | Keep eight shared futures for every retained action, including draws. Record missing roots without refills. Report both reused-label oracle gain and four-by-four cross-world diagnostic gain.                        |
+| Preservation        | Sample actual full-catalog A19 choices before outcomes. Fit with warm KL and teacher CE; require complete warm-validation CE to remain within 0.03 of its original value.                                             |
+| Selection           | Use separate family-level training, validation, development and confirmation banks. Four fixed fits may produce only one validation-locked complete pair. No subgroup rescue or fallback finalist.                    |
+| Opponent and draft  | Both combat seats use independent locked-V3 draft policies with authoritative sequential bundle visibility. This removes the older screen's fixed-previous-draft limitation.                                          |
+| Serving cost        | Train existing weights only: 65 or 130 parameters. No layers or search work are added. Quiet production whole-turn timing within 1.10 times the reference remains a separate gate.                                    |
+
+The research harness now accepts `researchOpponentDraftChoices` alongside the
+candidate hook. Each seat receives its own public context and retains its own
+state through collision retries. Tests exercise both physical mirrors and both
+draft seats, prove exact no-op setup/record parity, and reject an illegal
+opponent-only choice. Existing callers retain their original behavior.
+
+### Fixed acquisition and fit design
+
+The bank contains **648 training scenarios and 324 validation scenarios**. Its
+81 map/doctrine/phase strata each have eight training and four validation
+scenarios, balancing the four physical/draft assignments. One eligible root is
+selected by an outcome-blind hash within the requested phase; no focal creature
+is forced into the draft. Retain at most three eligible actions, including the
+actual baseline decision, native searched choice when different and a distinct
+action family when available. Every retained action receives all eight complete
+continuations. Unobserved alternatives receive no invented outcome.
+
+GPU training requires at least 300/128 usable training/validation roots, 96/32
+marginal-score-informative roots and 512/256 authentic warm rows. These counts
+are gates, not claims about data already collected. The immutable historical
+functional fixture separately runs the exact four-fit trainer before the label
+budget is spent. Its proxy warm argmax targets are diagnostic, all its exports
+remain marked functional, and it cannot lock a strength finalist.
+
+The four real-data recipes cross learning rates 0.003/0.01 with student/joint
+heads. They share initialization, AdamW weight decay 0.001, score scale 0.1,
+root KL weight 0.2, warm KL weight one, teacher CE weight 0.05 and clipping at
+one. Frozen encodings are reusable only because both original backbones remain
+frozen. The cap is 600 updates per fit, with checks every ten updates, at least
+40 updates and patience 60. Checkpoint eligibility requires validation loss to
+improve by at least 0.005, the warm CE bound, zero unlabeled served validation
+choices, nonnegative recorded-label gain and at least one changed decision.
+Validation may select the checkpoint; it cannot open multiple strength trials.
+
+The one selected pair must pass at least 96 Bun numerical/decision references
+and 48 complete warm-start A/A replay pairs. Its development bank has **864
+games**. Confirmation's separate **3,132 games** stay closed unless development
+scores at least 55% with a whole-board 95% lower bound above 50%. Confirmation
+requires at least 52% and a lower bound above 50%. Both banks balance maps,
+doctrines, physical sides and draft seats. The registered map-stratified
+bootstrap resamples complete four-game boards, never individual battles.
+
+This route learns corrections on top of full A19 search. It does not train or
+activate the native v0.9 anchor artifact. A positive baseline comparison would
+still leave general opponent-pool robustness and production timing to verify.
+Later changes to balance or combat code require explicit transfer evaluation;
+the shared working tree's uncommitted gameplay edits are outside this capsule.
+The current default remains locked v0.9 draft plus qualified A19 combat.
+
+Repository verification for the harness change passed lint, TypeScript checking
+and **7,500 common tests**. Ordinary run data and models remain outside Git.
+
+The live campaign passed its Linux controls and trainer preflight before starting
+fresh acquisition. Mac and Linux control receipts are identical: 12 cases each
+reproduce stock, observed capture and same-future continuation games, including
+788 restoration checks. The exact four-fit trainer completed 160 functional
+updates in **38.25 seconds**, using a sampled peak of **162.1 MiB VRAM**. None of
+those diagnostic fits satisfied checkpoint eligibility, and none can consume
+strength games. These results verify the new trainer's execution; fresh-data
+training and match-strength results are still pending.
+
 ## Joint-head training on the 9800X3D RDNA GPU — November 7, 2026 UTC
 
 The user requested a Tinygrad training path on the 9800X3D node. A source-pinned
