@@ -13,6 +13,10 @@ Use `bun fmt --no-script <paths>` for targeted formatting and add `--check` for 
 Do not invoke Prettier separately. `--no-script` avoids running this package's whole-source `fmt`
 script when you only intend to format your own files. Keep the required build and lint checks.
 
+Set `HOC_TEST_WORKERS=2` when a shared workstation is busy. The test runner caps this override at the
+available cores and the existing local/CI limits, and rejects invalid counts. It also applies to tests
+started by the package build; the default remains up to 12 local workers and 2 CI workers.
+
 ## User-locked A19 full-policy research reference
 
 The user accepted the **50.36%** result and requested a fixed checkpoint on November 8, 2026 UTC.

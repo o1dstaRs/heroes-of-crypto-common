@@ -35,7 +35,12 @@ export function testWorkerCount(availableWorkers: number, isCi = false): number 
 
 if (import.meta.main) {
     const repositoryRoot = resolve(import.meta.dir, "..");
-    const workers = testWorkerCount(availableParallelism(), process.env.CI === "true");
+    const availableWorkers = availableParallelism();
+    const requestedWorkers = process.env.HOC_TEST_WORKERS;
+    const workers = testWorkerCount(
+        requestedWorkers === undefined ? availableWorkers : Math.min(availableWorkers, Number(requestedWorkers)),
+        process.env.CI === "true",
+    );
     const forwardedArgs = process.argv.slice(2);
     const result = Bun.spawnSync({
         cmd: [
