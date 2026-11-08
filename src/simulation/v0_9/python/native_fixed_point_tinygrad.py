@@ -1,8 +1,40 @@
 """Native v0.9 dense ranker and canonical integer export. Importing starts no device."""
 from copy import deepcopy
 import math
+import hashlib
 import numpy as np
-from tinygrad import Tensor
+from tinygrad import Tensor, dtypes
+
+
+def upload_native_feature_bank(raw, offsets, scales, *, device, chunk_rows=128, verify=False):
+    """Normalize and fill resident storage without mapping a corpus-sized host allocation into KFD."""
+    offsets = np.asarray(offsets, np.float32)
+    scales = np.asarray(scales, np.float32)
+    if (len(raw.shape) != 3 or raw.shape[0] < 1 or raw.shape[1] < 1 or raw.shape[2] != 166
+            or offsets.shape != (166,) or scales.shape != (166,)
+            or not np.isfinite(offsets).all() or not np.isfinite(scales).all()
+            or not (scales > 0).all() or type(chunk_rows) is not int or chunk_rows < 1):
+        raise ValueError('Declare a nonempty native feature bank and a positive upload chunk size')
+    bank = Tensor.empty(*raw.shape, device=device, dtype=dtypes.float32).realize()
+    digest = hashlib.sha256()
+    maximum_host_chunk_bytes = 0
+    for start in range(0, len(raw), chunk_rows):
+        end = min(start + chunk_rows, len(raw))
+        values = np.asarray(raw[start:end], np.float32)
+        if not np.isfinite(values).all():
+            raise ValueError('Native upload contains nonfinite observations')
+        values = np.ascontiguousarray(((values - offsets) * scales).clip(-8, 8))
+        digest.update(values.tobytes())
+        maximum_host_chunk_bytes = max(maximum_host_chunk_bytes, values.nbytes)
+        bank[start:end].assign(Tensor(values, device=device)).realize()
+        bank = bank.realize().detach()
+        if verify and not np.array_equal(bank[start:end].numpy(), values):
+            raise ValueError('Native resident feature upload changed an input value')
+    return bank, {
+        'rows': len(raw), 'shape': list(raw.shape), 'normalizedFloat32Sha256': digest.hexdigest(),
+        'maximumHostChunkBytes': maximum_host_chunk_bytes, 'chunkRows': chunk_rows,
+        'readbackVerified': bool(verify),
+    }
 
 
 def select_native_candidates(scores, eligible, minimum_margin):

@@ -5,11 +5,35 @@ from tinygrad import Tensor
 from native_fixed_point_tinygrad import NativeRanker, fixed_point_scores, native_ranking_loss, quantize_layer, round_away, round_away_np
 from parity import score as scalar_fixed_point_score
 from native_fixed_point_tinygrad import NativeMarginCalibration, select_native_candidates
+from native_fixed_point_tinygrad import upload_native_feature_bank
 
 def template_fixture():
     return {'schema': 'hoc.ai.v0_9_model.v1', 'architecture': {'inputSize': 166}, 'features': {'inputFeatureNames': [f'feature-{i}' for i in range(166)]}, 'fixedPoint': {'inputScale': 256, 'inputClip': 8}, 'status': 'anchor_only', 'promoted': False}
 
 class NativeBackendTests(unittest.TestCase):
+
+    def test_bounded_upload_preserves_every_value_and_partial_tail(self):
+        import hashlib
+        rng = np.random.default_rng(71811)
+        raw = rng.uniform(-20, 20, (5, 3, 166)).astype(np.float32)
+        offsets = rng.uniform(-1, 1, 166).astype(np.float32)
+        scales = rng.uniform(.1, 2, 166).astype(np.float32)
+        expected = ((raw - offsets) * scales).clip(-8, 8)
+        bank, receipt = upload_native_feature_bank(raw, offsets, scales, device='CPU', chunk_rows=2, verify=True)
+        np.testing.assert_array_equal(bank.numpy(), expected)
+        self.assertEqual(receipt['normalizedFloat32Sha256'], hashlib.sha256(expected.tobytes()).hexdigest())
+        self.assertEqual(receipt['maximumHostChunkBytes'], 2 * 3 * 166 * 4)
+        self.assertTrue(receipt['readbackVerified'])
+
+    def test_bounded_upload_rejects_invalid_shapes_and_normalization(self):
+        raw = np.zeros((2, 3, 166), np.float32)
+        for rows in [0, -1, True]:
+            with self.assertRaises(ValueError):
+                upload_native_feature_bank(raw, np.zeros(166), np.ones(166), device='CPU', chunk_rows=rows)
+        with self.assertRaises(ValueError):
+            upload_native_feature_bank(raw, np.zeros(166), np.zeros(166), device='CPU')
+        with self.assertRaises(ValueError):
+            upload_native_feature_bank(raw[:, :, :165], np.zeros(166), np.ones(166), device='CPU')
 
     def test_selection_preserves_safety_ties_and_all_guarded_fallback(self):
         scores = np.asarray([[10, 10, 100], [7, 6, 5], [0, -2, 5], [0, 19, 20]], np.int64)

@@ -50,8 +50,11 @@ Preserve the read-only node reference `native-v09-2564-20261108-4e1d89927177` an
 See `docs/v0_9_native_combat_rdna_research.md` for source, registrations, exact artifact/archive hashes,
 numerical checks, failed pilot and complete fresh result. Further native models must beat this confirmed
 reference, with stock A19 still the target opponent. The next separately registered scale campaign uses
-`v09-native-scale-acquisition-20261108T170905Z` and `v09-native-scale-learning-20261108T170905Z` on the
-9800X3D/RDNA node. Exclude all prior and reserved banks, including their derived setup/combat channels;
+`v09-native-scale-acquisition-20261108T170905Z` on the 9800X3D/RDNA node. Its initial scale fitter stopped
+before SGD on a KFD host-memory mapping error. The separate
+`v09-native-scale-recovery-20261108T180216Z` learner uses exact-readback 128-row uploads and unchanged
+recipes, with a new unused fresh bank; see the research document for identities and transport checks.
+Exclude all prior and reserved banks, including their derived setup/combat channels;
 never select a replacement model after opening its fresh bank.
 
 ## Locked v0.9 draft default

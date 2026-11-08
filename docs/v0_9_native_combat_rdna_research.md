@@ -156,6 +156,19 @@ longer the improvement reference. Complete development results select one finali
 fresh board families / 12,096 matched battles. All previous banks, including unopened reserved banks, are
 excluded. The native side still executes zero A19 search, and nothing is promoted automatically.
 
+The initial scale fitter stopped before model construction or SGD: KFD returned `EAGAIN` while mapping
+a 1.20 GB host feature allocation. Collection and its confirmed-reference baseline continued. This is
+preserved as a failed execution of learner registration `004215d76608afbedca60ed13cf6b791922fc9a1a1be0f97613d2d107e7293c7`.
+
+The separately registered recovery is `v09-native-scale-recovery-20261108T180216Z`, registration SHA
+`7df627b451c042e379442f496f9d993dfafbf159d50b6c06bc2d7ef42bb25970`, capsule SHA
+`e870e42f420d1335b588e0ae7b8dda57ecd6cd0bf4d78d1ad686e7705d40c545`. It retains the source, recipes,
+loss, data admission and confirmed native reference, and reserves another unused fresh bank. It changes
+input transport: normalize 128-row FP32 chunks, fill resident GPU storage, and verify every chunk by exact
+readback before training. Each host chunk is at most 8,159,232 bytes. No observations are dropped and
+precision is unchanged. The full previously failed training/validation banks (24,879 decisions) passed
+exact GPU readback in 9.34 seconds. The portable backend's expanded thirteen CPU tests also passed.
+
 ## Validation and ownership
 
 The engine capture change passed 7,600 common tests, TypeScript compilation and the common build with
