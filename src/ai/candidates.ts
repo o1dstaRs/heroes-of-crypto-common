@@ -18,8 +18,10 @@ import { canWaitOnHourglass } from "../engine/hourglass";
 import { projectPostMoveActorAvailability } from "../engine/post_move_actor_availability";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import {
+    advanceDeltaBetween,
     getCellsAroundCell,
     getCellsAroundFootprint,
+    getFootprintCellsForAnchor,
     getFootprintCellsForPosition,
     getPositionForCell,
     getPositionForFootprintAnchor,
@@ -37,7 +39,7 @@ import { AttackHandler, type IPreparedRangeAttackEvaluation } from "../handlers/
 import {
     canCastSpell,
     cellTargetedSpellBlockCells,
-    firstSummonableAnchor,
+    summonableAnchors,
     canMassCastSpell,
     fireballBlastCells,
     resolveThrownSpellImpact,
@@ -3535,27 +3537,55 @@ class CandidateGenerator {
                 if (amount <= 0) {
                     continue;
                 }
-                // Deterministic (RNG-free) summon cell: the first anchor around the caster that the
-                // summoned creature actually FITS on. Asking only whether ONE cell is empty was right
-                // while every summon was a 1x1; now that the mounted class ships 2x1, a free cell is a
-                // coin flip on whether the body fits — and the engine refuses an EXPLICIT cell outright
-                // rather than re-routing it (only its own fallback retries), so the cast was simply lost.
-                // Ring the caster's whole FOOTPRINT too: from the base cell alone, a rectangular
-                // summoner offers spots that hug one end of its body.
                 const summonFootprint = getCreatureFootprint(
                     ToFactionName[spell.getSummonUnitRace()],
                     spell.getSummonUnitName(),
                 );
-                const cell = firstSummonableAnchor(
+                const casterCells = this.unit.getCells();
+                const cells = summonableAnchors(
                     spell,
                     matrix,
-                    getCellsAroundFootprint(gs, this.unit.getCells()),
+                    getCellsAroundFootprint(gs, casterCells),
                     summonFootprint.width,
                     summonFootprint.height,
                 );
+                const cell = cells[0];
+                const existing = unitsHolder.getSummonedUnitByName(team, spell.getSummonUnitName());
                 if (cell) {
                     this.pushSpell(spell, undefined, { x: cell.x, y: cell.y });
-                } else if (unitsHolder.getSummonedUnitByName(team, spell.getSummonUnitName())) {
+                    if (!existing) {
+                        const side = this.context.fightProperties?.isSideAxisPolicyTeam(team) === true;
+                        const lateral = (c: XY): number => (side ? c.y : c.x);
+                        const casterLane = casterCells.reduce((sum, c) => sum + lateral(c), 0) / casterCells.length;
+                        let forward: XY | undefined;
+                        let laneDistance = Infinity;
+                        for (const anchor of cells) {
+                            const body = getFootprintCellsForAnchor(
+                                anchor,
+                                summonFootprint.width,
+                                summonFootprint.height,
+                            );
+                            if (
+                                !body.every((c) =>
+                                    casterCells.every((from) => advanceDeltaBetween(team, from, c, side) > 0),
+                                )
+                            ) {
+                                continue;
+                            }
+                            const distance = Math.abs(
+                                body.reduce((sum, c) => sum + lateral(c), 0) / body.length - casterLane,
+                            );
+                            if (distance < laneDistance) {
+                                forward = anchor;
+                                laneDistance = distance;
+                            }
+                        }
+                        // Keep the original option and add at most one forward body for search to compare.
+                        if (forward && (forward.x !== cell.x || forward.y !== cell.y)) {
+                            this.pushSpell(spell, undefined, forward);
+                        }
+                    }
+                } else if (existing) {
                     // The engine reinforces an existing friendly summon before checking spawn space.
                     // A surrounded Satyr can therefore add wolves even when no new 2x1 body fits.
                     // Keep the original anchored candidate whenever space exists so ordinary search

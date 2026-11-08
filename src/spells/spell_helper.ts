@@ -734,20 +734,6 @@ export function canCastSummon(
 }
 
 /**
- * The first of `candidateAnchors` the summoned creature actually FITS on, or undefined when none of them
- * holds it.
- *
- * Every surface that picks a summon spot — the engine's hook, both AIs, the sandbox and the server's
- * fallback — takes the first free cell around the caster and hands it over as an anchor. For anything
- * bigger than a 1x1 that is a coin flip: the cell is free, the body does not fit, and the cast is refused
- * with no attempt at the next candidate. Walking the candidates through the real gate means the anchor that
- * comes back is one the engine will accept.
- *
- * The candidates themselves stay with the caller, which is the side that knows the caster: ring its whole
- * footprint (GridMath.getCellsAroundFootprint over Unit.getCells), not just its base cell, or the offered
- * spots hug one end of a rectangular summoner.
- */
-/**
  * The footprint the creature this spell summons will actually occupy.
  *
  * `canCastSummon` defaults to 1x1 because the summoned unit does not exist yet at the first gate. That
@@ -794,17 +780,46 @@ export function resolveSummonAnchor(
 export function firstSummonableAnchor(
     spell: Spell,
     gridMatrix: number[][],
-    candidateAnchors: readonly XY[],
+    casterRingCells: readonly XY[],
     summonFootprintWidth = 1,
     summonFootprintHeight = 1,
 ): XY | undefined {
-    for (const anchor of candidateAnchors) {
+    for (const anchor of summonAnchorsAround(casterRingCells, summonFootprintWidth, summonFootprintHeight)) {
         if (canCastSummon(spell, gridMatrix, anchor, summonFootprintWidth, summonFootprintHeight)) {
             return anchor;
         }
     }
 
     return undefined;
+}
+
+/** Every legal body touching the caster's ring, keeping the historical anchors first. */
+export function summonableAnchors(
+    spell: Spell,
+    gridMatrix: number[][],
+    casterRingCells: readonly XY[],
+    summonFootprintWidth = 1,
+    summonFootprintHeight = 1,
+): XY[] {
+    return [...summonAnchorsAround(casterRingCells, summonFootprintWidth, summonFootprintHeight)].filter((anchor) =>
+        canCastSummon(spell, gridMatrix, anchor, summonFootprintWidth, summonFootprintHeight),
+    );
+}
+
+function* summonAnchorsAround(casterRingCells: readonly XY[], width: number, height: number): Generator<XY> {
+    const seen = new Set<string>();
+    for (let dx = 0; dx < width; dx++) {
+        for (let dy = 0; dy < height; dy++) {
+            for (const cell of casterRingCells) {
+                // The adjacent cell can be any part of the body, not only its top-right anchor.
+                const anchor = { x: cell.x + dx, y: cell.y + dy };
+                const key = `${anchor.x},${anchor.y}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                yield anchor;
+            }
+        }
+    }
 }
 
 /**

@@ -174,8 +174,13 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        // Re-pinned for legal Satyr reinforcement when an existing wolf stack needs no spawn space.
-        sha256: "e70c4d91c2386ed9651245825119722af540a14f71e7dd216454452ef24626c5" as const,
+        // User-requested forward summon choice; existing Wolf reinforcements keep one placement option.
+        sha256: "8da0cc2836eaff62f208bb7b35c2863cd552fcc8331d5c5d8395ec9476c86f9d" as const,
+    }),
+    Object.freeze({
+        role: "summon-placement" as const,
+        source: "src/spells/spell_helper.ts" as const,
+        sha256: "dfb8bcdcbf3f550a8f8ca30de2af01174a78dc81b892ece14ef1d4780fcf4c6a" as const,
     }),
     Object.freeze({
         role: "last-fuse-estimates" as const,

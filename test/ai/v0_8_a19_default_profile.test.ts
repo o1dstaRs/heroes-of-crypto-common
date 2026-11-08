@@ -255,6 +255,7 @@ describe("v0.8+A19 production profile", () => {
             "gravechain-coverage",
             "last-fuse-trades",
             "last-fuse-catalog",
+            "summon-placement",
             "last-fuse-estimates",
             "lightning-spin-tactics",
             "ranged-shields",

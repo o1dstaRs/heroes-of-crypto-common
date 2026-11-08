@@ -13,14 +13,17 @@ import { describe, expect, it } from "bun:test";
 
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { getCellsAroundFootprint } from "../../src/grid/grid_math";
 import { Spell } from "../../src/spells/spell";
 import {
     canCastSummon,
     noSpaceToSummonMessage,
     resolveSummonAnchor,
     summonFootprintOf,
+    summonableAnchors,
 } from "../../src/spells/spell_helper";
 import type { XY } from "../../src/utils/math";
+import { testGridSettings } from "../helpers/combat";
 
 const summonWolves = (): Spell => new Spell({ spellProperties: getSpellConfig("Nature", "Summon Wolves"), amount: 1 });
 
@@ -39,6 +42,54 @@ describe("a summon is seated with the summoned creature's real body", () => {
     it("reads Summon Wolves as the 2x1 it actually spawns", () => {
         expect(summonFootprintOf(summonWolves())).toEqual({ width: 2, height: 1 });
     });
+
+    it("finds the Wolf body directly ahead when its anchor is beyond the caster's adjacent ring", () => {
+        const matrix = Array.from({ length: 16 }, () => new Array(16).fill(PBTypes.TeamVals.LEFT));
+        matrix[7][8] = 0;
+        matrix[7][9] = 0;
+        const ring = getCellsAroundFootprint(testGridSettings, [{ x: 7, y: 7 }]);
+
+        expect(ring).not.toContainEqual({ x: 9, y: 7 });
+        expect(resolveSummonAnchor(summonWolves(), matrix, ring)).toEqual({ x: 9, y: 7 });
+    });
+
+    for (const caster of [
+        { x: 0, y: 0 },
+        { x: 0, y: 7 },
+        { x: 7, y: 7 },
+        { x: 15, y: 7 },
+        { x: 15, y: 15 },
+    ]) {
+        for (const [width, height] of [
+            [1, 1],
+            [2, 1],
+            [1, 2],
+            [2, 2],
+        ]) {
+            it(`offers exactly the fitting adjacent ${width}x${height} bodies around ${caster.x},${caster.y}`, () => {
+                const matrix = emptyBoard();
+                matrix[caster.y][caster.x] = PBTypes.TeamVals.LEFT;
+                const actual = summonableAnchors(
+                    summonWolves(),
+                    matrix,
+                    getCellsAroundFootprint(testGridSettings, [caster]),
+                    width,
+                    height,
+                );
+                const expected: string[] = [];
+                for (let x = width - 1; x < 16; x++) {
+                    for (let y = height - 1; y < 16; y++) {
+                        const minX = x - width + 1,
+                            minY = y - height + 1;
+                        const dx = Math.max(minX - caster.x, caster.x - x, 0);
+                        const dy = Math.max(minY - caster.y, caster.y - y, 0);
+                        if (Math.max(dx, dy) === 1) expected.push(`${x},${y}`);
+                    }
+                }
+                expect(actual.map((cell) => `${cell.x},${cell.y}`).sort()).toEqual(expected.sort());
+            });
+        }
+    }
 
     it("keeps a preferred cell that can seat the body, so 1x1 draws are untouched", () => {
         const spell = summonWolves();
@@ -67,6 +118,8 @@ describe("a summon is seated with the summoned creature's real body", () => {
         const matrix = emptyBoard();
         matrix[5][4] = PBTypes.TeamVals.LEFT;
         matrix[9][8] = PBTypes.TeamVals.LEFT;
+        matrix[5][6] = PBTypes.TeamVals.LEFT;
+        matrix[9][10] = PBTypes.TeamVals.LEFT;
         expect(
             resolveSummonAnchor(
                 spell,
