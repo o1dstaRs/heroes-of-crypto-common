@@ -31,7 +31,7 @@ import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } 
 const LEFT = PBTypes.TeamVals.LEFT;
 const RIGHT = PBTypes.TeamVals.RIGHT;
 
-function fixture(team: TeamType = LEFT, side = true) {
+function fixture(team: TeamType = LEFT, side = true, healerAmount = 20) {
     const combat = createCombatTestContext();
     const own: Unit[] = [];
     const add = (name: string, faction: string, amount: number, cell: XY, unitTeam = team, summoned = false) => {
@@ -53,7 +53,7 @@ function fixture(team: TeamType = LEFT, side = true) {
         own.push(unit);
         return unit;
     };
-    const healer = add("Healer", "Life", 20, { x: 2, y: 7 });
+    const healer = add("Healer", "Life", healerAmount, { x: 2, y: 7 });
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setSideOrientedPlacement(side);
     let active = healer.getId();
@@ -141,6 +141,24 @@ function witness(f: ReturnType<typeof fixture>) {
 }
 
 describe("Healer recovery estimates and research spell selection", () => {
+    for (const name of ["Heal", "Mass Heal"] as const) {
+        test(`${name} floors the fractional recovery of an odd-sized caster stack`, () => {
+            const f = fixture(LEFT, true, 21);
+            const target = f.add("Abomination", "Chaos", 1, { x: 6, y: 7 });
+            f.add("Squire", "Life", 10, { x: 14, y: 7 }, f.enemyTeam);
+            f.start();
+            const cross = new Spell({ spellProperties: getSpellConfig("System", "Holy Cross"), amount: 1 });
+            cross.setPower(50);
+            f.healer.applyBuff(cross);
+            f.healer.getUnitProperties().attack_multiplier = 1.5;
+            target.applyDamage(400, 0, new SceneLogMock());
+            const predicted = v08HealingSpellPower(f.healer, name);
+            expect(predicted).toBe(name === "Heal" ? 236 : 78);
+            const before = target.getHp();
+            expect(f.engine.apply(f.cast(name, name === "Heal" ? target : undefined)[0]).completed).toBe(true);
+            expect(target.getHp() - before).toBe(predicted);
+        });
+    }
     for (const team of [LEFT, RIGHT]) {
         for (const name of ["Heal", "Mass Heal"] as const) {
             test(`team ${team}: ${name} estimate matches the actual Holy Cross cast`, () => {
