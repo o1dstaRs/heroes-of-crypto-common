@@ -49,6 +49,270 @@ required separately. A positive result does not automatically activate or
 deploy this research pair. The GPU fit is already complete; this stage needs
 battles rather than extra VRAM allocation.
 
+### Completed overall result
+
+The complete bank finished at **22:47:36 UTC on November 7**, after 88 minutes
+22 seconds including admission, or 84 minutes 14 seconds from the start of fresh
+games. Its result is:
+
+| Games |  Wins | Draws | Losses | Draw-aware score | Whole-board 95% interval |
+| ----: | ----: | ----: | -----: | ---------------: | ------------------------ |
+| 6,048 | 3,014 |    63 |  2,971 |       **50.36%** | **49.42–51.27%**         |
+
+The positive-advantage gate failed. The earlier 52.08% development estimate did
+not reproduce on this independent bank; it is not a confirmed two-point gain.
+All games ended by elimination, with zero rejected actions or model errors and
+294,769 restoration checks. Independent local reconstruction reproduced the raw
+integer totals and both registered 10,000-sample bootstrap endpoints exactly.
+The complete evidence archive is `v09-current-overall-evidence-20261107T230336Z.tar.gz`,
+SHA `5820294c6df5abd27cf8773ebb757f09b2b24ff279ba6f3e4b1b531cb72b840c`.
+This completed bank is now diagnostic/development evidence and is excluded from
+subsequent fresh confirmation. The original failed 55% study and its separate
+unopened bank retain their original status. No model was promoted.
+
+## Loss attribution and overlapping training — November 7–8, 2026 UTC
+
+The next user target is **at least 52% fresh draw-aware score**, with a positive
+whole-board lower 95% bound, while retaining the current serving architecture
+and the 1.10 production-compute allowance. This is a new research target, not a
+retroactive relaxation that passes either previous failed study. These fits
+adapt the complete A19 neural pair; native v0.9 combat remains unqualified.
+
+### Diagnose decisions before adding tactical rules
+
+The source-pinned diagnostic `v09-loss-diagnosis-pinned-20261107T233918Z`
+replayed 28 outcome-selected boards, including positive controls. All **112
+complete records and event/turn hashes** reproduced the original confirmation.
+The first diagnostic attempts used newer engine source, including a Satyr
+reinforcement correction, and did not reproduce the older trajectories. Those
+attempts are retained as source-mismatch failures; they are not evidence of
+platform nondeterminism.
+
+The matched sample contains 2,299 candidate-side neural decisions. Reconstructing
+both selectors on the same observations found **38 choices different from the
+stock pair**. Reconstruction exactly reproduced every actual trained-model
+choice. The examples involve shooting targets, melee approach cells and spell
+targets, but these outcome-selected counts cannot establish unit-specific
+population weaknesses or causal regressions.
+
+Ten losing games have a first divergence from the stock pair. Each was replayed
+with a transparent intervention control, then with only that action changed to
+the stock preference on the original RNG stream. All ten still lost. A separate
+full stock-policy baseline also lost all 56 losses in the 112-game diagnostic
+sample. This is evidence about the selected cases, not a population strength
+estimate or proof that no earlier decision could have saved them.
+
+The completed follow-up tested **all 51 fully scored tied actions** at those ten
+positions on eight shared future streams, totaling **408 full continuations**.
+Nine positions lost every tested future under every tested tied action. At the
+White Tiger position, the trained model's reposition-and-hit won two of eight
+futures; the stock stand-and-hit won one. This does not establish a preference
+from eight futures, but it prevents labeling the movement a proven mistake just
+because the original game lost. Root prefixes, one-action execution and all
+registered input hashes were checked. These experiments neither exhaust actions
+outside the scored tie set nor establish that the positions were irrecoverable
+under a different later policy. No diagnostic result qualifies a model or
+reopens a consumed strength bank.
+
+All frozen diagnostic source, matched traces and counterfactual outputs are
+preserved in `loss-diagnosis-evidence-20261108T042509Z.tar.gz`, SHA
+`c99419b345b6e0689d13725f978b45fe4892cf943b4f3b70d9d7fcf08e68d046`.
+Every one of its 2,136 archived files was independently hashed after archiving.
+
+### Label coverage, rather than more copies of the same fit
+
+The old producer retained at most three alternative actions per root. Among
+259 legacy validation roots, only **74** already have labels for every action
+the correction selector can serve. This is a structural coverage filter, made
+without inspecting outcomes. The new producer retains **every fully scored
+exact-primary-tie action**, with eight aligned complete-controller continuations
+per action. Missing roots/phases are reported rather than refilled, and unscored
+actions never become fabricated losses.
+
+The bounded bootstrap `v09-overlap52-bootstrap-20261107T230144Z` completed eight
+fixed regularization/learning-rate recipes in **599.77 seconds** on the old
+admitted data. None satisfied the predeclared validation-choice constraints, so
+none consumed strength games. Lower validation loss alone was insufficient.
+Its registration SHA is
+`16876b09fa7f5f12ff16fb287f265c996442f3c6f535d46294d104f4a71e61d9`.
+
+### Independent producer, learner and evaluator
+
+The source-sealed stream `v09-overlap52-stream-20261107T234117Z` launched on hft
+at **23:43:00 UTC**, from common `337c302c05c0664402cc9ca01a6dba6cd5b60fb0`.
+Registration SHA:
+`1c6c8f2bcf3e54c23f6cbcf383ff9bc23dd38bf5fd2b748d718da02dfc4c283a`;
+capsule SHA:
+`b28bd979588b370c4758ada38ad3e379c6cbf139dffd513f82a78de7a87efcbb`.
+Its fixed cutoff is **11:41:20 UTC on November 8**. Existing live services and
+other research workloads remain separate.
+
+- Six CPU workers generate full H64/R2 A19 continuations with independent locked
+  V3 drafts for both seats. Six predetermined increments collect 216 training
+  and 108 validation scenarios in total, with no outcome-dependent replacement.
+- The GPU consumes immutable cumulative snapshots as they become ready, running
+  eight fixed full-policy recipes per admitted snapshot. Readiness alone may
+  coalesce older snapshots; their rows remain in the cumulative bank. Training
+  does not wait for game evaluation. Both original encoders train in FP32 and
+  auxiliary-head weights remain frozen.
+- Two independent CPU workers evaluate each eligible, immutable coupled pair
+  after numerical parity, replay controls and smoke games. Each generation has
+  864 fresh development games. After all fitting and development finish, at most
+  one complete policy with development score at least 52% is locked before the
+  single untouched **6,048-game** confirmation. That confirmation requires both
+  score at least 52% and a whole-board lower 95% bound above 50%. There is no
+  fallback finalist, subgroup rescue or optional stopping.
+
+Each snapshot preserves raw-file hashes, source identity, all eight futures and
+separate training/validation ownership. Legacy warm validation is retained in
+full. Supplemental authentic warm-validation observations provide numerical
+export references when fully covered root references number fewer than 128;
+they are not scored as action-return evidence. All historical registered banks,
+including unopened banks and the completed 6,048 games, are excluded from the
+new seed schedules.
+
+The first shard admitted six training and three validation roots, and the GPU
+automatically started fitting while the CPU collected generation two. One live
+fit sample measured 98% GPU busy, 232 W, and 52/67/56 C edge/junction/memory.
+All eight first-shard recipes completed in 228.72 seconds; none was eligible.
+The learner then correctly waited for the next complete shard. This verifies
+overlap and automatic handoff, not uninterrupted GPU utilization: full-game
+CPU labels remain the supply bottleneck. Repeating rejected fits would not add
+independent information.
+
+The stream retains the proven padded backend; the separately measured compact
+packing speedup below is not silently substituted into this registered learner.
+Production timing remains unqualified and promotion is disabled. No repeatable
+52% strength result is established at this point.
+
+### Completed stream result
+
+The stream completed at **02:37:31 UTC on November 8**, about 2 hours 54 minutes
+after launch. All 324 scheduled scenarios finished. There were **177 new
+training and 87 new validation roots**; 39/21 scenarios had no eligible root in
+their registered phase and were not replaced. The complete new bank contains
+**9,672 full-controller continuations**. Its final dataset SHA is
+`4e1fa78b428ecff312336b6a3bdecd1de882050fd827bf27847d85a7c17b6c31`.
+
+All six immutable snapshots reached the learner: **48 fits / 6,030 updates**,
+with **1,212.76 seconds** of summed fitter wall time. None passed validation,
+so development and fresh confirmation stayed unopened. Independent local
+reconstruction checked every one of the 603 recorded checkpoints: none met all
+constraints; 602 failed the minimum actual choice-label gain. Some models
+reduced squared prediction error while their changed choices had zero or
+negative measured gain. More copies of these same fits are not justified.
+
+The final data, admissions and all fit histories were copied locally and hashed
+in `v09-overlap52-final-fit-inputs-20261108T032604Z.tar.gz`, SHA
+`bc5363c5c406f4182065a58d16e8297d21a5e1106606aaf4b372db03113f4801`.
+The next experiment changes the learner objective and keeps these failed
+results intact.
+
+### Decision-focused objective experiment
+
+Study `v09-decision-focused-20261108T033352Z` freezes the same engine and
+complete admitted data before fitting. It applies the structural coverage filter
+to training as well as validation: **329 training / 161 validation roots** have
+labels for every served action. Of these, 89/44 have differing mean action
+returns. All authentic warm banks remain unchanged. Missing labels do not
+become losses, and roots are not chosen by which action won.
+
+Let `z` be the existing coupled pair's served log policy. Subtracting one from
+every non-native candidate's `z` reproduces the margin-one choice ordering,
+with threshold ties resolved by the original selector. The new loss smooths
+these adjusted scores with a fixed temperature of 0.5 or 1, then maximizes
+their expected measured continuation score. Each informative root has equal
+weight regardless of its number of actions. It does not force arbitrary
+logit-distance regression between outcome-equivalent actions. Warm/root KL,
+teacher CE and the original teacher-CE tolerance still constrain drift.
+
+Eight fixed recipes compare four original-head-only fits with four original
+full-policy fits. They retain FP32 arithmetic, the original serving width,
+observation contract, confidence margin and H64/R2 search. Validation requires
+improved objective, at least two changed labeled choices, positive measured
+choice gain and zero unknown choices. At most one coupled pair is locked by
+whole-validation choice gain before its new **864-game development** bank. A
+development score of at least 52% may release the single untouched **6,048-game
+confirmation**, requiring both 52% score and a positive whole-board lower bound.
+No failed or unopened historical bank is reused, including the previous stream's
+reserved banks. This is a separate prospective objective experiment, not a
+relaxation that passes a failed fit.
+
+Registration SHA:
+`13d574fac8205629bc9eccd7cdb9bd42bb89ab8de38f53c336806553e1133853`;
+capsule SHA:
+`9cd934cb0d39c1810e472f918f884c12bfd882191b2957b70ea180b4282e3831`.
+The fixed cutoff is **09:34:06 UTC on November 8**. The first CPU admission
+stopped before GPU access because `clang` was absent from the service PATH.
+After inspection, a fresh `-compiler-recovery` workspace reused the identical
+capsule, registration, data, models, recipes and cutoff, exposing the existing
+ROCm clang-22 only in that service's PATH. The original failed logs and a
+source-bound recovery receipt are preserved; no packages or global settings
+changed.
+
+The recovered CPU admission passed all seven objective/gradient tests and
+**1,006 comparisons against the real Bun selector**, including threshold ties.
+Real-network gradients were finite across **500,418 policy parameters**, with
+maximum CPU policy-reference error `1.848e-6`. GPU fitting started at
+**04:14:58 UTC**. The eight fits subsequently completed in **263.61 seconds /
+3,250 updates**, reaching 3,468,091,392 bytes sampled VRAM and 63 C maximum
+available edge temperature. None passed the fixed validation constraints;
+development and confirmation remained unopened. The complete run finished at
+**04:19:26 UTC**. These are software and fitting results, not a new full-game
+gain or production timing qualification. Promotion remains disabled.
+
+Its completed fit histories, CPU admission, compiler recovery and original
+failed preflight are preserved in `v09-decision-focused-receipts-20261108T0426Z.tar.gz`,
+SHA `cc27912f80667af0ae3e89711f3e77dacd52d7dea6dc73c27b2ebb79c24e7522`.
+
+### Prospective first-lap acquisition
+
+The completed training-only acquisition audit found a concrete source of wasted
+label work:
+
+| Captured training position | Roots | Different mean action returns | Better action than the stock choice |
+| -------------------------- | ----: | ----------------------------: | ----------------------------------: |
+| Lap 1                      |    43 |                            22 |                                   6 |
+| Laps 1–2 combined          |    72 |                            30 |                                  10 |
+| Laps 3–5                   |    71 |                            15 |                                   8 |
+| Laps 6 onward              |    34 |                             0 |                                   0 |
+
+The lap-one row is a subset of the early row. The observed contrast yield is
+51.2% in lap one versus 25.4% over all 177 new training roots. This is a
+retrospective acquisition finding, not a measured twofold future throughput
+gain or a win-rate improvement. Early sampling now needs a prospective test.
+Independent local reconstruction matched all 264 new roots' action means,
+contrast flags and better-action flags against the admitted final dataset.
+
+Stream `v09-firstlap52-stream-20261108T042216Z` launched at **04:24:13 UTC** with
+an immutable first-lap sampling rule. It reserves three increments totaling
+**162 new training / 54 new validation scenarios**. The root is selected before
+outcomes, every fully scored tied action receives eight aligned continuations,
+and missing first-lap roots are reported without replacement. It retains the
+fully covered parent 329/161 roots and all authentic warm data.
+
+Four CPU workers collect data; the GPU consumes each admitted cumulative
+snapshot using the same fixed decision-focused recipes, after repeating CPU
+gradient and real-selector admission. Two independent CPU workers evaluate
+locked candidates. At most one whole-development finalist may open a new
+6,048-game confirmation requiring at least 52% score and a positive whole-board
+lower 95% bound. Its eight-worker confirmation additionally waits for the
+previous study's CPU service to finish. All prior reserved banks remain
+excluded. The original engine, serving architecture, confidence margin and
+production compute allowance remain unchanged.
+
+Registration SHA:
+`70a5197c2eae79b8d165482df3b51c9c2bf2d6fc89b136dcff57eda0af5f377d`;
+capsule SHA:
+`71509acc21bdfb174355e247df9601433b2016300ab9af28fcfc9ea20daa47d7`.
+The fixed cutoff is **12:22:18 UTC on November 8**. This is an active collection
+and training experiment; **52% full-game strength is still unconfirmed** and
+production promotion remains disabled.
+All twelve stock/observed/transparent-intervention control triplets passed
+across the three maps before fresh root collection began. The learner waits
+for a completely admitted shard; it does not turn incomplete results into
+training data or fill idle periods with repeated rejected fits.
+
 ## GPU DRAM capacity and useful training throughput — November 7, 2026 UTC
 
 The user also emphasized GPU DRAM. Capacity allocation and memory activity are
