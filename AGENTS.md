@@ -13,6 +13,24 @@ Use `bun fmt --no-script <paths>` for targeted formatting and add `--check` for 
 Do not invoke Prettier separately. `--no-script` avoids running this package's whole-source `fmt`
 script when you only intend to format your own files. Keep the required build and lint checks.
 
+## User-locked A19 full-policy research reference
+
+The user accepted the **50.36%** result and requested a fixed checkpoint on November 8, 2026 UTC.
+Keep `a19-full-policy-5036-20261108` immutable under
+`src/simulation/v0_9/checkpoints/a19_full_policy_5036_20261108/`. Load its original coupled models with
+`loadLockedA19FullPolicyPair()` from `src/simulation/v0_9/a19_full_policy_checkpoint.ts`; the same module
+exports the exact original model/profile bytes and verifies their identities. Its pair manifest SHA is
+`675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68`.
+Future combat research should retain this accepted reference alongside stock A19, with source differences
+recorded explicitly. Never overwrite its weights or modify an already registered campaign to substitute it.
+
+The measured source is `77af0770`, both seats use locked V3 draft, and the complete 6,048-game score is
+50.35549% with a whole-board 95% interval of 49.42130–51.27315%. User acceptance does not rewrite the
+original failed positive-advantage/55% gates or supply production timing. This is a locked research baseline;
+the global live AI/default profile is unchanged. Native v0.9 combat remains separate. The user's lock request
+authorizes these versioned model bytes, numerical references and compact evidence fixtures. Exclude the
+consumed channels in `docs/evidence/a19_full_policy_5036_20261108.json` from future confirmation.
+
 ## Locked v0.9 draft default
 
 The user explicitly activated the improved model as the default draft for v0.9 seats. The immutable

@@ -1,0 +1,91 @@
+{
+    "schema": "hoc.ai.a19.user-locked-checkpoint.v1",
+    "id": "a19-full-policy-5036-20261108",
+    "status": "user-accepted-research-baseline",
+    "userSelection": {
+        "dateUtc": "2026-11-08",
+        "instruction": "50.36 is good lets lock it in"
+    },
+    "immutable": true,
+    "pairManifestSha256": "675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68",
+    "bundleSha256": "f8f4aca1b792a02d4d72fa2208459ba33247455fb754222f54d43c6a6f45da99",
+    "artifactRawSha256": {
+        "pair-manifest.json": "675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68",
+        "model.json": "34b1507f05f8100986780ae28e586ead8dd35f54e61239bfced1f9b9b80e9779",
+        "partner-model.json": "c38c44d4cf5c7289f5dce9e4a954b89166642814d925a2e6692552085e8b614d",
+        "runtime-profile.json": "c0fe285ddb901b80e2d56d48bff8f4a40fd6ac90de8e63bffe0340a9c55aac0b"
+    },
+    "evidenceSha256": "b29ede6f7f64bdb59e724966564cf0f650216c4ad3d82ddd779b3652d17058fb",
+    "regressionReferencesSha256": "e383fb0c99900c6d13857b62b845e6a74ef1786ac02614894452aee81087f681",
+    "settings": {
+        "sourceCommit": "77af0770c79d5d1e5f8ea9c62bd648f1dc9743b1",
+        "runtime": "Bun 1.4.4",
+        "combat": "A19 H64 complementary R2",
+        "confidenceMargin": 1,
+        "actionFamily": "all",
+        "draftCheckpoint": "doctrine-draft-v3-20261104",
+        "draftModelSha256": "2736ce8d7917e12c5078b8cae0b51f49c2e20496b2ce181bf9995e04ef65ec7a",
+        "servingArchitecture": "original coupled A19 policy networks",
+        "computeAllowance": 1.1
+    },
+    "originalFit": {
+        "schema": "hoc.ai.v0_9.a19.research-head-pair-finalist.v1",
+        "promotion": false,
+        "ordinal": 0,
+        "pairManifestSha256": "675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68",
+        "studentModelSha256": "34b1507f05f8100986780ae28e586ead8dd35f54e61239bfced1f9b9b80e9779",
+        "partnerModelSha256": "c38c44d4cf5c7289f5dce9e4a954b89166642814d925a2e6692552085e8b614d",
+        "trainingMembers": "joint",
+        "objective": {
+            "kind": "score-difference",
+            "scoreScale": 0.1,
+            "weighting": "equal-informative-roots"
+        },
+        "selection": "Both members locked together before development games; no fallback finalist",
+        "registrationSha256": "f86e35cddbf9cf93db0206a14ca3bd001311708a61b2bcd065c87ff535859d2c",
+        "dataAdmissionSha256": "9c2256e92bf81b11d7c7919bc8041c0fe72c4f07a1e25b3c8adfbb36204c806e",
+        "beforeDevelopment": true,
+        "trainingScope": "both-original-policy-networks; auxiliary-head weights frozen; original serving architecture",
+        "changedGateChoices": 1
+    },
+    "result": {
+        "boards": 1512,
+        "games": 6048,
+        "wins": 3014,
+        "draws": 63,
+        "losses": 2971,
+        "score": 0.5035548941798942,
+        "board95": [0.49421296296296297, 0.5127314814814815],
+        "restorationChecks": 294769,
+        "positiveAdvantageGatePassed": false,
+        "independentVerificationPassed": true
+    },
+    "softwareEvidence": {
+        "parity": {
+            "passed": true,
+            "rows": 128,
+            "maximumError": 0.0000031427434787900665,
+            "pairSha256": "675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68",
+            "newStrengthGames": 0
+        },
+        "replayControls": {
+            "passed": true,
+            "boards": 12,
+            "exactPairs": 48,
+            "numericChecks": 890,
+            "restorationChecks": 2253,
+            "candidateSmokeGames": 12,
+            "newStrengthGames": 0,
+            "original55PercentStudyUnchanged": true,
+            "oldConfirmationOpened": false,
+            "productionTimingQualified": false,
+            "promotionAllowed": false
+        }
+    },
+    "productionActivation": false,
+    "productionTimingQualified": false,
+    "original55PercentStudyUnchanged": true,
+    "original3132GameBankOpened": false,
+    "subsequentExperimentsMayOverwrite": false,
+    "sha256": "20432dc1c9a99c6bfe0322c6875087591930dca06f09429bdb242edbe5d94307"
+}

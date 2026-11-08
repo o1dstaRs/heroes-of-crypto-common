@@ -1,5 +1,38 @@
 # v0.9 training against current A19 R2
 
+## User-accepted checkpoint — November 8, 2026 UTC
+
+The user accepted the 50.36% overall result and requested an immutable reference.
+Checkpoint **`a19-full-policy-5036-20261108`** now preserves the exact coupled
+model bytes, original pair manifest and measured runtime profile under
+`src/simulation/v0_9/checkpoints/a19_full_policy_5036_20261108/`.
+The compressed JSON bundle retains the original byte hashes and is copied by
+the ordinary package build. Four original numerical/decision references and
+the compact 1,512-board evidence fixture are versioned alongside this lock.
+
+Use `loadLockedA19FullPolicyPair()` from
+`src/simulation/v0_9/a19_full_policy_checkpoint.ts` as a fixed research comparator.
+`lockedA19FullPolicyInputs()` exports the original model/profile strings;
+`lockedA19FullPolicyCheckpoint()` validates the acceptance record. Running that
+module prints its identity, result and selector settings. The pair manifest SHA
+remains `675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68`;
+the acceptance-record SHA is
+`20432dc1c9a99c6bfe0322c6875087591930dca06f09429bdb242edbe5d94307`.
+
+The accepted measurement is **3,014 wins / 63 draws / 2,971 losses**, score
+**50.35549%**, with whole-board 95% interval **49.42130–51.27315%** on frozen
+source `77af0770`, Bun 1.4.4, H64/complementary R2, margin one and all-family
+fully scored primary ties. Both seats use their locked V3 draft. The original
+failed positive-advantage/55% gates remain recorded. Live timing within the
+1.10 allowance and production activation are separate from this accepted lock.
+The live default profile is unchanged.
+
+Future combat experiments retain this exact checkpoint rather than overwriting
+or refitting it. Compare new proposals with this accepted reference and stock
+A19 on newly registered banks. Existing immutable campaigns keep their original
+comparators. Exclude consumed channels preserved in
+`docs/evidence/a19_full_policy_5036_20261108.json` from subsequent confirmation.
+
 ## Fresh overall-strength test — November 7, 2026 UTC
 
 The user considers a repeatable two-point advantage valuable. The completed
