@@ -164,6 +164,15 @@ const spellPower = (unit: Unit, name: string): number =>
         .find((spell) => spell.getName() === name)
         ?.getPower() ?? 0;
 
+/** Match the engine's front-body recovery budget, including Holy Cross and spell-specific morale. */
+export const v08HealingSpellPower = (unit: Unit, name: typeof HEAL | typeof MASS_HEAL): number =>
+    Math.floor(
+        spellPower(unit, name) *
+            Math.max(0, unit.getAmountAlive()) *
+            (1 + (unit.getBuff("Holy Cross")?.getPower() ?? 0) / 100) *
+            getSpellMoraleMultiplier(name, unit.getAttackMultiplier()),
+    );
+
 const effectiveFrontHeal = (target: Unit, rawPower: number): number =>
     Math.max(0, Math.min(rawPower, target.getMaxHp() - target.getHp()));
 
@@ -192,11 +201,7 @@ const bestSingleHeal = (
     context: IDecisionContext,
     candidates: readonly IEnumeratedCandidate[],
 ): { candidate: IEnumeratedCandidate; value: number } | undefined => {
-    const rawPower = Math.floor(
-        spellPower(unit, HEAL) *
-            Math.max(0, unit.getAmountAlive()) *
-            getSpellMoraleMultiplier(HEAL, unit.getAttackMultiplier()),
-    );
+    const rawPower = v08HealingSpellPower(unit, HEAL);
     let best: { candidate: IEnumeratedCandidate; value: number } | undefined;
     for (const candidate of candidates) {
         // Candidate zero keeps kind="incumbent" even when its metadata identifies an exact legal spell.
@@ -220,7 +225,7 @@ const bestSingleHeal = (
 };
 
 const massHealValue = (unit: Unit, context: IDecisionContext): { value: number; recipients: number } => {
-    const rawPower = spellPower(unit, MASS_HEAL) * Math.max(0, unit.getAmountAlive());
+    const rawPower = v08HealingSpellPower(unit, MASS_HEAL);
     let value = 0;
     let recipients = 0;
     for (const ally of context.unitsHolder.getAllAllies(unit.getTeam())) {
