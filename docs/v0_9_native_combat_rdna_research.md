@@ -199,6 +199,74 @@ regardless of development score. The confirmed native reference remains `4e1d899
 stock A19 with matched openings. The new candidate has no strength-dependent replacement or stopping
 rule. Fresh paired confidence determines whether native strength improved; promotion remains disabled.
 
+## Second independently confirmed native gain
+
+The single fixed larger-data candidate completed its full fresh comparison. On this bank, the prior native
+reference scored **24.6610%** against stock A19 (1,461 wins / 61 draws / 4,526 losses); the new model scored
+**25.8598%** (1,532 wins / 64 draws / 4,452 losses). Both policies played 6,048 games on the same 1,512
+board families. Compare these matched scores; the earlier reference's 25.6366% came from a different bank.
+
+The gain is **+1.1987 percentage points**, with the registered whole-board 95% interval **+0.1819 to
++2.2321 points**. Independent reconstruction of all 12,096 battles and 20,000 separate NumPy resamples
+confirmed **+0.1653 to +2.2073 points**. Independent verification SHA:
+`2b78b931aa76a4a85ec5c16ae303ece2e3d1f6cfc666dca637e6f0684ffe00e5`.
+
+The architecture is unchanged at 96/48 hidden units and **20,592 multiply-accumulates per candidate**.
+Observed mean decision time was 1.0269 ms versus 1.0256 ms (+0.13%); total native decision time increased
+0.91%, including its additional decisions. Loaded-node p99 was 6.390 ms versus 6.326 ms. This meets the
+requested compute allowance on these research observations; production timing remains unqualified.
+All 135,172 candidate decisions and 134,122 reference decisions had matching authoritative preflights,
+zero native-seat A19 search calls and zero model errors. The 52% target remains unmet.
+
+The model is preserved read-only at `native-v09-2586-20261108-4749da06ec07` on the node. Its full archive
+SHA is `75e79f639610a118a86adbe43bc3c234a828c332c0d7395ae9db5af77e42e273`. The committed research
+checkpoint is `src/simulation/v0_9/checkpoints/native_scale_20261108/`, loaded explicitly with
+`loadNativeV09ScaleResearchModel()` from `native_scale_checkpoint.ts`. Its small compressed bundle
+restores the exact original 70,719-byte unpromoted artifact; no source metadata is rewritten. The compact
+evidence fixture in `docs/evidence/v0_9_native_scale_20261108.json` reconstructs every score and includes
+10,479 additional consumed/reserved native base seeds. Merge these with the other project ledgers.
+Numerical fixtures, independent-copy tests and default-policy checks keep loading separate from activation.
+
+## GPU-free native expert committee
+
+The next fixed experiment composes native experts `4e1d89927177` and `f907fc07a28a` with
+`fuseV09NativeResearchModels()` from `native_fusion.ts` (utility commit `4cfdafa8`). It requires identical
+feature, normalization, engine and quantization contracts. The hidden paths are copied exactly into a
+192/96 network with zero cross-expert weights. One final rescale averages the unrounded output heads;
+the result can differ from the mean of already-rounded parent scores by at most one integer output unit.
+There is no retraining, requantization, search, or activation of a production model.
+
+The source is registered as `v09-native-fusion-study-20261108T220850Z`, registration SHA
+`6d508b22963f75937304cda352a8fa400406b84b0a8cf86635bbfccf25d3b1f5`, capsule SHA
+`cd8d81c76a0216e41923c847dabf59e71257e04928fa1b55a1acf75c5c47560a`. Both parents and the single
+committee were fixed before its strength results. Margin 512 was selected on the old validation split only.
+No alternative parent pair or replacement candidate is allowed in this study.
+
+Validation now groups rows by their exact candidate count: 145,174 real candidates instead of 905,184
+padded slots, **6.24 times less scoring work**. Every one of the 9,429 decisions, guards and labels remains.
+Exact compact-versus-padded integer checks, real-reference mean checks and duplicated-expert controls
+passed. Validation completed in 3.41 seconds. Its 53.42% teacher agreement is not a win rate.
+
+On fixed closed vectors, scoring a full 96-candidate decision took 3.77 ms p99 for the committee versus
+1.75 ms for one expert, excluding feature extraction. Thus this wider model costs more than a single native
+expert; the study measures full native decision costs against the A19 opponent and enforces a 20 ms native
+research p99 ceiling and a 1.10 mean-cost ratio. These remain research measurements, not production
+qualification. Timing instrumentation and duplicated-expert policies must reproduce original gameplay
+traces exactly before strength evaluation.
+
+The full development bank has 108 new families. Fresh comparison uses 1,512 new families / **18,144
+battles**: committee, prior native reference and larger-data native reference each face matched stock A19.
+The newly confirmed `4749da06ec07` model was already included as the second comparison before its result
+was read; the original role name `larger_data` remains in this fixed protocol. An advancement must beat the
+current reference, and a strongest-native claim requires positive paired intervals against both references.
+Development strength does not select or cancel the single candidate; numerical, operational and timing
+checks gate fresh. All previous banks, including reserved unopened banks, remain excluded.
+
+The complete 1,296-battle development bank passed these checks: zero native search calls and model
+errors, committee mean decision time 1.701 ms and p99 9.868 ms. Its +0.81-point score difference against
+each native reference is inconclusive (both paired intervals cross zero). Fresh opened with the original
+fixed candidate and comparisons; the development result does not establish another gain.
+
 ## Validation and ownership
 
 The engine capture change passed 7,600 common tests, TypeScript compilation and the common build with
@@ -206,6 +274,11 @@ The engine capture change passed 7,600 common tests, TypeScript compilation and 
 fitting. The research services use fresh directories, a shared GPU lease and memory/temperature limits.
 Only the earlier owned hybrid research service was stopped to prioritize native combat. Existing game,
 database and site services were left running.
+
+The committee/checkpoint continuation passed 30 focused tests (17,167 assertions), ESLint, TypeScript
+typecheck, compilation, JSON/generated-file copying and a cold compiled checkpoint load. The broad common
+suite passed 7,659 tests with one sandbox process-inspection failure; that complete 18-test process-guard
+file passed when rerun with process access. No unrelated test or live default was changed.
 
 Run outputs, datasets, packed arrays, model candidates and HTML reports remain outside Git. Preserve the
 registrations, failed runs, frozen source and complete raw board results when continuing this work. Never

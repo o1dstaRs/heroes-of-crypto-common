@@ -1,0 +1,98 @@
+[
+    {
+        "id": "center",
+        "kind": "constant",
+        "value": 0,
+        "expectedScore": 158
+    },
+    {
+        "id": "positive-clip",
+        "kind": "constant",
+        "value": 8,
+        "expectedScore": -7764
+    },
+    {
+        "id": "negative-clip",
+        "kind": "constant",
+        "value": -8,
+        "expectedScore": -10720
+    },
+    {
+        "id": "above-positive-clip",
+        "kind": "constant",
+        "value": 80,
+        "expectedScore": -7764
+    },
+    {
+        "id": "below-negative-clip",
+        "kind": "constant",
+        "value": -80,
+        "expectedScore": -10720
+    },
+    {
+        "id": "positive-half",
+        "kind": "constant",
+        "value": 0.001953125,
+        "expectedScore": 155
+    },
+    {
+        "id": "negative-half",
+        "kind": "constant",
+        "value": -0.001953125,
+        "expectedScore": 160
+    },
+    {
+        "id": "alternating-clips",
+        "kind": "alternating",
+        "value": 80,
+        "expectedScore": -11646
+    },
+    {
+        "id": "pattern-0",
+        "kind": "pattern",
+        "seed": 0,
+        "expectedScore": -5363
+    },
+    {
+        "id": "pattern-1",
+        "kind": "pattern",
+        "seed": 1,
+        "expectedScore": -478
+    },
+    {
+        "id": "pattern-2",
+        "kind": "pattern",
+        "seed": 2,
+        "expectedScore": 1927
+    },
+    {
+        "id": "pattern-3",
+        "kind": "pattern",
+        "seed": 3,
+        "expectedScore": -1860
+    },
+    {
+        "id": "pattern-4",
+        "kind": "pattern",
+        "seed": 4,
+        "expectedScore": -436
+    },
+    {
+        "id": "pattern-5",
+        "kind": "pattern",
+        "seed": 5,
+        "expectedScore": -2311
+    },
+    {
+        "id": "pattern-6",
+        "kind": "pattern",
+        "seed": 6,
+        "expectedScore": 1511
+    },
+    {
+        "id": "pattern-7",
+        "kind": "pattern",
+        "seed": 7,
+        "expectedScore": 2730
+    }
+]

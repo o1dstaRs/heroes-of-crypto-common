@@ -61,17 +61,36 @@ rewrite the embedded native artifact's anchor-only metadata.
 
 Preserve the read-only node reference `native-v09-2564-20261108-4e1d89927177` and its paired evidence.
 See `docs/v0_9_native_combat_rdna_research.md` for source, registrations, exact artifact/archive hashes,
-numerical checks, failed pilot and complete fresh result. Further native models must beat this confirmed
-reference, with stock A19 still the target opponent. The next separately registered scale campaign uses
+numerical checks, failed pilot and complete fresh results. Preserve this first reference as a fixed comparator.
+The separately registered scale campaign uses
 `v09-native-scale-acquisition-20261108T170905Z` on the 9800X3D/RDNA node. Its initial scale fitter stopped
 before SGD on a KFD host-memory mapping error. The separate
 `v09-native-scale-recovery-20261108T180216Z` learner used exact-readback 128-row uploads and unchanged
 recipes. It completed one candidate before an AMD GPU virtual-memory fault/reset; preserve the original
 four-recipe campaign as failed/incomplete. No manual driver reset was performed. The completed candidate
-`4749da06ec07` now has a separate CPU-only study, `v09-native-single-evaluation-20261108T182917Z`, fixed
-before strength results and using another unused fresh bank. Its full development score is diagnostic;
-fresh proceeds after operational checks regardless of development strength. See the research document
-for exact identities and transport checks. Do not treat validation teacher agreement as a win rate.
+`4749da06ec07` completed the separately fixed CPU-only study
+`v09-native-single-evaluation-20261108T182917Z`. On its 1,512 new matched board families / 12,096 battles,
+it scored **25.8598% against stock A19**, versus **24.6610%** for `4e1d89927177` on the same bank:
+**+1.1987 points**, whole-board 95% interval **+0.1819 to +2.2321**. Independent reconstruction confirmed
+the positive interval. Both models use 20,592 multiply-accumulates per candidate; observed mean decision
+time increased 0.13%, and total native decision time increased 0.91%. Production timing remains unqualified.
+
+Keep this stronger reference immutable in `src/simulation/v0_9/checkpoints/native_scale_20261108/`.
+`loadNativeV09ScaleResearchModel()` from `native_scale_checkpoint.ts` restores the exact original artifact
+and leaves activation separate. Model SHA is
+`4749da06ec07bfd08db7ec6c2bbe03ba6dc4e73847e67585804dbccc253e7bb9`; checkpoint manifest SHA is
+`40b243333e4d6963650bf87877afd8ba8ec151cb89af2cbf2c46f6f5783b50b0`.
+The user's commit request authorizes these versioned model bytes, numerical references and compact
+evidence fixtures. Merge `docs/evidence/v0_9_native_scale_20261108.json` with previous seed ledgers.
+The model remains unpromoted, its native-seat search calls remain zero, and the 52% target remains unmet.
+
+Further native candidates must beat this stronger reference, with stock A19 still the target opponent.
+The fixed CPU-only committee study `v09-native-fusion-study-20261108T220850Z` already compares the
+committee against both native references. Its registration SHA is
+`6d508b22963f75937304cda352a8fa400406b84b0a8cf86635bbfccf25d3b1f5`.
+Preserve its original role names and selection rules; a strongest-native claim requires positive paired
+intervals against both references. See the research document for exact identities and transport checks.
+Do not treat validation teacher agreement as a win rate.
 Exclude all prior and reserved banks, including their derived setup/combat channels;
 never select a replacement model after opening its fresh bank.
 
