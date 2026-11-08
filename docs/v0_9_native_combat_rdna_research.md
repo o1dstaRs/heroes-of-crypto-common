@@ -106,6 +106,56 @@ No result bypasses the existing native qualification gates. Production timing, t
 budget and comparison with the accepted hybrid reference remain required before a production claim.
 Loaded-node timing is descriptive and cannot establish the user's same-compute/+10% requirement.
 
+## Completed fresh result
+
+Recipe 2 (96/48 hidden units, seed 117, margin 512) was fixed before fresh confirmation. Its native model
+SHA is `4e1d8992717784995447f28ccdf577692e8fb670f6915add313ff11425f77ce3`; the exact sealed artifact
+file SHA is `9408f462fc2a39f31e2a25eae48bad5956257800bb20df1bb5295cae818f3c0d`.
+
+Across 1,512 fresh board families and 12,096 matched battles:
+
+| Native policy                    |  Wins | Draws | Losses | Score against stock A19 |
+| -------------------------------- | ----: | ----: | -----: | ----------------------: |
+| Original untrained native anchor | 1,126 |    38 |  4,884 |                18.9319% |
+| Trained native recipe 2          | 1,520 |    61 |  4,467 |                25.6366% |
+
+The native gain is **+6.7047 percentage points**, with a prospectively specified whole-board 95% interval
+of **+5.6713 to +7.7546 points**. Independent reconstruction of every raw board record, with 20,000
+separate NumPy bootstrap resamples, gave **+5.6630 to +7.7546 points**. The absolute score's original 95%
+interval is 24.5866–26.6782%. Native improvement passed; the 52%-against-A19 target failed.
+
+All 132,275 native decisions had matching authoritative preflights, zero native-seat A19 search calls and
+zero model errors. Loaded-node native decision timing was 0.790 ms median and 5.611 ms p99; its maximum
+was 37.399 ms. This is not production timing qualification or a completed compute-allowance comparison.
+
+The read-only research reference is preserved at
+`/root/hoc-research/checkpoints/native-v09-2564-20261108-4e1d89927177`, including the exact model,
+registrations, all 1,512 paired board records and independent verification. Archive SHA:
+`13dacc6a152476f972bf29d8825c578ae5a010c68f5486c6a5d4400cbf72557f`; manifest SHA:
+`8abaa6702c70512a891d12670d0d9f67cd65cf6c3ad919226ebe2b5ab84df2b0`; independent verification SHA:
+`edfc720d3bb96ca7cc5afd6016e86cd1e56f8a0b1424cfddfa0a91cafc23631b`. A hash-verified copy also exists in
+the ignored local research workspace. The model remains unpromoted, and the production default is unchanged.
+
+## Next scale campaign
+
+The next independently registered collection is `v09-native-scale-acquisition-20261108T170905Z`, with
+registration SHA `75b5546aefda689ab30d4e702b2311fa51c8d78d8aab3d6fba45204f888dd63b` and capsule SHA
+`286c87cea2d729b2b237d2b0fd9be0ebe74e9c447bfe7868116fa1c552dea9dc`. It budgets 648 training and
+216 validation boards: **3,456 teacher games**, four times the first corpus. The engine, teacher, draft and
+nonfight profile stay frozen; new seeds and broader observations supply the additional evidence.
+
+Its learner is `v09-native-scale-learning-20261108T170905Z`, registration SHA
+`004215d76608afbedca60ed13cf6b791922fc9a1a1be0f97613d2d107e7293c7`, capsule SHA
+`09434a80d108c443caa2af8202f3b6f136f9a27b81171cf9f7ff1f90ce0082cc`. Fixed recipes test 96/48 with
+two seeds, 192/96, and 192/96/48. Complete cumulative data banks may coalesce according to readiness;
+GPU fitting, CPU integer validation and development evaluation use separate pipeline stages.
+
+Both development and fresh confirmation compare candidates with the **confirmed trained native model**
+`4e1d89927177`, each facing the same stock A19 and matched openings. The untrained 18.93% policy is no
+longer the improvement reference. Complete development results select one finalist before another 1,512
+fresh board families / 12,096 matched battles. All previous banks, including unopened reserved banks, are
+excluded. The native side still executes zero A19 search, and nothing is promoted automatically.
+
 ## Validation and ownership
 
 The engine capture change passed 7,600 common tests, TypeScript compilation and the common build with

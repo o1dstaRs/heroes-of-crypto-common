@@ -35,6 +35,25 @@ the global live AI/default profile is unchanged. Native v0.9 combat remains sepa
 authorizes these versioned model bytes, numerical references and compact evidence fixtures. Exclude the
 consumed channels in `docs/evidence/a19_full_policy_5036_20261108.json` from future confirmation.
 
+## Native v0.9 combat research reference
+
+Native combat now has an independently confirmed **unpromoted research model**, separate from the
+accepted A19 neural pair and the inert embedded native artifact. Model SHA
+`4e1d8992717784995447f28ccdf577692e8fb670f6915add313ff11425f77ce3` scored **25.6366% against stock
+A19**, versus 18.9319% for native anchor, on 1,512 fresh boards / 12,096 matched battles. The native gain
+is +6.7047 points (prospective whole-board 95% interval +5.6713 to +7.7546). All 132,275 native decisions
+had zero A19 search calls and zero model errors. This improves native v0.9; it does not beat A19 or pass
+the 52% target. Production timing and promotion remain unqualified; do not change the live default or
+rewrite the embedded native artifact's anchor-only metadata.
+
+Preserve the read-only node reference `native-v09-2564-20261108-4e1d89927177` and its paired evidence.
+See `docs/v0_9_native_combat_rdna_research.md` for source, registrations, exact artifact/archive hashes,
+numerical checks, failed pilot and complete fresh result. Further native models must beat this confirmed
+reference, with stock A19 still the target opponent. The next separately registered scale campaign uses
+`v09-native-scale-acquisition-20261108T170905Z` and `v09-native-scale-learning-20261108T170905Z` on the
+9800X3D/RDNA node. Exclude all prior and reserved banks, including their derived setup/combat channels;
+never select a replacement model after opening its fresh bank.
+
 ## Locked v0.9 draft default
 
 The user explicitly activated the improved model as the default draft for v0.9 seats. The immutable
