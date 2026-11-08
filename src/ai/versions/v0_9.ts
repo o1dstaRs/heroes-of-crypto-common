@@ -319,7 +319,8 @@ export function v09FallbackRequiresCircuitBreaker(fallbackReason: V09DecisionFal
     );
 }
 
-function enumerateV09Candidates(
+/** Shared by native inference and offline teacher capture so their action spaces cannot drift. */
+export function enumerateV09Candidates(
     unit: Unit,
     context: IDecisionContext,
     anchor: GameAction[],
