@@ -31,6 +31,12 @@ import {
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 
 describe("config_provider", () => {
+    it.each(["Skeleton", "Imp", "Zombie", "Dark Champion"])("cannot instantiate retired Death creature %s", (name) => {
+        expect(() => getCreatureConfig(PBTypes.TeamVals.LEFT, "Death", name, "retired_512", 1)).toThrow(
+            "Unknown faction - Death",
+        );
+    });
+
     it("builds hero configs for every supported faction", () => {
         for (const factionName of ["Might", "Chaos", "Nature", "Life", "Death", "Order"]) {
             const hero = getHeroConfig(PBTypes.TeamVals.RIGHT, factionName, `${factionName} Hero`, "hero_large_512");
