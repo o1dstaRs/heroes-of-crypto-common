@@ -1,0 +1,30 @@
+{
+    "schema": "hoc.satyr-contact.checkpoint.v1",
+    "id": "satyr-contact-support-20261108",
+    "status": "user-accepted-research-checkpoint",
+    "acceptedAtUtc": "2026-11-08T21:53:54.015Z",
+    "policyId": "satyr-contact-support-research-v1",
+    "policySource": "src/simulation/satyr_contact_policy.ts",
+    "policySha256": "39de95f41dee17dd5fc0621b70204bd332b321a6aba259780049d95a646b4345",
+    "testsSha256": "78e27b3eb4e71c6161635825713a6413dc54f526e1d6aa1371ec62433e66de7b",
+    "evidenceSha256": "ffe059d125098c609ae7c1da365c73fe15ce8155f0b81d28db020d6c27a76a5b",
+    "sourceCommit": "032c74bf79b32499e6516508370e1b24dad5ae2a",
+    "sourceWasDirty": true,
+    "originalProgressionGatePassed": false,
+    "productionActivation": false,
+    "productionTimingQualified": false,
+    "optimizerSteps": 0,
+    "modelFitted": false,
+    "subsequentExperimentsMayOverwrite": false,
+    "primary": {
+        "boards": 72,
+        "pairedGainPp": 4.513888888888888,
+        "wholeBoard95Pp": [-2.0833333333333335, 11.458333333333334]
+    },
+    "candidateMinusLocked": {
+        "boards": 72,
+        "pairedGainPp": 3.8194444444444446,
+        "wholeBoard95Pp": [-2.7777777777777777, 10.76388888888889]
+    },
+    "sha256": "58a8da8d47be38cf2c024d6b8071a7acf8a226f6bced94ae027dfbb8f8bcfead"
+}

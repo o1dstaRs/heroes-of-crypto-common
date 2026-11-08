@@ -35,6 +35,19 @@ the global live AI/default profile is unchanged. Native v0.9 combat remains sepa
 authorizes these versioned model bytes, numerical references and compact evidence fixtures. Exclude the
 consumed channels in `docs/evidence/a19_full_policy_5036_20261108.json` from future confirmation.
 
+## User-locked Satyr contact/support reference
+
+The user locked `satyr-contact-support-20261108` on November 8 and moved research to Healer.
+Keep `src/simulation/satyr_contact_policy.ts` immutable (SHA256
+`39de95f41dee17dd5fc0621b70204bd332b321a6aba259780049d95a646b4345`).
+`lockedSatyrContactCheckpoint()` validates the metadata; `docs/satyr_contact_research.md` documents it.
+The fixed 72-board / 432-fight paired pilot gained +4.5139 points over stock A19, whole-board 95%
+interval -2.0833 to +11.4583; the original progression gate failed. User acceptance preserves the
+research candidate, not a confirmed improvement or live activation. All arms shared the forward-summon
+fix. Keep the current production default unchanged and exclude all 150 consumed setup/combat channels
+in `docs/evidence/satyr_contact_20261108.json` from future independent studies. New Satyr candidates
+must use a separate module/checkpoint and retain this comparator; never overwrite its policy or gates.
+
 ## Native v0.9 combat research reference
 
 Native combat now has an independently confirmed **unpromoted research model**, separate from the

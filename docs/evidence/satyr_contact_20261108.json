@@ -1,0 +1,1173 @@
+{
+    "schema": "hoc.satyr-contact.evidence.v1",
+    "id": "satyr-contact-support-20261108",
+    "sourceCommit": "032c74bf79b32499e6516508370e1b24dad5ae2a",
+    "sourceManifestSha256": "12b0a5af2ac28450ed69476ec58ab6607ba7d65ded43a37b51ab479ea9b2527c",
+    "sourceWasDirty": true,
+    "policySha256": "39de95f41dee17dd5fc0621b70204bd332b321a6aba259780049d95a646b4345",
+    "registeredGames": 432,
+    "independentBoards": 72,
+    "arms": {
+        "stock": {
+            "games": 144,
+            "boards": 72,
+            "wins": 59,
+            "draws": 3,
+            "losses": 82,
+            "drawAwareScorePct": 42.013888888888886,
+            "wholeBoard95ScorePct": [33.333333333333336, 51.041666666666664],
+            "endReasons": {
+                "elimination": 144
+            }
+        },
+        "candidate": {
+            "games": 144,
+            "boards": 72,
+            "wins": 65,
+            "draws": 4,
+            "losses": 75,
+            "drawAwareScorePct": 46.52777777777778,
+            "wholeBoard95ScorePct": [38.888888888888886, 54.513888888888886],
+            "endReasons": {
+                "elimination": 144
+            }
+        },
+        "locked": {
+            "games": 144,
+            "boards": 72,
+            "wins": 60,
+            "draws": 3,
+            "losses": 81,
+            "drawAwareScorePct": 42.708333333333336,
+            "wholeBoard95ScorePct": [33.68055555555556, 51.736111111111114],
+            "endReasons": {
+                "elimination": 144
+            }
+        }
+    },
+    "primary": {
+        "boards": 72,
+        "pairedGainPp": 4.513888888888888,
+        "wholeBoard95Pp": [-2.0833333333333335, 11.458333333333334]
+    },
+    "candidateMinusLocked": {
+        "boards": 72,
+        "pairedGainPp": 3.8194444444444446,
+        "wholeBoard95Pp": [-2.7777777777777777, 10.76388888888889]
+    },
+    "byOwnDoctrine": {
+        "1": {
+            "primary": {
+                "boards": 24,
+                "pairedGainPp": -3.125,
+                "wholeBoard95Pp": [-13.541666666666666, 8.333333333333334]
+            },
+            "arms": {
+                "stock": {
+                    "games": 48,
+                    "boards": 24,
+                    "wins": 19,
+                    "draws": 1,
+                    "losses": 28,
+                    "drawAwareScorePct": 40.625,
+                    "wholeBoard95ScorePct": [25, 56.25],
+                    "endReasons": {
+                        "elimination": 48
+                    }
+                },
+                "candidate": {
+                    "games": 48,
+                    "boards": 24,
+                    "wins": 18,
+                    "draws": 0,
+                    "losses": 30,
+                    "drawAwareScorePct": 37.5,
+                    "wholeBoard95ScorePct": [22.916666666666668, 52.083333333333336],
+                    "endReasons": {
+                        "elimination": 48
+                    }
+                },
+                "locked": {
+                    "games": 48,
+                    "boards": 24,
+                    "wins": 19,
+                    "draws": 2,
+                    "losses": 27,
+                    "drawAwareScorePct": 41.666666666666664,
+                    "wholeBoard95ScorePct": [26.041666666666668, 57.291666666666664],
+                    "endReasons": {
+                        "elimination": 48
+                    }
+                }
+            }
+        },
+        "2": {
+            "primary": {
+                "boards": 24,
+                "pairedGainPp": 7.291666666666667,
+                "wholeBoard95Pp": [-3.125, 19.791666666666668]
+            },
+            "arms": {
+                "stock": {
+                    "games": 48,
+                    "boards": 24,
+                    "wins": 16,
+                    "draws": 1,
+                    "losses": 31,
+                    "drawAwareScorePct": 34.375,
+                    "wholeBoard95ScorePct": [20.833333333333332, 48.958333333333336],
+                    "endReasons": {
+                        "elimination": 48
+                    }
+                },
+                "candidate": {
+                    "games": 48,
+                    "boards": 24,
+                    "wins": 18,
+                    "draws": 4,
+                    "losses": 26,
+                    "drawAwareScorePct": 41.666666666666664,
+                    "wholeBoard95ScorePct": [27.083333333333332, 56.25],
+                    "endReasons": {
+                        "elimination": 48
+                    }
+                },
+                "locked": {
+                    "games": 48,
+                    "boards": 24,
+                    "wins": 17,
+                    "draws": 0,
+                    "losses": 31,
+                    "drawAwareScorePct": 35.416666666666664,
+                    "wholeBoard95ScorePct": [20.833333333333332, 50],
+                    "endReasons": {
+                        "elimination": 48
+                    }
+                }
+            }
+        },
+        "3": {
+            "primary": {
+                "boards": 24,
+                "pairedGainPp": 9.375,
+                "wholeBoard95Pp": [-4.166666666666667, 22.916666666666668]
+            },
+            "arms": {
+                "stock": {
+                    "games": 48,
+                    "boards": 24,
+                    "wins": 24,
+                    "draws": 1,
+                    "losses": 23,
+                    "drawAwareScorePct": 51.041666666666664,
+                    "wholeBoard95ScorePct": [35.416666666666664, 66.66666666666667],
+                    "endReasons": {
+                        "elimination": 48
+                    }
+                },
+                "candidate": {
+                    "games": 48,
+                    "boards": 24,
+                    "wins": 29,
+                    "draws": 0,
+                    "losses": 19,
+                    "drawAwareScorePct": 60.416666666666664,
+                    "wholeBoard95ScorePct": [47.916666666666664, 72.91666666666667],
+                    "endReasons": {
+                        "elimination": 48
+                    }
+                },
+                "locked": {
+                    "games": 48,
+                    "boards": 24,
+                    "wins": 24,
+                    "draws": 1,
+                    "losses": 23,
+                    "drawAwareScorePct": 51.041666666666664,
+                    "wholeBoard95ScorePct": [34.375, 67.70833333333333],
+                    "endReasons": {
+                        "elimination": 48
+                    }
+                }
+            }
+        }
+    },
+    "byMap": {
+        "1": {
+            "boards": 24,
+            "pairedGainPp": 10.416666666666668,
+            "wholeBoard95Pp": [-4.166666666666667, 25]
+        },
+        "3": {
+            "boards": 24,
+            "pairedGainPp": 9.375,
+            "wholeBoard95Pp": [-1.0416666666666667, 20.833333333333332]
+        },
+        "4": {
+            "boards": 24,
+            "pairedGainPp": -6.25,
+            "wholeBoard95Pp": [-16.666666666666668, 4.166666666666667]
+        }
+    },
+    "originalProgressionGatePassed": false,
+    "consumedSeedChannels": [
+        1755950201, 897902445, 185245876, 3177261523, 2380833217, 1679408318, 2904324555, 1427935338, 157468271,
+        1629072378, 4064558368, 3082053970, 584547965, 1709610286, 4118342947, 2484170923, 2218194365, 4099537859,
+        1258417017, 224316103, 801132520, 294746514, 2238300983, 838030627, 1381016464, 2912203031, 423746022,
+        2759796791, 887020879, 2683263711, 2542883818, 2581819917, 297759912, 4193842534, 2680197403, 1447339010,
+        647185770, 3840523649, 1761857077, 3856579535, 1784931317, 3812450298, 2673592080, 1261031075, 2984478762,
+        2201342555, 3416687632, 229804316, 3730616066, 1977950777, 2280032239, 2446749287, 1224980858, 878685899,
+        3257918157, 761805729, 1528777369, 4122993538, 2565345574, 1930590165, 95576114, 3265488065, 1159471735,
+        310818797, 1535421241, 898100721, 3749389059, 2688166245, 765240691, 292789281, 383871037, 3266865667,
+        3154208568, 927308228, 719545200, 3061213859, 2648888771, 2620516664, 3846041139, 1379712932, 2425781243,
+        2243570180, 1628954808, 1239252591, 3718159083, 1441733133, 2044728870, 3303156510, 635946210, 2969997967,
+        1694067291, 2408326899, 3948429070, 1689943650, 2192878342, 134144650, 2090846213, 3682106978, 2282308322,
+        623610406, 3348368318, 511533334, 1740559331, 3900240268, 3573695780, 2920241226, 327269239, 225316619,
+        4093460589, 1206835648, 1770292416, 3472652371, 4179566642, 2702237929, 3644686680, 3369905244, 483921562,
+        1028923363, 867261126, 3374446335, 3092774857, 3671174098, 4275447275, 2787596026, 1715346960, 1157484844,
+        1852990000, 3635662622, 1338463494, 2586729035, 3023207367, 2058921064, 4119893441, 3848969990, 2478468967,
+        2452173439, 3108179806, 1829816924, 2600212006, 3639431383, 2715221201, 2409288130, 1308669482, 3653890594,
+        458066644, 407871569, 2674696274, 2683104645, 955644960, 536322141
+    ],
+    "boards": [
+        {
+            "board": 0,
+            "setupSeed": 2904324555,
+            "combatSeed": 1427935338,
+            "map": 4,
+            "ownDoctrine": 2,
+            "rawSha256": "212c59089fdde3a983dc8a2d8fa9e8fff0f78e29833f74e9d8b1e26ec76c985e",
+            "scores": {
+                "stock": [1, 0],
+                "candidate": [0, 0.5],
+                "locked": [1, 0]
+            }
+        },
+        {
+            "board": 1,
+            "setupSeed": 157468271,
+            "combatSeed": 1629072378,
+            "map": 1,
+            "ownDoctrine": 2,
+            "rawSha256": "201898cb48c9c59f8641063d2a88e6589a877c8f4c8d6c728274828196c3e242",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 2,
+            "setupSeed": 4064558368,
+            "combatSeed": 3082053970,
+            "map": 1,
+            "ownDoctrine": 3,
+            "rawSha256": "377804b93e9f202af7955005012c5b683e894d40775d7e29e3b5d8bf3d5ef7c3",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 3,
+            "setupSeed": 584547965,
+            "combatSeed": 1709610286,
+            "map": 3,
+            "ownDoctrine": 3,
+            "rawSha256": "822448cc46148da4b4f9ac7265b61f2a15a30d61acb248dd94ad1f336f1eebe6",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 4,
+            "setupSeed": 4118342947,
+            "combatSeed": 2484170923,
+            "map": 3,
+            "ownDoctrine": 1,
+            "rawSha256": "0204e4fb09982ac9d1a2c86cb62a090d4e7aa740eff3ab79fe90732b747829ab",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 1],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 5,
+            "setupSeed": 2218194365,
+            "combatSeed": 4099537859,
+            "map": 1,
+            "ownDoctrine": 3,
+            "rawSha256": "acc052bdb97d208ea61db24f6c765aa5f3a0c72611411abc44af5b5e7bf96dfb",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 6,
+            "setupSeed": 1258417017,
+            "combatSeed": 224316103,
+            "map": 3,
+            "ownDoctrine": 2,
+            "rawSha256": "e939cf7de6ae2c99a9a1a6f614dd3cf0040bdc968f7274f7fd522199d1b3fc23",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 7,
+            "setupSeed": 801132520,
+            "combatSeed": 294746514,
+            "map": 4,
+            "ownDoctrine": 2,
+            "rawSha256": "7386ef6422647dd4d18cf2492386d8b94ae078b77931b20fcec56ed86f26d024",
+            "scores": {
+                "stock": [1, 0],
+                "candidate": [1, 1],
+                "locked": [1, 0]
+            }
+        },
+        {
+            "board": 8,
+            "setupSeed": 2238300983,
+            "combatSeed": 838030627,
+            "map": 3,
+            "ownDoctrine": 2,
+            "rawSha256": "57ecb5fd1d099c95469d147f23ee3409451c2f43586d52cd8fe3b72abe416c07",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 9,
+            "setupSeed": 1381016464,
+            "combatSeed": 2912203031,
+            "map": 3,
+            "ownDoctrine": 3,
+            "rawSha256": "75be3c9c40e2ee18cbfcfa2891acfe29d81cd432fdaaae2bbf271cc3f8e0fc49",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 10,
+            "setupSeed": 423746022,
+            "combatSeed": 2759796791,
+            "map": 1,
+            "ownDoctrine": 3,
+            "rawSha256": "d7cadf488c2de02339b3f4c81f3261e2b8009773018eff6aae4bca3b06c80a68",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [1, 1],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 11,
+            "setupSeed": 887020879,
+            "combatSeed": 2683263711,
+            "map": 4,
+            "ownDoctrine": 1,
+            "rawSha256": "e828d934dba5ceca70f873b08276bc40c2d08a84785498bbc96bbf34cd00eaea",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 12,
+            "setupSeed": 2542883818,
+            "combatSeed": 2581819917,
+            "map": 1,
+            "ownDoctrine": 2,
+            "rawSha256": "b659ac35bc93a444ced82ea0d232de8b3e6c6fcbec0e11b74a7c160cd0708495",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [1, 1],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 13,
+            "setupSeed": 297759912,
+            "combatSeed": 4193842534,
+            "map": 3,
+            "ownDoctrine": 2,
+            "rawSha256": "5e8144cd1503a99fd2cf320455ca8d7e4f0b8a1b890c6b454b646a5a65a00901",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 14,
+            "setupSeed": 2680197403,
+            "combatSeed": 1447339010,
+            "map": 3,
+            "ownDoctrine": 2,
+            "rawSha256": "c7ca0acce214675965c736797880ccae3b947b8a9f6ef1bb120fb0586faa3367",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [1, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 15,
+            "setupSeed": 647185770,
+            "combatSeed": 3840523649,
+            "map": 3,
+            "ownDoctrine": 2,
+            "rawSha256": "e08d7d13928b9468878a8492d492515b06dbdfd9a19b87d2820681c3425018d5",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 16,
+            "setupSeed": 1761857077,
+            "combatSeed": 3856579535,
+            "map": 3,
+            "ownDoctrine": 3,
+            "rawSha256": "d1b599f2643ec94b9648b1c8a626ff09be65c299b608d9d3b9a239ea17a4a0cc",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [0, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 17,
+            "setupSeed": 1784931317,
+            "combatSeed": 3812450298,
+            "map": 1,
+            "ownDoctrine": 3,
+            "rawSha256": "a44cf9875f28067498b1ba0f77f3453ef6241c1503e68777a58dfa319f970640",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 18,
+            "setupSeed": 2673592080,
+            "combatSeed": 1261031075,
+            "map": 3,
+            "ownDoctrine": 1,
+            "rawSha256": "8f953240b0624021eebb26b7fb2b7a0c16e305db7df0ee36a3af5c94233cd156",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 19,
+            "setupSeed": 2984478762,
+            "combatSeed": 2201342555,
+            "map": 4,
+            "ownDoctrine": 3,
+            "rawSha256": "c50c294b1fef79786d4629e5f5e637db259063f83444e96a34320f81fd3cd38b",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 20,
+            "setupSeed": 3416687632,
+            "combatSeed": 229804316,
+            "map": 1,
+            "ownDoctrine": 2,
+            "rawSha256": "bfe6411674e6926578f574a1dd19346cecd910bbb06952de619dbe21e2212dc2",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 21,
+            "setupSeed": 3730616066,
+            "combatSeed": 1977950777,
+            "map": 3,
+            "ownDoctrine": 3,
+            "rawSha256": "dc434d71502669507bfe823c3883b415f253563d12421f1bbdb07b9c0f10be98",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 22,
+            "setupSeed": 2280032239,
+            "combatSeed": 2446749287,
+            "map": 4,
+            "ownDoctrine": 2,
+            "rawSha256": "6e8753cfe77e8d1e5721015964bd77facb948aca5d175c09ae8744ee80b8dab6",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 23,
+            "setupSeed": 1224980858,
+            "combatSeed": 878685899,
+            "map": 3,
+            "ownDoctrine": 3,
+            "rawSha256": "915fa611d69c8375bdc45c7d172865aa2158d4c312448b5e7614bf94d39acebf",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [1, 1],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 24,
+            "setupSeed": 3257918157,
+            "combatSeed": 761805729,
+            "map": 4,
+            "ownDoctrine": 1,
+            "rawSha256": "0a8b2796813ea6b9bd3dcb0671e9ce876d6932f58fa2a2efdef8920e4a8af030",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 1],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 25,
+            "setupSeed": 1528777369,
+            "combatSeed": 4122993538,
+            "map": 3,
+            "ownDoctrine": 2,
+            "rawSha256": "ddad41b5541016ca2ff66a3dc7b658e9407dfe0b21e383b6bb94ed4c9797aeeb",
+            "scores": {
+                "stock": [0, 0.5],
+                "candidate": [0.5, 0.5],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 26,
+            "setupSeed": 2565345574,
+            "combatSeed": 1930590165,
+            "map": 1,
+            "ownDoctrine": 1,
+            "rawSha256": "f84d988debab6998d6eac66dcb71b0d661479862a2982d4d7342edf92548bd7a",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 1],
+                "locked": [0.5, 0]
+            }
+        },
+        {
+            "board": 27,
+            "setupSeed": 95576114,
+            "combatSeed": 3265488065,
+            "map": 3,
+            "ownDoctrine": 2,
+            "rawSha256": "602aa88cf6ed1e954093ad03d54699ba03fd7b036300252c8c71aeb223b3c719",
+            "scores": {
+                "stock": [1, 0],
+                "candidate": [1, 0],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 28,
+            "setupSeed": 1159471735,
+            "combatSeed": 310818797,
+            "map": 1,
+            "ownDoctrine": 1,
+            "rawSha256": "7bedb20343fff972c5364f28e3a2498ae95946545086cc81a6e5d9018665e627",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 29,
+            "setupSeed": 1535421241,
+            "combatSeed": 898100721,
+            "map": 1,
+            "ownDoctrine": 1,
+            "rawSha256": "7ea4c3e8abf4a60d84d53b2869f85c149be2ffb80cff42b48a95ff83d7b0dcbd",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 30,
+            "setupSeed": 3749389059,
+            "combatSeed": 2688166245,
+            "map": 3,
+            "ownDoctrine": 1,
+            "rawSha256": "79282ebc510067cd89017af1ddec2348b17254941c10028e33275c7c840f85a2",
+            "scores": {
+                "stock": [0, 0.5],
+                "candidate": [0, 0],
+                "locked": [0, 0.5]
+            }
+        },
+        {
+            "board": 31,
+            "setupSeed": 765240691,
+            "combatSeed": 292789281,
+            "map": 4,
+            "ownDoctrine": 2,
+            "rawSha256": "13f3f10cb05599bf9553a93afb77d2bd6b2e081fe1b156dc03535c74dd829252",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [0.5, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 32,
+            "setupSeed": 383871037,
+            "combatSeed": 3266865667,
+            "map": 1,
+            "ownDoctrine": 3,
+            "rawSha256": "1c7fcac5d82dd54530ad1d168c5f105d8df177c081e88952085d8faae111b2c2",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 33,
+            "setupSeed": 3154208568,
+            "combatSeed": 927308228,
+            "map": 3,
+            "ownDoctrine": 1,
+            "rawSha256": "61a7894f21491a7676e40c87d32ad066d3875a9e740b9e59611080f49ff44109",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 34,
+            "setupSeed": 719545200,
+            "combatSeed": 3061213859,
+            "map": 4,
+            "ownDoctrine": 2,
+            "rawSha256": "8e462faf08abe9e431cf225b3ce1b2b1748b1151952c91b803d4c35eb45c879e",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 35,
+            "setupSeed": 2648888771,
+            "combatSeed": 2620516664,
+            "map": 1,
+            "ownDoctrine": 1,
+            "rawSha256": "5fbee4db5190b0e1a7a54f62497e37bec146d82a89a9860d2b05028488981b87",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 36,
+            "setupSeed": 3846041139,
+            "combatSeed": 1379712932,
+            "map": 3,
+            "ownDoctrine": 1,
+            "rawSha256": "8bf63276daf12f0367687a327af40d21c9344de46f00152470f0f9d2c8f9959d",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 37,
+            "setupSeed": 2425781243,
+            "combatSeed": 2243570180,
+            "map": 3,
+            "ownDoctrine": 3,
+            "rawSha256": "2190bbb6076d9636d2523879c11c1d71c7eefdb6ff2d159dd6b9d0f5ae1bf7d1",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 38,
+            "setupSeed": 1628954808,
+            "combatSeed": 1239252591,
+            "map": 4,
+            "ownDoctrine": 3,
+            "rawSha256": "a34e52c000684bec9de673913180b2cf48acb6ceefd4f6e78f2283f0d4e2cb47",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 39,
+            "setupSeed": 3718159083,
+            "combatSeed": 1441733133,
+            "map": 1,
+            "ownDoctrine": 1,
+            "rawSha256": "0f3379543fb990809941fefaef3651deb4fefa33aa91baf87e26a1bebaaa1df8",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 40,
+            "setupSeed": 2044728870,
+            "combatSeed": 3303156510,
+            "map": 4,
+            "ownDoctrine": 1,
+            "rawSha256": "18023240f1ab14300400573fd19075dbbfcb3b01ee72c7bacec39a5d3d042310",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 41,
+            "setupSeed": 635946210,
+            "combatSeed": 2969997967,
+            "map": 1,
+            "ownDoctrine": 2,
+            "rawSha256": "46b20a6eac10654ae80427279677ff25825606b63821b12bb111089ff9d627ad",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [1, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 42,
+            "setupSeed": 1694067291,
+            "combatSeed": 2408326899,
+            "map": 4,
+            "ownDoctrine": 3,
+            "rawSha256": "2d4c98a9463d4ebb9ca0457f18eee1fb47f6ea4ddd4b6b513689bf178df9ecbb",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 43,
+            "setupSeed": 3948429070,
+            "combatSeed": 1689943650,
+            "map": 4,
+            "ownDoctrine": 2,
+            "rawSha256": "359305e1a242e21d9c0658392e35a58a9e969a3096f145cef66b5b9c9f13abd3",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 44,
+            "setupSeed": 2192878342,
+            "combatSeed": 134144650,
+            "map": 4,
+            "ownDoctrine": 1,
+            "rawSha256": "14a48df196ef3cf1bef29f48982f4b56f34a84ea69264facfe15a6e4f72ab04b",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 0],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 45,
+            "setupSeed": 2090846213,
+            "combatSeed": 3682106978,
+            "map": 1,
+            "ownDoctrine": 1,
+            "rawSha256": "a73eb16880f7882e2e8775afda2e7ab6705a6461508c17f89cc8bd7a6f093608",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 46,
+            "setupSeed": 2282308322,
+            "combatSeed": 623610406,
+            "map": 3,
+            "ownDoctrine": 1,
+            "rawSha256": "d3d5ca18b4f5f9fb295ded788c28f3119e4718e92846f8500860d07d1a842d3b",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 47,
+            "setupSeed": 3348368318,
+            "combatSeed": 511533334,
+            "map": 3,
+            "ownDoctrine": 1,
+            "rawSha256": "8fbf086367bc7e7ce1ecaee2507fdf60db1f540b7680cf500ceb7f93f35ff17e",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 48,
+            "setupSeed": 1740559331,
+            "combatSeed": 3900240268,
+            "map": 3,
+            "ownDoctrine": 1,
+            "rawSha256": "942164163b5d1b08e5e82385b4c6d0d9d1f11ddc52446dad4ca20128f992c6a3",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [1, 0],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 49,
+            "setupSeed": 3573695780,
+            "combatSeed": 2920241226,
+            "map": 3,
+            "ownDoctrine": 2,
+            "rawSha256": "ebe8f5c402409aba8bfe2a087b2b71553fb1e3b92bd8abbf86c709025c76e71a",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 50,
+            "setupSeed": 327269239,
+            "combatSeed": 225316619,
+            "map": 4,
+            "ownDoctrine": 3,
+            "rawSha256": "cc3596e373a8d31946b77a6f8eff3dd8387eecf81cf722ab373f61c39e7afae5",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 1],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 51,
+            "setupSeed": 4093460589,
+            "combatSeed": 1206835648,
+            "map": 4,
+            "ownDoctrine": 2,
+            "rawSha256": "41b1ce46a88fb7d00bcbb98da82e084d2c848e790403dce34c954c34dc9129e0",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 52,
+            "setupSeed": 1770292416,
+            "combatSeed": 3472652371,
+            "map": 1,
+            "ownDoctrine": 3,
+            "rawSha256": "f80bb076373decf62eeb066056d616b6dad7bf2193bf2587dacc006229741b50",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [1, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 53,
+            "setupSeed": 4179566642,
+            "combatSeed": 2702237929,
+            "map": 1,
+            "ownDoctrine": 1,
+            "rawSha256": "029334ac9c5a90d472bd9fc2ce89713868fcb0797b6ad3466e3477409b7fecfc",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 0],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 54,
+            "setupSeed": 3644686680,
+            "combatSeed": 3369905244,
+            "map": 1,
+            "ownDoctrine": 3,
+            "rawSha256": "fe280a7962aa4a42eb0ff474dfcca56b49a68a924428dc248466d2721bbe3a61",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [1, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 55,
+            "setupSeed": 483921562,
+            "combatSeed": 1028923363,
+            "map": 1,
+            "ownDoctrine": 2,
+            "rawSha256": "faced0e40e46aa173b65c011f0042b6c4e2fdbbefc9fad552364ff9eacf38760",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 56,
+            "setupSeed": 867261126,
+            "combatSeed": 3374446335,
+            "map": 4,
+            "ownDoctrine": 1,
+            "rawSha256": "56dde797dab387a10f60c49bb0cd5d0ad729b1f2470a3f64105a33a3122aa56d",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 57,
+            "setupSeed": 3092774857,
+            "combatSeed": 3671174098,
+            "map": 4,
+            "ownDoctrine": 3,
+            "rawSha256": "00a0e25458a8ddd7f569c0749da2b22c5967102c335f5d136af26e400ef60f50",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 58,
+            "setupSeed": 4275447275,
+            "combatSeed": 2787596026,
+            "map": 4,
+            "ownDoctrine": 2,
+            "rawSha256": "0f69af8e21e9a03e1f598150ea7265895a3ee58b953b00dc015f4e9de060a086",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 59,
+            "setupSeed": 1715346960,
+            "combatSeed": 1157484844,
+            "map": 4,
+            "ownDoctrine": 1,
+            "rawSha256": "8131d9f0ee2f7fcfd95c0d3bd89a47cb2118be4277db310b2e0a0fcd454a4a2c",
+            "scores": {
+                "stock": [1, 0],
+                "candidate": [0, 0],
+                "locked": [1, 0]
+            }
+        },
+        {
+            "board": 60,
+            "setupSeed": 1852990000,
+            "combatSeed": 3635662622,
+            "map": 1,
+            "ownDoctrine": 3,
+            "rawSha256": "0fa5c74275004c18bb261bd2702de838f410281644f0c3ecc1f7e3359699f261",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 61,
+            "setupSeed": 1338463494,
+            "combatSeed": 2586729035,
+            "map": 1,
+            "ownDoctrine": 2,
+            "rawSha256": "bd616fb9405c3576173e950fa00ad46f79c1ab0e210872f1c889a221687e337d",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [0, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 62,
+            "setupSeed": 3023207367,
+            "combatSeed": 2058921064,
+            "map": 4,
+            "ownDoctrine": 3,
+            "rawSha256": "643f03a9153e64c98f54ed99d0e5b5b14c2d750926f83d70fc62e8804cc0ad57",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 0],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 63,
+            "setupSeed": 4119893441,
+            "combatSeed": 3848969990,
+            "map": 1,
+            "ownDoctrine": 1,
+            "rawSha256": "80a5d27cca9b06b65458bb09c723417c0d25dd54d1d4462824bb1e0c2c66c75b",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 0],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 64,
+            "setupSeed": 2478468967,
+            "combatSeed": 2452173439,
+            "map": 3,
+            "ownDoctrine": 3,
+            "rawSha256": "bdeb6d2151ae218c6745c101d4d59babbf5d9a2eed51fcc14a4b059001de86c1",
+            "scores": {
+                "stock": [0.5, 0],
+                "candidate": [1, 0],
+                "locked": [0.5, 0]
+            }
+        },
+        {
+            "board": 65,
+            "setupSeed": 3108179806,
+            "combatSeed": 1829816924,
+            "map": 1,
+            "ownDoctrine": 2,
+            "rawSha256": "7b8199b10075bf924ff8b08ac52a66a28ae3b391e2552cbef91f21ae24f05766",
+            "scores": {
+                "stock": [1, 0],
+                "candidate": [0, 1],
+                "locked": [1, 0]
+            }
+        },
+        {
+            "board": 66,
+            "setupSeed": 2600212006,
+            "combatSeed": 3639431383,
+            "map": 4,
+            "ownDoctrine": 3,
+            "rawSha256": "84186347505bab2427a2d480d38a12a3c317a4c76f590ad8392300079fac9475",
+            "scores": {
+                "stock": [1, 1],
+                "candidate": [1, 0],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 67,
+            "setupSeed": 2715221201,
+            "combatSeed": 2409288130,
+            "map": 4,
+            "ownDoctrine": 3,
+            "rawSha256": "dc31cd8b11664a773574b8ba0ea4073209df19736f9a88fef5e21eb8b88a276e",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        },
+        {
+            "board": 68,
+            "setupSeed": 1308669482,
+            "combatSeed": 3653890594,
+            "map": 3,
+            "ownDoctrine": 3,
+            "rawSha256": "319a1d893f182097bbf8cbbfd0b288aeaea95a1e614a9cbee5740c0650b67b64",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [1, 1],
+                "locked": [1, 1]
+            }
+        },
+        {
+            "board": 69,
+            "setupSeed": 458066644,
+            "combatSeed": 407871569,
+            "map": 4,
+            "ownDoctrine": 1,
+            "rawSha256": "9ea9dc0cb15e22bf460b4b7088aaf54b34b6cb2b64679bfb627c357772dc13cb",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 70,
+            "setupSeed": 2674696274,
+            "combatSeed": 2683104645,
+            "map": 1,
+            "ownDoctrine": 2,
+            "rawSha256": "03ec564d0d588959a9bbbda56697face063167348ac860965bd17f402109f431",
+            "scores": {
+                "stock": [0, 1],
+                "candidate": [0, 1],
+                "locked": [0, 1]
+            }
+        },
+        {
+            "board": 71,
+            "setupSeed": 955644960,
+            "combatSeed": 536322141,
+            "map": 4,
+            "ownDoctrine": 1,
+            "rawSha256": "12b2fbd5483cc0ff97b02697a8f783634105084c3a8efa44d523e62f40869c95",
+            "scores": {
+                "stock": [0, 0],
+                "candidate": [0, 0],
+                "locked": [0, 0]
+            }
+        }
+    ],
+    "archiveSha256": "f359007f06dc4b0d9b767de22e2ead2ac2fc9d9a31268977a404af9c571fc859",
+    "reportSha256": "0687b407a6808a28f4bea586685a7eb4a74f75a9c23e15ac563c354d6d1fc1c4",
+    "sha256": "ffe059d125098c609ae7c1da365c73fe15ce8155f0b81d28db020d6c27a76a5b"
+}
