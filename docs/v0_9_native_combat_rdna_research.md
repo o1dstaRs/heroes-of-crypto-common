@@ -169,6 +169,36 @@ readback before training. Each host chunk is at most 8,159,232 bytes. No observa
 precision is unchanged. The full previously failed training/validation banks (24,879 decisions) passed
 exact GPU readback in 9.34 seconds. The portable backend's expanded thirteen CPU tests also passed.
 
+The recovery completed recipe 1 on g002, including float fitting, QAT, independent integer validation and
+export. The AMD kernel subsequently reported a GPU virtual-memory fault and reset the device while the
+process was moving to another recipe. Preserve this as a failed, incomplete four-recipe run; no candidate
+strength games had opened. The chunked-upload fidelity result remains valid, and a GPU runtime reset is
+not evidence of improved strength or a diagnosis of defective hardware. No manual driver reset or live
+service restart was performed.
+
+Collection nevertheless completed all 3,456 teacher games, admitting 113,986 training and 37,464
+validation decisions. Keep this full corpus for a separately validated training backend.
+
+## CPU-only evaluation of the completed scale candidate
+
+The sole completely exported pre-reset model is separately evaluated under
+`v09-native-single-evaluation-20261108T182917Z`, registration SHA
+`32e17ddce23e39b742e66aecbaff92d811a06a64b42d407f26824ff3259073ad`, capsule SHA
+`394ad0787c107a21482a539ac7da725c596d6a4cf78de2b08db22a9a35ebea85`.
+
+This freezes g002 recipe 1 before any battle-strength result. It is the only completed candidate, rather
+than a model chosen by observed wins. Its model SHA is
+`4749da06ec07bfd08db7ec6c2bbe03ba6dc4e73847e67585804dbccc253e7bb9`; sealed file SHA:
+`327aff190b7bfa7f74ecb41a2a8dc9fc4afc31d0b8fe48d2329fb4893dfe3a5e`. Canonical integer parity passed
+on 128 decisions / 2,053 candidate scores, followed by twelve complete native smoke games. Its 54.11%
+validation teacher agreement is not a battle win rate.
+
+The CPU-only study runs the complete 432-game development bank for diagnostics and operational checks.
+If these software checks pass, it always runs its new reserved 1,512-board / 12,096-battle fresh bank,
+regardless of development score. The confirmed native reference remains `4e1d89927177`, facing the same
+stock A19 with matched openings. The new candidate has no strength-dependent replacement or stopping
+rule. Fresh paired confidence determines whether native strength improved; promotion remains disabled.
+
 ## Validation and ownership
 
 The engine capture change passed 7,600 common tests, TypeScript compilation and the common build with

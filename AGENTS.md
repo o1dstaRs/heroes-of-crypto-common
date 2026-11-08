@@ -52,8 +52,13 @@ numerical checks, failed pilot and complete fresh result. Further native models 
 reference, with stock A19 still the target opponent. The next separately registered scale campaign uses
 `v09-native-scale-acquisition-20261108T170905Z` on the 9800X3D/RDNA node. Its initial scale fitter stopped
 before SGD on a KFD host-memory mapping error. The separate
-`v09-native-scale-recovery-20261108T180216Z` learner uses exact-readback 128-row uploads and unchanged
-recipes, with a new unused fresh bank; see the research document for identities and transport checks.
+`v09-native-scale-recovery-20261108T180216Z` learner used exact-readback 128-row uploads and unchanged
+recipes. It completed one candidate before an AMD GPU virtual-memory fault/reset; preserve the original
+four-recipe campaign as failed/incomplete. No manual driver reset was performed. The completed candidate
+`4749da06ec07` now has a separate CPU-only study, `v09-native-single-evaluation-20261108T182917Z`, fixed
+before strength results and using another unused fresh bank. Its full development score is diagnostic;
+fresh proceeds after operational checks regardless of development strength. See the research document
+for exact identities and transport checks. Do not treat validation teacher agreement as a win rate.
 Exclude all prior and reserved banks, including their derived setup/combat channels;
 never select a replacement model after opening its fresh bank.
 
