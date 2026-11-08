@@ -58,3 +58,33 @@ The frozen source, registration, complete raw journals, statistics and replay
 receipts belong under the client research output directory
 `game/core/tmp/healer-support-pilot-20261108/`. Preserve the fixed hypotheses,
 completed cases, and consumed seeds; do not refill or tune from partial outcomes.
+
+## Complete pilot result
+
+The fixed bank completed all 1,152 fights on 144 boards. Each arm played 288 games.
+The candidate scored 113 wins, 5 draws and 170 losses (40.1042% draw-aware score),
+versus 120/7/161 (42.8819%) for the Satyr baseline. Its paired gain was
+**−2.7778 percentage points**, whole-board 95% interval **−7.2917 to +1.7361**.
+The secondary gains were −2.2569 points versus stock A19 (−6.9444 to +2.2569)
+and −4.3403 versus the accepted model pair (−9.0278 to +0.1736).
+All three own-doctrine primary means were negative. The pilot gate failed.
+No confirmation, production activation, model fit or GPU run followed.
+
+All 52 changed-result seat contexts were replayed in both arms: 104 exact
+replays from 46 existing boards, with complete turn/event/outcome parity and
+committed-health accounting. They add no independent games. Raw winner counts,
+paired gains, confidence intervals and the gate were independently recomputed.
+
+The largest descriptive loss bucket first replaced Blessing with Spiritual
+Armor: 45 contexts, 2 gains, 10 losses and 33 ties, contributing −2.6042 points
+to the full-bank estimate. Armor casts increased from 250 to 456, while Mass
+Heal fell from 383 to 201. This does not isolate a causal spell effect.
+
+On board 39, green, the candidate valued Blessing on Wolf at zero, but that Wolf
+later made two melee attacks while Blessed in the baseline. The armored Wolf
+had more HP at its next activation (892 versus 451), yet only its branch lost.
+This is evidence of a valuation blind spot, not a rule to ban armor: two other
+contexts in the same bucket improved. The next separately registered policy
+needs to compare whole-team continuations through useful recipient activations,
+enemy replies, retaliation and buff duration. Do not remove the losing bucket
+posthoc and call the resulting arithmetic a measured strategy improvement.
