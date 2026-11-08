@@ -2,6 +2,10 @@
 import { createHash } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 
+// The inference contract reaches Unit through an engine import cycle. Initialize the catalog first:
+// its captured Unit prototypes must be ready in compiled JS as well as Bun's source execution.
+import "../../ai/decision_path_catalog";
+
 import savedCheckpoint from "./checkpoints/a19_full_policy_5036_20261108/checkpoint.json";
 import savedBundle from "./checkpoints/a19_full_policy_5036_20261108/pair_bundle.json";
 import { loadA19PolicyHeadPair } from "./a19_policy_head_pair";
