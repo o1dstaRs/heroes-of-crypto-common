@@ -50,7 +50,7 @@
     },
     "Tie up the Horses": {
         "name": "Tie up the Horses",
-        "range": 2,
+        "range": 3,
         "desc": "Allied non flying units within the aura's range gain +{} movement distance.",
         "power": 2,
         "is_buff": true,
