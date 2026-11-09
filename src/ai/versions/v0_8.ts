@@ -44,6 +44,7 @@ import {
 } from "./v0_8_support_roles";
 import { prioritizeV08A13FinishDecision } from "./v0_8s_finish";
 import { throughShotLineEnabled } from "../through_shot_line";
+import { battleMageTargetsEnabled } from "../battle_mage_targets";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const V08_DIRECT_COMBAT_KINDS = new Set<CandidateKind>(["melee", "shot", "area_throw"]);
@@ -373,6 +374,7 @@ function enumerateV08BoundaryCandidates(
         maxShotAims: 6,
         maxAreaThrowCells: 4,
         includeMountainAttacks,
+        preserveMeteoriteTargetCoverage: battleMageTargetsEnabled(unit),
         // A rediscovered incumbent attack needs the same kill/damage metadata as generated alternatives so the
         // late finish comparator can improve target selection even when v0.7 already chose to attack.
         enrichIncumbentMetadata: true,

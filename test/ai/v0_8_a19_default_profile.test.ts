@@ -89,7 +89,8 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v7",
+            schema: "hoc.v0_8_a19_production_profile.v8",
+            battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
             researchOnly: false,
@@ -251,6 +252,8 @@ describe("v0.8+A19 production profile", () => {
     it("pins the bytes of every source its behavior depends on", () => {
         expect(V08_A19_PROFILE.sourceLedger).toBe(V08_A19_SOURCE_LEDGER);
         expect(V08_A19_SOURCE_LEDGER.map(({ role }) => role)).toEqual([
+            "battle-mage-targets",
+            "native-v08-combat",
             "search-driver",
             "unit-support-setup",
             "healer-support-setup",

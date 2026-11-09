@@ -12,6 +12,7 @@
 import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
 import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
+import { BATTLE_MAGE_TARGET_POLICY } from "../battle_mage_targets";
 
 import { StrategyV0_8 } from "./v0_8";
 import { V08_A19_SCORED_ARBITRATION_POLICY } from "./v0_8_a19_scored_arbitration";
@@ -61,7 +62,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
  *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v7" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v8" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -160,10 +161,20 @@ export const V08_A19_PLACEMENT_POLICY = Object.freeze({
  */
 export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
+        role: "battle-mage-targets" as const,
+        source: "src/ai/battle_mage_targets.ts" as const,
+        sha256: "a185a1361e3781cc2e41a8774d86cda77cf986617f7494c2be9ffe87775b86c6" as const,
+    }),
+    Object.freeze({
+        role: "native-v08-combat" as const,
+        source: "src/ai/versions/v0_8.ts" as const,
+        sha256: "516b07f452d1fdd6b43e5ff1d1c6c498d19f7d7038da957d8158b3963c0f8904" as const,
+    }),
+    Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for whole-impact Hydra catalogs in both production enumeration paths.
-        sha256: "1895bcfd5d9539523741ddb87733a2ef74146e618cd4be97f2847e680b4219da" as const,
+        // Battle Mage retains distinct Meteorite impacts in both production enumeration paths.
+        sha256: "36b64f45920cac8512c728b7be192a9cf5a04dd62e6401f0bd5e8e76e61ead29" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
@@ -203,8 +214,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        // User-requested forward summon choice; existing Wolf reinforcements keep one placement option.
-        sha256: "8da0cc2836eaff62f208bb7b35c2863cd552fcc8331d5c5d8395ec9476c86f9d" as const,
+        // Battle Mage coverage is opt-in; historical catalogs and other casters retain their prior behavior.
+        sha256: "12046dee52607072bf1640ff813f29b6c3e739dd9aa46a647386229441d927bf" as const,
     }),
     Object.freeze({
         role: "summon-placement" as const,
@@ -392,6 +403,7 @@ export const V08_A19_PROFILE = Object.freeze({
     authoritativeFinalPlacement: A19_LEARNED_FINAL_PLACEMENT_POLICY,
     wanderingMageSupport: A19_WANDERING_MAGE_SUPPORT_POLICY,
     unitSupport: A19_UNIT_SUPPORT_POLICY,
+    battleMageTargets: BATTLE_MAGE_TARGET_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

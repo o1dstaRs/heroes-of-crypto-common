@@ -40,6 +40,7 @@ import {
     type IEnumeratedCandidate,
 } from "../ai";
 import { throughShotLineEnabled } from "../ai/through_shot_line";
+import { battleMageTargetsEnabled } from "../ai/battle_mage_targets";
 import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import {
     consumeWaitReplacement,
@@ -2697,6 +2698,7 @@ export class SearchDriver {
                 includeLastFuseCounterTrades: isV08Search && this.a19LastFuseTrades,
                 includeLastFusePrimaryTrades: isV08Search && this.a19LastFusePrimaryTrades,
                 includeLightningSpinCoverage: isV08Search && this.a19LightningSpinCoverage,
+                preserveMeteoriteTargetCoverage: isV08Search && battleMageTargetsEnabled(unit),
                 researchRangedShieldSequence: isV08Search && this.researchRangedShieldSequence,
                 researchFireBreathValue: isV08Search && this.researchFireBreathValue,
                 // v0.8 search rolls out the free Through Shot lines its native policy can take (V08_THROUGH_SHOT_LINE
@@ -2891,6 +2893,7 @@ export class SearchDriver {
                         includeLastFuseCounterTrades: isV08Search && this.a19LastFuseTrades,
                         includeLastFusePrimaryTrades: isV08Search && this.a19LastFusePrimaryTrades,
                         includeLightningSpinCoverage: isV08Search && this.a19LightningSpinCoverage,
+                        preserveMeteoriteTargetCoverage: isV08Search && battleMageTargetsEnabled(unit),
                         researchRangedShieldSequence: isV08Search && this.researchRangedShieldSequence,
                         researchFireBreathValue: isV08Search && this.researchFireBreathValue,
                         enrichIncumbentMetadata:

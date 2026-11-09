@@ -918,6 +918,8 @@ export interface IEnumerateOptions {
     includeLastFusePrimaryTrades?: boolean;
     /** Rank radial melee stands by the whole impact, rather than the declared primary target. */
     includeLightningSpinCoverage?: boolean;
+    /** Battle Mage only: retain distinct visible Meteorite impacts for real-engine search comparison. */
+    preserveMeteoriteTargetCoverage?: boolean;
     /** Research only: preserve shared and personal shield layers across ranged impacts. */
     researchRangedShieldSequence?: boolean;
     /** Research only: rank Fire Breath strikes by primary damage plus the complete magical tail. */
@@ -3444,9 +3446,10 @@ class CandidateGenerator {
      * every block that can catch any enemy footprint while a set prevents overlapping footprints from making
      * us evaluate the same anchor repeatedly.
      *
-     * Scored by damage that isn't overkill (a stack only has so much health to take) plus the kills it lands.
-     * Determinism: strict improvement only, walked in enemy then offset order, so ties keep the first block and
-     * the lookahead stays reproducible.
+     * The historical catalog keeps the greatest non-overkill HP damage. Battle Mage's opt-in coverage keeps
+     * that first plus every distinct visible impact, including shield breaks, so real-engine search can value
+     * the victims, reflections and continuations. Victim order matters; multiple mirrors can hit the caster.
+     * Strict improvement and stable enemy/offset order keep the representative anchors reproducible.
      */
     private addMeteoriteCastCandidates(spell: Spell): void {
         const { grid, unitsHolder } = this.context;
@@ -3460,9 +3463,17 @@ class CandidateGenerator {
         const spread = spell.getName() === "Meteor Shower" ? [-1, 0, 1] : [0, 1];
         const anchorOffsets = spell.getName() === "Meteor Shower" ? [-1, 0, 1] : [0, -1];
 
+        const preserveImpacts =
+            this.options.preserveMeteoriteTargetCoverage === true &&
+            this.unit.getName() === "Battle Mage" &&
+            spell.getName() === "Meteorite";
+        const impacts: { cell: XY; value: number; kill: 0 | 1 }[] = [];
+        const seenImpacts = new Set<string>();
+
         let best: { cell: XY; value: number; kill: 0 | 1 } | undefined;
         const seenAnchors = new Set<string>();
         for (const enemy of this.enemies) {
+            if (preserveImpacts && isHidden(enemy)) continue;
             for (const ec of enemy.getCells()) {
                 for (const ox of anchorOffsets) {
                     for (const oy of anchorOffsets) {
@@ -3484,27 +3495,43 @@ class CandidateGenerator {
                         const caught = evaluateAffectedUnits(cells, unitsHolder, grid, false)?.[0] ?? [];
                         let value = 0;
                         let kill: 0 | 1 = 0;
+                        let breaksShield = false;
+                        const visibleVictims: string[] = [];
                         for (const unit of caught) {
                             if (unit.getTeam() === this.unit.getTeam() || unit.isDead()) {
                                 continue;
                             }
-                            const dealt = projectSpellDamageAgainstUnit({
+                            if (preserveImpacts && isHidden(unit)) continue;
+                            visibleVictims.push(unit.getId());
+                            const projection = projectSpellDamageAgainstUnit({
                                 spell,
                                 caster: this.unit,
                                 target: unit,
                                 rawDamage,
-                            }).damage;
+                            });
+                            const dealt = projection.damage;
+                            breaksShield ||= projection.absorbedByWaterShield;
                             const hp = unit.getCumulativeHp();
                             value += Math.min(dealt, hp);
                             if (dealt >= hp) {
                                 kill = 1;
                             }
                         }
-                        if (value <= 0) {
+                        if (value <= 0 && !(preserveImpacts && breaksShield)) {
                             continue;
                         }
+                        const impact = { cell: anchor, value, kill };
                         if (!best || value > best.value) {
-                            best = { cell: anchor, value, kill };
+                            best = impact;
+                        }
+                        if (preserveImpacts) {
+                            // Preserve engine victim order: multiple Magic Mirrors can rebound onto the caster.
+                            // Do not rank or deduplicate with information from invisible stacks.
+                            const signature = JSON.stringify(visibleVictims);
+                            if (!seenImpacts.has(signature)) {
+                                seenImpacts.add(signature);
+                                impacts.push(impact);
+                            }
                         }
                     }
                 }
@@ -3512,6 +3539,13 @@ class CandidateGenerator {
         }
         if (best) {
             this.pushSpell(spell, undefined, best.cell, { expectedDamage: best.value, expectedKill: best.kill });
+            for (const impact of impacts) {
+                if (impact === best) continue;
+                this.pushSpell(spell, undefined, impact.cell, {
+                    expectedDamage: impact.value,
+                    expectedKill: impact.kill,
+                });
+            }
         }
     }
     private addSpells(): void {
