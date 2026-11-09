@@ -1,0 +1,55 @@
+{
+    "schema": "hoc.wandering-mage.checkpoint.v1",
+    "id": "wandering-mage-candidates-20261108",
+    "status": "user-saved-research-candidates",
+    "savedAtUtc": "2026-11-09T04:13:34.228835+00:00",
+    "policySource": "src/simulation/wandering_mage_research.ts",
+    "policySha256": "7a121a9592c7b78aebad2f9bcf93b2934d2b1fabccaf588b4fe50afa9330a288",
+    "sourceCommonCommit": "2867e31f147dc07da1c65c1960f1118b65ea6732",
+    "sourceServerCommit": "5c2bfa3ce5104d8f96916d21ddf60217a244d0ef",
+    "productionActivation": false,
+    "productionTimingQualified": false,
+    "originalProgressionGatesPassed": false,
+    "subsequentExperimentsMayOverwrite": false,
+    "archiveSha256": "dc9c9eaf59a9159a8ac23656e74297b5ec93625da095ca8f2254a32b25e140b5",
+    "evidenceSource": "docs/evidence/wandering_mage_20261108.json",
+    "strategies": [
+        {
+            "id": "wandering-mage-one-buff-search8-20261108",
+            "study": "wandering-mage-pilot-20261108",
+            "arm": "one-buff-search8",
+            "splitMode": "one-buff",
+            "retainLateralPosition": false,
+            "ownMageRootShortlist": 8,
+            "baseRootShortlist": 6,
+            "lookaheadActions": 64,
+            "rolloutReplicates": 2,
+            "gainVsStock": {
+                "mean": 7.175925925925926,
+                "ci95": [0.23148148148148145, 14.120370370370368],
+                "familywise95": [-1.1574074074074074, 15.50925925925926]
+            }
+        },
+        {
+            "id": "wandering-mage-rear-lateral-20261108",
+            "study": "lateral-54",
+            "arm": "rear-lateral",
+            "splitMode": "native",
+            "retainLateralPosition": true,
+            "ownMageRootShortlist": 6,
+            "baseRootShortlist": 6,
+            "lookaheadActions": 64,
+            "rolloutReplicates": 2,
+            "gainVsStock": {
+                "mean": 5.555555555555555,
+                "ci95": [-4.62962962962963, 15.74074074074074],
+                "familywise95": [-6.944444444444445, 18.055555555555554]
+            }
+        }
+    ],
+    "originalConfirmationOpened": false,
+    "modelFitted": false,
+    "optimizerSteps": 0,
+    "evidenceFingerprint": "bc15b4f7b1342fe400a74193d7aac7ccef587b1c2e6fb86fc46c9feca141c004",
+    "sha256": "f98041c7966c1e915f49b0e205484fbb4580ede93576efae9fee9f0bfd5eea0e"
+}

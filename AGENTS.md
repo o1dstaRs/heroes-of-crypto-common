@@ -48,6 +48,16 @@ fix. Keep the current production default unchanged and exclude all 150 consumed 
 in `docs/evidence/satyr_contact_20261108.json` from future independent studies. New Satyr candidates
 must use a separate module/checkpoint and retain this comparator; never overwrite its policy or gates.
 
+## Saved Wandering Mage research candidates
+
+The user requested preservation of the promising Mage strategies after the November 8 campaign.
+Use `createLockedWanderingMageResearchStrategy()` in `src/simulation/wandering_mage_checkpoint.ts`
+for the fixed one-buff/backline/search8 and flank-preserving backline candidates. Their positive
+point estimates did not clear the original gates; they remain explicit research options with no
+live activation. Preserve both IDs and helper hashes. Read `docs/wandering_mage_research.md`, retain
+all four studies' losses, and exclude the reserved channels in `docs/evidence/wandering_mage_20261108.json`.
+New rules or combinations need new IDs and independent evidence; never overwrite these checkpoints.
+
 ## Native v0.9 combat research reference
 
 Native combat now has an independently confirmed **unpromoted research model**, separate from the

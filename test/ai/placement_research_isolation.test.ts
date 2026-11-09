@@ -19,6 +19,8 @@ const unqualified = [
     "src/simulation/first_contact_placement_research.ts",
     "src/simulation/measure_first_contact_placement.ts",
     "src/simulation/blocked_approach_placement_research.ts",
+    "src/simulation/wandering_mage_research.ts",
+    "src/simulation/wandering_mage_checkpoint.ts",
 ].map((source) => resolve(root, source));
 
 // Follow executable imports/re-exports, not comments or type-only references. A helper silently called
