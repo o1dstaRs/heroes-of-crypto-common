@@ -17,6 +17,24 @@ Set `HOC_TEST_WORKERS=2` when a shared workstation is busy. The test runner caps
 available cores and the existing local/CI limits, and rejects invalid counts. It also applies to tests
 started by the package build; the default remains up to 12 local workers and 2 CI workers.
 
+## User-locked shooter counter-play research
+
+The user requested locking strategy gains on November 9, 2026 UTC. Preserve
+`ranged-counter-promising-20261109` through `lockedRangedCounterCheckpoint()` in
+`src/simulation/ranged_counter_checkpoint.ts`. The free-spread and middle-Placement/Sniper candidates have
+positive point estimates in different populations; neither passed the original 54-board / 1,512-fight
+qualification. This request preserves exact research references, not a new live activation.
+Keep `ranged_counter_research.ts` and `measure_ranged_counter_research.ts` immutable at the hashes checked
+by that loader, retain every losing arm and failed gate, and exclude all channels in
+`docs/evidence/ranged_counter_20261109.json`. The old held-out bank was never opened and is retired after
+an expanded seed audit found a reused combat channel. Do not reopen it or silently rewrite its registration.
+
+New situational dispatch belongs in `ranged_counter_situational_research.ts` under its separate v2 ID.
+Read `docs/ranged_counter_research.md`. Fully funded paid plans must improve against both current setup
+and a matched free formation, on independent armies and a fresh confirmation, within the user's +10%
+compute bound. Extra shots and favorable slices do not replace the registered score gates. Native v0.9
+combat training and its locked comparators remain separate.
+
 ## User-locked A19 full-policy research reference
 
 The user accepted the **50.36%** result and requested a fixed checkpoint on November 8, 2026 UTC.

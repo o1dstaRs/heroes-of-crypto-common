@@ -1,0 +1,37 @@
+# Shooter counter-play research, 2026-11-09
+
+The user requested improvements after test game `57e52f3a-5d1c-4222-9ae4-3b024d9d0566`, then requested that the strategy's gains be locked. Preserve `ranged-counter-promising-20261109` as the fixed **research** reference. Its free-spread and middle-tier Placement candidates have positive point estimates in different populations; neither passed its registered strength gate. No live draft, setup or combat default was activated by this campaign. These references are not native v0.9 combat training.
+
+The complete development comparison contains 1,512 fights across 54 independent offer boards: 27 ordinary locked-V3 AI opponents and 27 legal movement-heavy counter drafts. Each board tests both draft assignments and both physical seats. Maps and five/six/seven-point doctrines are balanced. A separate 56-fight smoke reuses two development boards and contributes no extra independent evidence. Every smoke outcome, action trace and final formation reproduced in development. There were zero rejected actions.
+
+| Candidate                           | Overall score | Paired change vs current | Family-adjusted 95% interval | Change vs fast counters |
+| ----------------------------------- | ------------: | -----------------------: | ---------------------------: | ----------------------: |
+| Current reference                   |        44.21% |                        — |                            — |                       — |
+| Counter-aware non-shooter selection |        43.75% |                 −0.46 pp |               −5.56 to +4.63 |                −0.93 pp |
+| Range-null escape proposal          |        42.82% |                 −1.39 pp |               −8.33 to +6.48 |                −1.85 pp |
+| Free spread                         |        47.69% |                 +3.47 pp |              −7.41 to +13.43 |                −0.93 pp |
+| Middle Placement, retain Sniper     |        44.68% |                 +0.46 pp |               −8.56 to +9.26 |                +5.09 pp |
+| Largest Placement, retain Sniper    |        36.81% |                 −7.41 pp |              −21.30 to +4.63 |                −4.17 pp |
+| Largest Placement, retain Armor     |        31.48% |                −12.73 pp |              −24.54 to −1.39 |                −9.26 pp |
+
+Free spread gained +7.87 points in the ordinary-opponent population, with an adjusted interval spanning zero. Middle Placement gained +6.02 points against the matched free formation in the fast-counter population, also unconfirmed. Those descriptive slices motivate a new prospective situational candidate; they do not qualify a matchup exception or replace a failed whole-population gate. Largest Placement produced more ranged attacks while losing more games and taking 15.6–36.4% more fight time. It exceeds the user's +10% compute allowance in this measurement and remains rejected.
+
+## Exact retained behavior
+
+`spreadRangedCounterFormation` in `src/simulation/ranged_counter_research.ts` runs two deterministic coordinate sweeps. It separates valuable shooters/casters using only own formation and public enemy identities, preserves every existing friendly aura link, validates complete rectangular footprints, and buys no upgrades. It applies only to at least three-shooter formations facing public area damage, range suppression or at least two melee flyers.
+
+`placement1-sniper` uses that same selector with a fully funded middle-tier Placement plan, maximum Sniper and the remaining points in Armor. Placement costs one point. The largest tier costs two, not three; it opens a six-column side deployment. The serving support planner consumes the actual extra stack capacity before placement. Split amounts and independent spellbooks are materialized through the real unit resource-sharing method. No spell charges are invented or divided heuristically.
+
+The draft arm preserves the locked V3 override state and changes a shooter pick only after legal reveals show Griffin with two own shooters already selected, or at least two melee flyers with three shooters selected. It retains the ordinary scorer for legal non-shooter alternatives and falls back if none exists. The escape arm offers a footprint-safe, nonhazardous move outside every active enemy range-null field; A19 still searches and arbitrates. Its rollout policy also changes: zero root proposals alone does not establish an unchanged search. The disabled escape wrapper reproduced the complete control trace in an A/A transport check.
+
+Do not modify the retained helper or runner bytes. `lockedRangedCounterCheckpoint()` checks their hashes. New dispatch rules, weights or combinations require a separate module and ID. Keep these controls, all losing arms and the failed gates in later reports.
+
+## Source, evidence and continuation
+
+The measured committed baseline is common `73da4814566b206a8c46dc2c77465ecf37212a1a`, plus the owned research files. The frozen source manifest SHA is `e877f11483ecc7831082cb1814fa6ea370598996fe286294a9ca3af49d24e2b2`; registration SHA is `f71f71728aff5318d7158a490745855121129473c9f881520eafdfb047b8401d`. The harness explicitly applies current support splitting and `finalizeA19Placement` to both seats before fight start and automatic artifact barrels. This is a deterministic headless test of those openings and combat, not a complete live-ranked trial. Later Battle Mage changes are outside this numerical estimate.
+
+[Compact evidence](evidence/ranged_counter_20261109.json) records every board's paired scores, all seven arms, source hashes and newly reserved channels. Raw matches, registrations and logs remain ignored under `game/core/tmp/ranged-counter-study-20261109T050437Z` in the client checkout. Exclude its channels and the earlier withdrawn, unopened snapshot's channels from future work.
+
+The original held-out confirmation was never opened because no candidate passed. A subsequent expanded audit also found a reused combat channel in that reserved confirmation bank; retire the entire bank. Its development channels are disjoint. The separate initial snapshot included an unrelated incomplete working edit and was withdrawn before study combat. Preserve both withdrawals and allocate new held-out channels through the complete seed ledger before another qualification; never edit the original registration to hide either issue.
+
+The next hypothesis is a new selector: middle Placement against public fast-flyer/range-null threats, with free spread for other eligible area threats. It must beat current behavior and its matched free control on new boards, retain the full budget/split costs, meet the +10% runtime bound, and pass a separate fresh confirmation before any promotion. Generalization to ordinary opponents and independent army-level confidence remain required.
