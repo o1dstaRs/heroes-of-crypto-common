@@ -12,6 +12,7 @@
 import { buildV08A19SearchEnvironment, V08_A19_PRODUCTION_VERSION } from "../ai/versions/v0_8_a19_profile";
 import type { ILookaheadDeps } from "./lookahead";
 import { attachA19NeuralCorrection } from "./a19_neural";
+import { attachA19SupportDecision } from "./a19_support";
 import {
     SearchDriver,
     withSearchEnvironment,
@@ -58,14 +59,20 @@ export function createV08A19SearchDriver(
     const environment = buildV08A19SearchEnvironment();
     const neural = environment.SEARCH_A19_NEURAL_TIES;
     if (neural !== "0" && neural !== "1") throw new Error("SEARCH_A19_NEURAL_TIES must be 0 or 1");
+    const support = environment.SEARCH_A19_SATYR_CONTACT_SUPPORT;
+    if (support !== "0" && support !== "1") throw new Error("SEARCH_A19_SATYR_CONTACT_SUPPORT must be 0 or 1");
     // The overlay is what the browser can actually see. The process.env scope stays so Node, which has no
     // overlay, constructs the same driver it did before.
     return withSearchEnvironment(environment, () =>
         withScopedAIEnvironment(environment, () => {
             const driver = new SearchDriver(deps, match, undefined, passiveProductiveProbeObserver);
-            return neural === "1" && options.neuralCorrection !== false
-                ? attachA19NeuralCorrection(driver, { offline: match.offlineDeterministicWork === true })
-                : driver;
+            const corrected =
+                neural === "1" && options.neuralCorrection !== false
+                    ? attachA19NeuralCorrection(driver, { offline: match.offlineDeterministicWork === true })
+                    : driver;
+            return support === "1"
+                ? attachA19SupportDecision(corrected, deps, match.offlineDeterministicWork === true)
+                : corrected;
         }),
     );
 }

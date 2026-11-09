@@ -1,5 +1,9 @@
 # Saved Wandering Mage candidates
 
+Later routing decision: the user explicitly adopted a new combined support policy. See
+[unit-support adoption](a19_unit_support_adoption.md). The research IDs and results below stay
+unchanged; their individual gains do not qualify that new combination.
+
 The user asked to save the promising strategies for reuse after the completed November 8 campaign.
 Two named candidates are retained in `src/simulation/wandering_mage_checkpoint.ts`. They are
 executable research options, not enabled in the live default. None passed its original progression

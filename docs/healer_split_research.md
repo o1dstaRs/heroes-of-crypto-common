@@ -1,5 +1,9 @@
 # Healer splitting and protected support placement
 
+Later routing decision: the user explicitly adopted a new situational dispatcher over these split
+alternatives. See [unit-support adoption](a19_unit_support_adoption.md). The original gates and
+evidence below remain unchanged; this study does not qualify the new dispatch rule.
+
 This is Healer-only setup research. It does not activate a combat override, change the default profile,
 or purchase Placement. The helper in `src/simulation/healer_split_research.ts` is intentionally outside
 the public AI and serving imports.

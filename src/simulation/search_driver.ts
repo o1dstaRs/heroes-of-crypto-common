@@ -10,6 +10,7 @@
  */
 
 import { friendlyShotBlockingBarrels } from "../ai/artifact_barrel_tactics";
+import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../ai/wandering_mage_support";
 import { reserveGravechainShortlistCandidate } from "../ai/gravechain_shortlist";
 import { includeImprovingLastFuseTrade, reserveLastFuseShortlistCandidate } from "../ai/last_fuse_tactics";
 import { canWaitOnHourglass } from "../engine/hourglass";
@@ -1429,6 +1430,7 @@ export class SearchDriver {
     private readonly a19MaterialLowEvidenceWinningSamples: number;
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
     private readonly a19GravechainCoverage: boolean;
+    private readonly a19WanderingMageSupport: boolean;
     private readonly a19LastFuseTrades: boolean;
     private readonly a19LightningSpinCoverage: boolean;
     private readonly researchRangedShieldSequence: boolean;
@@ -1729,6 +1731,10 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_GRAVECHAIN_COVERAGE must be 0 or 1");
         }
         this.a19GravechainCoverage = this.mode === "search" && gravechainCoverage === "1";
+        const mageSupport = searchEnv("SEARCH_A19_WANDERING_MAGE_SUPPORT");
+        if (mageSupport !== undefined && mageSupport !== "" && mageSupport !== "0" && mageSupport !== "1")
+            throw new Error("SEARCH_A19_WANDERING_MAGE_SUPPORT must be 0 or 1");
+        this.a19WanderingMageSupport = this.mode === "search" && mageSupport === "1";
         const fireBreathValue = searchEnv("SEARCH_RESEARCH_FIRE_BREATH_VALUE");
         if (
             fireBreathValue !== undefined &&
@@ -2230,8 +2236,17 @@ export class SearchDriver {
         return this.isDegraded() ? SearchDriver.DEGRADED_ROLLOUTS : this.rollouts;
     }
     /** Shortlist size for this decision; a degraded decision compares the incumbent with one challenger. */
-    private effectiveShortlist(version: string): number | null {
-        const shortlist = this.shortlistForVersion(version);
+    private effectiveShortlist(version: string, unit?: Unit): number | null {
+        let shortlist = this.shortlistForVersion(version);
+        if (
+            this.a19WanderingMageSupport &&
+            version === "v0.8" &&
+            unit?.getName() === "Wandering Mage" &&
+            this.appliesTo(version, unit.getTeam()) &&
+            this.researchShortlist === null &&
+            shortlist === 6
+        )
+            shortlist = A19_WANDERING_MAGE_SUPPORT_POLICY.rootShortlist;
         if (!this.isDegraded()) {
             return shortlist;
         }
@@ -4726,7 +4741,7 @@ export class SearchDriver {
         prioritizeV08STargetPressure = false,
         prioritizeV08SUrgency = false,
     ): readonly IEnumeratedCandidate[] {
-        const shortlist = this.effectiveShortlist(version);
+        const shortlist = this.effectiveShortlist(version, unit);
         if (shortlist === null || candidates.length <= shortlist) {
             return candidates;
         }

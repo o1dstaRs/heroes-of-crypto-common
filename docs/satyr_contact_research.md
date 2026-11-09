@@ -1,5 +1,9 @@
 # Locked Satyr contact/support reference
 
+Later routing decision: the user explicitly requested actual AI adoption for Satyr, Healer and Mage.
+See [unit-support adoption](a19_unit_support_adoption.md) for the separate production module and
+runtime guards. This does not change the original research checkpoint or its failed strength gate.
+
 The user asked to lock this candidate on November 8, 2026 and move research to Healer.
 `satyr-contact-support-20261108` preserves the exact policy in
 `src/simulation/satyr_contact_policy.ts`; `lockedSatyrContactCheckpoint()` validates its

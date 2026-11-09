@@ -2,6 +2,8 @@ import { creatureIdForName, creatureInfo } from "../setup/creature_score";
 import { propose, encode, predict, chooseCandidate, valid, type PublicInput, type Point, type Body } from "./layout";
 import { getPlacementModel, getPlacementRelationModel } from "./model";
 import { relationFeatures } from "./relations";
+import { protectA19WanderingMagePlacement } from "../wandering_mage_support";
+import { protectA19HealerPlacement } from "../healer_support_setup";
 export interface PlacementUnit {
     getId(): string;
     getName(): string;
@@ -132,4 +134,32 @@ export function finalizePlacement(
     } catch {
         return fallback();
     }
+}
+
+/** Apply user-adopted support protection after the unchanged learned formation, before barrels. */
+export function finalizeA19Placement(
+    units: readonly PlacementUnit[],
+    context: PlacementEnvelope,
+    incumbent: ReadonlyMap<string, Point>,
+): Map<string, Point> {
+    const learned = finalizePlacement(units, context, incumbent);
+    if (
+        units.length !== learned.size ||
+        new Set(units.map((unit) => unit.getId())).size !== units.length ||
+        !units.some((unit) => unit.getName() === "Wandering Mage" || unit.getName() === "Healer")
+    )
+        return learned;
+    const supportUnits = units.map((unit) => ({
+        id: unit.getId(),
+        name: unit.getName(),
+        amount: unit.getAmountAlive(),
+        small: unit.getFootprintWidth() === 1 && unit.getFootprintHeight() === 1,
+        footprintWidth: unit.getFootprintWidth(),
+        footprintHeight: unit.getFootprintHeight(),
+    }));
+    return protectA19WanderingMagePlacement(
+        protectA19HealerPlacement(learned, supportUnits, context),
+        supportUnits,
+        context,
+    );
 }

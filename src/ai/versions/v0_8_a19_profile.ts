@@ -10,6 +10,8 @@
  */
 
 import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
+import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
+import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
 
 import { StrategyV0_8 } from "./v0_8";
 import { V08_A19_SCORED_ARBITRATION_POLICY } from "./v0_8_a19_scored_arbitration";
@@ -59,7 +61,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
  *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v6" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v7" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -98,6 +100,8 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     // Hydra's capped catalog prices the complete radial impact, shared shields and Devour recovery.
     SEARCH_A19_LIGHTNING_SPIN_COVERAGE: "1",
     SEARCH_A19_NEURAL_TIES: "1",
+    SEARCH_A19_WANDERING_MAGE_SUPPORT: "1",
+    SEARCH_A19_SATYR_CONTACT_SUPPORT: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -126,7 +130,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8078c75f34a4030ad5c767c" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "5f298494ab93fde4fcb682c33df268f28cac1793ff61f0203c7e9e93ad96d890" as const;
+    "c08547c87fd69621b6dfd4722e160b543f29d00622eec7d9458257d5ffb81137" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -159,7 +163,32 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for whole-impact Hydra catalogs in both production enumeration paths.
-        sha256: "f7037a687a6c35adbb1b3110b3a1352113eaab45e7f421a95ea1dd2232969801" as const,
+        sha256: "1895bcfd5d9539523741ddb87733a2ef74146e618cd4be97f2847e680b4219da" as const,
+    }),
+    Object.freeze({
+        role: "unit-support-setup" as const,
+        source: "src/ai/support_setup.ts" as const,
+        sha256: "540fd13ca8861af1442f136d75e3236caaa488fad2e406af03c205fd0605e622" as const,
+    }),
+    Object.freeze({
+        role: "healer-support-setup" as const,
+        source: "src/ai/healer_support_setup.ts" as const,
+        sha256: "052d847e336793704059ad9361729b7604eabeed1d9d73708d5a37a0b84bbd18" as const,
+    }),
+    Object.freeze({
+        role: "wandering-mage-support" as const,
+        source: "src/ai/wandering_mage_support.ts" as const,
+        sha256: "0487911c030deae457a009180c7131277e9610a01e5d22eb805de28e00bdc923" as const,
+    }),
+    Object.freeze({
+        role: "satyr-contact-support" as const,
+        source: "src/ai/satyr_contact_support.ts" as const,
+        sha256: "d03da01acec056a1f88292ede6f762c1932e733c7b52392d298ee74d181d1a0a" as const,
+    }),
+    Object.freeze({
+        role: "unit-support-adapter" as const,
+        source: "src/simulation/a19_support.ts" as const,
+        sha256: "42f20009daf507771f1d591cc5c7869b2651f86c21ae74e342ac0ee584fc270a" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
@@ -255,7 +284,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "default-search-factory" as const,
         source: "src/simulation/v0_8_a19_search.ts" as const,
-        sha256: "830047c4327eedcacbedab7804860db794a7db2859451b95fe9f4d078f9fa1c7" as const,
+        sha256: "558dd7252b0a94e3968a7a9d825b89edb3843258899bc9b976b1aca658306e89" as const,
     }),
     Object.freeze({
         role: "default-search-routing" as const,
@@ -306,7 +335,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "final-placement-adapter" as const,
         source: "src/ai/placement/adapter.ts" as const,
-        sha256: "2905012efdfd8b23254cf7a8a47606141d0034e86d4583ad8bf4cc5ed7175572" as const,
+        sha256: "8fadd33f35da03c2c2f8d7a902ce06f9539fc7361f8ad91c82ef31223ce34eae" as const,
     }),
     Object.freeze({
         role: "final-placement-proposals" as const,
@@ -361,6 +390,8 @@ export const V08_A19_PROFILE = Object.freeze({
     placementPolicy: V08_A19_PLACEMENT_POLICY,
     neuralPolicy: A19_NEURAL_POLICY,
     authoritativeFinalPlacement: A19_LEARNED_FINAL_PLACEMENT_POLICY,
+    wanderingMageSupport: A19_WANDERING_MAGE_SUPPORT_POLICY,
+    unitSupport: A19_UNIT_SUPPORT_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 
