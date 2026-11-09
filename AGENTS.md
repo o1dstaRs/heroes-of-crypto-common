@@ -35,6 +35,13 @@ and a matched free formation, on independent armies and a fresh confirmation, wi
 compute bound. Extra shots and favorable slices do not replace the registered score gates. Native v0.9
 combat training and its locked comparators remain separate.
 
+The separate v2 continuation is `ranged-counter-situational-20261109T054706Z`, registration
+`121e70d7dc472ab906adf21934c2179e7c8ebaeb7191a213e4e7abd8075fdd07`, frozen policy source manifest
+`0eb9800682b2846542fe977747368f4c50e562f248cff7a5eca49d7fb07b79a9` on committed base `11110405`.
+It reserves 1,080 new development boards and 1,512 held-out boards with current/free/situational arms.
+Exclude `docs/evidence/ranged_counter_situational_registration_20261109.json` in other campaigns too.
+No replacement candidate after its confirmation opens and no automatic production promotion.
+
 ## User-locked A19 full-policy research reference
 
 The user accepted the **50.36%** result and requested a fixed checkpoint on November 8, 2026 UTC.
