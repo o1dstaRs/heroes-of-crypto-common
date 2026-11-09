@@ -75,7 +75,7 @@ it scored **25.8598% against stock A19**, versus **24.6610%** for `4e1d89927177`
 the positive interval. Both models use 20,592 multiply-accumulates per candidate; observed mean decision
 time increased 0.13%, and total native decision time increased 0.91%. Production timing remains unqualified.
 
-Keep this stronger reference immutable in `src/simulation/v0_9/checkpoints/native_scale_20261108/`.
+Keep this first-bank scale reference immutable in `src/simulation/v0_9/checkpoints/native_scale_20261108/`.
 `loadNativeV09ScaleResearchModel()` from `native_scale_checkpoint.ts` restores the exact original artifact
 and leaves activation separate. Model SHA is
 `4749da06ec07bfd08db7ec6c2bbe03ba6dc4e73847e67585804dbccc253e7bb9`; checkpoint manifest SHA is
@@ -84,12 +84,26 @@ The user's commit request authorizes these versioned model bytes, numerical refe
 evidence fixtures. Merge `docs/evidence/v0_9_native_scale_20261108.json` with previous seed ledgers.
 The model remains unpromoted, its native-seat search calls remain zero, and the 52% target remains unmet.
 
-Further native candidates must beat this stronger reference, with stock A19 still the target opponent.
-The fixed CPU-only committee study `v09-native-fusion-study-20261108T220850Z` already compares the
-committee against both native references. Its registration SHA is
+Further native candidates must beat both fixed references, with stock A19 still the target opponent.
+The fixed CPU-only committee study `v09-native-fusion-study-20261108T220850Z` completed all 18,144
+fresh battles without a confirmed gain: committee 25.9590%, prior reference 26.5625%, scale reference
+25.8681%; both committee paired intervals cross zero. Its registration SHA is
 `6d508b22963f75937304cda352a8fa400406b84b0a8cf86635bbfccf25d3b1f5`.
-Preserve its original role names and selection rules; a strongest-native claim requires positive paired
-intervals against both references. See the research document for exact identities and transport checks.
+The scale model's earlier +1.1987-point gain did not replicate on this independent bank. The secondary
+two-bank pooled gain is +0.2521 points (95% -0.4630 to +0.9590), so retain both models rather than claiming
+the scale model is conclusively stronger. Preserve the original first-bank checkpoint manifest and gates.
+The failed committee is not promoted; its read-only evidence archive SHA is
+`c66fede0801306a0b5bf661f96a9bae18409b6803b9688c46727271a8f49b452`.
+
+The separate continuation is `v09-native-full-cpu-20261109T021936Z`, registration SHA
+`5a71e35f3f556391a3813944523b48883319ed6fd2c74ab23de5fa52daae2d3b`.
+It fits four fixed float/QAT recipes on all 113,986 training / 37,464 validation decisions, using CPU only
+after numerical/gradient transport tests. The frozen engine remains `8a8d731b`; exact native execution
+optimization `65820f41` is recorded separately and does not change decisions. All recipes must finish;
+whole-development selection requires positive mean gain against both native references, followed by one
+new 1,512-family / 18,144-battle fresh comparison. No replacement after fresh opens and no automatic
+promotion. Do not reopen the failed AMD GPU fitter or reset a shared device to run this CPU campaign.
+See the research document for exact identities and transport checks.
 Do not treat validation teacher agreement as a win rate.
 Exclude all prior and reserved banks, including their derived setup/combat channels;
 never select a replacement model after opening its fresh bank.

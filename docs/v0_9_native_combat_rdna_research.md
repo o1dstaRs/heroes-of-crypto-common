@@ -199,7 +199,10 @@ regardless of development score. The confirmed native reference remains `4e1d899
 stock A19 with matched openings. The new candidate has no strength-dependent replacement or stopping
 rule. Fresh paired confidence determines whether native strength improved; promotion remains disabled.
 
-## Second independently confirmed native gain
+## Positive initial larger-data native comparison
+
+This section preserves the original positive bank. The subsequent independent bank below did not replicate
+its gain; the pooled estimate is inconclusive. Retain both fixed references and the original manifest.
 
 The single fixed larger-data candidate completed its full fresh comparison. On this bank, the prior native
 reference scored **24.6610%** against stock A19 (1,461 wins / 61 draws / 4,526 losses); the new model scored
@@ -274,6 +277,28 @@ errors, committee mean decision time 1.701 ms and p99 9.868 ms. Its +0.81-point 
 each native reference is inconclusive (both paired intervals cross zero). Fresh opened with the original
 fixed candidate and comparisons; the development result does not establish another gain.
 
+### Complete fresh committee result: no confirmed improvement
+
+The fixed study completed all **18,144 fresh battles** (1,512 families, 6,048 games per policy). Fresh
+execution took 10,165.84 seconds, or 2 h 49 m 26 s. The committee scored **25.9590%**, the prior native
+reference `4e1d89927177` **26.5625%**, and the scale reference `4749da06ec07` **25.8681%** on identical
+openings. Committee versus prior gain: **-0.6035 points**, registered whole-board 95% **-1.5294 to
++0.3144**. Committee versus scale: **+0.0909 points**, 95% **-0.9259 to +1.0830**. Both intervals cross
+zero. Preserve the failed progression/52% gates and do not promote the committee.
+
+Independent reconstruction verified every battle, opening and zero-search/model-error invariant, with
+20,000 separate NumPy whole-board bootstrap samples. Verification SHA:
+`f1d022bea39f35fb31f8761cef6428d79cbb7229abd6025b6608572e3f5a9f53`.
+The full read-only node archive is `native-v09-fusion-negative-20261109-d9dbd2f399b9.tar.gz`, SHA
+`c66fede0801306a0b5bf661f96a9bae18409b6803b9688c46727271a8f49b452`; it preserves 1,671 run files.
+The original frozen source capsule remains separately identified above.
+
+The secondary scale-versus-prior comparison is **-0.6944 points** on this bank (independent 95%
+**-1.6865 to +0.2894**). Across its first positive bank and this new bank, the exploratory paired mean
+is **+0.2521 points**, 95% **-0.4630 to +0.9590**, over 3,024 families / 24,192 matched battles. Thus the
+first-bank +1.1987-point result did not replicate. Do not rewrite its original artifact or historical receipt;
+retain both immutable native models and require future candidates to improve over both on new boards.
+
 ## Exact native execution optimization
 
 `v09DecisionFeatureVectors()` computes the unchanged public board-state feature block once per decision.
@@ -310,6 +335,36 @@ and production profile fingerprint unchanged; the helpers are imported from thei
 The node also preserves `native-v09-lossless-runtime-20261109-f7974e54.tar.gz` read-only, archive SHA
 `f7974e54dc3f306d4d29eedbff36c750dee1570dd5811e88adb1b272540dc4a7`; all 1,391 manifest entries were
 individually verified. It includes both frozen source copies, registrations, controls and timing results.
+
+## Full-corpus CPU float/QAT continuation
+
+The separately registered continuation is `v09-native-full-cpu-20261109T021936Z`, registration SHA
+`5a71e35f3f556391a3813944523b48883319ed6fd2c74ab23de5fa52daae2d3b`, capsule SHA
+`3903317c843c9a0715eec69a4b134cae043025350d0e69470af90faf212e38fc`.
+It uses all 113,986 admitted training and 37,464 validation decisions. Dataset SHA:
+`91e4ad61d5bc42496e7685bd6a3aca95b1592e8f5062a5f40f237b32e12a62cf`.
+This trains the full g003 corpus that the failed GPU run never reached, rather than changing that run.
+
+Four fixed recipes fit concurrently on CPU: two 96/48 initializations, one 192/96 model and one
+192/96/48 model. The masked classification/override-pair objective, AdamW, gradient clipping and float/QAT
+stages remain explicit. FP32 batches stream from the packed corpus, preserving their random membership;
+float and independent integer validation group exact candidate counts and retain every decision, guard and
+label. All four recipes must finish before selection; a failed recipe stops this campaign with partial outputs
+preserved. Missing/guarded teacher actions keep their original exclusion reasons.
+
+The CPU backend preflight completed eight finite gradient/Adam steps. The campaign's nine tests then
+verified signed arithmetic, gradients, QAT/export parity, snapshots, streamed-versus-resident inputs and
+parameter updates, and compact-versus-padded validation loss. Complete source/dataset checks and packing
+passed before four fitting processes started. No GPU context, device reset or live service restart is used.
+Nice 10, an eight-core quota, a 32 GiB hard memory cap, zero swap and a host memory reserve bound the job.
+
+The engine is frozen at `8a8d731b`, with only the four exact native runtime source changes from `65820f41`
+applied and hashed separately. Every eligible fixed model plays the complete new development bank against
+both retained native references. One finalist is selected by highest whole-development score among positive
+mean gains against both references and valid research timing; ties prefer lower recipe ordinal. Fresh uses
+1,512 new families / 18,144 battles against stock A19 with both comparisons. Positive paired lower intervals
+against both references and the separate 52% target remain required. There is no fresh replacement,
+automatic promotion or production timing qualification. All previous and unopened banks stay excluded.
 
 ## Validation and ownership
 
