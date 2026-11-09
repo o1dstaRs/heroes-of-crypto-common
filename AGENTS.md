@@ -46,6 +46,22 @@ Its source is preserved. The separate `analyze_raw.py` / `resume_verified.py` fi
 directory verifies exact emitted row bytes and resumes the unchanged registered analysis after development;
 read `finalizer-status.json` as well as the original controller status. No outcomes, policy or gates were edited.
 
+That v2 continuation completed all 12,960 games: free +1.09954 pp and situational +0.81019 pp versus current,
+both adjusted intervals crossing zero. No finalist qualified and confirmation stayed closed. Preserve
+`docs/evidence/ranged_counter_situational_results_20261109.json`; do not promote the earlier small pilot
+or an outcome-selected subgroup instead.
+
+The subsequent learned setup checkpoint is `public-ranged-setup-effects-d786f4e9-20261109`, canonical model SHA
+`d786f4e9d90c321172021b65a81cb5b04f715aba5c203d388580007f93930007`. Its 165-feature ridge heads use only
+own/public roster data, own budget, map and public synergy variants. The 810/270-board internal split
+selected a recipe; its gains are not independent confirmation. The fixed refit is evaluated separately as
+`learned-ranged-setup-qual-20261109T163646Z` on the 9800X3D: 1,080 new qualification boards and 1,512
+reserved fresh boards, each with current/free/situational/learned arms. Registration SHA is
+`d52d1b0e153f9c0788a1afa18088a97d925385e5f9e7e899991cf1d31b741f72`. Read
+`docs/learned_ranged_setup_research.md` and exclude its evidence ledger. Never refit or replace the
+candidate after either bank opens, expose concealed enemy inputs, relabel it native v0.9 combat, or
+activate it automatically. Preserve both failed earlier studies and every fixed control.
+
 ## User-locked A19 full-policy research reference
 
 The user accepted the **50.36%** result and requested a fixed checkpoint on November 8, 2026 UTC.
@@ -150,6 +166,10 @@ new 1,512-family / 18,144-battle fresh comparison. No replacement after fresh op
 promotion. Do not reopen the failed AMD GPU fitter or reset a shared device to run this CPU campaign.
 See the research document for exact identities and transport checks.
 Do not treat validation teacher agreement as a win rate.
+This CPU continuation has since completed all four fits and development comparisons with status
+`complete_without_finalist`; no fresh comparison opened and no native model was promoted. Preserve
+the failed continuation and the two existing native references. The learned shooter setup research above
+does not alter this native-combat result.
 Exclude all prior and reserved banks, including their derived setup/combat channels;
 never select a replacement model after opening its fresh bank.
 
