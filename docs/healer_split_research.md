@@ -8,6 +8,40 @@ The user requested half-sized healing stacks and one-creature buff stacks, parti
 Goblin Knight, Troll and Frenzied Boar. These roles have different timing needs; a single unconditional
 split rule has not been qualified.
 
+## Preserved situational research options
+
+The user requested committing the gains while keeping different configurations available for different
+settings. The compact [evidence checkpoint](evidence/healer_split_pilot_20261108.json) preserves the
+three tested options, all 36 paired board results, the original uncertainty and failed gates, and all
+80 consumed setup/combat seed channels, including the four smoke boards. The complete raw archive is
+identified by SHA256 in that checkpoint. This is acceptance of a research reference; no conditional
+selector has been fitted or enabled in the default profile.
+
+Keep the tested helper unchanged at SHA256
+`11cdb736b3d39500974bd752574e9bd9dcea2300e69549e9d574153e0e84ecdc`. Implement any new selector or
+placement treatment separately so the three measured alternatives remain reproducible.
+
+Situational selection is the next hypothesis. These are decision inputs to test, not qualified rules:
+
+| Configuration         | Potential use                                                                                   | Cost or failure mode to evaluate                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| One protected single  | An extra full-strength Spiritual Armor turn while retaining a large healing stack               | Consumes a slot; the small stack must survive and reach a useful unbuffed ally                         |
+| Protected halves      | Two useful healing or Blessing turns when both halves retain power three                        | Casualties can remove higher-power spells; smaller casts and altered formation can hurt                |
+| Two protected singles | Several valuable allies need separate armor buffs and safe support cells exist                  | Two slots can displace other useful children; extra fragile stacks and low-value heals can waste turns |
+| Current setup         | No available slot, no useful additional support turn, or another utility split is more valuable | May leave a useful Healer split or safer position unexplored                                           |
+
+Candidate scoring should use the actual own stack amounts, post-split spell power, repairable front-body
+HP, buff coverage, activation timing, legal positions and the utility split displaced by a new child.
+Troll's regeneration makes timing particularly relevant. Threats and opponent features must come only
+from the serving observation allowed by the current doctrine; hidden research state is not an input.
+
+The observed variation by ally, map and doctrine motivates testing these inputs. Nine boards per ally
+cannot establish rules such as always halving with Goblin Knight or never halving with Troll. First
+isolate protection of existing Healers from split priority and native formation changes. Then freeze a
+conditional selector using training families only, validate on separate families, and qualify it on a
+new fixed bank against current setup and the matched protected-single control. Preserve the failed
+pilot gates and exclude this checkpoint's consumed channels. Purchases of Placement remain separate.
+
 ## Mechanics
 
 - A split receives a complete independent spellbook. Healer starts with four Heals, two Spiritual Armors,

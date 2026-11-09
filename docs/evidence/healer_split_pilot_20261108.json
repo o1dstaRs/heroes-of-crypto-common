@@ -1,0 +1,1889 @@
+{
+    "schema": "hoc.healer-split-research-reference.v1",
+    "reference": "healer-split-options-20261108",
+    "status": {
+        "userRequestedCommit": true,
+        "userObservation": "Different configurations may suit different settings. Preserve the tested alternatives for situational research.",
+        "policyPromoted": false,
+        "conditionalSelectorFitted": false,
+        "freshConfirmationOpened": false,
+        "originalPilotGates": {
+            "half": false,
+            "two-singles": false
+        },
+        "interpretation": "Positive point estimates with intervals crossing zero; no universal or conditional policy is qualified."
+    },
+    "source": {
+        "commonCommit": "b456ea729d01225262749be60daf322ab508fe2c",
+        "serverCommit": "7504119f0b4a160be6ad752e4410179c2ec05745",
+        "basis": "Committed snapshots plus the explicit research helper; no peer working edits.",
+        "helperPath": "src/simulation/healer_split_research.ts",
+        "helperSha256": "11cdb736b3d39500974bd752574e9bd9dcea2300e69549e9d574153e0e84ecdc",
+        "registrationSha256": "cee0f303530da4cfcef9b69509018af6a21f75babd72eadcf86a3815b4b14738",
+        "boardsSha256": "97adc2f13a6272ea3d2faa73ec2a80d15d4c023d29c0b0fc558ebcbbb84f08ac",
+        "sourceManifestSha256": "3869abaf6da9c918eb4a7f312102b81064b6e4be1e1cba1d861d71ccd256b7e3",
+        "summarySha256": "aeaabbcdd0ac0a7d33e332e7efbe2b5e513d0f1b56dcc5d6d3cfdef54403cda0",
+        "verificationSha256": "9e978782fd2a823792f8b5c785586a094b5cef0a237af01540aaf3c3fa3f45ef",
+        "independentStatisticsSha256": "2cd7468bdc2c32c43ad24d8dedd326a4f732075d00b5dc690660e1ef1aa159af",
+        "replayAnalysisSha256": "36dbc65bf53a3b59447d795ae9f9e7b8bd2ddaf1c35c72944275ab33391f7d9e",
+        "archiveSha256": "3dd456e4f0878c45d1ce68ea0a7df3fceedcfc1bafbbb96842f4bbfa05d185df",
+        "archiveName": "healer-split-pilot-20261108-evidence.tar.gz"
+    },
+    "design": {
+        "arms": {
+            "stock": "Native current tactical splits, final placement and barrels.",
+            "single": "Prioritize one one-body Healer child, preserve other existing split priorities in remaining slots; protect all own Healers in rear legal cells.",
+            "half": "Same but one half-size Healer child.",
+            "two-singles": "Same but two one-body Healer children; other source splits yield the consumed slots."
+        },
+        "population": "Outcome-blind uniform-mixed prescribed armies containing Healer and exactly one named anchor. Existing funded setup supports at least eight stacks. One board in each anchor/map/own-doctrine cell. Both armies exclude Satyr. Opponent, artifacts, augments, synergies, combat and seed fixed.",
+        "scope": "Existing slot allocation only; no extra paid Placement or changed synergy. Paid augment choices already in these sampled armies are held equal across arms. All use ordinary A19 combat.",
+        "games": 288,
+        "boards": 36,
+        "physicalSeats": 2,
+        "matchedFuturesPerSeat": 1,
+        "gamesPerArm": 72,
+        "primary": "half minus stock paired draw-aware board score",
+        "requiredControl": "half minus single (matched protected placement treatment, same funded budget)",
+        "plannedContrasts": [
+            ["single", "stock"],
+            ["half", "stock"],
+            ["two-singles", "stock"],
+            ["half", "single"],
+            ["two-singles", "single"]
+        ],
+        "bootstrap": {
+            "seed": 811824997,
+            "resamples": 20000,
+            "unit": "whole independent board, averaging both physical seats",
+            "strata": "four named anchor cohorts, nine boards per cohort",
+            "individual95": [0.025, 0.975],
+            "familywise95Bonferroni5": [0.005, 0.995]
+        },
+        "pilotGate": "For half or two-singles: at least +1pp vs stock and positive familywise-adjusted lower bounds vs stock and protected single; nonnegative means for all own doctrines; zero rejects, exact native application and opponent invariance. Pilot only; any promotion requires new preregistered confirmation. Single arm diagnostic only.",
+        "limitations": [
+            "Prescribed armies; not full ranked draft or overall ladder win rate.",
+            "Conditional on at least eight funded stack slots and exactly one requested anchor.",
+            "Only one board per anchor/map/doctrine cell; subgroup estimates exploratory.",
+            "Split priority may displace other utility stacks; report those trades explicitly.",
+            "New native split counts unsupported by the learned six-creature formation selector retain its native fallback.",
+            "Repeated futures absent; uncertainty based on all 36 boards, never per-fight IID."
+        ]
+    },
+    "collectionOptions": {
+        "cohort": "uniform-mixed",
+        "games": 1920000,
+        "baseSeed": 811824019,
+        "studyProfile": "premium-ranked-v3",
+        "collectEvidence": true
+    },
+    "arms": {
+        "stock": {
+            "games": 72,
+            "boards": 36,
+            "wins": 22,
+            "draws": 1,
+            "losses": 49,
+            "scorePct": 31.25,
+            "wholeBoard95ScorePct": [20.833333333333332, 42.361111111111114]
+        },
+        "single": {
+            "games": 72,
+            "boards": 36,
+            "wins": 28,
+            "draws": 3,
+            "losses": 41,
+            "scorePct": 40.97222222222222,
+            "wholeBoard95ScorePct": [29.86111111111111, 52.77777777777778]
+        },
+        "half": {
+            "games": 72,
+            "boards": 36,
+            "wins": 30,
+            "draws": 0,
+            "losses": 42,
+            "scorePct": 41.666666666666664,
+            "wholeBoard95ScorePct": [29.166666666666668, 55.55555555555556]
+        },
+        "two-singles": {
+            "games": 72,
+            "boards": 36,
+            "wins": 30,
+            "draws": 2,
+            "losses": 40,
+            "scorePct": 43.05555555555556,
+            "wholeBoard95ScorePct": [29.166666666666668, 57.638888888888886]
+        }
+    },
+    "contrasts": {
+        "single-stock": {
+            "candidate": "single",
+            "control": "stock",
+            "boards": 36,
+            "gamesPerArm": 72,
+            "gainPp": 9.722222222222223,
+            "wholeBoard95Pp": [-1.3888888888888888, 21.52777777777778],
+            "familywise95Pp": [-4.861111111111111, 25.0]
+        },
+        "half-stock": {
+            "candidate": "half",
+            "control": "stock",
+            "boards": 36,
+            "gamesPerArm": 72,
+            "gainPp": 10.416666666666668,
+            "wholeBoard95Pp": [-1.3888888888888888, 22.22222222222222],
+            "familywise95Pp": [-4.170138888888886, 26.38888888888889]
+        },
+        "two-singles-stock": {
+            "candidate": "two-singles",
+            "control": "stock",
+            "boards": 36,
+            "gamesPerArm": 72,
+            "gainPp": 11.805555555555555,
+            "wholeBoard95Pp": [-1.3888888888888888, 25.0],
+            "familywise95Pp": [-5.555555555555555, 28.47222222222222]
+        },
+        "half-single": {
+            "candidate": "half",
+            "control": "single",
+            "boards": 36,
+            "gamesPerArm": 72,
+            "gainPp": 0.6944444444444444,
+            "wholeBoard95Pp": [-13.194444444444445, 14.583333333333334],
+            "familywise95Pp": [-17.36111111111111, 18.75]
+        },
+        "two-singles-single": {
+            "candidate": "two-singles",
+            "control": "single",
+            "boards": 36,
+            "gamesPerArm": 72,
+            "gainPp": 2.083333333333333,
+            "wholeBoard95Pp": [-11.11111111111111, 15.277777777777779],
+            "familywise95Pp": [-15.972222222222221, 19.44791666666737]
+        }
+    },
+    "diagnosticSubgroups": {
+        "anchor": {
+            "Abomination": {
+                "single-stock": {
+                    "candidate": "single",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 8.333333333333332,
+                    "wholeBoard95Pp": [-11.11111111111111, 27.77777777777778],
+                    "familywise95Pp": [-16.666666666666668, 33.333333333333336]
+                },
+                "half-stock": {
+                    "candidate": "half",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 2.7777777777777777,
+                    "wholeBoard95Pp": [-16.666666666666668, 22.22222222222222],
+                    "familywise95Pp": [-22.22222222222222, 27.77777777777778]
+                },
+                "two-singles-stock": {
+                    "candidate": "two-singles",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": -2.7777777777777777,
+                    "wholeBoard95Pp": [-27.77777777777778, 22.22222222222222],
+                    "familywise95Pp": [-36.111111111111114, 27.77777777777778]
+                },
+                "half-single": {
+                    "candidate": "half",
+                    "control": "single",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": -5.555555555555555,
+                    "wholeBoard95Pp": [-33.333333333333336, 22.22222222222222],
+                    "familywise95Pp": [-38.888888888888886, 33.333333333333336]
+                },
+                "two-singles-single": {
+                    "candidate": "two-singles",
+                    "control": "single",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": -11.11111111111111,
+                    "wholeBoard95Pp": [-44.44444444444444, 16.666666666666668],
+                    "familywise95Pp": [-50.0, 27.77777777777778]
+                }
+            },
+            "Frenzied Boar": {
+                "single-stock": {
+                    "candidate": "single",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 19.444444444444446,
+                    "wholeBoard95Pp": [-11.11111111111111, 52.77777777777778],
+                    "familywise95Pp": [-19.444444444444443, 66.66666666666667]
+                },
+                "half-stock": {
+                    "candidate": "half",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 22.22222222222222,
+                    "wholeBoard95Pp": [-5.555555555555555, 50.0],
+                    "familywise95Pp": [-11.11111111111111, 55.55555555555556]
+                },
+                "two-singles-stock": {
+                    "candidate": "two-singles",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 27.77777777777778,
+                    "wholeBoard95Pp": [-5.555555555555555, 61.111111111111114],
+                    "familywise95Pp": [-16.666666666666668, 72.22222222222223]
+                },
+                "half-single": {
+                    "candidate": "half",
+                    "control": "single",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 2.7777777777777777,
+                    "wholeBoard95Pp": [-33.333333333333336, 38.888888888888886],
+                    "familywise95Pp": [-44.44444444444444, 50.0]
+                },
+                "two-singles-single": {
+                    "candidate": "two-singles",
+                    "control": "single",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 8.333333333333332,
+                    "wholeBoard95Pp": [-27.77777777777778, 41.666666666666664],
+                    "familywise95Pp": [-38.888888888888886, 52.77777777777778]
+                }
+            },
+            "Goblin Knight": {
+                "single-stock": {
+                    "candidate": "single",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 5.555555555555555,
+                    "wholeBoard95Pp": [-13.88888888888889, 25.0],
+                    "familywise95Pp": [-19.444444444444443, 30.555555555555557]
+                },
+                "half-stock": {
+                    "candidate": "half",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 22.22222222222222,
+                    "wholeBoard95Pp": [0.0, 44.44444444444444],
+                    "familywise95Pp": [0.0, 55.55555555555556]
+                },
+                "two-singles-stock": {
+                    "candidate": "two-singles",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 13.88888888888889,
+                    "wholeBoard95Pp": [-8.333333333333334, 33.333333333333336],
+                    "familywise95Pp": [-13.88888888888889, 38.888888888888886]
+                },
+                "half-single": {
+                    "candidate": "half",
+                    "control": "single",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 16.666666666666664,
+                    "wholeBoard95Pp": [-5.555555555555555, 38.888888888888886],
+                    "familywise95Pp": [-13.88888888888889, 44.44444444444444]
+                },
+                "two-singles-single": {
+                    "candidate": "two-singles",
+                    "control": "single",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 8.333333333333332,
+                    "wholeBoard95Pp": [-11.11111111111111, 27.77777777777778],
+                    "familywise95Pp": [-19.444444444444443, 33.333333333333336]
+                }
+            },
+            "Troll": {
+                "single-stock": {
+                    "candidate": "single",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 5.555555555555555,
+                    "wholeBoard95Pp": [-11.11111111111111, 22.22222222222222],
+                    "familywise95Pp": [-16.666666666666668, 27.77777777777778]
+                },
+                "half-stock": {
+                    "candidate": "half",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": -5.555555555555555,
+                    "wholeBoard95Pp": [-27.77777777777778, 16.666666666666668],
+                    "familywise95Pp": [-33.333333333333336, 27.77777777777778]
+                },
+                "two-singles-stock": {
+                    "candidate": "two-singles",
+                    "control": "stock",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 8.333333333333332,
+                    "wholeBoard95Pp": [-13.88888888888889, 30.555555555555557],
+                    "familywise95Pp": [-19.444444444444443, 36.111111111111114]
+                },
+                "half-single": {
+                    "candidate": "half",
+                    "control": "single",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": -11.11111111111111,
+                    "wholeBoard95Pp": [-33.333333333333336, 11.11111111111111],
+                    "familywise95Pp": [-38.888888888888886, 16.666666666666668]
+                },
+                "two-singles-single": {
+                    "candidate": "two-singles",
+                    "control": "single",
+                    "boards": 9,
+                    "gamesPerArm": 18,
+                    "gainPp": 2.7777777777777777,
+                    "wholeBoard95Pp": [-16.666666666666668, 22.22222222222222],
+                    "familywise95Pp": [-22.22222222222222, 27.77777777777778]
+                }
+            }
+        },
+        "map": {
+            "1": {
+                "single-stock": {
+                    "candidate": "single",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 20.833333333333336,
+                    "wholeBoard95Pp": [6.25, 39.583333333333336],
+                    "familywise95Pp": [4.166666666666667, 43.75]
+                },
+                "half-stock": {
+                    "candidate": "half",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 4.166666666666666,
+                    "wholeBoard95Pp": [-16.666666666666668, 25.0],
+                    "familywise95Pp": [-20.833333333333332, 29.166666666666668]
+                },
+                "two-singles-stock": {
+                    "candidate": "two-singles",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 14.583333333333334,
+                    "wholeBoard95Pp": [-10.416666666666666, 37.5],
+                    "familywise95Pp": [-18.75, 41.666666666666664]
+                },
+                "half-single": {
+                    "candidate": "half",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": -16.666666666666664,
+                    "wholeBoard95Pp": [-37.5, 6.25],
+                    "familywise95Pp": [-41.666666666666664, 12.5]
+                },
+                "two-singles-single": {
+                    "candidate": "two-singles",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": -6.25,
+                    "wholeBoard95Pp": [-27.083333333333332, 16.718749999995453],
+                    "familywise95Pp": [-33.333333333333336, 25.0]
+                }
+            },
+            "3": {
+                "single-stock": {
+                    "candidate": "single",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 8.333333333333332,
+                    "wholeBoard95Pp": [-6.25, 20.833333333333332],
+                    "familywise95Pp": [-8.333333333333334, 25.0]
+                },
+                "half-stock": {
+                    "candidate": "half",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 14.583333333333334,
+                    "wholeBoard95Pp": [2.0833333333333335, 27.083333333333332],
+                    "familywise95Pp": [-2.0833333333333335, 31.25]
+                },
+                "two-singles-stock": {
+                    "candidate": "two-singles",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 10.416666666666668,
+                    "wholeBoard95Pp": [-4.166666666666667, 20.833333333333332],
+                    "familywise95Pp": [-8.333333333333334, 25.0]
+                },
+                "half-single": {
+                    "candidate": "half",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 6.25,
+                    "wholeBoard95Pp": [-8.333333333333334, 20.833333333333332],
+                    "familywise95Pp": [-14.583333333333334, 25.0]
+                },
+                "two-singles-single": {
+                    "candidate": "two-singles",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 2.083333333333333,
+                    "wholeBoard95Pp": [-18.75, 20.833333333333332],
+                    "familywise95Pp": [-25.0, 27.083333333333332]
+                }
+            },
+            "4": {
+                "single-stock": {
+                    "candidate": "single",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 0.0,
+                    "wholeBoard95Pp": [-20.833333333333332, 20.833333333333332],
+                    "familywise95Pp": [-25.0, 25.0]
+                },
+                "half-stock": {
+                    "candidate": "half",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 12.5,
+                    "wholeBoard95Pp": [-4.166666666666667, 29.166666666666668],
+                    "familywise95Pp": [-8.333333333333334, 33.333333333333336]
+                },
+                "two-singles-stock": {
+                    "candidate": "two-singles",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 10.416666666666668,
+                    "wholeBoard95Pp": [-4.166666666666667, 25.0],
+                    "familywise95Pp": [-8.333333333333334, 29.166666666666668]
+                },
+                "half-single": {
+                    "candidate": "half",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 12.5,
+                    "wholeBoard95Pp": [-16.666666666666668, 41.666666666666664],
+                    "familywise95Pp": [-20.833333333333332, 45.833333333333336]
+                },
+                "two-singles-single": {
+                    "candidate": "two-singles",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 10.416666666666668,
+                    "wholeBoard95Pp": [-8.333333333333334, 29.166666666666668],
+                    "familywise95Pp": [-14.583333333333334, 33.333333333333336]
+                }
+            }
+        },
+        "doctrine": {
+            "1": {
+                "single-stock": {
+                    "candidate": "single",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 6.25,
+                    "wholeBoard95Pp": [-8.333333333333334, 22.916666666666668],
+                    "familywise95Pp": [-12.5, 29.166666666666668]
+                },
+                "half-stock": {
+                    "candidate": "half",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 6.25,
+                    "wholeBoard95Pp": [-14.583333333333334, 25.0],
+                    "familywise95Pp": [-18.75, 29.166666666666668]
+                },
+                "two-singles-stock": {
+                    "candidate": "two-singles",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": -12.5,
+                    "wholeBoard95Pp": [-31.25, 8.333333333333334],
+                    "familywise95Pp": [-35.416666666666664, 12.5]
+                },
+                "half-single": {
+                    "candidate": "half",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 0.0,
+                    "wholeBoard95Pp": [-16.666666666666668, 16.666666666666668],
+                    "familywise95Pp": [-22.916666666666668, 20.833333333333332]
+                },
+                "two-singles-single": {
+                    "candidate": "two-singles",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": -18.75,
+                    "wholeBoard95Pp": [-33.333333333333336, -4.166666666666667],
+                    "familywise95Pp": [-37.5, 0.0]
+                }
+            },
+            "2": {
+                "single-stock": {
+                    "candidate": "single",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 8.333333333333332,
+                    "wholeBoard95Pp": [0.0, 16.666666666666668],
+                    "familywise95Pp": [0.0, 20.833333333333332]
+                },
+                "half-stock": {
+                    "candidate": "half",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 8.333333333333332,
+                    "wholeBoard95Pp": [-4.166666666666667, 25.0],
+                    "familywise95Pp": [-8.333333333333334, 29.166666666666668]
+                },
+                "two-singles-stock": {
+                    "candidate": "two-singles",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 29.166666666666668,
+                    "wholeBoard95Pp": [8.333333333333334, 50.0],
+                    "familywise95Pp": [4.166666666666667, 54.166666666666664]
+                },
+                "half-single": {
+                    "candidate": "half",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 0.0,
+                    "wholeBoard95Pp": [-20.833333333333332, 20.833333333333332],
+                    "familywise95Pp": [-25.0, 25.0]
+                },
+                "two-singles-single": {
+                    "candidate": "two-singles",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 20.833333333333336,
+                    "wholeBoard95Pp": [4.166666666666667, 41.666666666666664],
+                    "familywise95Pp": [-4.166666666666667, 45.833333333333336]
+                }
+            },
+            "3": {
+                "single-stock": {
+                    "candidate": "single",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 14.583333333333334,
+                    "wholeBoard95Pp": [-8.333333333333334, 37.5],
+                    "familywise95Pp": [-16.666666666666668, 43.75]
+                },
+                "half-stock": {
+                    "candidate": "half",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 16.666666666666664,
+                    "wholeBoard95Pp": [-4.166666666666667, 37.5],
+                    "familywise95Pp": [-8.333333333333334, 45.833333333333336]
+                },
+                "two-singles-stock": {
+                    "candidate": "two-singles",
+                    "control": "stock",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 18.75,
+                    "wholeBoard95Pp": [4.166666666666667, 35.416666666666664],
+                    "familywise95Pp": [-2.0833333333333335, 41.666666666666664]
+                },
+                "half-single": {
+                    "candidate": "half",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 2.083333333333333,
+                    "wholeBoard95Pp": [-22.916666666666668, 27.083333333333332],
+                    "familywise95Pp": [-29.166666666666668, 33.333333333333336]
+                },
+                "two-singles-single": {
+                    "candidate": "two-singles",
+                    "control": "single",
+                    "boards": 12,
+                    "gamesPerArm": 24,
+                    "gainPp": 4.166666666666666,
+                    "wholeBoard95Pp": [-18.75, 27.083333333333332],
+                    "familywise95Pp": [-27.083333333333332, 33.333333333333336]
+                }
+            }
+        }
+    },
+    "pairedBoards": [
+        {
+            "board": 0,
+            "anchor": "Goblin Knight",
+            "map": 4,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.5, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.0,
+                "half": 0.0,
+                "two-singles": 0.25
+            },
+            "rawSha256": "c41b55e940da1ccab4f4be60d365021057783c37e7a411ec5768691088cac8ec"
+        },
+        {
+            "board": 1,
+            "anchor": "Abomination",
+            "map": 1,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [0.0, 1.0],
+                "single": [1.0, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.5,
+                "half": 0.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "6377bc8f0222bdbf467f1c24f5ef956df158a478c816b03f4e08631d89f386bb"
+        },
+        {
+            "board": 2,
+            "anchor": "Frenzied Boar",
+            "map": 3,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [0.0, 1.0],
+                "two-singles": [0.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.0,
+                "half": 0.5,
+                "two-singles": 0.5
+            },
+            "rawSha256": "5ccc029b09d7781b4b3d7634a4c1140680b62a506ac5217353cfc91c2aa77770"
+        },
+        {
+            "board": 3,
+            "anchor": "Goblin Knight",
+            "map": 1,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.5],
+                "half": [1.0, 1.0],
+                "two-singles": [1.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.25,
+                "half": 1.0,
+                "two-singles": 0.5
+            },
+            "rawSha256": "c8878beaa27b9f0f375eccb77d598e97439f6bef0f2dbc0afb3fccf5c77949d7"
+        },
+        {
+            "board": 4,
+            "anchor": "Troll",
+            "map": 1,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [1.0, 0.0],
+                "single": [0.0, 1.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.5,
+                "half": 0.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "afefde54f2ce6c31e3e1bcdb677963cb0da9b35b8a7392da293c4a375d0e4c94"
+        },
+        {
+            "board": 5,
+            "anchor": "Frenzied Boar",
+            "map": 3,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [1.0, 0.0],
+                "half": [1.0, 1.0],
+                "two-singles": [1.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.5,
+                "half": 1.0,
+                "two-singles": 0.5
+            },
+            "rawSha256": "bfed33f7fa4b929d4036daac549b184b8a80e98b86388fbe4d93ef5fc95214c6"
+        },
+        {
+            "board": 6,
+            "anchor": "Frenzied Boar",
+            "map": 1,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [1.0, 0.0],
+                "single": [0.5, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.25,
+                "half": 0.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "69f6d6e583e140efa9f0c7d00747308d6f02814d072abae0df7a874cadd54064"
+        },
+        {
+            "board": 7,
+            "anchor": "Abomination",
+            "map": 3,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [0.5, 1.0],
+                "single": [1.0, 1.0],
+                "half": [0.0, 1.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.75,
+                "single": 1.0,
+                "half": 0.5,
+                "two-singles": 0.0
+            },
+            "rawSha256": "b2e37bbeb824ef9a2e811cb3c41407a5b2b25b1b81a939da1ff486505d284feb"
+        },
+        {
+            "board": 8,
+            "anchor": "Troll",
+            "map": 4,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.0,
+                "half": 0.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "237becea90247564b6fd14eb3dfb5387a2d785da1ea633ae9d2327ca70a01d13"
+        },
+        {
+            "board": 9,
+            "anchor": "Goblin Knight",
+            "map": 3,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.0,
+                "half": 0.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "685b0f5bac6cb850e42a42095573505ea6e621ecba97c2f54f594eab281a4c52"
+        },
+        {
+            "board": 10,
+            "anchor": "Troll",
+            "map": 1,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.0,
+                "half": 0.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "49422b458fd654865358791e6249de04bb552c71f683a8adac5eebc603cf8576"
+        },
+        {
+            "board": 11,
+            "anchor": "Goblin Knight",
+            "map": 4,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [1.0, 0.0],
+                "single": [1.0, 0.0],
+                "half": [1.0, 1.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.5,
+                "half": 1.0,
+                "two-singles": 1.0
+            },
+            "rawSha256": "8139decdda319cf898cf851786b4b7b35dc2d4782bd9b6ea1103368edba1e97d"
+        },
+        {
+            "board": 12,
+            "anchor": "Abomination",
+            "map": 3,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [1.0, 1.0],
+                "single": [0.0, 1.0],
+                "half": [1.0, 1.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 1.0,
+                "single": 0.5,
+                "half": 1.0,
+                "two-singles": 1.0
+            },
+            "rawSha256": "5061324c28b2f0cd3629d91cb91b3fea2a4dfd849fee3c60e0216813867f1489"
+        },
+        {
+            "board": 13,
+            "anchor": "Troll",
+            "map": 4,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [0.0, 1.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.0,
+                "half": 0.5,
+                "two-singles": 0.0
+            },
+            "rawSha256": "f7113bb6b0be841b38c3ad3170d3ef40807b31eeb2135a07cf69907b03bfe9b7"
+        },
+        {
+            "board": 14,
+            "anchor": "Goblin Knight",
+            "map": 4,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [1.0, 1.0],
+                "single": [1.0, 0.0],
+                "half": [1.0, 1.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 1.0,
+                "single": 0.5,
+                "half": 1.0,
+                "two-singles": 1.0
+            },
+            "rawSha256": "ea91da624f32913020493e401a889157aeecf03445464fcf6cec2b9ebb66f511"
+        },
+        {
+            "board": 15,
+            "anchor": "Troll",
+            "map": 4,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [1.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [1.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.0,
+                "half": 0.0,
+                "two-singles": 0.5
+            },
+            "rawSha256": "07e0628556737d1708cdb0383b8897027c2b9ed7c87ace71ef95eab5330a4e30"
+        },
+        {
+            "board": 16,
+            "anchor": "Troll",
+            "map": 3,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [1.0, 0.0],
+                "single": [1.0, 1.0],
+                "half": [0.0, 1.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 1.0,
+                "half": 0.5,
+                "two-singles": 1.0
+            },
+            "rawSha256": "15445404f669f78db204649813e97f960ac351f83ee6e98d233ddbdc5cefe746"
+        },
+        {
+            "board": 17,
+            "anchor": "Goblin Knight",
+            "map": 3,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [1.0, 0.0],
+                "single": [0.5, 0.0],
+                "half": [1.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.25,
+                "half": 0.5,
+                "two-singles": 0.0
+            },
+            "rawSha256": "01dbb9a2bb8090f7a3a0e94fae40281825f29eeeaca6ebea726163c90cab28de"
+        },
+        {
+            "board": 18,
+            "anchor": "Goblin Knight",
+            "map": 1,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 1.0],
+                "half": [0.0, 0.0],
+                "two-singles": [1.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.5,
+                "half": 0.0,
+                "two-singles": 0.5
+            },
+            "rawSha256": "24a0c7d83f8a6fae101fcc7c3cb6b22b9bd3aa6304e13e4c773525a8425416a2"
+        },
+        {
+            "board": 19,
+            "anchor": "Troll",
+            "map": 3,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [0.0, 1.0],
+                "single": [0.0, 1.0],
+                "half": [1.0, 0.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.5,
+                "half": 0.5,
+                "two-singles": 1.0
+            },
+            "rawSha256": "0c82ca0064c0dbe4f9e73a431b1c920db0501c89671a52e8141806d484d9151d"
+        },
+        {
+            "board": 20,
+            "anchor": "Frenzied Boar",
+            "map": 4,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [1.0, 1.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 1.0,
+                "half": 0.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "9d695a4710eef905ccb4ffedc7f7ef5a0ae8687b40bb15365a52765ed074fe97"
+        },
+        {
+            "board": 21,
+            "anchor": "Abomination",
+            "map": 1,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [1.0, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.5,
+                "half": 0.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "717a5999d931b54d4d1070d733b4a2312ed2ab7382918017ddeb1e6244fa2315"
+        },
+        {
+            "board": 22,
+            "anchor": "Frenzied Boar",
+            "map": 3,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.0,
+                "half": 0.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "959affb003399976e8e3843f2f27b4c11dd332a62974fef8104bcada7b4bcd71"
+        },
+        {
+            "board": 23,
+            "anchor": "Troll",
+            "map": 1,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [0.0, 1.0],
+                "single": [0.0, 1.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.5]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.5,
+                "half": 0.0,
+                "two-singles": 0.25
+            },
+            "rawSha256": "9e2b2bac7b63743f8534d289fef67f73831a7324ffe56efcd0d51ce0d03d3905"
+        },
+        {
+            "board": 24,
+            "anchor": "Frenzied Boar",
+            "map": 4,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [1.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [1.0, 1.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.0,
+                "half": 1.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "2bcb8b43b9ff32b77212b9222e13581395ea874e64995e098d7889f9d4c81a52"
+        },
+        {
+            "board": 25,
+            "anchor": "Abomination",
+            "map": 4,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1,
+            "seatScores": {
+                "stock": [1.0, 1.0],
+                "single": [1.0, 1.0],
+                "half": [1.0, 1.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 1.0,
+                "single": 1.0,
+                "half": 1.0,
+                "two-singles": 1.0
+            },
+            "rawSha256": "d24b5c27f34dd954c53699f0d7171b7ae172e8a64f0755f6f9bc80c1642415ed"
+        },
+        {
+            "board": 26,
+            "anchor": "Abomination",
+            "map": 4,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [1.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.0,
+                "half": 0.5,
+                "two-singles": 0.0
+            },
+            "rawSha256": "9dc215047149cbe5ff90635ad877efdd9e05abaabd3d6bbe720981856bc76157"
+        },
+        {
+            "board": 27,
+            "anchor": "Frenzied Boar",
+            "map": 1,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [1.0, 1.0],
+                "half": [0.0, 1.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 1.0,
+                "half": 0.5,
+                "two-singles": 1.0
+            },
+            "rawSha256": "435e2e1a4d892986e177a83045c9c8dfa025618418e0574350167f8206b0ea48"
+        },
+        {
+            "board": 28,
+            "anchor": "Frenzied Boar",
+            "map": 4,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [0.0, 1.0],
+                "single": [0.0, 1.0],
+                "half": [0.0, 1.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.5,
+                "half": 0.5,
+                "two-singles": 1.0
+            },
+            "rawSha256": "7f20df2d749d3b33119459ba683979fba6b2390506aa80cfb2e7ed7ff4da5562"
+        },
+        {
+            "board": 29,
+            "anchor": "Abomination",
+            "map": 4,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 1.0],
+                "half": [0.0, 0.0],
+                "two-singles": [1.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.5,
+                "half": 0.0,
+                "two-singles": 0.5
+            },
+            "rawSha256": "9b5125e808ae44f5686e005edc68ffb29efc4740e56dec4d26a00cede6127a75"
+        },
+        {
+            "board": 30,
+            "anchor": "Troll",
+            "map": 3,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 3,
+            "seatScores": {
+                "stock": [1.0, 0.0],
+                "single": [1.0, 1.0],
+                "half": [1.0, 1.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 1.0,
+                "half": 1.0,
+                "two-singles": 1.0
+            },
+            "rawSha256": "e749a95a7d089bce47559f7294b7bf932ec824336e227fe4186fa647a9594f2a"
+        },
+        {
+            "board": 31,
+            "anchor": "Abomination",
+            "map": 1,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [1.0, 0.0],
+                "single": [0.0, 1.0],
+                "half": [1.0, 1.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 0.5,
+                "single": 0.5,
+                "half": 1.0,
+                "two-singles": 1.0
+            },
+            "rawSha256": "14e90f4fd6616635168692ceb876f79e6e733cd12e6b74dc31d5352682305073"
+        },
+        {
+            "board": 32,
+            "anchor": "Abomination",
+            "map": 3,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.0,
+                "half": 0.0,
+                "two-singles": 0.0
+            },
+            "rawSha256": "454c16ceb3a7f423ed5bb50ef62a75304d6ba713a09e69819f70519d79190c02"
+        },
+        {
+            "board": 33,
+            "anchor": "Goblin Knight",
+            "map": 1,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 1.0],
+                "half": [1.0, 0.0],
+                "two-singles": [0.0, 0.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.5,
+                "half": 0.5,
+                "two-singles": 0.0
+            },
+            "rawSha256": "4ee6aaec17903f8fb083cfe1131697f6ad18c4c4189c347432000596a145cdd6"
+        },
+        {
+            "board": 34,
+            "anchor": "Goblin Knight",
+            "map": 3,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [1.0, 1.0],
+                "single": [1.0, 1.0],
+                "half": [1.0, 1.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 1.0,
+                "single": 1.0,
+                "half": 1.0,
+                "two-singles": 1.0
+            },
+            "rawSha256": "443846e3a3defc161b5ec712cc5e144794d20fe63f02bf2ee9553551dc7750a7"
+        },
+        {
+            "board": 35,
+            "anchor": "Frenzied Boar",
+            "map": 1,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2,
+            "seatScores": {
+                "stock": [0.0, 0.0],
+                "single": [0.0, 0.0],
+                "half": [0.0, 0.0],
+                "two-singles": [1.0, 1.0]
+            },
+            "boardScores": {
+                "stock": 0.0,
+                "single": 0.0,
+                "half": 0.0,
+                "two-singles": 1.0
+            },
+            "rawSha256": "b3fb8c8bcf2be5aa2bf8541c1553cb8e83d5082c34a2a67e526542873d2c1500"
+        }
+    ],
+    "consumedBoards": [
+        {
+            "bank": "smoke",
+            "index": 0,
+            "anchor": "Frenzied Boar",
+            "pair": 249,
+            "baselineStacks": 8,
+            "setupSeed": 1557295795,
+            "combatSeed": 1681059064,
+            "map": 1,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "smoke",
+            "index": 1,
+            "anchor": "Troll",
+            "pair": 290,
+            "baselineStacks": 8,
+            "setupSeed": 547996448,
+            "combatSeed": 3235632975,
+            "map": 4,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "smoke",
+            "index": 2,
+            "anchor": "Goblin Knight",
+            "pair": 441,
+            "baselineStacks": 8,
+            "setupSeed": 953747383,
+            "combatSeed": 118898882,
+            "map": 1,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "smoke",
+            "index": 3,
+            "anchor": "Abomination",
+            "pair": 482,
+            "baselineStacks": 10,
+            "setupSeed": 2741752879,
+            "combatSeed": 3082005728,
+            "map": 4,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 0,
+            "anchor": "Goblin Knight",
+            "pair": 1229,
+            "baselineStacks": 8,
+            "setupSeed": 3801342552,
+            "combatSeed": 2927796309,
+            "map": 4,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 1,
+            "anchor": "Abomination",
+            "pair": 1392,
+            "baselineStacks": 8,
+            "setupSeed": 517406062,
+            "combatSeed": 2720180089,
+            "map": 1,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 2,
+            "anchor": "Frenzied Boar",
+            "pair": 1429,
+            "baselineStacks": 8,
+            "setupSeed": 2154194504,
+            "combatSeed": 1858812021,
+            "map": 3,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 3,
+            "anchor": "Goblin Knight",
+            "pair": 1914,
+            "baselineStacks": 10,
+            "setupSeed": 914902671,
+            "combatSeed": 1184504013,
+            "map": 1,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 4,
+            "anchor": "Troll",
+            "pair": 2373,
+            "baselineStacks": 8,
+            "setupSeed": 1436060375,
+            "combatSeed": 2099281996,
+            "map": 1,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 5,
+            "anchor": "Frenzied Boar",
+            "pair": 2491,
+            "baselineStacks": 9,
+            "setupSeed": 2104587133,
+            "combatSeed": 921994389,
+            "map": 3,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 6,
+            "anchor": "Frenzied Boar",
+            "pair": 2502,
+            "baselineStacks": 9,
+            "setupSeed": 1294934749,
+            "combatSeed": 2752272259,
+            "map": 1,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 7,
+            "anchor": "Abomination",
+            "pair": 4030,
+            "baselineStacks": 8,
+            "setupSeed": 1144269531,
+            "combatSeed": 1333954638,
+            "map": 3,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 8,
+            "anchor": "Troll",
+            "pair": 4373,
+            "baselineStacks": 9,
+            "setupSeed": 1597020695,
+            "combatSeed": 416568522,
+            "map": 4,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 9,
+            "anchor": "Goblin Knight",
+            "pair": 5197,
+            "baselineStacks": 8,
+            "setupSeed": 436336213,
+            "combatSeed": 570957696,
+            "map": 3,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 10,
+            "anchor": "Troll",
+            "pair": 5271,
+            "baselineStacks": 8,
+            "setupSeed": 2625732963,
+            "combatSeed": 3638720352,
+            "map": 1,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 11,
+            "anchor": "Goblin Knight",
+            "pair": 6905,
+            "baselineStacks": 8,
+            "setupSeed": 3524004371,
+            "combatSeed": 1157513839,
+            "map": 4,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 12,
+            "anchor": "Abomination",
+            "pair": 6907,
+            "baselineStacks": 8,
+            "setupSeed": 3063696476,
+            "combatSeed": 3440397030,
+            "map": 3,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 13,
+            "anchor": "Troll",
+            "pair": 6956,
+            "baselineStacks": 8,
+            "setupSeed": 1498550322,
+            "combatSeed": 920206668,
+            "map": 4,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 14,
+            "anchor": "Goblin Knight",
+            "pair": 7082,
+            "baselineStacks": 8,
+            "setupSeed": 1875708251,
+            "combatSeed": 3491208581,
+            "map": 4,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 15,
+            "anchor": "Troll",
+            "pair": 7451,
+            "baselineStacks": 8,
+            "setupSeed": 1153071141,
+            "combatSeed": 3868982124,
+            "map": 4,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 16,
+            "anchor": "Troll",
+            "pair": 7924,
+            "baselineStacks": 8,
+            "setupSeed": 2292935771,
+            "combatSeed": 3484493719,
+            "map": 3,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 17,
+            "anchor": "Goblin Knight",
+            "pair": 8500,
+            "baselineStacks": 9,
+            "setupSeed": 4087663957,
+            "combatSeed": 4092727321,
+            "map": 3,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 18,
+            "anchor": "Goblin Knight",
+            "pair": 9027,
+            "baselineStacks": 8,
+            "setupSeed": 3558066503,
+            "combatSeed": 611252938,
+            "map": 1,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 19,
+            "anchor": "Troll",
+            "pair": 9592,
+            "baselineStacks": 8,
+            "setupSeed": 2915565190,
+            "combatSeed": 226027755,
+            "map": 3,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 20,
+            "anchor": "Frenzied Boar",
+            "pair": 9635,
+            "baselineStacks": 8,
+            "setupSeed": 664783015,
+            "combatSeed": 2387912702,
+            "map": 4,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 21,
+            "anchor": "Abomination",
+            "pair": 9933,
+            "baselineStacks": 8,
+            "setupSeed": 2850704075,
+            "combatSeed": 70801526,
+            "map": 1,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 22,
+            "anchor": "Frenzied Boar",
+            "pair": 10564,
+            "baselineStacks": 8,
+            "setupSeed": 1148791251,
+            "combatSeed": 2830628562,
+            "map": 3,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 23,
+            "anchor": "Troll",
+            "pair": 10800,
+            "baselineStacks": 9,
+            "setupSeed": 752099476,
+            "combatSeed": 655243266,
+            "map": 1,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 24,
+            "anchor": "Frenzied Boar",
+            "pair": 11369,
+            "baselineStacks": 8,
+            "setupSeed": 1929126976,
+            "combatSeed": 1187205845,
+            "map": 4,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 25,
+            "anchor": "Abomination",
+            "pair": 11525,
+            "baselineStacks": 8,
+            "setupSeed": 3428253812,
+            "combatSeed": 111556107,
+            "map": 4,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 1
+        },
+        {
+            "bank": "fresh",
+            "index": 26,
+            "anchor": "Abomination",
+            "pair": 12377,
+            "baselineStacks": 8,
+            "setupSeed": 2032717649,
+            "combatSeed": 2522527094,
+            "map": 4,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 27,
+            "anchor": "Frenzied Boar",
+            "pair": 12459,
+            "baselineStacks": 10,
+            "setupSeed": 1799042017,
+            "combatSeed": 105144667,
+            "map": 1,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 28,
+            "anchor": "Frenzied Boar",
+            "pair": 14495,
+            "baselineStacks": 8,
+            "setupSeed": 1548067546,
+            "combatSeed": 419150691,
+            "map": 4,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 29,
+            "anchor": "Abomination",
+            "pair": 14498,
+            "baselineStacks": 8,
+            "setupSeed": 1542693181,
+            "combatSeed": 1701149228,
+            "map": 4,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 30,
+            "anchor": "Troll",
+            "pair": 15484,
+            "baselineStacks": 8,
+            "setupSeed": 4193731010,
+            "combatSeed": 956513219,
+            "map": 3,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 3
+        },
+        {
+            "bank": "fresh",
+            "index": 31,
+            "anchor": "Abomination",
+            "pair": 15492,
+            "baselineStacks": 8,
+            "setupSeed": 1753552644,
+            "combatSeed": 3928009718,
+            "map": 1,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 32,
+            "anchor": "Abomination",
+            "pair": 19210,
+            "baselineStacks": 8,
+            "setupSeed": 1800890546,
+            "combatSeed": 4102072851,
+            "map": 3,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 33,
+            "anchor": "Goblin Knight",
+            "pair": 22035,
+            "baselineStacks": 8,
+            "setupSeed": 1246898579,
+            "combatSeed": 43415702,
+            "map": 1,
+            "ownDoctrine": 1,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 34,
+            "anchor": "Goblin Knight",
+            "pair": 25942,
+            "baselineStacks": 8,
+            "setupSeed": 3560767199,
+            "combatSeed": 3033672298,
+            "map": 3,
+            "ownDoctrine": 3,
+            "opponentDoctrine": 2
+        },
+        {
+            "bank": "fresh",
+            "index": 35,
+            "anchor": "Frenzied Boar",
+            "pair": 36225,
+            "baselineStacks": 8,
+            "setupSeed": 1640411627,
+            "combatSeed": 4095759888,
+            "map": 1,
+            "ownDoctrine": 2,
+            "opponentDoctrine": 2
+        }
+    ],
+    "excludedSeedChannels": [
+        43415702, 70801526, 105144667, 111556107, 118898882, 226027755, 416568522, 419150691, 436336213, 517406062,
+        547996448, 570957696, 611252938, 655243266, 664783015, 752099476, 914902671, 920206668, 921994389, 953747383,
+        956513219, 1144269531, 1148791251, 1153071141, 1157513839, 1184504013, 1187205845, 1246898579, 1294934749,
+        1333954638, 1436060375, 1498550322, 1542693181, 1548067546, 1557295795, 1597020695, 1640411627, 1681059064,
+        1701149228, 1753552644, 1799042017, 1800890546, 1858812021, 1875708251, 1929126976, 2032717649, 2099281996,
+        2104587133, 2154194504, 2292935771, 2387912702, 2522527094, 2625732963, 2720180089, 2741752879, 2752272259,
+        2830628562, 2850704075, 2915565190, 2927796309, 3033672298, 3063696476, 3082005728, 3235632975, 3428253812,
+        3440397030, 3484493719, 3491208581, 3524004371, 3558066503, 3560767199, 3638720352, 3801342552, 3868982124,
+        3928009718, 4087663957, 4092727321, 4095759888, 4102072851, 4193731010
+    ],
+    "correctnessOnly": {
+        "smokeBoards": 4,
+        "smokeFights": 32,
+        "exactAaReplays": 8,
+        "additionalInitialSmokeAdmissionFights": 2,
+        "diagnosticReplays": 176,
+        "diagnosticExistingBoards": 29,
+        "diagnosticSeatContexts": 44,
+        "initialReplayAdmissionAttempts": 2,
+        "newIndependentDiagnosticGames": 0,
+        "nativeTeamFormations": 576,
+        "acceptedSplitActions": 956,
+        "verifiedHealerTurns": 2943
+    },
+    "situationalResearchInputs": [
+        "Own post-split spell power and casualty margin.",
+        "Number of useful unbuffed allies and their upcoming activations.",
+        "Repairable front-body HP, incoming damage and regeneration timing.",
+        "Legal support positions, reachable allies and visible threats.",
+        "Funded stack capacity and the utility child displaced by each split."
+    ],
+    "continuationRules": [
+        "Keep the tested helper bytes unchanged; use a separate implementation for any new selector or treatment.",
+        "Use these boards for discovery only; exclude all listed setup/combat channels from independent qualification.",
+        "Use only information exposed by the serving observation, including doctrine visibility limits.",
+        "Keep stock setup and matched protected-single controls; isolate placement and split priority before attributing gains.",
+        "Do not derive hard-coded unit, map or doctrine rules from these small exploratory subgroups.",
+        "A new situational selector needs training/validation family separation, a frozen policy, exact serving-choice parity and a fresh fixed confirmation.",
+        "Budgeted Placement upgrades require their own fully funded comparison.",
+        "The user commit request preserves research; it does not rewrite failed gates or activate a default."
+    ]
+}
