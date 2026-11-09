@@ -476,21 +476,25 @@ const roundHalfAwayFromZero = (value: number): number =>
 const clampInt16 = (value: number): number => Math.max(-INT16_ABS_MAX, Math.min(INT16_ABS_MAX, value));
 const clampInt32 = (value: number): number => Math.max(INT32_MIN, Math.min(INT32_MAX, value));
 
-/**
- * Deterministic synchronous CPU inference. Inputs are normalized once, then every learned multiply/accumulate
- * and comparison uses exact integers; no softmax, native addon, GPU, network request, or random source exists.
- */
-export function scoreV09FixedPoint(artifact: IV09ModelArtifact, rawFeatures: readonly number[]): number {
+function normalizedV09Inputs(artifact: IV09ModelArtifact, rawFeatures: readonly number[]): number[] {
     if (rawFeatures.length !== artifact.architecture.inputSize) {
         throw new Error(`v0.9 expected ${artifact.architecture.inputSize} features, received ${rawFeatures.length}`);
     }
-    let activations = rawFeatures.map((raw, index) => {
+    return rawFeatures.map((raw, index) => {
         if (!Number.isFinite(raw)) throw new Error(`v0.9 feature ${index} is not finite`);
         const normalized =
             (raw - (artifact.normalization.offsets[index] ?? 0)) * (artifact.normalization.scales[index] ?? 1);
         const clipped = Math.max(-artifact.fixedPoint.inputClip, Math.min(artifact.fixedPoint.inputClip, normalized));
         return clampInt16(roundHalfAwayFromZero(clipped * artifact.fixedPoint.inputScale));
     });
+}
+
+/**
+ * Deterministic synchronous CPU inference. Inputs are normalized once, then every learned multiply/accumulate
+ * and comparison uses exact integers; no softmax, native addon, GPU, network request, or random source exists.
+ */
+export function scoreV09FixedPoint(artifact: IV09ModelArtifact, rawFeatures: readonly number[]): number {
+    let activations = normalizedV09Inputs(artifact, rawFeatures);
 
     for (let layerIndex = 0; layerIndex < artifact.layers.length; layerIndex += 1) {
         const layer = artifact.layers[layerIndex];
@@ -512,4 +516,71 @@ export function scoreV09FixedPoint(artifact: IV09ModelArtifact, rawFeatures: rea
     const score = activations[0];
     if (!Number.isInteger(score)) throw new Error("v0.9 produced a non-integer score");
     return score;
+}
+
+/**
+ * Exact batched scoring for an already structurally validated artifact. At each layer, input columns equal
+ * across every candidate contribute once to a shared accumulator. All other products remain candidate-specific.
+ * Equality is checked on quantized integers, never assumed from feature names or cached between decisions.
+ * The validated signed-int32 absolute envelope makes this integer reassociation exact, including before
+ * rounding, ReLU and saturation. Every candidate retains its full score and original order.
+ */
+export function scoreV09FixedPointBatch(
+    artifact: IV09ModelArtifact,
+    rawFeatures: readonly (readonly number[])[],
+): number[] {
+    // Small batches cannot amortize column discovery. Keep the independent scalar path as their fast path.
+    if (rawFeatures.length < 3) return rawFeatures.map((features) => scoreV09FixedPoint(artifact, features));
+    let activations = rawFeatures.map((features) => normalizedV09Inputs(artifact, features));
+
+    for (const layer of artifact.layers) {
+        const first = activations[0]!;
+        if (first.length !== layer.inputSize) throw new Error("v0.9 dense layer shape mismatch");
+        const common: number[] = [];
+        const varying: number[] = [];
+        for (let column = 0; column < layer.inputSize; column += 1) {
+            let equal = true;
+            for (let candidate = 1; candidate < activations.length; candidate += 1) {
+                if (activations[candidate]![column] !== first[column]) {
+                    equal = false;
+                    break;
+                }
+            }
+            (equal ? common : varying).push(column);
+        }
+
+        const bases = [...layer.biases];
+        for (let row = 0; row < layer.outputSize; row += 1) {
+            let accumulator = bases[row] ?? 0;
+            const offset = row * layer.inputSize;
+            for (let index = 0; index < common.length; index += 1) {
+                const column = common[index]!;
+                accumulator += first[column]! * (layer.weights[offset + column] ?? 0);
+            }
+            bases[row] = accumulator;
+        }
+
+        const divisor = 2 ** layer.scaleShift;
+        activations = activations.map((input) => {
+            const output: number[] = [];
+            for (let row = 0; row < layer.outputSize; row += 1) {
+                let accumulator = bases[row]!;
+                const offset = row * layer.inputSize;
+                for (let index = 0; index < varying.length; index += 1) {
+                    const column = varying[index]!;
+                    accumulator += input[column]! * (layer.weights[offset + column] ?? 0);
+                }
+                let value = roundHalfAwayFromZero(accumulator / divisor);
+                if (layer.activation === "relu") value = Math.max(0, value);
+                output.push(layer.activation === "linear" ? clampInt32(value) : clampInt16(value));
+            }
+            return output;
+        });
+    }
+
+    return activations.map((output) => {
+        const score = output[0];
+        if (!Number.isInteger(score)) throw new Error("v0.9 produced a non-integer score");
+        return score!;
+    });
 }

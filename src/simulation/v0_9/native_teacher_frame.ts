@@ -11,7 +11,7 @@ import {
 import {
     V09_FEATURE_SCHEMA_SHA256,
     V09_INPUT_FEATURE_NAMES,
-    v09CandidateFeatureVector,
+    v09DecisionFeatureVectors,
 } from "../../ai/versions/v0_9_features";
 
 export interface IV09NativeTeacherFrame {
@@ -31,7 +31,7 @@ export function captureV09NativeTeacherFrame(
     const candidates = enumerateV09Candidates(unit, context, anchor);
     const summary = buildV09HardGuardSummary(candidates, unit, context);
     const signatures = candidates.map((candidate) => v09CandidateSignature(candidate.actions));
-    const features = candidates.map((candidate) => v09CandidateFeatureVector(candidate, unit, context, candidates));
+    const features = v09DecisionFeatureVectors(candidates, unit, context);
     const eligible = candidates.map((candidate, index) =>
         v09CandidatePassesHardGuards(index, candidate, candidates, unit, context, summary),
     );

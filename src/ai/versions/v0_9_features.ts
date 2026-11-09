@@ -399,6 +399,25 @@ function richFeatureVector(
     ];
 }
 
+function assembleV09CandidateFeatureVector(
+    candidate: IEnumeratedCandidate,
+    unit: Unit,
+    context: IDecisionContext,
+    candidates: readonly IEnumeratedCandidate[],
+    stateFeatures: readonly number[],
+): number[] {
+    const vector = [
+        ...stateFeatures,
+        ...candidateFeatureVector(candidate),
+        ...ilCandidateActionEncoding(candidate, unit.getTeam()).features,
+        ...richFeatureVector(candidate, unit, context, candidates),
+    ];
+    if (vector.length !== V09_INPUT_FEATURE_NAMES.length || vector.some((value) => !Number.isFinite(value))) {
+        throw new Error(`v0.9 IL-v4 produced an invalid ${vector.length}-value feature vector`);
+    }
+    return vector;
+}
+
 /**
  * Browser-safe IL-v4 inference vector. Missing turn state fails closed instead of silently presenting a trained
  * model with a zeroed temporal/Armageddon block; StrategyV0_9 then returns the exact v0.8 anchor.
@@ -409,17 +428,25 @@ export function v09CandidateFeatureVector(
     context: IDecisionContext,
     candidates: readonly IEnumeratedCandidate[],
 ): number[] {
-    if (!context.fightProperties) {
-        throw new Error("v0.9 IL-v4 inference requires fightProperties");
-    }
-    const vector = [
-        ...extractValueFeaturesV2(context.unitsHolder, context.fightProperties, unit.getTeam()),
-        ...candidateFeatureVector(candidate),
-        ...ilCandidateActionEncoding(candidate, unit.getTeam()).features,
-        ...richFeatureVector(candidate, unit, context, candidates),
-    ];
-    if (vector.length !== V09_INPUT_FEATURE_NAMES.length || vector.some((value) => !Number.isFinite(value))) {
-        throw new Error(`v0.9 IL-v4 produced an invalid ${vector.length}-value feature vector`);
-    }
-    return vector;
+    if (!context.fightProperties) throw new Error("v0.9 IL-v4 inference requires fightProperties");
+    return assembleV09CandidateFeatureVector(
+        candidate,
+        unit,
+        context,
+        candidates,
+        extractValueFeaturesV2(context.unitsHolder, context.fightProperties, unit.getTeam()),
+    );
+}
+
+/** Same ordered vectors, with the public board-state block computed once for this decision only. */
+export function v09DecisionFeatureVectors(
+    candidates: readonly IEnumeratedCandidate[],
+    unit: Unit,
+    context: IDecisionContext,
+): number[][] {
+    if (!context.fightProperties) throw new Error("v0.9 IL-v4 inference requires fightProperties");
+    const state = extractValueFeaturesV2(context.unitsHolder, context.fightProperties, unit.getTeam());
+    return candidates.map((candidate) =>
+        assembleV09CandidateFeatureVector(candidate, unit, context, candidates, state),
+    );
 }

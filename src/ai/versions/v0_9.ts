@@ -36,11 +36,11 @@ import { v08DominantFinishState } from "./v0_8_dominant_finish";
 import { V09_MODEL_ARTIFACT } from "./v0_9_artifact";
 import {
     v09CandidateConsumesPassiveTurn,
-    v09CandidateFeatureVector,
+    v09DecisionFeatureVectors,
     v09CandidateIsProductive,
     v09HasResolvedVisibleShot,
 } from "./v0_9_features";
-import { scoreV09FixedPoint, validateV09ModelArtifact, type IV09ModelArtifact } from "./v0_9_model";
+import { scoreV09FixedPointBatch, validateV09ModelArtifact, type IV09ModelArtifact } from "./v0_9_model";
 
 export const V09_MAX_CANDIDATES = 96;
 const V09_OFFLINE_RESEARCH_ACTIVATION = Symbol("v0.9 offline research activation");
@@ -433,9 +433,7 @@ export class StrategyV0_9 implements IAIStrategy {
             const candidates = enumerateV09Candidates(unit, context, anchor);
             candidateCount = candidates.length;
             if (!candidates.length) throw new Error("v0.9 enumerator omitted candidate zero");
-            const scores = candidates.map((candidate) =>
-                scoreV09FixedPoint(this.artifact, v09CandidateFeatureVector(candidate, unit, context, candidates)),
-            );
+            const scores = scoreV09FixedPointBatch(this.artifact, v09DecisionFeatureVectors(candidates, unit, context));
             const guardSummary = buildV09HardGuardSummary(candidates, unit, context);
             const eligible = candidates.map((candidate, index) =>
                 v09CandidatePassesHardGuards(index, candidate, candidates, unit, context, guardSummary),

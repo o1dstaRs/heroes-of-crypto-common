@@ -227,6 +227,13 @@ evidence fixture in `docs/evidence/v0_9_native_scale_20261108.json` reconstructs
 10,479 additional consumed/reserved native base seeds. Merge these with the other project ledgers.
 Numerical fixtures, independent-copy tests and default-policy checks keep loading separate from activation.
 
+The overall gain is uneven. Descriptive breakdown on this completed bank gives 14.2857% for the new
+model versus 14.4345% for its reference in the lower draft seat, and 37.4339% versus 34.8876% in the upper
+draft seat. On map 3 the scores are 22.3958% versus 22.6687%. The candidate converted 528 former losses
+to wins but also converted 448 former wins to losses. These exploratory groups neither identify a causal
+failure nor establish subgroup advantages; preserve the full matched result and use new banks for future
+curriculum or policy changes. The lower-seat weakness is a useful target for diagnostic replay collection.
+
 ## GPU-free native expert committee
 
 The next fixed experiment composes native experts `4e1d89927177` and `f907fc07a28a` with
@@ -267,6 +274,43 @@ errors, committee mean decision time 1.701 ms and p99 9.868 ms. Its +0.81-point 
 each native reference is inconclusive (both paired intervals cross zero). Fresh opened with the original
 fixed candidate and comparisons; the development result does not establish another gain.
 
+## Exact native execution optimization
+
+`v09DecisionFeatureVectors()` computes the unchanged public board-state feature block once per decision.
+`scoreV09FixedPointBatch()` then discovers input columns whose quantized integers are equal across all
+candidates at each dense layer. Their products contribute once to a shared accumulator; all varying
+products remain candidate-specific. The validated signed-int32 absolute envelope makes the reordered
+integer sums exact before the original rounding, ReLU and saturation. Batches below three candidates
+retain scalar scoring. There is no cross-decision cache, omitted candidate, approximate score or changed
+guard. The original scalar scorer remains the independent numerical reference.
+
+Three real native artifacts matched exactly on 128 recorded decisions / 2,053 candidate vectors each.
+For the stronger 96/48 model, dense multiply-accumulates fell from 42,275,376 to 18,659,135 on this set,
+**55.86% less arithmetic**. Microbenchmark times varied with load; full-decision timing is reported below.
+The fixed-point model and feature schema hashes are unchanged. This adds no learned-model qualification.
+
+Software controls freeze engine `8a8d731b` and replace only native strategy, model arithmetic, feature
+assembly and teacher-frame source. On all three maps and four physical/draft mirrors, both confirmed
+native models reproduced every opening, record, committed-event digest, action-trace digest and native
+selection/fallback count in **48 battles / 543 matched native decisions**. Zero native-seat search calls or
+model errors occurred. Initial mean native decision time fell from 1.185 to 0.930 ms (**21.50%**), while
+the small cold p99 sample rose from 7.690 to 11.565 ms. Preserve that tail result rather than claiming an
+all-latency improvement. A separate fixed follow-up warms for 48 battles, then measures another 96 with
+balanced execution order. These software/performance controls do not establish additional battle strength.
+
+That complete warm follow-up also preserved every trace and selection in both measurement passes:
+1,086 paired native decisions, zero search calls or model errors. Mean decision time fell from 0.8790 to
+0.5834 ms (**33.63% less time**); p99 fell from 2.113 to 1.514 ms. The original cold observations remain
+above. These are local M4 Max software controls, not production-server latency qualification or a new
+independent strength bank. The comparison includes both feature extraction and model scoring.
+
+Control registrations and raw output remain under the ignored `v09-native-lossless-runtime-20261108`
+run directory. No running strength study is modified to use the new runtime. Keep the A19 registry bytes
+and production profile fingerprint unchanged; the helpers are imported from their native modules.
+The node also preserves `native-v09-lossless-runtime-20261109-f7974e54.tar.gz` read-only, archive SHA
+`f7974e54dc3f306d4d29eedbff36c750dee1570dd5811e88adb1b272540dc4a7`; all 1,391 manifest entries were
+individually verified. It includes both frozen source copies, registrations, controls and timing results.
+
 ## Validation and ownership
 
 The engine capture change passed 7,600 common tests, TypeScript compilation and the common build with
@@ -279,6 +323,11 @@ The committee/checkpoint continuation passed 30 focused tests (17,167 assertions
 typecheck, compilation, JSON/generated-file copying and a cold compiled checkpoint load. The broad common
 suite passed 7,659 tests with one sandbox process-inspection failure; that complete 18-test process-guard
 file passed when rerun with process access. No unrelated test or live default was changed.
+
+After the exact execution optimization, the complete common suite passed **7,693 tests across 606 files**
+with zero failures using two workers and the required process access. Targeted ESLint, typecheck, compilation
+and a cold compiled 96-candidate scalar-versus-batch comparison also passed. The A19 source ledger still
+matches byte-for-byte; no production profile pin was rewritten to accommodate native-only API exports.
 
 Run outputs, datasets, packed arrays, model candidates and HTML reports remain outside Git. Preserve the
 registrations, failed runs, frozen source and complete raw board results when continuing this work. Never
