@@ -87,3 +87,33 @@ These are observed actions, not estimates of useful buff value or additional str
 Small subgroup means also warn against a universal rule: halves were −5.56 pp in the nine Troll boards,
 while two singles were −12.50 pp in the twelve Scout boards. These descriptive slices neither qualify
 nor disqualify a unit-specific rule without new evidence.
+
+## Exact diagnostic replays
+
+All 176 registered replays completed: four arms for each of the 44 changed-result seat contexts, covering
+29 existing boards. All turn, event and outcome hashes matched. The audit reconciled 12,805 turns and
+33,328 committed health observations. These are zero new independent strength games.
+
+Within this selected sample, current setup produced 44 physical attacks while Blessing was active,
+the protected single 70, halves 118, and two singles 65. Actual HP restored during Healer casts was
+8,345, 11,272, 10,347 and 10,636 respectively. This describes different fight trajectories, including
+different survival times; neither metric identifies the cause of a win.
+
+Halves also have a spell-access tradeoff. Of the stacks observed at power three or above on their first
+activation, 43 of 82 half stacks later fell below three, compared with 20 of 43 current-setup stacks,
+21 of 43 protected-single stacks, and 18 of 43 two-single main stacks. The doubled raw count for halves
+must not be mistaken for a doubled per-stack failure rate. Casualties and the changing largest stack
+on the board can both affect power.
+
+Troll healing timing deserves a separate combat hypothesis. In the selected half-stack replays, three
+single-target Heals restored 99 HP with no recorded incoming damage before the Troll's next activation.
+Two occurred in board 15's green-seat loss, restoring 39 and 28 HP immediately before safe Troll turns.
+Wild Regeneration could repair the front body at activation, so these are potential low-value casts,
+not evidence that a different action would win. Four additional Mass Heal contributions in that arm
+also preceded safe Troll activations; those casts may still have benefited other allies.
+
+The next setup experiment should isolate protecting existing Healers from changing split priorities,
+preserving incumbent child order wherever rosters match. Native formation recomputation and child-order
+changes currently prevent attributing the result solely to rear placement. Split-size choice, buff-target
+timing, Troll regeneration and spending on Placement remain separate hypotheses. This pilot and its
+selected replays cannot promote or train a replacement default.
