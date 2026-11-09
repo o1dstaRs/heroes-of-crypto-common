@@ -1704,6 +1704,10 @@ export class AttackHandler {
                 );
             } else if (isResponseMissed) {
                 this.sceneLog.updateLog(`${targetUnit.getName()} misses 🏹 resp on ${rangeResponseUnit.getName()}`);
+                damageForAnimation.missedResponse = {
+                    unitId: rangeResponseUnit.getId(),
+                    position: { ...rangeResponseUnit.getPosition() },
+                };
             } else {
                 let abilityMultiplier = 1;
                 const paralysisTargetUnitEffect = targetUnit.getEffect("Paralysis");
@@ -2978,6 +2982,10 @@ export class AttackHandler {
 
                 if (isResponseMissed) {
                     this.sceneLog.updateLog(`${targetUnit.getName()} misses ⚔️ resp on ${attackerUnit.getName()}`);
+                    damageForAnimation.missedResponse = {
+                        unitId: attackerUnit.getId(),
+                        position: { ...attackerUnit.getPosition() },
+                    };
                 } else if (!hasLightningSpinResponseLanded && !attackerUnit.isDead()) {
                     abilityMultiplier = 1;
                     // Mirror of the outgoing swing above: on the response the original attacker is the

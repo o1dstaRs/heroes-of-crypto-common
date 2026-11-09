@@ -19,7 +19,7 @@ import { MoveHandler } from "../../src/handlers/move_handler";
 import type { ISceneLog } from "../../src/scene/scene_log_interface";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import { Unit } from "../../src/units/unit";
-import { createCombatTestContext, createTestUnit, testGridSettings } from "../helpers/combat";
+import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
 /** Recording log so the test can assert the shot was actually reported as a miss. */
 class RecordingSceneLog implements ISceneLog {
@@ -41,6 +41,77 @@ describe("missed attack lands no on-hit effects", () => {
     afterEach(() => {
         setDeterministicRandomSource(undefined);
     });
+
+    it.each(["melee", "range"] as const)(
+        "records a confirmed missed %s counter without inferring it from zero HP loss",
+        (kind) => {
+            for (const missed of [false, true]) {
+                const context = createCombatTestContext();
+                const { grid, unitsHolder } = context;
+                const fightProperties = FightStateManager.getInstance().getFightProperties();
+                fightProperties.startFight();
+                const options = {
+                    attackType: kind === "range" ? PBTypes.AttackVals.RANGE : PBTypes.AttackVals.MELEE,
+                    maxHp: 1000,
+                    amountAlive: 1,
+                    attack: 10,
+                    damageMin: 5,
+                    damageMax: 5,
+                    rangeShots: 10,
+                    shotDistance: 10,
+                };
+                const attacker = createTestUnit({ ...options, name: "Squire", team: PBTypes.TeamVals.LEFT });
+                const target = createTestUnit({ ...options, name: "Orc", team: PBTypes.TeamVals.RIGHT });
+                attacker.calculateMissChance = () => 0;
+                target.calculateMissChance = () => (missed ? 100 : 0);
+                placeUnit(grid, unitsHolder, attacker, { x: 3, y: 3 });
+                placeUnit(grid, unitsHolder, target, kind === "range" ? { x: 3, y: 9 } : { x: 4, y: 3 });
+                attacker.refreshPossibleAttackTypes(true);
+                target.refreshPossibleAttackTypes(true);
+                fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+                fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+                fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
+                const sceneLog = new RecordingSceneLog();
+                const engine = new GameActionEngine({
+                    fightProperties,
+                    grid,
+                    unitsHolder,
+                    sceneLog,
+                    moveHandler: new MoveHandler(grid.getSettings(), grid, unitsHolder),
+                    attackHandler: new AttackHandler(testGridSettings, grid, sceneLog, context.damageStatisticHolder),
+                    getCurrentActiveUnitId: () => attacker.getId(),
+                    runtime: createSequenceGameRuntime({ nowMillis: [1400] }),
+                });
+                const hpBefore = attacker.getCumulativeHp();
+                const result = engine.apply(
+                    kind === "range"
+                        ? { type: "range_attack", attackerId: attacker.getId(), targetId: target.getId() }
+                        : {
+                              type: "melee_attack",
+                              attackerId: attacker.getId(),
+                              targetId: target.getId(),
+                              attackFrom: { x: 3, y: 3 },
+                          },
+                );
+                expect(result.completed).toBe(true);
+                const event = result.events.find((event) => event.type === "unit_attacked");
+                if (!event || event.type !== "unit_attacked") throw new Error("Attack event missing");
+                const recorded = JSON.parse(JSON.stringify(event.damage));
+                if (missed) {
+                    expect(sceneLog.getLog()).toContain(kind === "range" ? "misses 🏹 resp" : "misses ⚔️ resp");
+                    expect(attacker.getCumulativeHp()).toBe(hpBefore);
+                    expect(recorded.missedResponse).toEqual({
+                        unitId: attacker.getId(),
+                        position: attacker.getPosition(),
+                    });
+                } else {
+                    expect(attacker.getCumulativeHp()).toBeLessThan(hpBefore);
+                    expect(recorded.missedResponse).toBeUndefined();
+                }
+                expect(recorded.missed).not.toBe(true);
+            }
+        },
+    );
 
     it("a dodged ranged shot does not Stun (Orc vs Scavenger)", () => {
         // RNG pinned to 0 makes this fully discriminating: the miss roll (0 < dodge chance) always

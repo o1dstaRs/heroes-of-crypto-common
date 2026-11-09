@@ -102,6 +102,8 @@ export interface IVisibleDamage {
     // dodge), or Boar Saliva. No damage was dealt; the client shows a "MISS" pop over `unitPosition`
     // instead of a damage number. `render` stays false on a miss (there is no damage to draw).
     missed?: boolean;
+    /** A confirmed missed ordinary counter, which cannot be recovered from an HP diff. */
+    missedResponse?: { unitId: string; position: XY };
     // Unit ids whose Lucky Strike proc'd during this exchange (attacker and/or responder).
     // Drives the ranked scene-log line and the gold proc VFX: the engine's own sceneLog text
     // never reaches ranked, which rebuilds its log from these event payloads.

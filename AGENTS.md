@@ -41,6 +41,10 @@ The separate v2 continuation is `ranged-counter-situational-20261109T054706Z`, r
 It reserves 1,080 new development boards and 1,512 held-out boards with current/free/situational arms.
 Exclude `docs/evidence/ranged_counter_situational_registration_20261109.json` in other campaigns too.
 No replacement candidate after its confirmation opens and no automatic production promotion.
+The original Python analyzer cannot reserialize tiny timing values with JavaScript's exact number notation.
+Its source is preserved. The separate `analyze_raw.py` / `resume_verified.py` finalizer in that ignored run
+directory verifies exact emitted row bytes and resumes the unchanged registered analysis after development;
+read `finalizer-status.json` as well as the original controller status. No outcomes, policy or gates were edited.
 
 ## User-locked A19 full-policy research reference
 
