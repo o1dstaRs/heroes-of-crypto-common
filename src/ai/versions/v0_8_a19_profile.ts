@@ -188,7 +188,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "unit-support-adapter" as const,
         source: "src/simulation/a19_support.ts" as const,
-        sha256: "42f20009daf507771f1d591cc5c7869b2651f86c21ae74e342ac0ee584fc270a" as const,
+        sha256: "7f3d44ddde59aba25540d8e0f9ea48016f93e3945947a335201377c995257db9" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,

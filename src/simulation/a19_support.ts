@@ -10,13 +10,15 @@ const attached = new WeakSet<SearchDriver>();
 /** Match-local outer layer, after neural correction. Never patches a global prototype. */
 export function attachA19SupportDecision(driver: SearchDriver, deps: ILookaheadDeps, offline: boolean): SearchDriver {
     if (attached.has(driver)) return driver;
-    const choose = driver.chooseDecision;
+    const ownChoose = Object.getOwnPropertyDescriptor(driver, "chooseDecision")?.value as
+        SearchDriver["chooseDecision"] | undefined;
     driver.chooseDecision = function (
         unit: Unit,
         version: string,
         incumbent: GameAction[],
         context?: IDecisionContext,
     ) {
+        const choose = ownChoose ?? (Object.getPrototypeOf(this) as SearchDriver).chooseDecision;
         const selected = choose.call(this, unit, version, incumbent, context);
         if (version !== "v0.8" || unit.getName() !== "Satyr" || !context || !this.appliesTo(version, unit.getTeam()))
             return selected;

@@ -363,3 +363,14 @@ test("a failed Satyr restore attempts every cleanup and propagates quarantine in
     expect(witness(f)).toBe(before);
     expect(captureDeterministicRandomState()).toEqual(random);
 });
+
+test("support wrapping resolves a prototype selector again after a temporary scope is removed", () => {
+    const f = fixture();
+    const first: GameAction[] = [{ type: "end_turn", unitId: f.satyr.getId() }];
+    const next: GameAction[] = [{ type: "defend_turn", unitId: f.satyr.getId() }];
+    const prototype = { appliesTo: () => true, chooseDecision: () => first };
+    const driver = attachA19SupportDecision(Object.create(prototype), f.deps, false);
+    expect(driver.chooseDecision(f.satyr, "v0.9", [], f.context)).toBe(first);
+    prototype.chooseDecision = () => next;
+    expect(driver.chooseDecision(f.satyr, "v0.9", [], f.context)).toBe(next);
+});
