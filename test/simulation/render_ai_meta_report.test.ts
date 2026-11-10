@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
 
 import { renderAiMetaReport } from "../../src/simulation/render_ai_meta_report";
 
@@ -316,7 +317,7 @@ describe("render_ai_meta_report", () => {
         expect(html).toContain("Water · NON-LIVE");
         expect(html).toContain('var defaultMap=reportedMaps.has("live")?"live"');
         expect(html).toContain(
-            'if(category.key!=="units"&&category.key!=="synergies")candidates=candidates.slice(0,12)',
+            'if(category.key!=="units"&&category.key!=="synergies"&&category.key!=="augmentLevels")candidates=candidates.slice(0,12)',
         );
         expect(html).not.toContain('slice(0,category.key==="units"?16:12)');
         expect(html).toContain('var unitLevel=row.category==="units"&&row.level?"L"+row.level+" · ":""');
@@ -354,6 +355,63 @@ describe("render_ai_meta_report", () => {
         expect(html).toContain('"key":"sourceSha256","value":"');
         expect(html).toContain('"key":"executionHost.cpuModel","value":"AMD Ryzen 7 9800X3D"');
         expect(html).toContain('"key":"executionHost.logicalCpus","value":"16"');
+    });
+
+    test("shows every active augment level and puts flagged tiny samples after larger samples", () => {
+        const html = renderAiMetaReport({ rankings: {} });
+        const functions = ["lowSample", "compareForestRows", "renderForest"]
+            .map((name) => {
+                const start = html.indexOf(`function ${name}(`);
+                return html.slice(start, html.indexOf("\nfunction ", start + 1));
+            })
+            .join("\n");
+        type Element = {
+            text?: string;
+            children: Element[];
+            style: Record<string, string>;
+            append(...items: Element[]): void;
+            replaceChildren(): void;
+        };
+        const node = (_tag = "div", _className?: string, text?: string): Element => ({
+            text,
+            children: [],
+            style: {},
+            append(...items) {
+                this.children.push(...items);
+            },
+            replaceChildren() {
+                this.children = [];
+            },
+        });
+        const rows = Array.from({ length: 16 }, (_, index) => ({
+            name: index >= 13 ? `Empower L${index - 12}` : `Augment ${index}`,
+            category: "augmentLevels",
+            sample: 100,
+            rate: 0.6 - index * 0.02,
+            level: 1,
+        }));
+        const host = node();
+        const context = {
+            node,
+            rows,
+            host,
+            exactCohortRows: () => rows,
+            eligibleLeader: () => true,
+            mountArt: () => {},
+            finite: Number.isFinite,
+            sample: (row: { sample: number }) => String(row.sample),
+            rate: String,
+            mapLabel: () => "All",
+        };
+        runInNewContext(functions + ';renderForest({key:"augmentLevels",label:"Augment levels"},host)', context);
+        expect(host.children[0].children).toHaveLength(16);
+        expect(JSON.stringify(host)).toContain("Empower L3");
+        rows.push({ name: "One win", category: "synergies", sample: 1, rate: 1, level: 3 });
+        runInNewContext(functions + ';renderForest({key:"synergies",label:"Synergies"},host)', context);
+        const last = host.children[0].children.at(-1)!;
+        expect(JSON.stringify(last)).toContain("One win");
+        expect(JSON.stringify(last)).toContain("n 1 · low sample");
+        expect(html).not.toContain('numberFormat.format(count)+" supported"');
     });
 
     test("keeps zero-support buckets auditable without allowing them into comparative views", () => {
