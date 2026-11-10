@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import completed from "../../docs/evidence/ranged_counter_situational_results_20261109.json";
 import learned from "../../docs/evidence/learned_ranged_setup_20261109.json";
+import learnedResult from "../../docs/evidence/learned_ranged_setup_results_20261109.json";
 import { LEARNED_RANGED_SETUP_MODEL_SHA256 } from "../../src/simulation/learned_ranged_setup_checkpoint";
 
 test("the larger completed setup study retains its paired outcomes and failed qualification", () => {
@@ -29,4 +30,22 @@ test("internal fitting stays separate from the fixed independent learned-setup b
     expect(learned.banks.confirmation.length).toBe(1512);
     expect(new Set(learned.reservedActualChannels).size).toBe(15552);
     expect(learned.priorChannelAudit.conflicts).toEqual([]);
+});
+
+test("the user-locked learned result keeps the baseline gain and failed stronger-control gates", () => {
+    expect(learnedResult.modelCanonicalSha256).toBe(LEARNED_RANGED_SETUP_MODEL_SHA256);
+    expect(learnedResult.pairedBoardScores.length).toBe(1080);
+    expect(learnedResult.rawRowsVerified).toBe(17312);
+    const total = (column: number): number =>
+        learnedResult.pairedBoardScores.reduce((sum, row) => sum + Number(row[column]), 0);
+    expect(total(3)).toBe(2031);
+    expect(total(4)).toBe(2132);
+    expect(total(5)).toBe(2091.5);
+    expect(total(6)).toBe(2141);
+    expect(learnedResult.result.comparisons.current.overall.familyAdjusted95Pp[0]).toBeGreaterThan(0);
+    expect(learnedResult.result.comparisons.free.overall.familyAdjusted95Pp[0]).toBeLessThan(0);
+    expect(learnedResult.result.observedFightTimeRatio).toBeLessThan(1.1);
+    expect(learnedResult.qualificationPassed).toBe(false);
+    expect(learnedResult.confirmationOpened).toBe(false);
+    expect(learnedResult.productionPromotion).toBe(false);
 });

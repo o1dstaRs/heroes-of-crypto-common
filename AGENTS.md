@@ -62,6 +62,17 @@ reserved fresh boards, each with current/free/situational/learned arms. Registra
 candidate after either bank opens, expose concealed enemy inputs, relabel it native v0.9 combat, or
 activate it automatically. Preserve both failed earlier studies and every fixed control.
 
+The learned setup qualification completed all 17,280 games. Its score was 49.560185% versus 47.013889%
+for the study reference: +2.546296 pp, adjusted 95% +0.856481 to +4.270833. Its advantage over free
+spacing was only +0.208333 pp with an interval crossing zero, and other registered gates failed.
+Confirmation remained unopened. The user's subsequent “lock it in and continue” preserves the exact
+checkpoint, completed evidence and positive baseline contrast; it does not rewrite the failed gates.
+Read `docs/evidence/learned_ranged_setup_results_20261109.json`. The archive SHA is
+`cf9d4e6c9c6d0ba22f8afe8f44032d99afc675b2957b0b924ecafd9dd87908cf`.
+Keep its original nonfight setup distinct from the server's v0.8 conditional Sniper/t2a19 setup.
+New map/synergy draft research must use the actual phase-projected map, public variants and distinct
+faction thresholds, retain locked V3 as a comparator, and keep the old banks closed and excluded.
+
 ## User-locked A19 full-policy research reference
 
 The user accepted the **50.36%** result and requested a fixed checkpoint on November 8, 2026 UTC.

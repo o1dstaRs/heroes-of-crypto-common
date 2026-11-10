@@ -23,3 +23,18 @@ The qualification bank contains **1,080 new boards / 17,280 games**. A further *
 The one fixed learned model must gain at least one point with a positive family-adjusted interval against **all three** controls, improve in the prespecified fast-threat population and retain general-opponent noninferiority. Confidence resamples whole boards, with nine planned contrasts and 20,000 replicates. Observed mean fight and own-decision time must remain within +10% of current. A successful qualification opens the already reserved fresh bank for the same model; there is no replacement after either bank opens. A separate warm serial timing run follows only a successful fresh result. No stage automatically activates the model in a live server.
 
 The CPU run uses eight low-priority processes in `learned-ranged-setup-qual-20261109T163646Z` under the authorized 9800X3D node's research root, with 800% CPU quota, 16/24 GiB memory high/max limits and no swap or GPU context for this job. Live services are not restarted. Source archive SHA is `1422b0d271b3c679e5ec9210032279a8ad23e8585c227e9d1035ba18190cfadf`. Raw outcomes remain outside Git; either final outcome is archived with checksums. Exclude every new reserved channel alongside the earlier studies.
+
+## Completed qualification and user lock
+
+The run completed all **17,280 games on 1,080 independent boards** on November 9 at 20:16:08 UTC. The user requested preserving the result and continuing with map/synergy-aware training. Preserve the exact model and this complete evidence; do not rewrite its original gates or replace its weights.
+
+| Setup | Draw-adjusted score |
+| --- | ---: |
+| Current study reference | 47.013889% |
+| Locked free spacing | 49.351852% |
+| Locked situational Placement | 48.414352% |
+| Frozen learned selector | 49.560185% |
+
+The learned selector gained **+2.546296 pp** against the study reference, family-adjusted 95% interval **+0.856481 to +4.270833 pp**. Against free spacing it gained +0.208333 pp, interval −1.458333 to +1.828704; against situational Placement +1.145833 pp, interval −0.636574 to +2.905093. Its fast-counter interval against current also crossed zero. The registered qualification therefore **failed**; the fresh bank remained unopened, serial timing was not opened and no production change was made. Observed mean fight time increased 2.780127% and own-decision time 2.811874%, within the provisional +10% bound.
+
+[Completed evidence](evidence/learned_ranged_setup_results_20261109.json) preserves every paired board total and all nine comparisons. Independent reconstruction verified all 17,312 raw smoke/qualification rows and reproduced all nine registered bootstrap intervals exactly. The read-only complete archive is 56,384,587 bytes, SHA `cf9d4e6c9c6d0ba22f8afe8f44032d99afc675b2957b0b924ecafd9dd87908cf`, retained on the node and locally. These scores use the study's frozen `artifact-fit-v6:v07-nonfight-4eda84635fe7` setup. They are not a measured score for the server's distinct v0.8 `artifact-fit-v6:conditional-v1:sniper+t2a19` setup; a transfer needs its own comparison.
