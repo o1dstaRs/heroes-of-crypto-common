@@ -17,6 +17,7 @@ import { getDistance, type IXYDistance, matrixElementOrDefault, type XY } from "
 import {
     getCellForPosition,
     getPositionForCell,
+    getSweptFootprintCells,
     isCellWithinGrid,
     isPositionWithinGrid,
     normalizeFootprintSide,
@@ -1563,12 +1564,16 @@ export class PathHelper {
         // call 2026-09-30): no crossing toll, and the burn on arrival only — see applyFireWallBurn.
         const fireWalls = FightStateManager.getInstance().getFightProperties().getFireWalls();
         const hasAnyFireWall = fireWalls.size() > 0;
-        const terrainAdjustedCost = (baseCost: number, cell: XY): number => {
+        const terrainAdjustedCost = (baseCost: number, cell: XY, from: XY): number => {
             const cost = vineAdjustedCost(baseCost, cell);
-            if (!hasAnyFireWall || canFly || !fireWalls.has(cell)) {
+            if (!hasAnyFireWall || canFly) {
                 return cost;
             }
-            return cost + FIRE_WALL_CROSS_PENALTY;
+            // Price the same body sweep the burn and red movement preview use, including diagonal corners.
+            const burning = getSweptFootprintCells(from, cell, width, height).filter((touched) =>
+                fireWalls.has(touched),
+            );
+            return cost + burning.length * FIRE_WALL_CROSS_PENALTY;
         };
 
         const indexedNeighbors: XY[] | undefined = usesIndexedPathState ? [] : undefined;
@@ -1718,7 +1723,7 @@ export class PathHelper {
                     } else {
                         moveCost = PathHelper.DIAGONAL_MOVE_COST * aggr(n, curWeightedRoute);
                     }
-                    moveCost = terrainAdjustedCost(moveCost, n);
+                    moveCost = terrainAdjustedCost(moveCost, n, cur);
 
                     if (remaining >= moveCost) {
                         if (relaxesVisited && !relaxesBudget(keyNeighbor, remaining - moveCost)) {
@@ -1863,7 +1868,7 @@ export class PathHelper {
                     } else {
                         moveCost = aggr(n, curWeightedRoute);
                     }
-                    moveCost = terrainAdjustedCost(moveCost, n);
+                    moveCost = terrainAdjustedCost(moveCost, n, cur);
                     if (remaining >= moveCost) {
                         if (relaxesVisited && !relaxesBudget(keyNeighbor, remaining - moveCost)) {
                             continue;

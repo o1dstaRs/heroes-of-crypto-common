@@ -126,6 +126,8 @@ function meleeFixture(resurrection = false): {
     ]);
     const safe = route({ x: 4, y: 3 }, [
         { x: 2, y: 2 },
+        // Step north first: cutting diagonally to (3,3) now correctly touches the fire at (3,2).
+        { x: 2, y: 3 },
         { x: 3, y: 3 },
         { x: 4, y: 3 },
     ]);
@@ -169,6 +171,7 @@ function cowardlyMeleeFixture(): {
     ]);
     const safe = route({ x: 4, y: 3 }, [
         { x: 2, y: 2 },
+        { x: 2, y: 3 },
         { x: 3, y: 3 },
         { x: 4, y: 3 },
     ]);
@@ -177,6 +180,19 @@ function cowardlyMeleeFixture(): {
 }
 
 describe("AI post-move actor availability", () => {
+    it("rejects a lethal diagonal corner crossing even when all route waypoints are clear", () => {
+        const fixture = meleeFixture();
+        const cornerRoute = route(fixture.safe.cell, [
+            { x: 2, y: 2 },
+            { x: 3, y: 3 },
+            { x: 4, y: 3 },
+        ]);
+        const context = contextWithRoutes(fixture.combat, [cornerRoute]);
+        const result = enumerateCandidates(fixture.actor, context, endTurn(fixture.actor));
+        expect(result.candidates.filter((candidate) => candidate.kind === "melee")).toHaveLength(0);
+        expect(result.candidates.some((candidate) => candidate.kind === "move")).toBe(true);
+    });
+
     it("filters lethal move-melee before maxMeleePairs, backfills safe melee, and keeps the lethal standalone move", () => {
         const fixture = meleeFixture();
         const result = enumerateCandidates(fixture.actor, fixture.context, endTurn(fixture.actor), {

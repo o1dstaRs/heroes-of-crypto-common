@@ -21,7 +21,8 @@ const AEGIS = ARTIFACT_POWER.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE;
 
 beforeEach(() => FightStateManager.getInstance().reset());
 
-it("rolls 18% magic defense for every ally instead of adding 18, and clears on deselection", () => {
+it("rolls 20% magic defense for every ally instead of adding 20, and clears on deselection", () => {
+    expect(AEGIS).toBe(20);
     const { grid, unitsHolder } = createCombatTestContext();
     const fight = FightStateManager.getInstance().getFightProperties();
     const allies = [
@@ -40,8 +41,8 @@ it("rolls 18% magic defense for every ally instead of adding 18, and clears on d
         allies.forEach((unit, index) => {
             expect(unit.getMagicResist()).toBeCloseTo(combinedMagicDefense(bases[index], AEGIS), 2);
         });
-        // 15 and an 18% roll is 30.3, not 15 + 18.
-        expect(allies[1].getMagicResist()).toBeCloseTo(30.3, 2);
+        // 15 and a 20% roll is 32, not 15 + 20.
+        expect(allies[1].getMagicResist()).toBeCloseTo(32, 2);
         expect(allies[1].getMagicResist()).not.toBeCloseTo(bases[1] + AEGIS, 2);
         expect(enemy.getMagicResist()).toBe(enemyBase);
     }
@@ -67,7 +68,7 @@ it("combines with Magic Shield as another roll, not as points added before the s
     unitsHolder.applyArtifacts(fight);
     unitsHolder.refreshStackPowerForAllUnits();
 
-    // 1 − 0.85 × 0.82 × 0.50 = 65.15. Adding 18 first, then the shield, would be 66.5.
+    // 1 − 0.85 × 0.80 × 0.50 = 66. Adding 20 first, then the shield, would be 67.5.
     expect(monk.getMagicResist()).toBeCloseTo(combinedMagicDefense(15, AEGIS, 50), 2);
     expect(monk.getMagicResist()).not.toBeCloseTo(combinedMagicDefense(15 + AEGIS, 50), 2);
 });
@@ -77,5 +78,5 @@ it("is draftable under its new wire id with an accurate tooltip", () => {
     expect(TIER2_ARTIFACT_LIST.some((item) => item.id === Tier2Artifact.AEGIS_OF_THE_ARCANE)).toBe(true);
     expect(
         formatArtifactDescription(getArtifactProperties(ArtifactTier.TIER_2, Tier2Artifact.AEGIS_OF_THE_ARCANE)),
-    ).toContain("extra 18% magic defense roll");
+    ).toContain("extra 20% magic defense roll");
 });

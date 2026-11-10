@@ -176,7 +176,7 @@ export const ARTIFACT_POWER = {
     ARCHMAGES_RING_MAGIC_PERCENT: 20,
     // An independent magic-defense roll for every unit, combined with the defense it already has by
     // 1 − Π(1 − p) — the same formula as Magic Shield. Not points added onto that defense.
-    AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE: 18,
+    AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE: 20,
     QUIVER_OF_ECHOES_CHANCE: 35,
     GRAVECHAIN_CHANCE: 50,
     GRAVECHAIN_SLOW_LAPS: 3,

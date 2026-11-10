@@ -252,7 +252,7 @@ describe("artifact spell decisions", () => {
         const h = fixture({ ring, fuse: false, aegis: true, target: { maxHp: 1000 } });
         h.unitsHolder.refreshStackPowerForAllUnits();
         const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
-        expect(h.target.getMagicResist()).toBe(18);
+        expect(h.target.getMagicResist()).toBe(20);
         expect(h.fire(cast).netDamage).toBe(cast.features.expectedDamage);
     });
 

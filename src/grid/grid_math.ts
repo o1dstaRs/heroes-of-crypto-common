@@ -221,6 +221,54 @@ export function getFootprintCellsForAnchor(anchor: XY, width: number, height: nu
     return cells;
 }
 
+/**
+ * Cells a moving body touches between two anchors, excluding its starting footprint.
+ * Diagonal corner crossings touch both side cells: walking between two diagonal flames must not
+ * tunnel through their shared corner. This supercover is for ground movement, not ranged shots.
+ */
+export function getSweptFootprintCells(from: XY, to: XY, width: number, height: number): XY[] {
+    if (![from.x, from.y, to.x, to.y].every(Number.isSafeInteger)) return [];
+    const key = (cell: XY): string => `${cell.x},${cell.y}`;
+    const seen = new Set(getFootprintCellsForAnchor(from, width, height).map(key));
+    const cells: XY[] = [];
+    const append = (anchor: XY): void => {
+        for (const cell of getFootprintCellsForAnchor(anchor, width, height)) {
+            const packed = key(cell);
+            if (seen.has(packed)) continue;
+            seen.add(packed);
+            cells.push(cell);
+        }
+    };
+    const dx = Math.abs(to.x - from.x);
+    const dy = Math.abs(to.y - from.y);
+    const sx = Math.sign(to.x - from.x);
+    const sy = Math.sign(to.y - from.y);
+    let x = from.x;
+    let y = from.y;
+    let ix = 0;
+    let iy = 0;
+    while (ix < dx || iy < dy) {
+        const nextX = (1 + 2 * ix) * dy;
+        const nextY = (1 + 2 * iy) * dx;
+        if (nextX === nextY) {
+            append({ x: x + sx, y });
+            append({ x, y: y + sy });
+            x += sx;
+            y += sy;
+            ix += 1;
+            iy += 1;
+        } else if (nextX < nextY) {
+            x += sx;
+            ix += 1;
+        } else {
+            y += sy;
+            iy += 1;
+        }
+        append({ x, y });
+    }
+    return cells;
+}
+
 /** The centre position of a `width` x `height` footprint anchored (top-right) at `anchor`. */
 export function getPositionForFootprintAnchor(
     gridSettings: GridSettings,

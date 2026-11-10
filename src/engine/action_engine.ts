@@ -651,19 +651,27 @@ export class GameActionEngine {
             events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
         }
         // Fire Wall: sear the mover for every burning cell the walk entered. A footprint-only large-unit
-        // move has no ordered step route, so its final footprint stands in for the cells it crossed.
+        // move uses the resolved route when available; only a legacy move without one falls back to landing.
         // The walk is a route of ANCHOR cells, and an anchor is only one corner of a large body — so a 2x2
         // Angel gliding onto a wall that sits under any of its other three cells crossed real fire and was
         // charged nothing. Expand each travelled anchor to the block it actually occupied, minus the body
-        // the unit started on (staying put is still free). A 1x1 is unaffected: its body IS its anchor.
+        // the unit started on (staying put is still free). Sweep diagonal side cells too, as in the preview.
         // A flyer is only seared for the burning cells it LANDS on (owner call 2026-09-30): it clears the
         // flames it crosses, exactly like it clears a vine, and pays only for standing in the fire.
-        events.push(
-            ...this.applyFireWallBurn(
-                unit,
-                fireWallCellsForTraversal(unit, startCells, travelledPath, targetCells, pathIsFootprintOnly),
-            ),
-        );
+        if (this.context.fightProperties.getFireWalls().size()) {
+            events.push(
+                ...this.applyFireWallBurn(
+                    unit,
+                    fireWallCellsForTraversal(
+                        unit,
+                        startCells,
+                        knownMoveRoute?.route ?? travelledPath,
+                        targetCells,
+                        pathIsFootprintOnly && !knownMoveRoute,
+                    ),
+                ),
+            );
+        }
         return { completed: true, events };
     }
     /**

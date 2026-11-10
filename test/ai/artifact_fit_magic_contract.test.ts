@@ -186,7 +186,7 @@ describe("artifact fit follows combat magic damage", () => {
                 expect(attacker.getMagicDamageBonusPercentage()).toBeGreaterThan(0);
             }
             unitsHolder.refreshStackPowerForAllUnits();
-            if (artifacts) expect(defender.getMagicResist()).toBe(18);
+            if (artifacts) expect(defender.getMagicResist()).toBe(20);
             setDeterministicRandomSource(() => 0);
             const hp = defender.getCumulativeHp();
             const result = attackHandler.handleMeleeAttack(

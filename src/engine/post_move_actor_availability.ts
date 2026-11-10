@@ -10,7 +10,7 @@
  */
 
 import { getSpellConfig } from "../configuration/config_provider";
-import { getFootprintCellsForAnchor, normalizeFootprintSide } from "../grid/grid_math";
+import { getFootprintCellsForAnchor, getSweptFootprintCells, normalizeFootprintSide } from "../grid/grid_math";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { fireWallBurnDamage, FireWalls, type IFireWallBurnTarget } from "../spells/fire_walls";
 import { madeOfFireBoostedMaxHp } from "../units/movement_stat_modifiers";
@@ -219,7 +219,13 @@ export function resolveMoveTraversal(
         pathIsFootprintOnly,
         travelledPath,
         routeModifierPath,
-        crossedCells: fireWallCellsForTraversal(unit, unit.getCells(), travelledPath, targetCells, pathIsFootprintOnly),
+        crossedCells: fireWallCellsForTraversal(
+            unit,
+            unit.getCells(),
+            resolvedRoute?.route ?? travelledPath,
+            targetCells,
+            pathIsFootprintOnly && !resolvedRoute,
+        ),
     };
 }
 
@@ -245,9 +251,8 @@ export function fireWallCellsForTraversal(
  * offered to the wall. (The footprint-only branch already passes the whole destination block, which is why
  * a rectangle's one-step slide burned correctly and a walking Angel did not.)
  *
- * `startCells` are excluded, keeping the standing rule intact: a unit that BEGAN its turn in the flames is
- * not charged for staying put, only for what it moves INTO. For a 1x1 this returns exactly the travelled
- * anchors minus the start, i.e. the previous behaviour unchanged.
+ * `startCells` are excluded, keeping the standing rule intact. Sweep between anchors as well as onto
+ * them: a diagonal walk touches the two side cells even when both waypoint cells are clear.
  */
 export function bodyCellsEnteredAlongPath(
     startCells: readonly XY[],
@@ -261,8 +266,14 @@ export function bodyCellsEnteredAlongPath(
     }
     const seen = new Set<number>();
     const entered: XY[] = [];
+    let previous: XY | undefined = startCells.length
+        ? { x: Math.max(...startCells.map((cell) => cell.x)), y: Math.max(...startCells.map((cell) => cell.y)) }
+        : undefined;
     for (const anchor of travelledAnchors) {
-        for (const cell of getFootprintCellsForAnchor(anchor, width, height)) {
+        const touched = previous
+            ? getSweptFootprintCells(previous, anchor, width, height)
+            : getFootprintCellsForAnchor(anchor, width, height);
+        for (const cell of touched) {
             const key = FireWalls.key(cell);
             if (started.has(key) || seen.has(key)) {
                 continue;
@@ -270,6 +281,7 @@ export function bodyCellsEnteredAlongPath(
             seen.add(key);
             entered.push(cell);
         }
+        previous = anchor;
     }
 
     return entered;
