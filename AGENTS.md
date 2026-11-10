@@ -75,6 +75,13 @@ faction thresholds, retain locked V3 as a comparator, and keep the old banks clo
 The continuation's design is in `docs/contextual_draft_research.md`: distinct map/synergy interactions,
 all public variants from the first bundle, early map only for five-point doctrine, actual conditional
 v0.8 setup, and paired outcome labels. Do not substitute the older nonfight setup or reopen an old bank.
+The frozen run is `contextual-draft-20261110T034659Z`, registration
+`b3c86d9ed2b14858828a31f30f664dd3b8d7b3be42ff1e567f63b94a0d0ffc29`, policy source `2ab2617e`.
+Exclude `docs/evidence/contextual_draft_registration_20261110.json`, including **every scanned preimage's**
+eight raw and eight `permuteRankedDraftSeed` channels. Generic recursive integer collection alone does not
+expand that compact ledger. Training has 4,320 boards; qualification and confirmation reserve 1,728 each.
+Preserve its full and separately fitted context-ablated heads and all controls. Before collection, an explicit
+runtime amendment lowered eight actors to nice 19 / 400% CPU to share the host; the original seal remains.
 
 ## User-locked A19 full-policy research reference
 
