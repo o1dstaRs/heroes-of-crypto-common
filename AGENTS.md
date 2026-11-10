@@ -72,6 +72,9 @@ Read `docs/evidence/learned_ranged_setup_results_20261109.json`. The archive SHA
 Keep its original nonfight setup distinct from the server's v0.8 conditional Sniper/t2a19 setup.
 New map/synergy draft research must use the actual phase-projected map, public variants and distinct
 faction thresholds, retain locked V3 as a comparator, and keep the old banks closed and excluded.
+The continuation's design is in `docs/contextual_draft_research.md`: distinct map/synergy interactions,
+all public variants from the first bundle, early map only for five-point doctrine, actual conditional
+v0.8 setup, and paired outcome labels. Do not substitute the older nonfight setup or reopen an old bank.
 
 ## User-locked A19 full-policy research reference
 

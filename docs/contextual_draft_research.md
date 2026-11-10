@@ -1,0 +1,31 @@
+# Public map and synergy draft training
+
+The user requested preserving the learned shooter setup result and training the AI to use the current game's synergies and map. This continuation retains the exact V3 draft and `d786f4e9` setup checkpoint as references. It changes no live default, creature balance, combat rule or locked research artifact.
+
+## Information and mechanics audit
+
+`getVisibleDraftMap` reveals the map to five-point Spymaster from the initial bundle. Every doctrine sees it from the first level-three phase. All four faction synergy variants are public from the first draft screen. The new feature extractor accepts the acting seat's `IDraftScoutingContext`; it never accepts a raw hidden map, game seed, opponent amounts, selected upgrades, positions or concealed picks.
+
+The existing locked draft has map and continuation features but no active-variant features. Its server adapter passes `undefined` for the common scorer's variant argument. The default v4-w16-r4 policy has no variant residual active anyway. Passing variants alone therefore cannot supply the requested intelligence. The older setup model has variant flags but no explicit army-by-variant interaction features.
+
+`draft_battlefield_context.ts` resolves distinct-creature 2/4/6 thresholds and reads powers from the same `SynergyKeysToPower` as `FightProperties`. Its movement, capacity, aura range, flying armor, ability power, supply, morale, luck and break values reproduce the authoritative engine. Split stacks do not create another distinct faction member. Revealed enemy synergy levels are lower bounds. Reachable own thresholds use only visible bans, known picks and remaining pick levels; they are possible continuations, not guaranteed future offers.
+
+The new research head includes map-by-role and available-variant-by-role interactions, actual own synergy powers, reachable levels, public enemy movement pressure against shooters/casters, and aura-extended null-field pressure. Nature board capacity interacts with spellbooks, aura carriers and shooters across the whole allied army. It does not assume every split is beneficial or invent additional experience. The serving split planner, actual budgets and complete spellbooks determine the battle.
+
+## Fixed policy and collection
+
+The locked V3 policy makes its normal decisions and retains its own one-use override. One new outcome-trained override may select the alternative during bundle or level-one through level-four picks. The alternative creature comes from the existing role-safe coherent scorer without the forced four-shooter floor. A proposed alternative is still a legal visible offer; a learned margin decides whether to accept it. A failed collision consumes the extra override, matching the authoritative persistence rule. Later picks continue through V3. Neutral-head tests reproduce the complete draft, including retries.
+
+Training reserves **4,320 independent boards / 17,280 fights**, each testing a single registered decision level with two physical mirror seats and reference/alternative arms. It balances all 16 public synergy combinations, three ranked maps, all nine doctrine pairs, two opponent populations and five decision levels. One candidate draft assignment is assigned independently per board; evaluation uses both assignments and both physical seats. Boards are selected by legal draft eligibility and required public variants before any fight outcome exists. Ordinary opponents use locked V3; pressure opponents use the preserved legal rush draft and fully paid Movement/Might plan.
+
+Reference and alternative use the locked setup selector on both training arms, transferred onto the server's actual v0.8 `artifact-fit-v6:conditional-v1:sniper+t2a19` setup. The previous setup study used a different nonfight setup; its numerical gains are not carried over. Both seats receive actual support splits and final authoritative placement before barrels. All fights retain the same deterministic A19 R2 work caps and must finish by elimination with zero rejected actions.
+
+Whole-board hashing reserves 1,080 training-bank boards for internal recipe selection. The fixed grid is ridge regularization 4/16/64 and margins 0.02/0.05/0.10. Fit the full-context head and a separately trained map/synergy-ablated head on the same examples. Select each recipe by its internal counterfactual score, then refit each once on the complete training bank before qualification. Internal recipe selection is not independent strength evidence.
+
+## Prospective gates
+
+Qualification reserves **1,728 new boards / 27,648 fights** across four conditions: current server-policy reference, locked setup with V3 draft, contextual draft with locked setup, and separately fitted context ablation. A further **1,728 boards / 27,648 fights** are reserved for conditional fresh confirmation. Every stage balances maps, doctrines, opponent populations and all 16 synergy combinations. No roster filtering forces a shooter army in the new population.
+
+The full candidate must gain at least one percentage point overall with a positive family-adjusted 95% interval against both the server-policy reference and locked-setup reference. The two populations must retain at least −1 pp noninferiority at the adjusted lower bound, with nonnegative means. These six planned contrasts use whole-board stratified bootstrap, 20,000 resamples, fixed seeds and Bonferroni correction. Map and candidate-doctrine means must not fall below −1 pp. The context ablation is a prespecified diagnostic; a gain over baseline alone does not establish that context caused it.
+
+Mean full-fight and total own-decision times must remain within +10% of both references. Only a successful qualification opens the fixed fresh bank; a failed finalist is not replaced. A successful fresh result requires a separate alternating serial timing check on reused qualification boards. None of these stages automatically activates the model on a server. Preserve all failures, old seed reservations and exact source/model identities. Eight low-priority main-thread CPU processes operate under a fresh research directory on the 9800X3D; live services and GPUs are untouched.
