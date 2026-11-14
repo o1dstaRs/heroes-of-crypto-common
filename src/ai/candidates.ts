@@ -920,6 +920,8 @@ export interface IEnumerateOptions {
     includeLightningSpinCoverage?: boolean;
     /** Battle Mage only: retain distinct visible Meteorite impacts for real-engine search comparison. */
     preserveMeteoriteTargetCoverage?: boolean;
+    /** Research only: retain distinct visible Magic Dragon Meteor Shower impacts; absent leaves A19 unchanged. */
+    researchMagicDragonMeteorCoverage?: boolean;
     /** Research only: preserve shared and personal shield layers across ranged impacts. */
     researchRangedShieldSequence?: boolean;
     /** Research only: rank Fire Breath strikes by primary damage plus the complete magical tail. */
@@ -3464,9 +3466,12 @@ class CandidateGenerator {
         const anchorOffsets = spell.getName() === "Meteor Shower" ? [-1, 0, 1] : [0, -1];
 
         const preserveImpacts =
-            this.options.preserveMeteoriteTargetCoverage === true &&
-            this.unit.getName() === "Battle Mage" &&
-            spell.getName() === "Meteorite";
+            (this.options.preserveMeteoriteTargetCoverage === true &&
+                this.unit.getName() === "Battle Mage" &&
+                spell.getName() === "Meteorite") ||
+            (this.options.researchMagicDragonMeteorCoverage === true &&
+                this.unit.getName() === "Magic Dragon" &&
+                spell.getName() === "Meteor Shower");
         const impacts: { cell: XY; value: number; kill: 0 | 1 }[] = [];
         const seenImpacts = new Set<string>();
 
