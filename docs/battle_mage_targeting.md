@@ -198,3 +198,73 @@ Native-tail registration SHA256:
 `596f3b5accbf26539cb0b9923a8e2bec7bfb5f5801e1f63e45bcfc55d999197e`.
 Verified native-tail archive SHA256:
 `dede204ecbe7d7b62c05a78e5787ff071d22e4048d84c387d91ecad26a3b9b4d`.
+
+## Preserved monotone ranker and finish guard (November 14)
+
+`src/simulation/battle_mage_finish_guard_research.ts` preserves the exact
+`monotone-action-value-030` bytes and the separate `battle-mage-finish-guard-v1` research rule.
+Neither is imported by a live/default AI factory. The adopted `battle-mage-impact-coverage-v1`
+coverage remains unchanged. Loading this checkpoint does not make it a qualified serving policy.
+
+The original fixed independent comparison used 864 new offer-board families, two physical seats and
+three arms: 5,184 fights. Both armies used locked V3 draft plus full v0.8/A19, conditional on the
+designated army drafting Battle Mage, on common `64acda5b` / server `aa0ce524`. The candidate scored
+967 W / 28 D / 733 L (56.770833%), versus current A19 962 W / 26 D / 740 L (56.423611%) and the
+locked 5036 reference 962 W / 27 D / 739 L (56.452546%). Its paired gains were +0.347222 points
+[-0.405093, +1.099537] and +0.318287 [-0.694444, +1.302083], respectively, with whole-family 95%
+intervals. Both failed the user's 0.5-point useful-gain threshold and positive-lower-bound gate.
+Battle Trance also regressed against the locked reference. The older positive 108-family pilot is
+separate and must not be pooled into this primary result.
+
+All 5,184 saved raw fights were reverified before the new diagnostic. Among 238 changed casts, 26
+improved the terminal result and 21 regressed; the rest kept the same outcome. Fire Strike to
+Meteorite accounted for 12 of the 21 regressions. More immediate HP was dealt in 19 of the 21
+regressions, so maximizing immediate damage is not sufficient. These are posthoc mechanisms,
+not newly qualified unit-specific rules.
+
+The new guard first computes the unchanged learned choice. It keeps that choice only if the
+public pre-cast projections for `stacksFinished`, `unactedFinished`,
+`resurrectionChargesFinished` and `shieldBreaks` each preserve or increase the baseline count.
+Otherwise it keeps the original final A19 action. The first eligible attempt is consumed even on
+rejection: there is no alternative reranking or later-root retry. All four counts must be finite,
+nonnegative integers; malformed inputs retain A19. Model weights, normalization and the 0.03 margin
+are unchanged. This is a count constraint, not target-identity preservation or guaranteed action denial.
+
+On the already inspected historical bank, selecting the corresponding stored branch prevents nine
+regressions but discards five improvements. It retains 160 interventions: 21 improved outcomes,
+12 regressions and 127 unchanged outcomes. Its retrospective score is 971 W / 27 D / 730 L
+(56.973380%), +0.549769 points versus current A19 and +0.520833 versus locked. Descriptive whole-family
+intervals remain [-0.086806, +1.215278] and [-0.405093, +1.446759]. These reused outcomes are discovery
+only; no fresh guard gate has been evaluated. Battle Trance versus locked remains -0.434028 points.
+There are zero new independent games, fits or optimizer steps. Python and Bun agree on all 1,479
+eligible stored choices. Six fixed numerical regressions preserve representative accepted/rejected choices.
+
+The five discarded improvements expose the limitation of unconditional finishing. In one, spending
+Meteorite on a lone 9-HP Dryad loses while damaging Goblin Knight, Wandering Mage and Elf wins. In
+another, finishing one 8-HP Peasant loses while reducing Zena from five bodies to three draws. Two
+stacks of the same creature must be distinguished by unit ID: finishing a one-body Wandering Mage
+loses where weakening its 45-body counterpart wins.
+
+The retained losses expose partial-stack threat and subsequent allied decisions. One comparison
+weakens Cyclops from four bodies to one; the alternative damages Cannon/Beholder, leaving Cyclops
+to deal 102 HP rather than seven on its next turn and survive the next retaliation. Another leaves
+Zena at seven bodies instead of three; its next activation shoots Fairy for 471 HP, while the weakened
+Zena moves without attacking in the control. Killing a
+small Centaur or Elf can still be inferior to weakening a dangerous Gargantuan or the larger Elf.
+These exact branch observations motivate future action-denial and allied-follow-up features; they do
+not establish that every terminal loss was caused by that single event.
+
+One original public feature approximation remains recorded: killing Satyr removes Helping Hand
+mid-Meteorite. The subsequent Arbalester hit kills more bodies than an independent per-target estimate
+using its previous max HP. The 510-HP capacity reduction is not direct spell damage. Both arms win;
+the mismatch was retained, with no outcome exclusion or gate change. Any future exact-effect feature
+must use legal visible inputs and declared modelled randomness, not the actual hidden future RNG.
+
+Fresh testing must freeze the current engine and server together, exclude all previous and reserved
+channels (including the complete old confirmation ledger and newer peer ledgers), and retain current
+A19 plus the locked 5036 reference. The proposed new banks are 432 families / 2,592 fights for
+qualification, then only after a pass 864 new families / 5,184 fights for independent confirmation.
+Both contrasts must gain at least 0.5 points with positive whole-family 95% lower bounds, every own
+doctrine nonnegative and exact legal application. No refilling, model change or subgroup dispatch
+after opening a bank. Runtime/Undo/live-budget qualification remains required before any adoption.
+The old compute cutoff expired; this checkpoint does not authorize a new simulation campaign.

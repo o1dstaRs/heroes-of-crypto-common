@@ -1,0 +1,284 @@
+{
+    "id": "battle-mage-finish-guard-v1",
+    "status": "preserved-unqualified-research",
+    "modelId": "monotone-action-value-030",
+    "modelRawSha256": "37372835db257f9eca9b42f355d05515157f26675d019b9f4cfbb622ef7a61f8",
+    "modelRawBytes": 15780,
+    "sourceCommonCommit": "64acda5b81b58623416635e50342f8c086e195f2",
+    "sourceServerCommit": "aa0ce52415a2e1d9ac14b94085ed65ee492af1da",
+    "originalConfirmation": {
+        "games": 5184,
+        "families": 864,
+        "armOutcomes": {
+            "current": {
+                "W": 962,
+                "D": 26,
+                "L": 740,
+                "outcomes": 1728,
+                "score": 56.423611111111114
+            },
+            "candidate": {
+                "W": 967,
+                "D": 28,
+                "L": 733,
+                "outcomes": 1728,
+                "score": 56.770833333333336
+            },
+            "locked": {
+                "W": 962,
+                "D": 27,
+                "L": 739,
+                "outcomes": 1728,
+                "score": 56.4525462962963
+            }
+        },
+        "contrasts": [
+            {
+                "reference": "current-a19",
+                "families": 864,
+                "gainPoints": 0.3472222222222222,
+                "ci95Points": [-0.40509259259259256, 1.099537037037037],
+                "ownDoctrines": [
+                    {
+                        "value": 1,
+                        "families": 288,
+                        "gainPoints": 0.0
+                    },
+                    {
+                        "value": 2,
+                        "families": 288,
+                        "gainPoints": 0.9548611111111112
+                    },
+                    {
+                        "value": 3,
+                        "families": 288,
+                        "gainPoints": 0.08680555555555555
+                    }
+                ],
+                "maps": [
+                    {
+                        "value": 1,
+                        "families": 288,
+                        "gainPoints": 0.0
+                    },
+                    {
+                        "value": 3,
+                        "families": 288,
+                        "gainPoints": 0.2604166666666667
+                    },
+                    {
+                        "value": 4,
+                        "families": 288,
+                        "gainPoints": 0.78125
+                    }
+                ],
+                "positiveFamilies": 25,
+                "negativeFamilies": 19,
+                "zeroFamilies": 820
+            },
+            {
+                "reference": "locked-5036",
+                "families": 864,
+                "gainPoints": 0.31828703703703703,
+                "ci95Points": [-0.6944444444444444, 1.3020833333333335],
+                "ownDoctrines": [
+                    {
+                        "value": 1,
+                        "families": 288,
+                        "gainPoints": 0.0
+                    },
+                    {
+                        "value": 2,
+                        "families": 288,
+                        "gainPoints": 1.4756944444444444
+                    },
+                    {
+                        "value": 3,
+                        "families": 288,
+                        "gainPoints": -0.5208333333333334
+                    }
+                ],
+                "maps": [
+                    {
+                        "value": 1,
+                        "families": 288,
+                        "gainPoints": -0.4340277777777778
+                    },
+                    {
+                        "value": 3,
+                        "families": 288,
+                        "gainPoints": 0.78125
+                    },
+                    {
+                        "value": 4,
+                        "families": 288,
+                        "gainPoints": 0.6076388888888888
+                    }
+                ],
+                "positiveFamilies": 43,
+                "negativeFamilies": 36,
+                "zeroFamilies": 785
+            }
+        ],
+        "changedGames": 238,
+        "unchangedGames": 1490,
+        "eligibleRoots": 1479,
+        "gate": false
+    },
+    "guardDiscovery": {
+        "kind": "posthoc-stored-branch-diagnostic",
+        "policyDefinitionSha256": "a54a6d64ca13d72090b940ff5d54b0a0848d6f68c54bfff8f8484a3431d47c5e",
+        "modelSha256": "37372835db257f9eca9b42f355d05515157f26675d019b9f4cfbb622ef7a61f8",
+        "rawFilesReverified": 5184,
+        "reusedFamilies": 864,
+        "newIndependentGames": 0,
+        "newFits": 0,
+        "counts": {
+            "originalAbstention": 1490,
+            "eligible": 1479,
+            "originalChanged": 238,
+            "blocked": 78,
+            "blocked_regressed": 9,
+            "blocked_improved": 5,
+            "retained": 160,
+            "retained_unchangedOutcome": 127,
+            "blocked_unchangedOutcome": 64,
+            "retained_improved": 21,
+            "retained_regressed": 12
+        },
+        "blockedReasonsOverlap": {
+            "stacksFinished": 74,
+            "unactedFinished": 30
+        },
+        "note": "Already inspected historical bank; discovery only. Branch reuse is exact for this one-attempt veto because it selects the original current or candidate branch and never retries. Not fresh validation, not current-source qualification, no promotion.",
+        "pythonBunChoiceParity": 1479,
+        "guarded": {
+            "W": 971,
+            "D": 27,
+            "L": 730,
+            "outcomes": 1728,
+            "scorePoints": 56.973379629629626
+        },
+        "originalCandidate": {
+            "W": 967,
+            "D": 28,
+            "L": 733,
+            "outcomes": 1728,
+            "scorePoints": 56.770833333333336
+        },
+        "current": {
+            "W": 962,
+            "D": 26,
+            "L": 740,
+            "outcomes": 1728,
+            "scorePoints": 56.423611111111114
+        },
+        "locked": {
+            "W": 962,
+            "D": 27,
+            "L": 739,
+            "outcomes": 1728,
+            "scorePoints": 56.4525462962963
+        },
+        "contrasts": [
+            {
+                "reference": "current",
+                "gainPoints": 0.5497685185185185,
+                "descriptiveOnlyCi95Points": [-0.08680555555555555, 1.2152777777777777],
+                "ownDoctrines": [
+                    {
+                        "value": 1,
+                        "families": 288,
+                        "gainPoints": 0.08680555555555555
+                    },
+                    {
+                        "value": 2,
+                        "families": 288,
+                        "gainPoints": 1.3888888888888888
+                    },
+                    {
+                        "value": 3,
+                        "families": 288,
+                        "gainPoints": 0.1736111111111111
+                    }
+                ],
+                "maps": [
+                    {
+                        "value": 1,
+                        "families": 288,
+                        "gainPoints": 0.5208333333333334
+                    },
+                    {
+                        "value": 3,
+                        "families": 288,
+                        "gainPoints": 0.1736111111111111
+                    },
+                    {
+                        "value": 4,
+                        "families": 288,
+                        "gainPoints": 0.9548611111111112
+                    }
+                ]
+            },
+            {
+                "reference": "locked",
+                "gainPoints": 0.5208333333333334,
+                "descriptiveOnlyCi95Points": [-0.4050925925925926, 1.4467592592592593],
+                "ownDoctrines": [
+                    {
+                        "value": 1,
+                        "families": 288,
+                        "gainPoints": 0.08680555555555555
+                    },
+                    {
+                        "value": 2,
+                        "families": 288,
+                        "gainPoints": 1.9097222222222223
+                    },
+                    {
+                        "value": 3,
+                        "families": 288,
+                        "gainPoints": -0.4340277777777778
+                    }
+                ],
+                "maps": [
+                    {
+                        "value": 1,
+                        "families": 288,
+                        "gainPoints": 0.08680555555555555
+                    },
+                    {
+                        "value": 3,
+                        "families": 288,
+                        "gainPoints": 0.6944444444444444
+                    },
+                    {
+                        "value": 4,
+                        "families": 288,
+                        "gainPoints": 0.78125
+                    }
+                ]
+            }
+        ],
+        "freshGateEvaluated": false,
+        "modelsPromoted": false
+    },
+    "sourceEvidenceSha256": {
+        "originalVerification": "b661ffecd2d591541cd67b7397b4ec0e281b2adef04525366ff1d81293328b64",
+        "oldRegistration": "d428d16a0d32044b149b05d44dbcfabee7702ecb518ef9f89ba665673a418516",
+        "discoveryReport": "15aa7b38ac3afc491fd468be4c561533e4014cff695fd393a6267f8c49281c31"
+    },
+    "limitations": [
+        "All guard outcomes reuse the already inspected old confirmation; zero new independent evidence.",
+        "Count guard does not preserve target identities or prove future action denial.",
+        "Original independent gate remains failed; default target coverage remains adopted.",
+        "New engine changes require a new frozen registration and fresh banks.",
+        "Source labels are locked V3 draft plus full v0.8 A19, conditional on drafting Battle Mage."
+    ],
+    "productionActivation": false,
+    "freshGuardQualificationPassed": false,
+    "currentServingQualified": false,
+    "minimumUsefulGainPoints": 0.5,
+    "subsequentExperimentsMayOverwrite": false,
+    "seedExclusionRequirement": "Before fresh registration load the full 8,461,169-channel predecessor exclusions plus all158,976reserved channels from the original confirmation, plus newer peer ledgers; these summary hashes are not a substitute for the full ledgers."
+}
