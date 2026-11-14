@@ -37,3 +37,32 @@ Study `contextual-draft-20261110T034659Z` binds committed policy source `2ab2617
 [Compact registration and seed reservations](evidence/contextual_draft_registration_20261110.json) preserve all 7,776 board rows and 124,416 selected channels. The 125,416 scanned preimages expand to **2,006,656** new reserved channels, disjoint from 5,226,607 previous numeric values. For **every** `reservedScannedPreimages` value `p`, exclude `p+i` and `permuteRankedDraftSeed(p+i)` for `i=0..7`. Reading only the selected bank seeds does not exclude the complete reservation. The expanded-ledger hash and the complete uncompressed prior/final ledgers remain in the study packet.
 
 Before independent training opened, a second research workload became active on the shared host. A separate execution amendment retains eight actors but lowers their priority from nice 10 to **nice 19** and their aggregate CPU quota from 800% to **400%**. It changes no policy, recipe, seed, contrast or gate. Amendment SHA is `39f4269ea88d49f2c56e0cf74d88f40068f8fb10a66d84b8c7b5aec419f9ba6e`. The original archive and orchestration seal are retained alongside the amended execution receipt. Timing comparisons must disclose these actual resource limits.
+
+## Completed comparison
+
+The run completed 17,280 training fights and all 27,648 qualification fights, finishing on **2026-11-11 at 03:36:33 UTC** (November 10, 7:36 PM Pacific). Qualification took approximately 14 hours 34 minutes after approximately nine hours of collection and fitting. Its 1,728 independent offer boards contain 864 ordinary and 864 pressure-opponent boards, both draft assignments and both physical seats.
+
+| Condition | Wins | Draws | Losses | Draw-adjusted score |
+| --- | ---: | ---: | ---: | ---: |
+| Frozen server-policy reference | 3,091 | 74 | 3,747 | 45.254630% |
+| Locked setup selector with V3 draft | 3,208 | 72 | 3,632 | 46.932870% |
+| Full contextual draft with locked setup | 3,329 | 72 | 3,511 | 48.683449% |
+| Separately fitted context-ablated head with locked setup | 3,325 | 75 | 3,512 | 48.647280% |
+
+The fixed full model gained **+3.428819 pp** against the frozen current reference, family-adjusted 95% interval **+2.018229 to +4.868345 pp**, and **+1.750579 pp** against locked setup, interval **+0.687211 to +2.813947 pp**. All map and candidate-doctrine means were positive. Against pressure opponents it gained +2.965856 pp over locked setup, interval +1.533565 to +4.412616.
+
+The registered progression gate nevertheless **failed**. The ordinary-opponent gain over locked setup was +0.535301 pp, with adjusted interval **−1.012731 to +2.112269 pp**. Its lower bound missed the predefined −1 pp noninferiority limit. Keep that failure exactly as registered: the reserved confirmation bank stayed closed, serial timing did not run and no model was promoted.
+
+The context ablation was +0.036169 pp in favor of the full head, nominal 95% interval −0.448495 to +0.535301. This does not establish incremental strength from the new head's explicit map/synergy block. Both arms retain V3's existing information use and the shared setup selector; this comparison does not remove all map/synergy knowledge from the AI.
+
+Observed concurrent full-fight time increased **1.656630%** against current and decreased 0.228591% against locked setup. Total own combat-decision time increased 0.951554% against current and decreased 1.030804% against locked setup. The draft phase itself increased 10.431555% against current. The registered compute gates concern full-fight and total own combat-decision time, not every phase individually. These are shared-host measurements; production serial timing remains unqualified.
+
+As a separate diagnostic, mean time per own combat decision was 308.8393 ms for the full candidate, versus 310.4368 ms for current and 312.5126 ms for locked setup. The draft-phase increase was approximately 2.49 ms per game (23.87 to 26.36 ms). These diagnostics do not change the registered gates or establish production latency.
+
+[Completed evidence](evidence/contextual_draft_results_20261110.json) retains every paired board total, all comparisons and descriptive diagnostics. Independent verification checked **44,968** manifest-listed node smoke/training/qualification records, all **709** frozen source files and all **4,320** paired training examples, plus the 40 matching local/node transport cases. It reproduced the six primary confidence intervals and the separate ablation interval exactly. Re-fitting both selected recipes on the saved dataset reproduced every weight exactly, maximum absolute difference zero. The read-only complete archive is 73,255,935 bytes, SHA `6af9c6e5c88367ee652825458942eeb28884d051cd3b2793fbbd984a911b25cf`.
+
+`lockedContextualDraftResearchModels()` restores the full model `063a888e6e38fe4322e89385929ac8f21dcb7b7f0dd5db070cb46a44a95eeeba` and ablated model `be2bf950866cbb139e8f7cd284302f41f4a3fc61361743310e0729202443072a`. Keep both models, all four helper hashes, their numerical reference cases and the original failed gate unchanged. Future experiments need separate files, IDs and channels.
+
+Descriptive usage shows mean native shooter count falling from 3.5972 to 3.5252, with four-or-more-shooter armies falling from 4,264 to 3,940 of 6,912 cases. The full head used its additional override in 2,468 cases. It committed before map reveal in 382 of 730 six-point overrides and 1,032 of 1,194 seven-point overrides. These counts motivate testing commitment timing; they do not demonstrate that waiting improves results. No map, synergy or unit subgroup from these diagnostics is promoted.
+
+The source remains `2ab2617e`; subsequent Fire Wall and Arcane Aegis changes in `50491b14` are outside this numerical estimate. This study improves the measured draft/setup research policy with A19 combat, not native v0.9 combat. Existing production defaults, engine rules, balance, checkpoint history and seed reservations are unchanged.

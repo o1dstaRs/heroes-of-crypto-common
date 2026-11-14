@@ -83,6 +83,19 @@ expand that compact ledger. Training has 4,320 boards; qualification and confirm
 Preserve its full and separately fitted context-ablated heads and all controls. Before collection, an explicit
 runtime amendment lowered eight actors to nice 19 / 400% CPU to share the host; the original seal remains.
 
+This contextual draft run completed 17,280 training and 27,648 qualification games. Preserve
+`docs/evidence/contextual_draft_results_20261110.json` and both models under
+`src/simulation/checkpoints/contextual_draft_20261110`, loaded by `lockedContextualDraftResearchModels()`.
+Full model `063a888e6e38fe4322e89385929ac8f21dcb7b7f0dd5db070cb46a44a95eeeba` gained +3.428819 pp
+against the frozen baseline and +1.750579 pp against locked setup, both positive adjusted overall intervals.
+Qualification still failed: ordinary-opponent noninferiority against locked setup reached -1.012731 pp,
+below the registered -1 pp limit. Confirmation stayed closed. Never waive that gate or reuse its held-out bank.
+The separate ablated model `be2bf950866cbb139e8f7cd284302f41f4a3fc61361743310e0729202443072a`
+was nearly tied; no incremental strength from the explicit context feature block was established.
+Keep all four helper hashes immutable; new candidates need new modules and channels. These results use
+`2ab2617e`, not later balance changes. See `docs/ai_research_closeout_20261114.md` for actual completed work,
+the Friday cutoff and the follow-on campaigns that were not launched during the pending inventory request.
+
 ## User-locked A19 full-policy research reference
 
 The user accepted the **50.36%** result and requested a fixed checkpoint on November 8, 2026 UTC.
