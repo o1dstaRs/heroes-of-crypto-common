@@ -1,0 +1,46 @@
+{
+    "id": "empower-protected-axis-20261114T212900Z",
+    "status": "frozen-research-fit",
+    "productionActivation": false,
+    "sourceCommit": "448eb1587d71dcff49881a2090638fda803a08c5",
+    "sourceManifestSha256": "74becb6020ec7fefa738aa73fd840dbc82b0237ae2b646e130867bddcd86df16",
+    "registrationSha256": "209d7c172fbb8cde1256cc5550d25327087060700b21865640040ed3144dd7c7",
+    "originalFitFileSha256": "37920bb757f8436baa00fa7d05df943b8d601e64e8f66a95b9905d15a8d905a3",
+    "modelSha256": "96750442dcf7d489f13db0334b39b9ead3b4e8d16da7c039857aeb7a8dcbd721",
+    "immutableHelpers": {
+        "src/ai/setup/empower_protected_axis.ts": "8b3c0881b68222d519e9cdf084408ef484534f5c61dde4cd3bb4fe78906f0b3c",
+        "src/simulation/empower_protected_axis_research.ts": "c8a3e5e9e9e55400cd7e521a346c5694135fe9a510a4151cb6fcdf1aab5a30c0",
+        "src/simulation/empower_protected_axis_training.ts": "843a86c5b74491fa833f0a244d505beb85406f2aed7892312119465ee0a6d14e",
+        "src/simulation/empower_protected_axis_worker.ts": "ab6acb2122e524205c9ff61209dcbe920c247126e106758cae7dea2c2dd790b0"
+    },
+    "training": {
+        "state": "fit-complete",
+        "registrationSha256": "209d7c172fbb8cde1256cc5550d25327087060700b21865640040ed3144dd7c7",
+        "fitFileSha256": "37920bb757f8436baa00fa7d05df943b8d601e64e8f66a95b9905d15a8d905a3",
+        "modelSha256": "96750442dcf7d489f13db0334b39b9ead3b4e8d16da7c039857aeb7a8dcbd721",
+        "trainRowsSha256": "512d52bb2609f1395f239ee80fcfd17ed90268e6e042cb2a7a29c24a9e5a2cec",
+        "logicalRows": 3456,
+        "newExecutedFights": 704,
+        "reusedPriorRows": 2752,
+        "examples": 515,
+        "selected": { "lambda": 0.01, "margin": 0.01, "gain": 0.006944444444444444, "switched": 30 }
+    },
+    "controlVerification": {
+        "verified": true,
+        "bothHosts": true,
+        "boards": 27,
+        "executedControls": 216,
+        "registrationSha256": "209d7c172fbb8cde1256cc5550d25327087060700b21865640040ed3144dd7c7",
+        "sourceManifestSha256": "74becb6020ec7fefa738aa73fd840dbc82b0237ae2b646e130867bddcd86df16",
+        "rowsSha256": "290de1a45f9bfb769e71297f90703482e7727e2eaebec78775506fe434f73862"
+    },
+    "concurrentSeedAudit": {
+        "peerManifestSha256": "fdf86b23914433b19fed83cc314e2f180357e1cff94bdf83f300667924987d19",
+        "pools": 20736,
+        "peerChannels": 476928,
+        "registrationSha256": "209d7c172fbb8cde1256cc5550d25327087060700b21865640040ed3144dd7c7",
+        "conflicts": []
+    },
+    "qualification": "pending-independent-complete-bank-analysis",
+    "confirmation": "closed-until-qualification-passes"
+}

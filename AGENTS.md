@@ -311,3 +311,28 @@ the old engine while their code expects the new one. Re-check all three pins aft
 including the actual common checkout: the client's `ignore = all` submodule setting hides pin drift from
 normal `git status`. Commit the server manifest and regenerated lockfile together, reinstall its dependency,
 then rerun the affected checks before deploying.
+
+## Empower spending research (2026-11-14)
+
+The default A19 setup's missing Empower allocation is being evaluated separately from report coverage.
+Read `docs/empower_setup_research.md` and reserve every eight-channel raw/permuted expansion in
+`docs/evidence/empower_setup_registration_20261114.json`, including its retired first registration.
+The current study is `empower-funding-20261114T231900Z-v2`, registration
+`c8a266a496d392ad7d9ead559df6a4ba3a4d61eb3dbc058c96a4f51ad077902b`. Its training source and node
+exports are sealed; the 432-board training bank, 864-board qualification bank and 864-board confirmation
+bank are distinct. Development results do not authorize claiming an independent strength improvement.
+Keep the registered funding, source, whole-board score gates and confirmation boundary intact.
+The default has not been changed by this study. If the live draft/setup is changed concurrently,
+verify the measured comparator and combination before claiming that this candidate improves it.
+
+This study completed qualification and failed: −0.260417 pp, whole-board 95% −0.795718 to +0.274884 pp,
+864 boards / 3,802 executed fights. Confirmation stayed closed. Preserve the exact fit via
+`lockedEmpowerSetupResearchModel()` and every result in `docs/evidence/empower_setup_results_20261114.json`.
+Do not activate it, reopen confirmation, or claim that adding Empower has established a strength gain.
+
+The distinct continuation `empower-protected-axis-20261114T212900Z`, registration
+`209d7c172fbb8cde1256cc5550d25327087060700b21865640040ed3144dd7c7`, tests only Empower 1 funded
+from spare Might/Sniper, then Armor, while retaining the preferred physical axis. Its training reuses
+the earlier development boards with exact-control provenance; its 864 qualification and 864 confirmation
+boards are new. Exclude `docs/evidence/empower_protected_axis_registration_20261114.json` as well.
+It retains the same progression gates and does not activate the failed earlier model.

@@ -1,0 +1,111 @@
+{
+    "examples": 515,
+    "recipes": [
+        { "lambda": 0.01, "margin": 0.01, "gain": 0.006944444444444444, "switched": 30 },
+        { "lambda": 0.01, "margin": 0.03, "gain": 0.005787037037037037, "switched": 28 },
+        { "lambda": 0.01, "margin": 0.05, "gain": 0.005787037037037037, "switched": 28 },
+        { "lambda": 0.01, "margin": 0.1, "gain": 0.003472222222222222, "switched": 13 },
+        { "lambda": 0.1, "margin": 0.01, "gain": 0.003472222222222222, "switched": 32 },
+        { "lambda": 0.1, "margin": 0.03, "gain": 0.005787037037037037, "switched": 29 },
+        { "lambda": 0.1, "margin": 0.05, "gain": -0.0023148148148148147, "switched": 9 },
+        { "lambda": 0.1, "margin": 0.1, "gain": 0, "switched": 0 },
+        { "lambda": 1, "margin": 0.01, "gain": 0, "switched": 7 },
+        { "lambda": 1, "margin": 0.03, "gain": 0, "switched": 0 },
+        { "lambda": 1, "margin": 0.05, "gain": 0, "switched": 0 },
+        { "lambda": 1, "margin": 0.1, "gain": 0, "switched": 0 }
+    ],
+    "selected": { "lambda": 0.01, "margin": 0.01, "gain": 0.006944444444444444, "switched": 30 },
+    "model": {
+        "schema": "own-roster-empower-v1",
+        "features": [
+            "ranged",
+            "damageSpells",
+            "magicAbilities",
+            "amplifiers",
+            "healers",
+            "flying",
+            "creature:8",
+            "creature:9",
+            "creature:19",
+            "creature:49",
+            "creature:55",
+            "creature:56",
+            "creature:57",
+            "budget:5",
+            "budget:5:ranged",
+            "budget:5:damageSpells",
+            "budget:5:magicAbilities",
+            "budget:5:amplifiers",
+            "budget:5:healers",
+            "budget:5:flying",
+            "budget:5:creature:8",
+            "budget:5:creature:9",
+            "budget:5:creature:19",
+            "budget:5:creature:49",
+            "budget:5:creature:55",
+            "budget:5:creature:56",
+            "budget:5:creature:57",
+            "budget:6",
+            "budget:6:ranged",
+            "budget:6:damageSpells",
+            "budget:6:magicAbilities",
+            "budget:6:amplifiers",
+            "budget:6:healers",
+            "budget:6:flying",
+            "budget:6:creature:8",
+            "budget:6:creature:9",
+            "budget:6:creature:19",
+            "budget:6:creature:49",
+            "budget:6:creature:55",
+            "budget:6:creature:56",
+            "budget:6:creature:57",
+            "budget:7",
+            "budget:7:ranged",
+            "budget:7:damageSpells",
+            "budget:7:magicAbilities",
+            "budget:7:amplifiers",
+            "budget:7:healers",
+            "budget:7:flying",
+            "budget:7:creature:8",
+            "budget:7:creature:9",
+            "budget:7:creature:19",
+            "budget:7:creature:49",
+            "budget:7:creature:55",
+            "budget:7:creature:56",
+            "budget:7:creature:57"
+        ],
+        "margin": 0.01,
+        "heads": [
+            {
+                "b": -0.09246375668738356,
+                "w": [
+                    -0.005194808292335206, 0.03338896281859374, 0.009372976360577392, 0.034433883972963,
+                    -0.08804146702872154, 0.017508761014333074, 0.02811892910563467, 0, 0, 0.03808266465084014,
+                    0.02174652443070366, 0, 0.040337701858085204, 0.0043849717164433965, -0.0806960873339901,
+                    0.031369834800863756, -0.014285146394828576, 0.004372818419152872, 0.05558079022908517,
+                    -0.015135505203518362, -0.042855439178705386, 0, 0, -0.012582477649201017, 0.05651052960377548, 0,
+                    0.0501814500179155, 0.006769582742757833, 0.013613737375015367, -0.017605689495801834,
+                    0.02365812275291735, 0.03565805196670766, -0.0681965059171474, 0.059971030407251935,
+                    0.07097436827479224, 0, 0, -0.017752855434793557, 0.0008892846088699533, 0, -0.03595349598131973,
+                    -0.011154553727849301, 0.0618875440533814, 0.019624817638408742, 0, -0.0055969864107473935,
+                    -0.07542575134369979, -0.027326764144890332, 0, 0, 0, 0.06841800134382016, -0.03565328863577083, 0,
+                    0.026109740476590385
+                ]
+            },
+            {
+                "b": 0,
+                "w": [
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                ]
+            },
+            {
+                "b": 0,
+                "w": [
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                ]
+            }
+        ]
+    }
+}

@@ -1,0 +1,38 @@
+{
+    "id": "empower-funding-20261114T231900Z-v2",
+    "status": "frozen-research-fit",
+    "productionActivation": false,
+    "sourceCommit": "448eb1587d71dcff49881a2090638fda803a08c5",
+    "sourceManifestSha256": "aa9572e1957d0f10b729cf2a3ba09d0f1942f1ee8422582388c41845cc460b3e",
+    "registrationSha256": "c8a266a496d392ad7d9ead559df6a4ba3a4d61eb3dbc058c96a4f51ad077902b",
+    "originalFitFileSha256": "a81f69d412ec1d739ca0218fa9fcf659c08a4e197083ca6311fb04ca95d053f5",
+    "modelSha256": "308dbc27429a16696778b4543d4130507f9246e0403b47411acd49a1b11c0c15",
+    "immutableHelpers": {
+        "src/ai/setup/empower_setup.ts": "8b4bba57aef49a2f343e54f57993f9dba64bc08c97f4a65de0d1a870a9b214cb",
+        "src/simulation/empower_setup_research.ts": "dabf34cbd840647d60cfa3cd5cd1ea9dc80cf7abfd48a0c355ef80a70e401530",
+        "src/simulation/empower_setup_training.ts": "1b89f25c3674ce9a7e4ed9a8985ea87c9c40633efa8d6ae938ee524adad57fb3"
+    },
+    "training": {
+        "state": "complete",
+        "completionMode": "all-registered-cases-with-verified-host-replicas",
+        "completedAtUtc": "2026-11-14T20:46:34.956347+00:00",
+        "rows": 6912,
+        "sourceRows": 7635,
+        "observedExecutedFights": 5349,
+        "verifiedDuplicateRows": 723,
+        "admittedExecutedRows": 4818,
+        "registrationSha256": "c8a266a496d392ad7d9ead559df6a4ba3a4d61eb3dbc058c96a4f51ad077902b",
+        "trainRowsSha256": "98aea28b3f41594f1ff30bc479446a0edc1840ec015bd0931dc4724c197e01af",
+        "fitFileSha256": "a81f69d412ec1d739ca0218fa9fcf659c08a4e197083ca6311fb04ca95d053f5",
+        "unusedDuplicateActorsCancelled": true
+    },
+    "qualification": {
+        "status": "failed",
+        "resultEvidence": "docs/evidence/empower_setup_results_20261114.json",
+        "gain": -0.0026041666666666665,
+        "lower95": -0.007957175925925927,
+        "upper95": 0.0027488425925925927,
+        "gates": { "gain": false, "interval": false, "budgets": true, "maps": true, "activation": true }
+    },
+    "confirmation": "closed-and-reserved-after-failed-qualification"
+}
