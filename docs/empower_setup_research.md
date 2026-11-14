@@ -140,7 +140,29 @@ Training completed: 3,456 logical rows, 704 new battles and 2,752 independently 
 The internal split selected ridge 0.01 and margin 0.01 (+0.694444 pp, 30 switched army cases); this is
 not independent strength evidence. The frozen model SHA is
 `96750442dcf7d489f13db0334b39b9ead3b4e8d16da7c039857aeb7a8dcbd721`, preserved by
-`lockedProtectedAxisEmpowerResearchModel()`. Fresh qualification is running under ignored
-`game/core/tmp/empower-protected-axis-20261114`. Twelve local
-actors handle seven of every eight balanced blocks; eight low-priority Puffalo actors handle the rest,
-leaving capacity for the node's other studies. No live model or default changed during this research.
+`lockedProtectedAxisEmpowerResearchModel()`. Raw qualification outputs remain under ignored
+`game/core/tmp/empower-protected-axis-20261114`. Twelve local actors handled seven of every eight
+balanced blocks; eight low-priority Puffalo actors handled the rest, leaving capacity for the node's
+other studies. No live model or default changed during this research.
+
+## Closed continuation result
+
+The protected-axis candidate also failed qualification. All 864 fresh boards completed: 6,912 logical
+rows, 3,902 newly executed fights and 3,010 exact unchanged-control reuses. Current setup scored
+50.434028%; the learned policy scored 50.622106%, a paired difference of **+0.188079 percentage points**.
+The whole-board 95% interval was **−0.347222 to +0.737847 pp**. It activated on 210 boards. The minimum
+gain and positive-interval gates failed; map, budget and activation gates passed. The independently
+implemented verifier reproduced every model choice, donor plan, paired score, interval and gate.
+
+`docs/evidence/empower_protected_axis_results_20261114.json` preserves all 864 board scores, source,
+model and collection identities. Confirmation stayed closed and its seeds remain reserved. Neither
+candidate is eligible for default activation. The favorable seven-point subgroup is exploratory and
+cannot qualify this failed overall policy. Do not alter its margin, funding or features and retest on
+the same qualification bank.
+
+The separate server correction routes human Premium build advice and Tier-2 artifact advice through
+the current default AI setup profile, while preserving explicitly injected policy overrides. Empower
+explanations name actual magic-damage beneficiaries, including Nightmare's Fire Wall. This routing fix
+was deployed to test, knowledge and production services; it does not enable either research model or
+replace the existing Premium SQLite snapshot. The report's six-axis coverage and these observational
+rows remain separate from independent policy qualification.

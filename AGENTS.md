@@ -336,3 +336,10 @@ from spare Might/Sniper, then Armor, while retaining the preferred physical axis
 the earlier development boards with exact-control provenance; its 864 qualification and 864 confirmation
 boards are new. Exclude `docs/evidence/empower_protected_axis_registration_20261114.json` as well.
 It retains the same progression gates and does not activate the failed earlier model.
+
+The protected-axis continuation also failed qualification: +0.188079 pp, whole-board 95%
+−0.347222 to +0.737847 pp, 864 boards / 3,902 executed fights, 210 activated boards. Its independent
+verifier passed, but the gain and interval gates did not. Preserve the exact fit and
+`docs/evidence/empower_protected_axis_results_20261114.json`; confirmation remains unopened and
+reserved. Neither Empower fit is a production default. A favorable budget slice does not rescue
+this result, and changing the selector requires a separate registered experiment and fresh banks.
