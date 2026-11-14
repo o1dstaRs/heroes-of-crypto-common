@@ -214,8 +214,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        // Battle Mage coverage is opt-in; historical catalogs and other casters retain their prior behavior.
-        sha256: "12046dee52607072bf1640ff813f29b6c3e739dd9aa46a647386229441d927bf" as const,
+        // Magic Dragon's new coverage flag is research-only; the default catalog remains unchanged.
+        sha256: "5caf20d9decdb0c937bd05bd03d61b1f270903d6c8e8995fb767049f0cad8f06" as const,
     }),
     Object.freeze({
         role: "summon-placement" as const,
