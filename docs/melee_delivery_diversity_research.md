@@ -25,18 +25,18 @@ without buying more search. Better geometry by itself is not a strength result; 
 
 ## Frozen measurement
 
-Registration: `85a3c390325bcec343c2842fecf1d3dca97e790cdbfa9a15c4b3a44220cfcb07`.
-The ignored capsule is `game/core/tmp/melee-delivery-diversity-20261115` in the client repository.
+Current registration: `9e8f698bc871d12fefc27984681051dd8ccd34abf526b42bba8df5cd5d6298ab`.
+The ignored capsule is `game/core/tmp/melee-delivery-diversity-20261115/v2` in the client repository.
 It freezes common `ab30315c` and server `916e3ca3`, explicit offline-only hooks, dependencies, actor,
-analyzer and inputs (2,542 sealed files). The source identifies a research checkout, not a deployed binary.
+analyzer and inputs (2,543 sealed files). The source identifies a research checkout, not a deployed binary.
 The reference is adopted contextual draft `063a888e`, native fully funded setup with ranged selector
 `d786f4e9`, native formations/support splits, and complete A19 combat for both armies. Ranked Setup is
 public; earlier draft decisions retain each doctrine's actual visibility. Only the controlled physical
 team's root catalog is treated.
 
 The functional bank reuses all 27 prior compatibility boards, first pick assignment and both physical
-seats: 54 cases in off, observer and treatment modes, 162 executions. Both controls must reproduce exact
-historical actions/events. Every fight must end in elimination with zero rejected actions, missing neural
+seats: 54 cases in off, observer and treatment modes, 162 executions. Every arm reconstructs its native opening independently; both controls must reproduce exact
+actions/events from the same corrected source and opening. Every fight must end in elimination with zero rejected actions, missing neural
 starts or model errors, and real A19 search on both teams. Slot/leader/cap identities are checked in every
 record. The fixed coverage gate requires at least ten catalogs with newly retained deliveries, three unit
 types, all three maps, and one changed complete trajectory. Failure closes the study before development.
@@ -58,3 +58,30 @@ qualification families, 1,512 independent confirmation families, a fixed contras
 and serial serving-path compatibility/timing. Both primary fresh banks must show at least +0.5 points,
 a whole-family 95% lower bound above zero, and nonnegative own-budget means. Additional compute must
 stay within 10%, including the existing controller. Development or partial results cannot activate it.
+
+## Measurement admission correction
+
+The original registration `85a3c390325bcec343c2842fecf1d3dca97e790cdbfa9a15c4b3a44220cfcb07`
+failed historical-control replay before development. The entire partial batch is excluded, with raw
+records, errors and invalidation retained. No partial strength aggregate or candidate selection was used.
+
+Diagnosis found two common modules: direct combat imports used the new capsule, while server package
+imports followed a shared dependency symlink into the older allocation capsule. Its separate RNG and
+fight-state singleton were outside the runner's seeded scope. Repeating one native opening produced
+multiple formations; changing server UUID allocation alone did not fix it. A runtime Bun alias plugin
+was insufficient to establish package identity in this environment.
+
+V2 gives the capsule its own dependency directory, with the server's actual common package symlink
+pointing to its frozen common source. Startup asserts exact RNG-function and FightStateManager identities.
+Copied server runtime identities use common's seeded UUID generator. Each arm reconstructs setup anew,
+clones its battle input, and must match its counterpart's entire configuration, formation and draft
+receipts. Twelve repeated reproductions of the original failing opening then produced one configuration
+and one formation. The same 54 functional cases, 162 development families, candidate bytes, coverage
+requirements and win-rate gates remain fixed. Historical traces from the mixed-module harness cannot
+serve as current-source replay references; the corrected current-source off/observer pair supplies that
+control. This correction changes the measurement capsule only, not any shipped policy.
+
+The active joint artifact/final-pick planner has its own server-to-frozen-common package link; inspection
+did not find this shared-dependency mistake there. Its running source was not modified. Earlier immutable
+research records are preserved: any claim of latest-source native compatibility from the affected shared
+capsules needs this module-identity qualification, even when two cached-opening combat replays matched.
