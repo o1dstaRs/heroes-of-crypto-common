@@ -467,3 +467,15 @@ but its six-point mean was −2.777778 pp. Preserve the inactive `chaos_rush_res
 test; no fresh qualification/confirmation ran and no default changed. Faster contact and shooter denial
 are mechanism results, not strength qualification. Do not activate it, rescue it with five-/seven-point
 slices, or tune this closed candidate on the same bank. Further work needs a distinct registered candidate.
+
+The distinct continuation `offense-preserving-mobility-20261115` is registered at
+`eca22a6fca45e15ff764fb58fc9ccdbb7bfe80b6d5d1fc2c477e6ddaa7ac8078`. Read
+`docs/offense_preserving_mobility_research.md`, including its reproducible seed reservation before
+allocating other banks. It keeps the adopted draft and every offensive augment, funding Movement only
+from existing Armor against public physical-shooter rosters. Four fixed recipes cover active-Chaos and
+ordinary dispatch. All 216 fresh development families completed: 1,684 distinct battles / 4,320 logical
+rows, with no finalist. Broad Movement 1 lost 4.552469 pp (simultaneous 95% −8.581220 to −0.523719),
+Movement 2 lost 1.697531 pp, and Chaos-only Movement 1/2 lost 1.466049/0.771605 pp. Earlier contact did
+not establish a score gain. Independent input, score and interval reconstruction passed; no
+qualification/confirmation was allocated and no default changed. Preserve the closed helper and full
+doctrine gates. Do not activate the five-point Movement 2 slice or tune this candidate on its opened bank.
