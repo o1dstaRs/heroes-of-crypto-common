@@ -206,3 +206,26 @@ was positive in all five folds but averaged only +0.202546 pp. No final model wa
 and confirmation stayed unopened, and no runtime changed. Preserve
 `docs/evidence/empower_context_results_20261115.json` and all reserved channels. The concurrent adopted
 A19 draft/ranged policy is a new baseline for further research, not a reason to reopen these banks.
+
+## Allocation continuation on adopted A19
+
+`empower-allocation-adopted-20261115T021200Z` compares six fully funded alternatives: Empower L1/L2/L3
+paid from spare physical damage followed by either the preferred physical axis or Armor. Its baseline
+is the newly adopted contextual draft and ranged setup, prepared through the authoritative server.
+It retains that baseline's real support splits, spell charges, final formation and barrels. Existing
+paid Placement plans and manual builds remain unchanged. Every activated contrast therefore shares
+the same free formation and spend limit. All selectors see only public setup and owned information.
+
+The new bank contains 648 development boards and 1,728 fresh boards for each later stage. Prior open
+Empower data may supply auxiliary training labels, but recipe selection scores only held-out boards
+from the new adopted policy. Eight ridge recipes and three margins use whole-board fivefold selection,
+with the unchanged +0.5 pp development threshold and three positive folds. Qualification and confirmation
+retain the +0.5 pp mean, positive 95% lower bound, budget/map safety and minimum-activation gates.
+Neither fresh stage may open without a fixed eligible model and complete prior-stage verification.
+
+Reserve `docs/evidence/empower_allocation_registration_20261115.json`, registration
+`72d5d0a369f569dac42cbbc0f2d783422086d5cd4b60564cadd2dcf1bdd6ff20`, source manifest
+`b432a6a63a39de33ee4869ac0856ce11c645e47c6a57ab77bfdab49f2ccd4a82`. The source snapshot records the
+server adoption overlays explicitly. Results must not be deployed if the eventual serving implementation
+differs. Native formation compatibility needs a narrowly matched runtime adapter before any promotion.
+The raw campaign lives under ignored `game/core/tmp/empower-allocation-20261115` in the client.

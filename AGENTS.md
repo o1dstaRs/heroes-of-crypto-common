@@ -370,3 +370,10 @@ development threshold (best +0.219907 pp). Both fresh banks remain unopened and 
 `docs/evidence/empower_context_results_20261115.json`; do not activate a failed recipe or describe its
 cross-validation scores as fresh qualification. Further Empower work must use a separate hypothesis
 and measure against the newly adopted A19 policy.
+
+The separate allocation continuation is `empower-allocation-adopted-20261115T021200Z`, registration
+`72d5d0a369f569dac42cbbc0f2d783422086d5cd4b60564cadd2dcf1bdd6ff20`. Reserve its evidence ledger too.
+It measures six fully funded Empower plans against the adopted A19 setup using the authoritative
+server's native formation, support splits, spell charges and public setup projection. Its candidate
+is research only; do not import it into a default before independent qualification, confirmation
+and serving compatibility verification. Both earlier one-point study banks remain closed.
