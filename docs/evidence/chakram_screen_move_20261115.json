@@ -1,0 +1,2038 @@
+{
+    "schema": "hoc.chakram-screen-move-evidence.v1",
+    "studyId": "chakram-screen-move-20261115",
+    "candidateId": "chakram-screen-move-v1",
+    "registrationSha256": "94405e2c05ef9853535a4c5dc4e1e69eae3ffcac0478c803a78122209d37d1d8",
+    "helperPath": "src/simulation/chakram_screen_move_research.ts",
+    "helperSha256": "737839f0d43e4fff70ef2039488e2c4ce1477b525a8df919b40bb64472cb3fcd",
+    "sealedFileCount": 2562,
+    "protocol": {
+        "schema": "hoc.chakram-screen-move-development.v1",
+        "studyId": "chakram-screen-move-20261115",
+        "candidateId": "chakram-screen-move-v1",
+        "at": "2026-11-15T08:08:35.475643+00:00",
+        "hypothesis": "Add one legal combat move with lower maximum geometric secondary Chakram exposure than all ordinary retained pure moves and the pure-move incumbent. Preserve normal moves and let unchanged A19 rollout and arbitration choose.",
+        "source": {
+            "common": "4af878d041196d9d09dc9e6b15f81c32e1a1a4da",
+            "server": "916e3ca3ccb14c093c7f550d880074640c5b9988",
+            "at": "2026-11-15T08:01:12.989935+00:00",
+            "overlay": "Offline copied move catalog + bounded shortlist reservation. Native public Setup, seeded server identities, capsule-specific common package identity and independent opening reconstruction unchanged.",
+            "priorControlRegistrationSha256": "5ddde8da61d439d9e135c0393b2c7886da61210c8e2d7b61155b2d5869412ed6",
+            "priorDevelopmentCasesSha256": "023e74645f42b18c187b1879950f1b15f3a4d7352339d0b6e402acdf7f530881",
+            "noPreviousExperimentalHooks": true,
+            "developmentFamiliesReused": 162,
+            "newIndependentChannels": 0
+        },
+        "workers": 8,
+        "priority": 19,
+        "newIndependentChannels": 0,
+        "reference": "Adopted contextual063a plus lockedV3 draft, authoritative fully funded rangedd786 setup, native formation/support splits and A19; actual full public ranked Setup",
+        "scope": "Controlled physical team root only; no dominant-finish or urgent-finish expansion. Existing move guards remain. At most one extra legal move, one additional leaf, normal K, leading ordinary challenger preserved. Existing later specialized reservations remain. No changed rollout policy, horizon/count or fitted weights.",
+        "proposal": "Canonical Chakram trajectory on detached grid with actor moved, never deleted. Rank maximum then total exp-times-alive secondary collateral, then original route order. Primary-shot legality and enemy choice are deliberately not predicted. Actual normal rollouts resolve terrain, LOS, attack damage, misses, initiative and other threats.",
+        "information": "Only currently visible combat units, abilities, shots, footprint and board occupancy; no future actions, RNG draws, hidden identities or outcome labels.",
+        "population": "Admission: first 27 already-opened development families, all four physical-seat/draft variants. Development: all 162 already-opened families. Three maps and all nine doctrine pairs; no creature/outcome selection. Reused development is not independent evidence.",
+        "preflight": {
+            "cases": 108,
+            "executions": 324,
+            "controls": "Independently reconstructed off/observer openings and exact full traces; exact replay against 108 prior corrected OFF receipts; identical package RNG and FightStateManager constructors; nine cold-process controls before development.",
+            "quality": "zero rejects/censoring/model errors or missing neural starts; both A19 seats; original moves retained, bounded shortlist and top challenger preserved; helper exceptions cannot be swallowed by native search",
+            "coverage": {
+                "eligibleDecisionsAtLeast": 10,
+                "unitTypesAtLeast": 3,
+                "mapsAtLeast": 2,
+                "chosenMovesAtLeast": 1,
+                "changedTrajectoriesAtLeast": 1
+            },
+            "admissionSemantics": "Count only proposals surviving unchanged native guards. Vetoes are reported separately. Any admission or quality failure closes this candidate without expanding the smoke bank."
+        },
+        "development": {
+            "families": 162,
+            "cases": 648,
+            "arms": ["off", "treatment"],
+            "fights": 1296,
+            "cacheReuse": false,
+            "swappedArmOrder": true
+        },
+        "analysis": {
+            "cluster": "Whole offer board, both draft assignments and physical seats",
+            "score": "win1 draw.5 loss0",
+            "bootstrap": {
+                "iterations": 20000,
+                "seed": 2026111593,
+                "generator": "xorshift32 unsigned; modulo family count",
+                "interval": "sorted floor((B-1)*.025),floor((B-1)*.975)"
+            },
+            "exactTest": "two-sided whole-family sign flip, integer deltas times8",
+            "fundingGate": {
+                "gainAtLeast": 0.005,
+                "everyOwnBudgetMeanNonnegative": true,
+                "zeroQualityErrors": true
+            },
+            "noThresholdRetuning": true,
+            "noOutcomeMasks": true
+        },
+        "futureRequirements": {
+            "independentQualificationFamilies": 864,
+            "independentConfirmationFamilies": 1512,
+            "gainAtLeast": 0.005,
+            "wholeFamily95LowerAboveZero": true,
+            "everyOwnBudgetNonnegative": true,
+            "serialAdditionalComputeAtMost": 0.1,
+            "opponentPanel": "Separate fixed contrasting controller/army panel after primary pass",
+            "freshSeeds": "Separate prospective registration and global exclusion audit before any fresh games; old banks closed"
+        },
+        "noDefaultActivation": true
+    },
+    "preflight": {
+        "passed": true,
+        "registrationSha256": "94405e2c05ef9853535a4c5dc4e1e69eae3ffcac0478c803a78122209d37d1d8",
+        "executions": 324,
+        "independentlyReconstructedControls": 216,
+        "exactOffObserverPairs": 108,
+        "qualityPassed": true,
+        "coverage": {
+            "probedDecisions": 708,
+            "proposedMoves": 284,
+            "appendedMoves": 284,
+            "nativeGuardVetoes": 0,
+            "eligibleDecisions": 284,
+            "reservedShortlists": 128,
+            "chosenMoves": 36,
+            "fightsWithOpportunity": 42,
+            "names": {
+                "Arbalester": 12,
+                "Battle Mage": 6,
+                "Beholder": 27,
+                "Blacksmith": 2,
+                "Centaur": 14,
+                "Cyclops": 35,
+                "Dryad": 11,
+                "Elf": 35,
+                "Fairy": 7,
+                "Gargantuan": 23,
+                "Griffin": 2,
+                "Harpy": 7,
+                "Leprechaun": 2,
+                "Magic Dragon": 8,
+                "Manticore": 3,
+                "Medusa": 13,
+                "Monk": 4,
+                "Orc": 12,
+                "Peasant": 13,
+                "Pikeman": 1,
+                "Satyr": 1,
+                "Scavenger": 5,
+                "Trent": 6,
+                "Troglodyte": 7,
+                "Troll": 5,
+                "Tsar Cannon": 13,
+                "Wandering Mage": 6,
+                "Wyvern": 4
+            },
+            "maps": [1, 3, 4],
+            "chosenNames": {
+                "Arbalester": 1,
+                "Beholder": 1,
+                "Blacksmith": 1,
+                "Centaur": 1,
+                "Cyclops": 3,
+                "Dryad": 1,
+                "Elf": 1,
+                "Fairy": 1,
+                "Gargantuan": 1,
+                "Harpy": 2,
+                "Leprechaun": 1,
+                "Medusa": 3,
+                "Orc": 2,
+                "Peasant": 4,
+                "Pikeman": 1,
+                "Scavenger": 4,
+                "Trent": 1,
+                "Troglodyte": 2,
+                "Troll": 1,
+                "Tsar Cannon": 1,
+                "Wandering Mage": 2,
+                "Wyvern": 1
+            },
+            "canonicalFlights": 98665,
+            "totalHelperMs": 887.0423719997198
+        },
+        "changedTrajectoryCases": 28,
+        "gates": {
+            "eligibleDecisions": true,
+            "unitTypes": true,
+            "maps": true,
+            "chosenMoves": true,
+            "changedTrajectories": true
+        },
+        "rawFiles": [
+            {
+                "path": "preflight/worker-0.jsonl",
+                "sha256": "0003767e49ad23a575acd790557fab25b79b5006827f2059a32cf7cd88793dfa"
+            },
+            {
+                "path": "preflight/worker-1.jsonl",
+                "sha256": "13809b321531e737e8511001480467d32e5db51b484c406c9d786f79a7be7f8d"
+            },
+            {
+                "path": "preflight/worker-2.jsonl",
+                "sha256": "a19ad5f283942b124ae67f2deef41b4846554792c281d4ff9e65ca7b138fd745"
+            },
+            {
+                "path": "preflight/worker-3.jsonl",
+                "sha256": "55d64254e043720d5d4d6efcf9d5e9fd9ea5eda549e1605bf28070d894cf3865"
+            },
+            {
+                "path": "preflight/worker-4.jsonl",
+                "sha256": "20e1e412d7ce3c17509324ee6c987b7c370cd9d0ba7d1705fe605348f0ff42b9"
+            },
+            {
+                "path": "preflight/worker-5.jsonl",
+                "sha256": "c0fb36b10e8959f22c3b242bccc0e0795ba59db6646e956c814cb2ea4bab5b7d"
+            },
+            {
+                "path": "preflight/worker-6.jsonl",
+                "sha256": "e85b0fe1f1b6360b0172c7aedce804c26cb8c856ebb953e59b301e7935a5d4a6"
+            },
+            {
+                "path": "preflight/worker-7.jsonl",
+                "sha256": "8ffce4b6c8db7d8fe935dd66bcd21d2adc121bc1192a41140a71c050343d42e9"
+            }
+        ]
+    },
+    "coldProcessReplay": {
+        "passed": true,
+        "cases": 9,
+        "newProcesses": 9,
+        "results": [
+            {
+                "board": 0,
+                "game": 0,
+                "traceSha256": "500d66db04dcc4cbf6a1222babe2a4801209dbb14bb69b6142fe6e8addad3391",
+                "rawSha256": "4989883592692b6238c3e23d2d019bec177528492c22b5516df1bb7ef16d15b2"
+            },
+            {
+                "board": 1,
+                "game": 0,
+                "traceSha256": "586bc2984d8f851f659d8295afb7c5f5a29a12f2ba48b1d2e87a78d307cf7528",
+                "rawSha256": "37381bc89c0ed44f0e6a9fcd38bbb20d9c25591195cc24492c6ba37d4318df31"
+            },
+            {
+                "board": 2,
+                "game": 0,
+                "traceSha256": "2f17f906fbce53e4412c6c9d8cb7f4c196ff356fdf58d57cb59a0bfa034c7454",
+                "rawSha256": "c09a798dcac436879dbecfaebcf4151ec96e9fb00bc20e68a42d069c50be10a0"
+            },
+            {
+                "board": 3,
+                "game": 0,
+                "traceSha256": "2ba360fc444202400cb75d2af1eb80af9802549d9fad096e38d2729835629d31",
+                "rawSha256": "d67bdd1f410d0f2b5203879a87c7807af0fd049f1b505e79aa636516d02b1668"
+            },
+            {
+                "board": 4,
+                "game": 0,
+                "traceSha256": "ef6834a24d7d69a9b8a22237583ceb93ee9a1f2c98efc971d54968b503dc0ecf",
+                "rawSha256": "4adf8b0a077bfa95e3f70e548404597e279895771c376e74ce514e9f5e5801d5"
+            },
+            {
+                "board": 5,
+                "game": 0,
+                "traceSha256": "8c977a9c6fa999494e07084c611d3cbd899c36847027df78be11eece387a2fea",
+                "rawSha256": "b1ebb3501d1ff9a6f963d3a14226ad34dcc71fc34cc077f4d66fd6445afc6868"
+            },
+            {
+                "board": 6,
+                "game": 0,
+                "traceSha256": "af8539da9e33c2a39e1afd5504c2cd7866ae90ef355cafac87c288bdb26e1023",
+                "rawSha256": "e772b03abb32399ef4a9d0a27560a90480bfc1058d40d1557144985d228ce72c"
+            },
+            {
+                "board": 7,
+                "game": 0,
+                "traceSha256": "85996510e04986c03eb04c53cc59cc1044bb654fef234f00ec48ce6d199cc354",
+                "rawSha256": "6dd29fb5c72f5f9ccf05b0477c1c7081fdc44959f4aa7af0bb2845da9de9f26a"
+            },
+            {
+                "board": 8,
+                "game": 0,
+                "traceSha256": "932013bdf49ef780503a6dd2c3e2996a2125e84978611aea722dcebcf3d4c6e3",
+                "rawSha256": "9bb1af7cb6ed3fe6db54f3cebd24c1e1683b0321f5c5efb34c0e41ec813816e2"
+            }
+        ]
+    },
+    "analysisCorrection": {
+        "at": "2026-11-15T08:13:14.691776+00:00",
+        "registrationSha256": "94405e2c05ef9853535a4c5dc4e1e69eae3ffcac0478c803a78122209d37d1d8",
+        "reason": "Ordinary catalog deduplicates a Tsar Cannon move against its identical incumbent, retaining a differently ordered targetCells array. The original analyzer compared ordered arrays. The correction sorts only targetCells for the preservation assertion; paths, flags, unit ids and other fields still compare exactly.",
+        "counterexample": {
+            "board": 9,
+            "game": 3,
+            "mode": "observe",
+            "turnIndex": 38,
+            "unit": "Tsar Cannon"
+        },
+        "originalAnalyzerSha256": "9933deac10a42d3a4d4def85e86243e7c57dbac3fa744b76798322f995512696",
+        "correctedAnalyzerSha256": "c339b30a7f336cbd4dfb24b3b0cbdff019f2d6dca409e2970738a6d03bdfefa7",
+        "policyChanged": false,
+        "casesChanged": false,
+        "gatesChanged": false,
+        "strengthAnalysisChanged": false,
+        "outcomeAggregatesReadBeforeCorrection": false,
+        "independentVerifierAlgorithmUnchanged": true,
+        "originalRegistrationPreserved": true,
+        "counterexampleReceipt": {
+            "rawFile": "preflight/worker-3.jsonl",
+            "rawFileSha256": "55d64254e043720d5d4d6efcf9d5e9fd9ea5eda549e1605bf28070d894cf3865",
+            "rawRowSha256": "61a5d102a6bf9a240b183e4d1001e45386c7dc1f1418f6270aa9e4fae688db9b",
+            "before": [
+                [
+                    {
+                        "type": "move_unit",
+                        "unitId": "6efc6dad-749a-59d4-941f-4a52d4148925",
+                        "path": [
+                            {
+                                "x": 2,
+                                "y": 13
+                            },
+                            {
+                                "x": 2,
+                                "y": 12
+                            },
+                            {
+                                "x": 3,
+                                "y": 11
+                            },
+                            {
+                                "x": 4,
+                                "y": 10
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 3,
+                                "y": 10
+                            },
+                            {
+                                "x": 4,
+                                "y": 10
+                            },
+                            {
+                                "x": 3,
+                                "y": 9
+                            },
+                            {
+                                "x": 4,
+                                "y": 9
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    }
+                ]
+            ],
+            "after": [
+                [
+                    {
+                        "type": "move_unit",
+                        "unitId": "6efc6dad-749a-59d4-941f-4a52d4148925",
+                        "path": [
+                            {
+                                "x": 2,
+                                "y": 13
+                            },
+                            {
+                                "x": 2,
+                                "y": 12
+                            },
+                            {
+                                "x": 3,
+                                "y": 11
+                            },
+                            {
+                                "x": 4,
+                                "y": 10
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 4,
+                                "y": 10
+                            },
+                            {
+                                "x": 3,
+                                "y": 10
+                            },
+                            {
+                                "x": 4,
+                                "y": 9
+                            },
+                            {
+                                "x": 3,
+                                "y": 9
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    }
+                ]
+            ],
+            "result": null,
+            "appended": false
+        }
+    },
+    "originalAnalyzerFailure": {
+        "at": "2026-11-15T08:13:18.181181+00:00",
+        "status": "error",
+        "error": "Command '('python3', 'analyze.py', 'preflight')' returned non-zero exit status 1.",
+        "registrationSha256": "94405e2c05ef9853535a4c5dc4e1e69eae3ffcac0478c803a78122209d37d1d8",
+        "defaultChanged": false
+    },
+    "development": {
+        "schema": "hoc.chakram-screen-move-development-results.v1",
+        "registrationSha256": "94405e2c05ef9853535a4c5dc4e1e69eae3ffcac0478c803a78122209d37d1d8",
+        "complete": true,
+        "families": 162,
+        "executions": 1296,
+        "arms": {
+            "off": {
+                "wins": 325,
+                "draws": 11,
+                "losses": 312,
+                "score": 0.5100308641975309,
+                "coverage": {
+                    "probedDecisions": 0,
+                    "proposedMoves": 0,
+                    "appendedMoves": 0,
+                    "nativeGuardVetoes": 0,
+                    "eligibleDecisions": 0,
+                    "reservedShortlists": 0,
+                    "chosenMoves": 0,
+                    "fightsWithOpportunity": 0,
+                    "names": {},
+                    "maps": [],
+                    "chosenNames": {},
+                    "canonicalFlights": 0,
+                    "totalHelperMs": 0
+                },
+                "totalFightMs": 3627305.259456001,
+                "work": {
+                    "decisions": 31935,
+                    "searched": 30341,
+                    "candidatesTotal": 203026,
+                    "scoredCandidatesTotal": 154518,
+                    "rolloutTurnsTotal": 7943088
+                }
+            },
+            "treatment": {
+                "wins": 324,
+                "draws": 11,
+                "losses": 313,
+                "score": 0.5084876543209876,
+                "coverage": {
+                    "probedDecisions": 3615,
+                    "proposedMoves": 1418,
+                    "appendedMoves": 1418,
+                    "nativeGuardVetoes": 0,
+                    "eligibleDecisions": 1418,
+                    "reservedShortlists": 611,
+                    "chosenMoves": 141,
+                    "fightsWithOpportunity": 220,
+                    "names": {
+                        "Arbalester": 95,
+                        "Battle Mage": 49,
+                        "Beholder": 95,
+                        "Blacksmith": 11,
+                        "Centaur": 39,
+                        "Cyclops": 176,
+                        "Dryad": 34,
+                        "Efreet": 6,
+                        "Elf": 92,
+                        "Fairy": 24,
+                        "Gargantuan": 131,
+                        "Griffin": 10,
+                        "Harpy": 14,
+                        "Healer": 3,
+                        "Hyena": 17,
+                        "Leprechaun": 6,
+                        "Magic Dragon": 41,
+                        "Manticore": 11,
+                        "Medusa": 83,
+                        "Monk": 56,
+                        "Nomad": 5,
+                        "Ogre Mage": 2,
+                        "Orc": 95,
+                        "Peasant": 42,
+                        "Pikeman": 5,
+                        "Satyr": 1,
+                        "Scavenger": 14,
+                        "Squire": 6,
+                        "Trent": 41,
+                        "Troglodyte": 15,
+                        "Troll": 14,
+                        "Tsar Cannon": 105,
+                        "Valkyrie": 5,
+                        "Wandering Mage": 56,
+                        "White Tiger": 7,
+                        "Wolf Rider": 6,
+                        "Wyvern": 6
+                    },
+                    "maps": [1, 3, 4],
+                    "chosenNames": {
+                        "Arbalester": 5,
+                        "Battle Mage": 3,
+                        "Beholder": 3,
+                        "Blacksmith": 2,
+                        "Centaur": 3,
+                        "Cyclops": 20,
+                        "Dryad": 3,
+                        "Elf": 6,
+                        "Fairy": 6,
+                        "Gargantuan": 9,
+                        "Griffin": 1,
+                        "Harpy": 3,
+                        "Hyena": 4,
+                        "Leprechaun": 2,
+                        "Magic Dragon": 2,
+                        "Manticore": 2,
+                        "Medusa": 10,
+                        "Monk": 2,
+                        "Orc": 10,
+                        "Peasant": 8,
+                        "Pikeman": 3,
+                        "Scavenger": 7,
+                        "Squire": 1,
+                        "Trent": 5,
+                        "Troglodyte": 4,
+                        "Troll": 2,
+                        "Tsar Cannon": 3,
+                        "Valkyrie": 2,
+                        "Wandering Mage": 6,
+                        "White Tiger": 2,
+                        "Wyvern": 2
+                    },
+                    "canonicalFlights": 478756,
+                    "totalHelperMs": 3790.2489990038093
+                },
+                "totalFightMs": 3733389.7786630006,
+                "work": {
+                    "decisions": 32176,
+                    "searched": 30571,
+                    "candidatesTotal": 206029,
+                    "scoredCandidatesTotal": 156375,
+                    "rolloutTurnsTotal": 8057032
+                }
+            }
+        },
+        "pairedGain": -0.0015432098765432098,
+        "wholeFamilyInterval95": [-0.014660493827160493, 0.011574074074074073],
+        "exactTwoSidedP": 0.908355712890625,
+        "exactSignFlipNumerator": "238120",
+        "exactSignFlipDenominator": "262144",
+        "byBudget": {
+            "5": {
+                "gamesPerArm": 216,
+                "gain": 0.0023148148148148147
+            },
+            "6": {
+                "gamesPerArm": 216,
+                "gain": -0.011574074074074073
+            },
+            "7": {
+                "gamesPerArm": 216,
+                "gain": 0.004629629629629629
+            }
+        },
+        "byMap": {
+            "1": {
+                "gamesPerArm": 216,
+                "gain": -0.0023148148148148147
+            },
+            "3": {
+                "gamesPerArm": 216,
+                "gain": 0.0
+            },
+            "4": {
+                "gamesPerArm": 216,
+                "gain": -0.0023148148148148147
+            }
+        },
+        "changedTrajectoryCases": 122,
+        "improvedCases": 11,
+        "worsenedCases": 13,
+        "developmentGate": false,
+        "gates": {
+            "gainAtLeastHalfPoint": false,
+            "allOwnBudgetsNonnegative": false,
+            "zeroQualityErrors": true
+        },
+        "independentlyQualified": false,
+        "productionPromotion": false,
+        "familyDeltas": [
+            {
+                "board": 0,
+                "difference": 0.0
+            },
+            {
+                "board": 1,
+                "difference": 0.0
+            },
+            {
+                "board": 2,
+                "difference": 0.0
+            },
+            {
+                "board": 3,
+                "difference": 0.0
+            },
+            {
+                "board": 4,
+                "difference": 0.0
+            },
+            {
+                "board": 5,
+                "difference": 0.0
+            },
+            {
+                "board": 6,
+                "difference": 0.0
+            },
+            {
+                "board": 7,
+                "difference": 0.0
+            },
+            {
+                "board": 8,
+                "difference": 0.0
+            },
+            {
+                "board": 9,
+                "difference": -0.25
+            },
+            {
+                "board": 10,
+                "difference": 0.0
+            },
+            {
+                "board": 11,
+                "difference": 0.0
+            },
+            {
+                "board": 12,
+                "difference": 0.0
+            },
+            {
+                "board": 13,
+                "difference": -0.25
+            },
+            {
+                "board": 14,
+                "difference": 0.0
+            },
+            {
+                "board": 15,
+                "difference": 0.0
+            },
+            {
+                "board": 16,
+                "difference": 0.0
+            },
+            {
+                "board": 17,
+                "difference": 0.0
+            },
+            {
+                "board": 18,
+                "difference": 0.0
+            },
+            {
+                "board": 19,
+                "difference": 0.0
+            },
+            {
+                "board": 20,
+                "difference": 0.0
+            },
+            {
+                "board": 21,
+                "difference": 0.0
+            },
+            {
+                "board": 22,
+                "difference": 0.0
+            },
+            {
+                "board": 23,
+                "difference": 0.0
+            },
+            {
+                "board": 24,
+                "difference": 0.0
+            },
+            {
+                "board": 25,
+                "difference": 0.25
+            },
+            {
+                "board": 26,
+                "difference": 0.0
+            },
+            {
+                "board": 27,
+                "difference": 0.0
+            },
+            {
+                "board": 28,
+                "difference": 0.0
+            },
+            {
+                "board": 29,
+                "difference": 0.0
+            },
+            {
+                "board": 30,
+                "difference": 0.0
+            },
+            {
+                "board": 31,
+                "difference": 0.0
+            },
+            {
+                "board": 32,
+                "difference": 0.0
+            },
+            {
+                "board": 33,
+                "difference": 0.0
+            },
+            {
+                "board": 34,
+                "difference": 0.25
+            },
+            {
+                "board": 35,
+                "difference": 0.0
+            },
+            {
+                "board": 36,
+                "difference": 0.0
+            },
+            {
+                "board": 37,
+                "difference": 0.0
+            },
+            {
+                "board": 38,
+                "difference": 0.0
+            },
+            {
+                "board": 39,
+                "difference": 0.0
+            },
+            {
+                "board": 40,
+                "difference": 0.0
+            },
+            {
+                "board": 41,
+                "difference": 0.0
+            },
+            {
+                "board": 42,
+                "difference": 0.0
+            },
+            {
+                "board": 43,
+                "difference": 0.0
+            },
+            {
+                "board": 44,
+                "difference": 0.0
+            },
+            {
+                "board": 45,
+                "difference": 0.0
+            },
+            {
+                "board": 46,
+                "difference": 0.0
+            },
+            {
+                "board": 47,
+                "difference": 0.0
+            },
+            {
+                "board": 48,
+                "difference": 0.0
+            },
+            {
+                "board": 49,
+                "difference": 0.0
+            },
+            {
+                "board": 50,
+                "difference": 0.0
+            },
+            {
+                "board": 51,
+                "difference": 0.0
+            },
+            {
+                "board": 52,
+                "difference": -0.125
+            },
+            {
+                "board": 53,
+                "difference": 0.0
+            },
+            {
+                "board": 54,
+                "difference": 0.0
+            },
+            {
+                "board": 55,
+                "difference": 0.25
+            },
+            {
+                "board": 56,
+                "difference": 0.0
+            },
+            {
+                "board": 57,
+                "difference": 0.0
+            },
+            {
+                "board": 58,
+                "difference": -0.25
+            },
+            {
+                "board": 59,
+                "difference": 0.0
+            },
+            {
+                "board": 60,
+                "difference": 0.0
+            },
+            {
+                "board": 61,
+                "difference": 0.0
+            },
+            {
+                "board": 62,
+                "difference": 0.0
+            },
+            {
+                "board": 63,
+                "difference": 0.25
+            },
+            {
+                "board": 64,
+                "difference": 0.25
+            },
+            {
+                "board": 65,
+                "difference": 0.0
+            },
+            {
+                "board": 66,
+                "difference": 0.0
+            },
+            {
+                "board": 67,
+                "difference": 0.0
+            },
+            {
+                "board": 68,
+                "difference": 0.0
+            },
+            {
+                "board": 69,
+                "difference": 0.0
+            },
+            {
+                "board": 70,
+                "difference": 0.0
+            },
+            {
+                "board": 71,
+                "difference": 0.0
+            },
+            {
+                "board": 72,
+                "difference": 0.0
+            },
+            {
+                "board": 73,
+                "difference": 0.0
+            },
+            {
+                "board": 74,
+                "difference": 0.25
+            },
+            {
+                "board": 75,
+                "difference": 0.0
+            },
+            {
+                "board": 76,
+                "difference": 0.0
+            },
+            {
+                "board": 77,
+                "difference": 0.0
+            },
+            {
+                "board": 78,
+                "difference": 0.0
+            },
+            {
+                "board": 79,
+                "difference": -0.125
+            },
+            {
+                "board": 80,
+                "difference": 0.0
+            },
+            {
+                "board": 81,
+                "difference": 0.0
+            },
+            {
+                "board": 82,
+                "difference": 0.0
+            },
+            {
+                "board": 83,
+                "difference": 0.0
+            },
+            {
+                "board": 84,
+                "difference": -0.25
+            },
+            {
+                "board": 85,
+                "difference": 0.25
+            },
+            {
+                "board": 86,
+                "difference": 0.0
+            },
+            {
+                "board": 87,
+                "difference": 0.0
+            },
+            {
+                "board": 88,
+                "difference": 0.0
+            },
+            {
+                "board": 89,
+                "difference": 0.0
+            },
+            {
+                "board": 90,
+                "difference": 0.0
+            },
+            {
+                "board": 91,
+                "difference": 0.0
+            },
+            {
+                "board": 92,
+                "difference": 0.0
+            },
+            {
+                "board": 93,
+                "difference": 0.0
+            },
+            {
+                "board": 94,
+                "difference": 0.0
+            },
+            {
+                "board": 95,
+                "difference": 0.0
+            },
+            {
+                "board": 96,
+                "difference": 0.0
+            },
+            {
+                "board": 97,
+                "difference": 0.0
+            },
+            {
+                "board": 98,
+                "difference": 0.0
+            },
+            {
+                "board": 99,
+                "difference": 0.0
+            },
+            {
+                "board": 100,
+                "difference": 0.0
+            },
+            {
+                "board": 101,
+                "difference": 0.0
+            },
+            {
+                "board": 102,
+                "difference": 0.0
+            },
+            {
+                "board": 103,
+                "difference": 0.0
+            },
+            {
+                "board": 104,
+                "difference": 0.0
+            },
+            {
+                "board": 105,
+                "difference": 0.25
+            },
+            {
+                "board": 106,
+                "difference": 0.0
+            },
+            {
+                "board": 107,
+                "difference": 0.0
+            },
+            {
+                "board": 108,
+                "difference": 0.0
+            },
+            {
+                "board": 109,
+                "difference": 0.0
+            },
+            {
+                "board": 110,
+                "difference": -0.125
+            },
+            {
+                "board": 111,
+                "difference": -0.125
+            },
+            {
+                "board": 112,
+                "difference": 0.0
+            },
+            {
+                "board": 113,
+                "difference": 0.0
+            },
+            {
+                "board": 114,
+                "difference": 0.0
+            },
+            {
+                "board": 115,
+                "difference": 0.0
+            },
+            {
+                "board": 116,
+                "difference": 0.0
+            },
+            {
+                "board": 117,
+                "difference": 0.0
+            },
+            {
+                "board": 118,
+                "difference": -0.5
+            },
+            {
+                "board": 119,
+                "difference": 0.0
+            },
+            {
+                "board": 120,
+                "difference": 0.0
+            },
+            {
+                "board": 121,
+                "difference": 0.0
+            },
+            {
+                "board": 122,
+                "difference": 0.0
+            },
+            {
+                "board": 123,
+                "difference": 0.0
+            },
+            {
+                "board": 124,
+                "difference": 0.0
+            },
+            {
+                "board": 125,
+                "difference": -0.25
+            },
+            {
+                "board": 126,
+                "difference": 0.0
+            },
+            {
+                "board": 127,
+                "difference": 0.0
+            },
+            {
+                "board": 128,
+                "difference": 0.0
+            },
+            {
+                "board": 129,
+                "difference": 0.0
+            },
+            {
+                "board": 130,
+                "difference": 0.0
+            },
+            {
+                "board": 131,
+                "difference": 0.0
+            },
+            {
+                "board": 132,
+                "difference": 0.0
+            },
+            {
+                "board": 133,
+                "difference": 0.0
+            },
+            {
+                "board": 134,
+                "difference": 0.0
+            },
+            {
+                "board": 135,
+                "difference": 0.0
+            },
+            {
+                "board": 136,
+                "difference": 0.0
+            },
+            {
+                "board": 137,
+                "difference": 0.0
+            },
+            {
+                "board": 138,
+                "difference": 0.0
+            },
+            {
+                "board": 139,
+                "difference": 0.0
+            },
+            {
+                "board": 140,
+                "difference": 0.0
+            },
+            {
+                "board": 141,
+                "difference": 0.0
+            },
+            {
+                "board": 142,
+                "difference": 0.0
+            },
+            {
+                "board": 143,
+                "difference": 0.0
+            },
+            {
+                "board": 144,
+                "difference": 0.0
+            },
+            {
+                "board": 145,
+                "difference": 0.0
+            },
+            {
+                "board": 146,
+                "difference": 0.0
+            },
+            {
+                "board": 147,
+                "difference": 0.0
+            },
+            {
+                "board": 148,
+                "difference": 0.0
+            },
+            {
+                "board": 149,
+                "difference": 0.0
+            },
+            {
+                "board": 150,
+                "difference": 0.0
+            },
+            {
+                "board": 151,
+                "difference": 0.0
+            },
+            {
+                "board": 152,
+                "difference": 0.0
+            },
+            {
+                "board": 153,
+                "difference": 0.0
+            },
+            {
+                "board": 154,
+                "difference": 0.0
+            },
+            {
+                "board": 155,
+                "difference": 0.0
+            },
+            {
+                "board": 156,
+                "difference": 0.0
+            },
+            {
+                "board": 157,
+                "difference": 0.0
+            },
+            {
+                "board": 158,
+                "difference": 0.0
+            },
+            {
+                "board": 159,
+                "difference": 0.0
+            },
+            {
+                "board": 160,
+                "difference": 0.0
+            },
+            {
+                "board": 161,
+                "difference": 0.0
+            }
+        ],
+        "rawFiles": [
+            {
+                "path": "development/worker-0.jsonl",
+                "sha256": "e054e70b2ca1ead93a2b9e26c1e47a0631b805d30b3e342fecdd09beadc5cabd"
+            },
+            {
+                "path": "development/worker-1.jsonl",
+                "sha256": "4e596975ab98cd4456de1362fb4cc2946c7afc8e742f3f1a3e3d6467e32468d9"
+            },
+            {
+                "path": "development/worker-2.jsonl",
+                "sha256": "0f61cb3f3d236e179f49d36b955f580ecfc04bccb5fc06009a6efb03dd4f0931"
+            },
+            {
+                "path": "development/worker-3.jsonl",
+                "sha256": "40a71c86de6b7ef6607a967c6f82bede83e3f12cca7dd95e3952a43126d79d4c"
+            },
+            {
+                "path": "development/worker-4.jsonl",
+                "sha256": "2b6c1edf7ed04dac9c046fb15b3165c1b6224a616181bc158f923714693b2579"
+            },
+            {
+                "path": "development/worker-5.jsonl",
+                "sha256": "d31b1444bb6f538f67ddbd580bf49bb092a439a8bafa6c4e0ebba7ac42d9f9f9"
+            },
+            {
+                "path": "development/worker-6.jsonl",
+                "sha256": "c9e7a43257606a3b16fb5d957391119077c93e329240bb8ea2d7efd5e9f15754"
+            },
+            {
+                "path": "development/worker-7.jsonl",
+                "sha256": "61bdf6b5e44e0217a75abc1d0e6f5cb6b924017b768362ee8d1d6d9003c15dad"
+            }
+        ]
+    },
+    "independentVerification": {
+        "passed": true,
+        "registrationSha256": "94405e2c05ef9853535a4c5dc4e1e69eae3ffcac0478c803a78122209d37d1d8",
+        "analyzerSha256": "c339b30a7f336cbd4dfb24b3b0cbdff019f2d6dca409e2970738a6d03bdfefa7",
+        "independentVerifierSha256": "f770a616fc7b39089b6efa098fd8807d519c9b51cd646a62567f9951e6bd2d0b",
+        "rows": 1296,
+        "wholeFamilies": 162,
+        "pairedGain": -0.0015432098765432098,
+        "wholeFamilyInterval95": [-0.014660493827160493, 0.011574074074074073],
+        "exactTwoSidedP": 0.908355712890625,
+        "developmentGate": false,
+        "integerBootstrapSha256": "f0fc1c1c498e2e745af28ccb268087aa02de6a872c23b2c65e827a1263cb9906",
+        "seals": 2562,
+        "defaultChanged": false
+    },
+    "fullControlReplay": {
+        "passed": true,
+        "complete": true,
+        "matchedIndependentControls": 648,
+        "referenceRegistrationSha256": "5ddde8da61d439d9e135c0393b2c7886da61210c8e2d7b61155b2d5869412ed6",
+        "verifierSha256": "7905e9ec5246a8ba8117ea14274387e0ed7ccaea7a9cbac39d1f65300589aefc"
+    },
+    "flightDescription": {
+        "schema": "hoc.chakram-flight-description.v1",
+        "registrationSha256": "94405e2c05ef9853535a4c5dc4e1e69eae3ffcac0478c803a78122209d37d1d8",
+        "rows": 1296,
+        "totals": {
+            "off:enemy": {
+                "throws": 998,
+                "responses": 195,
+                "missedPrimary": 6,
+                "secondaryReached": 403,
+                "reportedPrimaryDamage": 143157.80000000002,
+                "reportedSecondaryDamage": 47708.06,
+                "positiveSecondaryHits": 403
+            },
+            "treatment:enemy": {
+                "throws": 1006,
+                "responses": 178,
+                "missedPrimary": 5,
+                "secondaryReached": 363,
+                "reportedPrimaryDamage": 142093.40000000002,
+                "reportedSecondaryDamage": 39685.96,
+                "positiveSecondaryHits": 364
+            },
+            "treatment:controlled": {
+                "throws": 1120,
+                "responses": 210,
+                "missedPrimary": 2,
+                "secondaryReached": 479,
+                "reportedPrimaryDamage": 160021.14,
+                "reportedSecondaryDamage": 52569.8,
+                "positiveSecondaryHits": 477
+            },
+            "off:controlled": {
+                "throws": 1120,
+                "responses": 210,
+                "missedPrimary": 2,
+                "secondaryReached": 479,
+                "reportedPrimaryDamage": 160021.14,
+                "reportedSecondaryDamage": 52569.8,
+                "positiveSecondaryHits": 477
+            }
+        },
+        "rawFileHashesVerified": 8,
+        "interpretation": "All completed development games, no outcome selection. Aggregate observed flight damage is affected by fight length, chosen targets, deaths and all later decisions; it is not a causal decomposition or a strength/promotion endpoint. Damage means engine-reported damage, not HP-clipped expected damage.",
+        "verifierSha256": "526919358a322ec58dc12956c4fab5675525c187a54d344825c49120174c3804"
+    },
+    "firstDifferenceDescription": {
+        "registrationSha256": "94405e2c05ef9853535a4c5dc4e1e69eae3ffcac0478c803a78122209d37d1d8",
+        "changedCases": 122,
+        "allFirstChangesAreActionChoices": true,
+        "sameRawIncumbentAtEveryFirstChange": true,
+        "firstChoiceTransitions": {
+            "move_unit -> move_unit": 39,
+            "range_attack -> move_unit": 18,
+            "range_attack -> range_attack": 24,
+            "cast_spell -> cast_spell": 7,
+            "cast_spell -> move_unit": 3,
+            "move_unit+melee_attack -> move_unit+melee_attack": 1,
+            "move_unit -> range_attack": 7,
+            "range_attack -> area_throw_attack": 1,
+            "move_unit+melee_attack -> move_unit": 7,
+            "melee_attack -> move_unit": 4,
+            "wait_turn -> move_unit": 7,
+            "area_throw_attack -> area_throw_attack": 2,
+            "move_unit -> cast_spell": 1,
+            "melee_attack -> cast_spell": 1
+        },
+        "firstChoiceMechanisms": {
+            "extra_move_selected": 77,
+            "ordinary_choice_changed_with_extra_candidate": 45
+        },
+        "rawIncumbentKindsAtAllChosenExtraMoves": {
+            "move_unit": 32,
+            "range_attack": 42,
+            "wait_turn": 14,
+            "cast_spell": 6,
+            "melee_attack": 21,
+            "move_unit+melee_attack": 26
+        },
+        "description": "All changed trajectories, without win/loss selection. Raw incumbent is not necessarily the full baseline search choice. This is descriptive evidence, not a causal strength decomposition.",
+        "scriptSha256": "1814b26da8cc96402a9cf6a5320c868b9019695a6db8337f1c9f918bf4433b19"
+    },
+    "auditHashes": {
+        "source-freeze.json": "36dbd5d3b1e721c5d0b44c22d6cf39b7cfaf0ef345fb3d11ec152a3766a0dcac",
+        "analyze.py": "9933deac10a42d3a4d4def85e86243e7c57dbac3fa744b76798322f995512696",
+        "analyze-normalized-footprints.py": "c339b30a7f336cbd4dfb24b3b0cbdff019f2d6dca409e2970738a6d03bdfefa7",
+        "verify-independent.ts": "b2ddea101b69cb1deb5bb7eb103b6b33ea30f0c56b515f1e45f86680e045718c",
+        "verify-independent-normalized.ts": "f770a616fc7b39089b6efa098fd8807d519c9b51cd646a62567f9951e6bd2d0b",
+        "verify-controls.py": "7905e9ec5246a8ba8117ea14274387e0ed7ccaea7a9cbac39d1f65300589aefc",
+        "analysis.json": "a321cd66a19686b8932aefd09348d41074f3f0be78451a79c7acd25732181695",
+        "analysis-correction.json": "f4dba2ae7a01bc40e49377f89d67a4dfbc92dc91aa8cb39ecf561ad729520b95",
+        "actor.ts": "1c7d9c4da2e414c2850bace2ab96cab336dc93de965b3b206ee7368c2c12cb32",
+        "native.ts": "25d43fe7630d5e34d36977df73d9c3139d90dcee9fa6bfc6e39b55e09a182f0d",
+        "opening.ts": "89caba49ce4716b6938b71de840e10fe5ddc63c5dc502aa865ad5ee7f13fc1a2",
+        "profiles.ts": "b048d63befe3732c3899997295d27d38277e334e208937f3d44912f93b61c653",
+        "run.py": "8ea41f0ad6cc74f9369b24cdfd72b4e0b8db5e87aa0514dc6b50bf01877e52f9",
+        "finalize-normalized.py": "0f2091cd359206ff2ed47f50fbd4d30b62b8983e63de8904b403c1b4ffe0cca3",
+        "describe-flights.py": "526919358a322ec58dc12956c4fab5675525c187a54d344825c49120174c3804",
+        "describe-first-differences.py": "1814b26da8cc96402a9cf6a5320c868b9019695a6db8337f1c9f918bf4433b19",
+        "flight-description.json": "bc1b7a26fbcd79912177713e5d12224a1d859c735f6132e04456a19f3e407aa7",
+        "first-difference-description.json": "53d069b03f9db3dcf5fc6aec8b3d69b8fa1e30c37dc6a8ea3513bbdc9f46caf0",
+        "first-difference-cases.json": "0d2ed74a9b5c902f6ce589cfdb79bef3a2e31fd802ebeeaf60087a18884d83af"
+    },
+    "reusedFamilies": [
+        {
+            "board": 0,
+            "seed": 1218915744
+        },
+        {
+            "board": 1,
+            "seed": 1916394688
+        },
+        {
+            "board": 2,
+            "seed": 1566499600
+        },
+        {
+            "board": 3,
+            "seed": 420277176
+        },
+        {
+            "board": 4,
+            "seed": 2073541832
+        },
+        {
+            "board": 5,
+            "seed": 1653086768
+        },
+        {
+            "board": 6,
+            "seed": 1692032808
+        },
+        {
+            "board": 7,
+            "seed": 1652282008
+        },
+        {
+            "board": 8,
+            "seed": 811146264
+        },
+        {
+            "board": 9,
+            "seed": 1612506992
+        },
+        {
+            "board": 10,
+            "seed": 176311632
+        },
+        {
+            "board": 11,
+            "seed": 512010304
+        },
+        {
+            "board": 12,
+            "seed": 1594784112
+        },
+        {
+            "board": 13,
+            "seed": 305487048
+        },
+        {
+            "board": 14,
+            "seed": 936070768
+        },
+        {
+            "board": 15,
+            "seed": 2111285520
+        },
+        {
+            "board": 16,
+            "seed": 877766664
+        },
+        {
+            "board": 17,
+            "seed": 716017072
+        },
+        {
+            "board": 18,
+            "seed": 668570112
+        },
+        {
+            "board": 19,
+            "seed": 648742560
+        },
+        {
+            "board": 20,
+            "seed": 1406021032
+        },
+        {
+            "board": 21,
+            "seed": 642453416
+        },
+        {
+            "board": 22,
+            "seed": 303578376
+        },
+        {
+            "board": 23,
+            "seed": 1335539976
+        },
+        {
+            "board": 24,
+            "seed": 1802352424
+        },
+        {
+            "board": 25,
+            "seed": 975776544
+        },
+        {
+            "board": 26,
+            "seed": 1670521432
+        },
+        {
+            "board": 27,
+            "seed": 743245720
+        },
+        {
+            "board": 28,
+            "seed": 1558294672
+        },
+        {
+            "board": 29,
+            "seed": 1682398848
+        },
+        {
+            "board": 30,
+            "seed": 2122673584
+        },
+        {
+            "board": 31,
+            "seed": 2033183192
+        },
+        {
+            "board": 32,
+            "seed": 2043443312
+        },
+        {
+            "board": 33,
+            "seed": 1708343048
+        },
+        {
+            "board": 34,
+            "seed": 978787424
+        },
+        {
+            "board": 35,
+            "seed": 17466968
+        },
+        {
+            "board": 36,
+            "seed": 1328336832
+        },
+        {
+            "board": 37,
+            "seed": 16826360
+        },
+        {
+            "board": 38,
+            "seed": 817752536
+        },
+        {
+            "board": 39,
+            "seed": 2050538128
+        },
+        {
+            "board": 40,
+            "seed": 197817752
+        },
+        {
+            "board": 41,
+            "seed": 222873976
+        },
+        {
+            "board": 42,
+            "seed": 1297454840
+        },
+        {
+            "board": 43,
+            "seed": 254260640
+        },
+        {
+            "board": 44,
+            "seed": 302777976
+        },
+        {
+            "board": 45,
+            "seed": 120148392
+        },
+        {
+            "board": 46,
+            "seed": 1034514736
+        },
+        {
+            "board": 47,
+            "seed": 303979640
+        },
+        {
+            "board": 48,
+            "seed": 1533188248
+        },
+        {
+            "board": 49,
+            "seed": 311321872
+        },
+        {
+            "board": 50,
+            "seed": 492766248
+        },
+        {
+            "board": 51,
+            "seed": 1226087672
+        },
+        {
+            "board": 52,
+            "seed": 1663838768
+        },
+        {
+            "board": 53,
+            "seed": 2086080120
+        },
+        {
+            "board": 54,
+            "seed": 1211771056
+        },
+        {
+            "board": 55,
+            "seed": 1779316192
+        },
+        {
+            "board": 56,
+            "seed": 1907381240
+        },
+        {
+            "board": 57,
+            "seed": 898457632
+        },
+        {
+            "board": 58,
+            "seed": 939183592
+        },
+        {
+            "board": 59,
+            "seed": 250926360
+        },
+        {
+            "board": 60,
+            "seed": 487364528
+        },
+        {
+            "board": 61,
+            "seed": 737466808
+        },
+        {
+            "board": 62,
+            "seed": 739746536
+        },
+        {
+            "board": 63,
+            "seed": 356957232
+        },
+        {
+            "board": 64,
+            "seed": 1168610032
+        },
+        {
+            "board": 65,
+            "seed": 641757848
+        },
+        {
+            "board": 66,
+            "seed": 429151512
+        },
+        {
+            "board": 67,
+            "seed": 1635731440
+        },
+        {
+            "board": 68,
+            "seed": 945978264
+        },
+        {
+            "board": 69,
+            "seed": 367322880
+        },
+        {
+            "board": 70,
+            "seed": 343295632
+        },
+        {
+            "board": 71,
+            "seed": 332339016
+        },
+        {
+            "board": 72,
+            "seed": 1966519704
+        },
+        {
+            "board": 73,
+            "seed": 1950069496
+        },
+        {
+            "board": 74,
+            "seed": 997750296
+        },
+        {
+            "board": 75,
+            "seed": 228608896
+        },
+        {
+            "board": 76,
+            "seed": 1607632592
+        },
+        {
+            "board": 77,
+            "seed": 131948840
+        },
+        {
+            "board": 78,
+            "seed": 226535112
+        },
+        {
+            "board": 79,
+            "seed": 2138328808
+        },
+        {
+            "board": 80,
+            "seed": 1084430928
+        },
+        {
+            "board": 81,
+            "seed": 922250256
+        },
+        {
+            "board": 82,
+            "seed": 1514009168
+        },
+        {
+            "board": 83,
+            "seed": 626029400
+        },
+        {
+            "board": 84,
+            "seed": 1415870824
+        },
+        {
+            "board": 85,
+            "seed": 1334528496
+        },
+        {
+            "board": 86,
+            "seed": 32562704
+        },
+        {
+            "board": 87,
+            "seed": 558742504
+        },
+        {
+            "board": 88,
+            "seed": 1569924688
+        },
+        {
+            "board": 89,
+            "seed": 26569576
+        },
+        {
+            "board": 90,
+            "seed": 1783362208
+        },
+        {
+            "board": 91,
+            "seed": 58818672
+        },
+        {
+            "board": 92,
+            "seed": 2086375528
+        },
+        {
+            "board": 93,
+            "seed": 1501107480
+        },
+        {
+            "board": 94,
+            "seed": 1567561832
+        },
+        {
+            "board": 95,
+            "seed": 690445600
+        },
+        {
+            "board": 96,
+            "seed": 2023579416
+        },
+        {
+            "board": 97,
+            "seed": 1442314968
+        },
+        {
+            "board": 98,
+            "seed": 435392312
+        },
+        {
+            "board": 99,
+            "seed": 1620216912
+        },
+        {
+            "board": 100,
+            "seed": 851414504
+        },
+        {
+            "board": 101,
+            "seed": 992736960
+        },
+        {
+            "board": 102,
+            "seed": 1887612304
+        },
+        {
+            "board": 103,
+            "seed": 502856632
+        },
+        {
+            "board": 104,
+            "seed": 1091103464
+        },
+        {
+            "board": 105,
+            "seed": 581764816
+        },
+        {
+            "board": 106,
+            "seed": 1297070120
+        },
+        {
+            "board": 107,
+            "seed": 901034176
+        },
+        {
+            "board": 108,
+            "seed": 43740096
+        },
+        {
+            "board": 109,
+            "seed": 517929784
+        },
+        {
+            "board": 110,
+            "seed": 1829472176
+        },
+        {
+            "board": 111,
+            "seed": 1499552144
+        },
+        {
+            "board": 112,
+            "seed": 257013544
+        },
+        {
+            "board": 113,
+            "seed": 102737488
+        },
+        {
+            "board": 114,
+            "seed": 1738612920
+        },
+        {
+            "board": 115,
+            "seed": 1128692672
+        },
+        {
+            "board": 116,
+            "seed": 933930264
+        },
+        {
+            "board": 117,
+            "seed": 420238256
+        },
+        {
+            "board": 118,
+            "seed": 574473096
+        },
+        {
+            "board": 119,
+            "seed": 979643672
+        },
+        {
+            "board": 120,
+            "seed": 164731888
+        },
+        {
+            "board": 121,
+            "seed": 1909378624
+        },
+        {
+            "board": 122,
+            "seed": 311784880
+        },
+        {
+            "board": 123,
+            "seed": 618462480
+        },
+        {
+            "board": 124,
+            "seed": 1574842808
+        },
+        {
+            "board": 125,
+            "seed": 383774032
+        },
+        {
+            "board": 126,
+            "seed": 1035035368
+        },
+        {
+            "board": 127,
+            "seed": 1713058568
+        },
+        {
+            "board": 128,
+            "seed": 707112432
+        },
+        {
+            "board": 129,
+            "seed": 1018061816
+        },
+        {
+            "board": 130,
+            "seed": 350807472
+        },
+        {
+            "board": 131,
+            "seed": 882949112
+        },
+        {
+            "board": 132,
+            "seed": 1100102792
+        },
+        {
+            "board": 133,
+            "seed": 1342691728
+        },
+        {
+            "board": 134,
+            "seed": 1521752112
+        },
+        {
+            "board": 135,
+            "seed": 199179576
+        },
+        {
+            "board": 136,
+            "seed": 2009093432
+        },
+        {
+            "board": 137,
+            "seed": 661232488
+        },
+        {
+            "board": 138,
+            "seed": 1579105560
+        },
+        {
+            "board": 139,
+            "seed": 48611784
+        },
+        {
+            "board": 140,
+            "seed": 524282432
+        },
+        {
+            "board": 141,
+            "seed": 1853697808
+        },
+        {
+            "board": 142,
+            "seed": 1201462376
+        },
+        {
+            "board": 143,
+            "seed": 1055971832
+        },
+        {
+            "board": 144,
+            "seed": 1385986664
+        },
+        {
+            "board": 145,
+            "seed": 1114327072
+        },
+        {
+            "board": 146,
+            "seed": 1459519424
+        },
+        {
+            "board": 147,
+            "seed": 1843225536
+        },
+        {
+            "board": 148,
+            "seed": 1544225360
+        },
+        {
+            "board": 149,
+            "seed": 1958525680
+        },
+        {
+            "board": 150,
+            "seed": 1793394984
+        },
+        {
+            "board": 151,
+            "seed": 805998768
+        },
+        {
+            "board": 152,
+            "seed": 1593003344
+        },
+        {
+            "board": 153,
+            "seed": 760516512
+        },
+        {
+            "board": 154,
+            "seed": 33947728
+        },
+        {
+            "board": 155,
+            "seed": 2098404032
+        },
+        {
+            "board": 156,
+            "seed": 726797688
+        },
+        {
+            "board": 157,
+            "seed": 1340713184
+        },
+        {
+            "board": 158,
+            "seed": 423647600
+        },
+        {
+            "board": 159,
+            "seed": 478890720
+        },
+        {
+            "board": 160,
+            "seed": 834647216
+        },
+        {
+            "board": 161,
+            "seed": 947652632
+        }
+    ],
+    "newIndependentChannels": 0,
+    "freshQualificationOpened": false,
+    "freshConfirmationOpened": false,
+    "defaultChanged": false,
+    "productionTimingQualified": false,
+    "independentlyQualified": false,
+    "localCapsule": "game/core/tmp/chakram-screen-move-20261115"
+}

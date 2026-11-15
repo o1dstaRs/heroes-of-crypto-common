@@ -442,3 +442,18 @@ The completed 162-family / 1,296-game trial failed its +0.5 pp gate: gain +0.231
 Preserve `docs/evidence/retaliation_handoff_20261115.json`, its independent verification and the documented
 native-filter audit correction. No fresh bank opened and no serving default changed. Further ideas need
 a distinct hypothesis; do not weaken this gate or activate the failed candidate.
+
+The distinct combat continuation is `chakram-screen-move-20261115`, registration
+`94405e2c05ef9853535a4c5dc4e1e69eae3ffcac0478c803a78122209d37d1d8`. Read
+`docs/chakram_screen_move_research.md`. It adds at most one geometrically safer pure move to an offline
+catalog, preserving the normal moves, native guards and bounded A19 shortlist. The helper is not imported
+by serving code. Its 108-case admission and 162-family development reuse already-opened channels;
+neither is independent confirmation. Keep the failed static Chakram formation study closed. Do not
+expand this admission bank, weaken its coverage/score gates, or activate it without separate evidence.
+
+This continuation completed all 1,296 development games and failed: −0.154321 pp, whole-family 95%
+−1.466049 to +1.157407 pp, with a negative six-point mean. Preserve
+`docs/evidence/chakram_screen_move_20261115.json`, the order-only footprint audit correction and all 648
+exact control replays. Observed enemy Chakram collateral fell 16.81%, but that is not a strength gain.
+The candidate remains inactive; no fresh bank opened. Do not replace its gate with the collateral metric
+or enable a favorable doctrine slice. Further combat ideas need distinct candidates and evidence.

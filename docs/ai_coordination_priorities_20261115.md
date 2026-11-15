@@ -15,6 +15,13 @@ fights. Its 127 chosen waits changed 102 trajectories, but the +0.231481 pp gain
 +0.925926 pp) missed the fixed +0.5 pp gate. The helper remains inactive, with no fresh bank opened.
 Preserve the failed result and the original analyzer correction; no default changed.
 
+The subsequent [Chakram screen movement](chakram_screen_move_research.md) also failed its full
+1,296-game development gate: −0.154321 pp, 95% −1.466049 to +1.157407 pp, with a negative six-point mean.
+Reported enemy Chakram collateral declined 16.81%, but 141 chosen extra moves and a changed shortlist
+did not establish a better match score. All 648 control traces replayed exactly. Preserve that closed
+candidate and its narrow footprint-order audit correction. Attack tempo and displacement of ordinary
+search candidates need separate investigation; collateral reduction alone cannot qualify a policy.
+
 The original artifact/final-pick collection below subsequently stopped before fitting because private
 Setup did not match the live public-Setup bridge. The owner's replacement is
 `ranked-army-plan-public-20261115`, registration
