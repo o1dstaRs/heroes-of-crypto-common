@@ -94,3 +94,45 @@ traces after independently reconstructing their openings. Treatment retained 90 
 three complete trajectories changed. There were zero rejected actions or neural-state errors. The
 candidate therefore passed its fixed coverage gate and opened the 1,296-game development comparison.
 These are correctness/coverage counts, not win-rate evidence.
+
+## Result: closed without a measurable gain
+
+All **1,296 development fights from 162 complete offer-board families** finished, with zero rejected
+or censored games and zero missing neural starts/model errors. The ordinary controller scored
+**51.003086%** (325 wins, 11 draws, 312 losses); the candidate scored **51.080247%**
+(326 wins, 10 draws, 312 losses). The paired gain is **+0.077160 percentage points**, whole-family 95%
+bootstrap interval **−0.462963 to +0.694444 points**, exact two-sided family sign-flip **p = 1**.
+
+| Own upgrade budget | Paired cases | Score difference |
+| ------------------ | -----------: | ---------------: |
+| 5                  |          216 |     +0.231481 pp |
+| 6                  |          216 |     +0.231481 pp |
+| 7                  |          216 |     −0.231481 pp |
+
+The candidate changed 655 capped catalogs, retaining 869 new delivery options across 31 unit types and
+all three maps. It exercised changed catalogs in 299 fights and changed 53 complete trajectories.
+Three paired outcomes improved and three worsened. Coverage is therefore present, but it does not
+establish a useful complete-policy gain. The small map/budget differences cannot rescue the failed test.
+
+Both development strength gates fail: the overall gain is below +0.5 points and the seven-point mean
+is negative. **The candidate is closed.** No fresh qualification or confirmation opened, no additional
+seed channels were allocated, no weights were fitted, and the default, production and Premium snapshot
+remain unchanged. No selected subgroup, threshold change or extra batch is authorized by this result.
+
+The candidate's observed aggregate fight time was 0.41% higher and simulated rollout turns were 0.11%
+higher. These are parallel offline diagnostics, not serial production timing or a passed serving-cost gate.
+A production timing experiment and opponent panel were not opened after the failed strength gate.
+
+The sealed Python analyzer and an independently implemented TypeScript verifier agree on every paired
+outcome, all 162 family deltas, both bootstrap endpoints, the exact sign-flip numerator/denominator and
+the failed gate. All 2,543 source/dependency/input seals passed. Nine additional cold-process replay
+checks matched the warmed controls. Compact evidence is preserved in
+[evidence/melee_delivery_diversity_20261115.json](evidence/melee_delivery_diversity_20261115.json);
+complete raw records and the excluded initial batch remain in the ignored capsule.
+
+The other agent's original artifact/final-pick campaign stopped before fitting because it used private
+Setup while actual ranked Setup is public. Its replacement, `ranked-army-plan-public-20261115`, has
+registration `c9e37ee04066f25100373fe7f034cbf702d17bb86a6ccd6c50e8d3ad00e4b73d` and was collecting its
+training bank during this closeout. It is a separate hypothesis and dataset; no partial result is pooled
+with this failed melee experiment. Current coordination priorities continue through that properly routed
+army-planning measurement rather than activating a failed tactical rule.

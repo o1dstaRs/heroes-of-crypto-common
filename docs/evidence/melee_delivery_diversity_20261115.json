@@ -1,0 +1,1089 @@
+{
+    "schema": "hoc.melee-delivery-diversity-evidence.v1",
+    "policyId": "melee-delivery-diversity-v1",
+    "studyId": "melee-delivery-diversity-20261115-v2",
+    "reference": "Adopted contextual063a draft + authoritative fully funded rangedd786 setup, native formation/support splits and A19; full public ranked Setup",
+    "hypothesis": "Replace only equal-valued duplicate melee deliveries with spatially diverse approaches; same target coverage, cap, leaders and per-slot metadata; unchanged full engine A19 continuation.",
+    "scope": "Controlled physical team root only. No helper inside private rollout policy, no more rollouts, no fitted weights, no stationary-value prototype.",
+    "population": "All 54 reused compatibility cases before 162 whole already-opened allocation-development families, both draft assignments and physical seats. No outcome or creature selection.",
+    "registrationSha256": "9e8f698bc871d12fefc27984681051dd8ccd34abf526b42bba8df5cd5d6298ab",
+    "source": {
+        "common": "ab30315cfea7ee4285ac3f63a778ecbe53c7f53f",
+        "server": "916e3ca3ccb14c093c7f550d880074640c5b9988",
+        "at": "2026-11-15T06:18:15.348218+00:00",
+        "amendment": "Use a local common package symlink for all server/runtime imports and seeded server runtime identities. Reconstruct each arm opening independently. Historical mixed-module traces excluded; compare current off vs observer exact replay.",
+        "initialRegistrationSha256": "85a3c390325bcec343c2842fecf1d3dca97e790cdbfa9a15c4b3a44220cfcb07",
+        "policyChanged": false,
+        "casesChanged": false,
+        "winRateGatesChanged": false,
+        "allInitialOutcomesExcluded": true,
+        "newIndependentChannels": 0
+    },
+    "moduleResolution": {
+        "common": "sources/common",
+        "serverCommon": "node_modules/@heroesofcrypto/common -> ../../sources/common",
+        "seams": "Native assertions for RNG function and FightStateManager constructor identity. Server copied runtime uses common seeded UUIDs; unseeded live semantics unchanged.",
+        "reconstructEveryArm": true
+    },
+    "sealedFiles": 2543,
+    "helper": {
+        "path": "src/simulation/melee_delivery_diversity_research.ts",
+        "sha256": "3877f21ef8cf500d853881ed06bf62e9b4110b110a95edbbd19deb90086dd8a1"
+    },
+    "initialAttempt": {
+        "registrationSha256": "85a3c390325bcec343c2842fecf1d3dca97e790cdbfa9a15c4b3a44220cfcb07",
+        "status": "excluded_before_development",
+        "allOutcomeRowsExcluded": true,
+        "completedRawRows": 101,
+        "rawFiles": [
+            {
+                "path": "initial/preflight/worker-0.jsonl",
+                "sha256": "feb25556a1f65d436d85dc62e53321c95ceeda2a3732f1e0ef4856372e33f5fe"
+            },
+            {
+                "path": "initial/preflight/worker-1.jsonl",
+                "sha256": "24705c254d343e9e1861fe4e271bb98969772f9bad50c09dd0f7df08de84a6d3"
+            },
+            {
+                "path": "initial/preflight/worker-2.jsonl",
+                "sha256": "a959b757421b3616fefee5c0e7a2df26d98943804b35ed4b7046aa571f4e6285"
+            },
+            {
+                "path": "initial/preflight/worker-3.jsonl",
+                "sha256": "48ae6e785a976ac61a8f154963ecf5daef8d2e80696b37451b1a68550a18f0a6"
+            },
+            {
+                "path": "initial/preflight/worker-4.jsonl",
+                "sha256": "3f465f14ef813fc90772a4d598543605b96946bdedafc19dea290b75ecb4ca2d"
+            },
+            {
+                "path": "initial/preflight/worker-5.jsonl",
+                "sha256": "2be58750f9c5abbcdb5d8a60fec478e2aa2d244904f7fa012368309dc41345c2"
+            },
+            {
+                "path": "initial/preflight/worker-6.jsonl",
+                "sha256": "7ebe0c5832ad68acc875fd2cbf6b1d2ae676d892379076e8b5678cacfa5e66b3"
+            },
+            {
+                "path": "initial/preflight/worker-7.jsonl",
+                "sha256": "972304036418d20e0ee49fe73216b509b8f83c69f40c5deb4229e5d3fb4bd263"
+            }
+        ],
+        "reason": "Server package common and direct combat common resolved different source trees and RNG/singleton identities; seeded native opening was not reproducible.",
+        "repeatedOpeningChecks": 4,
+        "distinctFormations": 2,
+        "correction": "Own package links, runtime identity guards, seeded copied server IDs and independent per-arm opening reconstruction. Same candidate/cases/coverage and strength gates."
+    },
+    "correctedOpeningChecks": {
+        "repetitions": 12,
+        "distinctFormations": 1,
+        "distinctConfigs": 1
+    },
+    "admission": {
+        "passed": true,
+        "registrationSha256": "9e8f698bc871d12fefc27984681051dd8ccd34abf526b42bba8df5cd5d6298ab",
+        "executions": 162,
+        "independentlyReconstructedControls": 108,
+        "exactOffObserverPairs": 54,
+        "qualityPassed": true,
+        "coverage": {
+            "cappedCatalogs": 87,
+            "changedCatalogs": 67,
+            "newDeliveries": 90,
+            "fightsWithChangedCatalog": 32,
+            "names": {
+                "Angel": 10,
+                "Behemoth": 6,
+                "Centaur": 1,
+                "Fairy": 12,
+                "Griffin": 2,
+                "Harpy": 6,
+                "Magic Dragon": 1,
+                "Manticore": 2,
+                "Peasant": 13,
+                "Pikeman": 2,
+                "Valkyrie": 8,
+                "Wyvern": 4
+            },
+            "maps": [1, 3, 4],
+            "helperMs": 3.7355379999735305,
+            "retaliationPossibleSlots": 591
+        },
+        "changedTrajectoryCases": 3,
+        "gates": {
+            "changedCatalogs": true,
+            "unitTypes": true,
+            "maps": true,
+            "changedTrajectories": true
+        },
+        "rawFiles": [
+            {
+                "path": "preflight/worker-0.jsonl",
+                "sha256": "8360fecbca862a1b5e48bf50cfbce22382988e154c5569f52df3a678820dbf46"
+            },
+            {
+                "path": "preflight/worker-1.jsonl",
+                "sha256": "0101b61378cf9f29c43fdb587e33b3c625ca40c157e4291d6ea541fb4e8dd6aa"
+            },
+            {
+                "path": "preflight/worker-2.jsonl",
+                "sha256": "f5c24e3b206d749bbc3103e4703a06c75313a4f588383e5ba49ede93d89565ee"
+            },
+            {
+                "path": "preflight/worker-3.jsonl",
+                "sha256": "c4b61cd8328218c63cc3d70bd4f5413f7a6dcc54c6d125035b6c3f2debbc496a"
+            },
+            {
+                "path": "preflight/worker-4.jsonl",
+                "sha256": "4fb187d1c291c28626ace210e7af7cb82563376a3dbbd685542045a7c9bf4447"
+            },
+            {
+                "path": "preflight/worker-5.jsonl",
+                "sha256": "364269382ae8d6be45cb8392dd5fe2ae08ad3559bd65ffde21ec2c6f87a28b53"
+            },
+            {
+                "path": "preflight/worker-6.jsonl",
+                "sha256": "8d1ce2d10c7a06cc99198486e24fdabcffa8e3a07583ef5aa9da5e786629a770"
+            },
+            {
+                "path": "preflight/worker-7.jsonl",
+                "sha256": "98e23777b772851303595f98b6f131ddeba8ac3d1774a1c16266ddb1751fadb8"
+            }
+        ]
+    },
+    "coldProcessReplay": {
+        "passed": true,
+        "cases": 9,
+        "newProcesses": 9,
+        "results": [
+            {
+                "board": 0,
+                "game": 0,
+                "traceSha256": "1ef1bd73e7380c98a9a2fd276012fb2ddb6c23555e5e63052c8f131ee7561644",
+                "rawSha256": "8ced573a8ad8920b66f3fa8abe75dcb5bca61b065d2d77f8bf7341a307f394c8"
+            },
+            {
+                "board": 1,
+                "game": 0,
+                "traceSha256": "3cdecc8dfe0cfbdc6da2d6e53f9e1d2e5e056652c856b4dd2aca0d715ef86d55",
+                "rawSha256": "042ad935bfadfab12377aa9360dec6a73fab8b509a35937c73ae55c70b84444c"
+            },
+            {
+                "board": 2,
+                "game": 0,
+                "traceSha256": "c9538e198b0eb923b3b98bac54c96397c697c364e04192a5a43a066402a1acf3",
+                "rawSha256": "c3144c4895286e640f420ae1e48bfcaec3d6e313bcc480f88f4c7e251dc53add"
+            },
+            {
+                "board": 3,
+                "game": 0,
+                "traceSha256": "985b4c41d4984b168ca09b85111ef610a376fe23afdfff83848242d60963876d",
+                "rawSha256": "87553b0c86863aba68a000676f491418441f92b6f1d3b09baadffc3195e1c201"
+            },
+            {
+                "board": 4,
+                "game": 0,
+                "traceSha256": "ebb48c5cab583686817a8bedebb8aa82ff96cd785fb80844c382f5d473ed0217",
+                "rawSha256": "33a5a318b96c25c83e6b39348d24d4ab719b54a8d91b975e7a6b4e789d4ca777"
+            },
+            {
+                "board": 5,
+                "game": 0,
+                "traceSha256": "fcfb2f527a4cfe650b262430f9770ee83e21adebe21c9a5c094ca26333fc97e4",
+                "rawSha256": "d4c195c034421bb526421f5267da62f99be1c12e3a1fd422213826bd1240dad5"
+            },
+            {
+                "board": 6,
+                "game": 0,
+                "traceSha256": "9a343951256facffad0506ec7e55535cb5821518507e601fa3c5264543bfbe7d",
+                "rawSha256": "79e2a3428e845cfe90fd0328a39febd8920a31cca607654dec04d0e629bd2cb4"
+            },
+            {
+                "board": 7,
+                "game": 0,
+                "traceSha256": "d9992da65a70c44b73ddaf2f6bd32d3a9db668b9e400d41c62a6a0b9cb1d6960",
+                "rawSha256": "ab0355acbb04be64391fd3d1f271d974a35eb2aaa0768b7805cf23bd742b74f9"
+            },
+            {
+                "board": 8,
+                "game": 0,
+                "traceSha256": "7e1ccfb48d30b56e1a728fbe1ecb5e85ef22ed023a6467d172401756e76ad6ea",
+                "rawSha256": "55b0ca12ffa3560a2192668cfafe0c9ea4b87829fb456a95c6aae10ddf59ffd8"
+            }
+        ]
+    },
+    "developmentDesign": {
+        "families": 162,
+        "cases": 648,
+        "arms": ["off", "treatment"],
+        "fights": 1296,
+        "cacheReuse": false,
+        "swappedArmOrder": true
+    },
+    "analysisDesign": {
+        "cluster": "Whole offer board over both draft assignments and physical seats",
+        "score": "win1 draw.5 loss0",
+        "bootstrap": {
+            "iterations": 20000,
+            "seed": 2026111591,
+            "generator": "xorshift32 unsigned; modulo family count",
+            "interval": "sorted floor((B-1)*.025),floor((B-1)*.975)"
+        },
+        "exactTest": "two-sided whole-family sign flip, integer deltas times8",
+        "fundingGate": {
+            "gainAtLeast": 0.005,
+            "everyOwnBudgetMeanNonnegative": true,
+            "zeroQualityErrors": true
+        },
+        "noThresholdRetuning": true,
+        "noOutcomeMasks": true
+    },
+    "development": {
+        "schema": "hoc.melee-delivery-diversity-development-results.v1",
+        "registrationSha256": "9e8f698bc871d12fefc27984681051dd8ccd34abf526b42bba8df5cd5d6298ab",
+        "complete": true,
+        "families": 162,
+        "executions": 1296,
+        "arms": {
+            "off": {
+                "wins": 325,
+                "draws": 11,
+                "losses": 312,
+                "score": 0.5100308641975309,
+                "coverage": {
+                    "cappedCatalogs": 0,
+                    "changedCatalogs": 0,
+                    "newDeliveries": 0,
+                    "fightsWithChangedCatalog": 0,
+                    "names": {},
+                    "maps": [],
+                    "helperMs": 0,
+                    "retaliationPossibleSlots": 0
+                },
+                "totalFightMs": 4969858.256674003,
+                "work": {
+                    "decisions": 31935,
+                    "searched": 30341,
+                    "candidatesTotal": 203026,
+                    "scoredCandidatesTotal": 154518,
+                    "rolloutTurnsTotal": 7943088
+                }
+            },
+            "treatment": {
+                "wins": 326,
+                "draws": 10,
+                "losses": 312,
+                "score": 0.5108024691358025,
+                "coverage": {
+                    "cappedCatalogs": 915,
+                    "changedCatalogs": 655,
+                    "newDeliveries": 869,
+                    "fightsWithChangedCatalog": 299,
+                    "names": {
+                        "Abomination": 1,
+                        "Angel": 96,
+                        "Behemoth": 4,
+                        "Beholder": 20,
+                        "Centaur": 3,
+                        "Cyclops": 20,
+                        "Dryad": 1,
+                        "Efreet": 11,
+                        "Fairy": 112,
+                        "Frenzied Boar": 1,
+                        "Gargantuan": 1,
+                        "Goblin Knight": 3,
+                        "Griffin": 68,
+                        "Harpy": 35,
+                        "Hyena": 3,
+                        "Leprechaun": 2,
+                        "Magic Dragon": 10,
+                        "Manticore": 26,
+                        "Nomad": 5,
+                        "Peasant": 128,
+                        "Pikeman": 3,
+                        "Scavenger": 7,
+                        "Trent": 1,
+                        "Troglodyte": 1,
+                        "Troll": 2,
+                        "Valkyrie": 41,
+                        "Wandering Mage": 5,
+                        "White Tiger": 4,
+                        "Wolf": 1,
+                        "Wyvern": 39,
+                        "Zena": 1
+                    },
+                    "maps": [1, 3, 4],
+                    "helperMs": 45.711367999809454,
+                    "retaliationPossibleSlots": 6472
+                },
+                "totalFightMs": 4990191.667164,
+                "work": {
+                    "decisions": 31995,
+                    "searched": 30372,
+                    "candidatesTotal": 203163,
+                    "scoredCandidatesTotal": 154700,
+                    "rolloutTurnsTotal": 7951873
+                }
+            }
+        },
+        "pairedGain": 0.0007716049382716049,
+        "wholeFamilyInterval95": [-0.004629629629629629, 0.006944444444444444],
+        "exactTwoSidedP": 1.0,
+        "exactSignFlipNumerator": "64",
+        "exactSignFlipDenominator": "64",
+        "byBudget": {
+            "5": {
+                "gamesPerArm": 216,
+                "gain": 0.0023148148148148147
+            },
+            "6": {
+                "gamesPerArm": 216,
+                "gain": 0.0023148148148148147
+            },
+            "7": {
+                "gamesPerArm": 216,
+                "gain": -0.0023148148148148147
+            }
+        },
+        "byMap": {
+            "1": {
+                "gamesPerArm": 216,
+                "gain": 0.0
+            },
+            "3": {
+                "gamesPerArm": 216,
+                "gain": -0.0023148148148148147
+            },
+            "4": {
+                "gamesPerArm": 216,
+                "gain": 0.004629629629629629
+            }
+        },
+        "changedTrajectoryCases": 53,
+        "improvedCases": 3,
+        "worsenedCases": 3,
+        "developmentGate": false,
+        "gates": {
+            "gainAtLeastHalfPoint": false,
+            "allOwnBudgetsNonnegative": false,
+            "zeroQualityErrors": true
+        },
+        "independentlyQualified": false,
+        "productionPromotion": false,
+        "familyDeltas": [
+            {
+                "board": 0,
+                "difference": 0.0
+            },
+            {
+                "board": 1,
+                "difference": -0.25
+            },
+            {
+                "board": 2,
+                "difference": 0.0
+            },
+            {
+                "board": 3,
+                "difference": 0.0
+            },
+            {
+                "board": 4,
+                "difference": 0.0
+            },
+            {
+                "board": 5,
+                "difference": 0.0
+            },
+            {
+                "board": 6,
+                "difference": 0.0
+            },
+            {
+                "board": 7,
+                "difference": 0.0
+            },
+            {
+                "board": 8,
+                "difference": 0.0
+            },
+            {
+                "board": 9,
+                "difference": 0.0
+            },
+            {
+                "board": 10,
+                "difference": 0.0
+            },
+            {
+                "board": 11,
+                "difference": 0.0
+            },
+            {
+                "board": 12,
+                "difference": 0.0
+            },
+            {
+                "board": 13,
+                "difference": 0.0
+            },
+            {
+                "board": 14,
+                "difference": 0.0
+            },
+            {
+                "board": 15,
+                "difference": 0.0
+            },
+            {
+                "board": 16,
+                "difference": 0.0
+            },
+            {
+                "board": 17,
+                "difference": 0.0
+            },
+            {
+                "board": 18,
+                "difference": 0.0
+            },
+            {
+                "board": 19,
+                "difference": 0.0
+            },
+            {
+                "board": 20,
+                "difference": 0.0
+            },
+            {
+                "board": 21,
+                "difference": 0.0
+            },
+            {
+                "board": 22,
+                "difference": 0.0
+            },
+            {
+                "board": 23,
+                "difference": 0.0
+            },
+            {
+                "board": 24,
+                "difference": 0.0
+            },
+            {
+                "board": 25,
+                "difference": 0.0
+            },
+            {
+                "board": 26,
+                "difference": 0.0
+            },
+            {
+                "board": 27,
+                "difference": 0.0
+            },
+            {
+                "board": 28,
+                "difference": 0.0
+            },
+            {
+                "board": 29,
+                "difference": 0.0
+            },
+            {
+                "board": 30,
+                "difference": 0.0
+            },
+            {
+                "board": 31,
+                "difference": 0.0
+            },
+            {
+                "board": 32,
+                "difference": 0.0
+            },
+            {
+                "board": 33,
+                "difference": 0.0
+            },
+            {
+                "board": 34,
+                "difference": 0.0
+            },
+            {
+                "board": 35,
+                "difference": 0.0
+            },
+            {
+                "board": 36,
+                "difference": 0.0
+            },
+            {
+                "board": 37,
+                "difference": 0.0
+            },
+            {
+                "board": 38,
+                "difference": 0.0
+            },
+            {
+                "board": 39,
+                "difference": 0.0
+            },
+            {
+                "board": 40,
+                "difference": 0.0
+            },
+            {
+                "board": 41,
+                "difference": 0.0
+            },
+            {
+                "board": 42,
+                "difference": 0.0
+            },
+            {
+                "board": 43,
+                "difference": 0.0
+            },
+            {
+                "board": 44,
+                "difference": 0.0
+            },
+            {
+                "board": 45,
+                "difference": 0.0
+            },
+            {
+                "board": 46,
+                "difference": 0.0
+            },
+            {
+                "board": 47,
+                "difference": 0.0
+            },
+            {
+                "board": 48,
+                "difference": 0.0
+            },
+            {
+                "board": 49,
+                "difference": 0.0
+            },
+            {
+                "board": 50,
+                "difference": 0.0
+            },
+            {
+                "board": 51,
+                "difference": 0.0
+            },
+            {
+                "board": 52,
+                "difference": 0.0
+            },
+            {
+                "board": 53,
+                "difference": 0.0
+            },
+            {
+                "board": 54,
+                "difference": 0.0
+            },
+            {
+                "board": 55,
+                "difference": 0.0
+            },
+            {
+                "board": 56,
+                "difference": 0.0
+            },
+            {
+                "board": 57,
+                "difference": 0.0
+            },
+            {
+                "board": 58,
+                "difference": 0.0
+            },
+            {
+                "board": 59,
+                "difference": 0.0
+            },
+            {
+                "board": 60,
+                "difference": 0.0
+            },
+            {
+                "board": 61,
+                "difference": 0.0
+            },
+            {
+                "board": 62,
+                "difference": 0.0
+            },
+            {
+                "board": 63,
+                "difference": 0.0
+            },
+            {
+                "board": 64,
+                "difference": 0.0
+            },
+            {
+                "board": 65,
+                "difference": 0.25
+            },
+            {
+                "board": 66,
+                "difference": 0.0
+            },
+            {
+                "board": 67,
+                "difference": 0.0
+            },
+            {
+                "board": 68,
+                "difference": 0.0
+            },
+            {
+                "board": 69,
+                "difference": 0.0
+            },
+            {
+                "board": 70,
+                "difference": 0.0
+            },
+            {
+                "board": 71,
+                "difference": 0.0
+            },
+            {
+                "board": 72,
+                "difference": 0.0
+            },
+            {
+                "board": 73,
+                "difference": 0.0
+            },
+            {
+                "board": 74,
+                "difference": 0.0
+            },
+            {
+                "board": 75,
+                "difference": 0.0
+            },
+            {
+                "board": 76,
+                "difference": 0.0
+            },
+            {
+                "board": 77,
+                "difference": 0.0
+            },
+            {
+                "board": 78,
+                "difference": 0.0
+            },
+            {
+                "board": 79,
+                "difference": 0.0
+            },
+            {
+                "board": 80,
+                "difference": 0.0
+            },
+            {
+                "board": 81,
+                "difference": 0.0
+            },
+            {
+                "board": 82,
+                "difference": 0.0
+            },
+            {
+                "board": 83,
+                "difference": 0.0
+            },
+            {
+                "board": 84,
+                "difference": 0.0
+            },
+            {
+                "board": 85,
+                "difference": 0.0
+            },
+            {
+                "board": 86,
+                "difference": 0.0
+            },
+            {
+                "board": 87,
+                "difference": 0.0
+            },
+            {
+                "board": 88,
+                "difference": 0.0
+            },
+            {
+                "board": 89,
+                "difference": 0.0
+            },
+            {
+                "board": 90,
+                "difference": 0.0
+            },
+            {
+                "board": 91,
+                "difference": 0.0
+            },
+            {
+                "board": 92,
+                "difference": 0.0
+            },
+            {
+                "board": 93,
+                "difference": 0.0
+            },
+            {
+                "board": 94,
+                "difference": 0.0
+            },
+            {
+                "board": 95,
+                "difference": 0.0
+            },
+            {
+                "board": 96,
+                "difference": 0.0
+            },
+            {
+                "board": 97,
+                "difference": 0.0
+            },
+            {
+                "board": 98,
+                "difference": 0.0
+            },
+            {
+                "board": 99,
+                "difference": 0.125
+            },
+            {
+                "board": 100,
+                "difference": 0.0
+            },
+            {
+                "board": 101,
+                "difference": 0.0
+            },
+            {
+                "board": 102,
+                "difference": 0.0
+            },
+            {
+                "board": 103,
+                "difference": 0.0
+            },
+            {
+                "board": 104,
+                "difference": 0.0
+            },
+            {
+                "board": 105,
+                "difference": 0.0
+            },
+            {
+                "board": 106,
+                "difference": 0.0
+            },
+            {
+                "board": 107,
+                "difference": 0.0
+            },
+            {
+                "board": 108,
+                "difference": 0.0
+            },
+            {
+                "board": 109,
+                "difference": 0.0
+            },
+            {
+                "board": 110,
+                "difference": 0.0
+            },
+            {
+                "board": 111,
+                "difference": 0.0
+            },
+            {
+                "board": 112,
+                "difference": 0.0
+            },
+            {
+                "board": 113,
+                "difference": 0.0
+            },
+            {
+                "board": 114,
+                "difference": -0.125
+            },
+            {
+                "board": 115,
+                "difference": 0.0
+            },
+            {
+                "board": 116,
+                "difference": 0.0
+            },
+            {
+                "board": 117,
+                "difference": 0.0
+            },
+            {
+                "board": 118,
+                "difference": 0.0
+            },
+            {
+                "board": 119,
+                "difference": 0.0
+            },
+            {
+                "board": 120,
+                "difference": 0.0
+            },
+            {
+                "board": 121,
+                "difference": 0.0
+            },
+            {
+                "board": 122,
+                "difference": 0.0
+            },
+            {
+                "board": 123,
+                "difference": 0.0
+            },
+            {
+                "board": 124,
+                "difference": 0.0
+            },
+            {
+                "board": 125,
+                "difference": 0.0
+            },
+            {
+                "board": 126,
+                "difference": 0.0
+            },
+            {
+                "board": 127,
+                "difference": 0.0
+            },
+            {
+                "board": 128,
+                "difference": 0.0
+            },
+            {
+                "board": 129,
+                "difference": 0.0
+            },
+            {
+                "board": 130,
+                "difference": -0.125
+            },
+            {
+                "board": 131,
+                "difference": 0.0
+            },
+            {
+                "board": 132,
+                "difference": 0.0
+            },
+            {
+                "board": 133,
+                "difference": 0.0
+            },
+            {
+                "board": 134,
+                "difference": 0.0
+            },
+            {
+                "board": 135,
+                "difference": 0.0
+            },
+            {
+                "board": 136,
+                "difference": 0.0
+            },
+            {
+                "board": 137,
+                "difference": 0.0
+            },
+            {
+                "board": 138,
+                "difference": 0.0
+            },
+            {
+                "board": 139,
+                "difference": 0.25
+            },
+            {
+                "board": 140,
+                "difference": 0.0
+            },
+            {
+                "board": 141,
+                "difference": 0.0
+            },
+            {
+                "board": 142,
+                "difference": 0.0
+            },
+            {
+                "board": 143,
+                "difference": 0.0
+            },
+            {
+                "board": 144,
+                "difference": 0.0
+            },
+            {
+                "board": 145,
+                "difference": 0.0
+            },
+            {
+                "board": 146,
+                "difference": 0.0
+            },
+            {
+                "board": 147,
+                "difference": 0.0
+            },
+            {
+                "board": 148,
+                "difference": 0.0
+            },
+            {
+                "board": 149,
+                "difference": 0.0
+            },
+            {
+                "board": 150,
+                "difference": 0.0
+            },
+            {
+                "board": 151,
+                "difference": 0.0
+            },
+            {
+                "board": 152,
+                "difference": 0.0
+            },
+            {
+                "board": 153,
+                "difference": 0.0
+            },
+            {
+                "board": 154,
+                "difference": 0.0
+            },
+            {
+                "board": 155,
+                "difference": 0.0
+            },
+            {
+                "board": 156,
+                "difference": 0.0
+            },
+            {
+                "board": 157,
+                "difference": 0.0
+            },
+            {
+                "board": 158,
+                "difference": 0.0
+            },
+            {
+                "board": 159,
+                "difference": 0.0
+            },
+            {
+                "board": 160,
+                "difference": 0.0
+            },
+            {
+                "board": 161,
+                "difference": 0.0
+            }
+        ],
+        "rawFiles": [
+            {
+                "path": "development/worker-0.jsonl",
+                "sha256": "5a8a382445aa2941cd687c8ca0a80aabb3b86a4f71384f54e9e3ff01a781e35c"
+            },
+            {
+                "path": "development/worker-1.jsonl",
+                "sha256": "72e9a28c77ebca9a0313710ef77641abf74df76214ff44d5f0a8a0cb9fc5da6e"
+            },
+            {
+                "path": "development/worker-2.jsonl",
+                "sha256": "c4e7b1a90820d98cb8c90e35bd52b13b058ac6aa123269136914670dec29ae52"
+            },
+            {
+                "path": "development/worker-3.jsonl",
+                "sha256": "b3b55c0bb30622954633ed98a1fdd17835160dce98d0ad52041eee5aed2f7941"
+            },
+            {
+                "path": "development/worker-4.jsonl",
+                "sha256": "e3bc23f8c89bd6faee30b9934d8fe458f51862554ef4bb7ab1be38489285ff5d"
+            },
+            {
+                "path": "development/worker-5.jsonl",
+                "sha256": "481135d4660fd5abbe00b2cb9fb5910fbbadc2538c647c2178868d78f1d80960"
+            },
+            {
+                "path": "development/worker-6.jsonl",
+                "sha256": "60d94c6783d453745ca271df46d95319f00bbc9302380e7e9e44f4f19769e103"
+            },
+            {
+                "path": "development/worker-7.jsonl",
+                "sha256": "2cc44744150e05c2fb1093f5050ece3ece86a12deb098de1620c87a90a9611e4"
+            }
+        ]
+    },
+    "independentVerification": {
+        "passed": true,
+        "registrationSha256": "9e8f698bc871d12fefc27984681051dd8ccd34abf526b42bba8df5cd5d6298ab",
+        "analyzerSha256": "730d6a9efb9b8178f230a5833d9caf5931d98512965cd009c3015808aaba7e4f",
+        "independentVerifierSha256": "b2ddea101b69cb1deb5bb7eb103b6b33ea30f0c56b515f1e45f86680e045718c",
+        "rows": 1296,
+        "wholeFamilies": 162,
+        "pairedGain": 0.0007716049382716049,
+        "wholeFamilyInterval95": [-0.004629629629629629, 0.006944444444444444],
+        "exactTwoSidedP": 1,
+        "developmentGate": false,
+        "integerBootstrapSha256": "67caabff2948e8c312e5e91dd4688db57645d04de18d48dadbe568877a573fa7",
+        "seals": 2543,
+        "defaultChanged": false
+    },
+    "newIndependentChannels": 0,
+    "futureRequirements": {
+        "independentQualificationFamilies": 864,
+        "independentConfirmationFamilies": 1512,
+        "gainAtLeast": 0.005,
+        "wholeFamily95LowerAboveZero": true,
+        "everyOwnBudgetNonnegative": true,
+        "serialAdditionalComputeAtMost": 0.1,
+        "opponentPanel": "Supplementary fixed contrasting controller/army panel after primary pass; not a substitute for confirmation",
+        "freshSeeds": "Separate prospective registration and global exclusion audit before any independent games; old banks remain closed"
+    },
+    "freshQualificationOpened": false,
+    "freshConfirmationOpened": false,
+    "productionPromotion": false,
+    "provenanceCaution": "Older mixed-module cached-opening replay records remain preserved; they do not establish latest-source setup identity. This experiment uses the corrected current-source paired control.",
+    "capsule": "game/core/tmp/melee-delivery-diversity-20261115/v2"
+}

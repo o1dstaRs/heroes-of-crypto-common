@@ -414,3 +414,19 @@ at its fixed functional coverage gate: two supported estimates versus five requi
 executions, with exact control replays and zero changed trajectories. Its development bank never opened.
 Preserve `docs/evidence/stationary_melee_value_20261115.json` and the inert helper; do not enable it, broaden
 its eligibility or weaken that gate in place. Movement/retaliation coordination needs a distinct candidate.
+
+The separate `melee-delivery-diversity-20261115-v2` experiment keeps the native melee cap, target allocation,
+target leaders and per-slot damage/kill/stationary class, diversifying only equivalent extra approach cells.
+Read `docs/melee_delivery_diversity_research.md`; the helper is offline only. Registration
+`9e8f698bc871d12fefc27984681051dd8ccd34abf526b42bba8df5cd5d6298ab` passed its 162-fight correctness
+admission, then failed its complete 162-family / 1,296-fight development comparison: +0.077160 pp,
+95% −0.462963 to +0.694444 pp, with a negative seven-point mean. Preserve
+`docs/evidence/melee_delivery_diversity_20261115.json`. No fresh bank opened and no default changed.
+Do not import it into serving code or rescue it using a favorable subgroup or relaxed gate.
+
+Native research capsules must prove actual package identity. A shared `node_modules` symlink can make
+server setup import another frozen common tree while combat imports the intended tree; a Bun runtime
+alias plugin alone did not prevent this. Assert identical RNG functions and FightStateManager constructors,
+resolve the server's common dependency to the capsule's own source, seed copied runtime identities, and
+reconstruct each arm's opening independently. V2 also passes cold-process replay. Preserve the excluded
+initial batch and correction; cached-opening A/A replay does not establish source or setup reproducibility.
