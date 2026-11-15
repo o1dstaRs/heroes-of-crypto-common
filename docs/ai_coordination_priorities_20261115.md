@@ -10,6 +10,11 @@ Follow-up measurement: [melee delivery diversity](melee_delivery_diversity_resea
 That study also corrected a shared-dependency module mismatch in the research harness; its source-identity
 warning qualifies earlier cached-opening compatibility claims without rewriting their immutable records.
 
+The distinct [retaliation handoff wait](retaliation_handoff_research.md) passed its fixed coverage screen
+and is measuring all 1,296 development fights. It admits one wait within the existing search budget when
+a ready ally could draw the same defender's response. Its research helper is inactive in serving code;
+do not change the running policy or reuse its smoke outcomes as strength evidence.
+
 The original artifact/final-pick collection below subsequently stopped before fitting because private
 Setup did not match the live public-Setup bridge. The owner's replacement is
 `ranked-army-plan-public-20261115`, registration

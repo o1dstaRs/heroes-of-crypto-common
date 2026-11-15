@@ -430,3 +430,10 @@ alias plugin alone did not prevent this. Assert identical RNG functions and Figh
 resolve the server's common dependency to the capsule's own source, seed copied runtime identities, and
 reconstruct each arm's opening independently. V2 also passes cold-process replay. Preserve the excluded
 initial batch and correction; cached-opening A/A replay does not establish source or setup reproducibility.
+
+The distinct `retaliation-handoff-20261115-v1` study admits a legal melee wait only when a nearby ready ally
+could consume the defender's response, retaining that wait within the ordinary shortlist. Read
+`docs/retaliation_handoff_research.md`; registration
+`5ddde8da61d439d9e135c0393b2c7886da61210c8e2d7b61155b2d5869412ed6` fixes the coverage and development
+gates before execution. The helper is offline only, the development families are explicitly reused,
+and no fresh qualification bank or serving default is authorized by this smoke test.
