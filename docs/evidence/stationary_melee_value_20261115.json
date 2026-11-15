@@ -1,0 +1,347 @@
+{
+    "schema": "hoc.stationary-melee-value-admission.v1",
+    "studyId": "stationary-melee-value-20261115",
+    "at": "2026-11-15T05:35:52.019603+00:00",
+    "registrationSha256": "c60e3b76f5ce69aba6dd2ecfe58f9e5260388205eafa2c276f646bef4c2acc16",
+    "source": {
+        "common": "ccdce3efa6163cece15c25128bd58453f0d915d4",
+        "server": "916e3ca3ccb14c093c7f550d880074640c5b9988",
+        "parentManifestSha256": "8bb7d5825bd749726e01abc5a9ad635c784d817f4a26a3edf50036a0d8f707ff",
+        "at": "2026-11-15T05:30:11.796403+00:00",
+        "newIndependentChannels": 0,
+        "parentDevelopmentRegistrationSha256": "72d5d0a369f569dac42cbbc0f2d783422086d5cd4b60564cadd2dcf1bdd6ff20"
+    },
+    "status": "closed_at_coverage_gate",
+    "qualityPassed": true,
+    "coveragePassed": false,
+    "developmentOpened": false,
+    "developmentExecutions": 0,
+    "newIndependentChannels": 0,
+    "productionPromotion": false,
+    "functionalExecutions": 18,
+    "exactOffObserverPairs": 6,
+    "exactHistoricalReplays": 12,
+    "controlTurns": 285,
+    "supportedTreatmentEstimates": 2,
+    "requiredSupportedEstimates": 5,
+    "supportedMaps": [1, 4],
+    "requiredMaps": 2,
+    "changedCandidateTrajectories": 0,
+    "supportedExamples": [
+        {
+            "unit": "ffe43fcf-43c0-5f88-8ac4-d1bf868d180d",
+            "target": "13a2d727-57f3-5d2d-9a23-ff7d5a62b6ed",
+            "name": "Troll",
+            "team": 2,
+            "lap": 2,
+            "before": {
+                "effective": 362,
+                "kill": 0
+            },
+            "after": {
+                "effective": 362,
+                "kill": 0
+            }
+        },
+        {
+            "unit": "2cd6f72d-3e5b-536a-baff-0afc5554965e",
+            "target": "8f0b41e0-ea17-5265-bb96-19e7d5c2ba18",
+            "name": "Battle Mage",
+            "team": 1,
+            "lap": 3,
+            "before": {
+                "effective": 24,
+                "kill": 0
+            },
+            "after": {
+                "effective": 23.5,
+                "kill": 0
+            }
+        }
+    ],
+    "cases": [
+        {
+            "board": 0,
+            "seed": 2134097768,
+            "game": 1,
+            "map": 1,
+            "budget": 5,
+            "inputSha256": "26320e989e344871e58fb9bcc9d0d2c2a2b1a1796948a97d4688e6f388d8ba12",
+            "formationSha256": "6372d631bbddbba78cf03ef73405a8ccaccd2e83f21d56463d6d7a39fc613fed",
+            "traceSha256": {
+                "off": "73c1cb5d8097b0e571a8589bc9175391f0cd4641d954734bdb251916da324c4c",
+                "observe": "73c1cb5d8097b0e571a8589bc9175391f0cd4641d954734bdb251916da324c4c",
+                "treatment": "73c1cb5d8097b0e571a8589bc9175391f0cd4641d954734bdb251916da324c4c"
+            },
+            "estimates": {
+                "off": 0,
+                "observe": 0,
+                "treatment": 0
+            }
+        },
+        {
+            "board": 0,
+            "seed": 2134097768,
+            "game": 0,
+            "map": 1,
+            "budget": 5,
+            "inputSha256": "8c9989f3ca3cfb578e754a27ac5ab8d39083e3d412861f14c7396b23d35042ef",
+            "formationSha256": "da6132ccf10c545c2744a9f2e8106315ffa59334ce83601d08a30c22ae055dc4",
+            "traceSha256": {
+                "off": "1ef1bd73e7380c98a9a2fd276012fb2ddb6c23555e5e63052c8f131ee7561644",
+                "observe": "1ef1bd73e7380c98a9a2fd276012fb2ddb6c23555e5e63052c8f131ee7561644",
+                "treatment": "1ef1bd73e7380c98a9a2fd276012fb2ddb6c23555e5e63052c8f131ee7561644"
+            },
+            "estimates": {
+                "off": 0,
+                "observe": 1,
+                "treatment": 1
+            }
+        },
+        {
+            "board": 1,
+            "seed": 391450920,
+            "game": 0,
+            "map": 3,
+            "budget": 5,
+            "inputSha256": "26c2a46db792896515bb31c755d019e926964d83381908695e754a0fd7fc503c",
+            "formationSha256": "d908c54de8c64872618e0ca62f147fabf5dc5b0f53021b5b842f1ccbf6b89511",
+            "traceSha256": {
+                "off": "3cdecc8dfe0cfbdc6da2d6e53f9e1d2e5e056652c856b4dd2aca0d715ef86d55",
+                "observe": "3cdecc8dfe0cfbdc6da2d6e53f9e1d2e5e056652c856b4dd2aca0d715ef86d55",
+                "treatment": "3cdecc8dfe0cfbdc6da2d6e53f9e1d2e5e056652c856b4dd2aca0d715ef86d55"
+            },
+            "estimates": {
+                "off": 0,
+                "observe": 0,
+                "treatment": 0
+            }
+        },
+        {
+            "board": 1,
+            "seed": 391450920,
+            "game": 1,
+            "map": 3,
+            "budget": 5,
+            "inputSha256": "e6b9d756cdf2d557621b28b36b340a9391e3343a9632013fbd46132351f6163d",
+            "formationSha256": "ca87cdf75b9261f5f03e165936c8504f142a19abf816082ffb94c5340f9086c3",
+            "traceSha256": {
+                "off": "86b2d85c65d1d4d4c90780108844ded4599243bb7a9f849583816ade10a65b90",
+                "observe": "86b2d85c65d1d4d4c90780108844ded4599243bb7a9f849583816ade10a65b90",
+                "treatment": "86b2d85c65d1d4d4c90780108844ded4599243bb7a9f849583816ade10a65b90"
+            },
+            "estimates": {
+                "off": 0,
+                "observe": 0,
+                "treatment": 0
+            }
+        },
+        {
+            "board": 2,
+            "seed": 698200208,
+            "game": 0,
+            "map": 4,
+            "budget": 5,
+            "inputSha256": "b7c8ce1329752b776d8f83de88a50b1c2a3bd5791d8d22f310e7dbf98a0a3bdf",
+            "formationSha256": "c0843ad7dcd1b9989bbddb92659dd64784d79db0a0564c29b2ef144449816339",
+            "traceSha256": {
+                "off": "c9538e198b0eb923b3b98bac54c96397c697c364e04192a5a43a066402a1acf3",
+                "observe": "c9538e198b0eb923b3b98bac54c96397c697c364e04192a5a43a066402a1acf3",
+                "treatment": "c9538e198b0eb923b3b98bac54c96397c697c364e04192a5a43a066402a1acf3"
+            },
+            "estimates": {
+                "off": 0,
+                "observe": 0,
+                "treatment": 0
+            }
+        },
+        {
+            "board": 2,
+            "seed": 698200208,
+            "game": 1,
+            "map": 4,
+            "budget": 5,
+            "inputSha256": "6f1516bb978ec7a6fb60120fc23c19e149a6aa49267cbe73aae216c793a7fa8a",
+            "formationSha256": "079a1ac2afd034712062f6c8ba328d102fa6f75e09bcf44c0390182a4aa2cf31",
+            "traceSha256": {
+                "off": "065f0ac6ab54891213ebaab3ef4d72e676d17db88597d59049f6c1fdc028a45f",
+                "observe": "065f0ac6ab54891213ebaab3ef4d72e676d17db88597d59049f6c1fdc028a45f",
+                "treatment": "065f0ac6ab54891213ebaab3ef4d72e676d17db88597d59049f6c1fdc028a45f"
+            },
+            "estimates": {
+                "off": 0,
+                "observe": 1,
+                "treatment": 1
+            }
+        }
+    ],
+    "helperSha256": "aab493f8ae70b9af19fe54521dceddb10fab09faf3690d7876fbb6f3199667eb",
+    "overlays": [
+        {
+            "path": "sources/common/src/ai/candidates.ts",
+            "sha256": "553b113139995c5b5292aa5b4477d8e02ea09dcb2e081e2fa1eacbabf603da83"
+        },
+        {
+            "path": "sources/common/src/simulation/search_driver.ts",
+            "sha256": "bdfc98567e17f1b3b5a660c65b47e7c0146195e1b4e1f59c9cd9ea7f1f931e51"
+        }
+    ],
+    "rawFiles": [
+        {
+            "path": "preflight/worker-0.jsonl",
+            "sha256": "60a7ee33d7dd97c0aeb71ed8b98a4eb3102c37100ff560715aec08ee42bef9c8"
+        },
+        {
+            "path": "preflight/worker-1.jsonl",
+            "sha256": "4d07ec3ec7a0bd05b3b9a4ed47a734853b5738a8f0e7bf303f3e97cb971503a9"
+        },
+        {
+            "path": "preflight/worker-2.jsonl",
+            "sha256": "e38b32b6d825d200ad1ab57106c93e0e04d1fa91275b4eb50dd5668750d95b08"
+        },
+        {
+            "path": "preflight/worker-3.jsonl",
+            "sha256": "50f32126e278fc73da30a0b6f1561ea0985ca855120079f98e130f524c8e4611"
+        },
+        {
+            "path": "preflight/worker-4.jsonl",
+            "sha256": "212e3364aabdb3155cfc1787dc127bba50e14650ea8961a2250595c6cd73eefb"
+        },
+        {
+            "path": "preflight/worker-5.jsonl",
+            "sha256": "c755f62b98c1694c55e99b169ba718750cb5f603e985dd54ba97db508bbb7aad"
+        }
+    ],
+    "verifiedSourceFiles": 2538,
+    "analysisRegistration": {
+        "at": "2026-11-15T05:33:03.117210+00:00",
+        "registrationSha256": "c60e3b76f5ce69aba6dd2ecfe58f9e5260388205eafa2c276f646bef4c2acc16",
+        "analyzerSha256": "14bda9ae8138bd4ba0d14a14d9a590b4fd9c5b93d5347052731de1d77f0e7e2d",
+        "state": "before any development fight; no gates changed"
+    },
+    "controlTurnCensus": {
+        "scope": "six already-opened smoke controls only; descriptive, no strength or live-frequency inference",
+        "turns": 285,
+        "actions": {
+            "obstacle_attack": 13,
+            "range_attack": 131,
+            "move_unit": 86,
+            "area_throw_attack": 1,
+            "cast_spell": 28,
+            "melee_attack": 37,
+            "wait_turn": 16,
+            "defend_turn": 3
+        },
+        "spellCasts": {
+            "Vine Throw": 6,
+            "Fireball": 2,
+            "Fire Strike": 5,
+            "Misfortune": 2,
+            "Battle Roar": 2,
+            "Lightning Strike": 7,
+            "Resurrection": 2,
+            "Fireforged Sword": 1,
+            "Wild Regeneration": 1
+        },
+        "nativeDecisionChanged": 145,
+        "recoveryTurns": 0,
+        "meleeMoving": 30,
+        "meleeStationary": 7,
+        "events": {
+            "obstacle_attacked": 13,
+            "center_obstacle_cleared": 13,
+            "turn_completed": 285,
+            "unit_attacked": 168,
+            "effects_applied": 94,
+            "unit_moved": 86,
+            "area_attacked": 1,
+            "spell_cast": 28,
+            "vine_placed": 6,
+            "unit_destroyed": 52,
+            "unit_waited": 16,
+            "attack_type_selected": 1,
+            "unit_defended": 3
+        },
+        "actors": {
+            "Manticore": 5,
+            "Cyclops": 12,
+            "Zena": 26,
+            "Gargantuan": 3,
+            "Orc": 12,
+            "Beholder": 22,
+            "Squire": 5,
+            "Trent": 20,
+            "Tsar Cannon": 10,
+            "Wandering Mage": 8,
+            "Battle Mage": 8,
+            "Peasant": 22,
+            "Nomad": 3,
+            "Behemoth": 9,
+            "Troglodyte": 6,
+            "Monk": 18,
+            "Hyena": 18,
+            "Dryad": 16,
+            "Magic Dragon": 8,
+            "Arbalester": 11,
+            "Troll": 7,
+            "Wolf": 8,
+            "Angel": 18,
+            "Elf": 10
+        }
+    },
+    "resultSha256": "8144aa1062020e12a094d7123b309e2d59c649dbc43281bc2674768e986631cb",
+    "registrationSummary": {
+        "schema": "hoc.stationary-melee-value-development.v1",
+        "studyId": "stationary-melee-value-20261115",
+        "at": "2026-11-15T05:31:54.358550+00:00",
+        "hypothesis": "Correct supported unanswered stationary primary melee candidate HP values before the unchanged cap and A19 search. No additional rollouts or new weights.",
+        "reference": "adopted contextual draft + native paid setup, support splits, placement and A19; public complete ranked Setup",
+        "scope": "own root search candidates only; moving, retaliation, shield redirection and secondary damage sequences keep incumbent metadata",
+        "population": "first 162 entire already-opened parent Empower allocation development families, both draft assignments and physical seats; no outcome or creature selection",
+        "source": {
+            "common": "ccdce3efa6163cece15c25128bd58453f0d915d4",
+            "server": "916e3ca3ccb14c093c7f550d880074640c5b9988",
+            "parentManifestSha256": "8bb7d5825bd749726e01abc5a9ad635c784d817f4a26a3edf50036a0d8f707ff",
+            "at": "2026-11-15T05:30:11.796403+00:00",
+            "newIndependentChannels": 0,
+            "parentDevelopmentRegistrationSha256": "72d5d0a369f569dac42cbbc0f2d783422086d5cd4b60564cadd2dcf1bdd6ff20"
+        },
+        "newIndependentChannels": 0,
+        "workers": 12,
+        "priority": 19,
+        "preflight": {
+            "cases": 6,
+            "executions": 18,
+            "controls": "off and observe must reproduce exact prior full action/event trace for each case",
+            "treatment": "zero rejects/model errors; at least five supported estimates across at least two maps"
+        },
+        "development": {
+            "families": 162,
+            "cases": 648,
+            "arms": ["observe", "treatment"],
+            "fights": 1296,
+            "cacheReuse": false,
+            "swappedArmOrder": true
+        },
+        "analysis": {
+            "cluster": "one offer board across both draft assignments and seats",
+            "score": "win1 draw.5 loss0",
+            "bootstrap": {
+                "iterations": 20000,
+                "seed": 2026111577,
+                "generator": "xorshift32 unsigned; modulo family count",
+                "interval": "sorted differences floor((B-1)*.025), floor((B-1)*.975)"
+            },
+            "exactTest": "two-sided family sign flips, integer deltas times8",
+            "fundingGate": {
+                "gainAtLeast": 0.005,
+                "everyOwnBudgetMeanNonnegative": true,
+                "zeroQualityErrors": true
+            },
+            "noOutcomeBasedMasks": true,
+            "noThresholdRetuning": true,
+            "noDefaultActivation": true,
+            "futureRequirements": "independent registered qualification/confirmation, serving compatibility and serial <=10% extra compute before any promotion"
+        }
+    }
+}

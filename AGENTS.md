@@ -407,3 +407,10 @@ seven-point Dragon families were rebuilt on the latest engine with actual public
 4.513889 pp versus current and 6.25 pp versus precision alone. Read `docs/magic_empower_joint_research.md`.
 No fresh banks or channels were allocated and no model was activated. Preserve the factorial evidence
 and original failed gates; neither the seven-point hypothesis nor the favorable Lava slice is a qualification.
+
+For the user's broader improvement request, read `docs/ai_coordination_priorities_20261115.md` before
+duplicating the active artifact/final-pick planner. The separate stationary-melee metadata prototype closed
+at its fixed functional coverage gate: two supported estimates versus five required across eighteen
+executions, with exact control replays and zero changed trajectories. Its development bank never opened.
+Preserve `docs/evidence/stationary_melee_value_20261115.json` and the inert helper; do not enable it, broaden
+its eligibility or weaken that gate in place. Movement/retaliation coordination needs a distinct candidate.
