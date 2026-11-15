@@ -133,7 +133,9 @@ export type GameEvent =
           // "skewer_strike" / "fire_breath": a unit strike's Skewer Strike ran on into the barrel behind its small
           // target, or its Fire Breath burned a barrel in the band behind its target. Absent for the aimed stone, a
           // projectile impact and a pierce past a barrel — each lands on a strike of its own.
-          source?: "lightning_spin" | "skewer_strike" | "fire_breath";
+          // "ranged_splash": a Large Caliber / Area Throw blast. attackerId owns the actual projectile,
+          // including a counter-shot, so clients remove its barrels on that projectile's impact.
+          source?: "lightning_spin" | "skewer_strike" | "fire_breath" | "ranged_splash";
           // Unit damage dealt by the same obstacle strike. Lightning Spin catches every enemy around the attacker
           // even when the blow was aimed at a barrel, and a barrel is no unit to hang an attack payload on, so
           // the action's FIRST obstacle_attacked carries it: `damage.secondary` holds the spin's hits (plus any

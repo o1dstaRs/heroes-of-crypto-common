@@ -992,6 +992,7 @@ export class GameActionEngine {
         const primaryRangeTarget = evalResult.affectedUnits[0]?.[0];
         let responseDivisor = 1;
         let responseUnits: Unit[] | undefined = undefined;
+        let responseBlastCells: XY[] = [];
         if (
             primaryRangeTarget &&
             // isRangeCapable, not attack_type === RANGE: a melee unit holding a stolen Endless Quiver
@@ -1018,6 +1019,12 @@ export class GameActionEngine {
             );
             responseDivisor = responseEval.rangeAttackDivisors[0] ?? 1;
             responseUnits = responseEval.affectedUnits[0];
+            if (
+                primaryRangeTarget.hasAbilityActive("Large Caliber") ||
+                primaryRangeTarget.hasAbilityActive("Area Throw")
+            ) {
+                responseBlastCells = responseEval.affectedCells.flat();
+            }
         }
 
         const damage = this.createVisibleDamage();
@@ -1044,6 +1051,19 @@ export class GameActionEngine {
                 ...this.context.grid.clearScatteredMountainsInCells(evalResult.affectedCells.flat()),
             );
         }
+        // Evaluation alone does not authorize a counter-blast: death, response suppression and other gates
+        // can prevent the throw. Only the handler's actual return projectile can destroy its blast's barrels.
+        const responseWasThrown =
+            primaryRangeTarget &&
+            result.animationData?.some(
+                (animation) =>
+                    animation.fromPosition?.x === primaryRangeTarget.getPosition().x &&
+                    animation.fromPosition?.y === primaryRangeTarget.getPosition().y,
+            );
+        const responseDestroyedCells =
+            this.context.grid.hasScatteredMountains() && responseWasThrown
+                ? this.context.grid.clearScatteredMountainsInCells(responseBlastCells)
+                : [];
 
         const unitIdsDied = [...new Set(result.unitIdsDied)];
         const responseTarget = responseUnits?.[0];
@@ -1053,7 +1073,22 @@ export class GameActionEngine {
         ]);
         const events: GameEvent[] = [];
         if (!this.headlessEvents) {
-            events.push(...this.scatteredObstacleDestroyedEvents(attacker, destroyedScatteredCells));
+            events.push(
+                ...this.scatteredObstacleDestroyedEvents(
+                    attacker,
+                    destroyedScatteredCells,
+                    ignoresStructures ? "ranged_splash" : undefined,
+                ),
+            );
+            if (primaryRangeTarget) {
+                events.push(
+                    ...this.scatteredObstacleDestroyedEvents(
+                        primaryRangeTarget,
+                        responseDestroyedCells,
+                        "ranged_splash",
+                    ),
+                );
+            }
             events.push({
                 type: "unit_attacked",
                 attackType: "range",
@@ -1443,7 +1478,7 @@ export class GameActionEngine {
         const killAttributions = this.createDirectKillAttributions(unitIdsDied, areaVictims);
         const events: GameEvent[] = [];
         if (!this.headlessEvents) {
-            events.push(...this.scatteredObstacleDestroyedEvents(attacker, destroyedScatteredCells));
+            events.push(...this.scatteredObstacleDestroyedEvents(attacker, destroyedScatteredCells, "ranged_splash"));
             events.push({
                 type: "area_attacked",
                 attackType: "area_throw",
