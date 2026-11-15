@@ -1,0 +1,309 @@
+{
+    "schema": "hoc.empower-policy-tree-result.v1",
+    "studyId": "empower-policy-tree-20261115T044000Z",
+    "registrationSha256": "91d8571dcc9eeef69f1ff607318e729979543aa75e2c417fd140e9fab8f9dc46",
+    "status": "closed-no-development-finalist",
+    "fit": {
+        "registrationSha256": "91d8571dcc9eeef69f1ff607318e729979543aa75e2c417fd140e9fab8f9dc46",
+        "boards": 648,
+        "examples": 675,
+        "foldCounts": [130, 130, 130, 129, 129],
+        "scores": [
+            {
+                "recipe": {
+                    "depth": 1,
+                    "minimumBoards": 24,
+                    "uncertaintyPenalty": 0,
+                    "margin": 0.01
+                },
+                "gain": 0,
+                "foldGains": [
+                    0.0019230769230769232, 0.0019230769230769232, -0.004807692307692308, -0.0009689922480620155,
+                    0.001937984496124031
+                ],
+                "activatedBoards": 85,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 1,
+                    "minimumBoards": 24,
+                    "uncertaintyPenalty": 1,
+                    "margin": 0.01
+                },
+                "gain": -0.0007716049382716049,
+                "foldGains": [
+                    0, 0.0019230769230769232, -0.006730769230769231, -0.0009689922480620155, 0.001937984496124031
+                ],
+                "activatedBoards": 44,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 1,
+                    "minimumBoards": 48,
+                    "uncertaintyPenalty": 0,
+                    "margin": 0.01
+                },
+                "gain": 0,
+                "foldGains": [
+                    0.0019230769230769232, 0.0019230769230769232, -0.004807692307692308, -0.0009689922480620155,
+                    0.001937984496124031
+                ],
+                "activatedBoards": 94,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 1,
+                    "minimumBoards": 48,
+                    "uncertaintyPenalty": 1,
+                    "margin": 0.01
+                },
+                "gain": -0.0005787037037037037,
+                "foldGains": [0, 0, -0.0038461538461538464, -0.0009689922480620155, 0.001937984496124031],
+                "activatedBoards": 29,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 1,
+                    "minimumBoards": 96,
+                    "uncertaintyPenalty": 0,
+                    "margin": 0.01
+                },
+                "gain": -0.00019290123456790122,
+                "foldGains": [
+                    0.0019230769230769232, 0.0019230769230769232, -0.004807692307692308, -0.0048449612403100775,
+                    0.0048449612403100775
+                ],
+                "activatedBoards": 129,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 1,
+                    "minimumBoards": 96,
+                    "uncertaintyPenalty": 1,
+                    "margin": 0.01
+                },
+                "gain": -0.0009645061728395061,
+                "foldGains": [0, 0, -0.004807692307692308, 0, 0],
+                "activatedBoards": 29,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 2,
+                    "minimumBoards": 24,
+                    "uncertaintyPenalty": 0,
+                    "margin": 0.01
+                },
+                "gain": -0.0015432098765432098,
+                "foldGains": [
+                    0.006730769230769231, 0.0019230769230769232, -0.010576923076923078, -0.007751937984496124,
+                    0.001937984496124031
+                ],
+                "activatedBoards": 98,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 2,
+                    "minimumBoards": 24,
+                    "uncertaintyPenalty": 1,
+                    "margin": 0.01
+                },
+                "gain": -0.0009645061728395061,
+                "foldGains": [
+                    0.006730769230769231, 0.0019230769230769232, -0.006730769230769231, -0.006782945736434108, 0
+                ],
+                "activatedBoards": 74,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 2,
+                    "minimumBoards": 48,
+                    "uncertaintyPenalty": 0,
+                    "margin": 0.01
+                },
+                "gain": -0.004050925925925926,
+                "foldGains": [
+                    -0.007692307692307693, -0.0019230769230769232, -0.008653846153846154, -0.003875968992248062,
+                    0.001937984496124031
+                ],
+                "activatedBoards": 108,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 2,
+                    "minimumBoards": 48,
+                    "uncertaintyPenalty": 1,
+                    "margin": 0.01
+                },
+                "gain": -0.002700617283950617,
+                "foldGains": [
+                    -0.011538461538461539, 0.0038461538461538464, -0.006730769230769231, -0.0009689922480620155,
+                    0.001937984496124031
+                ],
+                "activatedBoards": 85,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 2,
+                    "minimumBoards": 96,
+                    "uncertaintyPenalty": 0,
+                    "margin": 0.01
+                },
+                "gain": -0.00019290123456790122,
+                "foldGains": [
+                    0.0019230769230769232, 0.0019230769230769232, -0.004807692307692308, -0.0048449612403100775,
+                    0.0048449612403100775
+                ],
+                "activatedBoards": 129,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 2,
+                    "minimumBoards": 96,
+                    "uncertaintyPenalty": 1,
+                    "margin": 0.01
+                },
+                "gain": -0.0009645061728395061,
+                "foldGains": [0, 0, -0.004807692307692308, 0, 0],
+                "activatedBoards": 29,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 3,
+                    "minimumBoards": 24,
+                    "uncertaintyPenalty": 0,
+                    "margin": 0.01
+                },
+                "gain": 0.0019290123456790122,
+                "foldGains": [
+                    0.014423076923076924, 0.0038461538461538464, -0.006730769230769231, -0.003875968992248062,
+                    0.001937984496124031
+                ],
+                "activatedBoards": 151,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 3,
+                    "minimumBoards": 24,
+                    "uncertaintyPenalty": 1,
+                    "margin": 0.01
+                },
+                "gain": 0.0011574074074074073,
+                "foldGains": [
+                    0.0125, 0.0038461538461538464, -0.0057692307692307696, -0.006782945736434108, 0.001937984496124031
+                ],
+                "activatedBoards": 110,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 3,
+                    "minimumBoards": 48,
+                    "uncertaintyPenalty": 0,
+                    "margin": 0.01
+                },
+                "gain": -0.008101851851851851,
+                "foldGains": [
+                    -0.025961538461538463, -0.0019230769230769232, -0.0125, -0.003875968992248062, 0.003875968992248062
+                ],
+                "activatedBoards": 191,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 3,
+                    "minimumBoards": 48,
+                    "uncertaintyPenalty": 1,
+                    "margin": 0.01
+                },
+                "gain": -0.0019290123456790122,
+                "foldGains": [
+                    -0.011538461538461539, 0.0038461538461538464, -0.0028846153846153848, -0.0009689922480620155,
+                    0.001937984496124031
+                ],
+                "activatedBoards": 78,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 3,
+                    "minimumBoards": 96,
+                    "uncertaintyPenalty": 0,
+                    "margin": 0.01
+                },
+                "gain": -0.00019290123456790122,
+                "foldGains": [
+                    0.0019230769230769232, 0.0019230769230769232, -0.004807692307692308, -0.0048449612403100775,
+                    0.0048449612403100775
+                ],
+                "activatedBoards": 129,
+                "eligible": false
+            },
+            {
+                "recipe": {
+                    "depth": 3,
+                    "minimumBoards": 96,
+                    "uncertaintyPenalty": 1,
+                    "margin": 0.01
+                },
+                "gain": -0.0009645061728395061,
+                "foldGains": [0, 0, -0.004807692307692308, 0, 0],
+                "activatedBoards": 29,
+                "eligible": false
+            }
+        ],
+        "selected": null,
+        "model": null,
+        "modelSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "independentGames": 0,
+        "qualification": "not-opened",
+        "productionPromotion": false
+    },
+    "verification": {
+        "passed": true,
+        "independentImplementation": "Python standard library",
+        "boards": 648,
+        "eligibleArmies": 675,
+        "settings": 18,
+        "foldModels": 90,
+        "newIndependentGames": 0,
+        "fitSha256": "c2df807333bef80ea2e88d1f7fe04bf1fd6dacf8450501389874e768532a1ead",
+        "examplesSha256": "8669bf85b5b8b2cd3199ec39a9e37632b6ce3cd21abb0942446d2d787f814cbc",
+        "foldModelsSha256": "504cf0283ef814499803da6e717f9d41ba09bbd95a8985baf30795fc8ee07edf",
+        "checks": [
+            "all paired arm labels",
+            "whole-board fold isolation",
+            "every held-out action and score",
+            "training-only leaf choices with clustered uncertainty",
+            "distinct-board support",
+            "unchanged gates and null finalist"
+        ]
+    },
+    "preflightAmendment": {
+        "at": "2026-11-15T04:21:49.538084+00:00",
+        "reason": "Initial reconstruction stopped before any fit: parent actor omits features for retained paid Placement plans. Mirror its exact funding guard before feature comparison; training algorithm, grid, folds and outcomes unchanged.",
+        "parentRegistrationSha256": "91d8571dcc9eeef69f1ff607318e729979543aa75e2c417fd140e9fab8f9dc46",
+        "trainerSha256": "73e3aac1ceee472ca743b453ec9b4e2a966627ea13f674694ac7c48b30f9f6f0",
+        "originalFailureLogSha256": "db67ee147bda443ad7770f2a25d3569e0a99c3f4c2a831cca1a58939d8668afc",
+        "fitsBeforeAmendment": 0,
+        "newGames": 0
+    },
+    "priorStudiesUnchanged": true,
+    "freshBanksAllocated": false,
+    "qualificationOpened": false,
+    "confirmationOpened": false,
+    "modelActivated": false,
+    "nextRequirement": "A separate hypothesis and fresh registration. Do not refit this closed grid or activate its best failed setting. Any future qualification must include latest balance and serving policy, independently of these reused old-engine labels."
+}

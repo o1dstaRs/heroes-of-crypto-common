@@ -393,3 +393,17 @@ Independent qualification, confirmation and serving-source compatibility are sti
 The shared-cost continuation completed all 48 settings with no development finalist (best +0.192901 pp,
 threshold +0.5 pp). Preserve `docs/evidence/empower_cost_results_20261115.json`. No model was refitted,
 no default changed, and both fresh banks remain unopened. Do not activate its best failed setting.
+
+The direct policy-tree continuation `empower-policy-tree-20261115T044000Z`, registration
+`91d8571dcc9eeef69f1ff607318e729979543aa75e2c417fd140e9fab8f9dc46`, also closed without a finalist.
+All 18 settings reused the 648 adopted-policy development boards explicitly; the best was +0.192901 pp,
+below +0.5 pp. Independent Python verified all 90 fold models and paired scores. No model was refitted,
+no fresh seeds or games were allocated, and no serving default changed. Preserve
+`docs/empower_policy_tree_research.md` and its registration/result fixtures. Its inference helper is inert.
+
+The joint continuation `magic-empower-joint-20261115T044500Z` also failed development. All 72 already-opened
+seven-point Dragon families were rebuilt on the latest engine with actual public ranked Setup. Across
+576 comparisons / 556 distinct fights, spare-physical-point Empower plus immutable precision lost
+4.513889 pp versus current and 6.25 pp versus precision alone. Read `docs/magic_empower_joint_research.md`.
+No fresh banks or channels were allocated and no model was activated. Preserve the factorial evidence
+and original failed gates; neither the seven-point hypothesis nor the favorable Lava slice is a qualification.

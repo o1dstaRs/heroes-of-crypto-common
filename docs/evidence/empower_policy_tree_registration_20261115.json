@@ -1,0 +1,184 @@
+{
+    "schema": "hoc.empower-policy-tree-development.v1",
+    "studyId": "empower-policy-tree-20261115T044000Z",
+    "registeredAt": "2026-11-15T04:21:12.027340+00:00",
+    "hypothesis": "Direct paired-policy optimization can learn nonlinear funding decisions that linear effect regressions miss. This is explicit development reuse, not a new independent strength claim.",
+    "commonCommit": "7ad58942df2f42d0931fc0bb0e3b40cddb5b8ca2",
+    "sources": [
+        {
+            "path": "train.ts",
+            "sha256": "bf99227fbe4ef80988b794ba3eff56b27305007a0c0bbd9ea1039a569e50e522"
+        },
+        {
+            "path": "../../../heroes-of-crypto-common/src/ai/setup/empower_policy_tree.ts",
+            "sha256": "ec769b0016d6771d26b48758ebe43bb9597486e88dddf2007725153becb8f278"
+        },
+        {
+            "path": "../../../heroes-of-crypto-common/src/simulation/empower_policy_tree_training.ts",
+            "sha256": "3e5d06f480a34a050b64302bd12e851e78c3b81e2136137a5dd5e2153f6aa39e"
+        },
+        {
+            "path": "../../../heroes-of-crypto-common/src/ai/setup/empower_allocation.ts",
+            "sha256": "978d81a8db8c0e4ed31f62de2d84f857aaf87ff0c5cbd183b03d4f50f4c6b23e"
+        },
+        {
+            "path": "../../../heroes-of-crypto-common/src/ai/setup/empower_context.ts",
+            "sha256": "24d829f7e9c36572ee81786f51973dd220580b623e515274d7367c7c9deffb98"
+        },
+        {
+            "path": "../../../heroes-of-crypto-common/src/ai/setup/empower_setup.ts",
+            "sha256": "8b4bba57aef49a2f343e54f57993f9dba64bc08c97f4a65de0d1a870a9b214cb"
+        },
+        {
+            "path": "../../../heroes-of-crypto-common/src/ai/setup/creature_score.ts",
+            "sha256": "b389165bffcf926140a08eb8a355ef0485ab230938f9bbe71b9ed4e8e998a679"
+        },
+        {
+            "path": "../../../heroes-of-crypto-common/src/simulation/ranked_draft_eval.ts",
+            "sha256": "cb66181e4e4b05758fb7b678c9d14b010a380ed42a8679975dbe93a4fac38649"
+        }
+    ],
+    "development": {
+        "parentRegistrationSha256": "72d5d0a369f569dac42cbbc0f2d783422086d5cd4b60564cadd2dcf1bdd6ff20",
+        "rowsSha256": "f6d7aa7bdd904457f5651cf479df4ec6f859bb00cd5a0fa20251e914edb737c1",
+        "boards": 648,
+        "earlierEngine": "491452e0 plus sealed adoption overlays; Champion movement blessing is absent in the reused labels",
+        "policyCompatibility": "all nine authoritative adoption overlay files matched the current server at turn start; no retrospective new-engine claim"
+    },
+    "training": {
+        "folds": 5,
+        "foldSalt": 2026111521,
+        "recipes": [
+            {
+                "depth": 1,
+                "minimumBoards": 24,
+                "uncertaintyPenalty": 0,
+                "margin": 0.01
+            },
+            {
+                "depth": 1,
+                "minimumBoards": 24,
+                "uncertaintyPenalty": 1,
+                "margin": 0.01
+            },
+            {
+                "depth": 1,
+                "minimumBoards": 48,
+                "uncertaintyPenalty": 0,
+                "margin": 0.01
+            },
+            {
+                "depth": 1,
+                "minimumBoards": 48,
+                "uncertaintyPenalty": 1,
+                "margin": 0.01
+            },
+            {
+                "depth": 1,
+                "minimumBoards": 96,
+                "uncertaintyPenalty": 0,
+                "margin": 0.01
+            },
+            {
+                "depth": 1,
+                "minimumBoards": 96,
+                "uncertaintyPenalty": 1,
+                "margin": 0.01
+            },
+            {
+                "depth": 2,
+                "minimumBoards": 24,
+                "uncertaintyPenalty": 0,
+                "margin": 0.01
+            },
+            {
+                "depth": 2,
+                "minimumBoards": 24,
+                "uncertaintyPenalty": 1,
+                "margin": 0.01
+            },
+            {
+                "depth": 2,
+                "minimumBoards": 48,
+                "uncertaintyPenalty": 0,
+                "margin": 0.01
+            },
+            {
+                "depth": 2,
+                "minimumBoards": 48,
+                "uncertaintyPenalty": 1,
+                "margin": 0.01
+            },
+            {
+                "depth": 2,
+                "minimumBoards": 96,
+                "uncertaintyPenalty": 0,
+                "margin": 0.01
+            },
+            {
+                "depth": 2,
+                "minimumBoards": 96,
+                "uncertaintyPenalty": 1,
+                "margin": 0.01
+            },
+            {
+                "depth": 3,
+                "minimumBoards": 24,
+                "uncertaintyPenalty": 0,
+                "margin": 0.01
+            },
+            {
+                "depth": 3,
+                "minimumBoards": 24,
+                "uncertaintyPenalty": 1,
+                "margin": 0.01
+            },
+            {
+                "depth": 3,
+                "minimumBoards": 48,
+                "uncertaintyPenalty": 0,
+                "margin": 0.01
+            },
+            {
+                "depth": 3,
+                "minimumBoards": 48,
+                "uncertaintyPenalty": 1,
+                "margin": 0.01
+            },
+            {
+                "depth": 3,
+                "minimumBoards": 96,
+                "uncertaintyPenalty": 0,
+                "margin": 0.01
+            },
+            {
+                "depth": 3,
+                "minimumBoards": 96,
+                "uncertaintyPenalty": 1,
+                "margin": 0.01
+            }
+        ],
+        "minimumGain": 0.005,
+        "selection": "whole-board mean gain >=0.5pp and at least three positive folds; maximize mean, ties first recipe; refit exactly once if eligible",
+        "auxiliary": false,
+        "splitCriterion": "maximum conservative paired action value; ties maximum multiarm heterogeneity; train-only fixed quantiles; minimum distinct boards on each side",
+        "uncertainty": "cluster sum by board, including correlated assignments; no hidden enemy state in features"
+    },
+    "futureGate": {
+        "qualificationBoards": 1728,
+        "confirmationBoards": 1728,
+        "gain": 0.005,
+        "lower95Above": 0,
+        "budgetFloor": -0.01,
+        "mapFloor": -0.01,
+        "minimumActivatedBoards": 60,
+        "illegalActions": 0,
+        "nativeFormationChanges": 0,
+        "serialDecisionComputeLimit": 1.1,
+        "requirement": "If development qualifies, freeze model and latest serving/common source, register new disjoint qualification/confirmation channels and execution before opening; retain all old closed banks; exact same native free formation control; independent verifier and source compatibility required"
+    },
+    "newSeeds": [],
+    "newIndependentGames": 0,
+    "productionPromotion": false,
+    "registrationSha256": "91d8571dcc9eeef69f1ff607318e729979543aa75e2c417fd140e9fab8f9dc46"
+}

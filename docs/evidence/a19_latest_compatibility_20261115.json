@@ -1,0 +1,166 @@
+{
+    "schema": "hoc.latest-a19-compatibility-result.v1",
+    "passed": true,
+    "commonCommit": "7ad58942df2f42d0931fc0bb0e3b40cddb5b8ca2",
+    "serverSourceCommit": "916e3ca3ccb14c093c7f550d880074640c5b9988",
+    "sourceOnly": true,
+    "uniqueCases": 108,
+    "exactReplayPairs": 108,
+    "executedFights": 216,
+    "newIndependentStrengthGames": 0,
+    "budgetCounts": {
+        "5": 36,
+        "6": 36,
+        "7": 36
+    },
+    "mapCounts": {
+        "1": 36,
+        "3": 36,
+        "4": 36
+    },
+    "championCases": 0,
+    "searchStatisticsUniqueCases": {
+        "decisions": 5381,
+        "inferred": 4291,
+        "corrected": 692,
+        "modelErrors": 0,
+        "missingStart": 0
+    },
+    "publicRosterProjection": "matched all cases",
+    "nativeFormationAndSpellbooks": "asserted by native runner before fight",
+    "sourceSealsVerified": 2140,
+    "manifestSha256": "8bb7d5825bd749726e01abc5a9ad635c784d817f4a26a3edf50036a0d8f707ff",
+    "rawFiles": [
+        {
+            "path": "replays/worker-0.jsonl",
+            "sha256": "b602f181db8cbc767c6cd708201a08fac17f329dd1f13d4a474b647310e9ef6f"
+        },
+        {
+            "path": "replays/worker-1.jsonl",
+            "sha256": "36a09a1bf1b3460d888b09848cfb0423aae4b782f1db4776f1b153475834f729"
+        },
+        {
+            "path": "replays/worker-10.jsonl",
+            "sha256": "af67154c9c0783c5a3ae619d90a1f3dd0a2283c5d1f36e31686883a43abb222d"
+        },
+        {
+            "path": "replays/worker-11.jsonl",
+            "sha256": "69017baef60ff5a24578549f02a0996c7b9586f6d9f52b1fa03227a1d8d05ade"
+        },
+        {
+            "path": "replays/worker-2.jsonl",
+            "sha256": "8c21dedae37592c0c3c44fb02e48b346019c1cc7f014a95559706caf59920a8d"
+        },
+        {
+            "path": "replays/worker-3.jsonl",
+            "sha256": "d771d195aac0747e165d12126f02c00bb7525e36a6145d267359cac781613b94"
+        },
+        {
+            "path": "replays/worker-4.jsonl",
+            "sha256": "b187523d28ed3b8f2e6907029ee39517dd0e5e8827ebd8f6245dd764c7d99deb"
+        },
+        {
+            "path": "replays/worker-5.jsonl",
+            "sha256": "68d3048321b9d8f16160d507b325b94207a914c4b7ae76d8ac62297069507bb2"
+        },
+        {
+            "path": "replays/worker-6.jsonl",
+            "sha256": "0ad870e9ca8124259aaace4c62fc459de839daf0a3422f7a2751b9017eb4d3a5"
+        },
+        {
+            "path": "replays/worker-7.jsonl",
+            "sha256": "0466d0235259539f0c7ffbc8ffb113395fd4b08bcfeb1ce775dfc2393742812a"
+        },
+        {
+            "path": "replays/worker-8.jsonl",
+            "sha256": "115681cfcbccf923de2f3ab8ef672a42dde48e21cbd990bb9a9f8fac2ddab925"
+        },
+        {
+            "path": "replays/worker-9.jsonl",
+            "sha256": "5dd4b7abbf92b54165ba37b2fd7b492c4977e13c4e79392c90e90a83f91037fe"
+        }
+    ],
+    "limits": [
+        "Functional deterministic replay; not an AI strength estimate",
+        "Current source verified; no remote deployment or live binary identity claim",
+        "Earlier Empower labels and Magic Dragon qualification used older engine or setup contracts; do not relabel them as latest ranked evidence"
+    ],
+    "championStress": {
+        "passed": true,
+        "syntheticChampion": true,
+        "purpose": "Synthetic latest Champion compatibility stress only, not a legal-draft strength comparison. Replace own L4 with canonical Champion after draft, regenerate live synergies, and retain native setup.",
+        "cases": 18,
+        "exactReplayPairs": 18,
+        "executedFights": 36,
+        "newIndependentStrengthGames": 0,
+        "budgets": {
+            "5": 6,
+            "7": 6,
+            "6": 6
+        },
+        "maps": {
+            "1": 6,
+            "3": 6,
+            "4": 6
+        },
+        "neuralStatisticsUniqueCases": {
+            "decisions": 917,
+            "inferred": 746,
+            "corrected": 126,
+            "modelErrors": 0,
+            "missingStart": 0
+        },
+        "manifestSha256": "b74505d61da6ad04760b1c56f28ec0a46f354f7d34387a45239a12f5e8ad482d",
+        "rawFiles": [
+            {
+                "path": "champion-v2-replays/worker-0.jsonl",
+                "sha256": "fc560706585135db66e78f918093774230f3a8880ca31fdc60f371bc5b1abc30"
+            },
+            {
+                "path": "champion-v2-replays/worker-1.jsonl",
+                "sha256": "8e96e18f85ab1bbd1bcdbf22652eac1a6c7c848011747e860ef5cf44f4beb1c7"
+            },
+            {
+                "path": "champion-v2-replays/worker-10.jsonl",
+                "sha256": "6ef6d616be35bdf8f412e9256896eb55a38beeee6df22031e75d2938fcaa8f78"
+            },
+            {
+                "path": "champion-v2-replays/worker-11.jsonl",
+                "sha256": "478e6ead907c57d9c215512c393cc9db8d1e86717823e79c1bfffbefe738b6ec"
+            },
+            {
+                "path": "champion-v2-replays/worker-2.jsonl",
+                "sha256": "7b14a3dd0aff7084d84873e79162649e070333edebd77e3121e6d61ea38de128"
+            },
+            {
+                "path": "champion-v2-replays/worker-3.jsonl",
+                "sha256": "04400e48805bfecd9de2f73911ed482395b05c414af4feebcc316126e4683e9d"
+            },
+            {
+                "path": "champion-v2-replays/worker-4.jsonl",
+                "sha256": "7412f22030d1de2c64b7c0817d9c946fd89cbeac6795c1a2b08ba6c4d22f66b8"
+            },
+            {
+                "path": "champion-v2-replays/worker-5.jsonl",
+                "sha256": "e95462466e74552912b6f18268d8f5eba5df6f68eb1b6f17ab4b3490b7705d77"
+            },
+            {
+                "path": "champion-v2-replays/worker-6.jsonl",
+                "sha256": "62469f6db8b29a632df0100cdb04e61447801c9838ae45233f7d1bf0b83c35d2"
+            },
+            {
+                "path": "champion-v2-replays/worker-7.jsonl",
+                "sha256": "a135bd7581a98694e0b33b42d3365e0d2a34bb6095f74440c32c1f2580f2e185"
+            },
+            {
+                "path": "champion-v2-replays/worker-8.jsonl",
+                "sha256": "2c53e247e626c7de337c5391fd820af88c7a6f67de5a3103af1490a7d870f796"
+            },
+            {
+                "path": "champion-v2-replays/worker-9.jsonl",
+                "sha256": "39b06651c2113adad09da478ac6bfd0b115183f28ac6594a421ef9aae092aa02"
+            }
+        ]
+    },
+    "totalExecutedFights": 252
+}

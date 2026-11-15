@@ -1,0 +1,1622 @@
+{
+    "schema": "hoc.magic-empower-joint-development-evidence.v1",
+    "studyId": "magic-empower-joint-20261115T044500Z",
+    "registrationSha256": "a9c9c04746192a911aec83efbae5a1e58c8e631034ce7a7a49689e133f72fb47",
+    "fullRegistrationFileSha256": "728af03a289627fac0600db95e14d72c6f85726114aa8539be563605bea30194",
+    "source": {
+        "common": "7ad58942df2f42d0931fc0bb0e3b40cddb5b8ca2",
+        "server": "916e3ca3ccb14c093c7f550d880074640c5b9988",
+        "setup": "actual ranked full public roster, native default adopted formation and spellbooks"
+    },
+    "purpose": "Explicit development reuse of all 72 already-opened seven-point Dragon qualification families; no fresh strength claim and no outcome-selected individual cases",
+    "hypothesis": "The utility of a spare-physical-point Empower1 purchase may depend on final spell-choice precision. Factorial comparison identifies its increment beyond precision alone. Seven-point hypothesis is posthoc from completed prior studies and must never rescue their failed gates.",
+    "arms": ["current", "spare-physical Empower1 only", "immutable Dragon precision only", "both"],
+    "funding": "Only exact incumbent free A3/S3/M1 or A3/M3/S1 may exchange its spare physical point for E1. Paid Placement and other plans retain all spending. Precision stays eligible on own Dragon under seven points; all cases retained.",
+    "precision": "dragon-precision-r8-030-v1 immutable helper, after complete native search and neural correction, maximum one override",
+    "population": {
+        "families": 72,
+        "maps": [1, 3, 4],
+        "opponentDoctrines": [1, 2, 3],
+        "ownDoctrine": 3,
+        "ownBudget": 7,
+        "physicalSeats": 2,
+        "developmentRows": 576,
+        "newIndependentFamilies": 0
+    },
+    "gate": {
+        "developmentOnly": true,
+        "bothMinusCurrent": 0.015,
+        "bothMinusPrecision": 0.005,
+        "bothMinusEmpower": 0,
+        "allMapsMinimum": 0,
+        "illegalActions": 0,
+        "exactFormationPairing": true,
+        "future": "Only if all complete development gates pass, register entirely new independent qualification and confirmation on latest source. No promotion from these reused families or favorable subgroup."
+    },
+    "execution": {
+        "workers": 12,
+        "priority": 19,
+        "runtime": "Bun1.4.4"
+    },
+    "preflightAmendment": {
+        "at": "2026-11-15T04:44:29.899467+00:00",
+        "parentRegistrationSha256": "9687f20a46247edb87008c6428d7664c8e8c6f107c2297be0ea7d5e0c470aa8e",
+        "reason": "First six control pairs matched but zero probes ran: researchDecisionTransform is an offline frozen-engine seam, not in published battle_engine. Add the exact peer-proven seam after final A19 choice. Original no-op controls are excluded from admission; repeat preflight before all development. Candidate, gates, cases and model bytes unchanged.",
+        "originalControlFights": 12,
+        "developmentFightsBeforeAmendment": 0,
+        "battleEngineOverlaySha256": "2bd0391164bee8a431e0c2b85a972d776477a9a0b3fc11c5e4f2662108efabf1"
+    },
+    "criticalSources": [
+        {
+            "path": "sources/common/src/ai/setup/empower_allocation.ts",
+            "sha256": "978d81a8db8c0e4ed31f62de2d84f857aaf87ff0c5cbd183b03d4f50f4c6b23e"
+        },
+        {
+            "path": "sources/common/src/simulation/battle_engine.ts",
+            "sha256": "2bd0391164bee8a431e0c2b85a972d776477a9a0b3fc11c5e4f2662108efabf1"
+        },
+        {
+            "path": "sources/common/src/simulation/magic_dragon_precision_research.ts",
+            "sha256": "2dcfb8ed0b015b365ba8766f6827884feba502d940fac0d24eb47d2ffe611058"
+        },
+        {
+            "path": "native.ts",
+            "sha256": "9e176ab25427633b598244f6edf4c823b439cd0752b9ac329bc920568719e82c"
+        },
+        {
+            "path": "opening.ts",
+            "sha256": "e6e3971d1a2556f8dd85b1a9adb678c1d76116232686a891c1f71147674876bc"
+        },
+        {
+            "path": "actor.ts",
+            "sha256": "7d5faed2dd281db3a67230aa6ab01490399279bb5d1fd5a74f43654e174ea3a6"
+        },
+        {
+            "path": "run.py",
+            "sha256": "dda25a17c255ad423f2cfaa7de59320aaae9fe927399c867ec041252107ca98b"
+        },
+        {
+            "path": "cases.json",
+            "sha256": "d12d5280d6b8eef3bf4c22386cb29c53cf4dd1ea4d13b263b613a3b8378d558c"
+        }
+    ],
+    "cases": [
+        {
+            "id": "qualify-s06-p004",
+            "seed": 3168597655,
+            "map": 1,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 692751217,
+            "reverseSetup": 555237292,
+            "combat": 4014688076,
+            "futures": [4190535072, 4072771697, 2989285867, 3718830269]
+        },
+        {
+            "id": "qualify-s06-p016",
+            "seed": 1873908812,
+            "map": 1,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 256999462,
+            "reverseSetup": 2719691435,
+            "combat": 2874440026,
+            "futures": [2510625942, 181345842, 3597192185, 658216277]
+        },
+        {
+            "id": "qualify-s06-p032",
+            "seed": 218030093,
+            "map": 1,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 4111093992,
+            "reverseSetup": 874538208,
+            "combat": 1185773667,
+            "futures": [2064175330, 842905534, 355649485, 1139349353]
+        },
+        {
+            "id": "qualify-s06-p033",
+            "seed": 1374649240,
+            "map": 1,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 3196573805,
+            "reverseSetup": 2065996603,
+            "combat": 4015749271,
+            "futures": [3251081349, 1384540182, 603589977, 1216450502]
+        },
+        {
+            "id": "qualify-s06-p046",
+            "seed": 1356654390,
+            "map": 1,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 2510795986,
+            "reverseSetup": 1903575507,
+            "combat": 2609526901,
+            "futures": [3828895425, 2662520841, 225063123, 583542442]
+        },
+        {
+            "id": "qualify-s06-p141",
+            "seed": 1311681513,
+            "map": 1,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 3386675977,
+            "reverseSetup": 1063096466,
+            "combat": 1619957805,
+            "futures": [3066534169, 2967934759, 3336482752, 285796927]
+        },
+        {
+            "id": "qualify-s06-p153",
+            "seed": 1715418476,
+            "map": 1,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 4072403032,
+            "reverseSetup": 3304293050,
+            "combat": 2744674991,
+            "futures": [797912579, 2262052370, 2388016050, 3852320048]
+        },
+        {
+            "id": "qualify-s06-p189",
+            "seed": 3269154181,
+            "map": 1,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 3088657193,
+            "reverseSetup": 2117249280,
+            "combat": 3681155653,
+            "futures": [1472538101, 1211944950, 1859593192, 3947722107]
+        },
+        {
+            "id": "qualify-s07-p001",
+            "seed": 3077903871,
+            "map": 1,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 1361828809,
+            "reverseSetup": 1092075503,
+            "combat": 49803053,
+            "futures": [3127179487, 2910580088, 299492810, 1839121449]
+        },
+        {
+            "id": "qualify-s07-p004",
+            "seed": 3852980023,
+            "map": 1,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 3916497716,
+            "reverseSetup": 775738695,
+            "combat": 4173600307,
+            "futures": [696568439, 1532917643, 1704156922, 1984955270]
+        },
+        {
+            "id": "qualify-s07-p011",
+            "seed": 258014802,
+            "map": 1,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 313575435,
+            "reverseSetup": 1621788023,
+            "combat": 2373413441,
+            "futures": [1720030015, 2793012630, 4150123016, 3413304040]
+        },
+        {
+            "id": "qualify-s07-p019",
+            "seed": 3787515106,
+            "map": 1,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 814593193,
+            "reverseSetup": 1182520406,
+            "combat": 1636678450,
+            "futures": [3129659448, 928892393, 3975502960, 334831410]
+        },
+        {
+            "id": "qualify-s07-p021",
+            "seed": 2449311112,
+            "map": 1,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 3541666730,
+            "reverseSetup": 2804790622,
+            "combat": 791416486,
+            "futures": [1122752142, 2281553922, 1643103861, 108472445]
+        },
+        {
+            "id": "qualify-s07-p022",
+            "seed": 1846072555,
+            "map": 1,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 1182299073,
+            "reverseSetup": 1510256989,
+            "combat": 4155828975,
+            "futures": [2211270439, 4201497153, 2831503866, 813089615]
+        },
+        {
+            "id": "qualify-s07-p028",
+            "seed": 416133380,
+            "map": 1,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 1734426041,
+            "reverseSetup": 3430018037,
+            "combat": 969376657,
+            "futures": [3753401798, 1047329081, 1289868293, 3814873399]
+        },
+        {
+            "id": "qualify-s07-p040",
+            "seed": 2215195770,
+            "map": 1,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 3883547927,
+            "reverseSetup": 2332303426,
+            "combat": 2536187217,
+            "futures": [534044981, 2637977088, 4068074872, 57956861]
+        },
+        {
+            "id": "qualify-s08-p000",
+            "seed": 3984631018,
+            "map": 1,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 4024032879,
+            "reverseSetup": 2345965382,
+            "combat": 3718347892,
+            "futures": [566059838, 2495151585, 3702131998, 1242913175]
+        },
+        {
+            "id": "qualify-s08-p006",
+            "seed": 3282855979,
+            "map": 1,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 3762595939,
+            "reverseSetup": 1486596146,
+            "combat": 559782610,
+            "futures": [579682605, 475279755, 600460907, 168819763]
+        },
+        {
+            "id": "qualify-s08-p012",
+            "seed": 2215360228,
+            "map": 1,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 796412558,
+            "reverseSetup": 3516989943,
+            "combat": 718086856,
+            "futures": [3415091492, 981972359, 1315455270, 2190398659]
+        },
+        {
+            "id": "qualify-s08-p014",
+            "seed": 2959821767,
+            "map": 1,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 2187184317,
+            "reverseSetup": 2741450726,
+            "combat": 629772675,
+            "futures": [2211470345, 1135256896, 1449809922, 2849793814]
+        },
+        {
+            "id": "qualify-s08-p043",
+            "seed": 12099304,
+            "map": 1,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 378131197,
+            "reverseSetup": 2713857043,
+            "combat": 638302350,
+            "futures": [3492028972, 3543170963, 2785379189, 885203595]
+        },
+        {
+            "id": "qualify-s08-p107",
+            "seed": 1906590918,
+            "map": 1,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 3536071119,
+            "reverseSetup": 3144403687,
+            "combat": 2053898675,
+            "futures": [3961226119, 452905296, 2397459557, 562205958]
+        },
+        {
+            "id": "qualify-s08-p115",
+            "seed": 965310858,
+            "map": 1,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 1483779643,
+            "reverseSetup": 3991182558,
+            "combat": 3490357049,
+            "futures": [2991275628, 637518422, 2595472038, 856945665]
+        },
+        {
+            "id": "qualify-s08-p139",
+            "seed": 3002425469,
+            "map": 1,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 2070580253,
+            "reverseSetup": 2452635823,
+            "combat": 3584999881,
+            "futures": [1706309822, 3339463079, 2808871519, 3091504480]
+        },
+        {
+            "id": "qualify-s15-p001",
+            "seed": 2433658269,
+            "map": 3,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 3818046568,
+            "reverseSetup": 3535164325,
+            "combat": 1621363913,
+            "futures": [900322799, 5800532, 2938599878, 3679555867]
+        },
+        {
+            "id": "qualify-s15-p007",
+            "seed": 4186393821,
+            "map": 3,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 3420968312,
+            "reverseSetup": 155711008,
+            "combat": 1934905011,
+            "futures": [2991149420, 995784763, 2133884144, 4033524428]
+        },
+        {
+            "id": "qualify-s15-p009",
+            "seed": 77316473,
+            "map": 3,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 403465173,
+            "reverseSetup": 909965705,
+            "combat": 4064024629,
+            "futures": [3851755639, 37534960, 981871768, 1367235675]
+        },
+        {
+            "id": "qualify-s15-p011",
+            "seed": 2245052411,
+            "map": 3,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 3618036991,
+            "reverseSetup": 2236042457,
+            "combat": 3605426305,
+            "futures": [2619005179, 3130945361, 2034732950, 588713789]
+        },
+        {
+            "id": "qualify-s15-p018",
+            "seed": 1384197876,
+            "map": 3,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 4273201736,
+            "reverseSetup": 745308171,
+            "combat": 3135316065,
+            "futures": [77968029, 3785203221, 1545802042, 3434264532]
+        },
+        {
+            "id": "qualify-s15-p024",
+            "seed": 1786492571,
+            "map": 3,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 767812696,
+            "reverseSetup": 3304128973,
+            "combat": 1493525981,
+            "futures": [3482588864, 3794021016, 2398319612, 2272558456]
+        },
+        {
+            "id": "qualify-s15-p084",
+            "seed": 1956058765,
+            "map": 3,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 3684590591,
+            "reverseSetup": 3422427172,
+            "combat": 4027378571,
+            "futures": [1705901989, 3505229654, 2514772351, 2552488904]
+        },
+        {
+            "id": "qualify-s15-p088",
+            "seed": 3135525941,
+            "map": 3,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 4225417318,
+            "reverseSetup": 4102855155,
+            "combat": 49900621,
+            "futures": [3739641663, 1222253060, 1292967458, 2503476734]
+        },
+        {
+            "id": "qualify-s16-p015",
+            "seed": 4247719167,
+            "map": 3,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 3834717873,
+            "reverseSetup": 1551845443,
+            "combat": 2960590602,
+            "futures": [778829504, 2968052310, 1611800579, 177191263]
+        },
+        {
+            "id": "qualify-s16-p018",
+            "seed": 3146884658,
+            "map": 3,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 755159524,
+            "reverseSetup": 1102800660,
+            "combat": 1957301010,
+            "futures": [2478112066, 2187855207, 556285894, 6486848]
+        },
+        {
+            "id": "qualify-s16-p032",
+            "seed": 2994375780,
+            "map": 3,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 2199281408,
+            "reverseSetup": 649844992,
+            "combat": 1098624286,
+            "futures": [2429410883, 3311253331, 211818453, 2731371631]
+        },
+        {
+            "id": "qualify-s16-p034",
+            "seed": 1396535525,
+            "map": 3,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 4198018960,
+            "reverseSetup": 1323170391,
+            "combat": 1791784464,
+            "futures": [530884022, 3390454692, 847063643, 453225900]
+        },
+        {
+            "id": "qualify-s16-p038",
+            "seed": 1171399294,
+            "map": 3,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 723672625,
+            "reverseSetup": 2117685985,
+            "combat": 1558219871,
+            "futures": [3326761141, 390512606, 2546137504, 385859724]
+        },
+        {
+            "id": "qualify-s16-p067",
+            "seed": 1688711292,
+            "map": 3,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 2364369601,
+            "reverseSetup": 1067776039,
+            "combat": 277799412,
+            "futures": [3190639628, 167951499, 540051540, 840406614]
+        },
+        {
+            "id": "qualify-s16-p073",
+            "seed": 957221502,
+            "map": 3,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 3235779490,
+            "reverseSetup": 3816356176,
+            "combat": 716223646,
+            "futures": [3332872256, 2882537058, 3466050003, 1642799191]
+        },
+        {
+            "id": "qualify-s16-p075",
+            "seed": 470435075,
+            "map": 3,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 3774441666,
+            "reverseSetup": 3444835917,
+            "combat": 189558335,
+            "futures": [726162312, 1861527167, 3181265634, 183227419]
+        },
+        {
+            "id": "qualify-s17-p006",
+            "seed": 4223709920,
+            "map": 3,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 3439011330,
+            "reverseSetup": 3481708725,
+            "combat": 790043632,
+            "futures": [845554824, 3487309116, 2515197926, 1501790094]
+        },
+        {
+            "id": "qualify-s17-p009",
+            "seed": 3862870035,
+            "map": 3,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 3734863028,
+            "reverseSetup": 2804135431,
+            "combat": 2646792312,
+            "futures": [3976267174, 1656763399, 1858292134, 1061853736]
+        },
+        {
+            "id": "qualify-s17-p013",
+            "seed": 4227700539,
+            "map": 3,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 913866192,
+            "reverseSetup": 3985680915,
+            "combat": 941535548,
+            "futures": [2638824716, 2029297421, 3077335866, 3535103854]
+        },
+        {
+            "id": "qualify-s17-p017",
+            "seed": 3290829335,
+            "map": 3,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 2603080870,
+            "reverseSetup": 1312278089,
+            "combat": 4090437285,
+            "futures": [537476412, 3373832563, 4124978905, 2899982870]
+        },
+        {
+            "id": "qualify-s17-p021",
+            "seed": 2337010395,
+            "map": 3,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 751679515,
+            "reverseSetup": 853567098,
+            "combat": 3186138149,
+            "futures": [2759038089, 457819028, 2036303666, 2829663335]
+        },
+        {
+            "id": "qualify-s17-p022",
+            "seed": 3978751873,
+            "map": 3,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 2962992565,
+            "reverseSetup": 1371242114,
+            "combat": 1067450973,
+            "futures": [1935251873, 260089013, 3934494928, 603892329]
+        },
+        {
+            "id": "qualify-s17-p036",
+            "seed": 4065891886,
+            "map": 3,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 1990532442,
+            "reverseSetup": 2232244787,
+            "combat": 3788342043,
+            "futures": [1626991585, 1646711258, 2051532127, 3767318955]
+        },
+        {
+            "id": "qualify-s17-p042",
+            "seed": 1525975420,
+            "map": 3,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 1078184650,
+            "reverseSetup": 3927373840,
+            "combat": 2520393455,
+            "futures": [249075163, 4199854254, 653437198, 3616937174]
+        },
+        {
+            "id": "qualify-s24-p000",
+            "seed": 2965478734,
+            "map": 4,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 2283235198,
+            "reverseSetup": 2024914819,
+            "combat": 640259653,
+            "futures": [1355194660, 3116875255, 3897228197, 2433601087]
+        },
+        {
+            "id": "qualify-s24-p004",
+            "seed": 1672759996,
+            "map": 4,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 1786390500,
+            "reverseSetup": 156171079,
+            "combat": 2122293944,
+            "futures": [73175508, 2759851226, 197668877, 2929000431]
+        },
+        {
+            "id": "qualify-s24-p006",
+            "seed": 177153700,
+            "map": 4,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 1377767958,
+            "reverseSetup": 2136771067,
+            "combat": 2983144044,
+            "futures": [1686493271, 424251751, 1918931931, 3797670759]
+        },
+        {
+            "id": "qualify-s24-p011",
+            "seed": 3906653806,
+            "map": 4,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 4135305164,
+            "reverseSetup": 329312189,
+            "combat": 121357428,
+            "futures": [3815403792, 63997380, 1732520235, 3467005091]
+        },
+        {
+            "id": "qualify-s24-p014",
+            "seed": 341944289,
+            "map": 4,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 0,
+            "setup": 843871464,
+            "reverseSetup": 190964750,
+            "combat": 3168008874,
+            "futures": [3822864840, 311928334, 867171056, 2997889917]
+        },
+        {
+            "id": "qualify-s24-p025",
+            "seed": 2957363136,
+            "map": 4,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 3765248930,
+            "reverseSetup": 3886953304,
+            "combat": 1675030047,
+            "futures": [1156633458, 3266441270, 1425968942, 3042891535]
+        },
+        {
+            "id": "qualify-s24-p029",
+            "seed": 3935642909,
+            "map": 4,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 1359701185,
+            "reverseSetup": 4165578061,
+            "combat": 836741904,
+            "futures": [942546280, 3714544896, 2353912325, 1981901109]
+        },
+        {
+            "id": "qualify-s24-p035",
+            "seed": 808226768,
+            "map": 4,
+            "d1": 3,
+            "d2": 1,
+            "pickOrder": 1,
+            "setup": 1865564210,
+            "reverseSetup": 2849242333,
+            "combat": 820515047,
+            "futures": [2603421552, 3007931911, 3159514412, 3225446146]
+        },
+        {
+            "id": "qualify-s25-p006",
+            "seed": 1865420979,
+            "map": 4,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 600995466,
+            "reverseSetup": 2055851059,
+            "combat": 2679407307,
+            "futures": [171667654, 997522690, 3399496014, 2856124613]
+        },
+        {
+            "id": "qualify-s25-p013",
+            "seed": 1226102976,
+            "map": 4,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 2302586563,
+            "reverseSetup": 2091819395,
+            "combat": 3534433925,
+            "futures": [1932880737, 894200058, 1744335523, 348096703]
+        },
+        {
+            "id": "qualify-s25-p021",
+            "seed": 3661763745,
+            "map": 4,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 4013043342,
+            "reverseSetup": 959487288,
+            "combat": 1454620533,
+            "futures": [493658789, 3365538981, 3260937151, 2189806748]
+        },
+        {
+            "id": "qualify-s25-p028",
+            "seed": 2471470249,
+            "map": 4,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 1627543955,
+            "reverseSetup": 2109082646,
+            "combat": 3809227028,
+            "futures": [3151926115, 3560976581, 1102071785, 3224927699]
+        },
+        {
+            "id": "qualify-s25-p029",
+            "seed": 730364589,
+            "map": 4,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 891104997,
+            "reverseSetup": 3242299520,
+            "combat": 4287634991,
+            "futures": [3041963288, 195246529, 3694708996, 652530328]
+        },
+        {
+            "id": "qualify-s25-p032",
+            "seed": 2410369372,
+            "map": 4,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 106271608,
+            "reverseSetup": 3775617583,
+            "combat": 1767804865,
+            "futures": [1276415536, 1206816198, 2434889624, 255783175]
+        },
+        {
+            "id": "qualify-s25-p033",
+            "seed": 3894963033,
+            "map": 4,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 0,
+            "setup": 1044725555,
+            "reverseSetup": 102934040,
+            "combat": 2672944767,
+            "futures": [1484440432, 2745092810, 4230586073, 3814088633]
+        },
+        {
+            "id": "qualify-s25-p084",
+            "seed": 3791521954,
+            "map": 4,
+            "d1": 3,
+            "d2": 2,
+            "pickOrder": 1,
+            "setup": 2581964842,
+            "reverseSetup": 436374850,
+            "combat": 54983340,
+            "futures": [3547011504, 806203009, 3345047863, 2537593979]
+        },
+        {
+            "id": "qualify-s26-p002",
+            "seed": 4129563478,
+            "map": 4,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 4004866485,
+            "reverseSetup": 2153409427,
+            "combat": 119715202,
+            "futures": [325146973, 1349382710, 4165759032, 2928386724]
+        },
+        {
+            "id": "qualify-s26-p004",
+            "seed": 684149781,
+            "map": 4,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 3722149594,
+            "reverseSetup": 3543196463,
+            "combat": 3869402288,
+            "futures": [1439507979, 786958454, 2077404178, 3513482890]
+        },
+        {
+            "id": "qualify-s26-p006",
+            "seed": 2453871342,
+            "map": 4,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 1148941528,
+            "reverseSetup": 2852590794,
+            "combat": 2433484510,
+            "futures": [1878000180, 1028537760, 68719945, 997075894]
+        },
+        {
+            "id": "qualify-s26-p015",
+            "seed": 3434510279,
+            "map": 4,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 1340941380,
+            "reverseSetup": 2224490579,
+            "combat": 3340645805,
+            "futures": [3904979849, 3868829492, 1323304662, 4174104608]
+        },
+        {
+            "id": "qualify-s26-p017",
+            "seed": 2397127437,
+            "map": 4,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 925631023,
+            "reverseSetup": 629633241,
+            "combat": 829425155,
+            "futures": [928536291, 223733080, 4042490927, 3863061449]
+        },
+        {
+            "id": "qualify-s26-p030",
+            "seed": 3554925500,
+            "map": 4,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 0,
+            "setup": 3570424242,
+            "reverseSetup": 4285214588,
+            "combat": 930068309,
+            "futures": [909348431, 2573307099, 2946565430, 3330528614]
+        },
+        {
+            "id": "qualify-s26-p041",
+            "seed": 1346157497,
+            "map": 4,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 4209245558,
+            "reverseSetup": 1759757429,
+            "combat": 2694158463,
+            "futures": [3700496297, 1689253992, 4219360221, 282782314]
+        },
+        {
+            "id": "qualify-s26-p065",
+            "seed": 1454905016,
+            "map": 4,
+            "d1": 3,
+            "d2": 3,
+            "pickOrder": 1,
+            "setup": 2059063523,
+            "reverseSetup": 406482514,
+            "combat": 2765861085,
+            "futures": [1027565618, 3346819976, 347332682, 2122558637]
+        }
+    ],
+    "preflight": {
+        "passed": true,
+        "cases": 6,
+        "executedControlFights": 12,
+        "exactTracePairs": 6,
+        "observeOnlyComparisons": 20,
+        "rawFiles": [
+            {
+                "path": "preflight/worker-1.jsonl",
+                "sha256": "ed8e146a925ace7f768c3b63933d702622644d57a8d37ad393fa8218cebdc585"
+            },
+            {
+                "path": "preflight/worker-2.jsonl",
+                "sha256": "4783fb501ceb10f1df2e4f6cb71096572919143ba98430e5b4e67a2ccf8cbc63"
+            },
+            {
+                "path": "preflight/worker-3.jsonl",
+                "sha256": "140c895ba095748bf8c567fbc4575dae4d3604aa7fbb75741dcca9cb180bd432"
+            }
+        ]
+    },
+    "analysisRegistration": {
+        "at": "2026-11-15T04:47:34.548898+00:00",
+        "analysisSha256": "6936a92cea55b85a6a64825b18a4deb21192a8a3189565958651ed25d026f90e",
+        "outcomesOpened": false,
+        "registrationSha256": "a9c9c04746192a911aec83efbae5a1e58c8e631034ce7a7a49689e133f72fb47",
+        "gate": "Exact original registered thresholds; latest-source entire population, no partial outcome inspection"
+    },
+    "result": {
+        "registrationSha256": "a9c9c04746192a911aec83efbae5a1e58c8e631034ce7a7a49689e133f72fb47",
+        "stage": "development-only",
+        "families": 72,
+        "comparisonRows": 576,
+        "executedFights": 556,
+        "counts": [
+            {
+                "arm": 0,
+                "wins": 88,
+                "draws": 3,
+                "losses": 53
+            },
+            {
+                "arm": 1,
+                "wins": 83,
+                "draws": 0,
+                "losses": 61
+            },
+            {
+                "arm": 2,
+                "wins": 90,
+                "draws": 4,
+                "losses": 50
+            },
+            {
+                "arm": 3,
+                "wins": 83,
+                "draws": 0,
+                "losses": 61
+            }
+        ],
+        "comparisons": {
+            "bothMinusCurrent": -0.04513888888888889,
+            "bothMinusPrecision": -0.0625,
+            "bothMinusEmpower": 0,
+            "empowerMinusCurrent": -0.04513888888888889,
+            "precisionMinusCurrent": 0.017361111111111112,
+            "interaction": -0.017361111111111112
+        },
+        "maps": [
+            {
+                "map": 1,
+                "families": 24,
+                "bothMinusCurrent": -0.07291666666666667
+            },
+            {
+                "map": 3,
+                "families": 24,
+                "bothMinusCurrent": 0.0625
+            },
+            {
+                "map": 4,
+                "families": 24,
+                "bothMinusCurrent": -0.125
+            }
+        ],
+        "fundedBothCases": 134,
+        "probes": 737,
+        "precisionOverrides": 43,
+        "gate": false,
+        "newIndependentFamilies": 0,
+        "noPromotion": true,
+        "rows": [
+            {
+                "id": "qualify-s06-p004",
+                "map": 1,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [1, 1, 0.5, 0.5]
+            },
+            {
+                "id": "qualify-s06-p016",
+                "map": 1,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [0, 0, 0, 0]
+            },
+            {
+                "id": "qualify-s06-p032",
+                "map": 1,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [0.5, 0.5, 1, 0.5]
+            },
+            {
+                "id": "qualify-s06-p033",
+                "map": 1,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s06-p046",
+                "map": 1,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s06-p141",
+                "map": 1,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s06-p153",
+                "map": 1,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [0, 0, 0, 0]
+            },
+            {
+                "id": "qualify-s06-p189",
+                "map": 1,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [1, 0.5, 1, 0.5]
+            },
+            {
+                "id": "qualify-s07-p001",
+                "map": 1,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [0.5, 0.5, 0.5, 0.5]
+            },
+            {
+                "id": "qualify-s07-p004",
+                "map": 1,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [0.75, 1, 0.25, 1]
+            },
+            {
+                "id": "qualify-s07-p011",
+                "map": 1,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [0.5, 0.5, 0.75, 0.5]
+            },
+            {
+                "id": "qualify-s07-p019",
+                "map": 1,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [0.5, 0, 0.5, 0]
+            },
+            {
+                "id": "qualify-s07-p021",
+                "map": 1,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [1, 0.5, 1, 0.5]
+            },
+            {
+                "id": "qualify-s07-p022",
+                "map": 1,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [0.5, 1, 0.5, 1]
+            },
+            {
+                "id": "qualify-s07-p028",
+                "map": 1,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [0.5, 0.5, 0.5, 0.5]
+            },
+            {
+                "id": "qualify-s07-p040",
+                "map": 1,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [1, 0.5, 1, 0.5]
+            },
+            {
+                "id": "qualify-s08-p000",
+                "map": 1,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [0, 0, 0, 0]
+            },
+            {
+                "id": "qualify-s08-p006",
+                "map": 1,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [0, 1, 0, 1]
+            },
+            {
+                "id": "qualify-s08-p012",
+                "map": 1,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [0.5, 0, 0.5, 0]
+            },
+            {
+                "id": "qualify-s08-p014",
+                "map": 1,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [0.5, 0.5, 0.5, 0.5]
+            },
+            {
+                "id": "qualify-s08-p043",
+                "map": 1,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [1, 1, 1, 0.5]
+            },
+            {
+                "id": "qualify-s08-p107",
+                "map": 1,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s08-p115",
+                "map": 1,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [0.5, 0.5, 0.5, 0.5]
+            },
+            {
+                "id": "qualify-s08-p139",
+                "map": 1,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [0, 0, 0, 0]
+            },
+            {
+                "id": "qualify-s15-p001",
+                "map": 3,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [0.5, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s15-p007",
+                "map": 3,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [1, 0.5, 1, 0.5]
+            },
+            {
+                "id": "qualify-s15-p009",
+                "map": 3,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [0.5, 0, 0.5, 0]
+            },
+            {
+                "id": "qualify-s15-p011",
+                "map": 3,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [0, 1, 0, 1]
+            },
+            {
+                "id": "qualify-s15-p018",
+                "map": 3,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [0, 0, 0, 0]
+            },
+            {
+                "id": "qualify-s15-p024",
+                "map": 3,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [1, 0.5, 1, 0.5]
+            },
+            {
+                "id": "qualify-s15-p084",
+                "map": 3,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s15-p088",
+                "map": 3,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s16-p015",
+                "map": 3,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [1, 0.5, 1, 1]
+            },
+            {
+                "id": "qualify-s16-p018",
+                "map": 3,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [0.5, 0.5, 0.5, 0.5]
+            },
+            {
+                "id": "qualify-s16-p032",
+                "map": 3,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s16-p034",
+                "map": 3,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [0, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s16-p038",
+                "map": 3,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [0.5, 1, 0.5, 1]
+            },
+            {
+                "id": "qualify-s16-p067",
+                "map": 3,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [0.5, 1, 0.5, 1]
+            },
+            {
+                "id": "qualify-s16-p073",
+                "map": 3,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [1, 0.5, 1, 0.5]
+            },
+            {
+                "id": "qualify-s16-p075",
+                "map": 3,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [1, 0.5, 1, 0.5]
+            },
+            {
+                "id": "qualify-s17-p006",
+                "map": 3,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [1, 0, 1, 0]
+            },
+            {
+                "id": "qualify-s17-p009",
+                "map": 3,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [0, 0.5, 0, 0.5]
+            },
+            {
+                "id": "qualify-s17-p013",
+                "map": 3,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s17-p017",
+                "map": 3,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [0, 0, 0, 0]
+            },
+            {
+                "id": "qualify-s17-p021",
+                "map": 3,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [0, 0, 0, 0]
+            },
+            {
+                "id": "qualify-s17-p022",
+                "map": 3,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s17-p036",
+                "map": 3,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [0.5, 1, 0.5, 1]
+            },
+            {
+                "id": "qualify-s17-p042",
+                "map": 3,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [0.5, 1, 0.5, 1]
+            },
+            {
+                "id": "qualify-s24-p000",
+                "map": 4,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [0.5, 0.5, 0.5, 0.5]
+            },
+            {
+                "id": "qualify-s24-p004",
+                "map": 4,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s24-p006",
+                "map": 4,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s24-p011",
+                "map": 4,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [0.5, 0.5, 0.5, 0.5]
+            },
+            {
+                "id": "qualify-s24-p014",
+                "map": 4,
+                "opponentDoctrine": 1,
+                "pickOrder": 0,
+                "scores": [0.5, 0, 0.5, 0]
+            },
+            {
+                "id": "qualify-s24-p025",
+                "map": 4,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [1, 0.5, 1, 0.5]
+            },
+            {
+                "id": "qualify-s24-p029",
+                "map": 4,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [0, 0, 0, 0]
+            },
+            {
+                "id": "qualify-s24-p035",
+                "map": 4,
+                "opponentDoctrine": 1,
+                "pickOrder": 1,
+                "scores": [0, 0.5, 0, 0.5]
+            },
+            {
+                "id": "qualify-s25-p006",
+                "map": 4,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [0.75, 0, 0.75, 0]
+            },
+            {
+                "id": "qualify-s25-p013",
+                "map": 4,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s25-p021",
+                "map": 4,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [0.5, 0, 0.5, 0]
+            },
+            {
+                "id": "qualify-s25-p028",
+                "map": 4,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [0, 0, 0, 0]
+            },
+            {
+                "id": "qualify-s25-p029",
+                "map": 4,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [0.75, 0, 0.75, 0]
+            },
+            {
+                "id": "qualify-s25-p032",
+                "map": 4,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s25-p033",
+                "map": 4,
+                "opponentDoctrine": 2,
+                "pickOrder": 0,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s25-p084",
+                "map": 4,
+                "opponentDoctrine": 2,
+                "pickOrder": 1,
+                "scores": [0.5, 0.5, 0.5, 0.5]
+            },
+            {
+                "id": "qualify-s26-p002",
+                "map": 4,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [1, 0.5, 1, 0.5]
+            },
+            {
+                "id": "qualify-s26-p004",
+                "map": 4,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [0, 0, 0, 0]
+            },
+            {
+                "id": "qualify-s26-p006",
+                "map": 4,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s26-p015",
+                "map": 4,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [0.5, 1, 0.5, 1]
+            },
+            {
+                "id": "qualify-s26-p017",
+                "map": 4,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s26-p030",
+                "map": 4,
+                "opponentDoctrine": 3,
+                "pickOrder": 0,
+                "scores": [1, 1, 1, 1]
+            },
+            {
+                "id": "qualify-s26-p041",
+                "map": 4,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [0.5, 0.5, 0.5, 0.5]
+            },
+            {
+                "id": "qualify-s26-p065",
+                "map": 4,
+                "opponentDoctrine": 3,
+                "pickOrder": 1,
+                "scores": [1, 0, 1, 0.5]
+            }
+        ],
+        "files": [
+            {
+                "path": "development/worker-0.jsonl",
+                "sha256": "ae9254d38acb54bcaf514101f89056055253f7b69ad4e4169b752d905e0b5fd9"
+            },
+            {
+                "path": "development/worker-1.jsonl",
+                "sha256": "69702b3b61945ae4a90d17cbd3231a031f78800e79342928a8cd91285a412d32"
+            },
+            {
+                "path": "development/worker-10.jsonl",
+                "sha256": "3f41e8afb46612165c6f1cf6c5bdeb20415dc0653995b53a2ca3cfeaef3f306f"
+            },
+            {
+                "path": "development/worker-11.jsonl",
+                "sha256": "ecd155cafe63f3cc0a73ede6ed67a463475d54ed77f522bf600cca1d8f1f0ac5"
+            },
+            {
+                "path": "development/worker-2.jsonl",
+                "sha256": "5d0eebb6b19915952c879d754f4823a7cab4138f54985b0cc4ddb4823ee0c225"
+            },
+            {
+                "path": "development/worker-3.jsonl",
+                "sha256": "9991f21820d4a881f6256a6a070f425b7aec7bcc29a591c6e560b297c262276d"
+            },
+            {
+                "path": "development/worker-4.jsonl",
+                "sha256": "175a60521916c61627fbb02ac74eaa13b7428ea0caf5c5447aa7184c71161b2d"
+            },
+            {
+                "path": "development/worker-5.jsonl",
+                "sha256": "3150cbe8fbdac3fc71b5f5cb04a6586201a5d3bd1c8ba55528088a6d42ac30fc"
+            },
+            {
+                "path": "development/worker-6.jsonl",
+                "sha256": "918774134388a165f065dc273b45ab5139db9ed4ed828e038b4168e241449af5"
+            },
+            {
+                "path": "development/worker-7.jsonl",
+                "sha256": "fda2e3ec304ce00dd31bc8bf949c32fed6d32c35b94fab4078cef8eff1ecc230"
+            },
+            {
+                "path": "development/worker-8.jsonl",
+                "sha256": "f93bc1337bc365e249f4fd4ae25b19025db9fac4410d968fd79d558eecc5d208"
+            },
+            {
+                "path": "development/worker-9.jsonl",
+                "sha256": "9e8941e18511db56ade3bbaab9fb26d6cf9327c9a403f8ae9af3a00c745729f6"
+            }
+        ]
+    },
+    "verification": {
+        "passed": true,
+        "implementation": "independent Python standard library",
+        "rows": 576,
+        "families": 72,
+        "funding": "exact spare physical point; Armor3 retained; paid Placement unchanged",
+        "comparisons": {
+            "bothMinusCurrent": -0.04513888888888889,
+            "bothMinusPrecision": -0.0625,
+            "bothMinusEmpower": 0.0,
+            "empowerMinusCurrent": -0.04513888888888889,
+            "precisionMinusCurrent": 0.017361111111111112,
+            "interaction": -0.017361111111111112
+        },
+        "developmentGate": false,
+        "newIndependentFamilies": 0,
+        "analysisSha256": "442ea048e43cf222ac61aad304d9368a97fe4c631b6dd2258062d2c79466d91f",
+        "sourceFilesVerified": 2140
+    },
+    "status": "closed-failed-joint-development-gate",
+    "qualificationOpened": false,
+    "confirmationOpened": false,
+    "newSeedChannels": [],
+    "modelActivated": false,
+    "sourcePackage": "client repository game/core/tmp/magic-empower-joint-development-20261115/v2"
+}
