@@ -85,3 +85,12 @@ The active joint artifact/final-pick planner has its own server-to-frozen-common
 did not find this shared-dependency mistake there. Its running source was not modified. Earlier immutable
 research records are preserved: any claim of latest-source native compatibility from the affected shared
 capsules needs this module-identity qualification, even when two cached-opening combat replays matched.
+
+## Completed correctness admission
+
+All 162 corrected preflight executions passed. The 54 off/observer pairs reproduced exact action/event
+traces after independently reconstructing their openings. Treatment retained 90 new delivery options in
+67 capped catalogs, across 12 unit types and all three maps; 32 fights exercised changed catalogs and
+three complete trajectories changed. There were zero rejected actions or neural-state errors. The
+candidate therefore passed its fixed coverage gate and opened the 1,296-game development comparison.
+These are correctness/coverage counts, not win-rate evidence.
