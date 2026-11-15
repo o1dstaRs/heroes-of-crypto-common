@@ -1,0 +1,89 @@
+{
+    "schema": "hoc.magic-dragon-precision-research-checkpoint.v1",
+    "id": "dragon-precision-r8-030-v1-20261115",
+    "preservedAt": "2026-11-15T04:15:03.043920+00:00",
+    "userRequest": "lock it in; continue improving versatile ranked AI with random doctrines",
+    "statusAtPreservation": "Discovery-selected candidate. Fixed fresh qualification is running; no strength confirmation or serving qualification claimed.",
+    "sourceFiles": {
+        "src/simulation/magic_dragon_precision_research.ts": "2dcfb8ed0b015b365ba8766f6827884feba502d940fac0d24eb47d2ffe611058",
+        "src/simulation/magic_dragon_screen_research.ts": "4b237f88e46f0607abf6bb67097a0339a6e4af9a7feeb5f37e007380bfe14018",
+        "src/simulation/ranked_draft_setup_visibility.ts": "d6d7c006ca78aa3ae40415d14154ecd95acca3a07a5225b40714b0c016ea5a85"
+    },
+    "policy": {
+        "maximumComparisons": 4,
+        "maximumOverrides": 1,
+        "maximumChallengers": 6,
+        "blocks": 2,
+        "rolloutsPerBlock": 4,
+        "horizon": 64,
+        "margin": 0.03,
+        "bothBlockGainsStrictlyPositive": true,
+        "shortlist": {
+            "Lightning Strike": 1,
+            "Meteor Shower": 2,
+            "Ring of Fire": 1,
+            "Whirlpool": 2
+        }
+    },
+    "selection": {
+        "at": "2026-11-15T03:57:02.293Z",
+        "policy": "precision-v1",
+        "selectionBiased": true,
+        "source": "discovery",
+        "selectionRule": "After all54 discovery families, candidates with gain>=.5pp and all own-doctrine means>=0 are eligible. Choose greatest candidate-current mean; exact ties prefer precision, screen, combined in that order. If none, stop. Lock selection before any fresh preparation. Discovery is selection-biased."
+    },
+    "registrationSha256": "ba7c93235d80d2feef2cc2f510c97ce033cfd2cc6201ad37ae209cddfd517c7a",
+    "sourceManifestSha256": "02821b8f71bd908591d32227ea01304c55f976eb73b48bd2f47a8d2d851a9260",
+    "dependencyManifestSha256": "f956c7066c63e686e7a065ef49c961c396d9b5d3e257b3cab72c77ab80bde8f5",
+    "implementationManifestSha256": "ae7b3f58d12afa6a12915c5963faedcf2dee4a2662f5c41781079d00dbeff815",
+    "transportBundleSha256": "c0094256d9e03c48824e97c0822348365325a3eaab670c2e9cf6f9c65b9c007b",
+    "frozenPublishedBases": {
+        "common": "8e7f550e084ba1c970c7a0207fbec8e7c8d219b3",
+        "server": "cca0a8082c7eca7b7e37fc8320e9de613e550d6c"
+    },
+    "sourceCaveat": "Explicit research and peer-adoption overlays are in the source manifest. Later Champion and Empower balance changes were excluded; this is not current published-main qualification.",
+    "profile": "Locked V3 then contextual draft 063a888e; exact legal private-Setup reveals; native funded setup and ranged selector d786f4e9; placement-v2 and adopted support defaults; full v0.8/A19 combat for both armies.",
+    "discovery": {
+        "independentFamilies": 54,
+        "games": 432,
+        "gamesPerArm": 108,
+        "currentWDL": [56, 4, 48],
+        "precisionWDL": [61, 1, 46],
+        "currentScore": 0.5370370370370371,
+        "precisionScore": 0.5694444444444444,
+        "pairedGainPoints": 3.2407407407407405,
+        "wholeFamily95IntervalPoints": [-1.3888888888888888, 8.333333333333332],
+        "selectionBiased": true,
+        "actualPrecisionOverrides": 22,
+        "screenGainPoints": -6.018518518518518,
+        "combinedGainPoints": -4.62962962962963,
+        "independentVerificationSha256": "89985bba2025c41e1342012ed1dd531165e7d3e1ee55291ccc4c840369baa2ab"
+    },
+    "freshDesign": {
+        "qualificationFamilies": 216,
+        "qualificationGames": 1296,
+        "confirmationFamilies": 432,
+        "confirmationGames": 2592,
+        "contrasts": ["candidate-current", "candidate-locked-full-policy-5036"],
+        "minimumGainPoints": 0.5,
+        "wholeFamily95LowerBoundStrictlyPositive": true,
+        "allOwnDoctrineMeansNonnegative": true,
+        "zeroRejectsExactNativeApplication": true,
+        "serialBanks": true,
+        "noPoolingRefillTuningReselection": true
+    },
+    "seedPreservation": {
+        "newAllocationSha256": "3a8390c37e5bfd5a0181d791a5a8c614f22e8096304fea35f8e183fc983d8f1d",
+        "newReservedChannels": 476928,
+        "retiredAllocationSha256": "3fa7f7a60ed931c9a0afa03fcb3fc59791d20cb887e5b63ff76991368306b6b6",
+        "retiredReservedChannels": 476928,
+        "retiredGames": 0,
+        "reproductionArtifacts": "Sibling client game/core/tmp/magic-dragon-precision-screen-20261115; off-node frozen bundle and Puffalo campaign. Both entire seed allocations, including unopened pools, remain reserved."
+    },
+    "runtimeStatus": "Offline simulation helper only. Requires current-source full-match comparison and authoritative deadline, Undo and state-restoration qualification before serving.",
+    "productionPromotion": false,
+    "gpuWork": false,
+    "fits": 0,
+    "optimizerSteps": 0,
+    "immutableReference": "Do not overwrite this helper or historical discovery metadata to tune another candidate. Use a new policy ID/source for later hypotheses. Fresh results must remain separate."
+}
