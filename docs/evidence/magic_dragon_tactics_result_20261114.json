@@ -1,0 +1,165 @@
+{
+    "at": "2026-11-14T23:05:37.934Z",
+    "bank": "qualify",
+    "games": 1296,
+    "families": 216,
+    "counts": [
+        {
+            "arm": "current-a19",
+            "games": 432,
+            "W": 206,
+            "D": 6,
+            "L": 220,
+            "score": 48.379629629629626
+        },
+        {
+            "arm": "meteor-coverage",
+            "games": 432,
+            "W": 201,
+            "D": 9,
+            "L": 222,
+            "score": 47.56944444444444
+        },
+        {
+            "arm": "locked-5036",
+            "games": 432,
+            "W": 207,
+            "D": 5,
+            "L": 220,
+            "score": 48.495370370370374
+        }
+    ],
+    "scoreIntervals": [
+        {
+            "arm": "current-a19",
+            "families": 216,
+            "ci95Score": [42.708333333333336, 54.050925925925924]
+        },
+        {
+            "arm": "meteor-coverage",
+            "families": 216,
+            "ci95Score": [42.013888888888886, 53.125]
+        },
+        {
+            "arm": "locked-5036",
+            "families": 216,
+            "ci95Score": [42.824074074074076, 54.282407407407405]
+        }
+    ],
+    "contrasts": [
+        {
+            "candidate": "meteor-coverage",
+            "reference": "current-a19",
+            "families": 216,
+            "gainPoints": -0.8101851851851852,
+            "ci95Points": [-3.125, 1.5046296296296295],
+            "ownDoctrines": [
+                {
+                    "doctrine": 1,
+                    "families": 72,
+                    "gainPoints": -1.0416666666666667
+                },
+                {
+                    "doctrine": 2,
+                    "families": 72,
+                    "gainPoints": -2.0833333333333335
+                },
+                {
+                    "doctrine": 3,
+                    "families": 72,
+                    "gainPoints": 0.6944444444444444
+                }
+            ],
+            "maps": [
+                {
+                    "map": 1,
+                    "families": 72,
+                    "gainPoints": 0
+                },
+                {
+                    "map": 3,
+                    "families": 72,
+                    "gainPoints": -0.3472222222222222
+                },
+                {
+                    "map": 4,
+                    "families": 72,
+                    "gainPoints": -2.0833333333333335
+                }
+            ],
+            "pickOrders": [
+                {
+                    "order": 0,
+                    "gainPoints": -2.314814814814815
+                },
+                {
+                    "order": 1,
+                    "gainPoints": 0.6944444444444444
+                }
+            ]
+        },
+        {
+            "candidate": "meteor-coverage",
+            "reference": "locked-5036",
+            "families": 216,
+            "gainPoints": -0.9259259259259259,
+            "ci95Points": [-3.587962962962963, 1.7361111111111112],
+            "ownDoctrines": [
+                {
+                    "doctrine": 1,
+                    "families": 72,
+                    "gainPoints": -3.125
+                },
+                {
+                    "doctrine": 2,
+                    "families": 72,
+                    "gainPoints": -2.0833333333333335
+                },
+                {
+                    "doctrine": 3,
+                    "families": 72,
+                    "gainPoints": 2.4305555555555554
+                }
+            ],
+            "maps": [
+                {
+                    "map": 1,
+                    "families": 72,
+                    "gainPoints": 0.6944444444444444
+                },
+                {
+                    "map": 3,
+                    "families": 72,
+                    "gainPoints": -1.0416666666666667
+                },
+                {
+                    "map": 4,
+                    "families": 72,
+                    "gainPoints": -2.4305555555555554
+                }
+            ],
+            "pickOrders": [
+                {
+                    "order": 0,
+                    "gainPoints": -1.3888888888888888
+                },
+                {
+                    "order": 1,
+                    "gainPoints": -0.46296296296296297
+                }
+            ]
+        }
+    ],
+    "gate": false,
+    "selectionBiased": false,
+    "noPromotion": true,
+    "id": "magic-dragon-tactics-20261114",
+    "sourceCommon": "448eb1587d71dcff49881a2090638fda803a08c5",
+    "sourceServer": "3039060b9c234c33ac01bfd2aad3f3e8d66d3f12",
+    "registrationSha256": "5ab4e820e63e973be42d36e448c6920ad1dc0cbd88a289d74b621096c6fed37e",
+    "rawSummarySha256": "2985995103220dcf5f004dd8c0ae2c459636159a4eb38c7199fbcdaa64f5842d",
+    "confirmationOpened": false,
+    "promoted": false,
+    "verificationSha256": "dd81dc3a79899920b536b8a80eac829821408962c3dce72c1bc8212bac1a603e",
+    "priorStudy": "Discovery 108 families / 2376 games, selected wider-Meteor +2.777778 points [-0.462963,+6.25], selection-biased; not pooled."
+}

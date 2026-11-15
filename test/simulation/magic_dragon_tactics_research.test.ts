@@ -25,6 +25,10 @@ import {
     type DragonSearchTrace,
 } from "../../src/simulation/magic_dragon_tactics_research";
 import { SearchDriver } from "../../src/simulation/search_driver";
+import {
+    withProtectedMeteorResearch,
+    type ProtectedMeteorTrace,
+} from "../../src/simulation/magic_dragon_protected_meteor_research";
 import { createV08A19SearchDriver } from "../../src/simulation/v0_8_a19_search";
 import { cellTargetedSpellBlockCells, isSpellUsableByCaster } from "../../src/spells/spell_helper";
 import { Unit } from "../../src/units/unit";
@@ -133,6 +137,97 @@ function fixture(amount = 4, team: TeamType = LEFT) {
         }).candidates;
     return { ...board, dragon, add, split, start, catalog, context, engine, fight, deps, team, enemyTeam };
 }
+
+for (const fail of [false, true])
+    test(`protected Meteor restores real probe state; injected failure=${fail}`, () => {
+        const f = fixture(8);
+        f.add({ x: 10, y: 8 }, { amountAlive: 3 });
+        f.add({ x: 12, y: 9 }, { amountAlive: 3 });
+        f.start();
+        setDeterministicRandomSource(makeRng(7281));
+        const driver = createV08A19SearchDriver(f.deps, {
+            seed: 173,
+            greenVersion: "v0.8",
+            redVersion: "v0.8",
+            offlineDeterministicWork: true,
+        });
+        const traces: ProtectedMeteorTrace[] = [];
+        const internal = driver as unknown as { scoreCandidates: (...args: unknown[]) => number[] };
+        const score = internal.scoreCandidates;
+        let probing = false,
+            checked = 0;
+        internal.scoreCandidates = function (...args) {
+            if (!probing) return score.apply(this, args);
+            if (fail) {
+                const meteor = (args[1] as { actions: import("../../src/engine/actions").GameAction[] }[])[1];
+                for (const action of meteor.actions) f.engine.apply(action);
+                f.deps.setActiveUnitId("speculative-only");
+                throw new Error("probe fault after mutation");
+            }
+            return (args[1] as unknown[]).map((_, i) => (args[3] === "leaf" ? 0.5 : i === 0 ? 0.1 : 0.9));
+        };
+        try {
+            withProtectedMeteorResearch(
+                LEFT,
+                (transform) => {
+                    const base = driver.chooseDecision(
+                        f.dragon,
+                        "v0.8",
+                        [{ type: "defend_turn", unitId: f.dragon.getId() }],
+                        f.context,
+                    );
+                    const before = snapshotBattle(f.unitsHolder, f.grid, f.fight),
+                        random = captureDeterministicRandomState(),
+                        activeId = f.deps.getActiveUnitId(),
+                        stats = f.deps.captureDamageStats();
+                    probing = true;
+                    const probe = () =>
+                        transform(
+                            f.dragon,
+                            f.context,
+                            base,
+                            () => {
+                                checked++;
+                                return { failure: null };
+                            },
+                            "v0.8",
+                        );
+                    let chosen = base;
+                    if (fail) expect(probe).toThrow("probe fault after mutation");
+                    else chosen = probe();
+                    probing = false;
+                    expect(snapshotBattle(f.unitsHolder, f.grid, f.fight)).toEqual(before);
+                    expect(captureDeterministicRandomState()).toEqual(random);
+                    expect(f.deps.getActiveUnitId()).toBe(activeId);
+                    expect(f.deps.captureDamageStats()).toEqual(stats);
+                    if (!fail) {
+                        expect(checked).toBe(1);
+                        expect(traces).toHaveLength(1);
+                        expect(traces[0].incumbent).toEqual(base);
+                        expect(chosen.some((a) => a.type === "cast_spell" && a.spellName === "Meteor Shower")).toBe(
+                            true,
+                        );
+                        const second = driver.chooseDecision(f.dragon, "v0.8", base, f.context);
+                        expect(
+                            transform(
+                                f.dragon,
+                                f.context,
+                                second,
+                                () => {
+                                    throw new Error("second override");
+                                },
+                                "v0.8",
+                            ),
+                        ).toEqual(second);
+                        for (const action of chosen) expect(f.engine.apply(action).completed).toBe(true);
+                    }
+                },
+                (t) => traces.push(t),
+            );
+        } finally {
+            internal.scoreCandidates = score;
+        }
+    });
 
 for (const team of [LEFT, RIGHT]) {
     test(`real 2x2 half splits retain two usable Whirlpools but lose the full-stack area spells, team ${team}`, () => {
