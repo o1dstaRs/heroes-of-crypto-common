@@ -479,3 +479,28 @@ Movement 2 lost 1.697531 pp, and Chaos-only Movement 1/2 lost 1.466049/0.771605 
 not establish a score gain. Independent input, score and interval reconstruction passed; no
 qualification/confirmation was allocated and no default changed. Preserve the closed helper and full
 doctrine gates. Do not activate the five-point Movement 2 slice or tune this candidate on its opened bank.
+
+The distinct `guarded-intercept-free-20261115` continuation completed under registration
+`356f98a9e4daae66d7144d7fc85fb12fbc267d4952ebac852dfe49bcbe23b98a`. Read
+`docs/guarded_intercept_research.md` and its capsule handoff before duplicating it. It compares current,
+one guarded late mobile draft override, selective free forward placement, and their fixed combination.
+All native augment spending is preserved; public damage casters can trigger the rule. Its 216-family
+bank completed 1,431 distinct battles. The combination lost 2.932099 pp versus current (simultaneous
+95% -7.649357 to +1.785159) and failed its fixed gates; all three doctrine means were negative. Input,
+score and bootstrap verification passed. No confirmation opened and no default changed. Preserve
+the closed policy and do not rescue a diagnostic component or subgroup. The earlier paid
+prototype closed unscored: placement-time steps omit fight-start upgrades and extra Placement can
+change native splits. Preserve that finding rather than claiming a real reach improvement from its
+proxy. Exclude every scanned seed preimage described in the research document. The separate peer
+`ranked-geometry-confirm-20261115` study remains independent and must not be interrupted.
+
+The distinct `backline-approach-move-20261115` combat continuation is registered at
+`1b884ae79e13b177e63504ca59f1a9811126cb41ae812bfd1fc9ea9b663797d3`. Read
+`docs/backline_approach_move_research.md` and exclude every scanned channel in its compact seed ledger.
+The read-only audit found omitted approach moves, while its complete off/observer traces matched.
+The candidate compares at most one legal pure move toward visible remaining shooter/damage-spell output,
+retains all native role filters and reserves an ordinary A19 slot without forcing movement. It changes no
+draft, upgrades, placement or default. Admission passed; 216 fresh development families are running.
+Preserve the fixed gates, source seal, materialized package identity, and earlier closed experiments.
+Do not enable the inert helper or treat admission coverage as strength. The peer geometry confirmation
+remains separate; neither job authorizes interrupting the other.
