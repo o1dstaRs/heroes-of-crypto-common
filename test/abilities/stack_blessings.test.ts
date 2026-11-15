@@ -18,6 +18,7 @@ const right = PBTypes.TeamVals.RIGHT;
 const creatures = [
     ["Nature", "Leprechaun", "Luck Blessing"],
     ["Nature", "Satyr", "Sylvan Focus Blessing"],
+    ["Life", "Champion", "Tie up the Horses Blessing"],
     ["Might", "Wolf Rider", "Wolf Trail Blessing"],
 ];
 
@@ -27,7 +28,10 @@ for (const { name, effect, walkingOnly } of STACK_BLESSINGS) {
             const base = getAbilityConfig(name).power;
             for (let tier = 1; tier <= 5; tier++) {
                 const source = createTestUnit({ abilities: [name], stackPower: tier, luck: 10 });
-                expect(source.calculateStackBlessingPower(name)).toBeCloseTo(base * tier * 0.2);
+                expect(source.calculateStackBlessingPower(name)).toBeCloseTo(
+                    base * tier * 0.2 * (name === "Tie up the Horses Blessing" ? 1.1 : 1),
+                    4,
+                );
                 expect(source.getAuraEffects()).toHaveLength(0);
             }
             const icon = `${effect.toLowerCase().replace(/ /g, "_")}_aura_256`;
@@ -56,7 +60,7 @@ for (const { name, effect, walkingOnly } of STACK_BLESSINGS) {
             expect(enemy.hasBuffActive(name)).toBe(false);
             strong.applyEffect(new EffectFactory().makeEffect("Break")!);
             unitsHolder.refreshStackPowerForAllUnits();
-            expect(ally.getBuff(name)?.getPower()).toBe(base * 0.4);
+            expect(ally.getBuff(name)?.getPower()).toBeCloseTo(base * 0.4, 4);
             weak.applyDamage(100000, 0, new SceneLogMock());
             unitsHolder.refreshStackPowerForAllUnits();
             expect(ally.hasBuffActive(name)).toBe(false);
@@ -93,7 +97,7 @@ for (const { name, effect, walkingOnly } of STACK_BLESSINGS) {
     });
 }
 
-it("converts the requested Leprechaun, Satyr and Wolf Rider cards", () => {
+it("converts the requested Leprechaun, Satyr, Champion and Wolf Rider cards", () => {
     for (const [faction, creature, blessing] of creatures) {
         const properties = getCreatureConfig(left, faction, creature, "test_512", 10);
         expect(properties.abilities).toContain(blessing);
@@ -119,7 +123,7 @@ it("applies and removes actual luck, movement and magic bonuses without accumula
         expect(source.getStackPower()).toBe(2);
         expect(ally.getBaseAttack()).toBe(100);
         expect(ally.getBaseArmor()).toBe(100);
-        expect(ally.getSteps()).toBeCloseTo(baseSteps + 0.4);
+        expect(ally.getSteps()).toBeCloseTo(baseSteps + 0.4 + 0.8736, 4);
         expect(ally.getLuck()).toBe(4);
         expect(ally.getMagicDamageBonusPercentage()).toBe(6);
         const index = source.getUnitProperties().abilities.indexOf("Sylvan Focus Blessing");
@@ -151,7 +155,8 @@ for (let tier = 1; tier <= 5; tier++) {
         expect(source.getStackPower()).toBe(tier);
         expect(ally.getBaseAttack()).toBe(100);
         expect(ally.getBaseArmor()).toBe(100);
-        expect(ally.getSteps()).toBeCloseTo(steps + tier * 0.2);
+        const championBase = [0.42, 0.84, 1.26, 1.68, 2.1][tier - 1];
+        expect(ally.getSteps()).toBeCloseTo(steps + tier * 0.2 + championBase * (1 + tier * 0.02), 4);
         expect(ally.getLuck()).toBe(tier * 2);
         expect(ally.getMagicDamageBonusPercentage()).toBe(tier * 3);
         if (tier > 1) {
@@ -164,11 +169,8 @@ for (let tier = 1; tier <= 5; tier++) {
     });
 }
 
-it("preserves Pegasus and Champion as their existing local auras", () => {
-    for (const [faction, creature, aura] of [
-        ["Nature", "Pegasus", "Pegasus Might Aura"],
-        ["Life", "Champion", "Tie up the Horses Aura"],
-    ]) {
+it("preserves Pegasus as its existing local aura", () => {
+    for (const [faction, creature, aura] of [["Nature", "Pegasus", "Pegasus Might Aura"]]) {
         const properties = getCreatureConfig(left, faction, creature, "test_512", 10);
         expect(properties.abilities).toContain(aura);
         expect(getAbilityConfig(aura).aura_effect).not.toBeNull();
@@ -181,6 +183,7 @@ it("preserves Pegasus and Champion as their existing local auras", () => {
     expect(STACK_BLESSINGS.map(({ name }) => name)).toEqual([
         "Luck Blessing",
         "Sylvan Focus Blessing",
+        "Tie up the Horses Blessing",
         "Wolf Trail Blessing",
     ]);
 });

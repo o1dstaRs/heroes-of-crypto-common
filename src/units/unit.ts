@@ -2502,7 +2502,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (!STACK_BLESSING_NAMES.has(name)) return 0;
         const ability = this.getAbility(name);
         const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, this.getStackPower()));
-        return Number((((ability?.getPower() ?? 0) * stackPower) / MAX_UNIT_STACK_POWER).toFixed(2));
+        const stackScaledPower = ((ability?.getPower() ?? 0) * stackPower) / MAX_UNIT_STACK_POWER;
+        if (name === "Tie up the Horses Blessing") {
+            // Champion's luck is a percentage of the tier bonus, not flat movement or synergy power.
+            // Preserve fractional budgets such as 0.42 × 1.01 = 0.4242; getSteps never rounds movement.
+            return Number((stackScaledPower * (1 + this.getLuck() / 100)).toFixed(4));
+        }
+        return Number(stackScaledPower.toFixed(2));
     }
     /** Preserve the Crusader aura's stack, luck, Might synergy and Made of Fire scaling. */
     public calculateSharpenedWeaponsBlessingPower(synergyAbilityPowerIncrease = 0): number {
@@ -4232,12 +4238,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (wolfTrailBlessing) {
             this.unitProperties.steps_mod += wolfTrailBlessing.getPower();
         }
-        if (!this.canFly()) {
-            const tieUpTheHorsesAuraEffect = this.getAppliedAuraEffect("Tie up the Horses Aura");
-            if (tieUpTheHorsesAuraEffect) {
-                this.unitProperties.steps_mod += tieUpTheHorsesAuraEffect.getPower();
-            }
-        }
+        const tieUpTheHorsesBlessing = this.canFly() ? undefined : statBuffs.get("Tie up the Horses Blessing");
         const movementAugmentBuff = statBuffs.get("Movement Augment");
         if (movementAugmentBuff) {
             this.unitProperties.steps += movementAugmentBuff.getPower();
@@ -4301,6 +4302,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.steps_mod = roundUnitStat(
                 this.unitProperties.steps_mod + angelicHostBuff.getPower(),
                 2,
+            );
+        }
+        if (tieUpTheHorsesBlessing) {
+            // Keep the established rounding of other modifiers, then add Champion's precise bonus.
+            // Slows still reduce it; 0.42 movement and its luck percentage must not collapse to tenths.
+            this.unitProperties.steps_mod = Number(
+                (this.unitProperties.steps_mod + tieUpTheHorsesBlessing.getPower() * stepsMultiplier).toFixed(4),
             );
         }
 

@@ -67,6 +67,7 @@ const ARROWS_WINGSHIELD_BLESSING_BIT = 8;
 const RALLYING_VOLLEY_BLESSING_BIT = 16;
 const SHARPENED_WEAPONS_BLESSING_BIT = 32;
 const LUCK_DEPENDENT_BLESSINGS: ReadonlySet<string> = new Set([
+    "Tie up the Horses Blessing",
     "Sharpened Weapons Blessing",
     "Arcane Ward Blessing",
     "Warding Mane Blessing",
@@ -1302,8 +1303,12 @@ export class UnitsHolder {
         let blessingCensus = this.captureBlessingCensus();
         const luckBlessing = STACK_BLESSING_BY_NAME.get("Luck Blessing")!;
         const luckPowers = blessingCensus.stackBlessings.get(luckBlessing.name)!;
-        if (hasPositivePower(luckPowers) || blessingCensus.carried & luckBlessing.bit) {
+        const refreshLuckBlessing = hasPositivePower(luckPowers) || !!(blessingCensus.carried & luckBlessing.bit);
+        if (refreshLuckBlessing) {
             this.reapplyTeamBlessing(blessingCensus, luckPowers, luckBlessing.bit, luckBlessing.name);
+        }
+        // Champion needs this lap's actual source luck even when no Leprechaun is present.
+        if (refreshLuckBlessing || hasPositivePower(blessingCensus.stackBlessings.get("Tie up the Horses Blessing")!)) {
             const fight = FightStateManager.getInstance().getFightProperties();
             // Resolve luck before reading blessing/aura powers. Only sources need this early refresh;
             // the normal stat pass below updates the rest of the army. adjustBaseStats owns the lap

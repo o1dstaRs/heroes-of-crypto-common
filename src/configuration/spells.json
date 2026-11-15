@@ -1206,6 +1206,27 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Tie up the Horses Blessing": {
+            "name": "Tie up the Horses Blessing",
+            "level": 0,
+            "desc": [
+                "Tie up the Horses Blessing: allied non-flying units gain +{} movement distance anywhere on the battlefield.",
+                "Active while an allied source is alive; only the strongest source applies."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 2.1,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Wolf Trail Blessing": {
             "name": "Wolf Trail Blessing",
             "level": 0,

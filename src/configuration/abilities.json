@@ -1260,16 +1260,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Tie up the Horses Aura": {
-        "name": "Tie up the Horses Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allied non-flying units within the aura's range gain +{} movement distance"],
-        "power": 2,
+    "Tie up the Horses Blessing": {
+        "name": "Tie up the Horses Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allied non-flying units gain +{} movement distance anywhere on the battlefield.",
+            "Base movement is 0.42/0.84/1.26/1.68/2.1 at stack power 1–5, multiplied by (1 + this unit's luck / 100). Only the strongest allied source applies."
+        ],
+        "power": 2.1,
         "power_type": "ADDITIONAL_STEPS_WALK",
         "skip_reponse": false,
-        "stack_powered": false,
+        "stack_powered": true,
         "effect": null,
-        "aura_effect": "Tie up the Horses",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Crusade": {
