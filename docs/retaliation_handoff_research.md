@@ -60,8 +60,7 @@ sources, input cases, registration, runner, independent opening receipts, raw co
 The screen passed: 32 admitted opportunities across 13 unit types and all three maps, 15 chosen waits,
 and eight changed trajectories. All 54 off/observer pairs and corrected prior controls matched exactly;
 nine additional cold-process controls also matched. No rejected action, missing neural start or model
-error occurred. The complete 1,296-game development comparison is now running. The candidate remains
-unqualified and unpromoted.
+error occurred.
 
 The original analyzer incorrectly asserted that every helper opportunity must survive all native filters.
 Four Angel waits were correctly vetoed before the experimental active-challenger return. The separately
@@ -69,3 +68,24 @@ preserved `analysis-correction.json` and `analyze-native-guards.py` permit these
 separately and count only admitted treatment waits toward coverage. The original registration, failed
 analysis, policy, cases, outcomes and thresholds remain unchanged; no strength aggregate was read before
 this correction. This narrows the activation count from 36 inspected opportunities to 32 admitted waits.
+
+## Completed development: no finalist
+
+All 162 whole families / 1,296 games completed. The candidate scored **51.234568%** (326 wins, 12 draws,
+310 losses), versus **51.003086%** (325 wins, 11 draws, 312 losses) for the adopted control. The paired
+gain was **+0.231481 percentage points**, with whole-family 95% interval **−0.462963 to +0.925926 pp**
+and exact two-sided sign-flip p = 0.6875. The fixed +0.5 pp development gate failed. No fresh qualification
+or confirmation bank opened; no model was fitted or default changed.
+
+The five-, six- and seven-point gains were respectively +0.231481, +0.462963 and 0 pp, with 216 cases per
+arm in each budget. These nonnegative slices do not rescue the failed overall gate. Across development,
+258 admitted opportunities covered 38 unit types and all three maps; 127 waits were chosen, changing
+102 complete trajectories. Four cases improved and two worsened. All games reached terminal elimination
+with zero action rejects or neural start/model errors. All 648 independently rebuilt controls reproduced
+the preceding corrected study's complete traces. A separate TypeScript verifier reconstructed all family
+deltas, bootstrap endpoints, sign-flip counts and the failed gate using integer arithmetic.
+
+Aggregate parallel fight time rose 0.62%, and recorded rollout turns rose 0.50%. These observations are
+not a serial production timing qualification. Preserve the helper and
+[compact evidence](evidence/retaliation_handoff_20261115.json), including the original analyzer failure
+and its correction. Do not enable the candidate, lower its threshold or claim a confirmed strength gain.

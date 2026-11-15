@@ -1,0 +1,1810 @@
+{
+    "schema": "hoc.retaliation-handoff-evidence.v1",
+    "studyId": "retaliation-handoff-20261115-v1",
+    "candidateId": "retaliation-handoff-wait-v1",
+    "registrationSha256": "5ddde8da61d439d9e135c0393b2c7886da61210c8e2d7b61155b2d5869412ed6",
+    "helperPath": "src/simulation/retaliation_handoff_research.ts",
+    "helperSha256": "18da09f2e0c9a1c4661be0083386dd48e94b14d4294f3d6709a273313afedc3b",
+    "sealedFileCount": 2553,
+    "protocol": {
+        "schema": "hoc.retaliation-handoff-development.v1",
+        "studyId": "retaliation-handoff-20261115-v1",
+        "at": "2026-11-15T06:59:40.481805+00:00",
+        "hypothesis": "Admit a legal wait for a native melee attacker while an adjacent unacted ally can consume the same defender response; reserve it within the usual shortlist and let unchanged A19 scoring/arbitration decide.",
+        "source": {
+            "common": "85d3ffc5819ac2e178fa3e986c5e4ae895e878ac",
+            "server": "916e3ca3ccb14c093c7f550d880074640c5b9988",
+            "at": "2026-11-15T06:58:32.254452+00:00",
+            "overlay": "Offline copied SearchDriver wait admission + bounded shortlist reservation only; copied server runtime identities remain seeded; capsule-specific common package identity asserted.",
+            "priorCorrectedMeasurementRegistration": "9e8f698bc871d12fefc27984681051dd8ccd34abf526b42bba8df5cd5d6298ab",
+            "priorCompatibilityCases": "cfe0986252d59325f785aae55f2dc48c754344adf406cf493dbdcaa9b920540a",
+            "priorDevelopmentCases": "023e74645f42b18c187b1879950f1b15f3a4d7352339d0b6e402acdf7f530881"
+        },
+        "workers": 8,
+        "priority": 19,
+        "newIndependentChannels": 0,
+        "reference": "Adopted contextual063a draft + authoritative fully funded rangedd786 setup, native formation/support splits and A19; full public ranked Setup",
+        "scope": "Controlled physical team root only; no force-productive, dominant-finish or urgent-finish override. Existing target-pressure arbitration remains. No changed rollout policy/horizon/count, no fitted weights. One extra leaf; bounded normal challenger cap; native special reservations remain.",
+        "population": "54 corrected prior compatibility cases, then 162 whole already-opened development families; all maps, nine doctrine pairs, both draft assignments and physical seats. Reused development is not independent evidence.",
+        "preflight": {
+            "cases": 54,
+            "executions": 162,
+            "controls": "Independently reconstructed off/observer opening and exact complete traces; exact control replay against corrected prior source; package RNG and FightStateManager identity asserted.",
+            "quality": "zero rejects/censoring; both A19 seats; zero missing neural starts/errors; legal wait opportunity and bounded reservation contracts",
+            "coverage": {
+                "eligibleDecisionsAtLeast": 5,
+                "unitTypesAtLeast": 2,
+                "mapsAtLeast": 2,
+                "chosenWaitsAtLeast": 1,
+                "changedTrajectoriesAtLeast": 1
+            }
+        },
+        "development": {
+            "families": 162,
+            "cases": 648,
+            "arms": ["off", "treatment"],
+            "fights": 1296,
+            "cacheReuse": false,
+            "swappedArmOrder": true
+        },
+        "analysis": {
+            "cluster": "Whole offer board, both draft assignments and physical seats",
+            "score": "win1 draw.5 loss0",
+            "bootstrap": {
+                "iterations": 20000,
+                "seed": 2026111592,
+                "generator": "xorshift32 unsigned; modulo family count",
+                "interval": "sorted floor((B-1)*.025),floor((B-1)*.975)"
+            },
+            "exactTest": "two-sided whole-family sign flip, integer deltas times8",
+            "fundingGate": {
+                "gainAtLeast": 0.005,
+                "everyOwnBudgetMeanNonnegative": true,
+                "zeroQualityErrors": true
+            },
+            "noThresholdRetuning": true,
+            "noOutcomeMasks": true
+        },
+        "futureRequirements": {
+            "independentQualificationFamilies": 864,
+            "independentConfirmationFamilies": 1512,
+            "gainAtLeast": 0.005,
+            "wholeFamily95LowerAboveZero": true,
+            "everyOwnBudgetNonnegative": true,
+            "serialAdditionalComputeAtMost": 0.1,
+            "opponentPanel": "Separate fixed contrasting controller/army panel after primary pass",
+            "freshSeeds": "Separate prospective registration and global exclusion audit before any fresh games; old banks closed"
+        },
+        "noDefaultActivation": true
+    },
+    "preflight": {
+        "passed": true,
+        "registrationSha256": "5ddde8da61d439d9e135c0393b2c7886da61210c8e2d7b61155b2d5869412ed6",
+        "executions": 162,
+        "independentlyReconstructedControls": 108,
+        "exactOffObserverPairs": 54,
+        "qualityPassed": true,
+        "coverage": {
+            "inspectedOpportunities": 36,
+            "nativeGuardVetoes": 4,
+            "eligibleDecisions": 32,
+            "reservedShortlists": 17,
+            "chosenWaits": 15,
+            "fightsWithOpportunity": 17,
+            "names": {
+                "Battle Mage": 1,
+                "Behemoth": 10,
+                "Cyclops": 3,
+                "Hyena": 1,
+                "Nomad": 1,
+                "Orc": 1,
+                "Peasant": 1,
+                "Pikeman": 3,
+                "Squire": 4,
+                "Trent": 4,
+                "Troglodyte": 1,
+                "Troll": 1,
+                "Wolf": 1
+            },
+            "maps": [1, 3, 4],
+            "chosenNames": {
+                "Behemoth": 4,
+                "Cyclops": 3,
+                "Orc": 1,
+                "Pikeman": 3,
+                "Trent": 2,
+                "Troglodyte": 1,
+                "Troll": 1
+            }
+        },
+        "changedTrajectoryCases": 8,
+        "gates": {
+            "eligibleDecisions": true,
+            "unitTypes": true,
+            "maps": true,
+            "chosenWaits": true,
+            "changedTrajectories": true
+        },
+        "rawFiles": [
+            {
+                "path": "preflight/worker-0.jsonl",
+                "sha256": "597f2aa703e3d1a91e2698db147ded7976296fbf32de9d68b8feddc5b833b919"
+            },
+            {
+                "path": "preflight/worker-1.jsonl",
+                "sha256": "05f0a3a007a0215a9dbcb82bb37c879bd058f819f57fa6e11b96f8e633412c3c"
+            },
+            {
+                "path": "preflight/worker-2.jsonl",
+                "sha256": "991bff9b345a22680e58c2d6cc0fe3d5f8dd332b3ed4dbf2112431a19ad64b4d"
+            },
+            {
+                "path": "preflight/worker-3.jsonl",
+                "sha256": "53aa082680166db52af4f1b5ac49a696ce22110d018a50518de979eb3a60e81a"
+            },
+            {
+                "path": "preflight/worker-4.jsonl",
+                "sha256": "2656b62ebc519fcb0fcead267c617412b21d28fab8faeb00e0764ddf1122aebf"
+            },
+            {
+                "path": "preflight/worker-5.jsonl",
+                "sha256": "df3669b67f722ad73df30b6df088148cd6b7643a09fb13ea452e84f0aeaa5b81"
+            },
+            {
+                "path": "preflight/worker-6.jsonl",
+                "sha256": "70f9ad348c13f36a3c6c02dd0c62f3ac9d6944b4991a6053eff369ae38ef4a2e"
+            },
+            {
+                "path": "preflight/worker-7.jsonl",
+                "sha256": "5b3c99974f8d18df1e02a9db5476be343c295e4b0a3e24f2c772d209cb41572e"
+            }
+        ]
+    },
+    "coldProcessReplay": {
+        "passed": true,
+        "cases": 9,
+        "newProcesses": 9,
+        "results": [
+            {
+                "board": 0,
+                "game": 0,
+                "traceSha256": "1ef1bd73e7380c98a9a2fd276012fb2ddb6c23555e5e63052c8f131ee7561644",
+                "rawSha256": "2b6ed2ebeb4f4da8c791593a00b942398cd317a9eb35964b0df44689a3876931"
+            },
+            {
+                "board": 1,
+                "game": 0,
+                "traceSha256": "3cdecc8dfe0cfbdc6da2d6e53f9e1d2e5e056652c856b4dd2aca0d715ef86d55",
+                "rawSha256": "09f6df1da6ef9637c159ce748eec179c763681228798cbe821df00698950c3ab"
+            },
+            {
+                "board": 2,
+                "game": 0,
+                "traceSha256": "c9538e198b0eb923b3b98bac54c96397c697c364e04192a5a43a066402a1acf3",
+                "rawSha256": "2199f8df65937a99bae8554069cd4af19c3eb6aefce1ceb9b536583233112319"
+            },
+            {
+                "board": 3,
+                "game": 0,
+                "traceSha256": "985b4c41d4984b168ca09b85111ef610a376fe23afdfff83848242d60963876d",
+                "rawSha256": "a24ded3da9e34769ef4bb19a4939d77491e173b76eae83c3b9438e25b368a556"
+            },
+            {
+                "board": 4,
+                "game": 0,
+                "traceSha256": "ebb48c5cab583686817a8bedebb8aa82ff96cd785fb80844c382f5d473ed0217",
+                "rawSha256": "e60e0587141fbb32c3a73eb8e19b93f979025af1f6ba3e7a0716a2e6529d18cc"
+            },
+            {
+                "board": 5,
+                "game": 0,
+                "traceSha256": "fcfb2f527a4cfe650b262430f9770ee83e21adebe21c9a5c094ca26333fc97e4",
+                "rawSha256": "01dc5bf9f1733ecd647366dc252ee359ab95b7577e6fa9e6db012a756b930d21"
+            },
+            {
+                "board": 6,
+                "game": 0,
+                "traceSha256": "9a343951256facffad0506ec7e55535cb5821518507e601fa3c5264543bfbe7d",
+                "rawSha256": "90015707aaaa2e1cd98d0d6b31c164f7100364c5ab45a4e6ca403e43dcdb7330"
+            },
+            {
+                "board": 7,
+                "game": 0,
+                "traceSha256": "d9992da65a70c44b73ddaf2f6bd32d3a9db668b9e400d41c62a6a0b9cb1d6960",
+                "rawSha256": "2547f52646680f220e5f94d49b1522fbe3c53a8692f8c824a8089bc64803d222"
+            },
+            {
+                "board": 8,
+                "game": 0,
+                "traceSha256": "7e1ccfb48d30b56e1a728fbe1ecb5e85ef22ed023a6467d172401756e76ad6ea",
+                "rawSha256": "7cdb5384069eb105fb41eb8c5634a8180017f19c6ef69ace8859ad354ac632c3"
+            }
+        ]
+    },
+    "analysisCorrection": {
+        "at": "2026-11-15T07:04:46.964828+00:00",
+        "registrationSha256": "5ddde8da61d439d9e135c0393b2c7886da61210c8e2d7b61155b2d5869412ed6",
+        "originalAnalyzerSha256": "19925240e935412d55c0f7aadf508e3615add9f012ca19a12dd9a9819f584a7f",
+        "correctedAnalyzerSha256": "a08eae8dfb7a8d5404d32e8a2069b417287637fb9307bde8a478f40cf47e0c44",
+        "reason": "The original observer audit required every helper opportunity to survive all native keepCandidate filters. Four treatment waits were correctly vetoed before the final active-challenger return. The experimental hook never bypassed those existing guards.",
+        "correction": "Permit native guard vetoes, report them separately, and count only admitted treatment waits toward every activation coverage gate. No simulator, candidate, input, arm, outcome or threshold changed. Original failed analysis and terminal remain intact.",
+        "outcomeAggregatesReadBeforeCorrection": false,
+        "strengthStageOpened": false,
+        "policyChanged": false,
+        "gatesChanged": false,
+        "nativeGuardVetoes": 4
+    },
+    "originalAnalyzerFailure": {
+        "at": "2026-11-15T07:03:12.198909+00:00",
+        "status": "error",
+        "error": "Command '('python3', 'analyze.py', 'preflight')' returned non-zero exit status 1.",
+        "registrationSha256": "5ddde8da61d439d9e135c0393b2c7886da61210c8e2d7b61155b2d5869412ed6",
+        "defaultChanged": false
+    },
+    "development": {
+        "schema": "hoc.retaliation-handoff-development-results.v1",
+        "registrationSha256": "5ddde8da61d439d9e135c0393b2c7886da61210c8e2d7b61155b2d5869412ed6",
+        "complete": true,
+        "families": 162,
+        "executions": 1296,
+        "arms": {
+            "off": {
+                "wins": 325,
+                "draws": 11,
+                "losses": 312,
+                "score": 0.5100308641975309,
+                "coverage": {
+                    "inspectedOpportunities": 0,
+                    "nativeGuardVetoes": 0,
+                    "eligibleDecisions": 0,
+                    "reservedShortlists": 0,
+                    "chosenWaits": 0,
+                    "fightsWithOpportunity": 0,
+                    "names": {},
+                    "maps": [],
+                    "chosenNames": {}
+                },
+                "totalFightMs": 4684728.78704,
+                "work": {
+                    "decisions": 31935,
+                    "searched": 30341,
+                    "candidatesTotal": 203026,
+                    "scoredCandidatesTotal": 154518,
+                    "rolloutTurnsTotal": 7943088
+                }
+            },
+            "treatment": {
+                "wins": 326,
+                "draws": 12,
+                "losses": 310,
+                "score": 0.5123456790123457,
+                "coverage": {
+                    "inspectedOpportunities": 262,
+                    "nativeGuardVetoes": 4,
+                    "eligibleDecisions": 258,
+                    "reservedShortlists": 114,
+                    "chosenWaits": 127,
+                    "fightsWithOpportunity": 180,
+                    "names": {
+                        "Abomination": 6,
+                        "Angel": 9,
+                        "Arbalester": 3,
+                        "Battle Mage": 9,
+                        "Behemoth": 2,
+                        "Beholder": 5,
+                        "Blacksmith": 6,
+                        "Centaur": 1,
+                        "Cyclops": 17,
+                        "Dryad": 3,
+                        "Efreet": 4,
+                        "Elf": 5,
+                        "Gargantuan": 3,
+                        "Goblin Knight": 4,
+                        "Griffin": 20,
+                        "Hyena": 11,
+                        "Leprechaun": 8,
+                        "Magic Dragon": 5,
+                        "Manticore": 3,
+                        "Medusa": 3,
+                        "Mermaid": 4,
+                        "Monk": 5,
+                        "Nomad": 8,
+                        "Orc": 6,
+                        "Peasant": 11,
+                        "Pikeman": 15,
+                        "Scavenger": 6,
+                        "Squire": 6,
+                        "Trent": 12,
+                        "Troglodyte": 6,
+                        "Troll": 3,
+                        "Valkyrie": 4,
+                        "Wandering Mage": 16,
+                        "White Tiger": 9,
+                        "Wolf": 3,
+                        "Wolf Rider": 5,
+                        "Wyvern": 4,
+                        "Zena": 8
+                    },
+                    "maps": [1, 3, 4],
+                    "chosenNames": {
+                        "Abomination": 1,
+                        "Angel": 4,
+                        "Arbalester": 2,
+                        "Battle Mage": 7,
+                        "Beholder": 5,
+                        "Blacksmith": 1,
+                        "Centaur": 1,
+                        "Cyclops": 12,
+                        "Dryad": 2,
+                        "Efreet": 1,
+                        "Elf": 3,
+                        "Gargantuan": 2,
+                        "Goblin Knight": 1,
+                        "Griffin": 13,
+                        "Hyena": 4,
+                        "Leprechaun": 3,
+                        "Magic Dragon": 1,
+                        "Manticore": 2,
+                        "Medusa": 3,
+                        "Mermaid": 1,
+                        "Monk": 1,
+                        "Nomad": 4,
+                        "Orc": 3,
+                        "Peasant": 6,
+                        "Pikeman": 5,
+                        "Squire": 2,
+                        "Trent": 7,
+                        "Troglodyte": 2,
+                        "Troll": 2,
+                        "Wandering Mage": 11,
+                        "White Tiger": 6,
+                        "Wolf": 1,
+                        "Wyvern": 1,
+                        "Zena": 7
+                    }
+                },
+                "totalFightMs": 4713574.584082002,
+                "work": {
+                    "decisions": 32118,
+                    "searched": 30513,
+                    "candidatesTotal": 204887,
+                    "scoredCandidatesTotal": 155658,
+                    "rolloutTurnsTotal": 7983194
+                }
+            }
+        },
+        "pairedGain": 0.0023148148148148147,
+        "wholeFamilyInterval95": [-0.004629629629629629, 0.009259259259259259],
+        "exactTwoSidedP": 0.6875,
+        "exactSignFlipNumerator": "44",
+        "exactSignFlipDenominator": "64",
+        "byBudget": {
+            "5": {
+                "gamesPerArm": 216,
+                "gain": 0.0023148148148148147
+            },
+            "6": {
+                "gamesPerArm": 216,
+                "gain": 0.004629629629629629
+            },
+            "7": {
+                "gamesPerArm": 216,
+                "gain": 0.0
+            }
+        },
+        "byMap": {
+            "1": {
+                "gamesPerArm": 216,
+                "gain": 0.004629629629629629
+            },
+            "3": {
+                "gamesPerArm": 216,
+                "gain": 0.0
+            },
+            "4": {
+                "gamesPerArm": 216,
+                "gain": 0.0023148148148148147
+            }
+        },
+        "changedTrajectoryCases": 102,
+        "improvedCases": 4,
+        "worsenedCases": 2,
+        "developmentGate": false,
+        "gates": {
+            "gainAtLeastHalfPoint": false,
+            "allOwnBudgetsNonnegative": true,
+            "zeroQualityErrors": true
+        },
+        "independentlyQualified": false,
+        "productionPromotion": false,
+        "familyDeltas": [
+            {
+                "board": 0,
+                "difference": 0.0
+            },
+            {
+                "board": 1,
+                "difference": 0.0
+            },
+            {
+                "board": 2,
+                "difference": 0.0
+            },
+            {
+                "board": 3,
+                "difference": 0.0
+            },
+            {
+                "board": 4,
+                "difference": 0.0
+            },
+            {
+                "board": 5,
+                "difference": 0.0
+            },
+            {
+                "board": 6,
+                "difference": 0.0
+            },
+            {
+                "board": 7,
+                "difference": 0.0
+            },
+            {
+                "board": 8,
+                "difference": 0.0
+            },
+            {
+                "board": 9,
+                "difference": 0.0
+            },
+            {
+                "board": 10,
+                "difference": 0.0
+            },
+            {
+                "board": 11,
+                "difference": 0.0
+            },
+            {
+                "board": 12,
+                "difference": 0.0
+            },
+            {
+                "board": 13,
+                "difference": 0.0
+            },
+            {
+                "board": 14,
+                "difference": 0.0
+            },
+            {
+                "board": 15,
+                "difference": 0.0
+            },
+            {
+                "board": 16,
+                "difference": 0.0
+            },
+            {
+                "board": 17,
+                "difference": 0.0
+            },
+            {
+                "board": 18,
+                "difference": 0.0
+            },
+            {
+                "board": 19,
+                "difference": 0.0
+            },
+            {
+                "board": 20,
+                "difference": 0.0
+            },
+            {
+                "board": 21,
+                "difference": 0.0
+            },
+            {
+                "board": 22,
+                "difference": 0.0
+            },
+            {
+                "board": 23,
+                "difference": 0.0
+            },
+            {
+                "board": 24,
+                "difference": 0.0
+            },
+            {
+                "board": 25,
+                "difference": 0.0
+            },
+            {
+                "board": 26,
+                "difference": 0.0
+            },
+            {
+                "board": 27,
+                "difference": 0.0
+            },
+            {
+                "board": 28,
+                "difference": 0.0
+            },
+            {
+                "board": 29,
+                "difference": 0.0
+            },
+            {
+                "board": 30,
+                "difference": 0.0
+            },
+            {
+                "board": 31,
+                "difference": 0.0
+            },
+            {
+                "board": 32,
+                "difference": 0.0
+            },
+            {
+                "board": 33,
+                "difference": 0.0
+            },
+            {
+                "board": 34,
+                "difference": 0.0
+            },
+            {
+                "board": 35,
+                "difference": 0.0
+            },
+            {
+                "board": 36,
+                "difference": 0.0
+            },
+            {
+                "board": 37,
+                "difference": 0.0
+            },
+            {
+                "board": 38,
+                "difference": 0.0
+            },
+            {
+                "board": 39,
+                "difference": 0.0
+            },
+            {
+                "board": 40,
+                "difference": 0.0
+            },
+            {
+                "board": 41,
+                "difference": 0.0
+            },
+            {
+                "board": 42,
+                "difference": 0.0
+            },
+            {
+                "board": 43,
+                "difference": 0.0
+            },
+            {
+                "board": 44,
+                "difference": 0.0
+            },
+            {
+                "board": 45,
+                "difference": 0.25
+            },
+            {
+                "board": 46,
+                "difference": 0.0
+            },
+            {
+                "board": 47,
+                "difference": 0.0
+            },
+            {
+                "board": 48,
+                "difference": 0.0
+            },
+            {
+                "board": 49,
+                "difference": 0.0
+            },
+            {
+                "board": 50,
+                "difference": 0.0
+            },
+            {
+                "board": 51,
+                "difference": 0.0
+            },
+            {
+                "board": 52,
+                "difference": 0.0
+            },
+            {
+                "board": 53,
+                "difference": 0.0
+            },
+            {
+                "board": 54,
+                "difference": 0.0
+            },
+            {
+                "board": 55,
+                "difference": 0.0
+            },
+            {
+                "board": 56,
+                "difference": 0.0
+            },
+            {
+                "board": 57,
+                "difference": 0.0
+            },
+            {
+                "board": 58,
+                "difference": 0.0
+            },
+            {
+                "board": 59,
+                "difference": 0.0
+            },
+            {
+                "board": 60,
+                "difference": 0.0
+            },
+            {
+                "board": 61,
+                "difference": 0.0
+            },
+            {
+                "board": 62,
+                "difference": 0.0
+            },
+            {
+                "board": 63,
+                "difference": 0.0
+            },
+            {
+                "board": 64,
+                "difference": 0.0
+            },
+            {
+                "board": 65,
+                "difference": 0.125
+            },
+            {
+                "board": 66,
+                "difference": 0.0
+            },
+            {
+                "board": 67,
+                "difference": 0.0
+            },
+            {
+                "board": 68,
+                "difference": 0.0
+            },
+            {
+                "board": 69,
+                "difference": 0.0
+            },
+            {
+                "board": 70,
+                "difference": 0.0
+            },
+            {
+                "board": 71,
+                "difference": 0.0
+            },
+            {
+                "board": 72,
+                "difference": 0.0
+            },
+            {
+                "board": 73,
+                "difference": 0.0
+            },
+            {
+                "board": 74,
+                "difference": 0.0
+            },
+            {
+                "board": 75,
+                "difference": 0.0
+            },
+            {
+                "board": 76,
+                "difference": 0.0
+            },
+            {
+                "board": 77,
+                "difference": 0.0
+            },
+            {
+                "board": 78,
+                "difference": 0.0
+            },
+            {
+                "board": 79,
+                "difference": 0.0
+            },
+            {
+                "board": 80,
+                "difference": 0.0
+            },
+            {
+                "board": 81,
+                "difference": 0.0
+            },
+            {
+                "board": 82,
+                "difference": 0.0
+            },
+            {
+                "board": 83,
+                "difference": 0.0
+            },
+            {
+                "board": 84,
+                "difference": 0.0
+            },
+            {
+                "board": 85,
+                "difference": 0.0
+            },
+            {
+                "board": 86,
+                "difference": 0.0
+            },
+            {
+                "board": 87,
+                "difference": 0.0
+            },
+            {
+                "board": 88,
+                "difference": 0.0
+            },
+            {
+                "board": 89,
+                "difference": 0.0
+            },
+            {
+                "board": 90,
+                "difference": 0.0
+            },
+            {
+                "board": 91,
+                "difference": 0.0
+            },
+            {
+                "board": 92,
+                "difference": 0.0
+            },
+            {
+                "board": 93,
+                "difference": 0.0
+            },
+            {
+                "board": 94,
+                "difference": 0.0
+            },
+            {
+                "board": 95,
+                "difference": 0.0
+            },
+            {
+                "board": 96,
+                "difference": 0.0
+            },
+            {
+                "board": 97,
+                "difference": 0.0
+            },
+            {
+                "board": 98,
+                "difference": 0.0
+            },
+            {
+                "board": 99,
+                "difference": 0.0
+            },
+            {
+                "board": 100,
+                "difference": 0.0
+            },
+            {
+                "board": 101,
+                "difference": 0.0
+            },
+            {
+                "board": 102,
+                "difference": 0.0
+            },
+            {
+                "board": 103,
+                "difference": 0.25
+            },
+            {
+                "board": 104,
+                "difference": 0.25
+            },
+            {
+                "board": 105,
+                "difference": 0.0
+            },
+            {
+                "board": 106,
+                "difference": 0.0
+            },
+            {
+                "board": 107,
+                "difference": 0.0
+            },
+            {
+                "board": 108,
+                "difference": 0.0
+            },
+            {
+                "board": 109,
+                "difference": -0.25
+            },
+            {
+                "board": 110,
+                "difference": 0.0
+            },
+            {
+                "board": 111,
+                "difference": 0.0
+            },
+            {
+                "board": 112,
+                "difference": 0.0
+            },
+            {
+                "board": 113,
+                "difference": 0.0
+            },
+            {
+                "board": 114,
+                "difference": 0.0
+            },
+            {
+                "board": 115,
+                "difference": 0.0
+            },
+            {
+                "board": 116,
+                "difference": 0.0
+            },
+            {
+                "board": 117,
+                "difference": 0.0
+            },
+            {
+                "board": 118,
+                "difference": 0.0
+            },
+            {
+                "board": 119,
+                "difference": 0.0
+            },
+            {
+                "board": 120,
+                "difference": 0.0
+            },
+            {
+                "board": 121,
+                "difference": 0.0
+            },
+            {
+                "board": 122,
+                "difference": -0.25
+            },
+            {
+                "board": 123,
+                "difference": 0.0
+            },
+            {
+                "board": 124,
+                "difference": 0.0
+            },
+            {
+                "board": 125,
+                "difference": 0.0
+            },
+            {
+                "board": 126,
+                "difference": 0.0
+            },
+            {
+                "board": 127,
+                "difference": 0.0
+            },
+            {
+                "board": 128,
+                "difference": 0.0
+            },
+            {
+                "board": 129,
+                "difference": 0.0
+            },
+            {
+                "board": 130,
+                "difference": 0.0
+            },
+            {
+                "board": 131,
+                "difference": 0.0
+            },
+            {
+                "board": 132,
+                "difference": 0.0
+            },
+            {
+                "board": 133,
+                "difference": 0.0
+            },
+            {
+                "board": 134,
+                "difference": 0.0
+            },
+            {
+                "board": 135,
+                "difference": 0.0
+            },
+            {
+                "board": 136,
+                "difference": 0.0
+            },
+            {
+                "board": 137,
+                "difference": 0.0
+            },
+            {
+                "board": 138,
+                "difference": 0.0
+            },
+            {
+                "board": 139,
+                "difference": 0.0
+            },
+            {
+                "board": 140,
+                "difference": 0.0
+            },
+            {
+                "board": 141,
+                "difference": 0.0
+            },
+            {
+                "board": 142,
+                "difference": 0.0
+            },
+            {
+                "board": 143,
+                "difference": 0.0
+            },
+            {
+                "board": 144,
+                "difference": 0.0
+            },
+            {
+                "board": 145,
+                "difference": 0.0
+            },
+            {
+                "board": 146,
+                "difference": 0.0
+            },
+            {
+                "board": 147,
+                "difference": 0.0
+            },
+            {
+                "board": 148,
+                "difference": 0.0
+            },
+            {
+                "board": 149,
+                "difference": 0.0
+            },
+            {
+                "board": 150,
+                "difference": 0.0
+            },
+            {
+                "board": 151,
+                "difference": 0.0
+            },
+            {
+                "board": 152,
+                "difference": 0.0
+            },
+            {
+                "board": 153,
+                "difference": 0.0
+            },
+            {
+                "board": 154,
+                "difference": 0.0
+            },
+            {
+                "board": 155,
+                "difference": 0.0
+            },
+            {
+                "board": 156,
+                "difference": 0.0
+            },
+            {
+                "board": 157,
+                "difference": 0.0
+            },
+            {
+                "board": 158,
+                "difference": 0.0
+            },
+            {
+                "board": 159,
+                "difference": 0.0
+            },
+            {
+                "board": 160,
+                "difference": 0.0
+            },
+            {
+                "board": 161,
+                "difference": 0.0
+            }
+        ],
+        "rawFiles": [
+            {
+                "path": "development/worker-0.jsonl",
+                "sha256": "c694391d76b6de2e27b5f5fce0eae2c4d1229fff5a3c37c2d150e19794874bf1"
+            },
+            {
+                "path": "development/worker-1.jsonl",
+                "sha256": "034d8b40b2fc12ec24c300b90b736b82db284319283ff43e31a11578864b24e4"
+            },
+            {
+                "path": "development/worker-2.jsonl",
+                "sha256": "051295377a9fbf564ee0f245661ba059ef32fefa8a1e8b190eac7a1cd5ab8080"
+            },
+            {
+                "path": "development/worker-3.jsonl",
+                "sha256": "e900b20f76b5c96e87817f5700cd234a6b49db4ff81d452b28723bad8663e320"
+            },
+            {
+                "path": "development/worker-4.jsonl",
+                "sha256": "8cc39809ea48f490d0ebd6f8da894bbcb0947f100bddb1c35130ab2b39ab59ba"
+            },
+            {
+                "path": "development/worker-5.jsonl",
+                "sha256": "60cafb9b5663a1cb92fcfbc81bdb80969d8600cd230729458ef5a3cd666091d0"
+            },
+            {
+                "path": "development/worker-6.jsonl",
+                "sha256": "45fd9519d2eef06a53bb57428fbaef96625ebdb1994fef60d20937e694dd9941"
+            },
+            {
+                "path": "development/worker-7.jsonl",
+                "sha256": "9a562d099fd72c16e8514600b6bd1d432deb07af84f6fbdf8b8ad7eddc228ba6"
+            }
+        ]
+    },
+    "independentVerification": {
+        "passed": true,
+        "registrationSha256": "5ddde8da61d439d9e135c0393b2c7886da61210c8e2d7b61155b2d5869412ed6",
+        "analyzerSha256": "a08eae8dfb7a8d5404d32e8a2069b417287637fb9307bde8a478f40cf47e0c44",
+        "independentVerifierSha256": "2bfbb7176b50c4d1587ecb6bc2a83bcfc71dc0665e362d418bd27ea39b9724ca",
+        "rows": 1296,
+        "wholeFamilies": 162,
+        "pairedGain": 0.0023148148148148147,
+        "wholeFamilyInterval95": [-0.004629629629629629, 0.009259259259259259],
+        "exactTwoSidedP": 0.6875,
+        "developmentGate": false,
+        "integerBootstrapSha256": "e484b8ff2911065c7b1db5039570a015baa155583bc116e0535d992fccde5cf3",
+        "seals": 2553,
+        "defaultChanged": false
+    },
+    "fullControlReplay": {
+        "passed": true,
+        "complete": true,
+        "matchedIndependentControls": 648,
+        "referenceRegistrationSha256": "9e8f698bc871d12fefc27984681051dd8ccd34abf526b42bba8df5cd5d6298ab",
+        "verifierSha256": "4c5a6834c762e8403c764c497499c12dbf71de768f464c19a00e95197acd7e19"
+    },
+    "auditHashes": {
+        "source-freeze.json": "822debb1f29fdcf6177e6f6f7cb4a059fab67b4798bfa0afd4700f01e90bbe8e",
+        "analyze.py": "19925240e935412d55c0f7aadf508e3615add9f012ca19a12dd9a9819f584a7f",
+        "analyze-native-guards.py": "a08eae8dfb7a8d5404d32e8a2069b417287637fb9307bde8a478f40cf47e0c44",
+        "verify-independent.ts": "2bfbb7176b50c4d1587ecb6bc2a83bcfc71dc0665e362d418bd27ea39b9724ca",
+        "verify-controls.py": "4c5a6834c762e8403c764c497499c12dbf71de768f464c19a00e95197acd7e19",
+        "analysis.json": "5f1806cf6057ab56bf1d72eead427fb6e08a5391a7ff8a915c97cb405cf32fbc",
+        "analysis-correction.json": "c7626d10299d4e8ea2d3e73337458ba46026cd21dbf7d180854475a814a0af04",
+        "actor.ts": "7a180cd9a24d2a2efee6df46d2c60c557de74eb4e1f60481699f8fc90ef02dde",
+        "native.ts": "72c30be9dc7e727b457d36892bed62c618f32b0b24d9378d5b73dc9e63e657f5",
+        "opening.ts": "89caba49ce4716b6938b71de840e10fe5ddc63c5dc502aa865ad5ee7f13fc1a2",
+        "profiles.ts": "b048d63befe3732c3899997295d27d38277e334e208937f3d44912f93b61c653",
+        "run.py": "8ea41f0ad6cc74f9369b24cdfd72b4e0b8db5e87aa0514dc6b50bf01877e52f9",
+        "finalize-native-guards.py": "ec2e1e8fce2185efd08ee1e73d4691cef6e55a434c2ae8a0dd15e6b671957517"
+    },
+    "reusedFamilies": [
+        {
+            "board": 0,
+            "seed": 1218915744
+        },
+        {
+            "board": 1,
+            "seed": 1916394688
+        },
+        {
+            "board": 2,
+            "seed": 1566499600
+        },
+        {
+            "board": 3,
+            "seed": 420277176
+        },
+        {
+            "board": 4,
+            "seed": 2073541832
+        },
+        {
+            "board": 5,
+            "seed": 1653086768
+        },
+        {
+            "board": 6,
+            "seed": 1692032808
+        },
+        {
+            "board": 7,
+            "seed": 1652282008
+        },
+        {
+            "board": 8,
+            "seed": 811146264
+        },
+        {
+            "board": 9,
+            "seed": 1612506992
+        },
+        {
+            "board": 10,
+            "seed": 176311632
+        },
+        {
+            "board": 11,
+            "seed": 512010304
+        },
+        {
+            "board": 12,
+            "seed": 1594784112
+        },
+        {
+            "board": 13,
+            "seed": 305487048
+        },
+        {
+            "board": 14,
+            "seed": 936070768
+        },
+        {
+            "board": 15,
+            "seed": 2111285520
+        },
+        {
+            "board": 16,
+            "seed": 877766664
+        },
+        {
+            "board": 17,
+            "seed": 716017072
+        },
+        {
+            "board": 18,
+            "seed": 668570112
+        },
+        {
+            "board": 19,
+            "seed": 648742560
+        },
+        {
+            "board": 20,
+            "seed": 1406021032
+        },
+        {
+            "board": 21,
+            "seed": 642453416
+        },
+        {
+            "board": 22,
+            "seed": 303578376
+        },
+        {
+            "board": 23,
+            "seed": 1335539976
+        },
+        {
+            "board": 24,
+            "seed": 1802352424
+        },
+        {
+            "board": 25,
+            "seed": 975776544
+        },
+        {
+            "board": 26,
+            "seed": 1670521432
+        },
+        {
+            "board": 27,
+            "seed": 743245720
+        },
+        {
+            "board": 28,
+            "seed": 1558294672
+        },
+        {
+            "board": 29,
+            "seed": 1682398848
+        },
+        {
+            "board": 30,
+            "seed": 2122673584
+        },
+        {
+            "board": 31,
+            "seed": 2033183192
+        },
+        {
+            "board": 32,
+            "seed": 2043443312
+        },
+        {
+            "board": 33,
+            "seed": 1708343048
+        },
+        {
+            "board": 34,
+            "seed": 978787424
+        },
+        {
+            "board": 35,
+            "seed": 17466968
+        },
+        {
+            "board": 36,
+            "seed": 1328336832
+        },
+        {
+            "board": 37,
+            "seed": 16826360
+        },
+        {
+            "board": 38,
+            "seed": 817752536
+        },
+        {
+            "board": 39,
+            "seed": 2050538128
+        },
+        {
+            "board": 40,
+            "seed": 197817752
+        },
+        {
+            "board": 41,
+            "seed": 222873976
+        },
+        {
+            "board": 42,
+            "seed": 1297454840
+        },
+        {
+            "board": 43,
+            "seed": 254260640
+        },
+        {
+            "board": 44,
+            "seed": 302777976
+        },
+        {
+            "board": 45,
+            "seed": 120148392
+        },
+        {
+            "board": 46,
+            "seed": 1034514736
+        },
+        {
+            "board": 47,
+            "seed": 303979640
+        },
+        {
+            "board": 48,
+            "seed": 1533188248
+        },
+        {
+            "board": 49,
+            "seed": 311321872
+        },
+        {
+            "board": 50,
+            "seed": 492766248
+        },
+        {
+            "board": 51,
+            "seed": 1226087672
+        },
+        {
+            "board": 52,
+            "seed": 1663838768
+        },
+        {
+            "board": 53,
+            "seed": 2086080120
+        },
+        {
+            "board": 54,
+            "seed": 1211771056
+        },
+        {
+            "board": 55,
+            "seed": 1779316192
+        },
+        {
+            "board": 56,
+            "seed": 1907381240
+        },
+        {
+            "board": 57,
+            "seed": 898457632
+        },
+        {
+            "board": 58,
+            "seed": 939183592
+        },
+        {
+            "board": 59,
+            "seed": 250926360
+        },
+        {
+            "board": 60,
+            "seed": 487364528
+        },
+        {
+            "board": 61,
+            "seed": 737466808
+        },
+        {
+            "board": 62,
+            "seed": 739746536
+        },
+        {
+            "board": 63,
+            "seed": 356957232
+        },
+        {
+            "board": 64,
+            "seed": 1168610032
+        },
+        {
+            "board": 65,
+            "seed": 641757848
+        },
+        {
+            "board": 66,
+            "seed": 429151512
+        },
+        {
+            "board": 67,
+            "seed": 1635731440
+        },
+        {
+            "board": 68,
+            "seed": 945978264
+        },
+        {
+            "board": 69,
+            "seed": 367322880
+        },
+        {
+            "board": 70,
+            "seed": 343295632
+        },
+        {
+            "board": 71,
+            "seed": 332339016
+        },
+        {
+            "board": 72,
+            "seed": 1966519704
+        },
+        {
+            "board": 73,
+            "seed": 1950069496
+        },
+        {
+            "board": 74,
+            "seed": 997750296
+        },
+        {
+            "board": 75,
+            "seed": 228608896
+        },
+        {
+            "board": 76,
+            "seed": 1607632592
+        },
+        {
+            "board": 77,
+            "seed": 131948840
+        },
+        {
+            "board": 78,
+            "seed": 226535112
+        },
+        {
+            "board": 79,
+            "seed": 2138328808
+        },
+        {
+            "board": 80,
+            "seed": 1084430928
+        },
+        {
+            "board": 81,
+            "seed": 922250256
+        },
+        {
+            "board": 82,
+            "seed": 1514009168
+        },
+        {
+            "board": 83,
+            "seed": 626029400
+        },
+        {
+            "board": 84,
+            "seed": 1415870824
+        },
+        {
+            "board": 85,
+            "seed": 1334528496
+        },
+        {
+            "board": 86,
+            "seed": 32562704
+        },
+        {
+            "board": 87,
+            "seed": 558742504
+        },
+        {
+            "board": 88,
+            "seed": 1569924688
+        },
+        {
+            "board": 89,
+            "seed": 26569576
+        },
+        {
+            "board": 90,
+            "seed": 1783362208
+        },
+        {
+            "board": 91,
+            "seed": 58818672
+        },
+        {
+            "board": 92,
+            "seed": 2086375528
+        },
+        {
+            "board": 93,
+            "seed": 1501107480
+        },
+        {
+            "board": 94,
+            "seed": 1567561832
+        },
+        {
+            "board": 95,
+            "seed": 690445600
+        },
+        {
+            "board": 96,
+            "seed": 2023579416
+        },
+        {
+            "board": 97,
+            "seed": 1442314968
+        },
+        {
+            "board": 98,
+            "seed": 435392312
+        },
+        {
+            "board": 99,
+            "seed": 1620216912
+        },
+        {
+            "board": 100,
+            "seed": 851414504
+        },
+        {
+            "board": 101,
+            "seed": 992736960
+        },
+        {
+            "board": 102,
+            "seed": 1887612304
+        },
+        {
+            "board": 103,
+            "seed": 502856632
+        },
+        {
+            "board": 104,
+            "seed": 1091103464
+        },
+        {
+            "board": 105,
+            "seed": 581764816
+        },
+        {
+            "board": 106,
+            "seed": 1297070120
+        },
+        {
+            "board": 107,
+            "seed": 901034176
+        },
+        {
+            "board": 108,
+            "seed": 43740096
+        },
+        {
+            "board": 109,
+            "seed": 517929784
+        },
+        {
+            "board": 110,
+            "seed": 1829472176
+        },
+        {
+            "board": 111,
+            "seed": 1499552144
+        },
+        {
+            "board": 112,
+            "seed": 257013544
+        },
+        {
+            "board": 113,
+            "seed": 102737488
+        },
+        {
+            "board": 114,
+            "seed": 1738612920
+        },
+        {
+            "board": 115,
+            "seed": 1128692672
+        },
+        {
+            "board": 116,
+            "seed": 933930264
+        },
+        {
+            "board": 117,
+            "seed": 420238256
+        },
+        {
+            "board": 118,
+            "seed": 574473096
+        },
+        {
+            "board": 119,
+            "seed": 979643672
+        },
+        {
+            "board": 120,
+            "seed": 164731888
+        },
+        {
+            "board": 121,
+            "seed": 1909378624
+        },
+        {
+            "board": 122,
+            "seed": 311784880
+        },
+        {
+            "board": 123,
+            "seed": 618462480
+        },
+        {
+            "board": 124,
+            "seed": 1574842808
+        },
+        {
+            "board": 125,
+            "seed": 383774032
+        },
+        {
+            "board": 126,
+            "seed": 1035035368
+        },
+        {
+            "board": 127,
+            "seed": 1713058568
+        },
+        {
+            "board": 128,
+            "seed": 707112432
+        },
+        {
+            "board": 129,
+            "seed": 1018061816
+        },
+        {
+            "board": 130,
+            "seed": 350807472
+        },
+        {
+            "board": 131,
+            "seed": 882949112
+        },
+        {
+            "board": 132,
+            "seed": 1100102792
+        },
+        {
+            "board": 133,
+            "seed": 1342691728
+        },
+        {
+            "board": 134,
+            "seed": 1521752112
+        },
+        {
+            "board": 135,
+            "seed": 199179576
+        },
+        {
+            "board": 136,
+            "seed": 2009093432
+        },
+        {
+            "board": 137,
+            "seed": 661232488
+        },
+        {
+            "board": 138,
+            "seed": 1579105560
+        },
+        {
+            "board": 139,
+            "seed": 48611784
+        },
+        {
+            "board": 140,
+            "seed": 524282432
+        },
+        {
+            "board": 141,
+            "seed": 1853697808
+        },
+        {
+            "board": 142,
+            "seed": 1201462376
+        },
+        {
+            "board": 143,
+            "seed": 1055971832
+        },
+        {
+            "board": 144,
+            "seed": 1385986664
+        },
+        {
+            "board": 145,
+            "seed": 1114327072
+        },
+        {
+            "board": 146,
+            "seed": 1459519424
+        },
+        {
+            "board": 147,
+            "seed": 1843225536
+        },
+        {
+            "board": 148,
+            "seed": 1544225360
+        },
+        {
+            "board": 149,
+            "seed": 1958525680
+        },
+        {
+            "board": 150,
+            "seed": 1793394984
+        },
+        {
+            "board": 151,
+            "seed": 805998768
+        },
+        {
+            "board": 152,
+            "seed": 1593003344
+        },
+        {
+            "board": 153,
+            "seed": 760516512
+        },
+        {
+            "board": 154,
+            "seed": 33947728
+        },
+        {
+            "board": 155,
+            "seed": 2098404032
+        },
+        {
+            "board": 156,
+            "seed": 726797688
+        },
+        {
+            "board": 157,
+            "seed": 1340713184
+        },
+        {
+            "board": 158,
+            "seed": 423647600
+        },
+        {
+            "board": 159,
+            "seed": 478890720
+        },
+        {
+            "board": 160,
+            "seed": 834647216
+        },
+        {
+            "board": 161,
+            "seed": 947652632
+        }
+    ],
+    "newIndependentChannels": 0,
+    "freshQualificationOpened": false,
+    "freshConfirmationOpened": false,
+    "defaultChanged": false,
+    "productionTimingQualified": false,
+    "independentlyQualified": false,
+    "localCapsule": "game/core/tmp/retaliation-handoff-20261115",
+    "descriptiveHandoffAudit": {
+        "schema": "hoc.retaliation-handoff-descriptive-audit.v1",
+        "counts": {
+            "chosenWaits": 127,
+            "actorReturnedLater": 94,
+            "eligibleAllyAttackedNamedTargetBeforeReturnOrEnd": 68,
+            "namedTargetActedBeforeReturnOrEnd": 60
+        },
+        "limitations": "Completed strategy action before the actor returns or the game ends; not proof of a hit, retaliation damage, same-lap response consumption, causation or strength. No outcome-conditioned selection.",
+        "auditorSha256": "07110596d5b2d4a7d025bd544ab99ff20598ff52ab20a43ce183c752b1c5d525"
+    }
+}

@@ -437,3 +437,8 @@ could consume the defender's response, retaining that wait within the ordinary s
 `5ddde8da61d439d9e135c0393b2c7886da61210c8e2d7b61155b2d5869412ed6` fixes the coverage and development
 gates before execution. The helper is offline only, the development families are explicitly reused,
 and no fresh qualification bank or serving default is authorized by this smoke test.
+The completed 162-family / 1,296-game trial failed its +0.5 pp gate: gain +0.231481 pp, whole-family 95%
+−0.462963 to +0.925926 pp. All doctrine means were nonnegative, but that does not rescue the overall result.
+Preserve `docs/evidence/retaliation_handoff_20261115.json`, its independent verification and the documented
+native-filter audit correction. No fresh bank opened and no serving default changed. Further ideas need
+a distinct hypothesis; do not weaken this gate or activate the failed candidate.
