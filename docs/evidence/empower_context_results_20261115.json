@@ -1,0 +1,744 @@
+{
+    "studyId": "empower-public-context-20261115T013200Z",
+    "status": "no-development-finalist",
+    "registrationSha256": "896fdd2c2ee97e1a9b5bd5192aee5991c56866ddc0932679fdd09ec1f48bcb17",
+    "sourceManifestSha256": "4894253a0c16d522ba7076878252d2dff59fd0845c3a9df8f8309e3864ee043d",
+    "trainingAlgorithmManifestSha256": "27673f3d61292debb345a96fec6f210e291c757eb0c23eb174095e53de38180b",
+    "fitFileSha256": "b3309510f6f034d326c1e036fb8d106180eab5a7d362beae145e0486276cf60d",
+    "training": {
+        "verified": true,
+        "rows": 17280,
+        "boards": 2160,
+        "reusedPriorRows": 14052,
+        "newExecutedFights": 3228,
+        "rowsSha256": "63b3c5ee619b122a0532b7e81741cff22b8f2757369fe8a3d6828c8bddcb7934"
+    },
+    "recipes": [
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.003
+            },
+            "margin": 0.01,
+            "gain": -0.004456018518518519,
+            "foldGains": [
+                -0.005497685185185185, 0.001736111111111111, -0.008680555555555556, -0.004050925925925926,
+                -0.005787037037037037
+            ],
+            "switched": 786,
+            "activatedBoards": 732,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.003
+            },
+            "margin": 0.03,
+            "gain": -0.002025462962962963,
+            "foldGains": [
+                -0.004050925925925926, 0.0028935185185185184, -0.004050925925925926, -0.0023148148148148147,
+                -0.0026041666666666665
+            ],
+            "switched": 579,
+            "activatedBoards": 549,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.003
+            },
+            "margin": 0.05,
+            "gain": -0.0007523148148148148,
+            "foldGains": [
+                0.0008680555555555555, 0.0008680555555555555, -0.005208333333333333, 0, -0.00028935185185185184
+            ],
+            "switched": 415,
+            "activatedBoards": 401,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.003
+            },
+            "margin": 0.1,
+            "gain": -0.000462962962962963,
+            "foldGains": [
+                -0.00028935185185185184, -0.0014467592592592592, -0.0014467592592592592, 0.002025462962962963,
+                -0.0011574074074074073
+            ],
+            "switched": 154,
+            "activatedBoards": 153,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.01
+            },
+            "margin": 0.01,
+            "gain": -0.0033564814814814816,
+            "foldGains": [
+                -0.004629629629629629, 0.0011574074074074073, -0.005787037037037037, -0.0023148148148148147,
+                -0.005208333333333333
+            ],
+            "switched": 736,
+            "activatedBoards": 690,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.01
+            },
+            "margin": 0.03,
+            "gain": -0.0014467592592592592,
+            "foldGains": [
+                -0.0028935185185185184, 0.0023148148148148147, -0.005208333333333333, 0, -0.0014467592592592592
+            ],
+            "switched": 530,
+            "activatedBoards": 507,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.01
+            },
+            "margin": 0.05,
+            "gain": 0.000462962962962963,
+            "foldGains": [
+                0.0005787037037037037, 0.00028935185185185184, -0.001736111111111111, 0.001736111111111111,
+                0.0014467592592592592
+            ],
+            "switched": 356,
+            "activatedBoards": 348,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.01
+            },
+            "margin": 0.1,
+            "gain": 0.0005208333333333333,
+            "foldGains": [0, 0, 0.0005787037037037037, 0.001736111111111111, 0.00028935185185185184],
+            "switched": 109,
+            "activatedBoards": 108,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.03
+            },
+            "margin": 0.01,
+            "gain": -0.0025462962962962965,
+            "foldGains": [
+                -0.004050925925925926, 0.0028935185185185184, -0.007523148148148148, -0.002025462962962963,
+                -0.002025462962962963
+            ],
+            "switched": 643,
+            "activatedBoards": 610,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.03
+            },
+            "margin": 0.03,
+            "gain": 0,
+            "foldGains": [
+                -0.00028935185185185184, 0.001736111111111111, -0.0026041666666666665, 0.0023148148148148147,
+                -0.0011574074074074073
+            ],
+            "switched": 431,
+            "activatedBoards": 418,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.03
+            },
+            "margin": 0.05,
+            "gain": 0.002025462962962963,
+            "foldGains": [
+                0.0028935185185185184, 0.00028935185185185184, 0.0011574074074074073, 0.00318287037037037,
+                0.0026041666666666665
+            ],
+            "switched": 243,
+            "activatedBoards": 239,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.03
+            },
+            "margin": 0.1,
+            "gain": 0.0008680555555555555,
+            "foldGains": [
+                0.0011574074074074073, 0.00028935185185185184, -0.00028935185185185184, 0.001736111111111111,
+                0.0014467592592592592
+            ],
+            "switched": 61,
+            "activatedBoards": 61,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.1
+            },
+            "margin": 0.01,
+            "gain": 0.00034722222222222224,
+            "foldGains": [
+                0.0014467592592592592, 0.0008680555555555555, -0.0008680555555555555, 0.0005787037037037037,
+                -0.00028935185185185184
+            ],
+            "switched": 438,
+            "activatedBoards": 430,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.1
+            },
+            "margin": 0.03,
+            "gain": 0.0019675925925925924,
+            "foldGains": [
+                0.0026041666666666665, -0.0005787037037037037, 0.00028935185185185184, 0.004050925925925926,
+                0.003472222222222222
+            ],
+            "switched": 208,
+            "activatedBoards": 206,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.1
+            },
+            "margin": 0.05,
+            "gain": 0.0012731481481481483,
+            "foldGains": [0.0023148148148148147, 0, 0, 0.002025462962962963, 0.002025462962962963],
+            "switched": 91,
+            "activatedBoards": 90,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.1
+            },
+            "margin": 0.1,
+            "gain": -5.787037037037037e-5,
+            "foldGains": [0, 0, 0, 0, -0.00028935185185185184],
+            "switched": 3,
+            "activatedBoards": 3,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.3
+            },
+            "margin": 0.01,
+            "gain": 0.002199074074074074,
+            "foldGains": [0.004918981481481482, -0.0008680555555555555, 0, 0.0028935185185185184, 0.004050925925925926],
+            "switched": 147,
+            "activatedBoards": 146,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.3
+            },
+            "margin": 0.03,
+            "gain": 0.0004050925925925926,
+            "foldGains": [
+                0.0005787037037037037, 0.00028935185185185184, -0.00028935185185185184, 0.001736111111111111,
+                -0.00028935185185185184
+            ],
+            "switched": 42,
+            "activatedBoards": 42,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.3
+            },
+            "margin": 0.05,
+            "gain": -5.787037037037037e-5,
+            "foldGains": [0, 0, 0, 0, -0.00028935185185185184],
+            "switched": 2,
+            "activatedBoards": 2,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "ridge",
+                "lambda": 0.3
+            },
+            "margin": 0.1,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "switched": 0,
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 2,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.01,
+            "gain": -0.0004050925925925926,
+            "foldGains": [0, 0, 0, 0, -0.002025462962962963],
+            "switched": 38,
+            "activatedBoards": 37,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 2,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.03,
+            "gain": 0.00011574074074074075,
+            "foldGains": [0, 0, 0, 0, 0.0005787037037037037],
+            "switched": 11,
+            "activatedBoards": 11,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 2,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.05,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "switched": 0,
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 2,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.1,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "switched": 0,
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 2,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.01,
+            "gain": -0.0006944444444444445,
+            "foldGains": [0, -0.00028935185185185184, 0, 0, -0.00318287037037037],
+            "switched": 42,
+            "activatedBoards": 42,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 2,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.03,
+            "gain": -0.00034722222222222224,
+            "foldGains": [0, 0, 0, 0, -0.001736111111111111],
+            "switched": 14,
+            "activatedBoards": 14,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 2,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.05,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "switched": 0,
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 2,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.1,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "switched": 0,
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 3,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.01,
+            "gain": -0.0010416666666666667,
+            "foldGains": [0.0005787037037037037, -0.002025462962962963, 0, 0, -0.003761574074074074],
+            "switched": 90,
+            "activatedBoards": 83,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 3,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.03,
+            "gain": -0.00017361111111111112,
+            "foldGains": [0, 0, 0, 0, -0.0008680555555555555],
+            "switched": 20,
+            "activatedBoards": 20,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 3,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.05,
+            "gain": -0.00011574074074074075,
+            "foldGains": [0, 0, 0, 0, -0.0005787037037037037],
+            "switched": 9,
+            "activatedBoards": 9,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 3,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.1,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "switched": 0,
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 3,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.01,
+            "gain": -0.001388888888888889,
+            "foldGains": [0, -0.0028935185185185184, 0, -0.0005787037037037037, -0.003472222222222222],
+            "switched": 89,
+            "activatedBoards": 82,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 3,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.03,
+            "gain": -0.00011574074074074075,
+            "foldGains": [0, 0, 0, 0, -0.0005787037037037037],
+            "switched": 20,
+            "activatedBoards": 20,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 3,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.05,
+            "gain": 0.00011574074074074075,
+            "foldGains": [0, 0, 0, 0, 0.0005787037037037037],
+            "switched": 1,
+            "activatedBoards": 1,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 3,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.1,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "switched": 0,
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 4,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.01,
+            "gain": -0.0015046296296296296,
+            "foldGains": [
+                0.0005787037037037037, -0.004050925925925926, -0.0023148148148148147, -0.0023148148148148147,
+                0.0005787037037037037
+            ],
+            "switched": 142,
+            "activatedBoards": 136,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 4,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.03,
+            "gain": -0.0006365740740740741,
+            "foldGains": [
+                0, -0.0008680555555555555, -0.0011574074074074073, -0.0005787037037037037, -0.0005787037037037037
+            ],
+            "switched": 36,
+            "activatedBoards": 35,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 4,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.05,
+            "gain": 0.00011574074074074075,
+            "foldGains": [0, 0, 0, 0, 0.0005787037037037037],
+            "switched": 8,
+            "activatedBoards": 8,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 4,
+                "minimumLeaf": 48,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.1,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "switched": 0,
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 4,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.01,
+            "gain": -0.0014467592592592592,
+            "foldGains": [
+                0.00028935185185185184, -0.0026041666666666665, -0.0011574074074074073, -0.001736111111111111,
+                -0.002025462962962963
+            ],
+            "switched": 149,
+            "activatedBoards": 139,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 4,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.03,
+            "gain": 0.00011574074074074075,
+            "foldGains": [0, 0, 0, -0.0005787037037037037, 0.0011574074074074073],
+            "switched": 36,
+            "activatedBoards": 34,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 4,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.05,
+            "gain": 0.00011574074074074075,
+            "foldGains": [0, 0, 0, 0, 0.0005787037037037037],
+            "switched": 7,
+            "activatedBoards": 7,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "kind": "forest",
+                "depth": 4,
+                "minimumLeaf": 96,
+                "trees": 64,
+                "featureFraction": 0.5,
+                "boardSampleFraction": 0.8,
+                "leafShrinkage": 24,
+                "seed": 2026111513
+            },
+            "margin": 0.1,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "switched": 0,
+            "activatedBoards": 0,
+            "eligible": false
+        }
+    ],
+    "selected": null,
+    "model": null,
+    "qualificationOpened": false,
+    "confirmationOpened": false,
+    "productionPromotion": false,
+    "closedAtUtc": "2026-11-15T02:00:12.341474+00:00"
+}

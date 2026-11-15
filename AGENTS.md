@@ -356,3 +356,17 @@ verifier passed, but the gain and interval gates did not. Preserve the exact fit
 `docs/evidence/empower_protected_axis_results_20261114.json`; confirmation remains unopened and
 reserved. Neither Empower fit is a production default. A favorable budget slice does not rescue
 this result, and changing the selector requires a separate registered experiment and fresh banks.
+
+The user's continuation starts `empower-public-context-20261115T013200Z`, registration
+`896fdd2c2ee97e1a9b5bd5192aee5991c56866ddc0932679fdd09ec1f48bcb17`: 2,160 explicit development boards
+(old training and both opened qualification banks), then 1,728 new boards per independent stage.
+Reserve `docs/evidence/empower_context_registration_20261115.json`. Preserve its sealed inference,
+reconstruction and actor hashes. Complete public placement context and full paid budgets are required;
+private setup and partial spending retain the incumbent. This remains research only. The research
+document records the model-selection gates and checks needed for any concurrent default change.
+
+This public-context continuation closed without a finalist: all 44 recipes missed its +0.5 pp
+development threshold (best +0.219907 pp). Both fresh banks remain unopened and reserved. Preserve
+`docs/evidence/empower_context_results_20261115.json`; do not activate a failed recipe or describe its
+cross-validation scores as fresh qualification. Further Empower work must use a separate hypothesis
+and measure against the newly adopted A19 policy.

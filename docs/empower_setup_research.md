@@ -166,3 +166,43 @@ explanations name actual magic-damage beneficiaries, including Nightmare's Fire 
 was deployed to test, knowledge and production services; it does not enable either research model or
 replace the existing Premium SQLite snapshot. The report's six-axis coverage and these observational
 rows remain separate from independent policy qualification.
+
+## Public-context continuation, 2026-11-15
+
+The user requested continued work after both earlier candidates failed. Study
+`empower-public-context-20261115T013200Z` retains one-point protected-axis funding and tests a new
+selector using complete public opponent identities, the public placement map, own artifacts, own
+roster and the full doctrine budget. Opponent artifacts, upgrades, stack amounts, formation and live
+engine objects are excluded. Private or incomplete setup and partially spent budgets keep the incumbent.
+
+The 2,160 development boards combine the original 432 training boards and both already-opened
+864-board qualification banks. Those old results are explicitly development evidence for this new
+hypothesis; they cannot qualify it. Reuse requires an identical paid plan and reconstructed input hash,
+with original file/line/hash provenance. Both initial hosts reproduced 216 controls, including outcomes
+and action traces. Only missing interventions are simulated. An independent Python implementation
+reconstructs every feature and funded plan from the public creature catalog.
+
+Fivefold selection groups whole boards. The registered recipes compare five ridge penalties, six
+shallow forest configurations and four positive margins. An eligible recipe needs at least +0.5 pp
+mean gain and three positive folds. The highest eligible mean is refit once. This is development
+selection, not independent strength evidence. Actor source and inference helpers are sealed separately
+from the fitter and analysis code.
+
+New qualification and confirmation each reserve 1,728 boards, retaining +0.5 pp mean gain, a positive
+whole-board 95% lower bound, all budget/map safety gates and at least 60 activated boards. Confirmation
+opens only after qualification passes. Registration is
+`896fdd2c2ee97e1a9b5bd5192aee5991c56866ddc0932679fdd09ec1f48bcb17`, source manifest
+`4894253a0c16d522ba7076878252d2dff59fd0845c3a9df8f8309e3864ee043d`. Reserve every channel in
+`docs/evidence/empower_context_registration_20261115.json`. Raw output is under ignored
+`game/core/tmp/empower-context-20261115` in the client. No default changed. A concurrent draft/setup
+adoption requires checking the new combination before applying a result measured on locked V3 and
+the current conditional setup. Both older failed fits and closed confirmation banks stay unchanged.
+
+The continuation finished all 17,280 development rows. Exact prior inputs/plans supplied 14,052 rows;
+3,228 new fights supplied the missing interventions. Independent reconstruction checked every feature,
+funded plan, paired input and reused source record. None of the 44 cross-validation recipes reached
+the registered +0.5 pp development threshold. The highest mean was +0.219907 pp; a different recipe
+was positive in all five folds but averaged only +0.202546 pp. No final model was fitted, qualification
+and confirmation stayed unopened, and no runtime changed. Preserve
+`docs/evidence/empower_context_results_20261115.json` and all reserved channels. The concurrent adopted
+A19 draft/ranged policy is a new baseline for further research, not a reason to reopen these banks.
