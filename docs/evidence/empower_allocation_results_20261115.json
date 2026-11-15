@@ -1,0 +1,327 @@
+{
+    "studyId": "empower-allocation-adopted-20261115T021200Z",
+    "status": "no-development-finalist",
+    "registrationSha256": "72d5d0a369f569dac42cbbc0f2d783422086d5cd4b60564cadd2dcf1bdd6ff20",
+    "sourceManifestSha256": "b432a6a63a39de33ee4869ac0856ce11c645e47c6a57ab77bfdab49f2ccd4a82",
+    "analysisManifestSha256": "e3b0ea1dc32834a9d76a612ade80475a1a4d6cf96afff9421a8e2d46a277a928",
+    "executionAmendmentSha256": "b43966a2ddcc4c8e268dbe2c904d82bec4198fc67272c265cfc896975cf7f9ed",
+    "fitFileSha256": "a7863d3c5532e39ca862d8354f6efd2378ddb779463fa2c68dd5f3ab5eebb06d",
+    "training": {
+        "verified": true,
+        "phase": "train",
+        "rows": 18144,
+        "boards": 648,
+        "rowsSha256": "f6d7aa7bdd904457f5651cf479df4ec6f859bb00cd5a0fa20251e914edb737c1",
+        "registrationSha256": "72d5d0a369f569dac42cbbc0f2d783422086d5cd4b60564cadd2dcf1bdd6ff20",
+        "sourceManifestSha256": "b432a6a63a39de33ee4869ac0856ce11c645e47c6a57ab77bfdab49f2ccd4a82",
+        "executedFights": 10252,
+        "independentFeaturesFundingAndAdoptedSetup": true,
+        "allThreeHosts": false,
+        "auxiliaryExamples": 4750,
+        "eligibleArmExamples": 4050,
+        "foldCounts": [130, 130, 130, 129, 129],
+        "archives": {
+            "puffalo": "ecd70e2d5a7959bb80a1cfec4c4bd6cbf4611e73f5d7d5adc7118b98a6be19e7",
+            "ryzen": "9f23a070c2f9d36cd46dc54975af23a90910c1d23a5515e52d56beee570e3717"
+        }
+    },
+    "recipes": [
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 0.03
+            },
+            "margin": 0.02,
+            "gain": -0.003279320987654321,
+            "foldGains": [
+                0.0038461538461538464, -0.006730769230769231, -0.0057692307692307696, 0.006782945736434108,
+                -0.014534883720930232
+            ],
+            "activatedBoards": 262,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 0.03
+            },
+            "margin": 0.05,
+            "gain": -0.001736111111111111,
+            "foldGains": [
+                0.0057692307692307696, -0.0057692307692307696, -0.008653846153846154, 0.006782945736434108,
+                -0.006782945736434108
+            ],
+            "activatedBoards": 207,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 0.03
+            },
+            "margin": 0.1,
+            "gain": -0.0023148148148148147,
+            "foldGains": [0.0009615384615384616, 0, -0.0125, 0.0029069767441860465, -0.0029069767441860465],
+            "activatedBoards": 113,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 0.1
+            },
+            "margin": 0.02,
+            "gain": -0.0013503086419753086,
+            "foldGains": [
+                0.0019230769230769232, 0.0019230769230769232, -0.008653846153846154, 0.0048449612403100775,
+                -0.006782945736434108
+            ],
+            "activatedBoards": 162,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 0.1
+            },
+            "margin": 0.05,
+            "gain": -0.0028935185185185184,
+            "foldGains": [
+                0.0019230769230769232, 0.0057692307692307696, -0.014423076923076924, 0.0009689922480620155,
+                -0.00872093023255814
+            ],
+            "activatedBoards": 110,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 0.1
+            },
+            "margin": 0.1,
+            "gain": -0.001736111111111111,
+            "foldGains": [
+                0.0019230769230769232, 0.0019230769230769232, -0.010576923076923078, 0, -0.001937984496124031
+            ],
+            "activatedBoards": 47,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 0.3
+            },
+            "margin": 0.02,
+            "gain": -0.002700617283950617,
+            "foldGains": [
+                0.0019230769230769232, 0.007692307692307693, -0.014423076923076924, -0.001937984496124031,
+                -0.006782945736434108
+            ],
+            "activatedBoards": 82,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 0.3
+            },
+            "margin": 0.05,
+            "gain": -0.00019290123456790122,
+            "foldGains": [0.0019230769230769232, 0, -0.0028846153846153848, 0, 0],
+            "activatedBoards": 29,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 0.3
+            },
+            "margin": 0.1,
+            "gain": 0.00038580246913580245,
+            "foldGains": [0, 0, 0, 0, 0.001937984496124031],
+            "activatedBoards": 3,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 1
+            },
+            "margin": 0.02,
+            "gain": 0.00038580246913580245,
+            "foldGains": [0, 0, 0, 0, 0.001937984496124031],
+            "activatedBoards": 3,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 1
+            },
+            "margin": 0.05,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": false,
+                "lambda": 1
+            },
+            "margin": 0.1,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 0.03
+            },
+            "margin": 0.02,
+            "gain": -0.009066358024691358,
+            "foldGains": [
+                0.0028846153846153848, -0.006730769230769231, -0.02403846153846154, 0.003875968992248062,
+                -0.02131782945736434
+            ],
+            "activatedBoards": 211,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 0.03
+            },
+            "margin": 0.05,
+            "gain": -0.004629629629629629,
+            "foldGains": [
+                0, 0.0019230769230769232, -0.011538461538461539, -0.003875968992248062, -0.009689922480620155
+            ],
+            "activatedBoards": 144,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 0.03
+            },
+            "margin": 0.1,
+            "gain": -0.0023148148148148147,
+            "foldGains": [0, 0, -0.011538461538461539, 0.005813953488372093, -0.005813953488372093],
+            "activatedBoards": 62,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 0.1
+            },
+            "margin": 0.02,
+            "gain": -0.0015432098765432098,
+            "foldGains": [
+                -0.0019230769230769232, 0.0019230769230769232, -0.015384615384615385, 0.007751937984496124, 0
+            ],
+            "activatedBoards": 115,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 0.1
+            },
+            "margin": 0.05,
+            "gain": 0.00038580246913580245,
+            "foldGains": [0, 0.0038461538461538464, -0.013461538461538462, 0.011627906976744186, 0],
+            "activatedBoards": 58,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 0.1
+            },
+            "margin": 0.1,
+            "gain": -0.00038580246913580245,
+            "foldGains": [0, 0.0019230769230769232, -0.0057692307692307696, 0.001937984496124031, 0],
+            "activatedBoards": 13,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 0.3
+            },
+            "margin": 0.02,
+            "gain": 0.0007716049382716049,
+            "foldGains": [
+                0.0019230769230769232, 0.0019230769230769232, -0.007692307692307693, 0.001937984496124031,
+                0.005813953488372093
+            ],
+            "activatedBoards": 31,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 0.3
+            },
+            "margin": 0.05,
+            "gain": -0.00038580246913580245,
+            "foldGains": [0, 0, -0.0019230769230769232, 0, 0],
+            "activatedBoards": 6,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 0.3
+            },
+            "margin": 0.1,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 1
+            },
+            "margin": 0.02,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 1
+            },
+            "margin": 0.05,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "activatedBoards": 0,
+            "eligible": false
+        },
+        {
+            "recipe": {
+                "auxiliary": true,
+                "lambda": 1
+            },
+            "margin": 0.1,
+            "gain": 0,
+            "foldGains": [0, 0, 0, 0, 0],
+            "activatedBoards": 0,
+            "eligible": false
+        }
+    ],
+    "selected": null,
+    "model": null,
+    "qualificationOpened": false,
+    "confirmationOpened": false,
+    "productionPromotion": false,
+    "closedAtUtc": "2026-11-15T03:21:34.896288+00:00"
+}

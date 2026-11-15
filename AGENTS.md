@@ -377,3 +377,19 @@ It measures six fully funded Empower plans against the adopted A19 setup using t
 server's native formation, support splits, spell charges and public setup projection. Its candidate
 is research only; do not import it into a default before independent qualification, confirmation
 and serving compatibility verification. Both earlier one-point study banks remain closed.
+
+The adopted-policy allocation continuation also closed without a finalist. All 18,144 development
+comparisons (10,252 distinct fights) were independently verified; the best of 24 settings gained only
++0.077160 pp. No model was refitted or activated. Preserve
+`docs/evidence/empower_allocation_results_20261115.json`; both fresh banks remain unopened and reserved.
+The explicitly parameterized compatibility helper is inert. Do not treat it as an adopted checkpoint.
+
+The separate shared-cost continuation is `empower-shared-cost-20261115T033000Z`, registration
+`3a33e2af1c3460a1f004026ef58930e739ff51397abbfb8c74b3a3eb1c958580`. Its 500-feature shared effect
+model prices actual marginal augment powers with public context; it is not a serving default. Reserve
+`docs/evidence/empower_cost_registration_20261115.json` and retain the earlier closed experiments.
+Independent qualification, confirmation and serving-source compatibility are still required.
+
+The shared-cost continuation completed all 48 settings with no development finalist (best +0.192901 pp,
+threshold +0.5 pp). Preserve `docs/evidence/empower_cost_results_20261115.json`. No model was refitted,
+no default changed, and both fresh banks remain unopened. Do not activate its best failed setting.

@@ -229,3 +229,55 @@ Reserve `docs/evidence/empower_allocation_registration_20261115.json`, registrat
 server adoption overlays explicitly. Results must not be deployed if the eventual serving implementation
 differs. Native formation compatibility needs a narrowly matched runtime adapter before any promotion.
 The raw campaign lives under ignored `game/core/tmp/empower-allocation-20261115` in the client.
+
+## Closed allocation result
+
+All 18,144 development comparisons completed on 648 boards, including 10,252 distinct fights and
+7,892 exact unchanged-plan reuses. The independent verifier reconstructed every public feature,
+adopted setup choice, funded alternative and paired formation. Each host first reproduced the same
+216 preflight inputs, outcomes and traces (648 executions total). No illegal actions were recorded.
+
+None of the 24 settings cleared the registered development gate. The best fivefold mean was only
+**+0.077160 pp**, from auxiliary ridge 0.3 with margin 0.02; it activated on 31 boards. No final model
+was fitted. Qualification and confirmation both remain unopened and reserved. The previous failed
+studies remain closed too. Preserve `docs/evidence/empower_allocation_results_20261115.json`.
+
+The pure `empower_allocation_compatibility` helper preserves the incumbent formation envelope only
+for an exact explicitly supplied model-selected paid plan. It is not bound to a serving default.
+A future qualified model still needs full native opening parity, source/profile compatibility and
+fresh validation before activation. Concurrent balance edits do not update this frozen experiment.
+
+## Separate shared-cost continuation
+
+`empower-shared-cost-20261115T033000Z` tests a shared effect model across all six fully funded plans.
+Its 500 public features multiply the actual marginal Empower, Might, Sniper attack/range and Armor
+powers by the public setup context. Armor's protection includes magic resistance. Farsight Quiver
+removes the marginal falloff-range component but retains Sniper's attack component. Antisymmetric
+training pairs constrain the unchanged control's predicted effect to exactly zero.
+
+The completed 648-board adopted-policy bank is reused explicitly for development, with 4,750 older
+auxiliary examples available to the registered recipes. Independent reconstruction checked all 500
+features and original paired labels. Twelve ridge recipes and four margins retain the same whole-board
+folds and +0.5 pp / three-positive-fold selection gate. The highest eligible recipe is refitted once.
+Both later stages reserve 1,728 fresh boards and retain every prior qualification/confirmation gate.
+The closed allocation experiment's unused banks remain excluded; no failed recipe is activated.
+
+Registration is `3a33e2af1c3460a1f004026ef58930e739ff51397abbfb8c74b3a3eb1c958580`, source manifest
+`93e6053639ebae12f4f169805ba3cf27269705aadd3282a30c8c15e6a3b5312f`. Reserve
+`docs/evidence/empower_cost_registration_20261115.json`. This uses the parent's frozen adopted-policy
+source, excludes concurrent balance edits, and cannot be promoted without serving compatibility.
+Raw files live under ignored `game/core/tmp/empower-cost-20261115` in the client.
+
+The shared-cost fit also closed without a finalist. The best of all 48 settings reached
+**+0.192901 pp**, with 67 activated boards and three positive folds; it missed the unchanged +0.5 pp
+minimum. Its recipe was current-only ridge 0.03, margin 0.01. This is development selection evidence,
+not qualification. No model was refitted or activated, and both fresh banks remain unopened and
+reserved. Preserve `docs/evidence/empower_cost_results_20261115.json`. The new cost encoder and the
+explicit compatibility adapter remain research utilities with no runtime binding.
+
+The completed adopted-policy sample overwhelmingly drafted physical shooters: 2,534 of 2,592 army
+cases had at least two ranged units. The no-ranged seventh-point case had no eligible magic-damage
+examples in that sample, so it cannot supply a claimed improvement. The audited engine already applies
+Empower to offensive spells, Fire Wall, Fire Breath, Fire Shield and Chain Lightning. Armor also grants
+flat magic resistance; Sniper improves ranged attack and falloff distance. The empirical price of
+removing these defenses or ranged bonuses cannot be ignored merely to produce nonzero Empower picks.
