@@ -13,6 +13,7 @@ import { Tier1Artifact, Tier2Artifact } from "../../artifacts/artifact_propertie
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { GridType } from "../../generated/protobuf/v1/types_gen";
 import { LifeSynergy, ChaosSynergy, MightSynergy, NatureSynergy } from "../../synergies/synergy_properties";
+import type { RankedDraftSynergyVariants } from "./draft_synergy_variants";
 
 interface ISetupDecisionContextBase {
     /**
@@ -28,6 +29,8 @@ interface ISetupDecisionContextBase {
     readonly ownDoctrine?: number;
     /** This seat's selected artifact ids in pick/tier order. Opponent artifacts are intentionally absent. */
     readonly ownArtifactIds?: readonly number[];
+    /** The four match-wide public variants, never the opponent's selected synergy levels. */
+    readonly synergyVariants?: RankedDraftSynergyVariants;
 }
 
 /**
@@ -81,6 +84,18 @@ const freezePublicSetupFields = (context: ISetupDecisionContextBase): Readonly<I
             : {}),
         ...(context.ownDoctrine !== undefined ? { ownDoctrine: context.ownDoctrine } : {}),
         ...(context.ownArtifactIds ? { ownArtifactIds: Object.freeze([...context.ownArtifactIds]) } : {}),
+        ...(context.synergyVariants
+            ? {
+                  synergyVariants: Object.freeze(
+                      Object.fromEntries(
+                          ["Life", "Chaos", "Might", "Nature"].map((faction) => [
+                              faction,
+                              context.synergyVariants![faction],
+                          ]),
+                      ),
+                  ),
+              }
+            : {}),
     });
 
 /** Construct the only legal earlier-pick context: partial opponent identities and no placement topology. */

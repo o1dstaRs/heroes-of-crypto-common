@@ -1,5 +1,18 @@
 # Agent guidance
 
+## Explicit A19 default adoption, November 14, 2026
+
+The user subsequently requested “lock in wins into default v19 and continue diving deep”. There is no
+v19 version; this means the existing A19-backed v0.8 default, retaining locked V3 draft and A19 combat.
+This explicit adoption supersedes the historical non-activation instructions below for the full
+063a888e contextual draft head and d786f4e9 ranged setup selector only. It does not change their failed
+qualification, unopened confirmation banks, immutable sources or model metadata. Read
+`docs/a19_default_adoption_20261114.md`. The new serving modules live in `src/ai/setup/a19_*` and remain
+outside the browser entry point. Both draft overrides need independent, atomic persisted state. Private
+setup never receives concealed opponent identities; unfunded Placement plans cannot be applied later.
+New research must compare against this adopted policy on fresh channels and report its legality-aware
+setup dispatch separately from the historical study. Native v0.9 combat remains unchanged research.
+
 ## User-selected v0.9 draft + A19 combat default
 
 After reviewing the completed 7,056-game comparison (native v0.9 20.48% score, A19 79.52%), the user
