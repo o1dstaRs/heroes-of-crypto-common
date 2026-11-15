@@ -4,6 +4,18 @@ The user asked to look beyond Empower and account for other agents' current work
 remains locked V3 plus contextual draft, authoritative funded setup/formation/support splits, and A19
 combat. Native v0.9 combat is a separate model. No policy is promoted by this audit.
 
+Follow-up measurement: [melee delivery diversity](melee_delivery_diversity_research.md) completed
+1,296 development fights from 162 whole families. It changed 53 trajectories but gained only +0.077160 pp
+(95% −0.462963 to +0.694444 pp) and failed its fixed gates. It remains inactive, with no fresh bank opened.
+That study also corrected a shared-dependency module mismatch in the research harness; its source-identity
+warning qualifies earlier cached-opening compatibility claims without rewriting their immutable records.
+
+The original artifact/final-pick collection below subsequently stopped before fitting because private
+Setup did not match the live public-Setup bridge. The owner's replacement is
+`ranked-army-plan-public-20261115`, registration
+`c9e37ee04066f25100373fe7f034cbf702d17bb86a6ccd6c50e8d3ad00e4b73d`; its training collection was running
+at the follow-up closeout. Do not restart the original campaign or mix its data into the replacement.
+
 ## Work already owned by another campaign
 
 `ranked-army-plan-20261115` is collecting a joint Tier-2 artifact/final-creature planner. Its registration
