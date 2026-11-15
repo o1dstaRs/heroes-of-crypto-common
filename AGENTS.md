@@ -457,3 +457,13 @@ This continuation completed all 1,296 development games and failed: −0.154321 
 exact control replays. Observed enemy Chakram collateral fell 16.81%, but that is not a strength gain.
 The candidate remains inactive; no fresh bank opened. Do not replace its gate with the collateral metric
 or enable a favorable doctrine slice. Further combat ideas need distinct candidates and evidence.
+
+The user's separate offensive Chaos Movement idea completed as `chaos-rush-20261115`: 108 explicitly
+reused development families, 8,079 distinct battles, 39 raw draft/setup arms and 13 pre-outcome Chaos-only
+compositions. Read `docs/chaos_rush_research.md`. No policy passed its fixed development gate. The strongest
+observed recipe, Chaos-only Movement 2 / Placement 1 / Armor-first, gained +3.086420 pp versus current
+(simultaneous 95% −2.875348 to +9.048188) and +1.851852 pp versus matched free (−3.122945 to +6.826649),
+but its six-point mean was −2.777778 pp. Preserve the inactive `chaos_rush_research.ts` helper and isolation
+test; no fresh qualification/confirmation ran and no default changed. Faster contact and shooter denial
+are mechanism results, not strength qualification. Do not activate it, rescue it with five-/seven-point
+slices, or tune this closed candidate on the same bank. Further work needs a distinct registered candidate.

@@ -25,21 +25,34 @@ search candidates need separate investigation; collateral reduction alone cannot
 The original artifact/final-pick collection below subsequently stopped before fitting because private
 Setup did not match the live public-Setup bridge. The owner's replacement is
 `ranked-army-plan-public-20261115`, registration
-`c9e37ee04066f25100373fe7f034cbf702d17bb86a6ccd6c50e8d3ad00e4b73d`; its training collection was running
-at the follow-up closeout. Do not restart the original campaign or mix its data into the replacement.
+`c9e37ee04066f25100373fe7f034cbf702d17bb86a6ccd6c50e8d3ad00e4b73d`. The owner's independently verified
+terminal handoff at 11:38 UTC closes that replacement too: 5,832 training and 1,944 validation fights,
+six fitted heads across three fixed recipes, and no validation finalist. Validation gains were −2.932099,
+−1.234568 and −1.234568 pp; every interval included zero. No qualification, confirmation, promotion or
+Premium rebuild followed. Preserve both closed campaigns; do not tune on their validation results.
 
-## Work already owned by another campaign
+The user's subsequent offensive idea is a distinct [Chaos Movement rush study](chaos_rush_research.md):
+legal mobile/Chaos drafts, fully funded Movement/Armor/Placement and forward deployment against current,
+shooter, caster and fast-pressure opponents. It uses existing native ranked draft/setup infrastructure and
+unchanged A19 combat. Its 108 reused development families are not fresh qualification. No default change
+followed its completed 8,079-battle comparison. The strongest of 52 policies, Chaos-only Movement 2 /
+Placement 1 / Armor-first, gained +3.086420 pp but failed the six-point doctrine gate (−2.777778 pp),
+and both simultaneous control intervals included zero. No recipe advanced; no fresh bank opened.
+Preserve the complete results and inactive helper. A favorable doctrine/opponent slice is not a new default.
 
-`ranked-army-plan-20261115` is collecting a joint Tier-2 artifact/final-creature planner. Its registration
-is `7d0c6c36a2f641d5fcd6a343d4d7d85ca4b30a70d03f6827e759673f645fc97d`. The planner compares only
+## Historical artifact and final-pick campaign
+
+`ranked-army-plan-20261115` collected a joint Tier-2 artifact/final-creature planner before its public-Setup
+replacement above. Its registration is `7d0c6c36a2f641d5fcd6a343d4d7d85ca4b30a70d03f6827e759673f645fc97d`.
+The planner compares only
 actually offered artifacts and legally available final picks, with real downstream setup and combat.
 It sees each doctrine's current public projection; it cannot inspect the future final offer at the earlier
-artifact decision. Do not duplicate its learner or alter its running source. Its initial training bank
+artifact decision. Do not restart its learner or alter its frozen source. Its initial training bank
 was running on Puffalo when checked at 05:35 UTC; that status is not a fitted model or a strength result.
 
-This is the first priority: an artifact and a last creature can each look reasonable separately while
-making a poor combined army. Preserve the current/adopted and locked-V3 references and the campaign's
-independent qualification/confirmation requirements.
+An artifact and a last creature can each look reasonable separately while making a poor combined army.
+The completed validation did not establish a better combined policy. Preserve the current/adopted and
+locked-V3 references and the campaign's independent qualification/confirmation requirements.
 
 ## Combat: distinguish a projection gap from a useful complete policy
 
@@ -102,7 +115,7 @@ registration, source overlays, raw traces and untouched development inputs.
    Self-play preference or a favorable unit/map slice is insufficient. The panel supplements independent
    confirmation and cannot replace it.
 
-Use the active teacher pipeline rather than adding a competing learner. Every future policy must use
+Reuse the existing teacher infrastructure for separately registered work. Every future policy must use
 phase-public information, account for all nested work and pass serial serving timing within the user's
 10% additional-compute limit. The prior failed Empower, precision, support-resource and searched-reply
 experiments remain closed; these priorities do not authorize reopening their reserved banks.
