@@ -5,20 +5,29 @@ import { aiMetaChoiceEvidence } from "./ai_meta_evidence";
 export const PREMIUM_META_PRIVATE_SETUP_STUDY = "premium-ranked-v1";
 export const PREMIUM_META_STUDY = "premium-ranked-v2";
 export const PREMIUM_META_FULL_AUGMENTS_STUDY = "premium-ranked-v3";
+export const PREMIUM_META_POLICY_LEARNING_STUDY = "premium-ranked-v4";
 export const PREMIUM_META_STUDIES = [
     PREMIUM_META_PRIVATE_SETUP_STUDY,
     PREMIUM_META_STUDY,
     PREMIUM_META_FULL_AUGMENTS_STUDY,
+    PREMIUM_META_POLICY_LEARNING_STUDY,
 ] as const;
 export const isPublicSetupStudy = (value: unknown): boolean =>
-    value === PREMIUM_META_STUDY || value === PREMIUM_META_FULL_AUGMENTS_STUDY;
+    value === PREMIUM_META_STUDY || isFullAugmentStudy(value);
+export const isFullAugmentStudy = (value: unknown): boolean =>
+    value === PREMIUM_META_FULL_AUGMENTS_STUDY || value === PREMIUM_META_POLICY_LEARNING_STUDY;
 export const isPremiumMetaStudy = (value: unknown): value is AiMetaStudy =>
     PREMIUM_META_STUDIES.some((study) => study === value);
 export const PREMIUM_META_DRAFT_SPEC = "ranked-unit-strength-a19-side-v4-w16-r4";
 export const PREMIUM_META_EVIDENCE_SCHEMA = "premium-cohort-evidence-v4";
 export const PREMIUM_META_FULL_AUGMENTS_SCHEMA = "premium-cohort-evidence-v5";
+export const PREMIUM_META_POLICY_LEARNING_SCHEMA = "premium-cohort-evidence-v6";
 export const premiumStudyEvidenceSchema = (study: AiMetaStudy) =>
-    study === PREMIUM_META_FULL_AUGMENTS_STUDY ? PREMIUM_META_FULL_AUGMENTS_SCHEMA : PREMIUM_META_EVIDENCE_SCHEMA;
+    study === PREMIUM_META_POLICY_LEARNING_STUDY
+        ? PREMIUM_META_POLICY_LEARNING_SCHEMA
+        : study === PREMIUM_META_FULL_AUGMENTS_STUDY
+          ? PREMIUM_META_FULL_AUGMENTS_SCHEMA
+          : PREMIUM_META_EVIDENCE_SCHEMA;
 export type AiMetaStudy = (typeof PREMIUM_META_STUDIES)[number];
 
 export function aiMetaStudyFromEnvironment(): AiMetaStudy | undefined {

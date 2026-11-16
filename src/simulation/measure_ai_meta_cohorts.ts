@@ -14,7 +14,8 @@ import {
     aiMetaStudyFromEnvironment,
     premiumStudyEvidenceSchema,
     PREMIUM_META_DRAFT_SPEC,
-    PREMIUM_META_FULL_AUGMENTS_STUDY,
+    PREMIUM_META_POLICY_LEARNING_STUDY,
+    isFullAugmentStudy,
     isPublicSetupStudy,
 } from "./ai_meta_study";
 import {
@@ -363,12 +364,12 @@ export class AiMetaAccumulator {
     public add(record: IAiMetaPairRecord): void {
         if (record.evidence?.studyProfile)
             for (const budget of [5, 6, 7])
-                for (const plan of record.evidence.studyProfile === PREMIUM_META_FULL_AUGMENTS_STUDY
+                for (const plan of isFullAugmentStudy(record.evidence.studyProfile)
                     ? enumeratePremiumAugmentPlans(budget)
                     : allAugmentPlans(budget)) {
                     if (!this.augmentPlans.has(planKey(plan))) this.augmentPlans.set(planKey(plan), emptyBucket());
                 }
-        if (record.evidence?.studyProfile === PREMIUM_META_FULL_AUGMENTS_STUDY)
+        if (isFullAugmentStudy(record.evidence?.studyProfile))
             for (let level = 0; level <= 3; level++)
                 if (!this.augmentLevels.has(`Empower:${level}`))
                     this.augmentLevels.set(`Empower:${level}`, emptyBucket());
@@ -1092,6 +1093,29 @@ function finishGzip(gzip: Gzip, output: ReturnType<typeof createWriteStream>): P
     });
 }
 
+/** A failed worker must not discard the last completed pair still buffered by gzip. */
+export async function preserveAiMetaRawCapture(
+    gzip: Gzip,
+    output: ReturnType<typeof createWriteStream>,
+    collect: () => Promise<unknown>,
+): Promise<void> {
+    let collectionError: unknown;
+    let failed = false;
+    try {
+        await collect();
+    } catch (error) {
+        failed = true;
+        collectionError = error;
+    }
+    try {
+        await finishGzip(gzip, output);
+    } catch (flushError) {
+        if (failed) throw new AggregateError([collectionError, flushError], "Collection and raw capture both failed");
+        throw flushError;
+    }
+    if (failed) throw collectionError;
+}
+
 function sourceFingerprint(): string {
     return fingerprintSourceTree(process.cwd(), ["src"], ["package.json"]);
 }
@@ -1222,7 +1246,21 @@ function writeSummary(
                       : null,
                 studyProfile: aiMetaStudyFromEnvironment() ?? "legacy-oracle",
                 draftExplorationRate:
-                    aiMetaStudyFromEnvironment() && !fightProfile.nativeV09 && !fightProfile.lockedV09Draft ? 0.2 : 0,
+                    aiMetaStudyFromEnvironment() &&
+                    (aiMetaStudyFromEnvironment() === PREMIUM_META_POLICY_LEARNING_STUDY ||
+                        (!fightProfile.nativeV09 && !fightProfile.lockedV09Draft))
+                        ? 0.2
+                        : 0,
+                ...(aiMetaStudyFromEnvironment() === PREMIUM_META_POLICY_LEARNING_STUDY
+                    ? {
+                          collectionContract: "policy-learning-v1",
+                          formationExplorationRate: 0.2,
+                          formationProposalPolicy: "incumbent-and-deduplicated-zone-reflections-v1",
+                          setupExecutionContract: "headless-meta-ranked-sides-not-server-qualified",
+                          splitPolicy: "existing-tactical-splits-not-randomized",
+                          decisionLabels: "logged-policy-outcome-not-paired-alternative",
+                      }
+                    : {}),
                 artifactExplorationRate: process.env.AI_META_ARTIFACT_UNIFORM === "1" ? 1 : AI_META_EXPLORATION_RATE,
             },
             selectionPolicy: aiMetaStudyFromEnvironment() ?? AI_META_POLICY,
@@ -1334,32 +1372,33 @@ async function runCohort(
     const windowGames = pairCount * AI_META_GAMES_PER_MATCHUP;
     let lastPrinted = 0;
     console.log(`\n[${cohort}] ${AI_META_COHORT_DESCRIPTIONS[cohort]} (${workers} workers)`);
-    await runAiMetaWorkerPool(
-        options,
-        workers,
-        fightProfile,
-        (record, completed, total) => {
-            accumulator.add(record);
-            aggregation.add(record);
-            gzip.write(`${JSON.stringify(record)}\n`);
-            const now = Date.now();
-            if (completed === total || now - lastPrinted >= 10_000) {
-                const games = completed * AI_META_GAMES_PER_MATCHUP;
-                const elapsed = Math.max(0.001, (now - cohortStarted) / 1000);
-                console.log(
-                    `  [${cohort}] ${games.toLocaleString()}/${windowGames.toLocaleString()} games ` +
-                        `(${(games / elapsed).toFixed(1)}/s, ${Math.floor((100 * completed) / total)}%)`,
-                );
-                lastPrinted = now;
-            }
-        },
-        {
-            beforeWorkerStart: () => assertAiMetaSourceIdentity(runIdentity),
-            pairStart,
-            pairCount,
-        },
+    await preserveAiMetaRawCapture(gzip, output, () =>
+        runAiMetaWorkerPool(
+            options,
+            workers,
+            fightProfile,
+            (record, completed, total) => {
+                accumulator.add(record);
+                aggregation.add(record);
+                gzip.write(`${JSON.stringify(record)}\n`);
+                const now = Date.now();
+                if (completed === total || now - lastPrinted >= 10_000) {
+                    const games = completed * AI_META_GAMES_PER_MATCHUP;
+                    const elapsed = Math.max(0.001, (now - cohortStarted) / 1000);
+                    console.log(
+                        `  [${cohort}] ${games.toLocaleString()}/${windowGames.toLocaleString()} games ` +
+                            `(${(games / elapsed).toFixed(1)}/s, ${Math.floor((100 * completed) / total)}%)`,
+                    );
+                    lastPrinted = now;
+                }
+            },
+            {
+                beforeWorkerStart: () => assertAiMetaSourceIdentity(runIdentity),
+                pairStart,
+                pairCount,
+            },
+        ),
     );
-    await finishGzip(gzip, output);
     const seconds = (Date.now() - cohortStarted) / 1000;
     const quality: ICohortQuality = {
         cohort,
@@ -1391,7 +1430,7 @@ const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
     "<fight-profile=a13|a19|a19-work|v09-native|v09-draft-a19-work> [pair-start=0] [pair-count=all]. " +
-    "Defaults to premium-ranked-v3 capture and an audited premium.sqlite (a19-work or v09-draft-a19-work). " +
+    "Defaults to premium-ranked-v4 learning capture and an audited premium.sqlite (a19-work or v09-draft-a19-work). " +
     "Outcome-only research requires AI_META_OUTPUT_MODE=legacy-oracle explicitly. " +
     "Sharded drivers set AI_META_SHARD=1 and finalize the merged study with ai_meta_outputs.ts.";
 

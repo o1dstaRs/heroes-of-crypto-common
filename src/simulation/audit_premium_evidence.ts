@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { createReadStream, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -13,7 +14,8 @@ import { normalizeFootprintSide } from "../grid/grid_math";
 import { simulationGridSettings } from "./battle_engine";
 import { footprintCellsForRecord } from "./footprint";
 import { aiMetaEvidencePartition, type IAiMetaFightEvidence } from "./ai_meta_evidence";
-import { isPremiumMetaStudy, PREMIUM_META_FULL_AUGMENTS_STUDY } from "./ai_meta_study";
+import { isPremiumMetaStudy, isFullAugmentStudy, PREMIUM_META_POLICY_LEARNING_STUDY } from "./ai_meta_study";
+import { premiumLearningDecisions } from "./premium_learning_decisions";
 import { getUpgradePoints } from "../doctrines/doctrine_properties";
 import { CreatureByLevel } from "../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -98,6 +100,9 @@ export function auditPremiumFormationGeometry(fight: IAiMetaFightEvidence): stri
 }
 
 export class PremiumEvidenceAudit {
+    public readonly learningHashes = new Map<string, string>();
+    public readonly learningCounts: Record<string, number> = {};
+    public readonly learningZeroProbabilityAlternatives: Record<string, number> = {};
     private readonly seen = new Set<string>();
     private readonly queryCounts: Record<string, number> = {};
     public families = 0;
@@ -181,6 +186,17 @@ export class PremiumEvidenceAudit {
     public rejectedActions = 0;
     public armyTurns = 0;
     public add(record: IAiMetaPairRecord, bytes = 0): void {
+        for (const row of premiumLearningDecisions(record)) {
+            const key = JSON.stringify([row.familyId, row.side, row.kind, row.index]);
+            if (this.learningHashes.has(key)) throw new Error("Duplicate normalized learning decision");
+            this.learningHashes.set(key, createHash("sha256").update(JSON.stringify(row)).digest("hex"));
+            increment(this.learningCounts, `${record.cohort}:${record.evidence!.partition}:${row.kind}`);
+            increment(
+                this.learningZeroProbabilityAlternatives,
+                row.kind,
+                row.distribution.candidates.filter((choice) => choice.probability === 0).length,
+            );
+        }
         const evidence = record.evidence;
         if (!evidence?.fights) throw new Error("Audit requires complete Premium evidence");
         if (this.seen.has(evidence.scenarioId)) throw new Error(`Duplicate family: ${evidence.scenarioId}`);
@@ -433,7 +449,7 @@ export class PremiumEvidenceAudit {
             ...TIER2_ARTIFACT_LIST.map(({ id }) => `2:${id}`),
         ];
         const livePlans = [5, 6, 7].flatMap((budget) => enumeratePremiumAugmentPlans(budget).map(premiumAugmentPlanId));
-        const fullDomain = this.studyProfiles.size === 1 && this.studyProfiles.has(PREMIUM_META_FULL_AUGMENTS_STUDY);
+        const fullDomain = this.studyProfiles.size === 1 && [...this.studyProfiles].every(isFullAugmentStudy);
         const plans = fullDomain
             ? livePlans
             : [5, 6, 7].flatMap((budget) => enumerateFullBudgetAugmentPlans(budget).map(augmentPlanId));
@@ -518,10 +534,19 @@ export class PremiumEvidenceAudit {
             recordBytes: distribution(this.recordBytes),
             failures: this.failures,
             rejectedActions: this.rejectedActions,
+            learning: {
+                decisions: this.learningHashes.size,
+                counts: this.learningCounts,
+                zeroProbabilityAlternatives: this.learningZeroProbabilityAlternatives,
+                uncertaintyUnit: "scenario-family",
+                serverFormationQualified: false,
+            },
             limitations: [
                 "Coverage pilot only; no causal alternative-arm comparisons or fitted advisor model.",
                 "Unit, pair and artifact counts are observational, conditional on this policy mixture.",
-                "Optional bans and alternate placement/split policies were not sampled.",
+                this.studyProfiles.has(PREMIUM_META_POLICY_LEARNING_STUDY)
+                    ? "Bounded free-formation reflections were randomized; optional bans and alternative split policies were not sampled. Setup is headless meta, not server-qualified."
+                    : "Optional bans and alternate placement/split policies were not sampled.",
                 "Event payloads are not a complete attributed damage/healing/mitigation ledger; V3 also lacks environmental/activation events outside decided turns.",
                 "Placement proposals need runtime legality validation and controlled evaluation before automatic application.",
             ],
@@ -596,6 +621,28 @@ export async function auditPremiumEvidence(summaryPath: string, snapshotPath?: s
         { supports: number[]; milliseconds: number[]; zero: number; limited: number; supported: number }
     > = {};
     if (snapshotPath) {
+        if (audit.learningHashes.size) {
+            const db = new Database(snapshotPath, { readonly: true });
+            try {
+                const remaining = new Map(audit.learningHashes);
+                for (const row of db
+                    .query<
+                        { family_id: string; side: string; kind: string; decision_index: number; payload: string },
+                        []
+                    >(
+                        "SELECT d.family_id,a.side,d.kind,d.decision_index,d.payload FROM learning_decision d JOIN army a ON a.id=d.army_id AND a.family_id=d.family_id",
+                    )
+                    .iterate()) {
+                    const key = JSON.stringify([row.family_id, row.side, row.kind, row.decision_index]);
+                    if (remaining.get(key) !== createHash("sha256").update(row.payload).digest("hex"))
+                        throw new Error("Learning index disagrees with raw observations/actions/probabilities/labels");
+                    remaining.delete(key);
+                }
+                if (remaining.size) throw new Error("Snapshot lost normalized learning decisions");
+            } finally {
+                db.close();
+            }
+        }
         const snapshot = new PremiumEvidenceSnapshot(snapshotPath, summary.provenance.sourceSha256, {
             allowDevelopment: true,
         });

@@ -9,8 +9,10 @@ import { enumerateFullBudgetAugmentPlans } from "../ai/setup/setup_ship";
 import { getUpgradePoints, type Doctrine } from "../doctrines/doctrine_properties";
 import { V09_DEFAULT_DRAFT_BASE_POLICY_SPEC, V09_DEFAULT_DRAFT_MODEL_ID } from "../ai/setup/doctrine_draft_policy";
 import {
-    PREMIUM_META_FULL_AUGMENTS_STUDY,
     PREMIUM_META_FULL_AUGMENTS_SCHEMA,
+    PREMIUM_META_POLICY_LEARNING_STUDY,
+    PREMIUM_META_POLICY_LEARNING_SCHEMA,
+    isFullAugmentStudy,
     isPublicSetupStudy,
     PREMIUM_META_EVIDENCE_SCHEMA,
     isPremiumMetaStudy,
@@ -44,6 +46,7 @@ import { footprintCellsForRecord } from "./footprint";
 import { summarizePremiumParticipation, type IPremiumCombatParticipation } from "./ai_meta_participation";
 import { summarizePremiumCombatMetrics, type IPremiumCombatMetrics } from "./ai_meta_combat_metrics";
 import { validatePremiumHealthLedger, type IPremiumHealthObservation } from "./ai_meta_health_ledger";
+import { validateMetaFormationDecision, type IMetaFormationDecision } from "./ai_meta_formation_learning";
 
 /** Additive archive extension: legacy schema-1 balance readers may continue to ignore this field. */
 export const AI_META_EVIDENCE_SCHEMA = "premium-cohort-evidence-v1";
@@ -88,6 +91,19 @@ export function aiMetaChoiceEvidence(
         conditionalProbability: mode === "explore" ? 1 / candidates.length : 1,
         candidates: distribution,
     };
+}
+
+export function validateLearningDistribution(
+    distribution: IAiMetaChoiceEvidence,
+    selectedKey: string,
+    epsilon: number,
+): void {
+    const greedy = epsilon === 1 ? selectedKey : distribution.candidates.find((row) => row.probability > 0.8)?.key;
+    if (!greedy || ![1, 0.2].includes(epsilon)) throw new Error("Missing learning sampling policy");
+    const mode = distribution.branchProbability === epsilon ? "explore" : "exploit";
+    const expected = aiMetaChoiceEvidence(distribution.candidates, greedy, selectedKey, mode, epsilon);
+    if (JSON.stringify(expected) !== JSON.stringify(distribution))
+        throw new Error("Learning probabilities do not match the registered sampler");
 }
 
 export interface IAiMetaDraftDecision {
@@ -138,6 +154,7 @@ export interface IAiMetaFormationEvidence {
 }
 
 export interface IAiMetaFightEvidence {
+    formationChoices?: Record<"a" | "b", IMetaFormationDecision>;
     aIsGreen: boolean;
     formations: { a: IAiMetaFormationEvidence; b: IAiMetaFormationEvidence };
     /** Physical sides retained on actions and outcomes; aIsGreen supplies the logical-army mapping. */
@@ -185,7 +202,8 @@ export interface IAiMetaEvidence {
         | "premium-cohort-evidence-v2"
         | "premium-cohort-evidence-v3"
         | typeof PREMIUM_META_EVIDENCE_SCHEMA
-        | typeof PREMIUM_META_FULL_AUGMENTS_SCHEMA;
+        | typeof PREMIUM_META_FULL_AUGMENTS_SCHEMA
+        | typeof PREMIUM_META_POLICY_LEARNING_SCHEMA;
     studyProfile?: AiMetaStudy;
     scenarioId: string;
     partition: "train" | "validation" | "test";
@@ -266,7 +284,9 @@ function validatePremiumDraft(record: IAiMetaPairRecord): void {
             decision.choice?.candidates.some(
                 ({ probability, score }) =>
                     !Number.isFinite(probability) ||
-                    (nativeV09 ? probability < 0 : probability <= 0) ||
+                    (nativeV09 && evidence.studyProfile !== PREMIUM_META_POLICY_LEARNING_STUDY
+                        ? probability < 0
+                        : probability <= 0) ||
                     probability > 1 ||
                     !Number.isFinite(score),
             )
@@ -303,6 +323,7 @@ export function validateAiMetaEvidence(record: IAiMetaPairRecord): void {
             "premium-cohort-evidence-v3",
             PREMIUM_META_EVIDENCE_SCHEMA,
             PREMIUM_META_FULL_AUGMENTS_SCHEMA,
+            PREMIUM_META_POLICY_LEARNING_SCHEMA,
         ].includes(evidence.schema) ||
         evidence.fights?.length !== 2
     ) {
@@ -317,9 +338,18 @@ export function validateAiMetaEvidence(record: IAiMetaPairRecord): void {
     if (evidence.schema !== AI_META_EVIDENCE_SCHEMA) {
         validatePremiumDraft(record);
         const publicSetup = isPublicSetupStudy(evidence.studyProfile);
-        const fullAugments = evidence.studyProfile === PREMIUM_META_FULL_AUGMENTS_STUDY;
-        if (fullAugments !== (evidence.schema === PREMIUM_META_FULL_AUGMENTS_SCHEMA))
+        const fullAugments = isFullAugmentStudy(evidence.studyProfile);
+        if (
+            fullAugments !==
+            (evidence.schema === PREMIUM_META_FULL_AUGMENTS_SCHEMA ||
+                evidence.schema === PREMIUM_META_POLICY_LEARNING_SCHEMA)
+        )
             throw new Error("Premium augment domain does not match the evidence schema");
+        if (
+            (evidence.studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY) !==
+            (evidence.schema === PREMIUM_META_POLICY_LEARNING_SCHEMA)
+        )
+            throw new Error("Premium learning study and schema disagree");
         if (
             !isPremiumMetaStudy(evidence.studyProfile) ||
             evidence.geometry.orientation !== "ranked-sides" ||
@@ -385,6 +415,8 @@ export function validateAiMetaEvidence(record: IAiMetaPairRecord): void {
                         ? action.doctrine
                         : action.creatureId,
             );
+            if (evidence.studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY && decision.choice)
+                validateLearningDistribution(decision.choice, key, action.type === "select_doctrine" ? 1 : 0.2);
             if (
                 !decision.choice ||
                 decision.choice.behaviorProbability !== decision.behaviorProbability ||
@@ -398,6 +430,8 @@ export function validateAiMetaEvidence(record: IAiMetaPairRecord): void {
         }
     }
     for (const army of [record.armyA, record.armyB]) {
+        if (evidence.studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY && army.augment.evidence)
+            validateLearningDistribution(army.augment.evidence, army.augment.planId, 0.2);
         for (const choice of [army.artifactT1, army.artifactT2, army.augment]) {
             const distribution = choice.evidence;
             const key = "id" in choice ? String(choice.id) : choice.planId;
@@ -420,6 +454,26 @@ export function validateAiMetaEvidence(record: IAiMetaPairRecord): void {
         }
     }
     for (const [index, fight] of evidence.fights.entries()) {
+        if (evidence.studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY) {
+            if (!fight.formationChoices) throw new Error("Learning capture lacks formation choices");
+            for (const side of ["a", "b"] as const) {
+                const decision = fight.formationChoices[side];
+                validateMetaFormationDecision(decision);
+                const team = (side === "a") === fight.aIsGreen ? PBTypes.TeamVals.LEFT : PBTypes.TeamVals.RIGHT;
+                if (decision.observation.team !== team || decision.observation.gridType !== record.map)
+                    throw new Error("Formation decision context mismatch");
+                const applied = fight.formations[side].placements;
+                const selected = decision.proposals.find(({ key }) => key === decision.selectedKey)!.positions;
+                if (
+                    selected.length !== applied.length ||
+                    selected.some(({ unitId, cell }) => {
+                        const placement = applied.find((row) => row.unitId === unitId);
+                        return !placement || placement.cell.x !== cell.x || placement.cell.y !== cell.y;
+                    })
+                )
+                    throw new Error("Learning formation choice differs from actual placement");
+            }
+        } else if (fight.formationChoices) throw new Error("Historical study cannot acquire learning interventions");
         if (fight.healthLedger) validatePremiumHealthLedger(fight.healthLedger, fight.committedEventBatches ?? []);
         if (
             fight.participation &&

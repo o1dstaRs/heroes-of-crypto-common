@@ -29,6 +29,9 @@ import {
 import {
     PREMIUM_META_FULL_AUGMENTS_STUDY,
     PREMIUM_META_FULL_AUGMENTS_SCHEMA,
+    PREMIUM_META_POLICY_LEARNING_SCHEMA,
+    PREMIUM_META_POLICY_LEARNING_STUDY,
+    isFullAugmentStudy,
     PREMIUM_META_EVIDENCE_SCHEMA,
     isPremiumMetaStudy,
 } from "./ai_meta_study";
@@ -38,6 +41,7 @@ import {
     PREMIUM_SNAPSHOT_SQL,
     type IPremiumSnapshotManifest,
 } from "./premium_evidence_snapshot";
+import { premiumLearningDecisions, PREMIUM_LEARNING_DECISION_SCHEMA } from "./premium_learning_decisions";
 
 async function fileHash(path: string): Promise<string> {
     const hash = createHash("sha256");
@@ -59,15 +63,20 @@ export async function buildPremiumEvidenceSnapshot(
         !Array.isArray(summary.cohorts) ||
         !summary.cohorts.length ||
         !isPremiumMetaStudy(provenance?.fightProfile?.studyProfile) ||
-        !["premium-cohort-evidence-v3", PREMIUM_META_EVIDENCE_SCHEMA, PREMIUM_META_FULL_AUGMENTS_SCHEMA].includes(
-            provenance?.fightProfile?.evidenceSchema,
-        ) ||
+        ![
+            "premium-cohort-evidence-v3",
+            PREMIUM_META_EVIDENCE_SCHEMA,
+            PREMIUM_META_FULL_AUGMENTS_SCHEMA,
+            PREMIUM_META_POLICY_LEARNING_SCHEMA,
+        ].includes(provenance?.fightProfile?.evidenceSchema) ||
         provenance?.fightProfile?.searchBudget !== "offline-deterministic-work" ||
         !/^[a-f0-9]{64}$/.test(provenance?.sourceSha256 ?? "") ||
         !Number.isSafeInteger(provenance?.baseSeed)
     ) {
         throw new Error("A complete Premium ranked study with deterministic work and source identity is required");
     }
+    if (provenance.fightProfile.studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY && !options.development)
+        throw new Error("Policy-learning captures require development status and separate serving qualification");
     if (
         !Number.isSafeInteger(provenance.gamesPerCohort) ||
         provenance.gamesPerCohort < 2 ||
@@ -123,6 +132,7 @@ export async function buildPremiumEvidenceSnapshot(
         const addCombatUnitMetric = db.query("INSERT INTO combat_unit_metric VALUES (?, ?, ?, ?)");
         const addHealthSummary = db.query("INSERT INTO health_summary VALUES (?, ?, ?)");
         const addHealthUnit = db.query("INSERT INTO health_unit_metric VALUES (?, ?, ?, ?)");
+        const addLearning = db.query("INSERT INTO learning_decision VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         let families = 0;
         const sources: IPremiumSnapshotManifest["sources"] = [];
         for (const [sourceIndex, cohort] of summary.cohorts.entries()) {
@@ -231,6 +241,18 @@ export async function buildPremiumEvidenceSnapshot(
                                 active ? aiMetaSynergyLevel(army.creatureIds, faction) : 0,
                             );
                         }
+                    }
+                    for (const row of premiumLearningDecisions(record)) {
+                        addLearning.run(
+                            row.familyId,
+                            families * 2 + (row.side === "a" ? 1 : 2),
+                            row.kind,
+                            row.index,
+                            row.physicalTeam,
+                            row.selectedKey,
+                            row.distribution.behaviorProbability,
+                            JSON.stringify(row),
+                        );
                     }
                     for (const decision of evidence.rankedDraft?.decisions ?? []) {
                         const action = decision.action;
@@ -356,6 +378,7 @@ export async function buildPremiumEvidenceSnapshot(
             throw new Error("Candidate snapshot requires committed health coverage in every fight");
         const snapshotId = createHash("sha256")
             .update(PREMIUM_SNAPSHOT_SCHEMA)
+            .update(PREMIUM_LEARNING_DECISION_SCHEMA)
             .update(PREMIUM_PARTICIPATION_SCHEMA)
             .update(PREMIUM_COMBAT_METRICS_SCHEMA)
             .update(PREMIUM_COMBAT_UNIT_METRICS_SCHEMA)
@@ -379,8 +402,9 @@ export async function buildPremiumEvidenceSnapshot(
             modelStatus: "not-fitted",
             capabilities: [
                 "contextual-associations",
-                ...(provenance.fightProfile.studyProfile === PREMIUM_META_FULL_AUGMENTS_STUDY
-                    ? ["six-axis-empower-v1"]
+                ...(isFullAugmentStudy(provenance.fightProfile.studyProfile) ? ["six-axis-empower-v1"] : []),
+                ...(provenance.fightProfile.studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY
+                    ? ["policy-learning-decisions-v1", "randomized-draft-v1", "randomized-formation-v1"]
                     : []),
                 "draft-observations",
                 "formation-examples",

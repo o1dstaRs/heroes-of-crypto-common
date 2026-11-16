@@ -6,7 +6,7 @@ describe("AI meta CLI output contract", () => {
         for (const profile of ["a19-work", "v09-draft-a19-work"])
             expect(aiMetaOutputContract(profile, {})).toEqual({
                 mode: "premium",
-                studyProfile: "premium-ranked-v3",
+                studyProfile: "premium-ranked-v4",
                 collectEvidence: true,
             });
     });

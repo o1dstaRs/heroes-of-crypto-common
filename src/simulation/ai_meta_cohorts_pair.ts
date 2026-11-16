@@ -26,7 +26,9 @@ import {
     type AiMetaStrategyProfileId,
 } from "./ai_meta_strategy_profile";
 import { materializeReplayAbSplits } from "./ranked_replay_tactics_ab_core";
-import { deterministicSimulationId } from "./army";
+import { deterministicSimulationId, hashSimulationParts } from "./army";
+import { sampleMetaFormation, type IMetaFormationDecision } from "./ai_meta_formation_learning";
+import { PREMIUM_META_POLICY_LEARNING_STUDY } from "./ai_meta_study";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { validateAiMetaEvidence, type IAiMetaFightEvidence, type IAiMetaFormationEvidence } from "./ai_meta_evidence";
 import { summarizePremiumParticipation } from "./ai_meta_participation";
@@ -265,6 +267,25 @@ function playMetaPairInner(
               }
             : {};
     FightStateManager.getInstance();
+    const learning = options.studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY;
+    const formationCollection = (aIsGreen: boolean) => {
+        const decisions = {} as Record<"a" | "b", IMetaFormationDecision>;
+        const selector: NonNullable<Parameters<typeof runMatch>[0]["researchFormationSelector"]> = (input) => {
+            const side = (input.team === PBTypes.TeamVals.LEFT) === aIsGreen ? "a" : "b";
+            const decision = sampleMetaFormation(
+                input,
+                hashSimulationParts(prepared.setupSeed, "formation-learning-v1", side),
+            );
+            decisions[side] = decision;
+            return new Map(
+                decision.proposals
+                    .find(({ key }) => key === decision.selectedKey)!
+                    .positions.map(({ unitId, cell }) => [unitId, cell]),
+            );
+        };
+        return { decisions, config: learning ? { researchFormationSelector: selector } : {} };
+    };
+    const aFormation = formationCollection(true);
     const aConfig = {
         ...aiMetaMatchConfig(
             prepared.armyA,
@@ -276,10 +297,12 @@ function playMetaPairInner(
             prepared.evidence?.geometry.orientation === "ranked-sides",
         ),
         ...searchBudget,
+        ...aFormation.config,
         ...(options.collectEvidence ? { headlessEvents: false } : {}),
     };
     const aCapture = capturePremiumFight(aConfig, Boolean(options.studyProfile));
     const aGreen = aCapture.result;
+    const bFormation = formationCollection(false);
     const bConfig = {
         ...aiMetaMatchConfig(
             prepared.armyB,
@@ -291,6 +314,7 @@ function playMetaPairInner(
             prepared.evidence?.geometry.orientation === "ranked-sides",
         ),
         ...searchBudget,
+        ...bFormation.config,
         ...(options.collectEvidence ? { headlessEvents: false } : {}),
     };
     const bCapture = capturePremiumFight(bConfig, Boolean(options.studyProfile));
@@ -305,6 +329,7 @@ function playMetaPairInner(
                       fights: [
                           {
                               ...fightEvidence(aGreen, aConfig, prepared.armyA, prepared.armyB, true),
+                              ...(learning ? { formationChoices: aFormation.decisions } : {}),
                               firstDecisionState: aCapture.firstDecisionState,
                               committedEventBatches: aCapture.committedEventBatches,
                               healthLedger: aCapture.healthLedger,
@@ -313,6 +338,7 @@ function playMetaPairInner(
                           },
                           {
                               ...fightEvidence(bGreen, bConfig, prepared.armyB, prepared.armyA, false),
+                              ...(learning ? { formationChoices: bFormation.decisions } : {}),
                               firstDecisionState: bCapture.firstDecisionState,
                               committedEventBatches: bCapture.committedEventBatches,
                               healthLedger: bCapture.healthLedger,

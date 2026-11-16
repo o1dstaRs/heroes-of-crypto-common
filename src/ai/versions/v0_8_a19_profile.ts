@@ -315,8 +315,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
-        // Capture native-start timing when the default neural policy is attached.
-        sha256: "4f1211262af0eae8c43484412915c65f1e4c1c2ceda88ff944957577b4b8d9be" as const,
+        // Offline formation collection is opt-in; omitted callers preserve default routing.
+        sha256: "18d6cffe9c6f232f663493587f6c2e626fd79c98549772282d5325dd1ad4c794" as const,
     }),
     Object.freeze({
         role: "neural-policy" as const,

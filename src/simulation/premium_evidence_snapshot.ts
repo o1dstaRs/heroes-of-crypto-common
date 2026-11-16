@@ -16,6 +16,7 @@ import {
     PREMIUM_HEALTH_UNIT_METRICS,
     type summarizePremiumHealth,
 } from "./ai_meta_health_ledger";
+import type { IPremiumLearningDecision } from "./premium_learning_decisions";
 
 export const PREMIUM_SNAPSHOT_SCHEMA = "hoc-premium-evidence-snapshot-v2";
 
@@ -133,6 +134,15 @@ CREATE TABLE health_unit_metric (
     payload TEXT NOT NULL CHECK(json_valid(payload)), PRIMARY KEY(army_id, creature_id, a_is_green)
 ) STRICT;
 CREATE INDEX health_unit_metric_lookup ON health_unit_metric(creature_id, army_id);
+CREATE TABLE learning_decision (
+    family_id TEXT NOT NULL REFERENCES family(id), army_id INTEGER NOT NULL REFERENCES army(id),
+    kind TEXT NOT NULL CHECK(kind IN ('draft','augment','formation')), decision_index INTEGER NOT NULL,
+    physical_team INTEGER NOT NULL, selected_key TEXT NOT NULL,
+    behavior_probability REAL NOT NULL CHECK(behavior_probability > 0 AND behavior_probability <= 1),
+    payload TEXT NOT NULL CHECK(json_valid(payload)),
+    PRIMARY KEY(army_id,kind,decision_index)
+) STRICT;
+CREATE INDEX learning_decision_scope ON learning_decision(kind,family_id);
 `;
 
 const validId = (id: number): boolean => Number.isSafeInteger(id) && id > 0 && id <= 2147483647;
@@ -195,6 +205,50 @@ export function canonicalPremiumEvidenceQuery(query: IPremiumEvidenceQuery): IPr
 export class PremiumEvidenceSnapshot {
     public readonly manifest: IPremiumSnapshotManifest;
     private readonly db: Database;
+    /** Training-only stream. A family remains the uncertainty/split unit, regardless of row count. */
+    public *trainingDecisions(
+        cohort: AiMetaCohort,
+        kind: IPremiumLearningDecision["kind"],
+    ): Generator<IPremiumLearningDecision> {
+        if (!this.manifest.capabilities?.includes("policy-learning-decisions-v1"))
+            throw new Error(
+                "Snapshot lacks normalized learning decisions; historical outcomes cannot reconstruct them",
+            );
+        if (!AI_META_COHORTS.includes(cohort) || !["draft", "augment", "formation"].includes(kind))
+            throw new Error("Explicit learning cohort and stage required");
+        for (const row of this.db
+            .query<
+                {
+                    payload: string;
+                    family_id: string;
+                    kind: string;
+                    decision_index: number;
+                    physical_team: number;
+                    selected_key: string;
+                    behavior_probability: number;
+                    side: string;
+                    army_family_id: string;
+                },
+                [string, string]
+            >(
+                "SELECT d.*, a.side, a.family_id AS army_family_id FROM learning_decision d JOIN family f ON f.id=d.family_id JOIN army a ON a.id=d.army_id WHERE f.partition='train' AND f.cohort=? AND d.kind=? ORDER BY f.id,d.army_id,d.decision_index",
+            )
+            .iterate(cohort, kind)) {
+            const payload = JSON.parse(row.payload) as IPremiumLearningDecision;
+            if (
+                payload.familyId !== row.family_id ||
+                row.army_family_id !== row.family_id ||
+                payload.side !== row.side ||
+                payload.kind !== row.kind ||
+                payload.index !== row.decision_index ||
+                payload.physicalTeam !== row.physical_team ||
+                payload.selectedKey !== row.selected_key ||
+                payload.distribution?.behaviorProbability !== row.behavior_probability
+            )
+                throw new Error("Learning payload disagrees with indexed family or decision identity");
+            yield payload;
+        }
+    }
     public constructor(path: string, expectedSourceSha256: string, options: { allowDevelopment?: boolean } = {}) {
         this.db = new Database(path, { readonly: true, strict: true });
         try {

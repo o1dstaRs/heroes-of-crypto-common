@@ -661,6 +661,13 @@ const executionTiming = (summary: UnknownRecord) => {
     return { start, finish, wallSeconds };
 };
 
+const executionRecovery = (summary: UnknownRecord) => {
+    const recovery = asRecord(asRecord(summary.provenance).executionRecovery);
+    const reusedPairs = countValue(recovery, ["recoveredPairsFromOriginalExecution"]);
+    const executedPairs = countValue(recovery, ["missingPairsRequiringExecution"]);
+    return reusedPairs === null || executedPairs === null ? null : { reusedPairs, executedPairs };
+};
+
 const reportTimestamp = (timestamp: number): string => {
     if (!Number.isFinite(timestamp)) return "Not reported";
     const iso = new Date(timestamp).toISOString();
@@ -669,10 +676,11 @@ const reportTimestamp = (timestamp: number): string => {
 
 const renderRunMetadata = (summary: UnknownRecord): string => {
     const { start, finish, wallSeconds } = executionTiming(summary);
+    const recovery = executionRecovery(summary);
     return `<dl class="run-meta" aria-label="Run dates and duration">
-      <div><dt>Started</dt><dd>${reportTimestamp(start)}</dd></div>
-      <div><dt>Finished</dt><dd>${reportTimestamp(finish)}</dd></div>
-      <div><dt>Elapsed wall time</dt><dd>${formatDuration(wallSeconds)}</dd></div>
+      <div><dt>${recovery ? "Recovery started" : "Started"}</dt><dd>${reportTimestamp(start)}</dd></div>
+      <div><dt>${recovery ? "Recovery captured" : "Finished"}</dt><dd>${reportTimestamp(finish)}</dd></div>
+      <div><dt>${recovery ? "Recovery wall time" : "Elapsed wall time"}</dt><dd>${formatDuration(wallSeconds)}</dd></div>
       <div><dt>Report generated</dt><dd>${reportTimestamp(Date.parse(textValue(summary, ["generatedAt"])))}</dd></div>
     </dl>`;
 };
@@ -682,6 +690,7 @@ const renderExecutionTiming = (summary: UnknownRecord): string => {
     const provenance = asRecord(summary.provenance);
     const sharding = asRecord(provenance.sharding);
     const timing = asRecord(provenance.timing);
+    const recovery = executionRecovery(summary);
     const { wallSeconds } = executionTiming(summary);
     if (wallSeconds === null || wallSeconds < 0) return "";
     const cohorts = Array.isArray(summary.cohorts) ? summary.cohorts.map(asRecord) : [];
@@ -702,10 +711,10 @@ const renderExecutionTiming = (summary: UnknownRecord): string => {
             ? `${processes} processes × ${workers} workers`
             : textValue(provenance, ["concurrency"], "Unknown");
     return `<section id="execution" data-report-section aria-labelledby="execution-title">
-    <div class="section-head"><div><p class="eyebrow">Measured on this run</p><h2 id="execution-title">Execution time</h2></div><p>Simulation wall time includes process startup and scheduling. Cohort spans overlap; accumulated process time sums concurrent shard durations and is not CPU time.</p></div>
+    <div class="section-head"><div><p class="eyebrow">Measured on this run</p><h2 id="execution-title">${recovery ? "Recovery pass timing" : "Execution time"}</h2></div><p>${recovery ? "This pass combines saved-record reads with execution of missing cases; its elapsed time is not the simulation time for the complete bank. " : "Simulation wall time includes process startup and scheduling. "}Cohort spans overlap; accumulated process time sums concurrent shard durations and is not CPU time.</p></div>
     <div class="hero-stats" style="width:100%;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:18px">
-      <div class="hero-stat"><strong>${formatDuration(wallSeconds)}</strong><span>Simulation wall time</span></div>
-      <div class="hero-stat"><strong>${throughput}</strong><span>Total throughput</span></div>
+      <div class="hero-stat"><strong>${formatDuration(wallSeconds)}</strong><span>${recovery ? "Recovery wall time" : "Simulation wall time"}</span></div>
+      <div class="hero-stat"><strong>${recovery ? `${formatInteger(recovery.executedPairs * 2)} fights` : throughput}</strong><span>${recovery ? "Executed this pass" : "Total throughput"}</span></div>
       <div class="hero-stat"><strong>${escapeHtml(layout)}</strong><span>Execution layout</span></div>
     </div>
     <div class="table-wrap"><table><thead><tr><th>Cohort</th><th>Fights</th><th>First start to last finish</th><th>Accumulated process time</th></tr></thead><tbody>${rows}</tbody></table></div>
@@ -718,19 +727,25 @@ const renderExecutionTiming = (summary: UnknownRecord): string => {
  */
 export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMetaReportOptions = {}): string {
     const summary = asRecord(summaryValue);
+    const recovery = executionRecovery(summary);
     const rows = normalizeRows(summary);
     const studyProfile = String(asRecord(asRecord(summary.provenance).fightProfile).studyProfile);
     const searchProfile = asRecord(asRecord(asRecord(summary.provenance).fightProfile).search);
     const complementaryR2 = searchProfile.rollouts === 2 && searchProfile.chanceSampling === "actor-antithetic";
-    const premiumStudy = ["premium-ranked-v1", "premium-ranked-v2", "premium-ranked-v3"].includes(studyProfile);
+    const premiumStudy = ["premium-ranked-v1", "premium-ranked-v2", "premium-ranked-v3", "premium-ranked-v4"].includes(
+        studyProfile,
+    );
     const premiumSetupNotice =
         studyProfile === "premium-ranked-v1"
             ? "This historical profile restricts opponent identities during augment setup; it does not match current ranked public-roster Setup. "
             : "Augment setup uses the public opponent roster; opponent positions, artifacts, augments and splits stay private. ";
-    const augmentDomainNotice =
-        studyProfile === "premium-ranked-v3"
-            ? "All six augment axes, including Empower, are eligible for collection. "
-            : "Historical collection covers five augment axes only; Empower allocations are unmeasured. ";
+    const augmentDomainNotice = ["premium-ranked-v3", "premium-ranked-v4"].includes(studyProfile)
+        ? "All six augment axes, including Empower, are eligible for collection. "
+        : "Historical collection covers five augment axes only; Empower allocations are unmeasured. ";
+    const learningNotice =
+        studyProfile === "premium-ranked-v4"
+            ? "Learning capture randomizes legal draft offers and deduplicated free-formation reflections at 20%, preserving decision-time observations and full selection probabilities in SQLite. These are logged outcomes, not paired alternative-action labels. Formations use the headless meta setup path, not a qualified authoritative server opening. Split policies and optional bans are not randomized. "
+            : "";
     if (premiumStudy)
         for (const row of rows) {
             if (row.rate === null || !row.pairs) continue;
@@ -972,7 +987,12 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
 <main class="shell report-main">
   ${
       fightVersion === "v0.8" && fightProfile.draftModelId
-          ? `<aside class="notice" aria-label="Combined draft and combat profile"><div class="notice-mark">i</div><div><h2>Locked v0.9 draft + A19 combat</h2><p>Draft checkpoint: ${escapeHtml(textValue(fightProfile, ["draftModelId"]))}. Combat uses the recorded v0.8 + A19 search and placement profile. Native v0.9 combat is a separate research profile; these games measure the user's selected combined default.</p></div></aside>`
+          ? `<aside class="notice" aria-label="Combined draft and combat profile"><div class="notice-mark">i</div><div><h2>Locked v0.9 draft + A19 combat${studyProfile === "premium-ranked-v4" ? " · exploration enabled" : ""}</h2><p>Draft checkpoint: ${escapeHtml(textValue(fightProfile, ["draftModelId"]))}. Combat uses the recorded v0.8 + A19 search and placement profile. ${studyProfile === "premium-ranked-v4" ? "This learning collection adds registered draft and formation exploration to that anchor. It does not measure unchanged default-policy play." : "Native v0.9 combat is a separate research profile; these games measure the user's selected combined default."}</p></div></aside>`
+          : ""
+  }
+  ${
+      recovery
+          ? `<aside class="notice" aria-label="Recovery provenance"><div class="notice-mark">i</div><div><h2>Fixed-case recovery with saved records</h2><p>${formatInteger(recovery.reusedPairs)} original families (${formatInteger(recovery.reusedPairs * 2)} fights) were reused unchanged. Only ${formatInteger(recovery.executedPairs)} missing fixed families (${formatInteger(recovery.executedPairs * 2)} fights) were executed in this pass. The timings include cache reads and must not be reported as full-bank simulation throughput. Per-family original source and record hashes remain in the recovery manifest.</p></div></aside>`
           : ""
   }
   ${
@@ -987,7 +1007,7 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
   }
   <aside class="notice" aria-label="Interpretation caveat">
     <div class="notice-mark">!</div>
-    <div><h2>${premiumStudy ? "Premium coverage study · exploratory evidence" : "Controlled strength and associative composition"}</h2><p>${premiumStudy ? premiumSetupNotice + augmentDomainNotice + "Ranked draft artifacts are retained from visible offers; their setup rows have no randomized artifact assignments and must not be read as zero strength. Synthetic cohorts explore setup artifacts. Augment exploration spans the actual 5/6/7-point doctrine budgets. Unit and synergy results are composition-confounded associations; no Premium advisor has been fitted or evaluated. This coverage pilot does not establish counter-pick gains or optimal formations. Premium charts use conservative family-bounded 95% intervals instead of the legacy summary variance intervals." : "Artifact and augment score rates use the policy's 20% uniform exploration assignments, breaking the link between a strong army and its usual item choice. Synergy rows instead track exact faction, choice, and active level under the deployed deterministic setup policy; they remain composition-confounded associations, not randomized causal effects. Augment plans are the causal unit; individual levels remain compositional diagnostics."}</p></div>
+    <div><h2>${premiumStudy ? "Premium coverage study · exploratory evidence" : "Controlled strength and associative composition"}</h2><p>${premiumStudy ? premiumSetupNotice + augmentDomainNotice + learningNotice + "Ranked draft artifacts are retained from visible offers; these artifact charts use synthetic setup exploration, not the draft decision table. Missing chart rows must not be read as zero strength. Augment exploration spans the actual 5/6/7-point doctrine budgets. Unit and synergy results are composition-confounded associations; no Premium advisor has been fitted or evaluated. This coverage pilot does not establish counter-pick gains or optimal formations. Premium charts use conservative family-bounded 95% intervals instead of the legacy summary variance intervals." : "Artifact and augment score rates use the policy's 20% uniform exploration assignments, breaking the link between a strong army and its usual item choice. Synergy rows instead track exact faction, choice, and active level under the deployed deterministic setup policy; they remain composition-confounded associations, not randomized causal effects. Augment plans are the causal unit; individual levels remain compositional diagnostics."}</p></div>
   </aside>
   ${
       partialRun

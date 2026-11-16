@@ -290,6 +290,8 @@ export interface ITurnExecutionObservation {
 }
 
 export interface IMatchConfig {
+    /** Offline collection only, after split placement. Receives detached own geometry, never hidden enemy setup. */
+    researchFormationSelector?: (input: import("./ai_meta_formation_learning").IMetaFormationInput) => Map<string, XY>;
     /** Research-only timing seam; omitted callers retain the existing clock path. */
     researchCaptureDecisionStart?: boolean;
     greenVersion: string;
@@ -1125,6 +1127,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             config.greenSetupPlacementPolicy,
             greenPublicOpponentCreatureIds,
             config.greenTacticalSplitStacks,
+            config.researchFormationSelector,
         ),
         red: placeArmy(
             redUnits,
@@ -1140,6 +1143,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             config.redSetupPlacementPolicy,
             redPublicOpponentCreatureIds,
             config.redTacticalSplitStacks,
+            config.researchFormationSelector,
         ),
     };
 
@@ -1926,6 +1930,7 @@ function placeArmy(
     setupPlacementPolicy?: PlacementPolicyVariant,
     publicOpponentCreatureIds?: readonly number[],
     tacticalSplitStacks?: readonly ITacticalSplitRosterStack[],
+    researchFormationSelector?: IMatchConfig["researchFormationSelector"],
 ): IPlacementRecord[] {
     const records: IPlacementRecord[] = [];
     const legal = zone.possibleCellHashes();
@@ -1947,7 +1952,7 @@ function placeArmy(
             const unit = units[split.rosterIndex];
             return unit ? [{ unitId: unit.getId(), role: split.role }] : [];
         }) ?? [];
-    const desired = splitStacks.length
+    let desired = splitStacks.length
         ? applyTacticalSplitPlacement(
               incumbent,
               units.map((unit) => ({
@@ -1967,6 +1972,42 @@ function placeArmy(
               },
           )
         : incumbent;
+
+    if (researchFormationSelector) {
+        const canonical = new Map<string, XY>();
+        const taken = new Set<string>();
+        const cells = [...legal].map((h) => ({ x: h >> 4, y: h & 0xf }));
+        const coordinateKey = ({ x, y }: XY) => `${x},${y}`;
+        // Bit-packed hashes alias off-board y=16 with a different in-bounds cell. Match the
+        // engine's coordinate legality before resolving its ordinary first-fit fallback.
+        const legalCoordinates = new Set(cells.map(coordinateKey));
+        for (const unit of units) {
+            const proposed = desired.get(unit.getId());
+            const base = [...(proposed ? [proposed] : []), ...cells].find((cell) =>
+                footprintCells(unit, cell).every(
+                    (covered) => legalCoordinates.has(coordinateKey(covered)) && !taken.has(coordinateKey(covered)),
+                ),
+            );
+            if (!base) throw new Error("Formation collection cannot place the complete army");
+            canonical.set(unit.getId(), { ...base });
+            for (const covered of footprintCells(unit, base)) taken.add(coordinateKey(covered));
+        }
+        desired = researchFormationSelector({
+            team,
+            gridType: grid.getGridType(),
+            legalCells: cells,
+            units: units.map((unit, index) => ({
+                unitId: unit.getId(),
+                creatureName: unit.getName(),
+                amount: roster[index].amount,
+                width: unit.getFootprintWidth(),
+                height: unit.getFootprintHeight(),
+                cell: { ...canonical.get(unit.getId())! },
+            })),
+        });
+        if (desired.size !== units.length || units.some((unit) => !desired.has(unit.getId())))
+            throw new Error("Formation collection changed army membership");
+    }
 
     const tryPlaceAt = (unit: Unit, base: XY): boolean => {
         const cells = footprintCells(unit, base);
@@ -1994,6 +2035,7 @@ function placeArmy(
     for (const unit of units) {
         const base = desired.get(unit.getId());
         let placed = base ? tryPlaceAt(unit, base) : false;
+        if (researchFormationSelector && !placed) throw new Error("Selected formation was not applied exactly");
         if (!placed) {
             for (const candidate of legalBaseCells) {
                 if (tryPlaceAt(unit, candidate)) {

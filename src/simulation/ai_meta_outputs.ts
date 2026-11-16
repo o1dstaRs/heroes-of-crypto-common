@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { isPremiumMetaStudy, PREMIUM_META_FULL_AUGMENTS_STUDY } from "./ai_meta_study";
+import { isPremiumMetaStudy, PREMIUM_META_POLICY_LEARNING_STUDY } from "./ai_meta_study";
 import { auditPremiumEvidence } from "./audit_premium_evidence";
 import { buildPremiumEvidenceSnapshot } from "./build_premium_evidence_snapshot";
 import { PremiumEvidenceSnapshot } from "./premium_evidence_snapshot";
@@ -26,7 +26,7 @@ export function aiMetaOutputContract(profile: string, environment: NodeJS.Proces
         throw new Error("Premium batches require evidence capture; unset AI_META_COLLECT_EVIDENCE or set it to 1");
     if (environment.AI_META_ARTIFACT_UNIFORM === "1")
         throw new Error("Premium study fixes exploration; unset AI_META_ARTIFACT_UNIFORM");
-    const studyProfile = environment.AI_META_STUDY_PROFILE ?? PREMIUM_META_FULL_AUGMENTS_STUDY;
+    const studyProfile = environment.AI_META_STUDY_PROFILE ?? PREMIUM_META_POLICY_LEARNING_STUDY;
     if (!isPremiumMetaStudy(studyProfile)) throw new Error(`Unknown AI_META_STUDY_PROFILE: ${studyProfile}`);
     return { mode, studyProfile, collectEvidence: true };
 }

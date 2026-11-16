@@ -96,7 +96,8 @@ import {
 } from "./ai_meta_evidence";
 
 import {
-    PREMIUM_META_FULL_AUGMENTS_STUDY,
+    PREMIUM_META_POLICY_LEARNING_STUDY,
+    isFullAugmentStudy,
     isPublicSetupStudy,
     isPremiumMetaStudy,
     PREMIUM_META_DRAFT_SPEC,
@@ -585,7 +586,7 @@ function generateRankedRosters(
     nativeV09 = false,
 ): { rosters: [IArmyUnitSpec[], IArmyUnitSpec[]]; rankedDraft?: IAiMetaDraftEvidence } {
     const premiumStudy = Boolean(studyProfile);
-    const exploreDraft = premiumStudy && !nativeV09;
+    const exploreDraft = premiumStudy && (!nativeV09 || studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY);
     const rng = rankedPickRandomInt(seed);
     let state = createPickSimState(rng);
     const decisions: IAiMetaDraftEvidence["decisions"] = [];
@@ -717,7 +718,15 @@ function generateRankedRosters(
             const context = nativeContext(team);
             const preferred = pickRankedLiveDraftBundle(NATIVE_V09_DRAFT_GENOME, offers, variants, 6, context.scouting);
             const selected = nativeChoices.get(team)!.bundle!(offers, context, preferred);
-            apply({ type: "select_bundle", team, bundleIndex: selected });
+            const selection = exploreDraft
+                ? choose(
+                      offers.map((_, index) => index),
+                      selected,
+                      team,
+                      "bundle",
+                  )
+                : { selected, evidence: undefined };
+            apply({ type: "select_bundle", team, bundleIndex: selection.selected }, state, selection.evidence);
         } else {
             apply(
                 { type: "select_bundle", team, bundleIndex: bundles[index].selected },
@@ -1230,7 +1239,7 @@ export function prepareMetaPair(
     const setup = (side: "a" | "b") =>
         premiumStudy
             ? {
-                  fullAugmentDomain: options.studyProfile === PREMIUM_META_FULL_AUGMENTS_STUDY,
+                  fullAugmentDomain: isFullAugmentStudy(options.studyProfile),
                   doctrine: matchup.rankedDraft?.doctrines?.[side] ?? premiumStudyDoctrine(matchup.setupSeed, side),
                   knownOpponentCreatureIds: publicSetup
                       ? creatureIdsForRoster(side === "a" ? matchup.rosterB : matchup.rosterA)
