@@ -527,3 +527,21 @@ an inactive versioned research checkpoint. Its helper SHA is
 Keep those bytes and the failed gates intact. This preserves reusable work for other agents without
 adopting a stronger default, strict-margin rule or favorable shooter-only exception. New variants need
 separate identities and fresh evidence; physical shooters and damage casters remain distinct hypotheses.
+
+The distinct `shooter-pin-delivery-20261116` prototype closed at functional admission. Read
+`docs/shooter_pin_and_forecast_audit.md`. Registration
+`9ba378bc695636ecb6c3392e791d4893e4715a5cf08b46f0eef37c6b1a50931d` preserves same-target melee delivery
+while adding contact suppression of ready physical shooters. All 171 admission/cold executions reproduce
+controls, but only three proposals occur, all blocked by Angel's protector-intent guard; zero full
+shortlists or trajectories change. Nine independent guard replays confirm the reason. No fresh seed
+or strength bank opened. Preserve the inactive helper and failed coverage gate; do not disable the
+protector guard or broaden this closed candidate on the same cases.
+
+The separate read-only `backline-forecast-audit-20261116` records all 35 old outcome-changing roots,
+70 exact full replays plus six cold controls, with no extra rollouts. Of 711 existing full forecasts,
+678 reach exact simulated terminals; both forecasts predict terminal wins in 10 of the 18 regression
+cases and 11 of the 17 improvements. This is selected diagnostic data, not population calibration or
+a new win-rate gain. Native future-turn modeling and actual searched continuation differ; the audit
+does not isolate that difference from chance or later interventions. Do not rescue the closed searched-
+reply candidate or tune from these selected roots. Future continuation work needs separate registration,
+outcome-independent samples, legal public inputs, representative strength evidence and serving timing.
