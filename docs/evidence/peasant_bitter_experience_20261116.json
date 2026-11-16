@@ -1,0 +1,182 @@
+{
+    "id": "peasant-bitter-response-20261116",
+    "status": "closed_without_qualified_candidate",
+    "defaultChanged": false,
+    "source": {
+        "common": "ade975b8378b71742ac51bd32eb9187a48100ee0",
+        "server": "82336c6981c7679febb1793043fd3671c90cb898",
+        "peerWorkingTreeExcluded": true,
+        "researchHelperSha256": "7bc1cb77450879e004fa13ca00bf7f3aa24ad0f475122e158c856e50fb939709",
+        "testSha256": "6ed267afbc4cc358df0d67ea40557d7f44d3bcddf0784b51695d94073ae3cdbb",
+        "frozenTestSha256": "3367e55e8e9ab1521bcac5d8b3a4242b72a933a55accbefd1e9cf10a36aa7543"
+    },
+    "registration": {
+        "initialSha256": "d35dcdd9c4e1005a9a6729f352ba8616fa3f3974eb4a11727ba3ac05ab680dc3",
+        "comparisonCorrectionSha256": "32133377eaab926e721cfe31e9dec8bfb062766497c3991ebca6223369e7d91d",
+        "validPilotSha256": "462f5291322fdd19ccd8a2e68edcabbf682808408dff2d2ff22f3e7dfb727d90",
+        "protocolSha256": "5895af52c241ccff79b31f6952d1641adcaf477b47fe99c788617920ccb05655",
+        "casesSha256": "96af75bd23937031e98d436f0457b5d71382531bacdd5db72b7234c33c9682cd",
+        "runtimeManifestSha256": "5255da2c0490e42130ec54d5336ff5fbbc342d24a1c76ec130cf143f2aecff61"
+    },
+    "data": {
+        "reusedDiagnosticOnly": true,
+        "newSeedChannels": false,
+        "freshBanksAllocated": false,
+        "familyCount": 26,
+        "physicalSeats": 2,
+        "combatFuturesPerSeat": 2,
+        "historicalSource": "ranked-geometry-aligned-20261116 completed qualification, first candidate-Peasant family per represented map/own/opponent doctrine stratum, no outcome filtering",
+        "missingStratum": {
+            "map": "Block",
+            "ownDoctrinePoints": 5,
+            "opponentDoctrinePoints": 7
+        }
+    },
+    "pilot": {
+        "families": 26,
+        "pilotExecutions": 312,
+        "coldExecutions": 18,
+        "offObserverExactPairs": 104,
+        "historicalControlsExact": true,
+        "stats": {
+            "observe": {
+                "roots": 402,
+                "qualifying": 4,
+                "added": 0,
+                "tierExtensions": 0,
+                "selectedAddedTrade": 0,
+                "leafObservedBonus": 3
+            },
+            "on": {
+                "roots": 402,
+                "qualifying": 4,
+                "added": 0,
+                "tierExtensions": 0,
+                "selectedAddedTrade": 0,
+                "leafObservedBonus": 3
+            }
+        },
+        "opportunityMaps": [1, 3],
+        "changedCompleteTrajectories": 0,
+        "gainPoints": 0.0,
+        "wholeFamily95Points": [0.0, 0.0],
+        "ownDoctrines": [
+            {
+                "doctrine": 1,
+                "gainPoints": 0
+            },
+            {
+                "doctrine": 2,
+                "gainPoints": 0.0
+            },
+            {
+                "doctrine": 3,
+                "gainPoints": 0
+            }
+        ],
+        "coveragePassed": false,
+        "progressionPassed": false
+    },
+    "verification": {
+        "qualityPassed": true,
+        "executions": 330,
+        "exactOffObserverPairs": 104,
+        "exactHistoricalNativeControls": 104,
+        "exactColdReplays": 18,
+        "sourceAndRawHashesPassed": true,
+        "healthLedgerAndNativeSearchPassed": true,
+        "sameInputBudgetsAndOpponent": true,
+        "independentWinnerScoresPassed": true,
+        "meanPoints": 0,
+        "changedTrajectories": 0,
+        "addedComparisons": 0
+    },
+    "counterfactualAudit": {
+        "initialRegistrationSha256": "756900b08dd2db0d552c1d71283f5962378617d8fc2dc25e5dce8ff5d093d0d4",
+        "initialAttemptRejectedByActualActionCheck": true,
+        "correctionSha256": "46049d4e6b40636564b34a575b01f88d1380869b9634805b93b6d00d4516a9ab",
+        "finalRegistrationSha256": "446d3ef204e47b4b775057922edf133abb7aaeb0d5803e1316351fc83fdb18f0",
+        "executions": 16,
+        "exactNativeControls": 4,
+        "exactColdReplays": 8,
+        "sourceAndTraceAndHealthChecksPassed": true,
+        "diagnosticOnly": true,
+        "rows": [
+            {
+                "case": "qualification-s01-f004-s1-f0",
+                "lap": 3,
+                "preexistingBonusStacks": 7,
+                "nativeTarget": "Centaur",
+                "forcedTarget": "Centaur",
+                "nativeHpLost": 4,
+                "forcedHpLost": 4,
+                "nativeBonusesEarned": 1,
+                "forcedBonusesEarned": 1,
+                "nativeScore": 1,
+                "forcedScore": 1,
+                "trajectoryChanged": true
+            },
+            {
+                "case": "qualification-s05-f001-s1-f0",
+                "lap": 4,
+                "preexistingBonusStacks": 5,
+                "nativeTarget": "Beholder",
+                "forcedTarget": "Beholder",
+                "nativeHpLost": 12,
+                "forcedHpLost": 12,
+                "nativeBonusesEarned": 1,
+                "forcedBonusesEarned": 1,
+                "nativeScore": 1,
+                "forcedScore": 1,
+                "trajectoryChanged": false
+            },
+            {
+                "case": "qualification-s10-f002-s0-f1",
+                "lap": 7,
+                "preexistingBonusStacks": 9,
+                "nativeTarget": "Wandering Mage",
+                "forcedTarget": "Wandering Mage",
+                "nativeHpLost": 6,
+                "forcedHpLost": 6,
+                "nativeBonusesEarned": 1,
+                "forcedBonusesEarned": 1,
+                "nativeScore": 1,
+                "forcedScore": 1,
+                "trajectoryChanged": false
+            },
+            {
+                "case": "qualification-s11-f000-s0-f1",
+                "lap": 3,
+                "preexistingBonusStacks": 8,
+                "nativeTarget": "Medusa",
+                "forcedTarget": "Wandering Mage",
+                "nativeHpLost": 0,
+                "forcedHpLost": 8,
+                "nativeBonusesEarned": 0,
+                "forcedBonusesEarned": 1,
+                "nativeScore": 0,
+                "forcedScore": 0,
+                "trajectoryChanged": true
+            }
+        ]
+    },
+    "artifactHashes": {
+        "pilotAnalysis": "be0921c9cedd69ae5c4921dcd841507e9308be43d11323628b6681fa2d8ed9f9",
+        "independentVerification": "1c4a156b7e81b750579249626bcffe8b9d6ab9eb3ab4f1a64fc3607165682a6a",
+        "counterfactualAnalysis": "6e0de1c6c4f1811132727aa407488c0ea8f093e75d903e1f17c7ded5bd219e84"
+    },
+    "limits": [
+        "No policy intervention in the pilot; a zero bootstrap interval reflects identical trajectories, not general certainty.",
+        "Pilot chosen-action instrumentation observes the search prototype before final neural tie correction. Committed turn traces are authoritative.",
+        "Forced one-root continuations are mechanism diagnostics, not a deployable policy or fresh strength qualification.",
+        "No serial serving qualification or Premium routing change."
+    ],
+    "validation": {
+        "targetedTestsPassed": 9,
+        "expectations": 41,
+        "targetedEslintPassed": true,
+        "allSourceAndNewTestTypecheckPassed": true,
+        "broadTestProjectTypecheckPassed": false
+    },
+    "capsule": "game/core/tmp/peasant-bitter-response-20261116"
+}

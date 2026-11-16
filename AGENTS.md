@@ -574,3 +574,23 @@ and all scanned reservations. The hard cutoff is 2026-11-16 17:34:15 UTC, four l
 no GPU or automatic restart/extension. It is distinct from the closed failed aligned pilot and the
 peer's aligned12h hypothetical-label campaign. No model is a default until all strength and serving
 gates pass. Inspect the capsule's pipeline/terminal receipts before reporting status or starting work.
+
+## Closed Peasant cheap-retaliation pilot
+
+The user's Peasant armor-farming idea was evaluated as `bitter-experience-cheap-response-v1`.
+Read `docs/peasant_bitter_experience_research.md` and its compact evidence. Bitter Experience grants
++1 base armor and +1 step per nonfatal hit with casualties; harmless or fatal hits give no bonus.
+Ordinary melee replies use the defender's pre-primary-hit stack. Keep the canonical response gate.
+The immediate value features omit armor/steps, but full engine search retains their effects.
+
+The 26-family reused diagnostic pilot completed 330 verified executions under registration
+`462f5291322fdd19ccd8a2e68edcabbf682808408dff2d2ff22f3e7dfb727d90`. All four nominated trades among
+402 Peasant roots were already in native full search; no comparison, decision or trajectory changed.
+Gain was 0.00 points and the fixed coverage/score gates failed. A further 16 verified forced-root
+continuations also changed no result: the rejected 8-HP trade earned the bonus but still lost.
+Preserve the inactive helper SHA `7bc1cb77450879e004fa13ca00bf7f3aa24ad0f475122e158c856e50fb939709`,
+tests, failed gates, serialization correction and final-neural-selector audit correction. Do not call
+this a strength win, broaden this closed candidate on its opened bank or bypass final serving guards.
+No fresh channels/banks were allocated and no default changed. Further value or movement hypotheses
+need separate identities and fresh evidence; actual committed turns are authoritative over a prototype
+selector's intermediate choice. The separate actual-outcome geometry collection remains untouched.
