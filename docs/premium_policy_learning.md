@@ -96,6 +96,49 @@ and use authoritative public Setup for any intended serving placement policy. Th
 capture cannot support new split policies. This is a follow-up design, not authorization to run a new bank,
 fit a model, alter this completed snapshot or replace a ranked default.
 
+## Prepared matched-upgrade follow-up
+
+The distinct, inactive `premium-one-point-upgrades-v1` helper in
+`src/simulation/premium_upgrade_neighborhood.ts` starts from the actual authoritative bot's purchases.
+It enumerates every legal one-point transfer between Armor, Might, Sniper, Movement and Empower,
+retaining the complete doctrine budget and exactly the same Placement level. An outcome-independent
+selection stream samples three distinct neighbors without replacement. The four recorded arms are the
+incumbent and those three neighbors; every arm is played, rather than treating an unplayed alternative
+as if its outcome were known. Inclusion probability is `3 / neighborhoodSize`, **not** the probability
+that a serving policy would choose the action.
+
+The proposed collection is **252 new ranked families × four arms × two physical seats × two matched
+futures = 4,032 fights**. Use 180 training and 72 validation families, allocated before any outcome.
+Balance maps and pick order within each split. Sample both doctrines independently and uniformly, and
+report actual assignments and all nine matchups. There is no strength confirmation bank or fit in this
+collection proposal. A later model needs a separate frozen recipe, admission and fresh comparison.
+
+Each family must retain the current draft, artifacts, opponent behavior, funded support splits and
+incumbent free formation. The changed budget is applied through the native public Setup purchase path,
+then the exact incumbent geometry is restored legally. Any changed body quantities, illegal placements,
+unfunded purchase or changed opponent setup is an admission failure, not a case to replace or drop.
+Fixing geometry makes the incumbent the matched free comparator as well as the current control for these
+labels. This does not qualify a later policy that changes formations, Placement spending or splits.
+
+`premium_matched_upgrade_snapshot.ts` prepares the separate SQLite contract. It requires all 16 outcomes
+per registered family, exact arm/seat/future identity, matching source/runtime/profile hashes, a global
+pre-outcome lock, full-A19 and native-application receipts, and matching geometry/body/opponent hashes.
+Its `training_comparison` view contains only training-family candidate-minus-incumbent labels for the same
+seat and future. Validation remains outside that view. The artifact is explicitly development data and
+cannot open as a normal Premium evidence snapshot or replace production SQLite. Partial and duplicate
+banks fail; existing files are never overwritten.
+
+The helper and artifact tests are exhaustive over all 783 funded plans and use synthetic outcomes for
+SQLite checks. They are **not** a completed native serving audit. Before launch, a separately recorded
+admission must verify current server purchase/formation/barrel/spellbook application, exact zero-intervention
+controls, complete local/remote replays, dependency identity, excluded historical/peer seed channels,
+pre-outcome lock chronology and the source of every raw-fight hash. The SQLite validator verifies the
+declared receipts; it cannot establish the truth of a receipt without that independent raw/native audit.
+
+This follow-up remains preparation until a new compute window is authorized. The previous collection,
+its held-out families, source capsules and production snapshot remain immutable. No follow-up simulation,
+learner, automatic confirmation, promotion or deployment is started by these modules.
+
 These are **logged policy outcomes**, not paired counterfactual outcomes. Positive action probability
 permits a separately specified off-policy analysis, but does not make arbitrary probability-weighted estimates
 reliable: inspect overlap, effective sample size, family dependence and downstream policy changes. The full
