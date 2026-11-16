@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .cache/
+/tmp/
 *.tgz
 lerna-debug.log
 .DS_Store
