@@ -162,3 +162,13 @@ The canonical Bun verifier independently reconstructed the allocation against 23
 excluded channels from 162 ledgers. Accepted execution-channel assignments are disjoint; the larger
 conservative scanned reservation includes rejected overlaps and must remain excluded in future work.
 No policy qualification or confirmation bank was allocated.
+
+## Subsequent post-movement coverage study
+
+The separate [post-movement response study](peasant_postmove_research.md) reuses these 108 opened
+families against a frozen baseline that includes the user-adopted melee-barrel correction. Its 1,359
+verified executions added 51 comparisons but changed no decision or outcome. A separate 112-execution
+forced-action audit found one improvement and two regressions; all three earned the same armor bonus
+under both choices. The missed win changed the attack square against the same Squire, not the bonus.
+The new helper remains inactive, its fixed gates failed, and no fresh channels or default were changed.
+Preserve both studies and the full scanned reservation above.
