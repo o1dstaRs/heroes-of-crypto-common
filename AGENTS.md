@@ -564,3 +564,13 @@ Exclude `docs/evidence/ranked_geometry_aligned_20261116.json`, including all sca
 channels and unopened confirmation. Independent score/input/trace/health/model checks passed, but no
 serving/default or Premium change was made. The original confirmed search policy is a different policy;
 its win does not validate this failed approximation. Further work needs a new registration and fresh banks.
+
+The separate `ranked-geometry-real-outcomes-20261116` continuation is registered, not a strength win.
+Read `docs/ranked_geometry_real_outcomes_research.md`. It trains three frozen public-input geometry
+models on 1,080 new actual-ranked-outcome families, then uses separate 216/648/648 development,
+qualification and confirmation banks. Preserve registration
+`60d306e95690ca89db6e57e799128afd9a8fcb61cc98af5592f056fde10426c8`, its pre-battle timing correction,
+and all scanned reservations. The hard cutoff is 2026-11-16 17:34:15 UTC, four local CPU actors,
+no GPU or automatic restart/extension. It is distinct from the closed failed aligned pilot and the
+peer's aligned12h hypothetical-label campaign. No model is a default until all strength and serving
+gates pass. Inspect the capsule's pipeline/terminal receipts before reporting status or starting work.
