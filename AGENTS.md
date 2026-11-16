@@ -500,7 +500,23 @@ The distinct `backline-approach-move-20261115` combat continuation is registered
 The read-only audit found omitted approach moves, while its complete off/observer traces matched.
 The candidate compares at most one legal pure move toward visible remaining shooter/damage-spell output,
 retains all native role filters and reserves an ordinary A19 slot without forcing movement. It changes no
-draft, upgrades, placement or default. Admission passed; 216 fresh development families are running.
-Preserve the fixed gates, source seal, materialized package identity, and earlier closed experiments.
-Do not enable the inert helper or treat admission coverage as strength. The peer geometry confirmation
-remains separate; neither job authorizes interrupting the other.
+draft, upgrades, placement or default. All 216 fresh development families / 1,728 battles completed:
+primary gain +0.154321 pp (whole-family 95% −1.388889 to +1.620370), with negative seven-point and
+damage-caster means. The candidate failed its fixed gates and remains inactive. All inputs, scores,
+source seals and seed channels were independently checked; no confirmation opened. Preserve the closed
+helper and evidence. Do not rescue the five-point/Lava slices, replace score with approach distance, or
+retune this candidate on its opened bank. The peer geometry confirmation remains separate and untouched.
+
+The user explicitly requested a distinct loss-focused follow-up to the uncertain +0.154321 pp result.
+Read `docs/backline_approach_preservation_research.md`. Registration
+`4c4a4919cd0ee03df7b9eaaec3aa0cbdff64ea6e24d17995e9ca90b7567f1b3e` fixes two new inactive candidates:
+retain every ordinary A19 alternative before appending the approach move, with a second arm also
+requiring the existing 0.01 value margin. All 18 old regressions and 17 improvements were audited;
+140 repaired admission fights and 12 cold replays passed. All 216 fresh families / 3,456 battles completed
+and independently verified. Preserve gained +0.462963 pp versus current (adjusted 95% −0.925926 to
++1.929012), but tied original v1 and lost 1.388889 pp against casters. Margin gained +0.231481 pp versus
+current, lost 0.231481 pp versus v1 and had negative seven-point/caster means. Neither candidate passed;
+no confirmation opened and no default changed. Reserve all 219 scanned preimages in the documented
+namespace, including rejected scans; the capsule also has `reserved-scanned-channels.json`. Do not
+activate a favorable shooter slice, retune either policy on this opened bank, or reopen the failed v1
+candidate. The peer geometry study is independent.
