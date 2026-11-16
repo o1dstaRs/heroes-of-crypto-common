@@ -214,8 +214,23 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        // Magic Dragon's new coverage flag is research-only; the default catalog remains unchanged.
-        sha256: "5caf20d9decdb0c937bd05bd03d61b1f270903d6c8e8995fb767049f0cad8f06" as const,
+        // Candidate rays share the player cursor's selectable-edge gate; Through Shot retains free aim.
+        sha256: "896f58905e7c12b52923e602970dd4701fd763faa94fc3337973443bbf62916e" as const,
+    }),
+    Object.freeze({
+        role: "ranged-target-selection" as const,
+        source: "src/ai/versions/v0_2.ts" as const,
+        sha256: "7a1cfcecc02a803d2a5d7c4dd0dd41a76b98894b1be62d9fdf88644150849a4d" as const,
+    }),
+    Object.freeze({
+        role: "ranged-action-validation" as const,
+        source: "src/ai/versions/v0_4.ts" as const,
+        sha256: "ce69329aa0d3248847376d10c104adde09014917bc769609f96eb96e385d01ef" as const,
+    }),
+    Object.freeze({
+        role: "player-ranged-aim" as const,
+        source: "src/grid/grid_math.ts" as const,
+        sha256: "c2032e7689700e930e90f890bd9e8dc1cb3835945dbcb9817470ac455a2947c9" as const,
     }),
     Object.freeze({
         role: "summon-placement" as const,

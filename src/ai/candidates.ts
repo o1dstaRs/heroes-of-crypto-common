@@ -30,6 +30,7 @@ import {
     isCellWithinGrid,
     isPositionWithinGrid,
     isRangeAttackSideObservable,
+    isRangeAttackSideSelectable,
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../grid/grid_math";
@@ -678,6 +679,23 @@ function prepareStationaryRangeAttackSearch(
         for (const aimCell of aimTarget.getCells()) {
             for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
                 if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot, isAOE)) continue;
+                if (
+                    !isThroughShot &&
+                    !isRangeAttackSideSelectable(
+                        matrix,
+                        gridSettings,
+                        aimCell,
+                        aimSide,
+                        shooterPosition,
+                        aimTarget.getPosition(),
+                        shooter.isSmallSize(),
+                        aimTarget.isSmallSize(),
+                        shooterTeam,
+                        isThroughShot,
+                        isAOE,
+                    )
+                )
+                    continue;
                 const toPosition = getRangeAttackSideCenter(gridSettings, aimCell, aimSide, shooterPosition);
                 probes.push({
                     aimTargetId,
@@ -831,6 +849,23 @@ export function findBestLegalStationaryRangeAttack(
         for (const aimCell of aimTarget.getCells()) {
             for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
                 if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot, isAOE)) continue;
+                if (
+                    !isThroughShot &&
+                    !isRangeAttackSideSelectable(
+                        matrix,
+                        gridSettings,
+                        aimCell,
+                        aimSide,
+                        shooterPosition,
+                        aimTarget.getPosition(),
+                        shooter.isSmallSize(),
+                        aimTarget.isSmallSize(),
+                        shooterTeam,
+                        isThroughShot,
+                        isAOE,
+                    )
+                )
+                    continue;
                 const to = getRangeAttackSideCenter(gridSettings, aimCell, aimSide, shooterPosition);
                 const evaluation = attackHandler.evaluateRangeAttack(
                     allUnits,
@@ -2257,6 +2292,23 @@ class CandidateGenerator {
         if (!targetCells) return;
         const origin = getPositionForCells(this.context.grid.getSettings(), targetCells);
         if (!origin) return;
+        if (
+            !isThroughShot &&
+            !isRangeAttackSideSelectable(
+                this.context.matrix,
+                this.context.grid.getSettings(),
+                shot.aimCell,
+                shot.aimSide as RangeAttackCellSide,
+                origin,
+                aimTarget.getPosition(),
+                this.unit.isSmallSize(),
+                aimTarget.isSmallSize(),
+                this.unit.getTeam(),
+                isThroughShot,
+                isLargeCaliber,
+            )
+        )
+            return;
         // handleRangeAttack re-checks canLandRangeAttack after the move has updated the actor's position. Mirror
         // that check at the hypothetical destination: current-cell eligibility is insufficient when the move
         // lands inside an enemy melee-aggression cell.
@@ -2441,7 +2493,23 @@ class CandidateGenerator {
             }
             for (const cell of enemy.getCells()) {
                 for (const side of RANGE_ATTACK_CELL_SIDES) {
-                    if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot, isAOE)) {
+                    if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot, isAOE)) continue;
+                    if (
+                        !isThroughShot &&
+                        !isRangeAttackSideSelectable(
+                            matrix,
+                            gs,
+                            cell,
+                            side,
+                            from,
+                            enemy.getPosition(),
+                            this.unit.isSmallSize(),
+                            enemy.isSmallSize(),
+                            fromTeam,
+                            isThroughShot,
+                            isAOE,
+                        )
+                    ) {
                         continue;
                     }
                     const to = getRangeAttackSideCenter(gs, cell, side, from);
@@ -2716,6 +2784,23 @@ class CandidateGenerator {
                         for (const side of RANGE_ATTACK_CELL_SIDES) {
                             if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot, isAOE))
                                 continue;
+                            if (
+                                !isThroughShot &&
+                                !isRangeAttackSideSelectable(
+                                    matrix,
+                                    gs,
+                                    cell,
+                                    side,
+                                    origin,
+                                    enemy.getPosition(),
+                                    this.unit.isSmallSize(),
+                                    enemy.isSmallSize(),
+                                    fromTeam,
+                                    isThroughShot,
+                                    isAOE,
+                                )
+                            )
+                                continue;
                             const to = getRangeAttackSideCenter(gs, cell, side, origin);
                             const evaluation = attackHandler.evaluateRangeAttack(
                                 allUnits,
@@ -2792,6 +2877,25 @@ class CandidateGenerator {
                 if (!shot.aimCell || shot.aimSide === undefined) {
                     continue; // a free line has no edge to re-aim from a new origin
                 }
+                const aimTarget = allUnits.get(shot.aimTargetId);
+                if (
+                    !aimTarget ||
+                    (!isThroughShot &&
+                        !isRangeAttackSideSelectable(
+                            matrix,
+                            gs,
+                            shot.aimCell,
+                            shot.aimSide,
+                            origin,
+                            aimTarget.getPosition(),
+                            this.unit.isSmallSize(),
+                            aimTarget.isSmallSize(),
+                            fromTeam,
+                            isThroughShot,
+                            isAOE,
+                        ))
+                )
+                    continue;
                 const to = getRangeAttackSideCenter(gs, shot.aimCell, shot.aimSide, origin);
                 const evaluation = attackHandler.evaluateRangeAttack(
                     allUnits,

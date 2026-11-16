@@ -16,6 +16,8 @@ import {
     getPositionForCell,
     getRangeAttackSideCenter,
     isRangeAttackSideObservable,
+    isRangeAttackSideSelectable,
+    resolveRangeAttackAimEdge,
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../../grid/grid_math";
@@ -212,6 +214,38 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const fromTeam = unit.getTeam();
         const through = unit.hasAbilityActive("Through Shot");
         const isAOE = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
+        // Current AI must offer an edge available to the player, rather than a clear rear-facing
+        // ray which only a fabricated action can select. Through Shot can freely aim anywhere.
+        if (this.requireResolvedPrimaryRangeTarget() && !through) {
+            const edge = resolveRangeAttackAimEdge(
+                matrix,
+                gs,
+                target.getCells(),
+                from,
+                fromTeam,
+                through,
+                action.aimCell,
+                action.aimSide,
+                isAOE,
+            );
+            if (
+                !edge ||
+                !isRangeAttackSideSelectable(
+                    matrix,
+                    gs,
+                    edge.cell,
+                    edge.side,
+                    from,
+                    target.getPosition(),
+                    unit.isSmallSize(),
+                    target.isSmallSize(),
+                    fromTeam,
+                    through,
+                    isAOE,
+                )
+            )
+                return false;
+        }
         // Replicate resolveRangeTargetPosition EXACTLY so our verdict matches the engine's handler.
         const closestCell = (cells: XY[]): XY | undefined => {
             let best: XY | undefined;

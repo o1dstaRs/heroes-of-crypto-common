@@ -19,6 +19,7 @@ import {
     getRandomGridCellAroundPosition,
     getRangeAttackSideCenter,
     isRangeAttackSideObservable,
+    isRangeAttackSideSelectable,
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
     getCellsAroundFootprint,
@@ -649,6 +650,26 @@ export class StrategyV0_2 extends StrategyV0_1 {
                     if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot, isAOE)) {
                         continue;
                     }
+                    // v0.8's correctness seam shares the human cursor's facing gate. A rear edge can
+                    // avoid a screening unit even though no player can select that trajectory.
+                    if (
+                        this.requireResolvedPrimaryRangeTarget() &&
+                        !isThroughShot &&
+                        !isRangeAttackSideSelectable(
+                            matrix,
+                            gridSettings,
+                            cell,
+                            side,
+                            from,
+                            enemy.getPosition(),
+                            unit.isSmallSize(),
+                            enemy.isSmallSize(),
+                            fromTeam,
+                            isThroughShot,
+                            isAOE,
+                        )
+                    )
+                        continue;
                     const to = getRangeAttackSideCenter(gridSettings, cell, side, from);
                     const evaluation = attackHandler.evaluateRangeAttack(
                         allUnits,

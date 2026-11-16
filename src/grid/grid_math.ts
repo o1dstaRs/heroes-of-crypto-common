@@ -1254,6 +1254,61 @@ export function getClosestSideCenterDetailed(
     };
 }
 
+/**
+ * Whether the player's ranged cursor can select this exact edge. An empty neighbour alone does not
+ * make an edge aimable: the side must also face the shooter. AI rays through a rear-facing edge can
+ * otherwise slip around cover along a trajectory the player cannot reproduce.
+ *
+ * Probe just inside the edge and reuse the cursor's existing geometry, including large footprints,
+ * neighbour occlusion and the deterministic two-side limit. Full ray interception still belongs to
+ * AttackHandler.evaluateRangeAttack.
+ */
+export function isRangeAttackSideSelectable(
+    gridMatrix: number[][],
+    gridSettings: GridSettings,
+    cell: XY,
+    side: RangeAttackCellSide,
+    attackerPosition: XY,
+    targetPosition: XY,
+    attackerIsSmall: boolean,
+    targetIsSmall: boolean,
+    attackerTeam: TeamType,
+    throughShot = false,
+    ignoresStructures = false,
+): boolean {
+    const probe = getPositionForCell(cell, gridSettings.getMinX(), gridSettings.getStep(), gridSettings.getHalfStep());
+    const distance = Math.max(0, gridSettings.getHalfStep() - 1);
+    switch (side) {
+        case RangeAttackCellSide.LEFT:
+            probe.x -= distance;
+            break;
+        case RangeAttackCellSide.RIGHT:
+            probe.x += distance;
+            break;
+        case RangeAttackCellSide.DOWN:
+            probe.y -= distance;
+            break;
+        case RangeAttackCellSide.UP:
+            probe.y += distance;
+            break;
+        default:
+            return false;
+    }
+    const resolved = getClosestSideCenterDetailed(
+        gridMatrix,
+        gridSettings,
+        probe,
+        attackerPosition,
+        targetPosition,
+        attackerIsSmall,
+        targetIsSmall,
+        attackerTeam,
+        throughShot,
+        ignoresStructures,
+    );
+    return resolved?.cell.x === cell.x && resolved.cell.y === cell.y && resolved.side === side;
+}
+
 export function getClosestSideCenter(
     gridMatrix: number[][],
     gridSettings: GridSettings,
