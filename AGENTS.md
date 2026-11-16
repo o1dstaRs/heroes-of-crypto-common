@@ -545,3 +545,22 @@ a new win-rate gain. Native future-turn modeling and actual searched continuatio
 does not isolate that difference from chance or later interventions. Do not rescue the closed searched-
 reply candidate or tune from these selected roots. Future continuation work needs separate registration,
 outcome-independent samples, legal public inputs, representative strength evidence and serving timing.
+
+## Closed action-aligned geometry approximation
+
+The original geometry planner's confirmed +2.083333-point checkpoint remains locked and unchanged.
+The explicitly authorized `ranked-geometry-aligned-20261116` continuation completed all 1,824 missing
+historical training battles and independently verified 15,552 exact current-spending labels. Read
+`docs/ranked_geometry_aligned_research.md`. Three fixed fast recipes were fitted; ridge 100 won the
+54-family development selection at +1.388889 points, then **lost 1.195988 points** on 324 fresh current-
+source qualification families (95% −2.353395 to −0.115741), with negative means for all three doctrines.
+It failed; the 648-family confirmation bank stayed closed. Do not adopt it, substitute ridge 10 after
+qualification, rescue a favorable slice, or retune this closed candidate on the opened bank.
+
+Registration is `89250a8a697feb0f117a90a4b535606fd418578b6204402bcb82fabb0ad00838`; selected model
+SHA is `889f3d9a66cf00f058f99a63da25d06c5b770600d9e2d5f27cbdc5c93b52b2d9`. Preserve the corrected
+dataset and all outcomes in the client capsule `game/core/tmp/ranked-geometry-aligned-20261116`.
+Exclude `docs/evidence/ranked_geometry_aligned_20261116.json`, including all scanned raw/permuted
+channels and unopened confirmation. Independent score/input/trace/health/model checks passed, but no
+serving/default or Premium change was made. The original confirmed search policy is a different policy;
+its win does not validate this failed approximation. Further work needs a new registration and fresh banks.
