@@ -520,3 +520,10 @@ no confirmation opened and no default changed. Reserve all 219 scanned preimages
 namespace, including rejected scans; the capsule also has `reserved-scanned-channels.json`. Do not
 activate a favorable shooter slice, retune either policy on this opened bank, or reopen the failed v1
 candidate. The peer geometry study is independent.
+
+The subsequent lock-in review preserves the backliner-preservation helper, tests and complete result as
+an inactive versioned research checkpoint. Its helper SHA is
+`27bf8168f64bf268f22a5014af1ae784f23534ee116dd6c1bfedcf97e18dabf8`; the research document pins its tests too.
+Keep those bytes and the failed gates intact. This preserves reusable work for other agents without
+adopting a stronger default, strict-margin rule or favorable shooter-only exception. New variants need
+separate identities and fresh evidence; physical shooters and damage casters remain distinct hypotheses.
