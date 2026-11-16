@@ -126,4 +126,11 @@ passing.
 Further research must distinguish immediate value representation, final neural tie selection, movement
 needed to reach a weak responder, and the cost of delaying a more urgent attack. A new candidate needs
 its own identity, legal public inputs and representative fresh evidence; this closed shortlist proposal
-must not be relabeled as a win. The separately running actual-outcome geometry study is untouched.
+must not be relabeled as a win. The separate actual-outcome geometry study is untouched.
+
+The distinct [exchange-angles audit](peasant_exchange_angles_research.md) subsequently completed 1,200
+verified executions across a fresh 108-family sample and 30 fixed continuation roots. It includes moving
+attacks, small late-game stacks and separate armor/movement ablations. Forcing the nominated attacks
+changed no final result versus native play; removing earned armor worsened two continuations. This
+preserves the value of the mechanic without establishing a stronger policy or reopening this candidate.
+Its compact evidence reserves every scanned fresh channel for future agents.
