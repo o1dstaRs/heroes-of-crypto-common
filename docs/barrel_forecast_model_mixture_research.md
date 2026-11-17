@@ -95,3 +95,38 @@ The separate integer Python/Bun finalizers are sealed before aggregate inspectio
 and no timing-driven search fallback. Concurrent progress/cost monitoring does not qualify serving
 cost or select a policy. Only the completed whole-family strength gate can open separately registered
 serial timing and fresh confirmation. No default or production deployment changed in this experiment.
+
+## Passed independent strength qualification
+
+The complete fresh qualification passed on November 17, 2026 at 20:28 UTC. See the
+[versioned result](evidence/barrel_forecast_model_mixture_qualification_results_20261117.json).
+Across **756 independent families / 12,096 full fights**, the mixture scored **58.531746%** versus
+57.043651% stock: **+1.488095 match-score points**, whole-family 95% **+0.281085 to +2.711640**.
+The primary contrast uses 3,024 matched cases; the other arms are descriptive controls.
+
+Every registered strength, confidence, map, own-doctrine, opponent-style and coverage gate passed.
+All map means were positive: Normal +0.396825 points, Lava +1.339286, Blocked +2.728175. All four
+opponent-style means were positive. The see-none own-doctrine mean was −0.099206 points, within the
+registered −1-point limit. These are observed slice means, not independently established subgroup
+noninferiority. There were 208 improved outcomes, 166 worsened and 2,650 unchanged; this is a net gain,
+not a claim that every previously won game is preserved. Full traces changed in 1,563 cases/672 families.
+
+All 12,096 inputs and source/reference identities verified. There were zero authoritative rejections,
+model errors, missing native starts or timing-driven fallbacks. All **288 fixed fresh cold executions**
+reproduced original inputs, full traces, outcomes, actual action lists and logical forecast witnesses on
+both ARM64 and Puffalo x64. Independent Python/Bun integer reconstruction and all 20,000 whole-family
+resamples agree exactly. Fresh aggregate scores stayed unopened until both shards and cold controls
+completed. No phase was retried, extended or reassigned; the candidate and gates stayed fixed.
+
+Qualification is conditional on naturally barrel-containing legal drafts, using the adopted v10
+comparator and real public, paid native Setup. It is not a global ranked win-rate estimate. The mixture's
++0.876323-point contrast with naive v1 has an interval crossing zero and remains descriptive; neither
+that arm nor the accepted neural reference becomes an alternate finalist.
+
+The candidate remains **inactive**. Serial full-fight/complete-decision cost within +10%, bounded-path
+checks and at least 756 fresh independent confirmation families are still required. The live adapter
+must supply the **effective** rollout budget to the frozen helper: timing-degraded R1 must stay native,
+just like R4 and non-full probes. The offline qualification cannot trigger adaptive degradation and
+used uniform full R2. Measuring only the inner search return would omit the outer neural/support work;
+use the complete-decision observer. No serving profile, model, wire version or production deployment
+changed as a result of qualification.

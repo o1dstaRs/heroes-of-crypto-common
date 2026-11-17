@@ -866,3 +866,15 @@ All 48 local/Puffalo functional cold runs match exactly. Fixed fresh cold cases 
 arms, including accepted reference, on both hosts after collection. Keep finalizers blind until both
 shards complete; independently verify integer outcomes/bootstrap and zero timing fallbacks. No result
 from reused admission or partial fresh data qualifies a new default or removes serial-cost/confirmation.
+
+The mixture passed its complete independent v10 strength qualification: **+1.488095 score points**,
+whole-family 95% **+0.281085 to +2.711640**, on 756 families / 12,096 fights. All registered strength,
+confidence, map, own-doctrine, opponent-style and coverage gates passed; all 288 fixed fresh cold
+executions and independent integer/bootstrap verification match. Preserve
+`docs/evidence/barrel_forecast_model_mixture_qualification_results_20261117.json`, including every
+family delta and all 166 worsened outcomes. This is a conditional net gain, not universal no-regression.
+The candidate remains inactive: quiet serial complete-decision/full-fight +10% cost and at least 756
+fresh independent confirmation families are still pending. A live adapter must pass the ACTUAL
+effective rollout count; timing-degraded R1 stays native. Offline qualification used uniform full R2
+and could not degrade. Preserve all failed helpers, original gates and the adopted default; no
+promotion/deployment follows from qualification alone.
