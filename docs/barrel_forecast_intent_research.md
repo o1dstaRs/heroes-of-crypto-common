@@ -119,3 +119,13 @@ win probabilities.
 Further useful-clear diagnostics preserve this failed policy and all its results. Any constrained
 revision needs a distinct identity, unchanged original evidence, fresh channels and comparison against
 the subsequently adopted v10 default. No map, unit-name or favorable outcome subset is promoted.
+
+A subsequent read-only ray audit replayed all 142 changed-outcome pairs again. Its 284 full traces and
+all first-root returned banks/choices matched the original JSON observations exactly. Of 3,247
+suppressed future clears at those roots, 982 intercepted an available friendly shot: 483 among
+regressions and 499 among gains. This motivates preserving mechanically useful clears, but does not
+make the tag a predictor of outcome. The Cyclops example had no such friendly blocker at its first
+changed root; this single guard cannot explain all regressions or certify a universal fix.
+The first diagnostic assertion mishandled optional `undefined` spell fields omitted by the original
+JSON. That stopped run is preserved; a separate execution corrected serialization only, without a
+numeric tolerance or policy change. See the result fixture for both identities and raw hashes.

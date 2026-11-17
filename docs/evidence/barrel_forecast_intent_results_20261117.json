@@ -466,5 +466,80 @@
         "serialTimingQualified": false,
         "retuneOrReopenOldBank": false,
         "futurePolicy": "A separate mechanistic revision requires new source identity and fresh games against the subsequently adopted v10 baseline. Favorable maps or action classes cannot rescue this closed candidate."
+    },
+    "readOnlyUsefulClearMechanismAudit": {
+        "id": "barrel-forecast-v1-useful-clear-observation-audit-json-v2",
+        "complete": true,
+        "status": {
+            "complete": true,
+            "completedCases": 142,
+            "expectedCases": 142,
+            "fights": 284,
+            "elapsedSeconds": 240.19
+        },
+        "registrationSha256": "2336a9e49bde6c859850b1526cb9a0c8d827ce0a8d5166c6c924760a0a720b82",
+        "allCases": 142,
+        "allOriginalInputsFullTracesAndScoresExact": true,
+        "allFirstRootReturnedBanksAndChoicesExactUnderEmittedJsonContract": true,
+        "futureOverrideClassifications": [
+            {
+                "direction": "gain",
+                "blocksAvailableFriendlyShot": false,
+                "blocksAvailableEnemyShot": false,
+                "count": 779
+            },
+            {
+                "direction": "gain",
+                "blocksAvailableFriendlyShot": false,
+                "blocksAvailableEnemyShot": true,
+                "count": 403
+            },
+            {
+                "direction": "gain",
+                "blocksAvailableFriendlyShot": true,
+                "blocksAvailableEnemyShot": false,
+                "count": 139
+            },
+            {
+                "direction": "gain",
+                "blocksAvailableFriendlyShot": true,
+                "blocksAvailableEnemyShot": true,
+                "count": 360
+            },
+            {
+                "direction": "regression",
+                "blocksAvailableFriendlyShot": false,
+                "blocksAvailableEnemyShot": false,
+                "count": 839
+            },
+            {
+                "direction": "regression",
+                "blocksAvailableFriendlyShot": false,
+                "blocksAvailableEnemyShot": true,
+                "count": 244
+            },
+            {
+                "direction": "regression",
+                "blocksAvailableFriendlyShot": true,
+                "blocksAvailableEnemyShot": false,
+                "count": 188
+            },
+            {
+                "direction": "regression",
+                "blocksAvailableFriendlyShot": true,
+                "blocksAvailableEnemyShot": true,
+                "count": 295
+            }
+        ],
+        "limits": "Engine-real ray interception is a mechanical observation, not an isolated cause, calibrated value, route diagnostic or fresh strength result. Both gain and regression roots contain it. Cyclops14/2 had zero such friendly blockers, so a friendly-shot guard alone cannot restore its first decision.",
+        "earlierDiagnosticError": "First read-only audit stopped after comparison rejected optional undefined spell fields absent from original JSON. Preserve it unchanged. The separate corrected execution uses exact original JSON serialization, with no numeric tolerance or policy change.",
+        "rawSha256": {
+            "mechanism-audit-json-v2/worker-0.jsonl": "9e1ee888104e0cccb43af36ea9310e5a165743e5bbe04445c232e14cc2c20998",
+            "mechanism-audit-json-v2/worker-1.jsonl": "94f25e9ee8d5f3a1b88fba58307ecdbe9d4c76622d049ea0dbf230bd9e3f449a",
+            "mechanism-audit-json-v2/worker-2.jsonl": "30f23f5ec0bcfadcd35962649c007737701193469c5063f8f94677c0c2d6166a",
+            "mechanism-audit-json-v2/worker-3.jsonl": "803d629c9792023daabc8c9bc86b00ddc977547e0985295ce51f79f08c99be1e",
+            "mechanism-audit-json-v2/worker-4.jsonl": "f644447080c0d02cb594e96650dd70d55dab4a152be42f69ac0bb411d42941a5",
+            "mechanism-audit-json-v2/worker-5.jsonl": "a9faa63a3451518cfda9592e94bee4dc57ac90fd994a3033f076dcb66a2179e0"
+        }
     }
 }

@@ -1,0 +1,33 @@
+{
+    "id": "barrel-forecast-friendly-shot-clear-v1",
+    "statusAtRegistration": "offline-regression-and-functional-admission",
+    "candidateSourceSha256": "5f031ae76411f1d3ab21391d81abf061d0decd8a4786e431de0fbd5b632de580",
+    "originalIntentSourceSha256": "43059e83b2e8c9c0a21596f9abc85ca3097b1fc45d2bbf5f121f4421d69ed2aa",
+    "sourceCommonV10": "4406754e01b0369db978a0d4e233b9de04f67811",
+    "sourceServer": "ae63b150413c04aa934e72792c6b8d3d15921306",
+    "regressionAdmission": {
+        "id": "barrel-forecast-friendly-shot-clear-v1-regression-admission-ready",
+        "at": "2026-11-17T17:25:57.818626+00:00",
+        "policy": "Exact independent helper preserving native forecast clear iff actual engine ray identifies an available friendly shot intercepted by that barrel; otherwise the unchanged original native-intent eligibility. Both future armies/owners, entrant forecast only. No map/unit-name/outcome trigger.",
+        "candidateSourceSha256": "5f031ae76411f1d3ab21391d81abf061d0decd8a4786e431de0fbd5b632de580",
+        "comparator": "Original frozen v9 sources and all 864 previously consumed cases; a new v10 fresh study is required for qualification.",
+        "cases": 864,
+        "guardExecutions": 864,
+        "oldControls": 284,
+        "totalExecutions": 1148,
+        "controls": "All 68 worsened and 74 improved outcomes rerun both original arms; exact input/full trace/score required. All candidate inputs exact against original. New helper not installed in shared runtime.",
+        "purpose": "Fixed-rule regression diagnosis on every old case, including unchanged outcomes. These are reused cases, not new independent strength evidence. Do not tune or promote from a favorable subset.",
+        "admission": "All controls and actions valid; mechanically retain at least one shot-opening clear; require fewer regressed outcomes versus stock and higher total score than original v1 across all 864 cases before spending on fresh strength. These diagnosis gates do not establish general improvement.",
+        "nextStudy": "Separate frozen v10 screen on fresh channels versus stock v10, failed naive v1 for attribution and accepted neural reference. Original failure and gates stay closed.",
+        "executionCorrection": "Original admission executed zero games: draft-parity.ts dependency omitted from copied packet. Restore its exact original bytes; no policy, existing source, jobs, channels, fixed gates or deadline changes. Preserve failed execution.",
+        "preflight": "All actor imports and package/relative common RNG and FightStateManager identity assertions now pass. Each capsule owns its node_modules alias directory, with @heroesofcrypto/common -> ../../sources/common; third-party versions unchanged. Earlier shared node_modules symlink incorrectly selected old common; preflight rejected it before any game. Fixed policy, controls, jobs and original absolute deadline unchanged."
+    },
+    "regressionRegistrationSha256": "ebd350745e6ab80cf126cd92188e67664b253ef408d6e8ba9b5a9c38fb8c01f3",
+    "functionalRegistrationSha256": "9e857d077453a452cdd3ff49b576646294b288dc507823253dabb699039414a6",
+    "fixedPolicy": "Retain native cleanup in an otherwise eligible future melee barrel override iff the actual engine ray reports it intercepts an available friendly shot. Otherwise the exact original intent helper applies. Both owners/armies, entrant forecasts only. No map, unit-name, style, outcome or tuned threshold filter.",
+    "controlledInputPopulation": "All 864 previously consumed v9 pairs, including outcome-unchanged cases; original stock/naive arms rerun exactly for all 142 changed outcomes. Diagnostic data only. V10 functional cases use unchanged public native Setup with 12 no-barrel controls.",
+    "qualification": "Unopened and unallocated. Requires separately frozen fresh v10 comparison, uncertainty and all map/doctrine/style safety gates plus at most +10% serial complete-decision/full-fight compute. No default change is authorized by this admission.",
+    "immutablePriorResult": "barrel_forecast_intent_results_20261117.json",
+    "reservedSeedLedger": "barrel_forecast_intent_registration_20261117.json (all raw/permuted scanned channels remain excluded)",
+    "notes": "All original helpers, failures and evidence stay unchanged. Packet/import issues before admission completed zero games; corrected identity preflight passes. Original absolute execution deadline retained."
+}

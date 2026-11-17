@@ -801,3 +801,15 @@ valuations; it does not qualify a root-action filter or prove every useful-clear
 inactive helper, source seals, original gates, all losing cases and the independent integer/bootstrap
 verification. Further constrained forecast work needs a distinct candidate and fresh games against the
 subsequently adopted v10 default. Keep the confirmed barrel deliberation and accepted neural pair intact.
+
+## Registered useful-clear forecast regression repair
+
+`barrel-forecast-friendly-shot-clear-v1` is a separate inactive helper, not a rewrite of closed naive v1.
+Read `docs/barrel_forecast_useful_clear_research.md` and preserve its source/registration. The fixed
+engine-ray guard retains native projected cleanup when its barrel intercepts an available friendly
+shot; all other eligibility and both-army/owner symmetry stay on the original helper. No root, model,
+search-cap, draft or Setup changes occur. All 864 consumed old cases are included in regression admission,
+with exact original controls for all 142 changed outcomes; a separate functional phase uses default v10.
+These reused games are diagnostics, not independent strength. Keep the +10% full-decision/full-fight cost,
+fresh v10 comparisons and full uncertainty/map/doctrine/style gates. Do not promote or tune an outcome-
+selected subset. Original failures and all scanned raw/permuted channels remain closed/excluded.
