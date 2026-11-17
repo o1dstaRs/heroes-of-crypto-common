@@ -1,0 +1,249 @@
+{
+    "schema": "hoc.barrel_forecast_loop_runtime.registration.v2",
+    "id": "barrel-forecast-loop-invariant-context-live-bounds-implementation-v2",
+    "recordedAt": "2026-11-17T22:35:30.917359+00:00",
+    "policySha256": "afcb5b44789a1c0d2e4a5c5f054bebf5d8b58b90f30142e77698da1a3947d50f",
+    "changes": "Hoist unchanged pure sample assignment outside projected-unit loop; stable readonly primitive context flag instead of conditional spread/object allocation. Preserve frozen strategy and all existing exact live-certified bounds. Private defaultfalse activation; no serving source/default change.",
+    "implementationPatches": {
+        "src/ai/a19_barrel_forecast.ts": {
+            "baselineSha256": null,
+            "candidateSha256": "d1ec5b340cc72ea1dbd17e441ea00a9e48ec7ca8fd5cac85b1d39ecdabe628b3",
+            "unifiedPatch": "--- a/src/ai/a19_barrel_forecast.ts\n+++ b/src/ai/a19_barrel_forecast.ts\n@@ -0,0 +1,39 @@\n+/** Direct, allocation-light implementation of the frozen paired future-model policy. */\n+import type { IDecisionContext } from \"./ai_strategy\";\n+import type { GameAction } from \"../engine/actions\";\n+import type { Unit } from \"../units/unit\";\n+import { PBTypes } from \"../generated/protobuf/v1/types\";\n+import { getCellForPosition } from \"../grid/grid_math\";\n+\n+/** Pure loop-invariant assignment, identical to the frozen full-R2 sample selector. */\n+export function usesA19BarrelIntentSample(seedBase:number,sampleIndex:number,rolloutCount:number,horizonMode:string):boolean {\n+    return horizonMode === \"turns\" && rolloutCount === 2 &&\n+        (sampleIndex === 0 || sampleIndex === 1) && Number.isInteger(seedBase) &&\n+        seedBase >= 0 && seedBase <= 0xffffffff && sampleIndex === (seedBase & 1);\n+}\n+\n+export function selectA19BarrelForecast(\n+    unit: Unit,\n+    context: IDecisionContext,\n+    beforeCleanup: GameAction[],\n+    cleanup: GameAction[],\n+): GameAction[] {\n+    if (context.a19BarrelIntentForecast !== true) return cleanup;\n+    if (context.decisionOrigin !== \"rollout\" || unit.getAttackTypeSelection() === PBTypes.AttackVals.RANGE ||\n+        beforeCleanup === cleanup) return cleanup;\n+    let hasIntent = false;\n+    for (const action of beforeCleanup) {\n+        switch (action.type) {\n+            case \"melee_attack\": case \"range_attack\": case \"area_throw_attack\": case \"cast_spell\": case \"obstacle_attack\":\n+                return cleanup;\n+            case \"move_unit\": case \"wait_turn\": case \"defend_turn\":\n+                hasIntent = true;\n+        }\n+    }\n+    if (!hasIntent) return cleanup;\n+    const strike = cleanup.find(action => action.type === \"obstacle_attack\");\n+    if (!strike || strike.attackerId !== unit.getId()) return cleanup;\n+    const cell = getCellForPosition(context.grid.getSettings(), strike.targetPosition);\n+    return context.grid.getArtifactBarrels().some(barrel => barrel.cell.x === cell.x && barrel.cell.y === cell.y)\n+        ? beforeCleanup : cleanup;\n+}\n"
+        },
+        "src/ai/ai_strategy.ts": {
+            "baselineSha256": "a2882379f4f42d17ba1cf5eb0b0633a9c2026074ef81682f27f90117da22c014",
+            "candidateSha256": "74572efa2b242e73a270d7f1ca945fd61ab99ac8ae4e1f3bbcfcde1e91ff3d53",
+            "unifiedPatch": "--- a/src/ai/ai_strategy.ts\n+++ b/src/ai/ai_strategy.ts\n@@ -463,6 +463,8 @@\n      * Research selectors should fail closed when this is absent; ordinary policies ignore it.\n      */\n     decisionOrigin?: \"root\" | \"rollout\";\n+    /** Invariant model assignment for a projected turn; absent on actual roots. */\n+    readonly a19BarrelIntentForecast?: boolean;\n     /** Optional simulation-only policy telemetry. Observers must not mutate strategy or battle state. */\n     policyEventObserver?: (event: IAIPolicyEvent) => void;\n }\n"
+        },
+        "src/ai/versions/v0_8.ts": {
+            "baselineSha256": "516b07f452d1fdd6b43e5ff1d1c6c498d19f7d7038da957d8158b3963c0f8904",
+            "candidateSha256": "20390b30a8af7edf234bf6d2ca96e1d0eb3ade27e09bbe42b2111ee8336446ca",
+            "unifiedPatch": "--- a/src/ai/versions/v0_8.ts\n+++ b/src/ai/versions/v0_8.ts\n@@ -1,3 +1,4 @@\n+import { selectA19BarrelForecast } from \"../a19_barrel_forecast\";\n /*\n  * -----------------------------------------------------------------------------\n  * This file is part of the common code of the Heroes of Crypto.\n@@ -735,7 +736,8 @@\n             this.canHourglass(unit, context),\n         );\n         const wardDecision = repairV08BacklineWardDecision(unit, context, protectedDecision);\n-        return prioritizeV08CemeteryObstacleAttack(unit, context, wardDecision);\n+        const cleanup = prioritizeV08CemeteryObstacleAttack(unit, context, wardDecision);\n+        return selectA19BarrelForecast(unit, context, wardDecision, cleanup);\n     }\n }\n \n"
+        },
+        "src/simulation/search_driver.ts": {
+            "baselineSha256": "6d2cecce705f56e8bc753f73ccddc0b40a96d727c8d76e31cc99f0cb62a21ab6",
+            "candidateSha256": "c30a4c3a3bcba7ca83964ab3963c3400783bc08c7f2af8281b64168f75db7b96",
+            "unifiedPatch": "--- a/src/simulation/search_driver.ts\n+++ b/src/simulation/search_driver.ts\n@@ -1,3 +1,4 @@\n+import { usesA19BarrelIntentSample } from \"../ai/a19_barrel_forecast\";\n /*\n  * -----------------------------------------------------------------------------\n  * This file is part of the common code of the Heroes of Crypto.\n@@ -1477,6 +1478,9 @@\n     private readonly rollouts: number;\n     private readonly complementaryR2: boolean;\n     private readonly chanceHashCache = { hashes: new Map<string, number>() };\n+    /** Inactive implementation experiment; the capsule actor explicitly scopes each actual driver. */\n+    private barrelForecastMixture = false;\n+    private liveCertifiedBounds = false;\n     private readonly certifiedSelectionBounds: boolean;\n     private readonly certifiedTightBounds: boolean;\n     private readonly rolloutAllocation: SearchRolloutAllocation;\n@@ -5313,7 +5317,7 @@\n         if (\n             !this.certifiedSelectionBounds ||\n             version !== \"v0.8\" ||\n-            this.match.offlineDeterministicWork !== true ||\n+            (this.match.offlineDeterministicWork !== true && !this.liveCertifiedBounds) ||\n             (this.captureA19Material && this.a19MaterialArbitration !== \"ties\") ||\n             this.ilPath !== undefined ||\n             this.auditPath !== undefined ||\n@@ -5570,6 +5574,7 @@\n                         deadlineAt,\n                         turnHorizon,\n                         complementaryR2 && rolloutCount <= 2,\n+                        rolloutCount,\n                     );\n                     if (captureMaterial && Number.isFinite(score)) {\n                         let ours = 0,\n@@ -5668,6 +5673,7 @@\n         deadlineAt: number | null = null,\n         turnHorizon = this.horizon,\n         complementaryR2 = false,\n+        actualRolloutCount = this.effectiveRollouts(),\n     ): number {\n         this.assertBeforeDecisionDeadline(deadlineAt);\n         setDeterministicRandomSource(makeRng((seedBase + r * 0x9e3779b1) >>> 0));\n@@ -5675,6 +5681,9 @@\n         this.finishedWinningTeam = null;\n         this.deps.setActiveUnitId(unit.getId());\n         const actingTeam = unit.getTeam();\n+        const a19BarrelIntentForecast = this.barrelForecastMixture && this.rolloutAllocation === \"uniform\" &&\n+            usesA19BarrelIntentSample(seedBase,r,actualRolloutCount,horizonMode) &&\n+            this.deps.strategyForTeam(actingTeam).version === \"v0.8\";\n         this.rolloutEnemyTeam = otherTeam(actingTeam);\n         const startLap = this.deps.fightProperties.getCurrentLap();\n         const isIncumbent = cand.kind === \"incumbent\";\n@@ -5751,7 +5760,7 @@\n                 this.deps.setActiveUnitId(\"\");\n                 continue;\n             }\n-            this.simPlayTurn(au);\n+            this.simPlayTurn(au, a19BarrelIntentForecast);\n             turns += 1;\n             this.counters.rolloutTurnsTotal += 1;\n             if (horizonMode === \"reply\" && au.getTeam() === enemyTeam) {\n@@ -5862,7 +5871,7 @@\n         return adjustment;\n     }\n     // ---- simulated turn plumbing (mirrors lookahead.ts / battle_engine's loop, minus recording) ----\n-    private simPlayTurn(unit: Unit): void {\n+    private simPlayTurn(unit: Unit, a19BarrelIntentForecast = false): void {\n         // SEARCH_OPP_MODEL: the searched side keeps its true self-model; only the enemy is re-modelled.\n         const teamStrategy =\n             this.oppModel && unit.getTeam() === this.rolloutEnemyTeam\n@@ -5895,6 +5904,7 @@\n                       attackHandler: this.deps.attackHandler,\n                       fightProperties: this.deps.fightProperties,\n                       decisionOrigin: \"rollout\",\n+                      a19BarrelIntentForecast,\n                   });\n         } catch {\n             decided = [];\n"
+        }
+    },
+    "unitControls": {
+        "comparisons": 95040,
+        "assertions": 190097,
+        "rngDraws": 0,
+        "passed": true
+    },
+    "originalAdmission": {
+        "sha256": "36ed17b8c51d54947c0f68146ea512589b6b2503ae9bb9cd316f1578839deb18",
+        "interruption": {
+            "at": "2026-11-17T22:29:06.843360+00:00",
+            "state": "interrupted-infrastructure-incomplete-not-a-passed-admission",
+            "originalRegistrationSha256": "36ed17b8c51d54947c0f68146ea512589b6b2503ae9bb9cd316f1578839deb18",
+            "lastWrittenStatus": {
+                "complete": false,
+                "expectedFights": 444,
+                "fights": 318,
+                "errors": [],
+                "registrationSha256": "36ed17b8c51d54947c0f68146ea512589b6b2503ae9bb9cd316f1578839deb18",
+                "controllerPid": 67283,
+                "absoluteDeadlineEpoch": 1794955387.051383,
+                "elapsedSeconds": 205.224,
+                "liveWorkerPids": [67290, 67291, 67292, 67294, 67293, 67295]
+            },
+            "controllerExitCode": 120,
+            "causeEvidence": "Local shell failed to allocate a here-document with ENOSPC; data filesystem was 100% full, 301 MiB later available. All controller/workers are stopped. Controller stderr contains no final exception because disk writes failed. Exit120 is consistent with a Python stream flush failure; exact unlogged exception cannot be recovered.",
+            "validCompleteRows": 319,
+            "missingControls": 125,
+            "allPresentInputsTracesOutcomesExact": true,
+            "allFrozenSourceHashesStillExact": true,
+            "rawDeletedOrRewritten": false,
+            "allOriginalFailuresRetained": true,
+            "next": "Distinct prospectively registered infrastructure recovery: reuse complete validated rows and execute each missing job once; no repeated completed games, code/gate/timing/strength changes."
+        }
+    },
+    "recovery": {
+        "registrationSha256": "ee6b95f3641d195286b0c9edd7c047fcae2a4cf520c1f4b79156c4ea6de0b803",
+        "analysis": {
+            "id": "barrel-forecast-loop-invariant-context-live-bounds-implementation-v2-admission",
+            "at": "2026-11-17T22:31:03.055758+00:00",
+            "passed": true,
+            "executions": 444,
+            "reusedCompletedControls": 319,
+            "newCompletedControls": 125,
+            "originalInterruptedStudyStillIncomplete": true,
+            "allInputFullTraceAndOutcomeControlsExact": true,
+            "zeroAuthoritativeModelAndTimingFailures": true,
+            "coverage": {
+                "unexhausted-live-full-r2": 216,
+                "candidateSampleCalls": 1212578,
+                "forcedFutureCallsWithBarrels": 5864,
+                "forced-r1": 12,
+                "offline-full-r2": 216
+            },
+            "registrationSha256": "36ed17b8c51d54947c0f68146ea512589b6b2503ae9bb9cd316f1578839deb18",
+            "rawSha256": {
+                "baseline-0.jsonl": "799583b9278991b7bce8a21d216ed899df1a4c799910272eba0a411eb2fe998d",
+                "baseline-1.jsonl": "25cc43742994c6ea508965dc12252d23d96604abb5d580110d514e798714eb56",
+                "candidate-0.jsonl": "526d4e88f570391e099cf5bff3b4d62913a7c978a5ad06f21f2a30241e3caa0d",
+                "candidate-1.jsonl": "e8b28a65818f992adef4838c9d07ad51b095d212676bfcac22f5be32e54c2aa1",
+                "candidate-2.jsonl": "bd8673e043ebcc7aa2db93eebf7cdebccb5fda351b57963ec677ec566afc8446",
+                "candidate-3.jsonl": "dab03489163021844a59fb47b69a2d7fa25fbca67cf28c7e024be5d63989f77e",
+                "prior-baseline-0.jsonl": "a91ae15b4382460b7b79e0fddb0d82e2c9df763205dab1c89f31f6c0726b21fa",
+                "prior-baseline-1.jsonl": "ec6574570a3e8ecd6be83062707fa59e68e7c5ac54bcc139fe33473eb0abe1bf",
+                "prior-candidate-0.jsonl": "e1d5a39a6c934de240932438b23f03acbd1796fcd2c535aa9eb69839cfef892a",
+                "prior-candidate-1.jsonl": "e8a559a275e4efd0f05468d9d988db643553d00ecec4bcc41f224502e0d76d1f",
+                "prior-candidate-2.jsonl": "74894249ca454bbd38e6a0e3decbd6517a40ace937af219d814ecb7f48f674f3",
+                "prior-candidate-3.jsonl": "bbfc884ebe08516205c3684821bd7c4a99a59eb90bcb0e1a76268def44f70ed7"
+            },
+            "defaultChanged": false,
+            "independentStrengthOrTimingQualified": false,
+            "scope": "Reused implementation equivalence controls with a controlled unexhausted clock. No strength gain or real latency claim and no waived original cost gate. Only opens distinct fixed real-clock cost registration."
+        },
+        "independentVerification": {
+            "passed": true,
+            "at": "2026-11-17T22:31:38.103Z",
+            "independentAll444InputsFullTracesOutcomesAndContextGuardsExact": true,
+            "analysisSha256": "0dbd02de5855d92d916fc2774d70149b5e3e7e041df886dc970de4dace065ea3"
+        },
+        "originalCutoffUnchanged": true
+    },
+    "newCost": {
+        "registrationSha256": "d673ea7b78485c75edea7055d088120e8e7bab772948eedc9dad3ee942653a39",
+        "protocol": {
+            "id": "barrel-forecast-loop-invariant-context-live-bounds-implementation-v2-cost",
+            "at": "2026-11-17T22:31:38.223113+00:00",
+            "hypothesis": "Genuine behavior-preserving implementation optimization after original cost failure: hoisted pure model assignment and stable primitive context layout, allocation-light frozen selector, plus only existing mathematically certified loser bounds in live mode. No new action, score, budget, model or strategy threshold.",
+            "requiredAdmission": "All444 reused exact input/full-trace/outcome controls and projected-context isolation pass before this opens.",
+            "reference": "Actual frozen v10 native strategy, without the old research forecast callback. Separate frozen module namespaces/processes for baseline and candidate; only one fight executes at a time.",
+            "cases": "Same complete balanced72-case matrix per phase, eighteen per style,24 per map and doctrine. Preserve known12 formerly slow cases as mandatory reported live diagnostics. User-selected prospective cost target is the overall balanced average. No outcome or timing subset selection.",
+            "executions": 464,
+            "warmup": "Sixteen fights per phase: eight per implementation, four per candidate mode. Excluded from timing; every warmup still requires exact original behavior.",
+            "arms": ["stock", "mixture", "both"],
+            "order": "Three arms rotate by ordinal modulo3,24 measured cases in each position. Two long-lived isolated actors, one active at a time, Unix nice19. Actual clocks; no future-policy audit wrappers.",
+            "gates": "Every input/full action+event trace/outcome must match the original fullR2 control. Zero authoritative/model/missing-start/timing-fallback/circuit/degradation failures. For complete offline72 and live72 matrices, MI/stock andboth/stock CPU,wall,complete-decision total andmean aggregate ratios must each be <=1.10. Preserve slow12 live subset ratios separately as descriptive diagnostics, with no prospective subgroup veto, following the explicit user answer Overall average (+10%). Both earlier subgroup gate failures remain failed. No unchanged reruns untilpass, cutoff extension or subset rescue.",
+            "observer": "Complete native+search+outer-neural/support decision start to post-selector observer, integer microseconds. Wholefight CPU andwall share the fight return endpoint; diagnostics and append occur afterward.",
+            "fixedTermination": "Freeze absolute cutoff before either actor starts, at most3600seconds after registration; stop only owned actors onfailure/deadline; no automatic retry or extension.",
+            "costOnly": "All cases reused. No fresh strength or production2-vCPU latency certification and no automatic activation/deploy. Passing only allows independent fresh confirmation of the unchanged qualified policy.",
+            "knownSlowCases": [
+                {
+                    "board": 1,
+                    "game": 1
+                },
+                {
+                    "board": 2,
+                    "game": 2
+                },
+                {
+                    "board": 3,
+                    "game": 3
+                },
+                {
+                    "board": 190,
+                    "game": 2
+                },
+                {
+                    "board": 191,
+                    "game": 3
+                },
+                {
+                    "board": 192,
+                    "game": 0
+                },
+                {
+                    "board": 379,
+                    "game": 3
+                },
+                {
+                    "board": 380,
+                    "game": 0
+                },
+                {
+                    "board": 381,
+                    "game": 1
+                },
+                {
+                    "board": 568,
+                    "game": 0
+                },
+                {
+                    "board": 569,
+                    "game": 1
+                },
+                {
+                    "board": 570,
+                    "game": 2
+                }
+            ]
+        },
+        "startupAmendment": {
+            "at": "2026-11-17T22:32:01.343042+00:00",
+            "state": "pre-first-actor-pre-first-cost-fight-startup-path-correction",
+            "baseRegistrationSha256": "d673ea7b78485c75edea7055d088120e8e7bab772948eedc9dad3ee942653a39",
+            "correctedRunnerSha256": "352fcad50e5d8096b3652f3a0246dd1e21bc3387777921a69ea54daecdc98439",
+            "correctedRunner": "run-average-cost-recovered-controls.py",
+            "onlyChange": "Read the independently passed admission-recovery/analysis.json instead of nonexistent original admission/analysis.json. Original interrupted study remains incomplete.",
+            "preservedStartupErrorSha256": "30f6053da34a8780a60cc397eb719cf9477b3a002f71df350dbbccda927177f6",
+            "costActorsEverStartedBeforeAmendment": false,
+            "costFightsEverStartedBeforeAmendment": 0,
+            "sameSourceJobsGatesAndOriginalCutoff": true,
+            "absoluteDeadlineUtc": "2026-11-17T23:31:38.293512+00:00"
+        },
+        "state": "running-no-interim-timing-aggregate-selection"
+    },
+    "explicitUserBudget": {
+        "at": "2026-11-17T22:23:06.821080+00:00",
+        "question": "For the next independent AI study, should your +10% compute limit apply to the overall average, or to every tested subgroup?",
+        "answer": "Overall average (+10%)",
+        "appliesProspectively": true,
+        "oldFailedGatesRemainFailed": true,
+        "newTarget": "All balanced72-case aggregate CPU/wall/complete-decision-total/mean ratios <=1.10 for both entrant and both-driver modes, offline and real live paths. Preserve full inputs, oldslow12 mandatory execution and descriptive ratios. No subgroup outcome-based pruning or denominator change."
+    },
+    "prospectiveFreshV11Design": {
+        "id": "barrel-forecast-mixture-v11-confirmation-20261117",
+        "state": "prospective-design-no-new-bank-allocated-or-opened",
+        "candidatePolicySha256": "afcb5b44789a1c0d2e4a5c5f054bebf5d8b58b90f30142e77698da1a3947d50f",
+        "candidateRuntime": "barrel-forecast-loop-invariant-context-live-bounds-implementation-v2",
+        "baseline": "adopted terrain-aware v11, locked V3/contextual draft, native paid public Setup, H64/R2 A19 combat",
+        "sameAllArms": "Engine, rules, draft, purchases, splitting, actual-terrain formation, models except the separately accepted descriptive reference, root candidate construction and computational search budget",
+        "arms": ["stock", "mixture", "accepted-descriptive"],
+        "families": 1512,
+        "casesPerFamily": 4,
+        "fullFights": 18144,
+        "population": "First completed legal naturally barrel-containing draft pair from 128 separately pre-reserved disjoint eight-raw/eight-native seed candidates per family. Four fixed opponent draft styles; each style has fourteen complete 27 map/own/opponent-doctrine cycles. No forced picks, artifacts or budgets.",
+        "primary": "Equal-weight whole-family entrant score(mixture)-score(stock). Each family retains both draft orders and both physical sides. Score 0/0.5/1. Analyze only after both hosts, input/quality audit and fixed cold replay complete. No pooling with qualification.",
+        "bootstrap": {
+            "resamples": 20000,
+            "primarySeed": 1746189201,
+            "secondaryDescriptiveSeed": 1746189202,
+            "sortedIndices": [500, 19500],
+            "halfPointDenominator": 12096
+        },
+        "gates": {
+            "meanGainAtLeast": 0.005,
+            "lower95StrictlyPositive": true,
+            "noMapOwnDoctrineOrOpponentStyleMeanBelow": -0.01,
+            "changedFamiliesAtLeast": 24,
+            "allInputQualityAndColdControlsExact": true
+        },
+        "costMustPassBeforeAllocation": "Separate registered v10 implementation cost gate d673ea7b78485c75edea7055d088120e8e7bab772948eedc9dad3ee942653a39 under explicit user overall-average +10% target. Old subgroup failures stay failed.",
+        "freshV11CostBeforeFinalClaim": "Preselect the first family for each of four styles x three maps x three own doctrines and games0/1, 72 cases total, before any strength outcome. Following collection, one-active-fight serial offline and real-live stock/mixture/both cost uses pure native v11 baseline and the identical candidate. All full-matrix aggregate fightCPU, fightwall, complete-decision-total and mean-decision ratios <=1.10 for entrant and both-driver use. Equal eight-fight warmup per implementation per phase and rotating arm order. Zero timing/model/action failures and exact original stock/mixture traces; both-driver controls first established offline then exact in live. This cost subgroup is fixed before outcomes, is not selected for low runtime, and cannot replace strength. Preserve actual-decision tails and worst subgroup diagnostics descriptively.",
+        "hostSplit": {
+            "localFamilies": 1404,
+            "puffaloFamilies": 108,
+            "localWorkers": 12,
+            "puffaloWorkers": 8,
+            "nice": 19,
+            "assignment": "For each 378-family style block, complete27-family cycles0..12 local and cycle13 Puffalo. Entire families/all arms stay assigned. Any throughput amendment must be before first combat and recorded explicitly."
+        },
+        "termination": "Freeze common absolute cutoff before either strength shard, at most four hours after combat registration; no automatic retry, cutoff extension, source/model/score-gate tuning, post-start family reassignment or outcome-selected subset rescue. A startup-only correction before any actor/game must be explicit and retain the original cutoff.",
+        "preflight": "Before fresh combat, twelve fixed reused cases span all styles and maps. Native baseline stock and candidate stock full inputs/traces/outcomes must match, and all three candidate arms must reproduce on Mac/Puffalo. Known unit and444-game implementation equivalence remain preserved. No new independent strength from controls.",
+        "freshCold": "Select thirty-six cases before combat, one per style/map/own doctrine cell, eighteen from each assigned host by fixed earliest-family order. All three arms replay on both hosts after collection and before aggregation. Exact consumed inputs/full action+event traces/scores and actual turns; timing fields are excluded from cold equality.",
+        "seeds": "Prior cached exclusions plus all changed/new ledgers, every scanned qualification preimage and any missing offset8..31 expansion from older cached peer32-width ledgers. Reserve rejects and unused candidates. Audit independent native permutation and source receipts before combat; publish allocation and recheck newly added peer ledgers before start.",
+        "storage": "Lossless concatenated gzip JSONL records retain every raw byte; compression is outside all timers. Preserve interrupted infrastructure artifacts and completed controls without deleting raw data.",
+        "progress": "Report completed counts and health, never select policy from intermediate scores.",
+        "promotion": "No automatic serving activation or production deployment. Preserve the failed broad forecast rules, every worsened outcome and the earlier cost-study failures. A confirmed conditional net gain is not a universal absence of losing games."
+    },
+    "priorFailedGatesRemainFailed": true,
+    "freshBankAllocatedOrOpened": false,
+    "servingChanged": false,
+    "deployed": false
+}

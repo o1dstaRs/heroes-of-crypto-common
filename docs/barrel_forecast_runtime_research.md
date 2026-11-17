@@ -102,3 +102,28 @@ they are descriptive under the new target. No repeated unchanged study until pas
 Fresh confirmation remains unallocated. The user has since adopted terrain-aware profile v11; any
 new default-strength comparison must apply that same placement to both arms. Frozen v10 equivalence
 controls retain their original baseline. There is no automatic serving activation or deployment.
+
+## Loop-invariant v2: exact controls and new cost registration
+
+The [v2 fixture](evidence/barrel_forecast_loop_runtime_registration_20261117.json) contains all four
+exact implementation patches, guards, interruption receipts, recovery results and prospective design.
+The initial equivalence execution stopped during local disk exhaustion after 319 complete valid rows.
+It remains an interrupted study. A separately registered recovery preserved those rows, executed only
+the 125 missing controls and retained the original 22:43:07 UTC cutoff. All **444 inputs, complete
+action/event traces, outcomes and context controls** now match, with independent raw verification.
+No raw evidence was deleted; identical immutable source copies were deduplicated by hard link.
+
+The new cost registration is
+`d673ea7b78485c75edea7055d088120e8e7bab772948eedc9dad3ee942653a39`: 464 executions,
+all balanced 72-case aggregate ratios within +10% for entrant/both-driver modes, offline/live, under
+the explicit user-selected criterion. The original twelve still run and remain separately reported.
+Cutoff is November 17 **23:31:38 UTC**. A startup path correction before any actor or cost fight
+pointed the runner to the completed recovery analysis; source, jobs, criteria and cutoff stayed fixed.
+Historical failures remain failed. No interim timing aggregates select the implementation.
+
+The prospectively fixed follow-up proposes **1,512 fresh families / 18,144 fights** against adopted
+terrain-aware v11, with identical placement on all arms, the unchanged mixture and a descriptive
+accepted-neural reference. It keeps the +0.5-point minimum gain, positive whole-family 95% lower bound,
+map/doctrine/style safety checks, independent seed/cold audits and a separately preselected v11 serial
+cost check. The new bank is unallocated while the current cost gate runs. This prepares confirmation;
+it does not claim a confirmed gain or alter the serving default.
