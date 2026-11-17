@@ -127,3 +127,26 @@ accepted-neural reference. It keeps the +0.5-point minimum gain, positive whole-
 map/doctrine/style safety checks, independent seed/cold audits and a separately preselected v11 serial
 cost check. The new bank is unallocated while the current cost gate runs. This prepares confirmation;
 it does not claim a confirmed gain or alter the serving default.
+
+## V2 completed: prospective overall-average cost passes
+
+All **464 executions** completed with exact original inputs, full action/event traces and outcomes,
+zero engine/model/timing failures and independent raw-integer verification. The
+[complete result](evidence/barrel_forecast_loop_runtime_results_20261117.json) passes all sixteen
+registered aggregate cost gates under the user's prospective overall-average +10% target.
+
+| Phase                              | Entrant CPU | Both-driver CPU | Entrant mean decision | Both-driver mean decision |
+| ---------------------------------- | ----------: | --------------: | --------------------: | ------------------------: |
+| Offline 72                         |      −2.45% |          +1.35% |                +1.62% |                    +3.75% |
+| Live 72                            |      +0.16% |      **+2.36%** |                +1.53% |                **+1.09%** |
+| Preserved live twelve, descriptive |      −2.10% |         +20.27% |                +1.58% |                    +6.44% |
+
+The slow twelve remain fully reported. They do not veto this prospectively registered average-cost
+study; the two historical subgroup-gated studies remain failed. Cross-run timing variation does not
+isolate a causal speedup over v1. This establishes the unchanged strategy's cost eligibility on this
+fixed M4 matrix, without certifying general production two-vCPU latency.
+
+All **96 reused v11 preflight executions** also pass: pure native baseline stock and candidate stock
+have identical consumed inputs, complete traces, outcomes and actions; all three candidate arms
+reproduce across Mac and Puffalo. Independent fresh terrain-aware v11 strength confirmation is the
+next stage. No new forecast serving default or production deployment follows from these checks.

@@ -960,6 +960,25 @@ user-selected target. The separate loop-invariant/stable-context v2 implementati
 executions; cost and fresh strength remain pending. Any fresh default comparison must use adopted
 terrain-aware v11 on both arms, while the already-frozen v10 implementation controls stay v10.
 
+The loop-invariant v2 passed its prospectively registered overall-average cost gate: all 464 full
+inputs/traces/outcomes exact, zero engine/model/timing failures, live two-AI CPU **+2.36%** and mean
+decision **+1.09%**. Slow12 remains +20.27% CPU descriptively; both earlier subgroup-gated studies
+remain failed. Read `docs/evidence/barrel_forecast_loop_runtime_results_20261117.json`. All 96 reused
+v11 cross-host cold controls also match. A lexical JSON verifier correction distinguishes original
+Python integer tokens from an integral floating deadline; actual seeds, prior, policy and gates did
+not change. Both failed verifier attempt and corrected independent checks remain preserved.
+
+Independent terrain-aware v11 confirmation is frozen under
+`1a31dd5fbba8544bf25ad96c3d10ab47165f4ddeabaf8602d9096f83c1dbb3ff`: 1,512 families / 18,144
+fights, unchanged mixture versus stock, accepted pair descriptive. Read its separate allocation and
+registration fixtures. Exclude **all 207,510 scanned preimages**, including rejected and unused, with
+eight raw/eight native-permuted channels. All 3,096,576 accepted channels independently avoid the
+29,997,656-channel prior; legal family selection and paid native physical-side doctrines pass.
+12 Mac / 8 Puffalo nice19 actors share the November18 **03:10:07 UTC** cutoff, with 1,404 / 108
+whole families. No retries, extension, family reassignment, policy/model/source/score-gate tuning or
+interim score selection. Fixed 36-case cold replay and 72-case v11 serial cost remain required before
+claiming a confirmed serving gain. No automatic default change or deployment.
+
 ## Closed ranged counter-shot screens
 
 Read `docs/ranged_countershot_safety_research.md` before continuing the November 17 human-match

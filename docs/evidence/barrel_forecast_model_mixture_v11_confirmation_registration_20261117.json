@@ -1,0 +1,609 @@
+{
+    "schema": "hoc.barrel_forecast_mixture_v11.confirmation_registration.v1",
+    "at": "2026-11-17T23:10:07.903009+00:00",
+    "id": "barrel-forecast-mixture-v11-confirmation-20261117",
+    "registrationSha256": "1a31dd5fbba8544bf25ad96c3d10ab47165f4ddeabaf8602d9096f83c1dbb3ff",
+    "protocol": {
+        "id": "barrel-forecast-mixture-v11-confirmation-20261117",
+        "state": "prospective-design-no-new-bank-allocated-or-opened",
+        "candidatePolicySha256": "afcb5b44789a1c0d2e4a5c5f054bebf5d8b58b90f30142e77698da1a3947d50f",
+        "candidateRuntime": "barrel-forecast-loop-invariant-context-live-bounds-implementation-v2",
+        "baseline": "adopted terrain-aware v11, locked V3/contextual draft, native paid public Setup, H64/R2 A19 combat",
+        "sameAllArms": "Engine, rules, draft, purchases, splitting, actual-terrain formation, models except the separately accepted descriptive reference, root candidate construction and computational search budget",
+        "arms": ["stock", "mixture", "accepted-descriptive"],
+        "families": 1512,
+        "casesPerFamily": 4,
+        "fullFights": 18144,
+        "population": "First completed legal naturally barrel-containing draft pair from 128 separately pre-reserved disjoint eight-raw/eight-native seed candidates per family. Four fixed opponent draft styles; each style has fourteen complete 27 map/own/opponent-doctrine cycles. No forced picks, artifacts or budgets.",
+        "primary": "Equal-weight whole-family entrant score(mixture)-score(stock). Each family retains both draft orders and both physical sides. Score 0/0.5/1. Analyze only after both hosts, input/quality audit and fixed cold replay complete. No pooling with qualification.",
+        "bootstrap": {
+            "resamples": 20000,
+            "primarySeed": 1746189201,
+            "secondaryDescriptiveSeed": 1746189202,
+            "sortedIndices": [500, 19500],
+            "halfPointDenominator": 12096
+        },
+        "gates": {
+            "meanGainAtLeast": 0.005,
+            "lower95StrictlyPositive": true,
+            "noMapOwnDoctrineOrOpponentStyleMeanBelow": -0.01,
+            "changedFamiliesAtLeast": 24,
+            "allInputQualityAndColdControlsExact": true
+        },
+        "costMustPassBeforeAllocation": "Separate registered v10 implementation cost gate d673ea7b78485c75edea7055d088120e8e7bab772948eedc9dad3ee942653a39 under explicit user overall-average +10% target. Old subgroup failures stay failed.",
+        "freshV11CostBeforeFinalClaim": "Preselect the first family for each of four styles x three maps x three own doctrines and games0/1, 72 cases total, before any strength outcome. Following collection, one-active-fight serial offline and real-live stock/mixture/both cost uses pure native v11 baseline and the identical candidate. All full-matrix aggregate fightCPU, fightwall, complete-decision-total and mean-decision ratios <=1.10 for entrant and both-driver use. Equal eight-fight warmup per implementation per phase and rotating arm order. Zero timing/model/action failures and exact original stock/mixture traces; both-driver controls first established offline then exact in live. This cost subgroup is fixed before outcomes, is not selected for low runtime, and cannot replace strength. Preserve actual-decision tails and worst subgroup diagnostics descriptively.",
+        "hostSplit": {
+            "localFamilies": 1404,
+            "puffaloFamilies": 108,
+            "localWorkers": 12,
+            "puffaloWorkers": 8,
+            "nice": 19,
+            "assignment": "For each 378-family style block, complete27-family cycles0..12 local and cycle13 Puffalo. Entire families/all arms stay assigned. Any throughput amendment must be before first combat and recorded explicitly."
+        },
+        "termination": "Freeze common absolute cutoff before either strength shard, at most four hours after combat registration; no automatic retry, cutoff extension, source/model/score-gate tuning, post-start family reassignment or outcome-selected subset rescue. A startup-only correction before any actor/game must be explicit and retain the original cutoff.",
+        "preflight": "Before fresh combat, twelve fixed reused cases span all styles and maps. Native baseline stock and candidate stock full inputs/traces/outcomes must match, and all three candidate arms must reproduce on Mac/Puffalo. Known unit and444-game implementation equivalence remain preserved. No new independent strength from controls.",
+        "freshCold": "Select thirty-six cases before combat, one per style/map/own doctrine cell, eighteen from each assigned host by fixed earliest-family order. All three arms replay on both hosts after collection and before aggregation. Exact consumed inputs/full action+event traces/scores and actual turns; timing fields are excluded from cold equality.",
+        "seeds": "Prior cached exclusions plus all changed/new ledgers, every scanned qualification preimage and any missing offset8..31 expansion from older cached peer32-width ledgers. Reserve rejects and unused candidates. Audit independent native permutation and source receipts before combat; publish allocation and recheck newly added peer ledgers before start.",
+        "storage": "Lossless concatenated gzip JSONL records retain every raw byte; compression is outside all timers. Preserve interrupted infrastructure artifacts and completed controls without deleting raw data.",
+        "progress": "Report completed counts and health, never select policy from intermediate scores.",
+        "promotion": "No automatic serving activation or production deployment. Preserve the failed broad forecast rules, every worsened outcome and the earlier cost-study failures. A confirmed conditional net gain is not a universal absence of losing games."
+    },
+    "runtime": {
+        "at": "2026-11-17T23:10:07.903009+00:00",
+        "workers": {
+            "local": 12,
+            "puffalo": 8
+        },
+        "nice": 19,
+        "absoluteDeadlineEpoch": 1794971407.903009,
+        "absoluteDeadlineUtc": "2026-11-18T03:10:07.903009+00:00",
+        "localFamilies": 1404,
+        "puffaloFamilies": 108,
+        "noRetryExtensionOrReassignment": true
+    },
+    "baseline": {
+        "at": "2026-11-17T22:30:06.378574+00:00",
+        "id": "barrel-forecast-mixture-v11-confirmation-20261117",
+        "state": "source-and-protocol-preparation-only-no-seed-bank-allocated",
+        "heads": {
+            "common": "89ed18e7fbb0a5fb23386c1e15f933ebc40a5f32",
+            "server": "93f456f060beb06c7929ef27bfd5f603893b8f5c"
+        },
+        "candidatePolicySha256": "afcb5b44789a1c0d2e4a5c5f054bebf5d8b58b90f30142e77698da1a3947d50f",
+        "runtimeImplementation": "barrel-forecast-loop-invariant-context-live-bounds-implementation-v2",
+        "baseline": "adopted-terrain-aware-v11-identical-all-arms",
+        "familiesProposed": 1512,
+        "fightsProposed": 18144,
+        "arms": ["stock", "mixture", "accepted-descriptive"],
+        "userBudget": "Overall average (+10%)",
+        "costMustPassBeforeAllocation": true,
+        "oldGatesResultsUnchanged": true,
+        "servingOrDeployChanged": false
+    },
+    "sourceFileManifestSha256": "874bc3effecffc51acf65ea406f994f7ca22b2d4483cedbe3670ae39a5d3b3e6",
+    "sourceFiles": 6959,
+    "implementationPatches": "barrel_forecast_loop_runtime_registration_20261117.json",
+    "costQualification": "barrel_forecast_loop_runtime_results_20261117.json",
+    "preflight": {
+        "passed": true,
+        "at": "2026-11-17T22:58:55.348294+00:00",
+        "reusedCases": 12,
+        "executions": 96,
+        "allNativeAndCandidateStockInputsFullTracesOutcomesExact": true,
+        "allThreeCandidateArmsCrossHostColdExact": true,
+        "newIndependentStrengthSamples": false,
+        "rawSha256": {
+            "preflight-local/baseline.jsonl.gz": "fb72b0e61db0e19d877e5c4558a7204722b1335295d0b40d18b977b8c8595647",
+            "preflight-local/candidate.jsonl.gz": "c2568ae2ef4237d2781c65323ae1838ace92aff9ca364eab109a762061f6dfcc",
+            "preflight-puffalo/baseline.jsonl.gz": "49cc2216f1f7d544540eaac4e27f0aa0fb4ae8d1ada433be511582426cd1b4b0",
+            "preflight-puffalo/candidate.jsonl.gz": "5a4e85176fb44c7e456ad760fa1bef1d077bcb5cc1cc583d76352e6066d7490a"
+        },
+        "preflightRegistrationSha256": "045aceae5718f4aaaab89d1ad6d31835806778981f90bdc8ed8e0a8510ab97e7"
+    },
+    "seedVerifierErratum": {
+        "at": "2026-11-17T23:02:57.376259+00:00",
+        "state": "pre-combat-verifier-numeric-lexeme-correction",
+        "actualCounterexample": [
+            {
+                "path": "/deadlineUnix",
+                "value": 1794978960.0,
+                "pythonType": "float"
+            }
+        ],
+        "source": "game/core/tmp/premium-counterpick-effects12h-20261117/remote-mirror/registration.json",
+        "oldVerifierSha256": "21dc59cca8df1584d9b19f2f7974f0fdaeb98b3469abc99b62c99df2e005f3cf",
+        "newVerifierSha256": "bedea1a4fafc39ff9b10ecee8be25fd898561ee57aa51fe8e9833dad81cd0cd4",
+        "correction": "JSON.parse reviver context.source preserves original numeric token spelling. For generic prior collection, floating/exponent tokens are ignored exactly as original Pythonisinstance(value,int), even if Number.isInteger would accept them. All true integer and official seed/native-channel membership checks remain unchanged.",
+        "bankPriorPolicyModelOrGatesChanged": false,
+        "freshStrengthBattlesOpened": false
+    },
+    "precombatNewLedgerAudit": {
+        "passed": true,
+        "at": "2026-11-17T23:08:13.003127+00:00",
+        "acceptedReservedChannels": 3096576,
+        "noNewPeerLedgerIntersections": true,
+        "newOrChangedPeerLedgers": {
+            "game/heroes-of-crypto-common/docs/evidence/revealed_ranged_delivery_registration_20261117.json": "95ceaffea72a109fe6d37d828fd2a6f3147da34ce7f2b17f15f071fe6dd7d933",
+            "game/heroes-of-crypto-common/docs/evidence/revealed_ranged_delivery_result_20261117.json": "c5309e96805bbfa253d4a1d4c351cc8e1341f806ca486dbe08a3e7cdb7dd9e92"
+        },
+        "ignoredOwnCurrentStudyLedgers": [
+            "game/heroes-of-crypto-common/docs/evidence/barrel_forecast_loop_runtime_results_20261117.json"
+        ],
+        "ownLedgerRationale": "Current study allocation/registration are self reservations, not prior banks. Its closed implementation cost result contains timing/quality metadata and reused v10 cases already excluded by the original q bank. No novel RNG channels are introduced there.",
+        "strengthOutcomesInspected": false
+    },
+    "freshColdCases": [
+        {
+            "board": 3,
+            "game": 0,
+            "host": "local"
+        },
+        {
+            "board": 351,
+            "game": 1,
+            "host": "puffalo"
+        },
+        {
+            "board": 6,
+            "game": 2,
+            "host": "local"
+        },
+        {
+            "board": 355,
+            "game": 3,
+            "host": "puffalo"
+        },
+        {
+            "board": 1,
+            "game": 0,
+            "host": "local"
+        },
+        {
+            "board": 358,
+            "game": 1,
+            "host": "puffalo"
+        },
+        {
+            "board": 5,
+            "game": 2,
+            "host": "local"
+        },
+        {
+            "board": 353,
+            "game": 3,
+            "host": "puffalo"
+        },
+        {
+            "board": 8,
+            "game": 0,
+            "host": "local"
+        },
+        {
+            "board": 732,
+            "game": 1,
+            "host": "puffalo"
+        },
+        {
+            "board": 378,
+            "game": 2,
+            "host": "local"
+        },
+        {
+            "board": 735,
+            "game": 3,
+            "host": "puffalo"
+        },
+        {
+            "board": 382,
+            "game": 0,
+            "host": "local"
+        },
+        {
+            "board": 730,
+            "game": 1,
+            "host": "puffalo"
+        },
+        {
+            "board": 385,
+            "game": 2,
+            "host": "local"
+        },
+        {
+            "board": 734,
+            "game": 3,
+            "host": "puffalo"
+        },
+        {
+            "board": 380,
+            "game": 0,
+            "host": "local"
+        },
+        {
+            "board": 737,
+            "game": 1,
+            "host": "puffalo"
+        },
+        {
+            "board": 759,
+            "game": 2,
+            "host": "local"
+        },
+        {
+            "board": 1107,
+            "game": 3,
+            "host": "puffalo"
+        },
+        {
+            "board": 762,
+            "game": 0,
+            "host": "local"
+        },
+        {
+            "board": 1111,
+            "game": 1,
+            "host": "puffalo"
+        },
+        {
+            "board": 757,
+            "game": 2,
+            "host": "local"
+        },
+        {
+            "board": 1114,
+            "game": 3,
+            "host": "puffalo"
+        },
+        {
+            "board": 761,
+            "game": 0,
+            "host": "local"
+        },
+        {
+            "board": 1109,
+            "game": 1,
+            "host": "puffalo"
+        },
+        {
+            "board": 764,
+            "game": 2,
+            "host": "local"
+        },
+        {
+            "board": 1488,
+            "game": 3,
+            "host": "puffalo"
+        },
+        {
+            "board": 1134,
+            "game": 0,
+            "host": "local"
+        },
+        {
+            "board": 1491,
+            "game": 1,
+            "host": "puffalo"
+        },
+        {
+            "board": 1138,
+            "game": 2,
+            "host": "local"
+        },
+        {
+            "board": 1486,
+            "game": 3,
+            "host": "puffalo"
+        },
+        {
+            "board": 1141,
+            "game": 0,
+            "host": "local"
+        },
+        {
+            "board": 1490,
+            "game": 1,
+            "host": "puffalo"
+        },
+        {
+            "board": 1136,
+            "game": 2,
+            "host": "local"
+        },
+        {
+            "board": 1493,
+            "game": 3,
+            "host": "puffalo"
+        }
+    ],
+    "serialCostCases": [
+        {
+            "board": 3,
+            "game": 0
+        },
+        {
+            "board": 3,
+            "game": 1
+        },
+        {
+            "board": 0,
+            "game": 0
+        },
+        {
+            "board": 0,
+            "game": 1
+        },
+        {
+            "board": 6,
+            "game": 0
+        },
+        {
+            "board": 6,
+            "game": 1
+        },
+        {
+            "board": 4,
+            "game": 0
+        },
+        {
+            "board": 4,
+            "game": 1
+        },
+        {
+            "board": 1,
+            "game": 0
+        },
+        {
+            "board": 1,
+            "game": 1
+        },
+        {
+            "board": 7,
+            "game": 0
+        },
+        {
+            "board": 7,
+            "game": 1
+        },
+        {
+            "board": 5,
+            "game": 0
+        },
+        {
+            "board": 5,
+            "game": 1
+        },
+        {
+            "board": 2,
+            "game": 0
+        },
+        {
+            "board": 2,
+            "game": 1
+        },
+        {
+            "board": 8,
+            "game": 0
+        },
+        {
+            "board": 8,
+            "game": 1
+        },
+        {
+            "board": 381,
+            "game": 0
+        },
+        {
+            "board": 381,
+            "game": 1
+        },
+        {
+            "board": 378,
+            "game": 0
+        },
+        {
+            "board": 378,
+            "game": 1
+        },
+        {
+            "board": 384,
+            "game": 0
+        },
+        {
+            "board": 384,
+            "game": 1
+        },
+        {
+            "board": 382,
+            "game": 0
+        },
+        {
+            "board": 382,
+            "game": 1
+        },
+        {
+            "board": 379,
+            "game": 0
+        },
+        {
+            "board": 379,
+            "game": 1
+        },
+        {
+            "board": 385,
+            "game": 0
+        },
+        {
+            "board": 385,
+            "game": 1
+        },
+        {
+            "board": 383,
+            "game": 0
+        },
+        {
+            "board": 383,
+            "game": 1
+        },
+        {
+            "board": 380,
+            "game": 0
+        },
+        {
+            "board": 380,
+            "game": 1
+        },
+        {
+            "board": 386,
+            "game": 0
+        },
+        {
+            "board": 386,
+            "game": 1
+        },
+        {
+            "board": 759,
+            "game": 0
+        },
+        {
+            "board": 759,
+            "game": 1
+        },
+        {
+            "board": 756,
+            "game": 0
+        },
+        {
+            "board": 756,
+            "game": 1
+        },
+        {
+            "board": 762,
+            "game": 0
+        },
+        {
+            "board": 762,
+            "game": 1
+        },
+        {
+            "board": 760,
+            "game": 0
+        },
+        {
+            "board": 760,
+            "game": 1
+        },
+        {
+            "board": 757,
+            "game": 0
+        },
+        {
+            "board": 757,
+            "game": 1
+        },
+        {
+            "board": 763,
+            "game": 0
+        },
+        {
+            "board": 763,
+            "game": 1
+        },
+        {
+            "board": 761,
+            "game": 0
+        },
+        {
+            "board": 761,
+            "game": 1
+        },
+        {
+            "board": 758,
+            "game": 0
+        },
+        {
+            "board": 758,
+            "game": 1
+        },
+        {
+            "board": 764,
+            "game": 0
+        },
+        {
+            "board": 764,
+            "game": 1
+        },
+        {
+            "board": 1137,
+            "game": 0
+        },
+        {
+            "board": 1137,
+            "game": 1
+        },
+        {
+            "board": 1134,
+            "game": 0
+        },
+        {
+            "board": 1134,
+            "game": 1
+        },
+        {
+            "board": 1140,
+            "game": 0
+        },
+        {
+            "board": 1140,
+            "game": 1
+        },
+        {
+            "board": 1138,
+            "game": 0
+        },
+        {
+            "board": 1138,
+            "game": 1
+        },
+        {
+            "board": 1135,
+            "game": 0
+        },
+        {
+            "board": 1135,
+            "game": 1
+        },
+        {
+            "board": 1141,
+            "game": 0
+        },
+        {
+            "board": 1141,
+            "game": 1
+        },
+        {
+            "board": 1139,
+            "game": 0
+        },
+        {
+            "board": 1139,
+            "game": 1
+        },
+        {
+            "board": 1136,
+            "game": 0
+        },
+        {
+            "board": 1136,
+            "game": 1
+        },
+        {
+            "board": 1142,
+            "game": 0
+        },
+        {
+            "board": 1142,
+            "game": 1
+        }
+    ],
+    "noAutomaticServingPromotionOrDeploy": true,
+    "priorFailuresUnchanged": true
+}
