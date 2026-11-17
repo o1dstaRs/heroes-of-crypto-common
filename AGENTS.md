@@ -815,14 +815,31 @@ inactive helper, source seals, original gates, all losing cases and the independ
 verification. Further constrained forecast work needs a distinct candidate and fresh games against the
 subsequently adopted v10 default. Keep the confirmed barrel deliberation and accepted neural pair intact.
 
-## Registered useful-clear forecast regression repair
+## Closed useful-clear forecast regression repair
 
-`barrel-forecast-friendly-shot-clear-v1` is a separate inactive helper, not a rewrite of closed naive v1.
-Read `docs/barrel_forecast_useful_clear_research.md` and preserve its source/registration. The fixed
-engine-ray guard retains native projected cleanup when its barrel intercepts an available friendly
-shot; all other eligibility and both-army/owner symmetry stay on the original helper. No root, model,
-search-cap, draft or Setup changes occur. All 864 consumed old cases are included in regression admission,
-with exact original controls for all 142 changed outcomes; a separate functional phase uses default v10.
-These reused games are diagnostics, not independent strength. Keep the +10% full-decision/full-fight cost,
-fresh v10 comparisons and full uncertainty/map/doctrine/style gates. Do not promote or tune an outcome-
-selected subset. Original failures and all scanned raw/permuted channels remain closed/excluded.
+`barrel-forecast-friendly-shot-clear-v1` failed its full reused regression admission. Read
+`docs/barrel_forecast_useful_clear_research.md` and preserve both registration/result fixtures and
+helper SHA `5f031ae76411f1d3ab21391d81abf061d0decd8a4786e431de0fbd5b632de580`.
+All 1,148 executions and 284 original controls verified; independent integer reconstruction agrees.
+Against stock, regressed cases decreased 68 to 56, but gains decreased 74 to 54: **−0.462963 points
+versus naive v1, −0.115741 versus stock**. It recovered 23 losses fully/one partly, erased 30 gains,
+and introduced ten losses/ten gains among formerly unchanged cases. Fewer losses alone is not a gain.
+
+All 144 v10 functional executions and 8,199 common tests pass; these do not qualify strength. No fresh
+bank, confirmation or serial timing opened, and no default/model changed. Keep both closed forecast
+helpers, original gates and every losing/unchanged case immutable. No map/action/outcome slice rescue
+or tuning on this bank. Distinct uncertain-model work needs new source identity and fresh v10 evidence
+within the +10% full-decision/full-fight cost bound, preserving the accepted neural pair and adopted
+barrel correction.
+
+## Registered paired forecast-model mixture
+
+`barrel-forecast-paired-model-mixture-v1` is a separate inactive uncertainty hypothesis after both
+closed forecast rules failed. Read `docs/barrel_forecast_model_mixture_research.md`. It uses one native
+and one original-intent sample within existing full R2, assigning the models by semantic seed parity
+identically across all candidates. Both future armies/owners share a sample's model. Root and non-full
+probes remain native. No new rollout/inference/RNG draw or learned weights are introduced. Each model
+has only one chance sample, so do not claim unchanged within-model antithetic cancellation or calibrated
+values. Keep the frozen helper, source seal and fixed all-864-case admission gates. Old data cannot
+qualify a new v10 default or rescue a favorable slice. Passing requires fresh v10 evidence, complete
+safety/uncertainty and +10% full-decision/full-fight cost gates; no automatic promotion.

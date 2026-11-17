@@ -1,0 +1,19 @@
+{
+    "id": "barrel-forecast-paired-model-mixture-v1-regression-admission",
+    "at": "2026-11-17T17:45:05.048382+00:00",
+    "policy": "In full canonical R2 forecasts, exactly one sample uses native cleanup and the other uses closed v1 intent, symmetrically for both future armies. Semantic root seed parity balances assignment to the two existing complementary chance streams identically for every candidate at that root. Other horizon modes, R4 and live roots stay native. No ray guard or new action/model/inference/rollout/RNG draw.",
+    "candidateSourceSha256": "afcb5b44789a1c0d2e4a5c5f054bebf5d8b58b90f30142e77698da1a3947d50f",
+    "comparator": "Original frozen v9 full 864-case reused bank, exact input/full-trace/score controls for all 142 old outcome changes. No new independent strength or v10 inference.",
+    "executions": 1148,
+    "guardExecutions": 864,
+    "oldControls": 284,
+    "fixedAdmission": "All original controls/engine/model/callbacks exact and valid; both full-turn forecast models exercised; fewer worsened outcomes versus stock than naive v1 and strictly higher total score than naive v1 on all 864 cases. No tuning, favorable subset, extension or automatic promotion.",
+    "limits": "Equal-weight forecast model approximation, not maximin or a proven better opponent model. Each model receives one chance stream, so within-model antithetic cancellation is not preserved; full empirical strength and <=+10% serving cost qualification remain necessary. Existing bound/selection algorithms remain unchanged.",
+    "freshStudy": "Only passing opens a separate fixed fresh v10 comparison with current default and accepted neural reference, full uncertainty/map/doctrine/style gates. No new channels allocated now.",
+    "statusAtRegistration": "offline-reused-regression-admission",
+    "registrationSha256": "69c3d050a84a83b30511e3f414ecb892526158894a2dbc81a1389b699e6598e8",
+    "frozenSourceFiles": 2651,
+    "originalSeedExclusionLedger": "barrel_forecast_intent_registration_20261117.json",
+    "originalNaiveClosedResult": "barrel_forecast_intent_results_20261117.json",
+    "usefulClearClosedResult": "barrel_forecast_useful_clear_results_20261117.json"
+}

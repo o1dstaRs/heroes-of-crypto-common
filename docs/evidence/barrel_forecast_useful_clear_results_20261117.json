@@ -1,0 +1,141 @@
+{
+    "id": "barrel-forecast-friendly-shot-clear-v1",
+    "status": "closed-failed-reused-regression-admission",
+    "regression": {
+        "id": "barrel-forecast-friendly-shot-clear-v1-regression-admission",
+        "at": "2026-11-17T17:40:07.012698+00:00",
+        "complete": true,
+        "independentStrength": false,
+        "baseline": "Frozen v9 on fully reused original bank. No v10 strength inference.",
+        "cases": 864,
+        "executions": 1148,
+        "originalControlsExact": 284,
+        "armHalfPoints": {
+            "stock": 921,
+            "naive": 927,
+            "guard": 919
+        },
+        "armScores": {
+            "stock": 0.5329861111111112,
+            "naive": 0.5364583333333334,
+            "guard": 0.5318287037037037
+        },
+        "guardMinusNaivePoints": -0.46296296296296297,
+        "guardMinusStockPoints": -0.11574074074074074,
+        "outcomeCensus": {
+            "oldRegressions": 68,
+            "oldGains": 74,
+            "oldUnchanged": 722,
+            "guardRegressions": 56,
+            "guardGains": 54,
+            "guardUnchanged": 754,
+            "oldRegressionsFullyRecovered": 23,
+            "oldRegressionsPartiallyRecovered": 1,
+            "oldGainsFullyRetained": 44,
+            "oldGainsReducedButPositive": 0,
+            "oldGainsLost": 30,
+            "newRegressionsIncludingOldNeutral": 11,
+            "oldNeutralNewLosses": 10,
+            "oldNeutralNewGains": 10,
+            "guardAboveNaive": 36,
+            "guardBelowNaive": 40
+        },
+        "forecastCoverage": {
+            "eligibleProjectedIntentChanges": 121104,
+            "usefulClearsRetained": 21553,
+            "otherIntentsRetained": 99551
+        },
+        "admissionGates": {
+            "allOriginalControlsExact": true,
+            "allEngineModelCallbacksValid": true,
+            "usefulClearMechanismExercised": true,
+            "fewerRegressionsThanNaive": true,
+            "higherTotalScoreThanNaive": false
+        },
+        "admissionPassed": false,
+        "registrationSha256": "ebd350745e6ab80cf126cd92188e67664b253ef408d6e8ba9b5a9c38fb8c01f3",
+        "rawSha256": {
+            "replays-admitted/worker-0.jsonl": "61939a1383ab7ca26b8e76c78817780ce0a6ca073eeb8ce3ba363472a5b93d3f",
+            "replays-admitted/worker-1.jsonl": "c43380024c0702e9f7ebd0f51b5377133dd50c6e480ac1431b4a34a83993141c",
+            "replays-admitted/worker-2.jsonl": "274526a873c8c04464495c7607e2fa7b523962c86462fceea0c2123b96358315",
+            "replays-admitted/worker-3.jsonl": "76481fce6625776a9b876a9be962a5652b8a2f653c3c7fd46512af1bab76dc7b",
+            "replays-admitted/worker-4.jsonl": "211321ce33e7880577aee3703d621752a1d234ebd731c1c88033f8831499f99b",
+            "replays-admitted/worker-5.jsonl": "c28e73cd402fc98dc5b254e8318bdd9ab741e47aa0000063b966bb4a25477814"
+        },
+        "limits": "All old cases included, even unchanged outcomes, but this is reused diagnostic data. No population CI or qualified gain is claimed; passing only opens fresh v10 registration. Never tune source or rescue a subset on this bank."
+    },
+    "independentVerification": {
+        "passed": true,
+        "at": "2026-11-17T17:40:07.229Z",
+        "cases": 864,
+        "exactControls": 284,
+        "halfPoints": {
+            "stock": 921,
+            "naive": 927,
+            "guard": 919
+        },
+        "census": {
+            "oldRegressions": 68,
+            "oldGains": 74,
+            "oldUnchanged": 722,
+            "guardRegressions": 56,
+            "guardGains": 54,
+            "guardUnchanged": 754,
+            "oldRegressionsFullyRecovered": 23,
+            "oldRegressionsPartiallyRecovered": 1,
+            "oldGainsFullyRetained": 44,
+            "oldGainsReducedButPositive": 0,
+            "oldGainsLost": 30,
+            "newRegressionsIncludingOldNeutral": 11,
+            "oldNeutralNewLosses": 10,
+            "oldNeutralNewGains": 10,
+            "guardAboveNaive": 36,
+            "guardBelowNaive": 40
+        },
+        "admissionPassed": false,
+        "scope": "Independent integer reconstruction using original full bank records, not analysis.expectedScore; diagnostic only, no population CI",
+        "analysisSha256": "50c9793ec981fb6e96d2c60d99db6b9406f837163b2d7150c2a21b93cda156c9"
+    },
+    "functionalV10": {
+        "at": "2026-11-17T17:31:23.960090+00:00",
+        "passed": true,
+        "complete": true,
+        "fights": 144,
+        "observerPairsExact": 36,
+        "noBarrelGuardPairsExact": 12,
+        "guardEligibleFutures": 3220,
+        "guardKeptUsefulClears": 1304,
+        "guardChangedFutureIntents": 1916,
+        "guardChangedFullTraces": 8,
+        "countsOnlyNotStrength": true,
+        "sourceSha256": "5f031ae76411f1d3ab21391d81abf061d0decd8a4786e431de0fbd5b632de580",
+        "registrationSha256": "9e857d077453a452cdd3ff49b576646294b288dc507823253dabb699039414a6",
+        "rawSha256": {
+            "functional/worker-0.jsonl": "d398d6b4d9193e2d5558dd353d6c442ce6c4afe34aaebbee888e2bd2299a0671",
+            "functional/worker-1.jsonl": "4ecfdd95eb36d5240ccd24f53cea6f7456204ba7088589caadb4d170931700d9",
+            "functional/worker-2.jsonl": "bc46e4fe7c99a9fd60b66b67f4029bb2f2ec776b772a5069cc1ebecf00971cf1"
+        }
+    },
+    "sourceSha256": "5f031ae76411f1d3ab21391d81abf061d0decd8a4786e431de0fbd5b632de580",
+    "fullCommonTests": {
+        "passed": 8199,
+        "failed": 0,
+        "files": 697,
+        "elapsedSeconds": 164.59
+    },
+    "checks": {
+        "lint": true,
+        "typecheck": true,
+        "compiledDistAndCopies": true,
+        "sourceCI": "https://github.com/o1dstaRs/heroes-of-crypto-common/actions/runs/44138053113"
+    },
+    "decision": {
+        "promoted": false,
+        "freshChannelsAllocated": false,
+        "qualificationOpened": false,
+        "confirmationOpened": false,
+        "serialTimingQualified": false,
+        "retuneOldRule": false
+    },
+    "limits": "Reused v9 data, not an independent estimate. The rule reduces regressions but removes more gains. It does not repair all forecast valuation changes. No subset may replace this failed whole-bank result."
+}
