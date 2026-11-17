@@ -1,7 +1,7 @@
 {
     "schemaVersion": 1,
     "id": "nightmare-route-preserving-20261117",
-    "status": "registered",
+    "status": "halted-before-fresh-selection-quality-failed",
     "protocol": {
         "id": "nightmare-route-preserving-20261117",
         "candidateId": "nightmare-route-preserving-wall-v1",
@@ -4801,5 +4801,46 @@
         "tests.log": "36a851a150b39fd6eda509e697c2b691fc42fb3bfc8b48aded1352d7ae35416e",
         "typecheck.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "eslint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "freshExecutions": 0,
+    "completedRegisteredExecutions": 284,
+    "terminal": {
+        "at": "2026-11-17T07:39:31.538662+00:00",
+        "status": "failed",
+        "defaultChangedByThisStudy": false
+    },
+    "admissionFailure": {
+        "mechanism": "Returned selection means were a detached copy; cached A19 material evidence still referenced raw means and could reselect a masked wall.",
+        "selectedNewWalls": 24,
+        "selectedWithoutOpportunityPass": 20,
+        "allRawInputTraceHealthModelChecksPassed": true,
+        "observerPairsExact": 65,
+        "coldReplaysExact": 24,
+        "oldCrossHostComparisons": 130,
+        "oldCrossHostExact": 130,
+        "invalidArmStrengthNotAnalyzed": true
+    },
+    "completionArtifactSha256": {
+        "terminal.json": "6f01dc12d5f5336aca6f9386c1232cd288794f86f65f815e382b44d1be895aca",
+        "failed-admission-integrity.json": "9682758dd3a9f3467c3e50d9c19bdbca39dd5c7ed5294a9bc72b708d3226595f",
+        "admission-selection-failure.json": "087ce14a5dc2a5b7fe2b814fbf697beb2099dabe10b0094c2447079a70871d31",
+        "verify-admission.log": "dd04beb34e86b959b86caad36af6c28b85c13fd0925d3965416305e1b7a8c380",
+        "diagnose-admission.ts": "e91fa197c1e8b9fcd09fe6ef3b3d6a4532ba423b721611537da71c8f9374887f",
+        "admission-download-receipt.json": "f8c0cbcdea93a0d65f0991cc78a6e1f2f7b38b3e9d10b1b800f7dc675cdd2d61"
+    },
+    "storageCleanup": {
+        "staleCachesRemoved": 11,
+        "allocatedBytesRemoved": 4464504832,
+        "scratchFreeBytesBefore": 612421632,
+        "scratchFreeBytesAfter": 5076971520,
+        "scope": "Old owned CUDA/Zig compiler caches with no active references; no research datasets or model files removed.",
+        "receiptSha256": "fcaee0471d44c2cd79eaea7c4da15f7c6a321543ab8ed09ef4d925d350bc47fd"
+    },
+    "separateCorrectedExecution": {
+        "id": "nightmare-route-selection-corrected-20261117",
+        "registrationSha256": "a2a5e57a790f1e9376f75c63aa3389df88175693038de179c7f006cccd0b1dba",
+        "fixture": "docs/evidence/nightmare_route_selection_corrected_20261117.json",
+        "freshBankWasUnopened": true,
+        "originalCutoffUnchanged": true
     }
 }

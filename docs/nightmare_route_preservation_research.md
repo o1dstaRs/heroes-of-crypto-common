@@ -119,8 +119,31 @@ flying crossings and landings, rectangular sweeps, alternate routes, hidden alli
 state/RNG purity, strict full-R2 opportunity margins and serving isolation. The original helper's bytes
 are unchanged. The two preflight executions exactly replayed the old control and matched each other.
 
-## Execution status
+## Halted before fresh outcomes: selection integration failure
 
-Registered and launched on Puffalo at **2026-11-17 07:23:04 UTC**. The fixed pipeline performs admission,
-admission verification, fresh comparisons, cold repeats, full verification and independent statistics in
-that order. Results and closure are pending; neither a qualified gain nor a default change is claimed.
+The run launched on Puffalo at **2026-11-17 07:23:04 UTC** and stopped at **07:39:31 UTC**, after all
+260 admission executions and 24 cold repeats. The admission verifier correctly rejected **20 of 24**
+new-wall selections: those walls had failed the intended opportunity gate. **Zero fresh executions**
+opened, and the invalid arm supplies no strength estimate.
+
+The hook returned a masked copy of the score array, while `SearchDriver` retained the original array
+in its material evidence. Later A19 arbitration could therefore reselect the wall using unmasked means;
+the final neural guard did not undo that already-selected action. The helper's pure gate was correct,
+but the integration did not implement the registered policy. This is a research-harness failure, not
+a change or newly introduced defect in the shipped default.
+
+A separate diagnostic verifier preserves the failure while checking every execution. All 65 observer
+pairs, 24 cold repeats and 130 original Mac versus Puffalo off/v1 comparisons match exactly. Source,
+input, health, model and original-candidate invariants pass. There were 30 v2 additional comparisons and
+25 opportunity masks; 20 masked walls were nevertheless selected. The failed capsule and original
+registration remain intact. No automatic retry or extension was sent.
+
+The correction uses the same selection array retained by material arbitration, preserving an independent
+raw-forecast copy for audits. Its regression tests exercise both real material and neural selector
+functions. A separately recorded corrected execution must pass full admission before opening the
+previously reserved, still-unopened fresh bank. The route policy, margin, old comparator, strength gates
+and original hard cutoff remain unchanged.
+
+The [corrected execution](nightmare_route_selection_corrected_research.md) has its own registration and
+capsule. It retains six Puffalo workers and adds four local workers with balanced, fixed host assignment;
+every paired comparison remains on one host. Preserve both records rather than overwriting this failure.

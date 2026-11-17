@@ -664,9 +664,9 @@ of the pilot result. Fixing the trained representation needs a new contract, new
 and serving-cost qualification. Future route-aware wall work must also price allied access and the
 attack/Empower turn given up. Preserve the accepted A19 neural pair and adopted barrel correction.
 
-## Registered Nightmare route-preservation follow-up
+## Halted Nightmare route-preservation admission
 
-The distinct `nightmare-route-preserving-wall-v1` follow-up is registered and running, not a qualified
+The distinct `nightmare-route-preserving-wall-v1` follow-up halted before fresh games, not a qualified
 gain. Read `docs/nightmare_route_preservation_research.md` and preserve its evidence fixture's full
 scanned reservations. The original wall checkpoint above remains immutable and inactive. The new
 helper filters its proposal using current native routes, protects allied safe approaches, declines
@@ -677,4 +677,18 @@ changed cases for admission and 216 fresh families / 864 paired comparisons agai
 original v1. Preserve all four arms, all outcomes and simultaneous confidence/doctrine gates. The
 original hard cutoff is November 17 at 09:51:21 UTC: six nice-19 Puffalo CPU workers, no GPU, no
 automatic retry or extension. Inspect the capsule's status and terminal receipts before starting work.
-No result permits automatic adoption, and opened admission cases never count as fresh strength.
+The first run completed 284 old-case executions, then failed selection-quality verification: 20 masked
+walls were reselected because cached material evidence retained an unmasked array. All observer/cold
+repeats and 130 cross-host off/v1 traces match. No fresh executions opened. Preserve the failed capsule;
+fixing this harness requires masking its shared selection array and separately recording a corrected
+execution before opening the reserved bank. No result permits automatic adoption, and opened admission
+cases never count as fresh strength.
+
+The manually reviewed corrected execution is now registered as
+`nightmare-route-selection-corrected-20261117`; read its separate research document and evidence fixture.
+Registration `a2a5e57a790f1e9376f75c63aa3389df88175693038de179c7f006cccd0b1dba` preserves the exact policy,
+previously unopened 216-family bank, gates and original cutoff. The adapter masks the shared selection
+array used by material arbitration and final neural correction, retaining raw forecasts separately.
+530 tests and eight old-case canaries pass. Six Puffalo plus four local nice-19 workers use a frozen,
+balanced host assignment, keeping each family's four arms and repeats together. Inspect this corrected
+capsule's terminal receipt; do not restart either run automatically or mistake registration for a win.
