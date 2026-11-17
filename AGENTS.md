@@ -746,3 +746,21 @@ confirmation or serving timing opened and no model/default changed. Preserve ina
 Do not retune it on this bank, substitute more walking for a strength gain or weaken its closed gates.
 Further native-forecast consistency work needs a distinct candidate and fresh channels, retaining
 this result, the adopted barrel correction and the earlier failed own-barrel/search-reply studies.
+
+## Registered barrel forecast-intent experiment
+
+`barrel-forecast-native-intent-v1` is a distinct running forecast-only hypothesis on the adopted v9
+baseline. Read `docs/barrel_forecast_intent_research.md` and preserve its registration fixture's full
+scanned raw/permuted reservations, including rejected/unused scans. Strength registration is
+`b9f7c9300dab52009a9d2164954a26f549edc355d82e63d2c43a187302a61e02`.
+It keeps earlier native move/wait/defend intentions only inside the entrant driver's projected melee
+barrel cleanup, symmetrically for both future armies. Native root incumbents and selection code stay
+unchanged; different forecast values may change actual chosen actions. It adds no rollout or model.
+
+All 144 functional/cold executions passed, including 18 exact cross-host fights. The fresh screen is
+216 legal draft families / 2,592 three-arm fights. Six local and four 9800X3D nice19 workers share a
+fixed November17 18:25:26 UTC cutoff, with no automatic retry, extension or post-combat reassignment.
+Inspect both live processes and terminal receipts before intervening. Keep full primary/confidence,
+map/doctrine/style, coverage and +10% serial cost gates. No qualification/confirmation is reserved and
+no default changes automatically. Preserve the adopted barrel correction, closed shortlist rule,
+failed own-barrel guard and searched-reply study; do not rescue a failed gate or favorable subgroup.
