@@ -728,3 +728,21 @@ v1 remains diagnostic. Six local and twelve Puffalo nice-19 CPU workers have a t
 November 17 18:30:31 UTC, no GPU, retry or extension. Read status/terminal receipts before intervening.
 Do not mistake registration or missing-comparison coverage for a gain. No default/weights/Premium
 change or automatic promotion is authorized by this study. Preserve all earlier failed wall studies.
+
+## Closed melee barrel shortlist coverage follow-up
+
+The distinct `melee-barrel-choice-diversity-v1` study completed against the adopted v9 default.
+Read `docs/melee_barrel_choice_diversity_research.md` and preserve both registration/result fixtures.
+Exclude every scanned preimage in `docs/evidence/melee_barrel_choice_diversity_registration_20261117.json`,
+expanding all eight raw and eight native-permuted channels, including rejected/unused scans.
+Registration is `44a82736e7631a66c2d976911d05ac8bf993bb42f5b786ef16ea66cfcce812f1`.
+
+All 1,353 executions passed quality checks, including 108 fresh families / 1,296 three-arm fights.
+Every one of the 432 primary paired outcomes was unchanged: 0.000000-point gain, ten changed traces
+on seven families, 25 shortlist interventions. Strength and coverage gates failed. The all-zero
+empirical bootstrap interval is degenerate, not proof of zero population effect. No qualification,
+confirmation or serving timing opened and no model/default changed. Preserve inactive helper SHA
+`dd35a741728acf6d2895f664ea330d9e588c4211e9b7ba8b520d45026c332934`, tests and exact type-erasure parity.
+Do not retune it on this bank, substitute more walking for a strength gain or weaken its closed gates.
+Further native-forecast consistency work needs a distinct candidate and fresh channels, retaining
+this result, the adopted barrel correction and the earlier failed own-barrel/search-reply studies.
