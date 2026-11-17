@@ -832,14 +832,25 @@ or tuning on this bank. Distinct uncertain-model work needs new source identity 
 within the +10% full-decision/full-fight cost bound, preserving the accepted neural pair and adopted
 barrel correction.
 
-## Registered paired forecast-model mixture
+## Paired forecast-model mixture passed reused admission
 
 `barrel-forecast-paired-model-mixture-v1` is a separate inactive uncertainty hypothesis after both
 closed forecast rules failed. Read `docs/barrel_forecast_model_mixture_research.md`. It uses one native
 and one original-intent sample within existing full R2, assigning the models by semantic seed parity
-identically across all candidates. Both future armies/owners share a sample's model. Root and non-full
+identically across all candidates. Both future armies/owners share a sample's model. Root incumbent construction and non-full
 probes remain native. No new rollout/inference/RNG draw or learned weights are introduced. Each model
 has only one chance sample, so do not claim unchanged within-model antithetic cancellation or calibrated
 values. Keep the frozen helper, source seal and fixed all-864-case admission gates. Old data cannot
 qualify a new v10 default or rescue a favorable slice. Passing requires fresh v10 evidence, complete
 safety/uncertainty and +10% full-decision/full-fight cost gates; no automatic promotion.
+
+The mixture completed all 1,148 reused executions: +0.983796 score points versus stock and +0.636574
+versus naive v1; regressed outcomes fell 68 to 49. It also erased 35 old gains and introduced 13 old-
+neutral losses. This passes fixed admission, not independent strength. Preserve the admission fixture,
+all raw counts and both failed rules. All 144 v10 functional runs and 8,204 common tests pass; source CI
+is green. Fresh qualification reserves 756 families / 12,096 fights with balanced 540 local/216 Puffalo
+families. Exclude every scanned preimage from
+`docs/evidence/barrel_forecast_model_mixture_qualification_allocation_20261117.json`, expanding eight
+raw/eight native-permuted channels including rejects/unused seeds. Require cold parity and the frozen
+strength registration before combat. Do not retune the mixture coefficient, rescue a subgroup, claim
+v10 strength from reused v9 data, or promote without independent strength/cost/confirmation.

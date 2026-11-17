@@ -44,3 +44,31 @@ These are reused diagnostics, not a fresh strength estimate. Only passing opens 
 study on independent channels against the subsequently adopted v10 default, retaining the accepted
 neural reference, complete uncertainty/map/doctrine/style gates and +10% serving-cost qualification.
 No new qualification/confirmation channels are allocated and no serving default changes here.
+
+## Passed reused admission; fresh v10 study remains unopened
+
+All 1,148 admission executions completed in 761.259 seconds, with all 284 original controls exact and
+independent integer verification matching. On the complete reused 864-case bank, the mixture scored
+**54.282407%** versus 53.298611% stock and 53.645833% naive intent: **+0.983796 points versus stock**,
+**+0.636574 versus naive**. Worsened cases fell from 68 to 49. It recovered 32 old losses fully and three
+partly, but lost 35 old gains and introduced 13 losses among previously unchanged cases. This is a
+positive net diagnostic result, not a universal fix or an independent population estimate.
+See the [admission fixture](evidence/barrel_forecast_model_mixture_admission_20261117.json).
+
+All 144 reused v10 functional runs passed: 108 original control traces/inputs/scores, 36 observer pairs
+and twelve no-barrel pairs match exactly. Both models are exercised. All 8,204 common tests, lint,
+TypeScript and compiled copies pass; hosted implementation CI is green. These controls establish
+integration and reproducibility, not v10 strength.
+
+The [fresh allocation](evidence/barrel_forecast_model_mixture_qualification_allocation_20261117.json)
+reserves 756 independent families, four matched cases and four fixed arms: **12,096 full fights**.
+Every style has seven complete map/own-doctrine/opponent-doctrine cycles. Five cycles per style stay
+local (540 families), two on Puffalo (216); every family's full arm set stays on one host. All native
+public Setup inputs were constructed before combat. Independent Bun reconstruction verifies every
+scanned seed, native permutation, first-eligible selection and balanced host/factor cell.
+
+Preserve all 101,505 scanned preimages, including rejected and unused seeds: 1,623,777 unique raw/derived
+channels, 1,548,288 reserved channels, zero intersection with 20,562,338 prior excluded channels. No
+fresh combat has opened at allocation. Exact local/Puffalo cold controls must pass before the frozen
+strength registration starts either shard. The registered score, confidence, safety, coverage and
+subsequent +10% serial-cost/fresh-confirmation gates remain unchanged. The serving default is intact.

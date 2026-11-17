@@ -1,0 +1,138 @@
+{
+    "id": "barrel-forecast-paired-model-mixture-v1-reused-admission",
+    "status": "passed-reused-admission-unqualified",
+    "regression": {
+        "id": "barrel-forecast-paired-model-mixture-v1-regression-admission",
+        "at": "2026-11-17T17:58:03.320836+00:00",
+        "complete": true,
+        "independentStrength": false,
+        "baseline": "Frozen v9 on fully reused original bank. No v10 strength inference.",
+        "cases": 864,
+        "executions": 1148,
+        "originalControlsExact": 284,
+        "armHalfPoints": {
+            "stock": 921,
+            "naive": 927,
+            "mixture": 938
+        },
+        "armScores": {
+            "stock": 0.5329861111111112,
+            "naive": 0.5364583333333334,
+            "mixture": 0.5428240740740741
+        },
+        "mixtureMinusNaivePoints": 0.6365740740740741,
+        "mixtureMinusStockPoints": 0.9837962962962963,
+        "outcomeCensus": {
+            "oldRegressions": 68,
+            "oldGains": 74,
+            "oldUnchanged": 722,
+            "mixtureRegressions": 49,
+            "mixtureGains": 57,
+            "mixtureUnchanged": 758,
+            "oldRegressionsFullyRecovered": 32,
+            "oldRegressionsPartiallyRecovered": 3,
+            "oldGainsFullyRetained": 39,
+            "oldGainsReducedButPositive": 0,
+            "oldGainsLost": 35,
+            "newRegressionsIncludingOldNeutral": 13,
+            "oldNeutralNewLosses": 13,
+            "oldNeutralNewGains": 18,
+            "mixtureAboveNaive": 56,
+            "mixtureBelowNaive": 49
+        },
+        "forecastCoverage": {
+            "eligibleProjectedIntentChanges": 109175,
+            "nativeModelCleanupRetained": 44039,
+            "otherIntentsRetained": 65136,
+            "nativeFullR2Samples": 105457,
+            "intentFullR2Samples": 105248
+        },
+        "admissionGates": {
+            "allOriginalControlsExact": true,
+            "allEngineModelCallbacksValid": true,
+            "bothModelsExercised": true,
+            "fewerRegressionsThanNaive": true,
+            "higherTotalScoreThanNaive": true
+        },
+        "admissionPassed": true,
+        "registrationSha256": "69c3d050a84a83b30511e3f414ecb892526158894a2dbc81a1389b699e6598e8",
+        "rawSha256": {
+            "replays/worker-0.jsonl": "ed5ef454a62cf23c09068987bcf7734b91e658e301da04d2f63c7bc3b41c1a6b",
+            "replays/worker-1.jsonl": "7dd3888f8f9c7ee5a4e7d2111860108325a1ca88d1812ca82820a86ec4ddbad4",
+            "replays/worker-2.jsonl": "8b73594a9a012497d646b39855663b11f047a09eae4b2c9c170cf25379e15dbd",
+            "replays/worker-3.jsonl": "0c1074eb04b4affe6e2b4c04d1e50fcf08b2ee15a8b7eaed51fa53ff51433196",
+            "replays/worker-4.jsonl": "826378d78cfd87e6d421ada9f168744315ccc668bfb9e70c2fb9afd77d172caa",
+            "replays/worker-5.jsonl": "b25789554cf0ba8623c77ffd850ac6d7160769b0946f50e2134dffb6288168e2"
+        },
+        "limits": "All old cases included, even unchanged outcomes, but this is reused diagnostic data. No population CI or qualified gain is claimed; passing only opens fresh v10 registration. Never tune source or rescue a subset on this bank."
+    },
+    "independentVerification": {
+        "passed": true,
+        "at": "2026-11-17T17:58:03.532Z",
+        "cases": 864,
+        "exactControls": 284,
+        "halfPoints": {
+            "stock": 921,
+            "naive": 927,
+            "mixture": 938
+        },
+        "census": {
+            "oldRegressions": 68,
+            "oldGains": 74,
+            "oldUnchanged": 722,
+            "mixtureRegressions": 49,
+            "mixtureGains": 57,
+            "mixtureUnchanged": 758,
+            "oldRegressionsFullyRecovered": 32,
+            "oldRegressionsPartiallyRecovered": 3,
+            "oldGainsFullyRetained": 39,
+            "oldGainsReducedButPositive": 0,
+            "oldGainsLost": 35,
+            "newRegressionsIncludingOldNeutral": 13,
+            "oldNeutralNewLosses": 13,
+            "oldNeutralNewGains": 18,
+            "mixtureAboveNaive": 56,
+            "mixtureBelowNaive": 49
+        },
+        "admissionPassed": true,
+        "scope": "Independent integer reconstruction using original full bank records, not analysis.expectedScore; diagnostic only, no population CI",
+        "analysisSha256": "b332d1ec8d9a1d8dac8cdf63630893fb9160b1f68efee5b3e2d92a50ba44494f"
+    },
+    "v10Functional": {
+        "passed": true,
+        "at": "2026-11-17T17:54:43.487528+00:00",
+        "scope": "Exact reused functional controls on adopted v10, not strength evidence",
+        "fights": 144,
+        "priorV10ControlInputsFullTracesScoresExact": 108,
+        "observerPairsExact": 36,
+        "noBarrelMixturePairsExact": 12,
+        "fullTurnModelSampleCalls": {
+            "native": 3991,
+            "intent": 3961
+        },
+        "nativeModelKeptCleanup": 1113,
+        "intentModelChangedCleanup": 1843,
+        "changedFullTraces": 15,
+        "registrationSha256": "f9e4d6f748f844dae8239950de761f96d6ac21d0f3c943fb7c398a0344ea5279",
+        "rawSha256": {
+            "replays/worker-0.jsonl": "24350debbba4bfe074f9e95aea547edca37a77fc27ec07468af9de6fd45103cc",
+            "replays/worker-1.jsonl": "56a0099ead85f625e663602416f2bd313f1e1ec6a48d0cf6798ea729e03fb97d",
+            "replays/worker-2.jsonl": "23b884bcee99a30a650bd87a24353f0ef46b4f357659f4f0e41af04f54287083"
+        }
+    },
+    "sourceSha256": "afcb5b44789a1c0d2e4a5c5f054bebf5d8b58b90f30142e77698da1a3947d50f",
+    "tests": {
+        "pass": 8204,
+        "fail": 0,
+        "files": 696,
+        "seconds": 170.99,
+        "lint": true,
+        "typecheck": true,
+        "compiledDistAndCopies": true,
+        "hostedSourceCI": "https://github.com/o1dstaRs/heroes-of-crypto-common/actions/runs/44141417304"
+    },
+    "defaultChanged": false,
+    "qualifiedStrength": false,
+    "serialTimingQualified": false,
+    "limits": "The old-data +0.983796-point contrast is reused diagnostic evidence. It is not an independent v10 gain or a no-regression claim: 35 old gains were lost and 13 old-neutral cases worsened. Only fixed fresh strength/cost/confirmation can qualify promotion."
+}
