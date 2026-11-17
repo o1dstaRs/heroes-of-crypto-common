@@ -12,6 +12,7 @@
 import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
 import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
+import { A19_NIGHTMARE_WALL_MOVEMENT_POLICY } from "../nightmare_wall_movement";
 import { BATTLE_MAGE_TARGET_POLICY } from "../battle_mage_targets";
 
 import { StrategyV0_8 } from "./v0_8";
@@ -62,7 +63,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
  *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v9" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v10" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -95,6 +96,8 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: "1",
     // Fresh 12,096-game confirmation: compare melee clears with legal movement and holds, never force them.
     SEARCH_A19_MELEE_BARREL_DELIBERATION: "1",
+    // Explicit user adoption; preserve the positive estimate and failed qualification separately.
+    SEARCH_A19_NIGHTMARE_WALL_MOVEMENT: "1",
     // Keep one broader single-target Gravechain attack for the horizon to price its movement denial.
     SEARCH_A19_GRAVECHAIN_COVERAGE: "1",
     // Give a wounded Last Fuse stack one supported counter-trade stand for real-engine comparison.
@@ -133,7 +136,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8078c75f34a4030ad5c767c" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "24b8ac37cea8c69731cd7ff1069a022dbfb46814e896514b87f816e3052602c4" as const;
+    "820db7a1f8eb9243a9d79e6ac68eff1df706c2d148a9d0606c28efaa709258ba" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -165,7 +168,12 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "melee-barrel-rollback-environment" as const,
         source: "src/ai/versions/v0_8_a13_profile.ts" as const,
-        sha256: "5ba904ec9c1872e93ae87c791a8a84400a4eb3d3372aa2ffa11963079f59c715" as const,
+        sha256: "49ac200e138d50f13a90d4b199b27d020abe523862d6464a25fed01c5a1d7264" as const,
+    }),
+    Object.freeze({
+        role: "nightmare-wall-movement" as const,
+        source: "src/ai/nightmare_wall_movement.ts" as const,
+        sha256: "2618932cb65f4205ce4a82ec9ff54c41797ee4ca4e85bed6126374957d245020" as const,
     }),
     Object.freeze({
         role: "battle-mage-targets" as const,
@@ -181,7 +189,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Battle Mage retains distinct Meteorite impacts in both production enumeration paths.
-        sha256: "cc9493295f252866aab86113903b7832992319937f36b9efcd4382895a1e778e" as const,
+        sha256: "6d2cecce705f56e8bc753f73ccddc0b40a96d727c8d76e31cc99f0cb62a21ab6" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
@@ -426,6 +434,7 @@ export const V08_A19_PROFILE = Object.freeze({
     wanderingMageSupport: A19_WANDERING_MAGE_SUPPORT_POLICY,
     unitSupport: A19_UNIT_SUPPORT_POLICY,
     battleMageTargets: BATTLE_MAGE_TARGET_POLICY,
+    nightmareWallMovement: A19_NIGHTMARE_WALL_MOVEMENT_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

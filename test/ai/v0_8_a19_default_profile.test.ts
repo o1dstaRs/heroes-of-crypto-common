@@ -53,6 +53,7 @@ const ENV_KEYS = [
     "V08_VISIBLE_EDGE_SCREEN_PRESSURE",
     "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
     "SEARCH_A19_MELEE_BARREL_DELIBERATION",
+    "SEARCH_A19_NIGHTMARE_WALL_MOVEMENT",
     "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
     "SEARCH_A19_ROLLOUT_ALLOCATION",
     "SEARCH_A19_COMPLEMENTARY_R2",
@@ -90,7 +91,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v9",
+            schema: "hoc.v0_8_a19_production_profile.v10",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -198,6 +199,38 @@ describe("v0.8+A19 production profile", () => {
         );
     });
 
+    it("seals user-adopted Nightmare coverage for live and offline A19, with a strict rollback", () => {
+        process.env.SEARCH_A19_NIGHTMARE_WALL_MOVEMENT = "0";
+        expect(V08_A19_PROFILE.nightmareWallMovement).toMatchObject({
+            policyId: "nightmare-wall-movement-coverage-v1",
+            adoption: "explicit-user-instruction",
+            qualification: "closed-development-failed",
+        });
+        for (const offlineDeterministicWork of [false, true]) {
+            const match = { greenVersion: "v0.8", redVersion: "v0.8", offlineDeterministicWork };
+            expect(createV08A19SearchDriver({} as ILookaheadDeps, match)).toMatchObject({
+                a19NightmareWallMovement: true,
+                horizon: 64,
+                rollouts: 2,
+                shortlist: 6,
+            });
+        }
+        const match = { greenVersion: "v0.8", redVersion: "v0.8" };
+        process.env.SEARCH_A19_NIGHTMARE_WALL_MOVEMENT = "1";
+        expect(createV08A13SearchDriver({} as ILookaheadDeps, match)).toMatchObject({
+            a19NightmareWallMovement: false,
+        });
+        expect(shouldUseDefaultV08A19Search({ greenVersion: "v0.9", redVersion: "v0.9" })).toBe(false);
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_NIGHTMARE_WALL_MOVEMENT: "0" });
+        expect(createV08A19SearchDriver({} as ILookaheadDeps, match)).toMatchObject({
+            a19NightmareWallMovement: false,
+        });
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_NIGHTMARE_WALL_MOVEMENT: "yes" });
+        expect(() => createV08A19SearchDriver({} as ILookaheadDeps, match)).toThrow(
+            "SEARCH_A19_NIGHTMARE_WALL_MOVEMENT must be 0 or 1",
+        );
+    });
+
     it("keeps the unqualified barrel candidate off unless explicitly overridden for research", () => {
         process.env.SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION = "1";
         expect(buildV08A19SearchEnvironment().SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION).toBe("0");
@@ -279,6 +312,7 @@ describe("v0.8+A19 production profile", () => {
         expect(V08_A19_PROFILE.sourceLedger).toBe(V08_A19_SOURCE_LEDGER);
         expect(V08_A19_SOURCE_LEDGER.map(({ role }) => role)).toEqual([
             "melee-barrel-rollback-environment",
+            "nightmare-wall-movement",
             "battle-mage-targets",
             "native-v08-combat",
             "search-driver",

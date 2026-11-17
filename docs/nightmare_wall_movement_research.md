@@ -1,5 +1,9 @@
 # Nightmare wall movement comparison coverage
 
+**Subsequent user decision:** the exact candidate was explicitly adopted into the A19 default on
+November 17, after this study closed. See [the separate adoption record](nightmare_wall_movement_adoption.md).
+The study results, failed gates and research sources below remain historical and unchanged.
+
 `nightmare-wall-movement-coverage-v1` is a distinct offline candidate following the
 [failed route-preservation study](nightmare_route_selection_corrected_research.md). It preserves the
 immutable original ground-wall proposal and adds one omitted native movement comparison. It does not

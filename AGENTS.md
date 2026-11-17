@@ -1,5 +1,27 @@
 # Agent guidance
 
+## Explicit Nightmare wall and movement adoption — November 17, 2026
+
+After reviewing the completed movement study, the user explicitly requested “that is strong... we
+should save those into default strategy”. This activates the exact combined ground-wall and missing
+movement candidate in the A19-backed v0.8 default, profile v10. It supersedes the historical
+non-activation notes below for this candidate only. Read `docs/nightmare_wall_movement_adoption.md`.
+
+The serving helper is `src/ai/nightmare_wall_movement.ts`, default switch
+`SEARCH_A19_NIGHTMARE_WALL_MOVEMENT=1`, policy `nightmare-wall-movement-coverage-v1`. Preserve every
+native shortlist entry and its order, then the extra legal ground wall, then at most one already
+leaf-scored pure move if none survived. Full H64/R2, material arbitration and neural correction still
+choose the action. Use only current public combat information. Do not activate the failed route
+veto, invent an extra attack preference, change draft/setup/models, or switch the wire default to v0.9.
+The a13 rollback clears the switch; explicit A19 research overrides may set it to 0.
+
+This is explicit user adoption with remaining uncertainty, not a statistical qualification. Preserve
+the original +0.520833-point estimate versus the previous default, simultaneous 95% interval
+−1.157407 to +2.256944, negative five-point doctrine slice and failed gates. Keep both immutable
+research helpers, the full evidence fixture and its excluded channels unchanged. Subsequent research
+must use the adopted default as its comparator; already-running frozen studies retain their original
+comparators and need separate confirmation against v10 before claiming a new default gain.
+
 ## Explicit A19 default adoption, November 14, 2026
 
 The user subsequently requested “lock in wins into default v19 and continue diving deep”. There is no

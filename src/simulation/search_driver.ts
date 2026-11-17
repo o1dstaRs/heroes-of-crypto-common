@@ -40,6 +40,11 @@ import {
     type IDecisionContext,
     type IEnumeratedCandidate,
 } from "../ai";
+import {
+    appendNightmareGroundWall,
+    proposeNightmareGroundWall,
+    reserveNightmareWallMovement,
+} from "../ai/nightmare_wall_movement";
 import { throughShotLineEnabled } from "../ai/through_shot_line";
 import { battleMageTargetsEnabled } from "../ai/battle_mage_targets";
 import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
@@ -1432,6 +1437,7 @@ export class SearchDriver {
     private readonly a19MaterialLowEvidenceWinningSamples: number;
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
     private readonly a19MeleeBarrelDeliberation: boolean;
+    private readonly a19NightmareWallMovement: boolean;
     private readonly a19GravechainCoverage: boolean;
     private readonly a19WanderingMageSupport: boolean;
     private readonly a19LastFuseTrades: boolean;
@@ -1734,6 +1740,16 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_MELEE_BARREL_DELIBERATION must be 0 or 1");
         }
         this.a19MeleeBarrelDeliberation = this.mode === "search" && meleeBarrelDeliberation === "1";
+        const nightmareWallMovement = searchEnv("SEARCH_A19_NIGHTMARE_WALL_MOVEMENT");
+        if (
+            nightmareWallMovement !== undefined &&
+            nightmareWallMovement !== "" &&
+            nightmareWallMovement !== "0" &&
+            nightmareWallMovement !== "1"
+        ) {
+            throw new Error("SEARCH_A19_NIGHTMARE_WALL_MOVEMENT must be 0 or 1");
+        }
+        this.a19NightmareWallMovement = this.mode === "search" && nightmareWallMovement === "1";
         const gravechainCoverage = searchEnv("SEARCH_A19_GRAVECHAIN_COVERAGE");
         if (
             gravechainCoverage !== undefined &&
@@ -4779,9 +4795,19 @@ export class SearchDriver {
         prioritizeV08STargetPressure = false,
         prioritizeV08SUrgency = false,
     ): readonly IEnumeratedCandidate[] {
+        // Propose on the live root before the leaf pre-pass. Keep the native prefix and reuse that
+        // pre-pass for movement coverage; the ordinary bounded H64/R2 comparison still chooses.
+        const wall =
+            this.a19NightmareWallMovement && version === "v0.8" && unit.getName() === "Nightmare"
+                ? proposeNightmareGroundWall(
+                      unit,
+                      { ...this.deps, matrix: this.deps.grid.getMatrix(), decisionOrigin: "root" },
+                      candidates,
+                  )
+                : undefined;
         const shortlist = this.effectiveShortlist(version, unit);
         if (shortlist === null || candidates.length <= shortlist) {
-            return candidates;
+            return appendNightmareGroundWall(candidates, wall);
         }
         const scores = this.scoreCandidates(unit, candidates, seedBase, "leaf", 1, deadlineAt);
         const rankedChallengers = this.shortlistRankScratch;
@@ -4957,7 +4983,10 @@ export class SearchDriver {
         if (this.a19LastFuseTrades && V08_AGGRESSIVE_VERSIONS.has(version)) {
             challengers = reserveLastFuseShortlistCandidate(candidates, challengers);
         }
-        return [candidates[0], ...challengers];
+        const retained = appendNightmareGroundWall([candidates[0], ...challengers], wall);
+        return wall
+            ? reserveNightmareWallMovement(unit, { decisionOrigin: "root" }, candidates, retained, scores, wall)
+            : retained;
     }
     // ---- Q2 gate-0 ablation ---------------------------------------------------------------------
     private static isWaitCandidate(c: IEnumeratedCandidate): boolean {
