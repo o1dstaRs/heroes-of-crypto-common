@@ -594,3 +594,25 @@ this a strength win, broaden this closed candidate on its opened bank or bypass 
 No fresh channels/banks were allocated and no default changed. Further value or movement hypotheses
 need separate identities and fresh evidence; actual committed turns are authoritative over a prototype
 selector's intermediate choice. The separate actual-outcome geometry collection remains untouched.
+
+## User-locked melee barrel correction (November 16, 2026)
+
+The user requested “lock it in and continue” after the complete independent confirmation. Preserve the
+A19 profile v9 default-on `SEARCH_A19_MELEE_BARREL_DELIBERATION` correction described in
+`docs/melee_barrel_deliberation.md`. It compares melee deployment-barrel incumbents with legal movement,
+wait and defend using the existing H64/R2/K6 search, rather than inheriting the neutral cemetery fast
+return or a forced-productive preference. Useful clears remain; ranged/neutral cleanup and native rollout
+policy stay unchanged. Wire version remains v0.8 and no model weights changed.
+
+All 1,512 fresh families / 12,096 fights completed: +0.620040 score points, whole-family 95% +0.124008 to
++1.132606, with positive means on every map, own doctrine and fixed opponent style. This is conditional
+on legally drafted barrel-containing families, not an unconditional global win rate. Independent input,
+integer-score and bootstrap reconstruction passed. Serial complete-fight CPU increased at most 0.711645%
+on the measured host, and bounded-live checks passed. Keep the compact evidence fixture
+`docs/evidence/melee_barrel_deliberation_20261116.json`, including every scanned raw/permuted seed channel.
+The original node handoff was not executed; strength games all stayed local.
+
+Future combat studies use this adopted default as their incumbent, with off only as an explicit ablation.
+Do not overwrite its confirmed result, reopen its bank, enable the older failed own-barrel fallback guard,
+or infer that native rollout cleanup is now qualified. Any continuation needs a distinct candidate and
+fresh channels; preserve the accepted neural pair and all earlier failed research references.

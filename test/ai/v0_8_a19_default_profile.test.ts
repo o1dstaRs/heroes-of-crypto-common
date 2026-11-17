@@ -41,7 +41,7 @@ import {
     shouldUseDefaultV08A19Search,
     V08_A19_SEARCH_OVERRIDE_ENV,
 } from "../../src/simulation/v0_8_a19_search";
-import { V08_A13_SEARCH_OVERRIDE_ENV } from "../../src/simulation/v0_8_a13_search";
+import { createV08A13SearchDriver, V08_A13_SEARCH_OVERRIDE_ENV } from "../../src/simulation/v0_8_a13_search";
 
 const ENV_KEYS = [
     V08_A19_SEARCH_OVERRIDE_ENV,
@@ -52,6 +52,7 @@ const ENV_KEYS = [
     "Q2_ORACLE",
     "V08_VISIBLE_EDGE_SCREEN_PRESSURE",
     "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
+    "SEARCH_A19_MELEE_BARREL_DELIBERATION",
     "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
     "SEARCH_A19_ROLLOUT_ALLOCATION",
     "SEARCH_A19_COMPLEMENTARY_R2",
@@ -89,7 +90,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v8",
+            schema: "hoc.v0_8_a19_production_profile.v9",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -172,6 +173,31 @@ describe("v0.8+A19 production profile", () => {
         expect(() => createV08A19SearchDriver({} as ILookaheadDeps, match)).toThrow("SEARCH_A19_COMPLEMENTARY_R2");
     });
 
+    it("seals measured melee barrel deliberation on while retaining an explicit rollback", () => {
+        process.env.SEARCH_A19_MELEE_BARREL_DELIBERATION = "0";
+        expect(buildV08A19SearchEnvironment().SEARCH_A19_MELEE_BARREL_DELIBERATION).toBe("1");
+        const match = { greenVersion: "v0.8", redVersion: "v0.8", offlineDeterministicWork: true };
+        expect(createV08A19SearchDriver({} as ILookaheadDeps, match)).toMatchObject({
+            a19MeleeBarrelDeliberation: true,
+            horizon: 64,
+            rollouts: 2,
+            shortlist: 6,
+        });
+        process.env.SEARCH_A19_MELEE_BARREL_DELIBERATION = "1";
+        expect(createV08A13SearchDriver({} as ILookaheadDeps, match)).toMatchObject({
+            a19MeleeBarrelDeliberation: false,
+            horizon: 12,
+        });
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_MELEE_BARREL_DELIBERATION: "0" });
+        expect(createV08A19SearchDriver({} as ILookaheadDeps, match)).toMatchObject({
+            a19MeleeBarrelDeliberation: false,
+        });
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_MELEE_BARREL_DELIBERATION: "invalid" });
+        expect(() => createV08A19SearchDriver({} as ILookaheadDeps, match)).toThrow(
+            "SEARCH_A19_MELEE_BARREL_DELIBERATION must be 0 or 1",
+        );
+    });
+
     it("keeps the unqualified barrel candidate off unless explicitly overridden for research", () => {
         process.env.SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION = "1";
         expect(buildV08A19SearchEnvironment().SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION).toBe("0");
@@ -252,6 +278,7 @@ describe("v0.8+A19 production profile", () => {
     it("pins the bytes of every source its behavior depends on", () => {
         expect(V08_A19_PROFILE.sourceLedger).toBe(V08_A19_SOURCE_LEDGER);
         expect(V08_A19_SOURCE_LEDGER.map(({ role }) => role)).toEqual([
+            "melee-barrel-rollback-environment",
             "battle-mage-targets",
             "native-v08-combat",
             "search-driver",

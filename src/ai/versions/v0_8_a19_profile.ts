@@ -62,7 +62,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
  *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v8" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v9" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -93,6 +93,8 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     // One-hit deployment barrels. Search compares a barrel that blocks a friendly shot, and otherwise
     // the nearest enemy barrel only when nothing else deals damage. Classic mountain mining stays banned.
     SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: "1",
+    // Fresh 12,096-game confirmation: compare melee clears with legal movement and holds, never force them.
+    SEARCH_A19_MELEE_BARREL_DELIBERATION: "1",
     // Keep one broader single-target Gravechain attack for the horizon to price its movement denial.
     SEARCH_A19_GRAVECHAIN_COVERAGE: "1",
     // Give a wounded Last Fuse stack one supported counter-trade stand for real-engine comparison.
@@ -131,7 +133,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8078c75f34a4030ad5c767c" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "c08547c87fd69621b6dfd4722e160b543f29d00622eec7d9458257d5ffb81137" as const;
+    "24b8ac37cea8c69731cd7ff1069a022dbfb46814e896514b87f816e3052602c4" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -161,6 +163,11 @@ export const V08_A19_PLACEMENT_POLICY = Object.freeze({
  */
 export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
+        role: "melee-barrel-rollback-environment" as const,
+        source: "src/ai/versions/v0_8_a13_profile.ts" as const,
+        sha256: "5ba904ec9c1872e93ae87c791a8a84400a4eb3d3372aa2ffa11963079f59c715" as const,
+    }),
+    Object.freeze({
         role: "battle-mage-targets" as const,
         source: "src/ai/battle_mage_targets.ts" as const,
         sha256: "a185a1361e3781cc2e41a8774d86cda77cf986617f7494c2be9ffe87775b86c6" as const,
@@ -174,7 +181,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Battle Mage retains distinct Meteorite impacts in both production enumeration paths.
-        sha256: "36b64f45920cac8512c728b7be192a9cf5a04dd62e6401f0bd5e8e76e61ead29" as const,
+        sha256: "cc9493295f252866aab86113903b7832992319937f36b9efcd4382895a1e778e" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,

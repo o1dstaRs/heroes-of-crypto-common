@@ -10,6 +10,7 @@
  */
 
 import { friendlyShotBlockingBarrels } from "../ai/artifact_barrel_tactics";
+import { getCellForPosition } from "../grid/grid_math";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../ai/wandering_mage_support";
 import { reserveGravechainShortlistCandidate } from "../ai/gravechain_shortlist";
 import { includeImprovingLastFuseTrade, reserveLastFuseShortlistCandidate } from "../ai/last_fuse_tactics";
@@ -1430,6 +1431,7 @@ export class SearchDriver {
     private readonly a19MaterialArbitration: A19MaterialArbitrationMode | undefined;
     private readonly a19MaterialLowEvidenceWinningSamples: number;
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
+    private readonly a19MeleeBarrelDeliberation: boolean;
     private readonly a19GravechainCoverage: boolean;
     private readonly a19WanderingMageSupport: boolean;
     private readonly a19LastFuseTrades: boolean;
@@ -1722,6 +1724,16 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE must be 0 or 1");
         }
         this.a19ArtifactBarrelAttackCoverage = this.mode === "search" && barrelCoverage === "1";
+        const meleeBarrelDeliberation = searchEnv("SEARCH_A19_MELEE_BARREL_DELIBERATION");
+        if (
+            meleeBarrelDeliberation !== undefined &&
+            meleeBarrelDeliberation !== "" &&
+            meleeBarrelDeliberation !== "0" &&
+            meleeBarrelDeliberation !== "1"
+        ) {
+            throw new Error("SEARCH_A19_MELEE_BARREL_DELIBERATION must be 0 or 1");
+        }
+        this.a19MeleeBarrelDeliberation = this.mode === "search" && meleeBarrelDeliberation === "1";
         const gravechainCoverage = searchEnv("SEARCH_A19_GRAVECHAIN_COVERAGE");
         if (
             gravechainCoverage !== undefined &&
@@ -2395,14 +2407,29 @@ export class SearchDriver {
         const passiveIncumbentKind = searchPassiveActionKind(incumbent);
         const isV08Search = this.mode === "search" && V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version);
         const isAggressiveV08 = this.aggressiveV08 && V08_AGGRESSIVE_VERSIONS.has(version);
-        // The v0.8 anchor emits a cemetery strike only after its final policy pass has ruled out a living-unit
-        // attack or cast. Each scattered stone dies in one hit, so this is productive terrain clearing rather
-        // than the multi-turn classic mountain mining that search is designed to replace with an advance.
+        const obstacleStrike = incumbent.find((action) => action.type === "obstacle_attack");
+        const obstacleCell =
+            this.a19MeleeBarrelDeliberation &&
+            obstacleStrike &&
+            unit.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE
+                ? getCellForPosition(this.deps.grid.getSettings(), obstacleStrike.targetPosition)
+                : undefined;
+        const deliberateBarrel =
+            isV08Search &&
+            !!obstacleCell &&
+            this.deps.grid
+                .getArtifactBarrels()
+                .some((barrel) => barrel.cell.x === obstacleCell.x && barrel.cell.y === obstacleCell.y);
+        // Deployment barrels also activate scattered terrain. They must not inherit the cemetery fast return:
+        // the native cleanup can replace a deliberate move/hold with a strike on either army's cover. Compare
+        // that strike with legal alternatives using the ordinary bounded search; preserve neutral-stone and
+        // ranged cleanup behavior.
         if (
             isV08Search &&
             this.deps.grid.hasScatteredMountains() &&
             this.deps.grid.getScatteredMountainsStanding().length > 0 &&
-            incumbent.some((action) => action.type === "obstacle_attack")
+            obstacleStrike &&
+            !deliberateBarrel
         ) {
             return incumbent;
         }
@@ -2430,7 +2457,9 @@ export class SearchDriver {
         // lap. Only hard passive/no-op incumbents get the lexicographic productive tier. The research aggressive
         // arm scores a wait normally but uses a zero gate against engine-valid productive actions. The separate
         // two-to-one-HP dominant-finish tier may still force immediate combat late.
-        const prioritizeProductiveActions = isV08Search && V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS.has(incumbentKind);
+        // A barrel clear is a tactical choice, so an advance cannot win merely by being called productive.
+        const prioritizeProductiveActions =
+            isV08Search && !deliberateBarrel && V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS.has(incumbentKind);
         const strongerRangedPostureWait =
             incumbentKind === "wait" &&
             isV08StrongerRangedPostureWait(unit, this.deps.unitsHolder, currentLap, incumbent);
@@ -2771,7 +2800,7 @@ export class SearchDriver {
                 // mountain or Luck Shield as a fail-closed fallback.
                 if (
                     isV08Search &&
-                    (candidate.kind === "mine" || candidate.kind === "defend") &&
+                    (candidate.kind === "mine" || (candidate.kind === "defend" && !deliberateBarrel)) &&
                     !this.keepsArtifactBarrelMine(
                         unit,
                         candidate,
@@ -2794,7 +2823,13 @@ export class SearchDriver {
                 if (!this.includeMoves && candidate.kind === "move" && !isV08Search) {
                     return false;
                 }
-                return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
+                // Leaving cover intact must be executable: the ordinary active-only filter would otherwise
+                // discard both no-touch options before the barrel comparison reaches its fixed shortlist.
+                return (
+                    deliberateBarrel ||
+                    !this.activeChallengers ||
+                    (candidate.kind !== "wait" && candidate.kind !== "defend")
+                );
             };
             const enumeratedCandidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates;
             let candidates = enumeratedCandidates.filter(keepCandidate);

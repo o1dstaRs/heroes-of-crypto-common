@@ -111,6 +111,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_A19_FAST_FLYER_COHESION",
     "SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE",
     "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
+    "SEARCH_A19_MELEE_BARREL_DELIBERATION",
     "SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES",
     "V08_AGGRESSIVE",
     "SEARCH_OBSERVE_ONLY",
@@ -842,6 +843,159 @@ describe("search driver — gating, hygiene, determinism", () => {
         };
 
         expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+    });
+
+    const barrelDeliberationFixture = (map: GridType = PBTypes.GridVals.NORMAL, enemyOwned = false) => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "0.03",
+            SEARCH_ACTIVE_CHALLENGERS: "1",
+            SEARCH_INCLUDE_MOVES: "1",
+            SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: "1",
+            SEARCH_A19_MELEE_BARREL_DELIBERATION: "1",
+            SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE: "1",
+        });
+        const harness = buildBattle(
+            7,
+            "v0.8",
+            undefined,
+            [
+                { faction: "Might", creatureName: "Berserker", level: 3, size: 1, amount: 10 },
+                { faction: "Life", creatureName: "Pikeman", level: 1, size: 1, amount: 10 },
+            ],
+            false,
+            map,
+        );
+        const unit = harness.activeUnit()!;
+        const owner = enemyOwned ? (unit.getTeam() === GREEN_TEAM ? RED_TEAM : GREEN_TEAM) : unit.getTeam();
+        const base = unit.getBaseCell();
+        const cells = [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => ({ x: base.x + dx, y: base.y + dy })));
+        const cell = cells.find((c) => harness.grid.placeArtifactBarrel(owner, 0, c));
+        expect(cell).toBeDefined();
+        const settings = harness.grid.getSettings();
+        const incumbent: GameAction[] = [
+            {
+                type: "obstacle_attack",
+                attackerId: unit.getId(),
+                attackFrom: { ...base },
+                targetPosition: getPositionForCell(
+                    cell!,
+                    settings.getMinX(),
+                    settings.getStep(),
+                    settings.getHalfStep(),
+                ),
+            },
+        ];
+        return { harness, unit, incumbent };
+    };
+    type BarrelTestDriver = {
+        chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        scoreCandidates(unit: Unit, candidates: readonly IEnumeratedCandidate[]): number[];
+        search(): GameAction[];
+    };
+    for (const map of [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER, PBTypes.GridVals.BLOCK_CENTER] as const) {
+        for (const enemyOwned of [false, true]) {
+            for (const preferred of ["move", "wait", "defend"] as const) {
+                it(`compares ${preferred} against a melee barrel clear on map ${map}, enemy owner ${enemyOwned}`, () => {
+                    const { harness, unit, incumbent } = barrelDeliberationFixture(map, enemyOwned);
+                    const before = snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties);
+                    let offered: readonly IEnumeratedCandidate[] = [];
+                    const driver = harness.makeDriver() as unknown as BarrelTestDriver;
+                    driver.scoreCandidates = (_actor, candidates) => {
+                        offered = candidates;
+                        return candidates.map((candidate) => (candidate.kind === preferred ? 0.9 : 0.2));
+                    };
+                    const chosen = driver.chooseDecision(unit, "v0.8", incumbent);
+                    expect(offered.some((candidate) => candidate.kind === preferred)).toBe(true);
+                    const action = { move: "move_unit", wait: "wait_turn", defend: "defend_turn" } as const;
+                    expect(chosen.some((a) => a.type === action[preferred])).toBe(true);
+                    expect(chosen.some((a) => a.type === "obstacle_attack")).toBe(false);
+                    expect(snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties)).toEqual(before);
+                });
+            }
+        }
+    }
+    it("retains a useful barrel clear and the incumbent on equal forecasts", () => {
+        const { harness, unit, incumbent } = barrelDeliberationFixture();
+        const driver = harness.makeDriver() as unknown as BarrelTestDriver;
+        driver.scoreCandidates = (_actor, candidates) => candidates.map((c) => (c.kind === "incumbent" ? 0.9 : 0.2));
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+        driver.scoreCandidates = (_actor, candidates) => candidates.map(() => 0.5);
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+    });
+    it("keeps rollback and ranged cleanup outside melee barrel search", () => {
+        for (const ranged of [false, true]) {
+            const { harness, unit, incumbent } = barrelDeliberationFixture();
+            if (ranged) unit.getAttackTypeSelection = () => PBTypes.AttackVals.RANGE;
+            else process.env.SEARCH_A19_MELEE_BARREL_DELIBERATION = "0";
+            const driver = harness.makeDriver() as unknown as BarrelTestDriver;
+            driver.search = () => {
+                throw new Error("Unchanged cleanup entered search");
+            };
+            expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+        }
+    });
+    it("keeps neutral cemetery cleanup outside melee barrel search", () => {
+        const { harness, unit, incumbent } = barrelDeliberationFixture();
+        const cell = harness.grid.getArtifactBarrels()[0].cell;
+        harness.grid.clearArtifactBarrels(unit.getTeam());
+        harness.grid.setScatteredMountains([cell]);
+        const driver = harness.makeDriver() as unknown as BarrelTestDriver;
+        driver.search = () => {
+            throw new Error("Neutral cleanup entered search");
+        };
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+    });
+    it("restores terrain, units and live randomness after actual barrel forecasts", () => {
+        const { harness, unit, incumbent } = barrelDeliberationFixture();
+        process.env.SEARCH_HORIZON = "64";
+        process.env.SEARCH_ROLLOUTS = "2";
+        process.env.SEARCH_SHORTLIST = "6";
+        const driver = harness.makeDriver();
+        const before = snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties);
+        const source = getDeterministicRandomSource();
+        const chosen = driver.chooseDecision(unit, "v0.8", incumbent);
+        expect(chosen.length).toBeGreaterThan(0);
+        expect(driver.counters.decisions).toBe(1);
+        expect(driver.counters.rolloutTurnsTotal).toBeGreaterThan(0);
+        expect(snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties)).toEqual(before);
+        expect(getDeterministicRandomSource()).toBe(source);
+        for (const action of chosen) expect(harness.engine.apply(action).completed).toBe(true);
+    });
+
+    it("fails closed when a melee barrel comparison exhausts its deadline", () => {
+        const { harness, unit, incumbent } = barrelDeliberationFixture();
+        process.env.SEARCH_DECISION_DEADLINE_MS = "1000";
+        const driver = harness.makeDriver();
+        const internal = driver as unknown as {
+            search(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+            ): GameAction[];
+        };
+        const context: IDecisionContext = {
+            grid: harness.grid,
+            unitsHolder: harness.unitsHolder,
+            matrix: harness.grid.getMatrix(),
+            fightProperties: harness.fightProperties,
+            pathHelper: harness.pathHelper,
+            attackHandler: harness.attackHandler,
+        };
+        const candidates = [...enumerateCandidates(unit, context, incumbent).candidates];
+        const before = snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties);
+        expect(internal.search(unit, candidates, incumbent, 123, performance.now() - 2000)).toBe(incumbent);
+        expect(driver.counters.deadlineFallbacks).toBe(1);
+        expect(snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties)).toEqual(before);
+    });
+
+    it("validates the explicit melee barrel deliberation switch", () => {
+        const { harness } = barrelDeliberationFixture();
+        process.env.SEARCH_A19_MELEE_BARREL_DELIBERATION = "sometimes";
+        expect(() => harness.makeDriver()).toThrow("SEARCH_A19_MELEE_BARREL_DELIBERATION must be 0 or 1");
     });
 
     it("A19 repairs a hard passive only with a nonregressive productive rollout", () => {
