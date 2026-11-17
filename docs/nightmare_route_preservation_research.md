@@ -147,3 +147,8 @@ and original hard cutoff remain unchanged.
 The [corrected execution](nightmare_route_selection_corrected_research.md) has its own registration and
 capsule. It retains six Puffalo workers and adds four local workers with balanced, fixed host assignment;
 every paired comparison remains on one host. Preserve both records rather than overwriting this failure.
+
+The corrected execution subsequently completed all 3,812 registered executions with quality checks
+passing. Its guarded policy scored −0.173611 points versus default and −0.925926 versus original v1 on
+864 fresh paired comparisons, failing development. It remains inactive; the corrected document and
+fixture contain the complete results. This failed first admission remains a separate preserved record.

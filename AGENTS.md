@@ -684,11 +684,29 @@ fixing this harness requires masking its shared selection array and separately r
 execution before opening the reserved bank. No result permits automatic adoption, and opened admission
 cases never count as fresh strength.
 
-The manually reviewed corrected execution is now registered as
-`nightmare-route-selection-corrected-20261117`; read its separate research document and evidence fixture.
-Registration `a2a5e57a790f1e9376f75c63aa3389df88175693038de179c7f006cccd0b1dba` preserves the exact policy,
-previously unopened 216-family bank, gates and original cutoff. The adapter masks the shared selection
-array used by material arbitration and final neural correction, retaining raw forecasts separately.
-530 tests and eight old-case canaries pass. Six Puffalo plus four local nice-19 workers use a frozen,
-balanced host assignment, keeping each family's four arms and repeats together. Inspect this corrected
-capsule's terminal receipt; do not restart either run automatically or mistake registration for a win.
+## Closed corrected Nightmare route-preservation pilot
+
+The corrected execution `nightmare-route-selection-corrected-20261117` completed 3,812 executions before
+the original cutoff. Read `docs/nightmare_route_selection_corrected_research.md` and its evidence fixture.
+Registration `a2a5e57a790f1e9376f75c63aa3389df88175693038de179c7f006cccd0b1dba` preserved the exact policy,
+previously unopened 216-family bank and gates. The adapter masks the shared selection array used by
+material arbitration and final neural correction, retaining raw forecasts separately. 530 tests and
+eight old-case canaries pass. Every selected new wall obeys the gate. All 929 observer pairs, 96 cold replays
+and 130 original cross-host comparisons match. Fresh cold repeats were local; admission cold coverage
+was split across hosts. Preserve that actual allocation.
+
+On 864 fresh paired outcomes, guarded v2 scored **−0.173611 points versus default** (simultaneous 95%
+−0.810185 to +0.405093) and **−0.925926 versus original v1** (−2.083333 to +0.231481). It selected 24 new
+walls and changed 24 trajectories. Quality/coverage passed; gain, confidence and doctrine gates failed.
+Original v1's diagnostic replication was +0.752315 points (ordinary 95% −0.405093 to +1.909722), still
+uncertain and not a retrospective promotion. Independent raw-score/integer-family/bootstrap checks agree
+on rejection. No confirmation, serial cost qualification, default, model or Premium change followed.
+
+The guards retained only two of v1's 18 improved outcomes and four of its 12 regressions. Two retained
+regressions replaced movement with a wall while neither game had a burn. Better friendly-fire totals
+did not imply better outcomes. Preserve every outcome, the all-guard first-divergence audit and the
+complete reservations; do not retune on this opened bank or rescue a guard subgroup. Future work needs
+fresh evidence for movement opportunity cost, longer-horizon wall value or a new wall-aware learned
+representation. The separate Hidden fixture confirms untargetable units still take fire damage; it is
+mechanics evidence only and did not modify the candidate. Keep the original helper and route-helper
+hashes, the corrected shared-array adapter/tests, accepted A19 pair and adopted barrel correction intact.
