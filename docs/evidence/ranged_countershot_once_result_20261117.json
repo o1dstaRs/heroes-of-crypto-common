@@ -1,0 +1,2257 @@
+{
+    "id": "ranged-countershot-once-20261117-result",
+    "at": "2026-11-17T20:10:39.237500+00:00",
+    "status": "completed-failed-gain-gates-not-promoted",
+    "registrationEvidence": "ranged_countershot_once_registration_20261117.json",
+    "registrationSha256": "c204e5c4c03543fb8e80dffe84b270fb53feba56d4f8ea93ad63376cfee1610b",
+    "candidateSourceSha256": "9f200185188d38a805fd48ab274b86dc8d8a6c39c7e7287b7386f900e37ce1b6",
+    "analysis": {
+        "registrationSha256": "c204e5c4c03543fb8e80dffe84b270fb53feba56d4f8ea93ad63376cfee1610b",
+        "complete": true,
+        "battles": 864,
+        "families": 108,
+        "meanScoreGainPp": 0.0,
+        "familyBootstrap95Pp": [-0.6944444444444444, 0.6944444444444444],
+        "counters": {
+            "observe_battles": 432,
+            "observe_losses": 217,
+            "observe_roots": 4615,
+            "observe_danger_roots": 25,
+            "observe_overrides": 0,
+            "candidate_battles": 432,
+            "candidate_losses": 217,
+            "candidate_roots": 4620,
+            "candidate_danger_roots": 29,
+            "candidate_overrides": 21,
+            "tied_cases": 430,
+            "observe_wins": 211,
+            "candidate_wins": 211,
+            "changed_trajectories": 21,
+            "worse_cases": 1,
+            "observe_draws": 4,
+            "candidate_draws": 4,
+            "better_cases": 1
+        },
+        "changedFamilies": 18,
+        "subgroups": {
+            "map": {
+                "1": {
+                    "families": 36,
+                    "meanPp": 0
+                },
+                "3": {
+                    "families": 36,
+                    "meanPp": 0.0
+                },
+                "4": {
+                    "families": 36,
+                    "meanPp": 0.0
+                }
+            },
+            "d1": {
+                "1": {
+                    "families": 36,
+                    "meanPp": 0.0
+                },
+                "2": {
+                    "families": 36,
+                    "meanPp": 0.0
+                },
+                "3": {
+                    "families": 36,
+                    "meanPp": 0.0
+                }
+            },
+            "d2": {
+                "1": {
+                    "families": 36,
+                    "meanPp": -0.6944444444444444
+                },
+                "2": {
+                    "families": 36,
+                    "meanPp": 0.6944444444444444
+                },
+                "3": {
+                    "families": 36,
+                    "meanPp": 0.0
+                }
+            },
+            "pickOrder": {
+                "0": {
+                    "families": 54,
+                    "meanPp": 0.0
+                },
+                "1": {
+                    "families": 54,
+                    "meanPp": 0.0
+                }
+            }
+        },
+        "gates": {
+            "meanAtLeastHalfPoint": false,
+            "lower95StrictlyPositive": false,
+            "atLeastTwelveChangedFamilies": true,
+            "noMapOrDoctrineBelowMinusOnePoint": true
+        },
+        "screenPassed": false,
+        "promotionAuthorized": false,
+        "wallTimeIsSharedLoadDescriptiveOnly": true,
+        "medianBattleMs": {
+            "observe": 5012.235057499958,
+            "candidate": 5033.895851000067
+        },
+        "familyResults": [
+            {
+                "id": "fresh-s00-f000",
+                "map": 1,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s00-f001",
+                "map": 1,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s00-f002",
+                "map": 1,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s00-f003",
+                "map": 1,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s01-f000",
+                "map": 1,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s01-f001",
+                "map": 1,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s01-f002",
+                "map": 1,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s01-f003",
+                "map": 1,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s02-f000",
+                "map": 1,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s02-f001",
+                "map": 1,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s02-f002",
+                "map": 1,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s02-f003",
+                "map": 1,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s03-f000",
+                "map": 1,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s03-f001",
+                "map": 1,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s03-f002",
+                "map": 1,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s03-f003",
+                "map": 1,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s04-f000",
+                "map": 1,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s04-f001",
+                "map": 1,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s04-f002",
+                "map": 1,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s04-f003",
+                "map": 1,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s05-f000",
+                "map": 1,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s05-f001",
+                "map": 1,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s05-f002",
+                "map": 1,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s05-f003",
+                "map": 1,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s06-f000",
+                "map": 1,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s06-f001",
+                "map": 1,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s06-f002",
+                "map": 1,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s06-f003",
+                "map": 1,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s07-f000",
+                "map": 1,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s07-f001",
+                "map": 1,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s07-f002",
+                "map": 1,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s07-f003",
+                "map": 1,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 2,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s08-f000",
+                "map": 1,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 2,
+                "baselineDangerRoots": 2,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s08-f001",
+                "map": 1,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s08-f002",
+                "map": 1,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s08-f003",
+                "map": 1,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s09-f000",
+                "map": 3,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s09-f001",
+                "map": 3,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s09-f002",
+                "map": 3,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 2,
+                "baselineDangerRoots": 2,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s09-f003",
+                "map": 3,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s10-f000",
+                "map": 3,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s10-f001",
+                "map": 3,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s10-f002",
+                "map": 3,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s10-f003",
+                "map": 3,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s11-f000",
+                "map": 3,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s11-f002",
+                "map": 3,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s11-f003",
+                "map": 3,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s11-f005",
+                "map": 3,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s12-f000",
+                "map": 3,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s12-f001",
+                "map": 3,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s12-f002",
+                "map": 3,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s12-f003",
+                "map": 3,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s13-f000",
+                "map": 3,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s13-f001",
+                "map": 3,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s13-f002",
+                "map": 3,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s13-f003",
+                "map": 3,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s14-f000",
+                "map": 3,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s14-f001",
+                "map": 3,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s14-f002",
+                "map": 3,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s14-f003",
+                "map": 3,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s15-f000",
+                "map": 3,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": -0.25,
+                "caseDeltas": [-1, 0, 0, 0],
+                "changedCases": 2,
+                "baselineDangerRoots": 2,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s15-f001",
+                "map": 3,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s15-f002",
+                "map": 3,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0.0,
+                "caseDeltas": [0.0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 1.5,
+                    "candidate": 1.5
+                }
+            },
+            {
+                "id": "fresh-s15-f003",
+                "map": 3,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s16-f000",
+                "map": 3,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s16-f001",
+                "map": 3,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s16-f002",
+                "map": 3,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s16-f003",
+                "map": 3,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0.25,
+                "caseDeltas": [0, 1, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s17-f000",
+                "map": 3,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s17-f001",
+                "map": 3,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s17-f002",
+                "map": 3,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s17-f003",
+                "map": 3,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s18-f000",
+                "map": 4,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s18-f001",
+                "map": 4,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s18-f002",
+                "map": 4,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s18-f003",
+                "map": 4,
+                "d1": 1,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s19-f000",
+                "map": 4,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s19-f001",
+                "map": 4,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s19-f002",
+                "map": 4,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0.0,
+                "caseDeltas": [0, 0, 0, 0.0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.5,
+                    "candidate": 0.5
+                }
+            },
+            {
+                "id": "fresh-s19-f003",
+                "map": 4,
+                "d1": 1,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s20-f000",
+                "map": 4,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s20-f001",
+                "map": 4,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s20-f002",
+                "map": 4,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s20-f003",
+                "map": 4,
+                "d1": 1,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s21-f000",
+                "map": 4,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s21-f001",
+                "map": 4,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0.0,
+                "caseDeltas": [0.0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.5,
+                    "candidate": 1.5
+                }
+            },
+            {
+                "id": "fresh-s21-f002",
+                "map": 4,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s21-f003",
+                "map": 4,
+                "d1": 2,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s22-f000",
+                "map": 4,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s22-f001",
+                "map": 4,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s22-f002",
+                "map": 4,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s22-f003",
+                "map": 4,
+                "d1": 2,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s23-f000",
+                "map": 4,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s23-f001",
+                "map": 4,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s23-f002",
+                "map": 4,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s23-f003",
+                "map": 4,
+                "d1": 2,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s24-f000",
+                "map": 4,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s24-f001",
+                "map": 4,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s24-f002",
+                "map": 4,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s24-f003",
+                "map": 4,
+                "d1": 3,
+                "d2": 1,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            },
+            {
+                "id": "fresh-s25-f000",
+                "map": 4,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 4.0,
+                    "candidate": 4.0
+                }
+            },
+            {
+                "id": "fresh-s25-f001",
+                "map": 4,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s25-f002",
+                "map": 4,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s25-f003",
+                "map": 4,
+                "d1": 3,
+                "d2": 2,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 3.0,
+                    "candidate": 3.0
+                }
+            },
+            {
+                "id": "fresh-s26-f000",
+                "map": 4,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 0.0,
+                    "candidate": 0.0
+                }
+            },
+            {
+                "id": "fresh-s26-f001",
+                "map": 4,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 1,
+                "baselineDangerRoots": 1,
+                "scores": {
+                    "observe": 1.0,
+                    "candidate": 1.0
+                }
+            },
+            {
+                "id": "fresh-s26-f002",
+                "map": 4,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 0,
+                "delta": 0.0,
+                "caseDeltas": [0, 0, 0, 0.0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 0.5,
+                    "candidate": 0.5
+                }
+            },
+            {
+                "id": "fresh-s26-f003",
+                "map": 4,
+                "d1": 3,
+                "d2": 3,
+                "pickOrder": 1,
+                "delta": 0,
+                "caseDeltas": [0, 0, 0, 0],
+                "changedCases": 0,
+                "baselineDangerRoots": 0,
+                "scores": {
+                    "observe": 2.0,
+                    "candidate": 2.0
+                }
+            }
+        ]
+    },
+    "independentVerification": {
+        "qualityPassed": true,
+        "independentIntegerHalfPointReconstruction": true,
+        "families": 108,
+        "better": 1,
+        "worse": 1,
+        "tied": 430,
+        "meanPp": 0,
+        "intervalPp": [-0.6944444444444444, 0.6944444444444444],
+        "priorVerifierRepair": "Python Counter omits zero-valued better/worse keys; normalize absent counters to zero. No input, policy or result changed."
+    },
+    "causalVerification": {
+        "qualityPassed": true,
+        "matchedCases": 432,
+        "allActionPrefixesVerified": true,
+        "atMostOneCorrectionEveryBattle": true,
+        "noUnexplainedTrajectoryChanges": true,
+        "counts": {
+            "unchangedCases": 411,
+            "tiedChanged": 19,
+            "correctedCases": 21,
+            "worse": 1,
+            "better": 1
+        },
+        "corrections": [
+            {
+                "case": "fresh-s00-f002-s1-f1",
+                "family": "fresh-s00-f002",
+                "map": 1,
+                "ownDoctrine": 1,
+                "opponentDoctrine": 1,
+                "actor": "Zena",
+                "actorHp": 40,
+                "lap": 4,
+                "nativeTargets": ["Orc"],
+                "correctedTargets": ["2872d208-f96f-5aed-ba30-4f3978e36bc1"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 44
+            },
+            {
+                "case": "fresh-s01-f001-s0-f0",
+                "family": "fresh-s01-f001",
+                "map": 1,
+                "ownDoctrine": 1,
+                "opponentDoctrine": 2,
+                "actor": "Elf",
+                "actorHp": 146,
+                "lap": 2,
+                "nativeTargets": ["Arbalester"],
+                "correctedTargets": ["Troll"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 16
+            },
+            {
+                "case": "fresh-s02-f000-s0-f1",
+                "family": "fresh-s02-f000",
+                "map": 1,
+                "ownDoctrine": 1,
+                "opponentDoctrine": 3,
+                "actor": "Elf",
+                "actorHp": 75,
+                "lap": 6,
+                "nativeTargets": ["Cyclops"],
+                "correctedTargets": ["Angel"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 51
+            },
+            {
+                "case": "fresh-s06-f002-s1-f1",
+                "family": "fresh-s06-f002",
+                "map": 1,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 1,
+                "actor": "Beholder",
+                "actorHp": 37,
+                "lap": 5,
+                "nativeTargets": ["Gargantuan"],
+                "correctedTargets": ["Orc"],
+                "nativeForecast": 1,
+                "correctedForecast": 1,
+                "baselineScore": 1,
+                "candidateScore": 1,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 41
+            },
+            {
+                "case": "fresh-s07-f003-s0-f1",
+                "family": "fresh-s07-f003",
+                "map": 1,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 2,
+                "actor": "Dryad",
+                "actorHp": 325.2200000000001,
+                "lap": 1,
+                "nativeTargets": ["Arbalester"],
+                "correctedTargets": ["Trent"],
+                "nativeForecast": 0.500146389901084,
+                "correctedForecast": 0.5,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 9
+            },
+            {
+                "case": "fresh-s08-f000-s0-f1",
+                "family": "fresh-s08-f000",
+                "map": 1,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 3,
+                "actor": "Zena",
+                "actorHp": 102,
+                "lap": 1,
+                "nativeTargets": ["Centaur"],
+                "correctedTargets": ["Tsar Cannon"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 5
+            },
+            {
+                "case": "fresh-s08-f000-s1-f0",
+                "family": "fresh-s08-f000",
+                "map": 1,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 3,
+                "actor": "Zena",
+                "actorHp": 138,
+                "lap": 1,
+                "nativeTargets": ["Centaur"],
+                "correctedTargets": ["Battle Mage"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 7
+            },
+            {
+                "case": "fresh-s09-f002-s0-f0",
+                "family": "fresh-s09-f002",
+                "map": 3,
+                "ownDoctrine": 1,
+                "opponentDoctrine": 1,
+                "actor": "Orc",
+                "actorHp": 9,
+                "lap": 1,
+                "nativeTargets": ["Dryad"],
+                "correctedTargets": ["Angel"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 7
+            },
+            {
+                "case": "fresh-s09-f002-s1-f0",
+                "family": "fresh-s09-f002",
+                "map": 3,
+                "ownDoctrine": 1,
+                "opponentDoctrine": 1,
+                "actor": "Orc",
+                "actorHp": 9,
+                "lap": 1,
+                "nativeTargets": ["Dryad"],
+                "correctedTargets": ["Angel"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 1
+            },
+            {
+                "case": "fresh-s09-f003-s1-f0",
+                "family": "fresh-s09-f003",
+                "map": 3,
+                "ownDoctrine": 1,
+                "opponentDoctrine": 1,
+                "actor": "Medusa",
+                "actorHp": 37,
+                "lap": 2,
+                "nativeTargets": ["Arbalester"],
+                "correctedTargets": ["Battle Mage"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 17
+            },
+            {
+                "case": "fresh-s10-f000-s1-f0",
+                "family": "fresh-s10-f000",
+                "map": 3,
+                "ownDoctrine": 1,
+                "opponentDoctrine": 2,
+                "actor": "Medusa",
+                "actorHp": 47,
+                "lap": 5,
+                "nativeTargets": ["Cyclops"],
+                "correctedTargets": ["Gargantuan"],
+                "nativeForecast": 1,
+                "correctedForecast": 1,
+                "baselineScore": 1,
+                "candidateScore": 1,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 41
+            },
+            {
+                "case": "fresh-s12-f000-s1-f0",
+                "family": "fresh-s12-f000",
+                "map": 3,
+                "ownDoctrine": 2,
+                "opponentDoctrine": 1,
+                "actor": "Beholder",
+                "actorHp": 128,
+                "lap": 6,
+                "nativeTargets": ["Arbalester"],
+                "correctedTargets": ["Tsar Cannon"],
+                "nativeForecast": 0.5,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 56
+            },
+            {
+                "case": "fresh-s13-f001-s1-f0",
+                "family": "fresh-s13-f001",
+                "map": 3,
+                "ownDoctrine": 2,
+                "opponentDoctrine": 2,
+                "actor": "Zena",
+                "actorHp": 64,
+                "lap": 2,
+                "nativeTargets": ["Beholder"],
+                "correctedTargets": ["Wolf"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 21
+            },
+            {
+                "case": "fresh-s13-f002-s0-f1",
+                "family": "fresh-s13-f002",
+                "map": 3,
+                "ownDoctrine": 2,
+                "opponentDoctrine": 2,
+                "actor": "Elf",
+                "actorHp": 17.08,
+                "lap": 1,
+                "nativeTargets": ["Orc"],
+                "correctedTargets": ["Trent"],
+                "nativeForecast": 0.9915679184340114,
+                "correctedForecast": 1,
+                "baselineScore": 1,
+                "candidateScore": 1,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 6
+            },
+            {
+                "case": "fresh-s15-f000-s0-f0",
+                "family": "fresh-s15-f000",
+                "map": 3,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 1,
+                "actor": "Elf",
+                "actorHp": 14,
+                "lap": 1,
+                "nativeTargets": ["Arbalester"],
+                "correctedTargets": ["Satyr"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 1,
+                "candidateScore": 0,
+                "scoreDelta": -1,
+                "prefixTurnsIdentical": 6
+            },
+            {
+                "case": "fresh-s15-f000-s1-f0",
+                "family": "fresh-s15-f000",
+                "map": 3,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 1,
+                "actor": "Elf",
+                "actorHp": 14,
+                "lap": 1,
+                "nativeTargets": ["Arbalester"],
+                "correctedTargets": ["Satyr"],
+                "nativeForecast": 0.499844101992495,
+                "correctedForecast": 0,
+                "baselineScore": 1,
+                "candidateScore": 1,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 0
+            },
+            {
+                "case": "fresh-s15-f002-s1-f0",
+                "family": "fresh-s15-f002",
+                "map": 3,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 1,
+                "actor": "Orc",
+                "actorHp": 369,
+                "lap": 2,
+                "nativeTargets": ["Dryad"],
+                "correctedTargets": ["Battle Mage"],
+                "nativeForecast": 0.4987766821633823,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 19
+            },
+            {
+                "case": "fresh-s16-f003-s0-f1",
+                "family": "fresh-s16-f003",
+                "map": 3,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 2,
+                "actor": "Elf",
+                "actorHp": 106,
+                "lap": 2,
+                "nativeTargets": ["Zena"],
+                "correctedTargets": ["Orc"],
+                "nativeForecast": 1,
+                "correctedForecast": 1,
+                "baselineScore": 0,
+                "candidateScore": 1,
+                "scoreDelta": 1,
+                "prefixTurnsIdentical": 21
+            },
+            {
+                "case": "fresh-s25-f001-s1-f1",
+                "family": "fresh-s25-f001",
+                "map": 4,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 2,
+                "actor": "Zena",
+                "actorHp": 27,
+                "lap": 4,
+                "nativeTargets": ["Cyclops"],
+                "correctedTargets": ["Dryad"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 36
+            },
+            {
+                "case": "fresh-s26-f000-s1-f1",
+                "family": "fresh-s26-f000",
+                "map": 4,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 3,
+                "actor": "Zena",
+                "actorHp": 53,
+                "lap": 3,
+                "nativeTargets": ["Orc"],
+                "correctedTargets": ["Trent"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 29
+            },
+            {
+                "case": "fresh-s26-f001-s1-f0",
+                "family": "fresh-s26-f001",
+                "map": 4,
+                "ownDoctrine": 3,
+                "opponentDoctrine": 3,
+                "actor": "Centaur",
+                "actorHp": 64,
+                "lap": 3,
+                "nativeTargets": ["Zena"],
+                "correctedTargets": ["Magic Dragon"],
+                "nativeForecast": 0,
+                "correctedForecast": 0,
+                "baselineScore": 0,
+                "candidateScore": 0,
+                "scoreDelta": 0,
+                "prefixTurnsIdentical": 31
+            }
+        ]
+    },
+    "coldVerification": {
+        "qualityPassed": true,
+        "cases": 3,
+        "executions": 6,
+        "sourceHost": "hft",
+        "repeatHost": "local",
+        "fieldsIdentical": ["opening", "result", "turns", "events", "health", "observations"]
+    },
+    "importVerification": {
+        "qualityPassed": true,
+        "battles": 864,
+        "matchedCases": 432,
+        "allCompressedAndRawHashesValid": true,
+        "allBattleQualityReceiptsPassed": true,
+        "registrationSha256": "c204e5c4c03543fb8e80dffe84b270fb53feba56d4f8ea93ad63376cfee1610b",
+        "archiveSha256": "1466dca1a11f8be613bd76a58012abbf9c14d0054e5b5ab1d5d4cb5bf13c8550",
+        "crossHostFunctionalCases": 3
+    },
+    "seedVerification": {
+        "qualityPassed": true,
+        "families": 108,
+        "distinctUsedPreimages": 540,
+        "distinctUsedRawAndPermutedChannels": 34560,
+        "verifiedLedgersIncludingDerived": 192,
+        "priorIntersections": 0,
+        "allPreimagesReserved": true
+    },
+    "responseBaitWitness": {
+        "case": "fresh-s15-f000-s0-f0",
+        "mechanism": "Single Elf bait spent the Arbalester response before the Centaur shot; preserving it left a 285-HP response on the Centaur. This documents the local exchange, not an estimate of expected whole-battle causal effect across random futures.",
+        "arms": {
+            "observe": {
+                "score": 1,
+                "centaurRoundOneActions": [
+                    {
+                        "actionType": "range_attack",
+                        "damage": 293,
+                        "impactDamage": 293,
+                        "targetCreature": "Arbalester"
+                    }
+                ],
+                "centaurDamageTakenRoundOne": []
+            },
+            "candidate": {
+                "score": 0,
+                "centaurRoundOneActions": [
+                    {
+                        "actionType": "range_attack",
+                        "damage": 341,
+                        "impactDamage": 341,
+                        "targetCreature": "Arbalester"
+                    }
+                ],
+                "centaurDamageTakenRoundOne": [
+                    {
+                        "unitId": "810dfbe1-44a8-5516-a70d-144c903a178f",
+                        "name": "Centaur",
+                        "team": 1,
+                        "kind": "damage",
+                        "requestedHp": 285,
+                        "sourceUnitId": "1d975d39-7050-5168-9c69-32667a735d10",
+                        "before": {
+                            "hp": 1155,
+                            "maxHp": 15,
+                            "amount": 77
+                        },
+                        "after": {
+                            "hp": 870,
+                            "maxHp": 15,
+                            "amount": 58
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "monitoringReceipt": {
+        "event": "read-only monitoring helper timed out after 45 seconds",
+        "at": "2026-11-17T19:54:22Z",
+        "simulationWorkersDetached": true,
+        "subsequentHealthCheck": {
+            "completeBattles": 475,
+            "completePairs": 237,
+            "allFourWorkersAlive": true,
+            "workerErrors": 0
+        },
+        "battleRestarts": 0,
+        "casesDropped": 0,
+        "candidateOrRegistrationChanged": false
+    },
+    "analysisSources": {
+        "analyze.py": {
+            "sha256": "1c7506e226ef56d0ad41a0e34d5365213b2c53d27acbc96fc0dee9d7bf27ea2e",
+            "source": "from pathlib import Path\nimport collections, gzip, hashlib, json, statistics\n\nP = Path(__file__).resolve().parent\ndef read(name):\n    b = (P / name).read_bytes()\n    return json.loads(gzip.decompress(b) if name.endswith('.gz') else b)\ndef stable(value): return json.dumps(value, sort_keys=True, separators=(',', ':'))\ndef bootstrap(values):\n    state = 17112026\n    def next_int():\n        nonlocal state\n        state ^= (state << 13) & 0xffffffff; state ^= state >> 17; state ^= (state << 5) & 0xffffffff; state &= 0xffffffff\n        return state\n    means = sorted(sum(values[next_int() % len(values)] for _ in values) / len(values) * 100 for _ in range(20000))\n    return [means[500], means[19500]]\n\nreg = read('registration.json'); reg_hash = hashlib.sha256((P / 'registration.json').read_bytes()).hexdigest()\nfamilies = []; counters = collections.Counter(); sources = {}; timings = collections.defaultdict(list)\nfor task in read('cases.json'):\n    deltas = []; changes = 0; danger = 0; scores = collections.defaultdict(float)\n    for seat in [0, 1]:\n        for future in [0, 1]:\n            case = f'{task[\"id\"]}-s{seat}-f{future}'\n            paths = {m:f'pilot/{case}-{m}.json.gz' for m in ['observe', 'candidate']}\n            rows = {m:read(path) for m,path in paths.items()}\n            assert read(f'pilot/complete-{case}.json')['qualityPassed']\n            for mode,row in rows.items():\n                assert row['qualityPassed'] and row['receipt']['qualityPassed']\n                assert row['registrationSha256'] == reg_hash\n                assert row['score'] in [0, 0.5, 1]\n                assert row['result']['winner'] in ['green', 'red', 'draw']\n                expected = 0.5 if row['result']['winner'] == 'draw' else int(row['result']['winner'] == ('green' if row['candidateTeam'] == 2 else 'red'))\n                assert row['score'] == expected\n                counters[f'{mode}_battles'] += 1\n                counters[f'{mode}_wins' if row['score']==1 else f'{mode}_draws' if row['score']==0.5 else f'{mode}_losses'] += 1\n                counters[f'{mode}_roots'] += len(row['observations'])\n                counters[f'{mode}_danger_roots'] += sum(o['danger'] for o in row['observations'])\n                counters[f'{mode}_overrides'] += sum(o['changed'] for o in row['observations'])\n                timings[mode].append(row['elapsedMs'])\n                sources[paths[mode]] = hashlib.sha256((P / paths[mode]).read_bytes()).hexdigest()\n                scores[mode] += row['score']\n            assert stable(rows['observe']['opening']) == stable(rows['candidate']['opening'])\n            diff = rows['candidate']['score'] - rows['observe']['score']; deltas.append(diff)\n            counters['better_cases' if diff > 0 else 'worse_cases' if diff < 0 else 'tied_cases'] += 1\n            changed = stable(rows['candidate']['turns']) != stable(rows['observe']['turns'])\n            changes += changed\n            if changed: counters['changed_trajectories'] += 1\n            else:\n                for field in ['result','events','health']: assert stable(rows['candidate'][field]) == stable(rows['observe'][field])\n            danger += sum(o['danger'] for o in rows['observe']['observations'])\n    families.append({'id':task['id'],'map':task['map'],'d1':task['d1'],'d2':task['d2'],'pickOrder':task['pickOrder'],'delta':statistics.mean(deltas),'caseDeltas':deltas,'changedCases':changes,'baselineDangerRoots':danger,'scores':dict(scores)})\nassert len(families) == 108 and counters['observe_battles'] == counters['candidate_battles'] == 432\nvalues=[f['delta'] for f in families]; mean=statistics.mean(values)*100; interval=bootstrap(values)\ngroups={}\nfor axis in ['map','d1','d2','pickOrder']:\n    groups[axis]={str(k):{'families':len([f for f in families if f[axis]==k]),'meanPp':statistics.mean(f['delta'] for f in families if f[axis]==k)*100} for k in sorted({f[axis] for f in families})}\nchanged_families=sum(f['changedCases'] > 0 for f in families)\ngates={'meanAtLeastHalfPoint':mean>=0.5,'lower95StrictlyPositive':interval[0]>0,'atLeastTwelveChangedFamilies':changed_families>=12,'noMapOrDoctrineBelowMinusOnePoint':all(g['meanPp']>=-1 for axis in ['map','d1','d2'] for g in groups[axis].values())}\nsummary={'registrationSha256':reg_hash,'complete':True,'battles':864,'families':108,'meanScoreGainPp':mean,'familyBootstrap95Pp':interval,'counters':dict(counters),'changedFamilies':changed_families,'subgroups':groups,'gates':gates,'screenPassed':all(gates.values()),'promotionAuthorized':False,'wallTimeIsSharedLoadDescriptiveOnly':True,'medianBattleMs':{k:statistics.median(v) for k,v in timings.items()},'familyResults':families}\nwith(P/'analysis.json').open('x')as f:json.dump(summary,f,indent=2);f.write('\\n')\nwith(P/'result-receipts.json').open('x')as f:json.dump(sources,f,indent=2);f.write('\\n')\nprint(json.dumps({k:v for k,v in summary.items() if k not in ['familyResults','subgroups']}))\n"
+        },
+        "verify-analysis.ts": {
+            "sha256": "05b30e5df693bd660fb7df7e045e4cc5481b228d1c63bfaea5422b14d9b123ed",
+            "source": "import assert from \"node:assert/strict\";\nimport { read, save } from \"./io\";\nconst summary = read(\"analysis.json\"), families = read(\"cases.json\"), sums: number[] = [];\nlet better = 0, worse = 0, tied = 0;\nfor (const family of families) {\n    let delta = 0;\n    for (const seat of [0, 1]) for (const future of [0, 1]) {\n        const score = (mode: string) => {\n            const r = read(`pilot/${family.id}-s${seat}-f${future}-${mode}.json.gz`);\n            assert(r.qualityPassed && r.receipt.qualityPassed);\n            return r.result.winner === \"draw\" ? 1 : r.result.winner === (r.candidateTeam === 2 ? \"green\" : \"red\") ? 2 : 0;\n        };\n        const d = score(\"candidate\") - score(\"observe\");\n        delta += d;\n        if (d > 0) better++; else if (d < 0) worse++; else tied++;\n    }\n    sums.push(delta);\n}\nconst mean = sums.reduce((a, b) => a + b, 0) / (8 * sums.length) * 100;\nlet state = 17112026;\nfunction next() { state ^= state << 13; state ^= state >>> 17; state ^= state << 5; return state >>> 0; }\nconst resamples: number[] = [];\nfor (let b = 0; b < 20000; b++) {\n    let value = 0;\n    for (let i = 0; i < sums.length; i++) value += sums[next() % sums.length];\n    resamples.push(value / (8 * sums.length) * 100);\n}\nresamples.sort((a, b) => a - b);\nconst interval = [resamples[500], resamples[19500]];\nassert(Math.abs(mean - summary.meanScoreGainPp) < 1e-12);\ninterval.forEach((x, i) => assert(Math.abs(x - summary.familyBootstrap95Pp[i]) < 1e-12));\nassert.equal(better, summary.counters.better_cases ?? 0);\nassert.equal(worse, summary.counters.worse_cases ?? 0);\nassert.equal(tied, summary.counters.tied_cases ?? 0);\nconst proof = { qualityPassed: true, independentIntegerHalfPointReconstruction: true, families: sums.length, better, worse, tied, meanPp: mean, intervalPp: interval, priorVerifierRepair: \"Python Counter omits zero-valued better/worse keys; normalize absent counters to zero. No input, policy or result changed.\" };\nsave(\"independent-verification.json\", proof);\nconsole.log(JSON.stringify(proof));\n"
+        },
+        "verify-corrections.py": {
+            "sha256": "551e3401272cd9eba8c7b4aec4fd546e9e257668b0c9e56bf749d8f3fe7685c3",
+            "source": "from pathlib import Path\nimport gzip,json,collections\nP=Path(__file__).resolve().parent\ndef read(n):\n    b=(P/n).read_bytes();return json.loads(gzip.decompress(b) if n.endswith('.gz') else b)\ncases=[];counts=collections.Counter()\nfor task in read('cases.json'):\n    for seat in [0,1]:\n        for future in [0,1]:\n            case=f'{task[\"id\"]}-s{seat}-f{future}'\n            b=read(f'pilot/{case}-observe.json.gz');c=read(f'pilot/{case}-candidate.json.gz')\n            assert b['qualityPassed'] and c['qualityPassed']\n            changes=[o for o in c['observations'] if o['changed']]\n            assert len(changes)<=1,(case,'correction budget exceeded')\n            if not changes:\n                assert c['turns']==b['turns'],(case,'unexplained change without a correction')\n                assert c['events']==b['events'] and c['health']==b['health'] and c['result']==b['result']\n                counts['unchangedCases']+=1;continue\n            o=changes[0]\n            first=next((i for i,(a,z) in enumerate(zip(b['turns'],c['turns'])) if a!=z),None)\n            assert first is not None,(case,'correction not executed')\n            old=b['turns'][first];new=c['turns'][first]\n            assert old['unitId']==new['unitId']==o['actor']['id']\n            assert old['chosenDecision']==o['chosen'] and new['chosenDecision']==o['finalChosen']\n            assert b['turns'][:first]==c['turns'][:first]\n            names={u['unitId']:u['creatureName'] for a in b['result']['placements'].values() for u in a}\n            def targets(actions):return [names.get(a.get('targetId'),a.get('targetId')) for a in actions if a['type']=='range_attack']\n            final=[s for s in o['scores'] if s['mode']=='turns'][-1]\n            native=next(m for m,k in zip(final['means'],final['candidates']) if k['actions']==o['chosen'])\n            delta=c['score']-b['score'];counts['better' if delta>0 else 'worse' if delta<0 else 'tiedChanged']+=1\n            counts['correctedCases']+=1\n            cases.append({'case':case,'family':task['id'],'map':task['map'],'ownDoctrine':task['d1'],'opponentDoctrine':task['d2'],\n                'actor':o['actor']['name'],'actorHp':o['actor']['hp'],'lap':o['lap'],'nativeTargets':targets(o['chosen']),\n                'correctedTargets':targets(o['finalChosen']),'nativeForecast':native,'correctedForecast':o['alternative']['mean'],\n                'baselineScore':b['score'],'candidateScore':c['score'],'scoreDelta':delta,'prefixTurnsIdentical':first})\nassert counts['unchangedCases']+counts['correctedCases']==432\nresult={'qualityPassed':True,'matchedCases':432,'allActionPrefixesVerified':True,'atMostOneCorrectionEveryBattle':True,\n        'noUnexplainedTrajectoryChanges':True,'counts':dict(counts),'corrections':cases}\nwith(P/'causal-verification.json').open('x')as f:json.dump(result,f,indent=2);f.write('\\n')\nprint(json.dumps({k:v for k,v in result.items() if k!='corrections'}))\n"
+        },
+        "verify-cold.py": {
+            "sha256": "bfd799a251526d69be1e233a994b94f1caa31688228d9a4493cd2c6542837943",
+            "source": "from pathlib import Path\nimport gzip,json\nP=Path(__file__).resolve().parent\nfiles=list((P/'cold').glob('*.json.gz'));assert len(files)==6\nassert len(list((P/'cold').glob('complete-*.json')))==3\nfields=['opening','result','turns','events','health','observations']\nfor file in files:\n    c=json.loads(gzip.decompress(file.read_bytes()));b=json.loads(gzip.decompress((P/'pilot'/file.name).read_bytes()))\n    for field in fields:assert c[field]==b[field],(file.name,field)\nproof={'qualityPassed':True,'cases':3,'executions':6,'sourceHost':'hft','repeatHost':'local','fieldsIdentical':fields}\nwith(P/'cold-verification.json').open('x')as f:json.dump(proof,f,indent=2);f.write('\\n')\nprint(json.dumps(proof))\n"
+        },
+        "import-results.py": {
+            "sha256": "7750c5f88b65f887493b4bf544ed3c795ddd14f50fb9996fe53ab9f24de93d9e",
+            "source": "from pathlib import Path\nimport gzip, hashlib, json, re, sys, tarfile\nP=Path(__file__).resolve().parent\nexpected=sys.argv[1];assert re.fullmatch('[a-f0-9]{64}',expected)\narchive=P/'remote-results-final.tar.gz';assert hashlib.sha256(archive.read_bytes()).hexdigest()==expected\nassert not (P/'pilot').exists()\nwith tarfile.open(archive)as t:t.extractall(P,filter='data')\nfiles=list((P/'pilot').glob('*.json.gz'));assert len(files)==864\nassert len(list((P/'pilot').glob('complete-*.json')))==432\nregistration=hashlib.sha256((P/'registration.json').read_bytes()).hexdigest()\nfor file in files:\n    raw=file.read_bytes();receipt=json.loads(Path(str(file)+'.receipt').read_text())\n    assert hashlib.sha256(raw).hexdigest()==receipt['sha256'],file.name\n    inflated=gzip.decompress(raw);assert hashlib.sha256(inflated).hexdigest()==receipt['rawSha256'],file.name\n    row=json.loads(inflated);assert row['qualityPassed'] and row['receipt']['qualityPassed'] and row['registrationSha256']==registration\nadmitted=list((P/'admission-hft').glob('*.json'));assert len(admitted)==3\nassert all(json.loads(f.read_text())['qualityPassed'] for f in admitted)\nproof={'qualityPassed':True,'battles':864,'matchedCases':432,'allCompressedAndRawHashesValid':True,'allBattleQualityReceiptsPassed':True,'registrationSha256':registration,'archiveSha256':expected,'crossHostFunctionalCases':3}\nwith(P/'import-verification.json').open('x')as f:json.dump(proof,f,indent=2);f.write('\\n')\nprint(json.dumps(proof))\n"
+        },
+        "verify-seeds.py": {
+            "sha256": "4c0bc3fdd0b720157e6b3a6a0ce736272b48baad346d536f3cedb310cec0543d",
+            "source": "from pathlib import Path\nimport gzip, hashlib, json\nP=Path(__file__).resolve().parent; client=P.parents[3]\ndef perm(n):\n    n&=0xffffffff;n^=n>>16;n=n*0x85ebca6b&0xffffffff;n^=n>>13;n=n*0xc2b2ae35&0xffffffff;return(n^(n>>16))&0xffffffff\ndef expansion(n):return [(n+i)&0xffffffff for i in range(32)]+[perm(n+i) for i in range(32)]\ncases=json.loads((P/'cases.json').read_text())\npreimages=[s for t in cases for s in [t['seed'],t['setup'],t['reverseSetup'],*t['evalFutures']]]\nqueries={v for n in preimages for v in expansion(n)}\nassert len(cases)==108 and len(preimages)==540 and len(queries)==34560\nreserved=json.loads((P/'reserved-scanned-preimages.json').read_text())\nassert all(s in reserved for s in preimages)\nblocked=set();verified=[]\ndef collect(o):\n    if isinstance(o,bool):return\n    if isinstance(o,int):\n        if o in queries:blocked.add(o)\n    elif isinstance(o,list):\n        for v in o:collect(v)\n    elif isinstance(o,dict):\n        for k,v in o.items():\n            if k=='reservedScannedPreimages':\n                for n in v:\n                    blocked.update(set(expansion(n))&queries)\n            collect(v)\nfor name,expected in json.loads((P/'exclusion-ledgers.json').read_text()).items():\n    if name.startswith('derived:'):\n        namespace=name[len('derived:'):]\n        for i in range(1,int(expected)+1):\n            n=int.from_bytes(hashlib.sha256(f'{namespace}:{i}'.encode()).digest()[:4],'little')\n            blocked.update(set(expansion(n))&queries)\n        verified.append(name);continue\n    raw=(client/name).read_bytes()\n    if hashlib.sha256(raw).hexdigest()!=expected:\n        preserved=P/'ledger-preserved'/Path(name).name\n        assert preserved.exists(),name\n        raw=preserved.read_bytes()\n    assert hashlib.sha256(raw).hexdigest()==expected,name\n    collect(json.loads(gzip.decompress(raw) if name.endswith('.gz') else raw))\n    verified.append(name)\nassert not blocked,sorted(blocked)\nresult={'qualityPassed':True,'families':108,'distinctUsedPreimages':540,'distinctUsedRawAndPermutedChannels':34560,'verifiedLedgersIncludingDerived':len(verified),'priorIntersections':0,'allPreimagesReserved':True}\nwith(P/'independent-seed-verification.json').open('x')as f:json.dump(result,f,indent=2);f.write('\\n')\nprint(json.dumps(result))\n"
+        }
+    },
+    "resultReceiptsSha256": "0d5e41a79c9e90f438fa66c58e0a1bc4db24c98c1e380ba21e8912be2df431c7",
+    "executionCounts": {
+        "freshComparisonBattles": 864,
+        "developmentPolicyParity": 14,
+        "crossHostDevelopmentParity": 3,
+        "freshColdRepeats": 6
+    },
+    "servingChanged": false,
+    "retuneOnThisBank": false,
+    "nextHypothesis": "Value consuming an enemy response for ready allied shooters; distinguish small bait stacks from valuable ranged survivors. Requires a distinct policy and fresh seeds; do not delete or rescue the losing case."
+}

@@ -1,0 +1,373 @@
+{
+    "descriptiveOnly": true,
+    "noPolicyTuningOrPromotion": true,
+    "informationDiagnostics": [
+        {
+            "label": "all-six-enemies-known",
+            "families": 18,
+            "posthocDiagnosticOnly": true,
+            "contrasts": [
+                {
+                    "candidate": "formation_guard",
+                    "control": "native",
+                    "gainPp": -15.277777777777779,
+                    "ci95": [-36.11111111111111, 5.555555555555555]
+                },
+                {
+                    "candidate": "formation_guard",
+                    "control": "abomination",
+                    "gainPp": 9.722222222222223,
+                    "ci95": [-4.166666666666666, 25.0]
+                },
+                {
+                    "candidate": "abomination",
+                    "control": "native",
+                    "gainPp": -25.0,
+                    "ci95": [-50.0, 0.0]
+                }
+            ]
+        },
+        {
+            "label": "some-enemies-hidden",
+            "families": 90,
+            "posthocDiagnosticOnly": true,
+            "contrasts": [
+                {
+                    "candidate": "formation_guard",
+                    "control": "native",
+                    "gainPp": -6.666666666666667,
+                    "ci95": [-15.555555555555555, 1.9444444444444444]
+                },
+                {
+                    "candidate": "formation_guard",
+                    "control": "abomination",
+                    "gainPp": 3.3333333333333335,
+                    "ci95": [-4.444444444444445, 11.11111111111111]
+                },
+                {
+                    "candidate": "abomination",
+                    "control": "native",
+                    "gainPp": -10.0,
+                    "ci95": [-18.88888888888889, -1.1111111111111112]
+                }
+            ]
+        },
+        {
+            "label": "magic-dragon-banned",
+            "families": 44,
+            "posthocDiagnosticOnly": true,
+            "contrasts": [
+                {
+                    "candidate": "formation_guard",
+                    "control": "native",
+                    "gainPp": -7.954545454545454,
+                    "ci95": [-20.454545454545457, 4.545454545454546]
+                },
+                {
+                    "candidate": "formation_guard",
+                    "control": "abomination",
+                    "gainPp": 2.840909090909091,
+                    "ci95": [-9.659090909090908, 15.340909090909092]
+                },
+                {
+                    "candidate": "abomination",
+                    "control": "native",
+                    "gainPp": -10.795454545454545,
+                    "ci95": [-25.568181818181817, 3.977272727272727]
+                }
+            ]
+        },
+        {
+            "label": "magic-dragon-not-known-banned",
+            "families": 64,
+            "posthocDiagnosticOnly": true,
+            "contrasts": [
+                {
+                    "candidate": "formation_guard",
+                    "control": "native",
+                    "gainPp": -8.203125,
+                    "ci95": [-18.359375, 2.34375]
+                },
+                {
+                    "candidate": "formation_guard",
+                    "control": "abomination",
+                    "gainPp": 5.46875,
+                    "ci95": [-2.734375, 13.671875]
+                },
+                {
+                    "candidate": "abomination",
+                    "control": "native",
+                    "gainPp": -13.671875,
+                    "ci95": [-23.828125, -3.515625]
+                }
+            ]
+        },
+        {
+            "label": "at-least-three-known-shooters",
+            "families": 58,
+            "posthocDiagnosticOnly": true,
+            "contrasts": [
+                {
+                    "candidate": "formation_guard",
+                    "control": "native",
+                    "gainPp": -8.620689655172415,
+                    "ci95": [-20.689655172413794, 3.8793103448275863]
+                },
+                {
+                    "candidate": "formation_guard",
+                    "control": "abomination",
+                    "gainPp": 3.0172413793103448,
+                    "ci95": [-6.896551724137931, 13.36206896551724]
+                },
+                {
+                    "candidate": "abomination",
+                    "control": "native",
+                    "gainPp": -11.637931034482758,
+                    "ci95": [-24.137931034482758, 0.8620689655172413]
+                }
+            ]
+        },
+        {
+            "label": "at-least-three-own-shooters",
+            "families": 59,
+            "posthocDiagnosticOnly": true,
+            "contrasts": [
+                {
+                    "candidate": "formation_guard",
+                    "control": "native",
+                    "gainPp": -3.389830508474576,
+                    "ci95": [-14.40677966101695, 7.203389830508475]
+                },
+                {
+                    "candidate": "formation_guard",
+                    "control": "abomination",
+                    "gainPp": 1.2711864406779663,
+                    "ci95": [-8.050847457627118, 10.16949152542373]
+                },
+                {
+                    "candidate": "abomination",
+                    "control": "native",
+                    "gainPp": -4.661016949152542,
+                    "ci95": [-15.677966101694915, 6.3559322033898304]
+                }
+            ]
+        }
+    ],
+    "sourceSha256": "75f96771aca49bd946e79e0739c0fba423f1181957879bc13c7f55a480080076",
+    "broadBankFrontlineWitness": {
+        "family": "fresh-s03-f001",
+        "seat": 1,
+        "descriptiveOnly": true,
+        "cases": [
+            {
+                "mode": "abomination",
+                "actions": [
+                    {
+                        "index": 6,
+                        "lap": 1,
+                        "side": "red",
+                        "unitId": "c123125e-5b0c-5840-937d-1d17a3a269db",
+                        "creatureName": "Abomination",
+                        "fromCell": {
+                            "x": 14,
+                            "y": 14
+                        },
+                        "actionType": "wait_turn",
+                        "completed": true
+                    },
+                    {
+                        "index": 8,
+                        "lap": 1,
+                        "side": "red",
+                        "unitId": "1463a0dd-7af3-52e0-bd59-55eec6070528",
+                        "creatureName": "Peasant",
+                        "fromCell": {
+                            "x": 13,
+                            "y": 11
+                        },
+                        "actionType": "wait_turn",
+                        "completed": true
+                    },
+                    {
+                        "index": 13,
+                        "lap": 1,
+                        "side": "red",
+                        "unitId": "c123125e-5b0c-5840-937d-1d17a3a269db",
+                        "creatureName": "Abomination",
+                        "fromCell": {
+                            "x": 14,
+                            "y": 14
+                        },
+                        "actionType": "move_unit",
+                        "toCell": {
+                            "x": 13,
+                            "y": 13
+                        },
+                        "completed": true
+                    },
+                    {
+                        "index": 14,
+                        "lap": 1,
+                        "side": "red",
+                        "unitId": "1463a0dd-7af3-52e0-bd59-55eec6070528",
+                        "creatureName": "Peasant",
+                        "fromCell": {
+                            "x": 13,
+                            "y": 11
+                        },
+                        "actionType": "move_unit",
+                        "toCell": {
+                            "x": 13,
+                            "y": 10
+                        },
+                        "completed": true
+                    },
+                    {
+                        "index": 23,
+                        "lap": 2,
+                        "side": "red",
+                        "unitId": "c123125e-5b0c-5840-937d-1d17a3a269db",
+                        "creatureName": "Abomination",
+                        "fromCell": {
+                            "x": 13,
+                            "y": 13
+                        },
+                        "actionType": "move_unit",
+                        "toCell": {
+                            "x": 10,
+                            "y": 10
+                        },
+                        "completed": true
+                    },
+                    {
+                        "index": 24,
+                        "lap": 2,
+                        "side": "red",
+                        "unitId": "c123125e-5b0c-5840-937d-1d17a3a269db",
+                        "creatureName": "Abomination",
+                        "fromCell": {
+                            "x": 10,
+                            "y": 10
+                        },
+                        "actionType": "melee_attack",
+                        "targetId": "2aaf7d69-f05a-59f9-a78e-5902f99dbbae",
+                        "targetCreature": "Hyena",
+                        "toCell": {
+                            "x": 10,
+                            "y": 10
+                        },
+                        "completed": true,
+                        "impactDamage": 43,
+                        "damage": 43,
+                        "secondaryHits": 0
+                    },
+                    {
+                        "index": 26,
+                        "lap": 2,
+                        "side": "red",
+                        "unitId": "1463a0dd-7af3-52e0-bd59-55eec6070528",
+                        "creatureName": "Peasant",
+                        "fromCell": {
+                            "x": 13,
+                            "y": 10
+                        },
+                        "actionType": "move_unit",
+                        "toCell": {
+                            "x": 6,
+                            "y": 7
+                        },
+                        "completed": true
+                    },
+                    {
+                        "index": 27,
+                        "lap": 2,
+                        "side": "red",
+                        "unitId": "1463a0dd-7af3-52e0-bd59-55eec6070528",
+                        "creatureName": "Peasant",
+                        "fromCell": {
+                            "x": 6,
+                            "y": 7
+                        },
+                        "actionType": "melee_attack",
+                        "targetId": "2aaf7d69-f05a-59f9-a78e-5902f99dbbae",
+                        "targetCreature": "Hyena",
+                        "toCell": {
+                            "x": 6,
+                            "y": 7
+                        },
+                        "completed": true,
+                        "impactDamage": 171,
+                        "damage": 171,
+                        "secondaryHits": 0
+                    }
+                ]
+            },
+            {
+                "mode": "formation_guard",
+                "actions": [
+                    {
+                        "index": 6,
+                        "lap": 1,
+                        "side": "red",
+                        "unitId": "c123125e-5b0c-5840-937d-1d17a3a269db",
+                        "creatureName": "Abomination",
+                        "fromCell": {
+                            "x": 14,
+                            "y": 10
+                        },
+                        "actionType": "wait_turn",
+                        "completed": true
+                    },
+                    {
+                        "index": 8,
+                        "lap": 1,
+                        "side": "red",
+                        "unitId": "1463a0dd-7af3-52e0-bd59-55eec6070528",
+                        "creatureName": "Peasant",
+                        "fromCell": {
+                            "x": 13,
+                            "y": 11
+                        },
+                        "actionType": "move_unit",
+                        "toCell": {
+                            "x": 8,
+                            "y": 6
+                        },
+                        "completed": true
+                    },
+                    {
+                        "index": 12,
+                        "lap": 1,
+                        "side": "red",
+                        "unitId": "c123125e-5b0c-5840-937d-1d17a3a269db",
+                        "creatureName": "Abomination",
+                        "fromCell": {
+                            "x": 14,
+                            "y": 10
+                        },
+                        "actionType": "defend_turn",
+                        "completed": true
+                    },
+                    {
+                        "index": 21,
+                        "lap": 2,
+                        "side": "red",
+                        "unitId": "c123125e-5b0c-5840-937d-1d17a3a269db",
+                        "creatureName": "Abomination",
+                        "fromCell": {
+                            "x": 14,
+                            "y": 10
+                        },
+                        "actionType": "wait_turn",
+                        "completed": true
+                    }
+                ]
+            }
+        ]
+    },
+    "coverageLimitations": {
+        "broadBankOwnHealerFamilies": 0,
+        "targetedBankOwnHealerFamilies": 1,
+        "paidPlacementNotTested": true
+    }
+}

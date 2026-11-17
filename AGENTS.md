@@ -945,6 +945,94 @@ user-selected target. The separate loop-invariant/stable-context v2 implementati
 executions; cost and fresh strength remain pending. Any fresh default comparison must use adopted
 terrain-aware v11 on both arms, while the already-frozen v10 implementation controls stay v10.
 
+## Closed ranged counter-shot screens
+
+Read `docs/ranged_countershot_safety_research.md` before continuing the November 17 human-match
+investigation. The separate inactive `ranged-countershot-safety-20261117-pilot-v1` freezes current v10
+at `997490ee`, 54 fresh native draft families and 432 paired battles. It uses existing full-search
+samples to reject only fatal low-return ranged exchanges with a surviving, non-losing ranged
+alternative whose full forecast is no worse. Keep its fixed candidate and all cases; do not tune on
+partial outcomes. The registered one-decision alternatives are reused-bank diagnostics, not fresh
+policy qualification. Neither experiment changes a serving default or the peer's mixture study.
+Reserve every scanned channel in namespace `ranged-countershot-safety-20261117-fresh-v1`, counters
+1 through 20,480, with 32 raw and 32 native-permuted channels per SHA-256 little-endian preimage,
+including unused and rejected allocations. The ignored client capsule contains the exact receipts.
+
+The conservative screen completed: both arms 102 wins / 5 draws / 109 losses, **0.00 points**, nine
+changed trajectories across six families. It failed promotion. All six cold repeats and independent
+integer checks passed. The separate 14-case one-shot diagnostic recovered one loss and two draws into
+wins with no worse cases, all from safer shots whose native full forecast was 0.25 lower. That is
+selected reused evidence, not a general strength claim. Preserve the closed source and all 216 paired
+outcomes in `docs/evidence/ranged_countershot_safety_20261117.json`; a new one-correction rule needs
+a distinct registration and fresh seeds. No default changed.
+
+The distinct `ranged-countershot-once-20261117-fresh-v1` candidate removes the forecast floor but
+permits only one correction per battle. Read `docs/ranged_countershot_once_research.md`. All 14
+automatic-policy development traces match the prior forced branches exactly. Its independent screen
+reserves 108 fresh families / 864 battles on the 9800X3D host, four nice19 workers, cutoff November 17
+20:41:38 UTC. Exclude namespace `ranged-countershot-once-20261117-fresh-v1`, counters 1..20,480,
+with the same 32 raw/32 native-permuted expansion. No partial-outcome tuning, extension or promotion;
+positive fresh evidence still needs independent confirmation, durable budget semantics and +10% cost.
+Its frozen source and every scanned preimage are recorded in
+`docs/evidence/ranged_countershot_once_registration_20261117.json` (registration
+`c204e5c4c03543fb8e80dffe84b270fb53feba56d4f8ea93ad63376cfee1610b`). Independent channel verification
+found zero prior intersections across all 34,560 used raw/permuted channels and 192 exclusion ledgers.
+
+The once-per-battle fresh screen is complete and failed: **+0.00 points, 95% -0.69 to +0.69**, 864
+battles. Both arms scored 211 wins / 4 draws / 217 losses. Twenty-one corrections across 18 families
+produced one gain, one loss and 19 unchanged outcomes; all 411 untouched cases and every changed prefix
+matched exactly. All six fresh cross-host cold executions and independent integer calculations passed.
+Preserve `docs/evidence/ranged_countershot_once_result_20261117.json`. The regression saved a 14-HP
+single Elf that had baited Arbalester's response; the following Centaur then took 285 HP / 19 creatures
+in retaliation. A distinct future hypothesis must account for response consumption and ready allies,
+not erase this counterexample or exempt its creature after the fact. Both fresh outcome flips were
+full-forecast ties. Do not claim lower-forecast corrections were qualified. No default, model,
+confirmation or cost campaign changed; both closed helpers and seed reservations remain immutable.
+
+## Abomination counterpick screen, November 17, 2026
+
+Read `docs/abomination_counterpick_research.md`. The distinct six-arm exploratory screen freezes 54
+public legal offer families / 648 battles against current v10. It tests draft choice, the existing
+guard contract, free shield coverage and their combination without spending extra upgrade points.
+Preserve hidden collision retries, public-only choices, native opponent formations and family-level
+inference. No subgroup or absorption statistic licenses promotion; the old protector-release wins
+remain historical evidence. Registration and sources are in
+`docs/evidence/abomination_counterpick_registration_20261117.json`. Exclude every scanned preimage in
+namespace `abomination-counterpick-20261117-fresh-v1`, counters 1..20,480, and its 32 raw/32 permuted
+channels, including rejected and unused values. Fixed cutoff: November 17, 22:15 UTC. No default
+change, automatic promotion or tuning on these outcomes.
+
+The initial screen is complete: no overall win. Prefer-Abomination versus the alternate offer was
+-7.41 pp; formation plus guard versus the native default was -7.87 pp. All planned confidence
+intervals include zero. Preserve `docs/evidence/abomination_counterpick_result_20261117.json` and the
+18 exact cold replays. A 24-family post-hoc physical-shooter slice was +8.33 pp [-8.33,+25.00]; it is
+only a hypothesis, not a promoted exception.
+
+The separate `abomination-physical-counterpick-20261117` validation freezes 108 new eligible families,
+both seats and three arms / 648 fights. The first public L4 offer must show at least two ranged
+opponents, no magic-damage-capable opponent and at least two own ranged/caster assets. Keep that
+decision through retries; never use hidden or later-revealed identities to select cases. Compare the
+unchanged formation-plus-guard policy against both native default and ordinary Abomination play.
+Registration `23be7c8f621ad8ff66105f3d4798123f76ef5d86b1d50ddcb41f12df9ea97917`, sources and every
+scanned seed are in `docs/evidence/abomination_physical_counterpick_registration_20261117.json`.
+Exclude namespace `abomination-physical-counterpick-20261117-fresh-v1`, counters 1..20,480, with the
+same 32 raw/32 permuted expansion, including rejected and unused channels. Eligibility-only sampling
+was extended within already-reserved channels before any battle to fill the low-visibility
+Block / seven-point versus five-point / first-pick stratum. No outcome-based extension or tuning;
+cutoff remains November 17 22:15 UTC. No default activation.
+
+The fresh targeted Abomination validation is complete and **failed all three strength gates**.
+Native: 105W/5D/106L; contextual Abomination with ordinary play: 79W/3D/134L; formation plus guard:
+89W/2D/125L. Combined versus native was **-8.10 pp**, simultaneous 95% **[-17.59,+1.16]**. Combined
+versus ordinary Abomination was **+4.40 pp [-3.47,+12.50]** and remains uncertain. All 648 battles,
+nine cold cross-host repeats, six smoke traces and independent integer/bootstrap checks passed.
+Preserve `docs/evidence/abomination_physical_counterpick_result_20261117.json`. The earlier +8.33
+post-hoc hint did not validate. More shield HP or a favorable slice does not rescue either bank;
+do not enable this draft preference, formation repair or guard rule. Default v10 remains unchanged.
+Future research needs a distinct registration and fresh seeds; retained channels include every
+rejected, unused and eligibility-extension bundle. Healer builds were scarcely represented, and
+frontline coordination and paid Placement were not independently qualified here.
+
 ## Closed terrain-placement reflection screen
 
 The November 17 audit confirmed a missing actual-terrain input in split/final placement: all 48
