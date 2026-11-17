@@ -72,3 +72,26 @@ channels, 1,548,288 reserved channels, zero intersection with 20,562,338 prior e
 fresh combat has opened at allocation. Exact local/Puffalo cold controls must pass before the frozen
 strength registration starts either shard. The registered score, confidence, safety, coverage and
 subsequent +10% serial-cost/fresh-confirmation gates remain unchanged. The serving default is intact.
+
+## Frozen fresh execution
+
+Qualification is registered as
+`c2e6a08938110cc5ab360b2cffb1823391abe92044fab4ad1f65a013f403eebb`; see the
+[full registration](evidence/barrel_forecast_model_mixture_qualification_registration_20261117.json).
+Both local ARM64 and Puffalo x64 completed the fixed 24 functional cold fights with identical consumed
+inputs, complete game traces, scores, forecast counts and witnesses. This is functional parity across
+stock, observer, mixture and naive v1; the accepted neural reference is an additional strength arm.
+The preselected fresh cold controls will replay all four strength arms on both hosts after collection.
+
+Before any fresh fight, throughput calibration amended the execution split to **648 local families /
+12 workers** and **108 Puffalo families / 8 workers**, all Unix nice 19. Every host/style/map/own-doctrine/
+opponent-doctrine cell remains balanced: six local and one Puffalo family per cell. The original 540/216
+allocation and protocol remain preserved; no source, model, seed, setup, eligibility or score gate was
+changed. Both shards are running. The fixed shared cutoff is **November 17, 20:56:07 UTC**, without an
+automatic retry, extension or post-combat family reassignment.
+
+The separate integer Python/Bun finalizers are sealed before aggregate inspection. Both require all
+12,096 fights, original input hashes, exact family/arm membership, zero authoritative/model failures,
+and no timing-driven search fallback. Concurrent progress/cost monitoring does not qualify serving
+cost or select a policy. Only the completed whole-family strength gate can open separately registered
+serial timing and fresh confirmation. No default or production deployment changed in this experiment.

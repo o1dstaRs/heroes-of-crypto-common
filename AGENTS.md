@@ -854,3 +854,15 @@ families. Exclude every scanned preimage from
 raw/eight native-permuted channels including rejects/unused seeds. Require cold parity and the frozen
 strength registration before combat. Do not retune the mixture coefficient, rescue a subgroup, claim
 v10 strength from reused v9 data, or promote without independent strength/cost/confirmation.
+
+Fresh mixture qualification is now frozen under
+`c2e6a08938110cc5ab360b2cffb1823391abe92044fab4ad1f65a013f403eebb`;
+read `docs/evidence/barrel_forecast_model_mixture_qualification_registration_20261117.json`.
+After cold throughput calibration, BEFORE fresh combat, execution changed to 648 local/108 Puffalo
+families (12/8 workers, Unix nice19). Original allocation stays preserved, with six/one complete factor
+replicates per host. No source, seed, model or score-gate change occurred. Both shards use the common
+November17 20:56:07 UTC hard cutoff. No automatic retry, extension or family reassignment after start.
+All 48 local/Puffalo functional cold runs match exactly. Fixed fresh cold cases replay all four strength
+arms, including accepted reference, on both hosts after collection. Keep finalizers blind until both
+shards complete; independently verify integer outcomes/bootstrap and zero timing fallbacks. No result
+from reused admission or partial fresh data qualifies a new default or removes serial-cost/confirmation.
