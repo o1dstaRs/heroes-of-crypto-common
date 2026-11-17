@@ -635,3 +635,31 @@ helper SHA `95c25e5faefffda560ee045a57e18d011b67b95b04a2a22797118c2183472824`, t
 default, model or Premium change was made. Do not activate or widen this closed rule on its opened bank.
 Further positioning work needs a distinct hypothesis and fresh evidence; shorter geometric distance
 does not establish an extra attack or a strength gain.
+
+## Closed Nightmare ground-wall coverage pilot
+
+The user's Nightmare Fire Wall investigation completed as `nightmare-ground-wall-coverage-v1` on
+November 17. Read `docs/nightmare_ground_wall_research.md` and preserve the full reservation ledger in
+`docs/evidence/nightmare_ground_wall_20261117.json`. The inactive helper adds one ground-approach wall
+to the unchanged root search, excluding flyers and units with remaining ranged/damaging-spell output
+from its geometric targeting. It preserves every native action and uses no hidden information or RNG.
+
+All 1,350 executions passed quality checks: 108 fresh legal Nightmare-preference draft families,
+432 paired outcomes, 432 observer comparisons and 54 cold replays. The extra wall was selected 64 times;
+65 trajectories changed. Four losses became wins, three wins became losses: **+0.231481 score points**,
+whole-family 95% **−0.925926 to +1.388889**. The 7-point doctrine regressed. Minimum gain, confidence
+and doctrine gates failed. Do not activate this rule, rescue a favorable slice or retune it on this bank.
+No qualification/confirmation opened; no model, default or Premium routing changed.
+
+Preserve helper SHA `83d590e8ad804382bf649891c8114a29e3ea5db2da937b8492f476ea5dffd85c`, registration
+`bc6bb9ca33124c11133c24a87f0a4c0a1950a89e7ef464e9e8392e2be19da03d`, all 20,480 scanned preimages and
+their 1,310,532 raw/permuted channels, including rejected and unused scans. Independent geometry,
+integer-score/bootstrap, full wall-use and all-seven-outcome trace audits passed. More enemy burns
+were accompanied by more allied burns; damage totals do not establish a strength gain.
+
+A separate frozen-model diagnostic proves A19's observation omits Fire Wall orientation and existing
+burning cells/lifetime/power. Identical neural inputs/predictions can accompany 0 versus 250 HP crossing
+damage. Engine rollouts still simulate fire; this is not complete-agent blindness or an isolated cause
+of the pilot result. Fixing the trained representation needs a new contract, new fits and fresh strength
+and serving-cost qualification. Future route-aware wall work must also price allied access and the
+attack/Empower turn given up. Preserve the accepted A19 neural pair and adopted barrel correction.
