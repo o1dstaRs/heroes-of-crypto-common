@@ -710,3 +710,21 @@ fresh evidence for movement opportunity cost, longer-horizon wall value or a new
 representation. The separate Hidden fixture confirms untargetable units still take fire damage; it is
 mechanics evidence only and did not modify the candidate. Keep the original helper and route-helper
 hashes, the corrected shared-array adapter/tests, accepted A19 pair and adopted barrel correction intact.
+
+## Registered Nightmare wall movement comparison study
+
+The distinct `nightmare-wall-movement-coverage-v1` candidate is registered as
+`nightmare-wall-movement-20261117`, registration
+`819fa13d6e88006994abcca5c31ca400a0d5bac9c339e00eddc57c167e64b09a`. Read
+`docs/nightmare_wall_movement_research.md` and preserve its full seed reservation fixture. The prior
+coverage audit found no pure move in full search on 261 of 481 eligible wall roots, despite legal
+native moves. Preserve the original-v1 comparison set and append at most one best finite native leaf
+move only when none survived. No route veto, score mask, forced move or new model is involved.
+
+All 535 targeted tests and four old-case canaries pass. The fixed study has 24 admission cases, then
+216 fresh families / 864 paired comparisons, with off/observe/original-v1/movement arms and 3,720 total
+executions. Both primary contrasts must pass simultaneous confidence and own-doctrine gates; original
+v1 remains diagnostic. Six local and twelve Puffalo nice-19 CPU workers have a three-hour cutoff at
+November 17 18:30:31 UTC, no GPU, retry or extension. Read status/terminal receipts before intervening.
+Do not mistake registration or missing-comparison coverage for a gain. No default/weights/Premium
+change or automatic promotion is authorized by this study. Preserve all earlier failed wall studies.
