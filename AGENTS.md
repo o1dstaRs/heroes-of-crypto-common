@@ -1,5 +1,20 @@
 # Agent guidance
 
+## Closed revealed-ranged delivery screen — November 17, 2026
+
+Read `docs/revealed_ranged_delivery_research.md` before revisiting early public shooter/caster reveals,
+Chaos Movement, flying picks or paid rush setup. This distinct current-v11 screen used 27 fresh
+opportunity families / 270 paired logical battles. Combined draft/setup scored −1.851852 pp versus
+native (adjusted 95% −16.666667 to +12.962963); draft alone +7.407407 and setup alone +9.259259 both
+have intervals crossing zero. Adding setup after the new draft lost ten seats and recovered five.
+Only one incremental paid-Placement seat differed from its matched free control. No candidate passed,
+no confirmation opened, and no default changed. Preserve both evidence fixtures and all failed arms.
+Exclude namespace `revealed-ranged-delivery-20261117-fresh-v1`, counters 1..20,480, including every
+scanned preimage plus offsets 0..31 raw and permuted. The prototype uses real fight-start own stats,
+native paid splits and public neutral terrain; never regress to placement-time steps or concealed
+enemy positions. Ranked Setup already exposes the whole roster; early doctrine/collision reveals
+matter during drafting. Positive component estimates are exploratory, not approved promotions.
+
 ## Explicit public-terrain placement adoption — November 17, 2026
 
 The user requested “plesae add it to the default strategy for sure” after reviewing the terrain
