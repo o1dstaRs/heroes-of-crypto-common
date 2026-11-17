@@ -616,3 +616,22 @@ Future combat studies use this adopted default as their incumbent, with off only
 Do not overwrite its confirmed result, reopen its bank, enable the older failed own-barrel fallback guard,
 or infer that native rollout cleanup is now qualified. Any continuation needs a distinct candidate and
 fresh channels; preserve the accepted neural pair and all earlier failed research references.
+
+## Closed Peasant same-kill follow-through pilot
+
+The distinct `peasant-same-kill-followthrough-v1` candidate completed its registered study on November 17.
+Read `docs/peasant_followthrough_research.md` and preserve
+`docs/evidence/peasant_followthrough_20261117.json`. It compared already-complete H64/R2 same-target
+kill ties with matched immediate Peasant HP, bodies, armor, steps, Bitter stacks and response price,
+then preferred a square closer to remaining ranged/caster output before the unchanged neural correction.
+It added no candidate or rollout and remains offline only.
+
+All 1,413 executions passed quality checks, including 108 fresh families / 432 paired outcome comparisons.
+Every game result was unchanged: 0.000000-point gain, six changed trajectories, failed coverage and
+strength gates. The all-zero empirical bootstrap interval is degenerate, not proof of zero population
+effect. In every changed comparison both Peasants still attacked next turn in the same lap. Preserve
+helper SHA `95c25e5faefffda560ee045a57e18d011b67b95b04a2a22797118c2183472824`, tests, all audits and the
+20,480 scanned preimages with all raw/permuted channels. No qualification/confirmation opened and no
+default, model or Premium change was made. Do not activate or widen this closed rule on its opened bank.
+Further positioning work needs a distinct hypothesis and fresh evidence; shorter geometric distance
+does not establish an extra attack or a strength gain.
