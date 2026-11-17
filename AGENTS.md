@@ -711,9 +711,9 @@ representation. The separate Hidden fixture confirms untargetable units still ta
 mechanics evidence only and did not modify the candidate. Keep the original helper and route-helper
 hashes, the corrected shared-array adapter/tests, accepted A19 pair and adopted barrel correction intact.
 
-## Registered Nightmare wall movement comparison study
+## Closed Nightmare wall movement comparison pilot
 
-The distinct `nightmare-wall-movement-coverage-v1` candidate is registered as
+The distinct `nightmare-wall-movement-coverage-v1` candidate completed as
 `nightmare-wall-movement-20261117`, registration
 `819fa13d6e88006994abcca5c31ca400a0d5bac9c339e00eddc57c167e64b09a`. Read
 `docs/nightmare_wall_movement_research.md` and preserve its full seed reservation fixture. The prior
@@ -721,13 +721,28 @@ coverage audit found no pure move in full search on 261 of 481 eligible wall roo
 native moves. Preserve the original-v1 comparison set and append at most one best finite native leaf
 move only when none survived. No route veto, score mask, forced move or new model is involved.
 
-All 535 targeted tests and four old-case canaries pass. The fixed study has 24 admission cases, then
-216 fresh families / 864 paired comparisons, with off/observe/original-v1/movement arms and 3,720 total
-executions. Both primary contrasts must pass simultaneous confidence and own-doctrine gates; original
-v1 remains diagnostic. Six local and twelve Puffalo nice-19 CPU workers have a three-hour cutoff at
-November 17 18:30:31 UTC, no GPU, retry or extension. Read status/terminal receipts before intervening.
-Do not mistake registration or missing-comparison coverage for a gain. No default/weights/Premium
-change or automatic promotion is authorized by this study. Preserve all earlier failed wall studies.
+All 3,720 executions completed on November 17 at 16:38:52 UTC: 24 admission cases, 216 fresh families /
+864 paired outcomes and fixed cold repetitions. All 888 observer pairs, 168 cold replays and 48 old
+default/v1 control comparisons match. Both source seals, raw scores and independent whole-family
+statistics verify. All 535 targeted tests and the later 8,151-test common suite pass; full TypeScript
+and package copy steps pass after a peer fixed its own transient type error.
+
+Movement coverage scored **+0.520833 points versus default** (simultaneous 95% −1.157407 to +2.256944)
+and **+0.231481 versus original v1** (−0.694444 to +1.388889). These are positive estimates, not qualified
+gains: confidence and own-doctrine gates failed, with the five-point doctrine negative. Original v1's
+diagnostic replication was +0.289352 points (ordinary 95% −0.752315 to +1.273148); it is not an alternate
+finalist. No confirmation, serial serving-cost qualification, default, model or Premium change followed.
+
+The move was added 293 times and selected 69 times. There were 69 changed trajectories against v1:
+seven losses became wins, five wins became losses, and 852 paired outcomes stayed the same. Three wins
+came from one family; the positive result is fragile. All twelve flips first chose movement, but three
+other first divergences changed between existing actions and kept the same outcome. Preserve that
+descriptive audit correction. Strict forecast leads preceded three regressions as well as five gains;
+do not infer a qualified tie filter or blanket movement preference. Fewer allied burns and fewer wall
+casts do not substitute for match score. Keep the full evidence, all 1,310,515 scanned reserved channels
+and every earlier failed wall study. Do not tune a subgroup/threshold on this opened bank. Further
+wall-aware representation or continuation research needs a distinct contract and fresh evidence while
+preserving the accepted A19 pair and adopted barrel correction.
 
 ## Closed melee barrel shortlist coverage follow-up
 
