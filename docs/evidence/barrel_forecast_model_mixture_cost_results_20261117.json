@@ -1,0 +1,2191 @@
+{
+    "schema": "hoc.barrel_forecast_model_mixture.serial_cost_results.v1",
+    "recordedAt": "2026-11-17T21:07:03.241488+00:00",
+    "state": "strength-qualified-cost-failed-confirmation-unopened",
+    "analysis": {
+        "id": "barrel-forecast-paired-model-mixture-v1-serial-cost-20261117",
+        "at": "2026-11-17T20:55:34.118817+00:00",
+        "complete": true,
+        "executions": 276,
+        "registrationSha256": "8f91fb4c12efceaeb4c34b908959106cb87ce2e741a7a112121a139394538a5a",
+        "allSourceInputAndOriginalOfflineControlsExact": true,
+        "forcedR1": {
+            "pairs": 6,
+            "fullTracesAndScoresExact": true,
+            "eligibleBarrelBoundaries": 83,
+            "effectiveR1Queries": 5973,
+            "degradedDecisions": 271,
+            "intentSelections": 0
+        },
+        "phases": {
+            "serial-full-r2": {
+                "arms": {
+                    "stock": {
+                        "fights": 72,
+                        "fightCpuMicros": 197783020,
+                        "fightWallMicros": 188064360,
+                        "decisionMicros": 187208891,
+                        "decisionCount": 3559,
+                        "meanDecisionMicros": 52601.54284911492,
+                        "decisionTailMicros": {
+                            "0.5": 40570,
+                            "0.9": 121242,
+                            "0.95": 143658,
+                            "0.99": 193474,
+                            "1": 314695
+                        },
+                        "work": {
+                            "decisions": 3323,
+                            "searched": 3184,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "circuitWaitArbitrations": 0,
+                            "degradedDecisions": 0
+                        }
+                    },
+                    "mixture": {
+                        "fights": 72,
+                        "fightCpuMicros": 190965471,
+                        "fightWallMicros": 182577488,
+                        "decisionMicros": 181747360,
+                        "decisionCount": 3522,
+                        "meanDecisionMicros": 51603.45258375923,
+                        "decisionTailMicros": {
+                            "0.5": 39713,
+                            "0.9": 119312,
+                            "0.95": 141675,
+                            "0.99": 190426,
+                            "1": 276588
+                        },
+                        "work": {
+                            "decisions": 3293,
+                            "searched": 3143,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "circuitWaitArbitrations": 0,
+                            "degradedDecisions": 0
+                        }
+                    },
+                    "both": {
+                        "fights": 72,
+                        "fightCpuMicros": 200990034,
+                        "fightWallMicros": 191163739,
+                        "decisionMicros": 190299051,
+                        "decisionCount": 3594,
+                        "meanDecisionMicros": 52949.095993322204,
+                        "decisionTailMicros": {
+                            "0.5": 40693,
+                            "0.9": 122541,
+                            "0.95": 142596,
+                            "0.99": 190157,
+                            "1": 258232
+                        },
+                        "work": {
+                            "decisions": 3365,
+                            "searched": 3210,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "circuitWaitArbitrations": 0,
+                            "degradedDecisions": 0
+                        }
+                    }
+                },
+                "ratiosVsStock": {
+                    "mixture": {
+                        "fightCpuMicros": 0.965530160273617,
+                        "fightWallMicros": 0.970824498591865,
+                        "decisionMicros": 0.9708265404980151,
+                        "meanDecisionMicros": 0.9810254564544111
+                    },
+                    "both": {
+                        "fightCpuMicros": 1.0162148095422954,
+                        "fightWallMicros": 1.0164804165978072,
+                        "decisionMicros": 1.0165064809875937,
+                        "meanDecisionMicros": 1.006607280421493
+                    }
+                }
+            },
+            "bounded-live": {
+                "arms": {
+                    "stock": {
+                        "fights": 12,
+                        "fightCpuMicros": 32638198,
+                        "fightWallMicros": 31670415,
+                        "decisionMicros": 31530159,
+                        "decisionCount": 592,
+                        "meanDecisionMicros": 53260.40371621621,
+                        "decisionTailMicros": {
+                            "0.5": 41627,
+                            "0.9": 123292,
+                            "0.95": 148683,
+                            "0.99": 194579,
+                            "1": 225739
+                        },
+                        "work": {
+                            "decisions": 551,
+                            "searched": 531,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "circuitWaitArbitrations": 0,
+                            "degradedDecisions": 0
+                        }
+                    },
+                    "mixture": {
+                        "fights": 12,
+                        "fightCpuMicros": 30998919,
+                        "fightWallMicros": 30168007,
+                        "decisionMicros": 30032275,
+                        "decisionCount": 569,
+                        "meanDecisionMicros": 52780.79964850615,
+                        "decisionTailMicros": {
+                            "0.5": 40573,
+                            "0.9": 123935,
+                            "0.95": 153445,
+                            "0.99": 200835,
+                            "1": 229985
+                        },
+                        "work": {
+                            "decisions": 529,
+                            "searched": 504,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "circuitWaitArbitrations": 0,
+                            "degradedDecisions": 0
+                        }
+                    },
+                    "both": {
+                        "fights": 12,
+                        "fightCpuMicros": 38549059,
+                        "fightWallMicros": 37522663,
+                        "decisionMicros": 37361600,
+                        "decisionCount": 661,
+                        "meanDecisionMicros": 56522.84417549168,
+                        "decisionTailMicros": {
+                            "0.5": 46106,
+                            "0.9": 128775,
+                            "0.95": 159932,
+                            "0.99": 201988,
+                            "1": 258198
+                        },
+                        "work": {
+                            "decisions": 619,
+                            "searched": 580,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "circuitWaitArbitrations": 0,
+                            "degradedDecisions": 0
+                        }
+                    }
+                },
+                "ratiosVsStock": {
+                    "mixture": {
+                        "fightCpuMicros": 0.9497742185398839,
+                        "fightWallMicros": 0.9525611521036274,
+                        "decisionMicros": 0.9524936109583209,
+                        "meanDecisionMicros": 0.9909951101710475
+                    },
+                    "both": {
+                        "fightCpuMicros": 1.1811025535172008,
+                        "fightWallMicros": 1.1847859587567766,
+                        "decisionMicros": 1.184948036576663,
+                        "meanDecisionMicros": 1.0612545198992203
+                    }
+                }
+            }
+        },
+        "gates": {
+            "serial-full-r2/mixture/fightCpuMicros<=1.10": true,
+            "serial-full-r2/mixture/fightWallMicros<=1.10": true,
+            "serial-full-r2/mixture/decisionMicros<=1.10": true,
+            "serial-full-r2/mixture/meanDecisionMicros<=1.10": true,
+            "serial-full-r2/both/fightCpuMicros<=1.10": true,
+            "serial-full-r2/both/fightWallMicros<=1.10": true,
+            "serial-full-r2/both/decisionMicros<=1.10": true,
+            "serial-full-r2/both/meanDecisionMicros<=1.10": true,
+            "bounded-live/mixture/fightCpuMicros<=1.10": true,
+            "bounded-live/mixture/fightWallMicros<=1.10": true,
+            "bounded-live/mixture/decisionMicros<=1.10": true,
+            "bounded-live/mixture/meanDecisionMicros<=1.10": true,
+            "bounded-live/both/fightCpuMicros<=1.10": false,
+            "bounded-live/both/fightWallMicros<=1.10": false,
+            "bounded-live/both/decisionMicros<=1.10": false,
+            "bounded-live/both/meanDecisionMicros<=1.10": true
+        },
+        "serialAndBoundedCostGatePassed": false,
+        "rawSha256": "3f0ceebb50878219c8a412f635b91320eac57a9b4696941abcd1c76d6af325a6",
+        "sourceStrengthQualificationSha256": "4747fb38860cd0f0dd5a7f195b9c93433b52ea695b7718b78e6b973f81451267",
+        "defaultChanged": false,
+        "confirmationOpened": false,
+        "scope": "One counterbalanced serial nice19 M4 actor, complete native/search/outer-neural/support decision observer. Both actual-driver mode is cost coverage only. Bounded M4 timing is not production2-vCPU certification; no new strength samples, no retry or automatic promotion."
+    },
+    "independentVerification": {
+        "passed": true,
+        "at": "2026-11-17T20:55:34.212Z",
+        "independentRawIntegerTimingsAndAllRatiosExact": true,
+        "serialAndBoundedCostGatePassed": false,
+        "analysisSha256": "edfa7a4b7a7f558d9f8d351b2d2536271684f61c1b29caf052b2bea2f5d65492"
+    },
+    "diagnostic": {
+        "at": "2026-11-17T21:00:40.426310+00:00",
+        "id": "trajectory-regression-audit-v2",
+        "actualFullTraceInputAndOutcomeMatches": 36,
+        "crossPhaseExecutions": 36,
+        "logicalForecastMatches": 13,
+        "allDeadlineCircuitDegradationCountersZero": true,
+        "costFailureUnchanged": true,
+        "confirmationNotOpened": true,
+        "newPolicyOrGateChange": false,
+        "scope": "Read-only complete12-case cost diagnosis. Actual traces and forecast work compared separately. No live/offline forecast-equality assumption, no waived gate or claimed causal action fix.",
+        "rawSha256": "3f0ceebb50878219c8a412f635b91320eac57a9b4696941abcd1c76d6af325a6"
+    },
+    "diagnosticCases": [
+        {
+            "ordinal": 3,
+            "board": 192,
+            "game": 0,
+            "factors": {
+                "board": 192,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "shooter",
+                "host": "local"
+            },
+            "stockWinner": "green",
+            "bothWinner": "green",
+            "stockDecisionCount": 36,
+            "bothDecisionCount": 50,
+            "decisionCountDelta": 14,
+            "cpuDeltaMicros": 1428229,
+            "stockActions": {
+                "cast_spell": 13,
+                "move_unit": 4,
+                "range_attack": 12,
+                "obstacle_attack": 1,
+                "move_unit+melee_attack": 3,
+                "wait_turn": 2,
+                "melee_attack": 1
+            },
+            "bothActions": {
+                "cast_spell": 11,
+                "move_unit": 12,
+                "range_attack": 16,
+                "move_unit+melee_attack": 6,
+                "obstacle_attack": 1,
+                "melee_attack": 3,
+                "wait_turn": 1
+            },
+            "firstDivergence": {
+                "turnIndex": 2,
+                "actor": "Healer",
+                "rawIncumbent": [
+                    {
+                        "type": "cast_spell",
+                        "casterId": "c838936c-894d-559b-aa86-2aa7de9fcf22",
+                        "spellName": "Blessing",
+                        "targetId": "5d62e1b8-f0dd-5167-b846-0f04f18c0408"
+                    }
+                ],
+                "stock": [
+                    {
+                        "type": "cast_spell",
+                        "casterId": "c838936c-894d-559b-aa86-2aa7de9fcf22",
+                        "spellName": "Blessing",
+                        "targetId": "5d62e1b8-f0dd-5167-b846-0f04f18c0408"
+                    }
+                ],
+                "both": [
+                    {
+                        "type": "move_unit",
+                        "unitId": "c838936c-894d-559b-aa86-2aa7de9fcf22",
+                        "path": [
+                            {
+                                "x": 14,
+                                "y": 8
+                            },
+                            {
+                                "x": 13,
+                                "y": 9
+                            },
+                            {
+                                "x": 12,
+                                "y": 10
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 12,
+                                "y": 10
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    }
+                ]
+            }
+        },
+        {
+            "ordinal": 10,
+            "board": 568,
+            "game": 0,
+            "factors": {
+                "board": 568,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "pressure",
+                "host": "local"
+            },
+            "stockWinner": "green",
+            "bothWinner": "red",
+            "stockDecisionCount": 52,
+            "bothDecisionCount": 70,
+            "decisionCountDelta": 18,
+            "cpuDeltaMicros": 1204889,
+            "stockActions": {
+                "wait_turn": 5,
+                "cast_spell": 9,
+                "move_unit": 9,
+                "area_throw_attack": 1,
+                "range_attack": 9,
+                "move_unit+melee_attack": 14,
+                "melee_attack": 5
+            },
+            "bothActions": {
+                "wait_turn": 3,
+                "cast_spell": 12,
+                "move_unit": 12,
+                "range_attack": 11,
+                "move_unit+melee_attack": 23,
+                "melee_attack": 7,
+                "select_attack_type+move_unit+melee_attack": 1,
+                "select_attack_type+melee_attack": 1
+            },
+            "firstDivergence": {
+                "turnIndex": 3,
+                "actor": "Healer",
+                "rawIncumbent": [
+                    {
+                        "type": "cast_spell",
+                        "casterId": "cd92dbe3-d31a-5bbb-b56a-a0f9de498322",
+                        "spellName": "Blessing",
+                        "targetId": "ffd91270-9826-5265-96c8-a1433ee874d6"
+                    }
+                ],
+                "stock": [
+                    {
+                        "type": "cast_spell",
+                        "casterId": "cd92dbe3-d31a-5bbb-b56a-a0f9de498322",
+                        "spellName": "Spiritual Armor",
+                        "targetId": "f20090dd-9c91-5e95-accf-aafa136d78ce"
+                    }
+                ],
+                "both": [
+                    {
+                        "type": "cast_spell",
+                        "casterId": "cd92dbe3-d31a-5bbb-b56a-a0f9de498322",
+                        "spellName": "Spiritual Armor",
+                        "targetId": "cd92dbe3-d31a-5bbb-b56a-a0f9de498322"
+                    }
+                ]
+            }
+        },
+        {
+            "ordinal": 6,
+            "board": 381,
+            "game": 1,
+            "factors": {
+                "board": 381,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "caster",
+                "host": "local"
+            },
+            "stockWinner": "red",
+            "bothWinner": "red",
+            "stockDecisionCount": 53,
+            "bothDecisionCount": 72,
+            "decisionCountDelta": 19,
+            "cpuDeltaMicros": 1161429,
+            "stockActions": {
+                "wait_turn": 2,
+                "move_unit": 11,
+                "range_attack": 24,
+                "cast_spell": 2,
+                "obstacle_attack": 1,
+                "move_unit+melee_attack": 8,
+                "melee_attack": 5
+            },
+            "bothActions": {
+                "move_unit": 19,
+                "range_attack": 23,
+                "obstacle_attack": 1,
+                "cast_spell": 6,
+                "move_unit+melee_attack": 15,
+                "melee_attack": 7,
+                "select_attack_type+move_unit+melee_attack": 1
+            },
+            "firstDivergence": {
+                "turnIndex": 0,
+                "actor": "White Tiger",
+                "rawIncumbent": [
+                    {
+                        "type": "obstacle_attack",
+                        "attackerId": "585bf9ef-2fa3-5e7f-a32a-15a06289daac",
+                        "targetPosition": {
+                            "x": 576,
+                            "y": 448
+                        },
+                        "attackFrom": {
+                            "x": 11,
+                            "y": 4
+                        },
+                        "path": [
+                            {
+                                "x": 13,
+                                "y": 8
+                            },
+                            {
+                                "x": 12,
+                                "y": 8
+                            },
+                            {
+                                "x": 11,
+                                "y": 7
+                            },
+                            {
+                                "x": 11,
+                                "y": 6
+                            },
+                            {
+                                "x": 11,
+                                "y": 5
+                            },
+                            {
+                                "x": 11,
+                                "y": 4
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    }
+                ],
+                "stock": [
+                    {
+                        "type": "wait_turn",
+                        "unitId": "585bf9ef-2fa3-5e7f-a32a-15a06289daac"
+                    }
+                ],
+                "both": [
+                    {
+                        "type": "move_unit",
+                        "unitId": "585bf9ef-2fa3-5e7f-a32a-15a06289daac",
+                        "path": [
+                            {
+                                "x": 13,
+                                "y": 8
+                            },
+                            {
+                                "x": 12,
+                                "y": 8
+                            },
+                            {
+                                "x": 11,
+                                "y": 7
+                            },
+                            {
+                                "x": 10,
+                                "y": 6
+                            },
+                            {
+                                "x": 9,
+                                "y": 5
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 9,
+                                "y": 5
+                            },
+                            {
+                                "x": 8,
+                                "y": 5
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    }
+                ]
+            }
+        },
+        {
+            "ordinal": 8,
+            "board": 380,
+            "game": 0,
+            "factors": {
+                "board": 380,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "caster",
+                "host": "local"
+            },
+            "stockWinner": "green",
+            "bothWinner": "green",
+            "stockDecisionCount": 68,
+            "bothDecisionCount": 80,
+            "decisionCountDelta": 12,
+            "cpuDeltaMicros": 1065165,
+            "stockActions": {
+                "move_unit+melee_attack": 14,
+                "obstacle_attack": 9,
+                "move_unit": 13,
+                "range_attack": 21,
+                "cast_spell": 3,
+                "melee_attack": 8
+            },
+            "bothActions": {
+                "move_unit+melee_attack": 18,
+                "obstacle_attack": 10,
+                "move_unit": 16,
+                "range_attack": 21,
+                "cast_spell": 7,
+                "melee_attack": 8
+            },
+            "firstDivergence": {
+                "turnIndex": 16,
+                "actor": "Elf",
+                "rawIncumbent": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "650b7bed-089c-5eb7-bcf0-0afd035762ee",
+                        "targetId": "6d698b7d-e39e-5b85-b8ae-4eb564ddb914",
+                        "aimCell": {
+                            "x": 1,
+                            "y": 1
+                        },
+                        "aimSide": 1
+                    }
+                ],
+                "stock": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "650b7bed-089c-5eb7-bcf0-0afd035762ee",
+                        "targetId": "31344615-dc96-54e4-87e9-1ad4e66c5fc7",
+                        "aimCell": {
+                            "x": 10,
+                            "y": 11
+                        },
+                        "aimSide": 2
+                    }
+                ],
+                "both": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "650b7bed-089c-5eb7-bcf0-0afd035762ee",
+                        "targetId": "6d698b7d-e39e-5b85-b8ae-4eb564ddb914",
+                        "aimCell": {
+                            "x": 1,
+                            "y": 1
+                        },
+                        "aimSide": 1
+                    }
+                ]
+            }
+        },
+        {
+            "ordinal": 1,
+            "board": 1,
+            "game": 1,
+            "factors": {
+                "board": 1,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "current",
+                "host": "local"
+            },
+            "stockWinner": "green",
+            "bothWinner": "red",
+            "stockDecisionCount": 48,
+            "bothDecisionCount": 73,
+            "decisionCountDelta": 25,
+            "cpuDeltaMicros": 1020922,
+            "stockActions": {
+                "range_attack": 21,
+                "cast_spell": 5,
+                "wait_turn": 3,
+                "defend_turn": 1,
+                "move_unit": 7,
+                "move_unit+melee_attack": 8,
+                "obstacle_attack": 1,
+                "melee_attack": 2
+            },
+            "bothActions": {
+                "range_attack": 22,
+                "cast_spell": 6,
+                "wait_turn": 7,
+                "move_unit": 19,
+                "obstacle_attack": 2,
+                "move_unit+melee_attack": 11,
+                "melee_attack": 4,
+                "defend_turn": 2
+            },
+            "firstDivergence": {
+                "turnIndex": 4,
+                "actor": "Elf",
+                "rawIncumbent": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "13854b71-9f51-546e-acd0-c1a1435c4f97",
+                        "targetId": "ec617306-3a11-5b34-85de-54541f7d6769",
+                        "aimCell": {
+                            "x": 14,
+                            "y": 4
+                        },
+                        "aimSide": 0
+                    }
+                ],
+                "stock": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "13854b71-9f51-546e-acd0-c1a1435c4f97",
+                        "targetId": "f1541715-4af8-5ff2-88dd-81150ecd6c80",
+                        "aimCell": {
+                            "x": 14,
+                            "y": 10
+                        },
+                        "aimSide": 0
+                    }
+                ],
+                "both": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "13854b71-9f51-546e-acd0-c1a1435c4f97",
+                        "targetId": "56a0d6cb-7bca-5560-ba95-b217c8376998",
+                        "aimCell": {
+                            "x": 14,
+                            "y": 13
+                        },
+                        "aimSide": 0
+                    }
+                ]
+            }
+        },
+        {
+            "ordinal": 9,
+            "board": 570,
+            "game": 2,
+            "factors": {
+                "board": 570,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "pressure",
+                "host": "local"
+            },
+            "stockWinner": "red",
+            "bothWinner": "red",
+            "stockDecisionCount": 30,
+            "bothDecisionCount": 39,
+            "decisionCountDelta": 9,
+            "cpuDeltaMicros": 641457,
+            "stockActions": {
+                "wait_turn": 5,
+                "move_unit": 7,
+                "move_unit+melee_attack": 4,
+                "obstacle_attack": 2,
+                "range_attack": 10,
+                "melee_attack": 1,
+                "cast_spell": 1
+            },
+            "bothActions": {
+                "wait_turn": 4,
+                "move_unit": 10,
+                "move_unit+melee_attack": 11,
+                "range_attack": 10,
+                "obstacle_attack": 2,
+                "melee_attack": 2
+            },
+            "firstDivergence": {
+                "turnIndex": 2,
+                "actor": "Black Dragon",
+                "rawIncumbent": [
+                    {
+                        "type": "melee_attack",
+                        "attackerId": "e375ca77-8814-568a-ab97-7015c4f0b136",
+                        "targetId": "30ae020c-7fce-5b05-b33b-212a1eeb43ca",
+                        "attackFrom": {
+                            "x": 3,
+                            "y": 14
+                        }
+                    }
+                ],
+                "stock": [
+                    {
+                        "type": "move_unit",
+                        "unitId": "e375ca77-8814-568a-ab97-7015c4f0b136",
+                        "path": [
+                            {
+                                "x": 3,
+                                "y": 14
+                            },
+                            {
+                                "x": 4,
+                                "y": 14
+                            },
+                            {
+                                "x": 5,
+                                "y": 14
+                            },
+                            {
+                                "x": 6,
+                                "y": 14
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 5,
+                                "y": 14
+                            },
+                            {
+                                "x": 6,
+                                "y": 14
+                            },
+                            {
+                                "x": 5,
+                                "y": 13
+                            },
+                            {
+                                "x": 6,
+                                "y": 13
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    },
+                    {
+                        "type": "melee_attack",
+                        "attackerId": "e375ca77-8814-568a-ab97-7015c4f0b136",
+                        "targetId": "30ae020c-7fce-5b05-b33b-212a1eeb43ca",
+                        "attackFrom": {
+                            "x": 6,
+                            "y": 14
+                        }
+                    }
+                ],
+                "both": [
+                    {
+                        "type": "move_unit",
+                        "unitId": "e375ca77-8814-568a-ab97-7015c4f0b136",
+                        "path": [
+                            {
+                                "x": 3,
+                                "y": 14
+                            },
+                            {
+                                "x": 4,
+                                "y": 14
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 3,
+                                "y": 14
+                            },
+                            {
+                                "x": 4,
+                                "y": 14
+                            },
+                            {
+                                "x": 3,
+                                "y": 13
+                            },
+                            {
+                                "x": 4,
+                                "y": 13
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    },
+                    {
+                        "type": "melee_attack",
+                        "attackerId": "e375ca77-8814-568a-ab97-7015c4f0b136",
+                        "targetId": "30ae020c-7fce-5b05-b33b-212a1eeb43ca",
+                        "attackFrom": {
+                            "x": 4,
+                            "y": 14
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "ordinal": 2,
+            "board": 2,
+            "game": 2,
+            "factors": {
+                "board": 2,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "current",
+                "host": "local"
+            },
+            "stockWinner": "red",
+            "bothWinner": "red",
+            "stockDecisionCount": 47,
+            "bothDecisionCount": 47,
+            "decisionCountDelta": 0,
+            "cpuDeltaMicros": 84068,
+            "stockActions": {
+                "range_attack": 15,
+                "move_unit+melee_attack": 12,
+                "move_unit": 3,
+                "cast_spell": 4,
+                "area_throw_attack": 4,
+                "melee_attack": 4,
+                "obstacle_attack": 5
+            },
+            "bothActions": {
+                "range_attack": 15,
+                "move_unit+melee_attack": 12,
+                "move_unit": 3,
+                "cast_spell": 4,
+                "area_throw_attack": 4,
+                "melee_attack": 4,
+                "obstacle_attack": 5
+            },
+            "firstDivergence": null
+        },
+        {
+            "ordinal": 0,
+            "board": 3,
+            "game": 3,
+            "factors": {
+                "board": 3,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "current",
+                "host": "local"
+            },
+            "stockWinner": "green",
+            "bothWinner": "green",
+            "stockDecisionCount": 56,
+            "bothDecisionCount": 56,
+            "decisionCountDelta": 0,
+            "cpuDeltaMicros": 72691,
+            "stockActions": {
+                "area_throw_attack": 5,
+                "range_attack": 20,
+                "move_unit": 17,
+                "move_unit+melee_attack": 8,
+                "melee_attack": 4,
+                "wait_turn": 1,
+                "cast_spell": 1
+            },
+            "bothActions": {
+                "area_throw_attack": 5,
+                "range_attack": 20,
+                "move_unit": 17,
+                "move_unit+melee_attack": 8,
+                "melee_attack": 4,
+                "wait_turn": 1,
+                "cast_spell": 1
+            },
+            "firstDivergence": null
+        },
+        {
+            "ordinal": 4,
+            "board": 190,
+            "game": 2,
+            "factors": {
+                "board": 190,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "shooter",
+                "host": "local"
+            },
+            "stockWinner": "red",
+            "bothWinner": "red",
+            "stockDecisionCount": 25,
+            "bothDecisionCount": 25,
+            "decisionCountDelta": 0,
+            "cpuDeltaMicros": -20584,
+            "stockActions": {
+                "move_unit": 4,
+                "range_attack": 16,
+                "area_throw_attack": 1,
+                "cast_spell": 4
+            },
+            "bothActions": {
+                "move_unit": 4,
+                "range_attack": 16,
+                "area_throw_attack": 1,
+                "cast_spell": 4
+            },
+            "firstDivergence": null
+        },
+        {
+            "ordinal": 5,
+            "board": 191,
+            "game": 3,
+            "factors": {
+                "board": 191,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "shooter",
+                "host": "local"
+            },
+            "stockWinner": "green",
+            "bothWinner": "red",
+            "stockDecisionCount": 61,
+            "bothDecisionCount": 45,
+            "decisionCountDelta": -16,
+            "cpuDeltaMicros": -209945,
+            "stockActions": {
+                "obstacle_attack": 9,
+                "range_attack": 7,
+                "area_throw_attack": 5,
+                "cast_spell": 8,
+                "move_unit+melee_attack": 15,
+                "move_unit": 10,
+                "melee_attack": 4,
+                "wait_turn": 3
+            },
+            "bothActions": {
+                "obstacle_attack": 7,
+                "range_attack": 17,
+                "area_throw_attack": 2,
+                "cast_spell": 7,
+                "move_unit": 4,
+                "move_unit+melee_attack": 7,
+                "melee_attack": 1
+            },
+            "firstDivergence": {
+                "turnIndex": 3,
+                "actor": "Zena",
+                "rawIncumbent": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "1272dcb5-1f73-5165-a0f5-34cd35e30a5a",
+                        "targetId": "3d960469-6665-5606-994a-e144186e0272",
+                        "aimCell": {
+                            "x": 1,
+                            "y": 4
+                        },
+                        "aimSide": 1
+                    }
+                ],
+                "stock": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "1272dcb5-1f73-5165-a0f5-34cd35e30a5a",
+                        "targetId": "3d960469-6665-5606-994a-e144186e0272",
+                        "aimCell": {
+                            "x": 1,
+                            "y": 4
+                        },
+                        "aimSide": 1
+                    }
+                ],
+                "both": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "1272dcb5-1f73-5165-a0f5-34cd35e30a5a",
+                        "targetId": "8eb47403-d283-581d-b6c2-ac2c708608f9",
+                        "aimCell": {
+                            "x": 5,
+                            "y": 10
+                        },
+                        "aimSide": 1
+                    }
+                ]
+            }
+        },
+        {
+            "ordinal": 11,
+            "board": 569,
+            "game": 1,
+            "factors": {
+                "board": 569,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "pressure",
+                "host": "local"
+            },
+            "stockWinner": "red",
+            "bothWinner": "red",
+            "stockDecisionCount": 59,
+            "bothDecisionCount": 56,
+            "decisionCountDelta": -3,
+            "cpuDeltaMicros": -242399,
+            "stockActions": {
+                "move_unit": 12,
+                "obstacle_attack": 11,
+                "range_attack": 20,
+                "move_unit+melee_attack": 12,
+                "melee_attack": 1,
+                "wait_turn": 2,
+                "defend_turn": 1
+            },
+            "bothActions": {
+                "move_unit": 10,
+                "obstacle_attack": 9,
+                "range_attack": 19,
+                "move_unit+melee_attack": 13,
+                "melee_attack": 4,
+                "wait_turn": 1
+            },
+            "firstDivergence": {
+                "turnIndex": 32,
+                "actor": "Elf",
+                "rawIncumbent": [
+                    {
+                        "type": "move_unit",
+                        "unitId": "1a66dd4d-6a03-54e8-857e-bbf750341504",
+                        "path": [
+                            {
+                                "x": 13,
+                                "y": 13
+                            },
+                            {
+                                "x": 13,
+                                "y": 14
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 13,
+                                "y": 14
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    },
+                    {
+                        "type": "melee_attack",
+                        "attackerId": "1a66dd4d-6a03-54e8-857e-bbf750341504",
+                        "targetId": "4b2bcb81-474a-51cc-92f9-f09fad0b808f",
+                        "attackFrom": {
+                            "x": 13,
+                            "y": 14
+                        }
+                    }
+                ],
+                "stock": [
+                    {
+                        "type": "move_unit",
+                        "unitId": "1a66dd4d-6a03-54e8-857e-bbf750341504",
+                        "path": [
+                            {
+                                "x": 13,
+                                "y": 13
+                            },
+                            {
+                                "x": 13,
+                                "y": 14
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 13,
+                                "y": 14
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    }
+                ],
+                "both": [
+                    {
+                        "type": "melee_attack",
+                        "attackerId": "1a66dd4d-6a03-54e8-857e-bbf750341504",
+                        "targetId": "4b2bcb81-474a-51cc-92f9-f09fad0b808f",
+                        "attackFrom": {
+                            "x": 13,
+                            "y": 13
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "ordinal": 7,
+            "board": 379,
+            "game": 3,
+            "factors": {
+                "board": 379,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "caster",
+                "host": "local"
+            },
+            "stockWinner": "green",
+            "bothWinner": "green",
+            "stockDecisionCount": 57,
+            "bothDecisionCount": 48,
+            "decisionCountDelta": -9,
+            "cpuDeltaMicros": -295061,
+            "stockActions": {
+                "wait_turn": 4,
+                "move_unit": 19,
+                "move_unit+melee_attack": 10,
+                "range_attack": 9,
+                "cast_spell": 7,
+                "select_attack_type+move_unit+melee_attack": 1,
+                "melee_attack": 6,
+                "obstacle_attack": 1
+            },
+            "bothActions": {
+                "wait_turn": 2,
+                "move_unit": 13,
+                "move_unit+melee_attack": 8,
+                "range_attack": 16,
+                "cast_spell": 7,
+                "melee_attack": 2
+            },
+            "firstDivergence": {
+                "turnIndex": 3,
+                "actor": "White Tiger",
+                "rawIncumbent": [
+                    {
+                        "type": "wait_turn",
+                        "unitId": "c193972b-e3a6-55a0-9c90-6ebb05990615"
+                    }
+                ],
+                "stock": [
+                    {
+                        "type": "move_unit",
+                        "unitId": "c193972b-e3a6-55a0-9c90-6ebb05990615",
+                        "path": [
+                            {
+                                "x": 3,
+                                "y": 4
+                            },
+                            {
+                                "x": 2,
+                                "y": 5
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 2,
+                                "y": 5
+                            },
+                            {
+                                "x": 1,
+                                "y": 5
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    }
+                ],
+                "both": [
+                    {
+                        "type": "move_unit",
+                        "unitId": "c193972b-e3a6-55a0-9c90-6ebb05990615",
+                        "path": [
+                            {
+                                "x": 3,
+                                "y": 4
+                            },
+                            {
+                                "x": 4,
+                                "y": 4
+                            },
+                            {
+                                "x": 5,
+                                "y": 4
+                            },
+                            {
+                                "x": 6,
+                                "y": 4
+                            },
+                            {
+                                "x": 7,
+                                "y": 5
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 7,
+                                "y": 5
+                            },
+                            {
+                                "x": 6,
+                                "y": 5
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    }
+                ]
+            }
+        }
+    ],
+    "crossPhaseControls": [
+        {
+            "ordinal": 0,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2367.355494000025, 2538.2157950003166],
+                    "rolloutTurnsTotal": [12867, 12927]
+                }
+            ]
+        },
+        {
+            "ordinal": 0,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 7655,
+                    "eligible": 22,
+                    "nativeModelKeptCleanup": 10,
+                    "changed": 12
+                },
+                "live": {
+                    "boundaries": 7715,
+                    "eligible": 23,
+                    "nativeModelKeptCleanup": 10,
+                    "changed": 13
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2418.872247999956, 2562.28954300005],
+                    "rolloutTurnsTotal": [12866, 12926]
+                }
+            ]
+        },
+        {
+            "ordinal": 0,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 12868,
+                    "eligible": 35,
+                    "nativeModelKeptCleanup": 13,
+                    "changed": 22
+                },
+                "live": {
+                    "boundaries": 12928,
+                    "eligible": 36,
+                    "nativeModelKeptCleanup": 13,
+                    "changed": 23
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2327.6513349999805, 2593.9064529994503],
+                    "rolloutTurnsTotal": [12868, 12928]
+                }
+            ]
+        },
+        {
+            "ordinal": 1,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 6469,
+                    "eligible": 370,
+                    "nativeModelKeptCleanup": 83,
+                    "changed": 287
+                },
+                "live": {
+                    "boundaries": 6915,
+                    "eligible": 393,
+                    "nativeModelKeptCleanup": 89,
+                    "changed": 304
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2480.7576259999914, 2614.1929589995416],
+                    "rolloutTurnsTotal": [12470, 13177]
+                }
+            ]
+        },
+        {
+            "ordinal": 1,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 19600,
+                    "eligible": 408,
+                    "nativeModelKeptCleanup": 116,
+                    "changed": 292
+                },
+                "live": {
+                    "boundaries": 20204,
+                    "eligible": 439,
+                    "nativeModelKeptCleanup": 127,
+                    "changed": 312
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [3873.480296999951, 4026.6190019997302],
+                    "rolloutTurnsTotal": [19600, 20204]
+                }
+            ]
+        },
+        {
+            "ordinal": 1,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2700.0326250000144, 2949.308791000163],
+                    "rolloutTurnsTotal": [13395, 14343]
+                }
+            ]
+        },
+        {
+            "ordinal": 2,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 7947,
+                    "eligible": 181,
+                    "nativeModelKeptCleanup": 99,
+                    "changed": 82
+                },
+                "live": {
+                    "boundaries": 8406,
+                    "eligible": 190,
+                    "nativeModelKeptCleanup": 99,
+                    "changed": 91
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1682.904121999978, 1802.5138319996186],
+                    "rolloutTurnsTotal": [8673, 9151]
+                }
+            ]
+        },
+        {
+            "ordinal": 2,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1611.78149999999, 1799.1135009995196],
+                    "rolloutTurnsTotal": [8678, 9147]
+                }
+            ]
+        },
+        {
+            "ordinal": 2,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 3539,
+                    "eligible": 81,
+                    "nativeModelKeptCleanup": 47,
+                    "changed": 34
+                },
+                "live": {
+                    "boundaries": 3828,
+                    "eligible": 87,
+                    "nativeModelKeptCleanup": 47,
+                    "changed": 40
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1595.956876000011, 1808.6814939999022],
+                    "rolloutTurnsTotal": [8677, 9155]
+                }
+            ]
+        },
+        {
+            "ordinal": 3,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1706.837835000042, 1847.2688339996384],
+                    "rolloutTurnsTotal": [6647, 6987]
+                }
+            ]
+        },
+        {
+            "ordinal": 3,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 2585,
+                    "eligible": 49,
+                    "nativeModelKeptCleanup": 23,
+                    "changed": 26
+                },
+                "live": {
+                    "boundaries": 2774,
+                    "eligible": 56,
+                    "nativeModelKeptCleanup": 30,
+                    "changed": 26
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1626.937707999983, 1736.9870830000145],
+                    "rolloutTurnsTotal": [5879, 6331]
+                }
+            ]
+        },
+        {
+            "ordinal": 3,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 12501,
+                    "eligible": 502,
+                    "nativeModelKeptCleanup": 240,
+                    "changed": 262
+                },
+                "live": {
+                    "boundaries": 13094,
+                    "eligible": 523,
+                    "nativeModelKeptCleanup": 242,
+                    "changed": 281
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2792.072874000034, 3094.143121999572],
+                    "rolloutTurnsTotal": [12501, 13094]
+                }
+            ]
+        },
+        {
+            "ordinal": 4,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 2139,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 2172,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [869.0386269999726, 879.2689169998048],
+                    "rolloutTurnsTotal": [3450, 3483]
+                }
+            ]
+        },
+        {
+            "ordinal": 4,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 3450,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 3483,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [906.9458739999973, 909.8790000004228],
+                    "rolloutTurnsTotal": [3450, 3483]
+                }
+            ]
+        },
+        {
+            "ordinal": 4,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [901.5252089998685, 926.1361230000621],
+                    "rolloutTurnsTotal": [3450, 3483]
+                }
+            ]
+        },
+        {
+            "ordinal": 5,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 10879,
+                    "eligible": 125,
+                    "nativeModelKeptCleanup": 56,
+                    "changed": 69
+                },
+                "live": {
+                    "boundaries": 11628,
+                    "eligible": 131,
+                    "nativeModelKeptCleanup": 60,
+                    "changed": 71
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [3025.1022079999093, 3277.38020899985],
+                    "rolloutTurnsTotal": [10879, 11628]
+                }
+            ]
+        },
+        {
+            "ordinal": 5,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [3229.9256230000465, 3464.690672000521],
+                    "rolloutTurnsTotal": [14098, 14149]
+                }
+            ]
+        },
+        {
+            "ordinal": 5,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 8020,
+                    "eligible": 58,
+                    "nativeModelKeptCleanup": 39,
+                    "changed": 19
+                },
+                "live": {
+                    "boundaries": 8071,
+                    "eligible": 59,
+                    "nativeModelKeptCleanup": 40,
+                    "changed": 19
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [3181.316373000096, 3515.5194619997637],
+                    "rolloutTurnsTotal": [14103, 14154]
+                }
+            ]
+        },
+        {
+            "ordinal": 6,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [3133.2023369998205, 2798.734206999885],
+                    "rolloutTurnsTotal": [12759, 12853]
+                }
+            ]
+        },
+        {
+            "ordinal": 6,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 2844,
+                    "eligible": 27,
+                    "nativeModelKeptCleanup": 12,
+                    "changed": 15
+                },
+                "live": {
+                    "boundaries": 3017,
+                    "eligible": 33,
+                    "nativeModelKeptCleanup": 12,
+                    "changed": 21
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1668.9527089999174, 1526.7611650003819],
+                    "rolloutTurnsTotal": [6797, 7012]
+                }
+            ]
+        },
+        {
+            "ordinal": 6,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 18254,
+                    "eligible": 38,
+                    "nativeModelKeptCleanup": 14,
+                    "changed": 24
+                },
+                "live": {
+                    "boundaries": 19400,
+                    "eligible": 43,
+                    "nativeModelKeptCleanup": 17,
+                    "changed": 26
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [3720.8605450001196, 3955.3983300009277],
+                    "rolloutTurnsTotal": [18254, 19400]
+                }
+            ]
+        },
+        {
+            "ordinal": 7,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 5974,
+                    "eligible": 170,
+                    "nativeModelKeptCleanup": 72,
+                    "changed": 98
+                },
+                "live": {
+                    "boundaries": 6077,
+                    "eligible": 173,
+                    "nativeModelKeptCleanup": 75,
+                    "changed": 98
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2311.1594559998484, 2569.616670999676],
+                    "rolloutTurnsTotal": [10621, 10870]
+                }
+            ]
+        },
+        {
+            "ordinal": 7,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 10635,
+                    "eligible": 316,
+                    "nativeModelKeptCleanup": 139,
+                    "changed": 177
+                },
+                "live": {
+                    "boundaries": 10884,
+                    "eligible": 324,
+                    "nativeModelKeptCleanup": 147,
+                    "changed": 177
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2330.9493360001943, 2636.1631279999856],
+                    "rolloutTurnsTotal": [10635, 10884]
+                }
+            ]
+        },
+        {
+            "ordinal": 7,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2340.4052969995537, 2914.7270020002034],
+                    "rolloutTurnsTotal": [10988, 11807]
+                }
+            ]
+        },
+        {
+            "ordinal": 8,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 19156,
+                    "eligible": 583,
+                    "nativeModelKeptCleanup": 246,
+                    "changed": 337
+                },
+                "live": {
+                    "boundaries": 19884,
+                    "eligible": 588,
+                    "nativeModelKeptCleanup": 251,
+                    "changed": 337
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [5555.155411999789, 5602.765998000279],
+                    "rolloutTurnsTotal": [19156, 19884]
+                }
+            ]
+        },
+        {
+            "ordinal": 8,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [4574.477539000043, 4625.593705999665],
+                    "rolloutTurnsTotal": [15828, 16503]
+                }
+            ]
+        },
+        {
+            "ordinal": 8,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 8716,
+                    "eligible": 210,
+                    "nativeModelKeptCleanup": 92,
+                    "changed": 118
+                },
+                "live": {
+                    "boundaries": 9399,
+                    "eligible": 215,
+                    "nativeModelKeptCleanup": 97,
+                    "changed": 118
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [4157.502701999911, 4616.770501000574],
+                    "rolloutTurnsTotal": [16024, 16707]
+                }
+            ]
+        },
+        {
+            "ordinal": 9,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1281.719376999943, 1400.0979589999188],
+                    "rolloutTurnsTotal": [4745, 4847]
+                }
+            ]
+        },
+        {
+            "ordinal": 9,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 2732,
+                    "eligible": 23,
+                    "nativeModelKeptCleanup": 10,
+                    "changed": 13
+                },
+                "live": {
+                    "boundaries": 2834,
+                    "eligible": 23,
+                    "nativeModelKeptCleanup": 10,
+                    "changed": 13
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1298.747286999831, 1403.474790000124],
+                    "rolloutTurnsTotal": [4721, 4823]
+                }
+            ]
+        },
+        {
+            "ordinal": 9,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 7238,
+                    "eligible": 136,
+                    "nativeModelKeptCleanup": 59,
+                    "changed": 77
+                },
+                "live": {
+                    "boundaries": 7351,
+                    "eligible": 146,
+                    "nativeModelKeptCleanup": 60,
+                    "changed": 86
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1883.4497899998678, 2019.6967499996535],
+                    "rolloutTurnsTotal": [7238, 7351]
+                }
+            ]
+        },
+        {
+            "ordinal": 10,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 6267,
+                    "eligible": 210,
+                    "nativeModelKeptCleanup": 95,
+                    "changed": 115
+                },
+                "live": {
+                    "boundaries": 6267,
+                    "eligible": 210,
+                    "nativeModelKeptCleanup": 95,
+                    "changed": 115
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [3208.9257069999003, 3621.6501239993377]
+                }
+            ]
+        },
+        {
+            "ordinal": 10,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 14429,
+                    "eligible": 292,
+                    "nativeModelKeptCleanup": 133,
+                    "changed": 159
+                },
+                "live": {
+                    "boundaries": 14860,
+                    "eligible": 300,
+                    "nativeModelKeptCleanup": 137,
+                    "changed": 163
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [3657.0742069999105, 4189.979583000531],
+                    "rolloutTurnsTotal": [14429, 14860]
+                }
+            ]
+        },
+        {
+            "ordinal": 10,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2702.6410440001637, 3038.904459999758],
+                    "rolloutTurnsTotal": [9331, 9422]
+                }
+            ]
+        },
+        {
+            "ordinal": 11,
+            "mode": "both",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 9241,
+                    "eligible": 212,
+                    "nativeModelKeptCleanup": 85,
+                    "changed": 127
+                },
+                "live": {
+                    "boundaries": 9351,
+                    "eligible": 215,
+                    "nativeModelKeptCleanup": 85,
+                    "changed": 130
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1950.4797490001074, 2229.001704999944],
+                    "rolloutTurnsTotal": [9883, 10005]
+                }
+            ]
+        },
+        {
+            "ordinal": 11,
+            "mode": "stock",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": true,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                },
+                "live": {
+                    "boundaries": 0,
+                    "eligible": 0,
+                    "nativeModelKeptCleanup": 0,
+                    "changed": 0
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [2125.510210000153, 2293.3332049999153],
+                    "rolloutTurnsTotal": [10294, 10420]
+                }
+            ]
+        },
+        {
+            "ordinal": 11,
+            "mode": "mixture",
+            "actualFullTraceInputAndOutcomeExact": true,
+            "forecastRecordExact": false,
+            "forecastCounts": {
+                "offline": {
+                    "boundaries": 5381,
+                    "eligible": 126,
+                    "nativeModelKeptCleanup": 54,
+                    "changed": 72
+                },
+                "live": {
+                    "boundaries": 5491,
+                    "eligible": 129,
+                    "nativeModelKeptCleanup": 54,
+                    "changed": 75
+                }
+            },
+            "workDifferences": [
+                {
+                    "msTotal": [1939.1102490001358, 2288.6530850003473],
+                    "rolloutTurnsTotal": [9825, 9947]
+                }
+            ]
+        }
+    ],
+    "auditErratum": {
+        "at": "2026-11-17T21:00:40.355477+00:00",
+        "attempt": "trajectory-regression-audit-v1",
+        "status": "stopped-on-diagnostic-assumption",
+        "assertion": "(0, 'mixture', 'forecast')",
+        "explanation": "The read-only audit initially assumed offline and bounded-live logical forecast counts/witnesses must be identical when actual game traces match. This assertion failed at first mixture row. The cost study itself remains failed and unchanged. Corrected read-only audit separately compares actual game traces and records, rather than assumes, forecast/work differences. No games, policy, gates or source changed."
+    },
+    "interpretation": "All276 executions and quality controls completed. Every72-case offline cost ratio passed; all one-sided live ratios passed. Two-actual-driver12-case bounded live CPU/wall/complete-decision-total ratios failed+10%, despite mean-decision cost passing. Original failed gate remains unchanged. No confirmation channels allocated or games opened, no default change. Longer matched two-AI trajectories and their costs require a genuine new optimization, not repeated timing or subset rescue.",
+    "boundsObservation": "Offline certified selection bounds can skip provably losing continuation samples. Live currently retains full work; this explains logical forecast-count differences despite identical full game traces. It does not itself fix or waive the two-AI cost failure.",
+    "receiptSha256": {
+        "serial-cost-registration.json": "8f91fb4c12efceaeb4c34b908959106cb87ce2e741a7a112121a139394538a5a",
+        "serial-cost/analysis.json": "edfa7a4b7a7f558d9f8d351b2d2536271684f61c1b29caf052b2bea2f5d65492",
+        "serial-cost/independent-verification.json": "caa30d5322218c3be3f8baa765b797326262416445e2092a9697454c54f8d109",
+        "serial-cost/trajectory-regression-audit-v2.json": "e75abaa5be92f56f97920c64ce613583a0bf5f75af8a85fe1a565b551c7a8a2a"
+    },
+    "candidateSourceSha256": "afcb5b44789a1c0d2e4a5c5f054bebf5d8b58b90f30142e77698da1a3947d50f",
+    "candidateRemainsInactive": true,
+    "defaultChanged": false,
+    "confirmationAllocated": false
+}

@@ -147,3 +147,33 @@ must exactly retain native traces and exercise eligible barrel forecasts while s
 alternatives. Non-full-R2 queries retain the exact native cleanup reference. The fixed shared cutoff
 is **November 17 at 21:43:41 UTC**, without retry, extension, subset rescue or automatic promotion.
 This M4 control is separate from production two-vCPU latency certification and fresh confirmation.
+
+## Complete-cost gate failed; confirmation remains closed
+
+The complete [cost result](evidence/barrel_forecast_model_mixture_cost_results_20261117.json) preserves
+all 276 executions, the unchanged registration and independent raw integer verification. Every engine,
+model, source and input check passed. All 152 original offline stock/mixture control traces and logical
+forecasts match. All six forced-R1 pairs match exactly, exercising 83 eligible barrel boundaries,
+5,973 effective-R1 future queries and 271 degraded decisions with **zero intent selections**.
+
+| Phase                  | Entrant-only CPU | Both-driver CPU | Entrant mean decision | Both-driver mean decision |
+| ---------------------- | ---------------: | --------------: | --------------------: | ------------------------: |
+| 72-case offline serial |           −3.45% |          +1.62% |                −1.90% |                    +0.66% |
+| 12-case bounded live   |           −5.02% |     **+18.11%** |                −0.90% |                    +6.13% |
+
+All offline ratios and all entrant-only live ratios passed +10%. Both-driver live total wall and
+complete-decision time also increased about 18.5%, so the cost gate **failed**. The primary strength
+qualification remains positive; it does not replace this failed gate. No confirmation was allocated
+or opened and no serving default changed. Do not repeat timings until they pass or rescue a subgroup.
+
+The same twelve cases have identical live/offline inputs, full traces, outcomes and actual actions
+for all three arms: 36 exact comparisons, zero deadline/circuit/degradation fallbacks. Their two-AI
+trajectories use 661 decisions versus 592 stock. The excess also appears on the same twelve offline
+cases (+16.76% CPU), despite the complete balanced 72-case average passing. Both facts remain recorded.
+
+Logical forecast records match on 13 of those 36 comparisons; offline certified selection bounds can
+skip losing continuations that live still evaluates. An initial read-only diagnostic incorrectly
+assumed forecast records must also be identical and stopped at the first mismatch. Its preserved
+erratum and corrected separate trace/work comparison changed no game, source, policy, gate or result.
+A new behavior-preserving implementation/branch-pruning hypothesis needs its own source identity,
+exact-action controls and fixed cost study. The frozen candidate and every failed rule stay immutable.

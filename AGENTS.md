@@ -886,3 +886,15 @@ runs 276 fixed executions, including 72 balanced three-arm serial cases, full-de
 bounded-live controls and forced-effective-R1 identity pairs. Its cutoff is November 17 at 21:43:41 UTC.
 Both one- and two-actual-driver modes must satisfy every registered +10% cost gate; no retry,
 extension, subset rescue, automatic promotion or fresh confirmation before cost passes.
+
+The cost study completed all 276 executions and **failed** its registered gate. Preserve
+`docs/evidence/barrel_forecast_model_mixture_cost_results_20261117.json`. Offline 72-case CPU was
+−3.45% entrant-only / +1.62% both drivers; bounded 12-case CPU was −5.02% / **+18.11%**. Both-driver
+bounded wall/decision totals also failed +10%, while mean decision cost passed. All quality, original
+controls, forced-effective-R1 pairs and independent integer checks passed. All 36 matched live/offline
+actual traces agree; their longer two-AI trajectories use 661 versus 592 decisions. Forecast records can
+differ because certified loser bounds are offline-only. Preserve the diagnostic assertion erratum;
+it changed no result. No confirmation was allocated/opened and the candidate remains inactive. Never
+repeat this unchanged study until pass, waive its two-AI gate or promote the positive strength result.
+Further implementation/pruning work must have a distinct source, exact behavioral controls and its
+own fixed cost gate; preserve the frozen mixture and every earlier failed candidate unchanged.
