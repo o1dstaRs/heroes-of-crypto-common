@@ -979,6 +979,21 @@ whole families. No retries, extension, family reassignment, policy/model/source/
 interim score selection. Fixed 36-case cold replay and 72-case v11 serial cost remain required before
 claiming a confirmed serving gain. No automatic default change or deployment.
 
+The prospective final-validation source seal is
+`f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51`; read
+`docs/evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json`. The original
+72-case timing sample covers games0/1 and only opponent see-all. It stays unchanged and required.
+Before any strength aggregation or new timing observation, a separate **216-case / 1,328-execution**
+cost check was fixed from all108style/map/own/opponent-doctrine cells, covering both draft orders
+and opposite physical teams, 54 cases of each game index. Both cost studies must pass the same
+full-matrix aggregate +10% gates; neither rescues a failed phase. No outcome/runtime-based sampling.
+All8 validation runner/verifier bodies and hashes are versioned in the fixture; prepare scripts
+check the seal before execution. Six reused functional smoke fights reproduced every stored stock/
+mixture input, full trace, outcome and actual action; both-driver activation also ran. This adds no
+strength or timing claim. No existing frozen file, policy, model or score gate changed. Cold replay
+still requires 216 exact executions. Each later validation phase gets its own fixed cutoff and
+does not extend the unchanged strength-collection cutoff. No automatic default change or deployment.
+
 ## Closed ranged counter-shot screens
 
 Read `docs/ranged_countershot_safety_research.md` before continuing the November 17 human-match

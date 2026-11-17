@@ -150,3 +150,27 @@ All **96 reused v11 preflight executions** also pass: pure native baseline stock
 have identical consumed inputs, complete traces, outcomes and actions; all three candidate arms
 reproduce across Mac and Puffalo. Independent fresh terrain-aware v11 strength confirmation is the
 next stage. No new forecast serving default or production deployment follows from these checks.
+
+## Prospective final checks: paired draft-order and doctrine coverage
+
+During collection, the planned 72-case cost matrix was audited using input metadata only. It covers
+games 0/1 and opponent `see-all`; it does not cover the other draft order or opponent doctrines.
+The original sample, criteria and study remain unchanged. The separate
+[validation design](evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json) adds
+**216 fixed cases / 1,328 serial executions**, selected before any strength-score aggregation or
+new timing observation. Every style × map × own-doctrine × opponent-doctrine cell contributes its
+earliest family, with opposite physical teams and both draft orders: 54 cases of each game index.
+
+Both the original 72-case and additional 216-case aggregate +10% cost gates remain required.
+The additional study cannot rescue a failed original phase. Both use the identical frozen strategy,
+one active fight, pure native v11 baseline, equal warmup, counterbalanced arm order, full-decision
+and full-fight timers, and independent exact-integer checks. The accepted-model prediction wrapper
+is removed from cost actors. Subgroup/tail timings remain descriptive. Each separate validation
+phase has a fixed cutoff; none extends the strength collection deadline.
+
+All eight runner/verifier source bodies and hashes are preserved in the fixture. A six-fight
+functional smoke on two **reused** preflight cases reproduced every stored stock/mixture input,
+full trace, outcome and actual action; both-driver activation also ran. These are harness controls
+without new strength or timing claims. All 6,959 frozen research files remain unchanged.
+The original 36-case, three-arm, two-host cold check still requires 216 exact replays after both
+strength shards finish and before score aggregation. No candidate/default change or deployment.
