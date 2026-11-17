@@ -1,0 +1,403 @@
+{
+    "policy": "public-terrain-formation-reflection-v1",
+    "kind": "exploratory-screen-not-confirmation",
+    "families": 36,
+    "pairedSeats": 72,
+    "logicalBattles": 144,
+    "executedBattles": 106,
+    "exactOpeningReuses": 38,
+    "changedSeats": 34,
+    "gainPp": 7.638888888888889,
+    "familyBootstrapCi95Pp": [0.0, 16.666666666666664],
+    "exploratoryGatePassed": false,
+    "promoted": false,
+    "qualityPassed": true,
+    "registrationSha256": "544219357e1afd504597dc571d157fe71b64aba9c1b0bf59aebe4e43bb0cc871",
+    "arms": {
+        "native": {
+            "wins": 32,
+            "draws": 1,
+            "losses": 39,
+            "scorePct": 45.13888888888889
+        },
+        "terrain": {
+            "wins": 37,
+            "draws": 2,
+            "losses": 33,
+            "scorePct": 52.77777777777778
+        }
+    },
+    "familiesDetail": [
+        {
+            "id": "fresh-d1-1-p0-r0",
+            "d1": 1,
+            "d2": 1,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-1-p0-r1",
+            "d1": 1,
+            "d2": 1,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-1-p1-r0",
+            "d1": 1,
+            "d2": 1,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-1-p1-r1",
+            "d1": 1,
+            "d2": 1,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-2-p0-r0",
+            "d1": 1,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-2-p0-r1",
+            "d1": 1,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-2-p1-r0",
+            "d1": 1,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-2-p1-r1",
+            "d1": 1,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-3-p0-r0",
+            "d1": 1,
+            "d2": 3,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-3-p0-r1",
+            "d1": 1,
+            "d2": 3,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-3-p1-r0",
+            "d1": 1,
+            "d2": 3,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d1-3-p1-r1",
+            "d1": 1,
+            "d2": 3,
+            "difference": -0.25
+        },
+        {
+            "id": "fresh-d2-1-p0-r0",
+            "d1": 2,
+            "d2": 1,
+            "difference": 0.5
+        },
+        {
+            "id": "fresh-d2-1-p0-r1",
+            "d1": 2,
+            "d2": 1,
+            "difference": 0.5
+        },
+        {
+            "id": "fresh-d2-1-p1-r0",
+            "d1": 2,
+            "d2": 1,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d2-1-p1-r1",
+            "d1": 2,
+            "d2": 1,
+            "difference": 0.0
+        },
+        {
+            "id": "fresh-d2-2-p0-r0",
+            "d1": 2,
+            "d2": 2,
+            "difference": 0.5
+        },
+        {
+            "id": "fresh-d2-2-p0-r1",
+            "d1": 2,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d2-2-p1-r0",
+            "d1": 2,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d2-2-p1-r1",
+            "d1": 2,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d2-3-p0-r0",
+            "d1": 2,
+            "d2": 3,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d2-3-p0-r1",
+            "d1": 2,
+            "d2": 3,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d2-3-p1-r0",
+            "d1": 2,
+            "d2": 3,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d2-3-p1-r1",
+            "d1": 2,
+            "d2": 3,
+            "difference": 1
+        },
+        {
+            "id": "fresh-d3-1-p0-r0",
+            "d1": 3,
+            "d2": 1,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d3-1-p0-r1",
+            "d1": 3,
+            "d2": 1,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d3-1-p1-r0",
+            "d1": 3,
+            "d2": 1,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d3-1-p1-r1",
+            "d1": 3,
+            "d2": 1,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d3-2-p0-r0",
+            "d1": 3,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d3-2-p0-r1",
+            "d1": 3,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d3-2-p1-r0",
+            "d1": 3,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d3-2-p1-r1",
+            "d1": 3,
+            "d2": 2,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d3-3-p0-r0",
+            "d1": 3,
+            "d2": 3,
+            "difference": 0
+        },
+        {
+            "id": "fresh-d3-3-p0-r1",
+            "d1": 3,
+            "d2": 3,
+            "difference": 0.5
+        },
+        {
+            "id": "fresh-d3-3-p1-r0",
+            "d1": 3,
+            "d2": 3,
+            "difference": -0.5
+        },
+        {
+            "id": "fresh-d3-3-p1-r1",
+            "d1": 3,
+            "d2": 3,
+            "difference": 0.5
+        }
+    ],
+    "audit": {
+        "qualityPassed": true,
+        "kind": "mechanical-input-audit",
+        "independentDraftFamilies": 12,
+        "nativeOpenings": 36,
+        "barrelDraftFamilies": 6,
+        "barrelLayoutComparisons": 48,
+        "identicalBarrelFormations": 48,
+        "testResults": {
+            "commonTestsPassed": 65,
+            "serverTestsPassed": 10
+        },
+        "cases": [
+            {
+                "map": 4,
+                "doctrine": 1,
+                "pickOrder": 0,
+                "nativeOpenings": 5,
+                "comparisonCount": 8,
+                "identicalFormations": 8
+            },
+            {
+                "map": 4,
+                "doctrine": 1,
+                "pickOrder": 1,
+                "nativeOpenings": 5,
+                "comparisonCount": 8,
+                "identicalFormations": 8
+            },
+            {
+                "map": 4,
+                "doctrine": 2,
+                "pickOrder": 0,
+                "nativeOpenings": 5,
+                "comparisonCount": 8,
+                "identicalFormations": 8
+            },
+            {
+                "map": 4,
+                "doctrine": 2,
+                "pickOrder": 1,
+                "nativeOpenings": 5,
+                "comparisonCount": 8,
+                "identicalFormations": 8
+            },
+            {
+                "map": 4,
+                "doctrine": 3,
+                "pickOrder": 0,
+                "nativeOpenings": 5,
+                "comparisonCount": 8,
+                "identicalFormations": 8
+            },
+            {
+                "map": 4,
+                "doctrine": 3,
+                "pickOrder": 1,
+                "nativeOpenings": 5,
+                "comparisonCount": 8,
+                "identicalFormations": 8
+            },
+            {
+                "map": 3,
+                "doctrine": 1,
+                "pickOrder": 0,
+                "nativeOpenings": 1,
+                "comparisonCount": 0,
+                "identicalFormations": 0
+            },
+            {
+                "map": 3,
+                "doctrine": 1,
+                "pickOrder": 1,
+                "nativeOpenings": 1,
+                "comparisonCount": 0,
+                "identicalFormations": 0
+            },
+            {
+                "map": 3,
+                "doctrine": 2,
+                "pickOrder": 0,
+                "nativeOpenings": 1,
+                "comparisonCount": 0,
+                "identicalFormations": 0
+            },
+            {
+                "map": 3,
+                "doctrine": 2,
+                "pickOrder": 1,
+                "nativeOpenings": 1,
+                "comparisonCount": 0,
+                "identicalFormations": 0
+            },
+            {
+                "map": 3,
+                "doctrine": 3,
+                "pickOrder": 0,
+                "nativeOpenings": 1,
+                "comparisonCount": 0,
+                "identicalFormations": 0
+            },
+            {
+                "map": 3,
+                "doctrine": 3,
+                "pickOrder": 1,
+                "nativeOpenings": 1,
+                "comparisonCount": 0,
+                "identicalFormations": 0
+            }
+        ]
+    },
+    "independentVerification": {
+        "qualityPassed": true,
+        "compressedAndRawReceiptsVerified": 144,
+        "winnerRecomputedScores": 144,
+        "integerFamilyDifferences": [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 2, 2, 0, 0, 2, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, -2, 2
+        ],
+        "gainPp": 7.638888888888889,
+        "ci95Pp": [0.0, 16.666666666666664],
+        "exactOpeningReuseVerified": 38,
+        "executedBattles": 106,
+        "counts": {
+            "native": [32, 1, 39],
+            "terrain": [37, 2, 33]
+        }
+    },
+    "reproducibility": {
+        "qualityPassed": true,
+        "smokeExecutions": 4,
+        "crossHostColdExecutions": 8,
+        "extraChangedSeatChecks": {
+            "at": "2026-11-17T21:50:13.243782+00:00",
+            "kind": "reproducibility-only additive check; no policy/seed/gate change",
+            "selection": "For each physical team 1 and 2, first manifest-order then seat-order entry whose recorded geometry diagnostic changed is true. Selection does not use combat score. Reexecute both native and candidate on M4 and compare complete opening/draft/results/turns/events/health to HFT. No extra independent strength observations.",
+            "reason": "The four originally registered cold executions covered only unchanged formations. Verify active terrain choices too.",
+            "verifierSha256": "906c8af7c34b54b8007124a41d891678918cfb046df1ac619a4cc05ac70e183e"
+        },
+        "sameCompleteOpeningsResultsTurnsEventsHealth": true
+    },
+    "completedAt": "2026-11-17T21:52:30.272750+00:00",
+    "files": {
+        "audit.json": "ae5240fc59b761dbaab1d91d56c2b49a26fd167dc314fe66ae2713681c9a8794",
+        "audit.ts": "6229c1326b300ad5634ed4a374a8319bc9208d5cf64747f06834c5e41002c919",
+        "probe.json": "caa918fa4df974bcc1734f76169e922b13451264a3a119a81d8f270bf1f81a6a",
+        "candidate.ts": "c45a89903c24ac44dacd49717825939b0907201f29a02963bb55ab8583c6ac1e",
+        "registration.json": "544219357e1afd504597dc571d157fe71b64aba9c1b0bf59aebe4e43bb0cc871",
+        "analysis.json": "e4912241507ae37481c9c386d3e0755e1f01233df94b27fd444c9d22e95bd316",
+        "independent-verification.json": "6771cac3ac70dcd6af1376025a469f2785614b72591f26c42445c38a4e73b562",
+        "quality-amendment.json": "758b1fac6f69343534a5eec7c4be4081aae4e09d56a5ca4cf407fc93f24aa2bb",
+        "verify-changed.ts": "906c8af7c34b54b8007124a41d891678918cfb046df1ac619a4cc05ac70e183e"
+    },
+    "closed": true,
+    "confirmationOpened": false,
+    "defaultChanged": false
+}

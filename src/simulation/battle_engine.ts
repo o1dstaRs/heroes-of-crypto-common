@@ -22,6 +22,7 @@ import { captureAITargetMemory, clearAITargetMemory, recordAITargetMemory, resto
 import { createDecisionPathCatalog } from "../ai/decision_path_catalog";
 import type { PlacementPolicyVariant } from "../ai/setup/setup_ship";
 import { applyTacticalSplitPlacement, type TacticalSplitRole } from "../ai/tactical_split_placement";
+import { chooseA19TerrainPlacement } from "../ai/placement/terrain_reflection";
 import { StrategyV0_8 } from "../ai/versions/v0_8";
 import { V08_A13_PRODUCTION_VERSION } from "../ai/versions/v0_8_a13_profile";
 import {
@@ -290,7 +291,7 @@ export interface ITurnExecutionObservation {
 }
 
 export interface IMatchConfig {
-    /** Offline collection only, after split placement. Receives detached own geometry, never hidden enemy setup. */
+    /** Offline collection only, after default final placement. Receives detached own geometry, never hidden enemy setup. */
     researchFormationSelector?: (input: import("./ai_meta_formation_learning").IMetaFormationInput) => Map<string, XY>;
     /** Research-only timing seam; omitted callers retain the existing clock path. */
     researchCaptureDecisionStart?: boolean;
@@ -1127,7 +1128,6 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             config.greenSetupPlacementPolicy,
             greenPublicOpponentCreatureIds,
             config.greenTacticalSplitStacks,
-            config.researchFormationSelector,
         ),
         red: placeArmy(
             redUnits,
@@ -1143,7 +1143,6 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             config.redSetupPlacementPolicy,
             redPublicOpponentCreatureIds,
             config.redTacticalSplitStacks,
-            config.researchFormationSelector,
         ),
     };
 
@@ -1268,6 +1267,99 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         unitsHolder.applyArtifacts(fightProperties);
         unitsHolder.applyAugments(fightProperties);
         unitsHolder.refreshStackPowerForAllUnits();
+    }
+
+    // Default terrain placement follows fully funded setup. Formation collection then observes this
+    // final incumbent and owns its explicit selection; labels must describe the cells actually played.
+    const terrainPlacement = !a13Rollback && sideOriented && effectiveGridType === PBTypes.GridVals.BLOCK_CENTER;
+    if (terrainPlacement || config.researchFormationSelector) {
+        for (const [team, version, override, units, records] of [
+            [GREEN_TEAM, config.greenVersion, config.greenStrategyOverride, greenUnits, placements.green],
+            [RED_TEAM, config.redVersion, config.redStrategyOverride, redUnits, placements.red],
+        ] as const) {
+            if (records.length !== units.length) {
+                if (config.researchFormationSelector)
+                    throw new Error("Formation collection cannot place the complete army");
+                continue;
+            }
+            const legal = zoneHashesFor(team);
+            const incumbent = new Map(units.map((unit) => [unit.getId(), { ...unit.getBaseCell() }]));
+            let desired = incumbent;
+            // Native-server replay and explicit strategy overrides already own their complete formation.
+            if (terrainPlacement && version === V08_A19_PRODUCTION_VERSION && !override) {
+                desired = chooseA19TerrainPlacement(
+                    units,
+                    {
+                        team,
+                        gridType: effectiveGridType,
+                        gridSettings,
+                        sideOrientedPlacement: fightProperties.isSideAxisPolicyTeam(team),
+                        legalCellHashes: legal,
+                        publicMapSeed: `sim-${config.seed}`,
+                    },
+                    incumbent,
+                ).positions;
+            }
+            if (config.researchFormationSelector) {
+                desired = config.researchFormationSelector({
+                    team,
+                    gridType: effectiveGridType,
+                    legalCells: [...legal].map((hash) => ({ x: hash >> 4, y: hash & 0xf })),
+                    units: units.map((unit) => ({
+                        unitId: unit.getId(),
+                        creatureName: unit.getName(),
+                        amount: unit.getAmountAlive(),
+                        width: unit.getFootprintWidth(),
+                        height: unit.getFootprintHeight(),
+                        cell: { ...desired.get(unit.getId())! },
+                    })),
+                });
+                if (desired.size !== units.length || units.some((unit) => !desired.has(unit.getId())))
+                    throw new Error("Formation collection changed army membership");
+                for (const unit of units) {
+                    const base = desired.get(unit.getId())!;
+                    if (
+                        !Number.isInteger(base.x) ||
+                        !Number.isInteger(base.y) ||
+                        footprintCells(unit, base).some(
+                            (cell) =>
+                                cell.x < 0 ||
+                                cell.x >= GRID_SIZE ||
+                                cell.y < 0 ||
+                                cell.y >= GRID_SIZE ||
+                                !legal.has(cellKey(cell)),
+                        )
+                    )
+                        throw new Error("Selected formation was not applied exactly");
+                }
+            }
+            if (
+                units.every((unit) => {
+                    const a = incumbent.get(unit.getId())!,
+                        b = desired.get(unit.getId())!;
+                    return a.x === b.x && a.y === b.y;
+                })
+            )
+                continue;
+            const before = snapshotBattle(unitsHolder, grid, fightProperties);
+            try {
+                for (const unit of units) grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
+                for (const unit of units) {
+                    const result = engine.apply({
+                        type: "place_unit",
+                        unitId: unit.getId(),
+                        unitName: unit.getName(),
+                        team,
+                        cells: footprintCells(unit, desired.get(unit.getId())!),
+                    });
+                    if (!result.completed) throw new Error("Selected formation was not applied exactly");
+                }
+                for (const record of records) record.cell = { ...desired.get(record.unitId)! };
+            } catch (error) {
+                restoreBattle(before, unitsHolder, grid, fightProperties);
+                if (config.researchFormationSelector) throw error;
+            }
+        }
     }
 
     // --- run the fight ---
@@ -1930,7 +2022,6 @@ function placeArmy(
     setupPlacementPolicy?: PlacementPolicyVariant,
     publicOpponentCreatureIds?: readonly number[],
     tacticalSplitStacks?: readonly ITacticalSplitRosterStack[],
-    researchFormationSelector?: IMatchConfig["researchFormationSelector"],
 ): IPlacementRecord[] {
     const records: IPlacementRecord[] = [];
     const legal = zone.possibleCellHashes();
@@ -1952,7 +2043,7 @@ function placeArmy(
             const unit = units[split.rosterIndex];
             return unit ? [{ unitId: unit.getId(), role: split.role }] : [];
         }) ?? [];
-    let desired = splitStacks.length
+    const desired = splitStacks.length
         ? applyTacticalSplitPlacement(
               incumbent,
               units.map((unit) => ({
@@ -1972,42 +2063,6 @@ function placeArmy(
               },
           )
         : incumbent;
-
-    if (researchFormationSelector) {
-        const canonical = new Map<string, XY>();
-        const taken = new Set<string>();
-        const cells = [...legal].map((h) => ({ x: h >> 4, y: h & 0xf }));
-        const coordinateKey = ({ x, y }: XY) => `${x},${y}`;
-        // Bit-packed hashes alias off-board y=16 with a different in-bounds cell. Match the
-        // engine's coordinate legality before resolving its ordinary first-fit fallback.
-        const legalCoordinates = new Set(cells.map(coordinateKey));
-        for (const unit of units) {
-            const proposed = desired.get(unit.getId());
-            const base = [...(proposed ? [proposed] : []), ...cells].find((cell) =>
-                footprintCells(unit, cell).every(
-                    (covered) => legalCoordinates.has(coordinateKey(covered)) && !taken.has(coordinateKey(covered)),
-                ),
-            );
-            if (!base) throw new Error("Formation collection cannot place the complete army");
-            canonical.set(unit.getId(), { ...base });
-            for (const covered of footprintCells(unit, base)) taken.add(coordinateKey(covered));
-        }
-        desired = researchFormationSelector({
-            team,
-            gridType: grid.getGridType(),
-            legalCells: cells,
-            units: units.map((unit, index) => ({
-                unitId: unit.getId(),
-                creatureName: unit.getName(),
-                amount: roster[index].amount,
-                width: unit.getFootprintWidth(),
-                height: unit.getFootprintHeight(),
-                cell: { ...canonical.get(unit.getId())! },
-            })),
-        });
-        if (desired.size !== units.length || units.some((unit) => !desired.has(unit.getId())))
-            throw new Error("Formation collection changed army membership");
-    }
 
     const tryPlaceAt = (unit: Unit, base: XY): boolean => {
         const cells = footprintCells(unit, base);
@@ -2035,7 +2090,6 @@ function placeArmy(
     for (const unit of units) {
         const base = desired.get(unit.getId());
         let placed = base ? tryPlaceAt(unit, base) : false;
-        if (researchFormationSelector && !placed) throw new Error("Selected formation was not applied exactly");
         if (!placed) {
             for (const candidate of legalBaseCells) {
                 if (tryPlaceAt(unit, candidate)) {

@@ -1,5 +1,18 @@
 # Agent guidance
 
+## Explicit public-terrain placement adoption — November 17, 2026
+
+The user requested “plesae add it to the default strategy for sure” after reviewing the terrain
+screen. This adopts the exact `public-terrain-formation-reflection-v1` candidate as profile v11
+and supersedes that candidate's historical non-activation instructions below. Read
+`docs/terrain_placement_adoption.md`. Keep the original +7.638889-point result, 95% interval
+0 to +16.666667, failed lower-bound gate and unopened confirmation unchanged. The serving helper
+is `src/ai/placement/terrain_reflection.ts`; use only own units and public neutral terrain, after
+all normal formation layers and before own artifact barrels. Preserve ranked/Premium routing,
+undo and simulation parity. Normal/Lava/Water and other AI versions retain their behavior.
+The wire default remains v0.8 with locked v0.9 V3/contextual draft and A19 combat. Future research
+uses this adopted v11 comparator; do not silently modify a frozen in-flight baseline.
+
 ## Explicit Nightmare wall and movement adoption — November 17, 2026
 
 After reviewing the completed movement study, the user explicitly requested “that is strong... we
@@ -911,3 +924,17 @@ nice-19 actors; offline and live 72-case ratios AND the original twelve slow cas
 22:35:37 UTC; no retry,
 extension or subset rescue. Original cost failure remains failed; no confirmation/default/deploy opens
 from equivalence alone. Exact patches/hashes are preserved without modifying serving source.
+
+## Closed terrain-placement reflection screen
+
+The November 17 audit confirmed a missing actual-terrain input in split/final placement: all 48
+changed-neutral-barrel-layout comparisons retained identical formations. Read
+`docs/terrain_placement_research.md`; this is not complete combat or lava blindness.
+`public-terrain-formation-reflection-v1` then completed a fixed 36-family, both-seat screen against
+the adopted v10 default: +7.638889 match-score points, whole-family 95% interval 0 to +16.666667.
+The strictly positive lower-bound gate failed; no default/model changed and confirmation remains
+unopened. Preserve both terrain-placement evidence fixtures, exact frozen candidate source, all
+20,480 scanned/rejected/unused preimages plus audit seeds, 106 executed battles/38 exact-input
+reuses, and successful reproducibility checks. Do not extend this bank until significant or
+activate the heuristic as a qualified gain. Future terrain-aware learning must retain public-only
+information, both ranked/Premium routing, native setup/split parity and the placement promotion gate.

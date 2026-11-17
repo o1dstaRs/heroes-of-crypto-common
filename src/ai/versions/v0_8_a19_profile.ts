@@ -10,6 +10,7 @@
  */
 
 import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
+import { A19_TERRAIN_PLACEMENT_POLICY } from "../placement/terrain_reflection";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
 import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
 import { A19_NIGHTMARE_WALL_MOVEMENT_POLICY } from "../nightmare_wall_movement";
@@ -63,7 +64,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
  *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v10" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v11" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -165,6 +166,11 @@ export const V08_A19_PLACEMENT_POLICY = Object.freeze({
  * entry, so a change to any of these files is a deliberate, re-pinned change to the production AI.
  */
 export const V08_A19_SOURCE_LEDGER = Object.freeze([
+    Object.freeze({
+        role: "terrain-placement-reflection" as const,
+        source: "src/ai/placement/terrain_reflection.ts" as const,
+        sha256: "3f598faf67be49b241d124f35c2b47192804cdbd52ff738b92f871469106884b" as const,
+    }),
     Object.freeze({
         role: "melee-barrel-rollback-environment" as const,
         source: "src/ai/versions/v0_8_a13_profile.ts" as const,
@@ -331,7 +337,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
         // Offline formation collection is opt-in; omitted callers preserve default routing.
-        sha256: "18d6cffe9c6f232f663493587f6c2e626fd79c98549772282d5325dd1ad4c794" as const,
+        sha256: "2378bb71912ecce3eb678c5a97037f943b9f8bfdf688e1c08e38c3e5e0bc8d38" as const,
     }),
     Object.freeze({
         role: "neural-policy" as const,
@@ -431,6 +437,7 @@ export const V08_A19_PROFILE = Object.freeze({
     placementPolicy: V08_A19_PLACEMENT_POLICY,
     neuralPolicy: A19_NEURAL_POLICY,
     authoritativeFinalPlacement: A19_LEARNED_FINAL_PLACEMENT_POLICY,
+    terrainPlacement: A19_TERRAIN_PLACEMENT_POLICY,
     wanderingMageSupport: A19_WANDERING_MAGE_SUPPORT_POLICY,
     unitSupport: A19_UNIT_SUPPORT_POLICY,
     battleMageTargets: BATTLE_MAGE_TARGET_POLICY,
