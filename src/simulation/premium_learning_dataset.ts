@@ -72,7 +72,9 @@ const setupFields = [
 const plansByBudget = new Map<number, Map<string, ObjectValue>>();
 
 /** Only this object is a model input. It excludes outcomes, behavior scores and opaque audit IDs. */
-export function premiumLearningInput(row: IPremiumLearningDecision) {
+export function premiumLearningInput(
+    row: Pick<IPremiumLearningDecision, "kind" | "observation" | "action" | "distribution" | "candidateActions">,
+) {
     const keys = row.distribution.candidates.map(({ key }) => key);
     let observation: ObjectValue;
     let actions: ObjectValue[];

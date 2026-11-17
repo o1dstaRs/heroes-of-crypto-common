@@ -173,3 +173,12 @@ The process-sharded meta wrapper is preferred on Puffalo. Snapshots remain devel
 candidate-publication gate explicitly rejects learning captures; the existing reviewed production snapshot
 and bot stay unchanged. Qualification of a learned policy requires separately frozen models and independent
 current-engine comparisons, including each own doctrine and authoritative serving checks.
+
+## Historical draft memory preparation
+
+The separate [draft-memory pipeline](premium_draft_memory.md) reads captured ranked training histories
+from either v3 or v4 snapshots, reconstructs opponent-state targets, fits a fixed compact occupancy
+estimator and evaluates it by whole-family folds. `export_premium_draft_memory.ts` is the reusable
+entry point; the original snapshot and its held-out partitions stay unchanged. Its public-view observer
+returns beliefs, not picks. A refreshed snapshot or a better prediction-error score does not activate a
+new default drafter or establish stronger ranked play.

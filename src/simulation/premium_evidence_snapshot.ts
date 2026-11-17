@@ -17,6 +17,12 @@ import {
     type summarizePremiumHealth,
 } from "./ai_meta_health_ledger";
 import type { IPremiumLearningDecision } from "./premium_learning_decisions";
+import type { IPremiumDraftHistoryRow } from "./premium_draft_memory_dataset";
+import type { IPremiumMatchupFamily } from "./premium_matchup_dataset";
+import { draftMatchupFeatures } from "../ai/setup/draft_matchup_value";
+import { draftMatchupContextFeatures } from "../ai/setup/draft_matchup_context_value";
+import type { RankedDraftSynergyVariants } from "../ai/setup/draft_synergy_variants";
+import { ToFactionName } from "../factions/faction_type";
 
 export const PREMIUM_SNAPSHOT_SCHEMA = "hoc-premium-evidence-snapshot-v2";
 
@@ -205,6 +211,160 @@ export function canonicalPremiumEvidenceQuery(query: IPremiumEvidenceQuery): IPr
 export class PremiumEvidenceSnapshot {
     public readonly manifest: IPremiumSnapshotManifest;
     private readonly db: Database;
+    /** Add only own artifacts and original PUBLIC rolled variants; deliberately never select level/purchases. */
+    public *trainingContextualMatchups(cohorts: readonly AiMetaCohort[]) {
+        const contextQuery = this.db.query<
+            { side: "a" | "b"; artifact_t1: number; artifact_t2: number; faction: number; synergy: number },
+            [string]
+        >(
+            "SELECT a.side,a.artifact_t1,a.artifact_t2,s.faction,s.synergy FROM army a JOIN synergy s ON s.army_id=a.id WHERE a.family_id=? ORDER BY a.side,s.faction",
+        );
+        for (const family of this.trainingMatchups(cohorts)) {
+            const context = contextQuery.all(family.familyId);
+            const armies = family.armies.map((army) => {
+                const rows = context.filter((r) => r.side === army.side);
+                if (rows.length !== 4 || new Set(rows.map((r) => r.faction)).size !== 4)
+                    throw new Error("Incomplete public synergy capture");
+                const synergyVariants = Object.fromEntries(
+                    rows.map((r) => [ToFactionName[r.faction], r.synergy]),
+                ) as unknown as RankedDraftSynergyVariants;
+                const input = {
+                    ...army.input,
+                    ownArtifactT1: rows[0].artifact_t1,
+                    ownArtifactT2: rows[0].artifact_t2,
+                    synergyVariants,
+                };
+                draftMatchupContextFeatures(input);
+                return { ...army, input };
+            });
+            if (JSON.stringify(armies[0].input.synergyVariants) !== JSON.stringify(armies[1].input.synergyVariants))
+                throw new Error("Public synergy rolls disagree across armies");
+            yield { ...family, armies };
+        }
+    }
+    /** Explicit cohort scope, training partition enforced in SQL. No held-out outcomes are read. */
+    public *trainingMatchups(cohorts: readonly AiMetaCohort[]): Generator<IPremiumMatchupFamily> {
+        if (
+            !cohorts.length ||
+            new Set(cohorts).size !== cohorts.length ||
+            cohorts.some((c) => !AI_META_COHORTS.includes(c))
+        )
+            throw new Error("Explicit unique matchup cohorts required");
+        const query = this.db.query<
+            {
+                id: string;
+                cohort: AiMetaCohort;
+                map: number;
+                side: "a" | "b";
+                doctrine: number;
+                score: number;
+                units: string;
+            },
+            string[]
+        >(`SELECT f.id,f.cohort,f.map,a.side,a.doctrine,a.score,
+            (SELECT json_group_array(creature_id) FROM (SELECT creature_id FROM unit WHERE army_id=a.id ORDER BY creature_id)) units
+            FROM family f JOIN army a ON a.family_id=f.id
+            WHERE f.partition='train' AND f.cohort IN (${cohorts.map(() => "?").join(",")}) ORDER BY f.id,a.side`);
+        type Row = ReturnType<typeof query.all>[number];
+        let pending: Row | undefined;
+        for (const row of query.iterate(...cohorts)) {
+            if (!pending) {
+                pending = row;
+                continue;
+            }
+            const a = pending;
+            const b = row;
+            if (
+                a.id !== b.id ||
+                a.side !== "a" ||
+                b.side !== "b" ||
+                a.map !== b.map ||
+                a.cohort !== b.cohort ||
+                !Number.isFinite(a.score) ||
+                !Number.isFinite(b.score) ||
+                a.score < 0 ||
+                a.score > 1 ||
+                b.score < 0 ||
+                b.score > 1 ||
+                Math.abs(a.score + b.score - 1) > 1e-12
+            )
+                throw new Error("Invalid paired matchup family");
+            const armies = [a, b].map((own, index) => {
+                const enemy = index === 0 ? b : a;
+                const input = {
+                    ownCreatureIds: JSON.parse(own.units) as number[],
+                    opponentCreatureIds: JSON.parse(enemy.units) as number[],
+                    ownDoctrine: own.doctrine,
+                    map: own.map,
+                };
+                draftMatchupFeatures(input, false);
+                return { side: own.side, input, target: { seatPairedScore: own.score } };
+            });
+            yield {
+                familyId: a.id,
+                snapshotId: this.manifest.snapshotId,
+                cohort: a.cohort,
+                partition: "train",
+                armies,
+            };
+            pending = undefined;
+        }
+        if (pending) throw new Error("Unpaired training matchup");
+    }
+    /** Training draft chronology only; no join to scores or held-out observations. Supports v3 and v4. */
+    public *trainingDraftHistory(): Generator<IPremiumDraftHistoryRow> {
+        if (!this.manifest.capabilities?.includes("draft-observations"))
+            throw new Error("Snapshot lacks captured draft observations");
+        for (const row of this.db
+            .query<
+                {
+                    family_id: string;
+                    side: "a" | "b";
+                    army_family_id: string;
+                    decision_index: number;
+                    kind: string;
+                    phase: number;
+                    action_key: number;
+                    status: string;
+                    behavior_probability: number;
+                    payload: string;
+                },
+                []
+            >(
+                "SELECT d.*,a.side,a.family_id AS army_family_id FROM decision d JOIN family f ON f.id=d.family_id JOIN army a ON a.id=d.army_id WHERE f.partition='train' AND f.cohort='ranked-draft' ORDER BY f.id,d.decision_index",
+            )
+            .iterate()) {
+            const decision = JSON.parse(row.payload) as IAiMetaDraftDecision;
+            const action = decision.action;
+            const key =
+                "creatureId" in action
+                    ? action.creatureId
+                    : "bundleIndex" in action
+                      ? action.bundleIndex
+                      : "doctrine" in action
+                        ? action.doctrine
+                        : "artifactId" in action
+                          ? action.artifactId
+                          : NaN;
+            if (
+                row.family_id !== row.army_family_id ||
+                decision.index !== row.decision_index ||
+                decision.status !== row.status ||
+                action.type !== row.kind ||
+                decision.observation.phaseSequence !== row.phase ||
+                key !== row.action_key ||
+                decision.behaviorProbability !== row.behavior_probability
+            )
+                throw new Error("Draft payload disagrees with indexed family/decision identity");
+            yield {
+                familyId: row.family_id,
+                side: row.side,
+                partition: "train",
+                snapshotId: this.manifest.snapshotId,
+                decision,
+            };
+        }
+    }
     /** Training-only stream. A family remains the uncertainty/split unit, regardless of row count. */
     public *trainingDecisions(
         cohort: AiMetaCohort,

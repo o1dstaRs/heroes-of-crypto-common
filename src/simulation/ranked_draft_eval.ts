@@ -63,6 +63,7 @@ import {
     getCurrentPickPhase,
     getKnownOpponentCreatures,
     getPickScoutingContext,
+    getPickTeamView,
     getVisibleCreatureChoices,
     isPickSimComplete,
     LIVE_TIER1_ARTIFACT_IDS,
@@ -71,6 +72,7 @@ import {
     transitionServerPersistedPickSim,
     type IPickSimState,
     type IPickTeamState,
+    type IPickTeamView,
     type PickAction,
     type PickRandomInt,
     type PickTeam,
@@ -972,6 +974,8 @@ export interface IRankedDraftPickRules {
 }
 
 export interface IRankedDraftResearchContext {
+    /** Exact viewer projection for opt-in collectors; never the unprojected pick state. */
+    readonly publicView?: Readonly<IPickTeamView>;
     readonly ownCreatureIds: readonly number[];
     readonly knownOpponentCreatureIds: readonly number[];
     readonly tier1ArtifactId?: number;
@@ -1130,6 +1134,7 @@ export function resolveRankedDraftPick(
         const own = teamState(team);
         const context = getPickScoutingContext(state, team, rules.gridType);
         return Object.freeze({
+            publicView: Object.freeze(getPickTeamView(state, team)),
             ownCreatureIds: Object.freeze([...own.creatures]),
             knownOpponentCreatureIds: Object.freeze(getKnownOpponentCreatures(state, team)),
             tier1ArtifactId: own.tier1Artifact,
