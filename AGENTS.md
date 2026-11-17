@@ -663,3 +663,18 @@ damage. Engine rollouts still simulate fire; this is not complete-agent blindnes
 of the pilot result. Fixing the trained representation needs a new contract, new fits and fresh strength
 and serving-cost qualification. Future route-aware wall work must also price allied access and the
 attack/Empower turn given up. Preserve the accepted A19 neural pair and adopted barrel correction.
+
+## Registered Nightmare route-preservation follow-up
+
+The distinct `nightmare-route-preserving-wall-v1` follow-up is registered and running, not a qualified
+gain. Read `docs/nightmare_route_preservation_research.md` and preserve its evidence fixture's full
+scanned reservations. The original wall checkpoint above remains immutable and inactive. The new
+helper filters its proposal using current native routes, protects allied safe approaches, declines
+positive-damage attacks, and requires a strict full-R2 lead over productive alternatives.
+
+Registration `3ed06ee12097d7e63ff7079e853f7b015f95017343144ffd5846b193c35b0887` covers all 65 old
+changed cases for admission and 216 fresh families / 864 paired comparisons against both default and
+original v1. Preserve all four arms, all outcomes and simultaneous confidence/doctrine gates. The
+original hard cutoff is November 17 at 09:51:21 UTC: six nice-19 Puffalo CPU workers, no GPU, no
+automatic retry or extension. Inspect the capsule's status and terminal receipts before starting work.
+No result permits automatic adoption, and opened admission cases never count as fresh strength.
