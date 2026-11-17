@@ -1,4 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+
+import { SearchDriver } from "../../src/simulation/search_driver";
 
 import {
     V08_A19_RANGED_CORNER_PLACEMENT_AB_SCHEDULE,
@@ -26,15 +28,29 @@ describe("A19 Ogre Mage and Behemoth ranged-corner A/B", () => {
         }
     });
 
-    test("assembles and summarizes the complete two-seat candidate/control shape", () => {
-        // The two file-level shards below own the four full max-lap-20 fights. A zero-lap cluster still runs
-        // the identical setup/placement path and covers the production cluster assembler and summarizer
-        // without serializing a second copy of those fights in this file.
-        const cluster = evaluateV08A19RangedCornerPlacementCluster("ground-control", 0, 819_024_611, 0);
+    test("assembles both seats, executes their openings and summarizes the same four games", () => {
+        // Share a real opening for formation checks; complete-fight legality has separate combat regressions.
+        const searched: number[] = [];
+        const onMatchEnd = SearchDriver.prototype.onMatchEnd;
+        const observer = spyOn(SearchDriver.prototype, "onMatchEnd").mockImplementation(function (
+            this: SearchDriver,
+            ...args: Parameters<SearchDriver["onMatchEnd"]>
+        ) {
+            searched.push(this.counters.searched);
+            onMatchEnd.apply(this, args);
+        });
+        let cluster: ReturnType<typeof evaluateV08A19RangedCornerPlacementCluster>;
+        try {
+            cluster = evaluateV08A19RangedCornerPlacementCluster("ground-control", 0, 819_024_611, 1);
+        } finally {
+            observer.mockRestore();
+        }
+        expect(searched.filter((count) => count > 0)).toHaveLength(4);
+        expect(cluster.games.every((game) => game.laps >= 1 && game.endReason === "turn_cap")).toBe(true);
         expect(cluster.games.map((game) => game.id)).toEqual(
             V08_A19_RANGED_CORNER_PLACEMENT_AB_SCHEDULE.map((schedule) => schedule.id),
         );
-        expect([...new Set(cluster.games.map((game) => game.seed))]).toHaveLength(1);
+        expect(new Set(cluster.games.map((game) => game.seed))).toEqual(new Set([4_173_708_502]));
         expect(
             cluster.games.every((game) => game.supportRejectedActions === 0 && game.opponentRejectedActions === 0),
         ).toBe(true);

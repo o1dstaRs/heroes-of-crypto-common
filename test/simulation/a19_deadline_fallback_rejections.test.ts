@@ -33,7 +33,12 @@ const REPRO_PAIRS: { cohort: AiMetaCohort; pair: number }[] = [
     { cohort: "cross-archetype", pair: 249 },
 ];
 
-type PairGames = { cohort: AiMetaCohort; pair: number; games: IAiMetaGameOutcome[] };
+type PairGames = {
+    cohort: AiMetaCohort;
+    pair: number;
+    games: IAiMetaGameOutcome[];
+    searches: { deadlineFallbacks: number }[];
+};
 
 const playWithForcedDeadlines = (): Promise<PairGames[]> =>
     new Promise((resolve, reject) => {
@@ -58,12 +63,18 @@ const playWithForcedDeadlines = (): Promise<PairGames[]> =>
     });
 
 describe("a19 deadline fallback", () => {
-    it("never emits an engine-rejected command when every search times out", async () => {
+    it("never emits an engine-rejected command when every timed search times out", async () => {
         const results = await playWithForcedDeadlines();
 
         expect(results.map(({ cohort, pair }) => `${cohort}:${pair}`)).toEqual(
             REPRO_PAIRS.map(({ cohort, pair }) => `${cohort}:${pair}`),
         );
+        for (const result of results) {
+            expect(result.searches).toHaveLength(2);
+            for (const search of result.searches) {
+                expect(search.deadlineFallbacks).toBeGreaterThan(0);
+            }
+        }
         const rejected = results.flatMap(({ cohort, pair, games }) =>
             games
                 .filter((game) => game.rejectedA + game.rejectedB > 0)

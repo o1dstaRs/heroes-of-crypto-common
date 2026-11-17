@@ -52,6 +52,19 @@ Set `HOC_TEST_WORKERS=2` when a shared workstation is busy. The test runner caps
 available cores and the existing local/CI limits, and rejects invalid counts. It also applies to tests
 started by the package build; the default remains up to 12 local workers and 2 CI workers.
 
+## Focused verification before the final gate
+
+Use focused tests while editing, then one full gate for the finalized source. The client root's
+`bun run check` already runs this package's full suite; do not launch a duplicate common suite beside
+it. Re-run a passed gate when source, dependencies or relevant configuration change, not just because
+another message arrived. Retain isolated workers and the required lint/typecheck checks.
+
+The ranged-corner placement regression now shares one four-arm, two-seat opening across placement,
+opening legality and summary assertions. Its measured serial time fell from 14.3 to 5.5 seconds by
+removing duplicated setup and reducing the placement smoke check from twenty rounds to one. Keep actual
+search-activity assertions so a zero-action fixture cannot pass. Full combat rejection/fallback and
+observer-parity tests remain separate; the deadline fixture also proves actual fallbacks occurred.
+
 ## User-locked shooter counter-play research
 
 The user requested locking strategy gains on November 9, 2026 UTC. Preserve

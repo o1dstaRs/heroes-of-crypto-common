@@ -14,11 +14,17 @@ if (!parentPort) {
     throw new Error("a19_forced_truncation_worker must run in a worker thread");
 }
 
-// Deterministic deadline exhaustion: every search sees its wall-clock deadline expire on the first check, so
-// SearchDriver takes the real SearchDecisionDeadlineExceeded fallback on every searched decision regardless of
-// host speed. The parent passes the sanitized a19 environment with the circuit breaker pushed out of reach.
+// Deterministic deadline exhaustion: every timed search expires on the first check, so
+// SearchDriver takes the real SearchDecisionDeadlineExceeded fallback regardless of host speed.
+// Operation-bounded waits and fallback validation retain their normal non-deadline path.
 type DeadlineCheck = (this: unknown, deadlineAt: number | null) => void;
 const driver = SearchDriver.prototype as unknown as { assertBeforeDecisionDeadline: DeadlineCheck };
+const drivers = new Set<SearchDriver>();
+const onMatchEnd = SearchDriver.prototype.onMatchEnd;
+SearchDriver.prototype.onMatchEnd = function (...args) {
+    drivers.add(this);
+    onMatchEnd.apply(this, args);
+};
 const assertBeforeDecisionDeadline = driver.assertBeforeDecisionDeadline;
 driver.assertBeforeDecisionDeadline = function (deadlineAt) {
     assertBeforeDecisionDeadline.call(this, deadlineAt === null ? null : 0);
@@ -26,11 +32,16 @@ driver.assertBeforeDecisionDeadline = function (deadlineAt) {
 
 const { pairs, strategyProfileId } = workerData as IForcedTruncationWorkerData;
 try {
-    const games = pairs.map(({ cohort, pair }) => ({
-        cohort,
-        pair,
-        games: playMetaPair({ cohort, games: 1008, baseSeed: 85_000_717 }, pair, strategyProfileId).games,
-    }));
+    const games = pairs.map(({ cohort, pair }) => {
+        drivers.clear();
+        const games = playMetaPair({ cohort, games: 1008, baseSeed: 85_000_717 }, pair, strategyProfileId).games;
+        const searches = [...drivers]
+            .filter((driver) => driver.counters.decisions > 0)
+            .map((driver) => ({
+                deadlineFallbacks: driver.counters.deadlineFallbacks,
+            }));
+        return { cohort, pair, games, searches };
+    });
     parentPort.postMessage({ type: "result", games });
 } catch (error) {
     parentPort.postMessage({
