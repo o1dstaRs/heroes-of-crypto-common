@@ -130,3 +130,20 @@ just like R4 and non-full probes. The offline qualification cannot trigger adapt
 used uniform full R2. Measuring only the inner search return would omit the outer neural/support work;
 use the complete-decision observer. No serving profile, model, wire version or production deployment
 changed as a result of qualification.
+
+## Registered complete-cost check
+
+The [serial cost registration](evidence/barrel_forecast_model_mixture_cost_registration_20261117.json)
+opened after independent strength passed. One nice-19 M4 actor runs six fixed effective-R1 control
+pairs, four three-arm warmup cases, 72 balanced three-arm serial cases, then twelve three-arm bounded
+live cases: **276 executions**, with no new independent strength samples. Stock, entrant-only mixture
+and both-actual-driver mixture rotate across all three measured arm positions. Original offline
+stock/mixture inputs, full traces, outcomes and logical forecast witnesses must remain exact.
+
+The observer measures the complete decision after the native policy, search and outer neural/support
+selection. Both offline and bounded-live phases require mixture/stock and both/stock CPU, wall,
+complete-decision total and complete-decision mean ratios at most **1.10**. Forced-effective-R1 games
+must exactly retain native traces and exercise eligible barrel forecasts while selecting zero intent
+alternatives. Non-full-R2 queries retain the exact native cleanup reference. The fixed shared cutoff
+is **November 17 at 21:43:41 UTC**, without retry, extension, subset rescue or automatic promotion.
+This M4 control is separate from production two-vCPU latency certification and fresh confirmation.

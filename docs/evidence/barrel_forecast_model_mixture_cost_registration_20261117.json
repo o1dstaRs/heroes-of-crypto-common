@@ -1,0 +1,1361 @@
+{
+    "schema": "hoc.barrel_forecast_model_mixture.serial_cost_registration.v1",
+    "id": "barrel-forecast-paired-model-mixture-v1-serial-cost-20261117",
+    "registeredAt": "2026-11-17T20:43:41.824466+00:00",
+    "registrationSha256": "8f91fb4c12efceaeb4c34b908959106cb87ce2e741a7a112121a139394538a5a",
+    "absoluteDeadlineUtc": "2026-11-17T21:43:41.824466+00:00",
+    "strengthQualificationFixture": "barrel_forecast_model_mixture_qualification_results_20261117.json",
+    "strengthQualificationSha256": "4747fb38860cd0f0dd5a7f195b9c93433b52ea695b7718b78e6b973f81451267",
+    "protocol": {
+        "id": "barrel-forecast-paired-model-mixture-v1-serial-cost-20261117",
+        "at": "2026-11-17T20:42:31.430149+00:00",
+        "strengthResultSha256": "4747fb38860cd0f0dd5a7f195b9c93433b52ea695b7718b78e6b973f81451267",
+        "candidateSourceSha256": "afcb5b44789a1c0d2e4a5c5f054bebf5d8b58b90f30142e77698da1a3947d50f",
+        "servingDefaultChanged": false,
+        "selection": "First complete27-family cycle per opponent style; retain (mapIndex+ownDoctrineIndex+opponentDoctrineIndex)%3 !=0; game=board%4. 72 fixed cases,18 per style, maps/doctrine pairings balanced. No outcome selection.",
+        "arms": {
+            "stock": "current adopted v10",
+            "mixture": "frozen mixture on entrant actual driver; both forecast armies",
+            "both": "same frozen mixture on both actual drivers, conservative two-AI cost coverage"
+        },
+        "order": "One Unix nice19 serial actor. Six fixed reused functional cases first prove forced-effective-R1 stock/mixture identity. Four warmup cases then72 measured cases, each3 arms rotated by ordinal modulo3. Finally12 fixed map/style live cases, each3 arms.",
+        "executions": {
+            "forcedR1": 12,
+            "warmup": 12,
+            "measuredOffline": 216,
+            "boundedLive": 36,
+            "total": 276
+        },
+        "measurements": [
+            "integer process CPU micros for complete fight",
+            "integer wall micros for complete fight, same endpoint as CPU",
+            "integer complete native+search+outer-neural/support decision micros from context start through post-selector decisionObserver",
+            "complete-decision count, mean and tails",
+            "real bounded deadline/circuit/degradation counters"
+        ],
+        "timingGates": "For BOTH measured offline and bounded-live phases, mixture/stock and both/stock total CPU, total wall, total complete-decision time and mean complete-decision time must all be <=1.10. No retries, subset rescue or repeated timing until pass.",
+        "integrityGates": "Every engine/model/callback/input/source check valid. Offline stock+mixture full input/trace/score/logical forecast parity with qualification. Forced R1 must be exact stock/mixture full trace/score, exercise eligible barrel boundaries and effective R1, and select zero intent forecasts. All non-full-R2 contexts retain cleanup by identity. Original helper and weights unchanged.",
+        "adapterDifference": "Read-only actual effectiveRollouts() replaces configured .rollouts in the research sample metadata. Uniform offline full R2 must reproduce every measured original stock/mixture trace and witness; bounded degraded R1 is native. Complete-decision observer runs after all timed selectors and adds no action/model/RNG work.",
+        "termination": "Common absolute cutoff fixed before first serial fight, maximum3600seconds after registration; no automatic retry or extension.",
+        "limits": "Shared M4 workstation; record load/thermal state. This is not certification of production2-vCPU latency or confirmation strength. Both-arm/live/degraded repeats are controls, not independent strength samples. Passing only opens >=756 new independent confirmation families; no automatic promotion/deploy."
+    },
+    "frozenOriginalStrengthRegistrationSha256": "c2e6a08938110cc5ab360b2cffb1823391abe92044fab4ad1f65a013f403eebb",
+    "sourceFileCount": 3448,
+    "additionalSourceSha256": [
+        {
+            "path": "prepare-serial-cost.py",
+            "sha256": "c6045d8ae927f97dada2cf1fe17d50a2b9580785b410c53a4cf9f815fd5ced4e"
+        },
+        {
+            "path": "run-serial-cost.py",
+            "sha256": "636b5418eae13c51c222ad5fbad00c0da2211f042b12b486d9747773396c2b6a"
+        },
+        {
+            "path": "analyze-serial-cost.py",
+            "sha256": "09e70e252f88bb7e95ab54d6f8460bbd73b75fd78ae94cbfb9b9714b5f86499f"
+        },
+        {
+            "path": "verify-serial-cost.ts",
+            "sha256": "33de1d67afa2fc7f29a01946c337920d1e6b53ef01a762021da746d585d662d8"
+        },
+        {
+            "path": "native-serial-cost.ts",
+            "sha256": "391d546cfcc3bb9d533d57767a78c3c8056ab4d7040b1e6b71a25e305523bd3e"
+        },
+        {
+            "path": "serial-cost-actor.ts",
+            "sha256": "54f5aa0f66dea38633b88d8be567ca3e44293015543f44d5cd6a8e4f3cd20dd5"
+        },
+        {
+            "path": "serial-cost-cases.json",
+            "sha256": "d7b87c04876bda90f6660b761405e512b8b58fe808eeda03c40e76d4b5447a8c"
+        },
+        {
+            "path": "serial-cost-jobs.json",
+            "sha256": "bd7e767859dd8f6a7b103b4c289b8b44defb7a7bada69feeefa46bda9e7305f4"
+        },
+        {
+            "path": "serial-cost-protocol.json",
+            "sha256": "69652bbd693e977df1f8135991c3729c87929a0561c47594e0071932083f4b30"
+        }
+    ],
+    "measuredCases": [
+        {
+            "board": 1,
+            "game": 1,
+            "seed": 1199008264,
+            "expectedInputSha256": "6ccd4736dce5463fd814b26a9c19731f4b4190480d3e16089ee13f7e22fa2f38",
+            "factors": {
+                "board": 1,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 2,
+            "game": 2,
+            "seed": 2435387133,
+            "expectedInputSha256": "cd1d7888c5b149282be4a0bdf6e7ba592de5d231b78ae5e9887699c57b5e9749",
+            "factors": {
+                "board": 2,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 3,
+            "game": 3,
+            "seed": 2751111898,
+            "expectedInputSha256": "12553999b33b97ee15f322f32291f61cb550b44a7d49cc263f076e9b00355882",
+            "factors": {
+                "board": 3,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 4,
+            "game": 0,
+            "seed": 1524147136,
+            "expectedInputSha256": "8826302afd72c592c82874e53aacd9eb33c27694470adf522454c050d2180e89",
+            "factors": {
+                "board": 4,
+                "map": 3,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 6,
+            "game": 2,
+            "seed": 860785144,
+            "expectedInputSha256": "c567180a3df7cc64f95430fac2257355dcab80550096e4fe183361067a1de75e",
+            "factors": {
+                "board": 6,
+                "map": 1,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-all",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 8,
+            "game": 0,
+            "seed": 3490756393,
+            "expectedInputSha256": "34c24c2cb6bcd2a09614f1d26c8169897b16c7483edbfafe48f2f66a32da1f1c",
+            "factors": {
+                "board": 8,
+                "map": 4,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-all",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 9,
+            "game": 1,
+            "seed": 2256937884,
+            "expectedInputSha256": "b8088ce3177800aac5d80b9534482dde5da8b8236624697ef51f0463762828a1",
+            "factors": {
+                "board": 9,
+                "map": 1,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "three-reveals",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 10,
+            "game": 2,
+            "seed": 970769876,
+            "expectedInputSha256": "7dfa154b14a52dd13270514d5086cf41d2c76e71cc627025e9fed52600f5e042",
+            "factors": {
+                "board": 10,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "three-reveals",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 12,
+            "game": 0,
+            "seed": 42641250,
+            "expectedInputSha256": "f97ef6843dd0522407a9353a64b383de6714c078e791c1d52cf5a213539ac30a",
+            "factors": {
+                "board": 12,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "three-reveals",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 14,
+            "game": 2,
+            "seed": 4215072543,
+            "expectedInputSha256": "ab88e460babc8e4b43eb9fb194c917c2f52bff1dc527b57ecc85d6f32b6f9ce1",
+            "factors": {
+                "board": 14,
+                "map": 4,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "three-reveals",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 16,
+            "game": 0,
+            "seed": 2635760536,
+            "expectedInputSha256": "6d6037a84b69bbfb08c6769397962c25b8cf51b9a36eb4f05eff97978eff3b93",
+            "factors": {
+                "board": 16,
+                "map": 3,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "three-reveals",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 17,
+            "game": 1,
+            "seed": 2109116938,
+            "expectedInputSha256": "07a6e74e55d4a8d27fdbb9cac342c26ac6c216b324c1092b809d9c33504f5606",
+            "factors": {
+                "board": 17,
+                "map": 4,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "three-reveals",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 18,
+            "game": 2,
+            "seed": 2685890819,
+            "expectedInputSha256": "a88856a4f7b7635bd193aa91ba57f3a9ccfccd9c07d593c65ad44db0c29e4a7e",
+            "factors": {
+                "board": 18,
+                "map": 1,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-none",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 20,
+            "game": 0,
+            "seed": 3392816487,
+            "expectedInputSha256": "b2902cfd4576430a241f63674d666dc97efeb8aad20d94c0b4b189a88e39930a",
+            "factors": {
+                "board": 20,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-none",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 22,
+            "game": 2,
+            "seed": 310435823,
+            "expectedInputSha256": "be58e7ddb835a4b88a0024e0ed01ad0751f0e4a76f15aa6b9b59243167963e10",
+            "factors": {
+                "board": 22,
+                "map": 3,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-none",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 23,
+            "game": 3,
+            "seed": 4252545453,
+            "expectedInputSha256": "b4512641eb59894fc2e557b099003ce043dbf883f573a5f3097652e575f9ddc2",
+            "factors": {
+                "board": 23,
+                "map": 4,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-none",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 24,
+            "game": 0,
+            "seed": 3596431734,
+            "expectedInputSha256": "07ce83ac7da61f1c06f146fdc4a733be65844d398f06512c888728b0b8660336",
+            "factors": {
+                "board": 24,
+                "map": 1,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-none",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 25,
+            "game": 1,
+            "seed": 4198547322,
+            "expectedInputSha256": "c5e963083ebe5962e4132cb69e02818bd07a41f97a60af64d2e64fd6a8fc48db",
+            "factors": {
+                "board": 25,
+                "map": 3,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-none",
+                "style": "current",
+                "host": "local"
+            }
+        },
+        {
+            "board": 190,
+            "game": 2,
+            "seed": 4078190500,
+            "expectedInputSha256": "1fc79fd263b3e69cfed2f8a929cc172d3797367aed9036d623c31bb4a5f356fc",
+            "factors": {
+                "board": 190,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 191,
+            "game": 3,
+            "seed": 2407224357,
+            "expectedInputSha256": "7ac77efae1bcef7060ed40874ba97d412f7d695bba25dec14a73a2f8ab64cb94",
+            "factors": {
+                "board": 191,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 192,
+            "game": 0,
+            "seed": 729006826,
+            "expectedInputSha256": "16adf337c13372bf14da4a4d065c079a04dc74553c0bbba5e39ff83b4e24cd2a",
+            "factors": {
+                "board": 192,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 193,
+            "game": 1,
+            "seed": 1749896380,
+            "expectedInputSha256": "656898ccb335079df2c41dacb212bdd5ca801296b61a360a07331a37f94d603a",
+            "factors": {
+                "board": 193,
+                "map": 3,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 195,
+            "game": 3,
+            "seed": 1971283719,
+            "expectedInputSha256": "a9730b62cbe2f4fc487f781347ce8628f549d0e39708d44b971270af27d99477",
+            "factors": {
+                "board": 195,
+                "map": 1,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-all",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 197,
+            "game": 1,
+            "seed": 1556588544,
+            "expectedInputSha256": "76b14ab665b924c32ef1c66341dc19710d138a9caa17da20cbddd81b48ed33f4",
+            "factors": {
+                "board": 197,
+                "map": 4,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-all",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 198,
+            "game": 2,
+            "seed": 1900901120,
+            "expectedInputSha256": "78b99663017c4ebb879999f181348a0a7c49a0c2e518d1c331b3ed62152dbc7e",
+            "factors": {
+                "board": 198,
+                "map": 1,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "three-reveals",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 199,
+            "game": 3,
+            "seed": 1541645672,
+            "expectedInputSha256": "8d28a200f54142d71d9e7e1640ab45efec3562674f47f2f49314e1fbc3633686",
+            "factors": {
+                "board": 199,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "three-reveals",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 201,
+            "game": 1,
+            "seed": 898168759,
+            "expectedInputSha256": "1e08f07c478a36221572dccde3e0656baed9e0449ef454859e19aa7a1a319307",
+            "factors": {
+                "board": 201,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "three-reveals",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 203,
+            "game": 3,
+            "seed": 1385117408,
+            "expectedInputSha256": "51865f7e14129d15be601b403a977fdb252d49cd284beb723177a2d8087ce98b",
+            "factors": {
+                "board": 203,
+                "map": 4,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "three-reveals",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 205,
+            "game": 1,
+            "seed": 4274886167,
+            "expectedInputSha256": "cf7d7c7943004df56d73d11f2709f40ffd8b8cc6836c1804c558b06b29257e81",
+            "factors": {
+                "board": 205,
+                "map": 3,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "three-reveals",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 206,
+            "game": 2,
+            "seed": 2749606142,
+            "expectedInputSha256": "7ae6ba0afc1c6b5a70387019fd2a80f301b0f977c3e978dd4772e3db06068074",
+            "factors": {
+                "board": 206,
+                "map": 4,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "three-reveals",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 207,
+            "game": 3,
+            "seed": 1891713858,
+            "expectedInputSha256": "d3536e988aa996c1759f0409e70de1be80be8efd68b81199cbec447957d00a4a",
+            "factors": {
+                "board": 207,
+                "map": 1,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-none",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 209,
+            "game": 1,
+            "seed": 1161972847,
+            "expectedInputSha256": "508dd25a27e05cf3e8a16b18e101611f0341b90dd5d2e457a6e79261fb413576",
+            "factors": {
+                "board": 209,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-none",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 211,
+            "game": 3,
+            "seed": 925777780,
+            "expectedInputSha256": "deb9702cddf2b3563cc4774d747d197a6cf774da11ccdda612a215314bb0100d",
+            "factors": {
+                "board": 211,
+                "map": 3,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-none",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 212,
+            "game": 0,
+            "seed": 3677661161,
+            "expectedInputSha256": "da8a3e5b34b1c03bf2cd13342029a35409caaddb35923896ae933ff3a2de7d0d",
+            "factors": {
+                "board": 212,
+                "map": 4,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-none",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 213,
+            "game": 1,
+            "seed": 1394190799,
+            "expectedInputSha256": "71e88238df5789b2e30a8b85fb3fa964d11ea97362e5f38d4c5fa562ec04123e",
+            "factors": {
+                "board": 213,
+                "map": 1,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-none",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 214,
+            "game": 2,
+            "seed": 3575305590,
+            "expectedInputSha256": "2cb31dd771b1c2d1b46ab70871be03bd90c4de9ae890a64e5a5633d970d50b88",
+            "factors": {
+                "board": 214,
+                "map": 3,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-none",
+                "style": "shooter",
+                "host": "local"
+            }
+        },
+        {
+            "board": 379,
+            "game": 3,
+            "seed": 381527968,
+            "expectedInputSha256": "3d262de03ac4c11a0938a3c3557a020cde1878df99e3b64f6f2a8165cf4c4731",
+            "factors": {
+                "board": 379,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 380,
+            "game": 0,
+            "seed": 3871804117,
+            "expectedInputSha256": "6dd8ad560755d98d1b2a246909d10d9c43fc2190e4bddb3858f336f04137b7b0",
+            "factors": {
+                "board": 380,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 381,
+            "game": 1,
+            "seed": 857732759,
+            "expectedInputSha256": "03e3ed536b3f4b30ad0787e2bbb1ed59dc0ff71f64746ea67a17dfeb6a3238e4",
+            "factors": {
+                "board": 381,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 382,
+            "game": 2,
+            "seed": 1764663308,
+            "expectedInputSha256": "21e6cb5692ac4aef5f62e22b9faec8c74abe1f7e4bd841e4a64d17b7e7a4cc37",
+            "factors": {
+                "board": 382,
+                "map": 3,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 384,
+            "game": 0,
+            "seed": 3541106932,
+            "expectedInputSha256": "94fa52f427e0229e6fdbf80d74ec42df3d1a7fa6dbde1e51575004b110b8f027",
+            "factors": {
+                "board": 384,
+                "map": 1,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-all",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 386,
+            "game": 2,
+            "seed": 872620202,
+            "expectedInputSha256": "f0ce3c121f12a8bae0c29429b0da58329bd44911b1f68ee5df7454e7fc1b6154",
+            "factors": {
+                "board": 386,
+                "map": 4,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-all",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 387,
+            "game": 3,
+            "seed": 3613009263,
+            "expectedInputSha256": "89f67b1d6fddf28586f7dd8d3171f6e1b90f9015a8452fca96028becae3b0223",
+            "factors": {
+                "board": 387,
+                "map": 1,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "three-reveals",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 388,
+            "game": 0,
+            "seed": 2113610760,
+            "expectedInputSha256": "82f01e48d8914f992a6ca929ba51f7d74ec36b9b617af42ac50d18e7a92c79d4",
+            "factors": {
+                "board": 388,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "three-reveals",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 390,
+            "game": 2,
+            "seed": 3568820167,
+            "expectedInputSha256": "be0619e9a4965e5cd873331205f5936f07b19bd00f5ad3abf7191778ba87ed07",
+            "factors": {
+                "board": 390,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "three-reveals",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 392,
+            "game": 0,
+            "seed": 3559024881,
+            "expectedInputSha256": "3e87d409dd5c7fddddd809f50d1ede6e72e8c36d01263ba3f9dfa6f671e519f3",
+            "factors": {
+                "board": 392,
+                "map": 4,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "three-reveals",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 394,
+            "game": 2,
+            "seed": 2942176767,
+            "expectedInputSha256": "a7f4173020df8963bf67393909405657a9e3ffed98452a4404880f511f7b0467",
+            "factors": {
+                "board": 394,
+                "map": 3,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "three-reveals",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 395,
+            "game": 3,
+            "seed": 23985083,
+            "expectedInputSha256": "e5f619261c8c949159adca363d7d0506bfcd884947bdda124f3a0ca8b7fd5321",
+            "factors": {
+                "board": 395,
+                "map": 4,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "three-reveals",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 396,
+            "game": 0,
+            "seed": 1826282207,
+            "expectedInputSha256": "467519f37687a49ca3814889c71ef194701d4bc5b77533ec3737f3b8ceccf9e3",
+            "factors": {
+                "board": 396,
+                "map": 1,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-none",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 398,
+            "game": 2,
+            "seed": 4145822424,
+            "expectedInputSha256": "010678b293a741e6c1106f4eb4f5838abe619d2ef7c6932ae7003dd07225b345",
+            "factors": {
+                "board": 398,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-none",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 400,
+            "game": 0,
+            "seed": 1088980542,
+            "expectedInputSha256": "0ae2e74924655b2baaf75dc86be8f58fa0258a85a450184067440fbebbd8fc43",
+            "factors": {
+                "board": 400,
+                "map": 3,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-none",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 401,
+            "game": 1,
+            "seed": 2454587187,
+            "expectedInputSha256": "6536743c317a5bcf7a152d0082bb89a41b8a114d6213dbc069f830908e5ec395",
+            "factors": {
+                "board": 401,
+                "map": 4,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-none",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 402,
+            "game": 2,
+            "seed": 856573313,
+            "expectedInputSha256": "bf9b9258e3302608a103fb3afb93e41ead57f9740d7a5cd1c94c0290b370a8b1",
+            "factors": {
+                "board": 402,
+                "map": 1,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-none",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 403,
+            "game": 3,
+            "seed": 1171594620,
+            "expectedInputSha256": "935c3371ed3bfcf06e6ea217b598341ace4c5467f985f03b187f0eb2bfaf7d97",
+            "factors": {
+                "board": 403,
+                "map": 3,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-none",
+                "style": "caster",
+                "host": "local"
+            }
+        },
+        {
+            "board": 568,
+            "game": 0,
+            "seed": 1880374144,
+            "expectedInputSha256": "a9606e5c17d6b36f7aed020a6be299e6c1a90cd93f829af8ca2668c40e6906b6",
+            "factors": {
+                "board": 568,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 569,
+            "game": 1,
+            "seed": 1558058343,
+            "expectedInputSha256": "e7490d932c7ccc5683ec3a84ab781624a843bbbee49e83cbd1fa723eb5ea19c0",
+            "factors": {
+                "board": 569,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-all",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 570,
+            "game": 2,
+            "seed": 1508110492,
+            "expectedInputSha256": "e118bb2fc5f9b54e4d47456c243e775af838b52827e35cae1f079ece651f9c47",
+            "factors": {
+                "board": 570,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 571,
+            "game": 3,
+            "seed": 1276573946,
+            "expectedInputSha256": "dc3abb8b81869ffa4dd7a73aa8ce22431413a5218649ef7429be8b7c900df3e7",
+            "factors": {
+                "board": 571,
+                "map": 3,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-all",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 573,
+            "game": 1,
+            "seed": 3275353300,
+            "expectedInputSha256": "cc3facc6269f9779ddc5e58606dd2987e604fe5a4491d7e704e35f3e2477d15a",
+            "factors": {
+                "board": 573,
+                "map": 1,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-all",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 575,
+            "game": 3,
+            "seed": 1594850739,
+            "expectedInputSha256": "e0e834fb2b7b0e7b02d9583ed9bcbc23391c45655f524bbc7b518389fe421374",
+            "factors": {
+                "board": 575,
+                "map": 4,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-all",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 576,
+            "game": 0,
+            "seed": 4225475451,
+            "expectedInputSha256": "8d6730576d625dd10e2aad3fa6c689058e80d5587bb1c0f5285aed77372dc795",
+            "factors": {
+                "board": 576,
+                "map": 1,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "three-reveals",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 577,
+            "game": 1,
+            "seed": 3867726551,
+            "expectedInputSha256": "ade0f6fe5a2c1772382f78799be491336080578f85ecbb47fb029647c7e8c299",
+            "factors": {
+                "board": 577,
+                "map": 3,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "three-reveals",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 579,
+            "game": 3,
+            "seed": 2824440919,
+            "expectedInputSha256": "0d9da0654cee840664b6f527f7f7ec447c919125308ea82574143929d8eaaece",
+            "factors": {
+                "board": 579,
+                "map": 1,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "three-reveals",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 581,
+            "game": 1,
+            "seed": 1342346128,
+            "expectedInputSha256": "4fa9b61d22ba1a78994443fb81bcaeb04df23d58f94a0f1af49603bebd49b9d9",
+            "factors": {
+                "board": 581,
+                "map": 4,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "three-reveals",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 583,
+            "game": 3,
+            "seed": 4062067440,
+            "expectedInputSha256": "6ffab1f57af518252182493a96a66577f4fe7f64d419fc816a453cf980b865bf",
+            "factors": {
+                "board": 583,
+                "map": 3,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "three-reveals",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 584,
+            "game": 0,
+            "seed": 2743045042,
+            "expectedInputSha256": "0015cb03bfe1d765d3e3e5dcf6de7ab3f96433f9b87d4f62f16c77fcf0da7386",
+            "factors": {
+                "board": 584,
+                "map": 4,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "three-reveals",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 585,
+            "game": 1,
+            "seed": 2139366711,
+            "expectedInputSha256": "8f5ad4314d7f2cd8c223c34fa396f44582ea21334db18cc58c0620e8e6c29db1",
+            "factors": {
+                "board": 585,
+                "map": 1,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-none",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 587,
+            "game": 3,
+            "seed": 2317499837,
+            "expectedInputSha256": "61b36596b7cdbf36b6976ab28f87711c3e691d5d15ff1f7ff74fd2f242faaa84",
+            "factors": {
+                "board": 587,
+                "map": 4,
+                "ownDoctrine": "see-all",
+                "opponentDoctrine": "see-none",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 589,
+            "game": 1,
+            "seed": 1119788171,
+            "expectedInputSha256": "b4c1727a3296681af49243f723e8e6f898b49a2dc589b3069da86fd13dc40032",
+            "factors": {
+                "board": 589,
+                "map": 3,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-none",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 590,
+            "game": 2,
+            "seed": 757602138,
+            "expectedInputSha256": "4e174f0e45d3390fbcd31f3e80be5cf84e1216ed6c55f1ed0c76424726a1f555",
+            "factors": {
+                "board": 590,
+                "map": 4,
+                "ownDoctrine": "three-reveals",
+                "opponentDoctrine": "see-none",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 591,
+            "game": 3,
+            "seed": 624441930,
+            "expectedInputSha256": "ae54c192232ec5b74a5311a649272712f1644806cb81027a4c60455a086d47f2",
+            "factors": {
+                "board": 591,
+                "map": 1,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-none",
+                "style": "pressure",
+                "host": "local"
+            }
+        },
+        {
+            "board": 592,
+            "game": 0,
+            "seed": 3510250024,
+            "expectedInputSha256": "614eb55318a3c862639ecb29d1e765bfcbb522abc57bef374223ace11bb7a895",
+            "factors": {
+                "board": 592,
+                "map": 3,
+                "ownDoctrine": "see-none",
+                "opponentDoctrine": "see-none",
+                "style": "pressure",
+                "host": "local"
+            }
+        }
+    ],
+    "controlJobs": [
+        {
+            "phase": "forced-r1-isolation",
+            "ordinal": 0,
+            "board": 0,
+            "game": 0,
+            "seed": 2959019314,
+            "expectedInputSha256": "6a30cd6dbcb8fed46b1914ddb214e8b7ecf937649ed5fdb3850930913f99c838",
+            "live": false,
+            "forceDegraded": true,
+            "warmup": false,
+            "modes": ["stock", "mixture"]
+        },
+        {
+            "phase": "forced-r1-isolation",
+            "ordinal": 1,
+            "board": 1,
+            "game": 0,
+            "seed": 2844626646,
+            "expectedInputSha256": "efff9057e35765a32ee3018658ae0b6e29a385e6224f69ad4a4ba767f5211d39",
+            "live": false,
+            "forceDegraded": true,
+            "warmup": false,
+            "modes": ["stock", "mixture"]
+        },
+        {
+            "phase": "forced-r1-isolation",
+            "ordinal": 2,
+            "board": 2,
+            "game": 0,
+            "seed": 2095272910,
+            "expectedInputSha256": "9af6700986d65d42c5a763edf3545aeea47565d884c188f648262bf4cec912fb",
+            "live": false,
+            "forceDegraded": true,
+            "warmup": false,
+            "modes": ["stock", "mixture"]
+        },
+        {
+            "phase": "forced-r1-isolation",
+            "ordinal": 3,
+            "board": 216,
+            "game": 0,
+            "seed": 3304729945,
+            "expectedInputSha256": "5e00a22c343cdcbdc3abd6feb41216194353ffb48b5a179f3b43b6d4197f245f",
+            "live": false,
+            "forceDegraded": true,
+            "warmup": false,
+            "modes": ["stock", "mixture"]
+        },
+        {
+            "phase": "forced-r1-isolation",
+            "ordinal": 4,
+            "board": 217,
+            "game": 0,
+            "seed": 2812483607,
+            "expectedInputSha256": "3be8f72b5b5b94ebe4d19f08be44aa897aba0ff3858488f03a9b071d57831bb9",
+            "live": false,
+            "forceDegraded": true,
+            "warmup": false,
+            "modes": ["stock", "mixture"]
+        },
+        {
+            "phase": "forced-r1-isolation",
+            "ordinal": 5,
+            "board": 218,
+            "game": 0,
+            "seed": 1710614849,
+            "expectedInputSha256": "156a2d5596155a2822926f55b3bc96e983ab46ec7e1e0ffdb95def50b8bd3e6a",
+            "live": false,
+            "forceDegraded": true,
+            "warmup": false,
+            "modes": ["stock", "mixture"]
+        },
+        {
+            "phase": "serial-full-r2",
+            "ordinal": -4,
+            "board": 1,
+            "game": 1,
+            "seed": 1199008264,
+            "expectedInputSha256": "6ccd4736dce5463fd814b26a9c19731f4b4190480d3e16089ee13f7e22fa2f38",
+            "live": false,
+            "forceDegraded": false,
+            "warmup": true,
+            "modes": ["both", "stock", "mixture"]
+        },
+        {
+            "phase": "serial-full-r2",
+            "ordinal": -3,
+            "board": 2,
+            "game": 2,
+            "seed": 2435387133,
+            "expectedInputSha256": "cd1d7888c5b149282be4a0bdf6e7ba592de5d231b78ae5e9887699c57b5e9749",
+            "live": false,
+            "forceDegraded": false,
+            "warmup": true,
+            "modes": ["stock", "mixture", "both"]
+        },
+        {
+            "phase": "serial-full-r2",
+            "ordinal": -2,
+            "board": 3,
+            "game": 3,
+            "seed": 2751111898,
+            "expectedInputSha256": "12553999b33b97ee15f322f32291f61cb550b44a7d49cc263f076e9b00355882",
+            "live": false,
+            "forceDegraded": false,
+            "warmup": true,
+            "modes": ["mixture", "both", "stock"]
+        },
+        {
+            "phase": "serial-full-r2",
+            "ordinal": -1,
+            "board": 4,
+            "game": 0,
+            "seed": 1524147136,
+            "expectedInputSha256": "8826302afd72c592c82874e53aacd9eb33c27694470adf522454c050d2180e89",
+            "live": false,
+            "forceDegraded": false,
+            "warmup": true,
+            "modes": ["both", "stock", "mixture"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 0,
+            "board": 3,
+            "game": 3,
+            "seed": 2751111898,
+            "expectedInputSha256": "12553999b33b97ee15f322f32291f61cb550b44a7d49cc263f076e9b00355882",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["stock", "mixture", "both"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 1,
+            "board": 1,
+            "game": 1,
+            "seed": 1199008264,
+            "expectedInputSha256": "6ccd4736dce5463fd814b26a9c19731f4b4190480d3e16089ee13f7e22fa2f38",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["mixture", "both", "stock"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 2,
+            "board": 2,
+            "game": 2,
+            "seed": 2435387133,
+            "expectedInputSha256": "cd1d7888c5b149282be4a0bdf6e7ba592de5d231b78ae5e9887699c57b5e9749",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["both", "stock", "mixture"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 3,
+            "board": 192,
+            "game": 0,
+            "seed": 729006826,
+            "expectedInputSha256": "16adf337c13372bf14da4a4d065c079a04dc74553c0bbba5e39ff83b4e24cd2a",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["stock", "mixture", "both"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 4,
+            "board": 190,
+            "game": 2,
+            "seed": 4078190500,
+            "expectedInputSha256": "1fc79fd263b3e69cfed2f8a929cc172d3797367aed9036d623c31bb4a5f356fc",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["mixture", "both", "stock"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 5,
+            "board": 191,
+            "game": 3,
+            "seed": 2407224357,
+            "expectedInputSha256": "7ac77efae1bcef7060ed40874ba97d412f7d695bba25dec14a73a2f8ab64cb94",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["both", "stock", "mixture"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 6,
+            "board": 381,
+            "game": 1,
+            "seed": 857732759,
+            "expectedInputSha256": "03e3ed536b3f4b30ad0787e2bbb1ed59dc0ff71f64746ea67a17dfeb6a3238e4",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["stock", "mixture", "both"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 7,
+            "board": 379,
+            "game": 3,
+            "seed": 381527968,
+            "expectedInputSha256": "3d262de03ac4c11a0938a3c3557a020cde1878df99e3b64f6f2a8165cf4c4731",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["mixture", "both", "stock"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 8,
+            "board": 380,
+            "game": 0,
+            "seed": 3871804117,
+            "expectedInputSha256": "6dd8ad560755d98d1b2a246909d10d9c43fc2190e4bddb3858f336f04137b7b0",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["both", "stock", "mixture"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 9,
+            "board": 570,
+            "game": 2,
+            "seed": 1508110492,
+            "expectedInputSha256": "e118bb2fc5f9b54e4d47456c243e775af838b52827e35cae1f079ece651f9c47",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["stock", "mixture", "both"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 10,
+            "board": 568,
+            "game": 0,
+            "seed": 1880374144,
+            "expectedInputSha256": "a9606e5c17d6b36f7aed020a6be299e6c1a90cd93f829af8ca2668c40e6906b6",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["mixture", "both", "stock"]
+        },
+        {
+            "phase": "bounded-live",
+            "ordinal": 11,
+            "board": 569,
+            "game": 1,
+            "seed": 1558058343,
+            "expectedInputSha256": "e7490d932c7ccc5683ec3a84ab781624a843bbbee49e83cbd1fa723eb5ea19c0",
+            "live": true,
+            "forceDegraded": false,
+            "warmup": false,
+            "modes": ["both", "stock", "mixture"]
+        }
+    ],
+    "noNewIndependentStrengthSamples": true,
+    "defaultChanged": false,
+    "noAutomaticPromotionOrDeployment": true
+}

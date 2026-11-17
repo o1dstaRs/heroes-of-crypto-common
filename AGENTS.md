@@ -878,3 +878,11 @@ fresh independent confirmation families are still pending. A live adapter must p
 effective rollout count; timing-degraded R1 stays native. Offline qualification used uniform full R2
 and could not degrade. Preserve all failed helpers, original gates and the adopted default; no
 promotion/deployment follows from qualification alone.
+
+The complete-cost study is frozen under
+`8f91fb4c12efceaeb4c34b908959106cb87ce2e741a7a112121a139394538a5a`; read
+`docs/evidence/barrel_forecast_model_mixture_cost_registration_20261117.json`. One nice-19 M4 actor
+runs 276 fixed executions, including 72 balanced three-arm serial cases, full-decision timing,
+bounded-live controls and forced-effective-R1 identity pairs. Its cutoff is November 17 at 21:43:41 UTC.
+Both one- and two-actual-driver modes must satisfy every registered +10% cost gate; no retry,
+extension, subset rescue, automatic promotion or fresh confirmation before cost passes.
