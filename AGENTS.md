@@ -898,3 +898,16 @@ it changed no result. No confirmation was allocated/opened and the candidate rem
 repeat this unchanged study until pass, waive its two-AI gate or promote the positive strength result.
 Further implementation/pruning work must have a distinct source, exact behavioral controls and its
 own fixed cost gate; preserve the frozen mixture and every earlier failed candidate unchanged.
+
+The distinct `barrel-forecast-native-context-live-bounds-implementation-v1` is an inactive,
+behavior-preserving runtime hypothesis. Read `docs/barrel_forecast_runtime_research.md` and its
+registration fixture. Direct native sample context, a lean selector and the existing certified loser
+bound replace research overhead; no strategy, score, budget or model changes. All 444 full-game
+controls and independent verification match; 95,040 selector guard comparisons and 20,000 bound
+matrices pass. Admission uses a controlled unexhausted clock and claims no speed gain.
+Its separate real-clock cost study freezes 464 executions with one active fight in two isolated
+nice-19 actors; offline and live 72-case ratios AND the original twelve slow cases must all pass
++10% CPU/wall/full-decision-total/mean for entrant and both-driver modes. Cutoff November 17 at
+22:35:37 UTC; no retry,
+extension or subset rescue. Original cost failure remains failed; no confirmation/default/deploy opens
+from equivalence alone. Exact patches/hashes are preserved without modifying serving source.
