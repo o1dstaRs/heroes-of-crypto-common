@@ -175,3 +175,7 @@ on dangerous enemies**, rather than a generic preference for cheap retaliation. 
 needs a distinct registration, legal public inputs, representative independent strength evidence and
 serving timing; this one selected draw-to-win cannot qualify it. Do not reopen this closed candidate,
 weaken its gates, or promote a favorable slice.
+
+The separate [conditional-futures audit](peasant_position_futures_research.md) tests all 18 same-target
+roots across matched random futures and two future controllers. It preserves this closed study and
+does not reinterpret its single realized improvement as a qualified positional rule.
