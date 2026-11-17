@@ -1,0 +1,275 @@
+{
+    "schema": "hoc.barrel_forecast_native_runtime.results.v1",
+    "id": "barrel-forecast-native-context-live-bounds-implementation-v1-cost",
+    "recordedAt": "2026-11-17T22:11:40.271275+00:00",
+    "state": "implementation-equivalence-passed-overall-cost-passed-preserved-subgroup-cost-failed",
+    "analysis": {
+        "id": "barrel-forecast-native-context-live-bounds-implementation-v1-cost",
+        "at": "2026-11-17T22:00:40.414332+00:00",
+        "complete": true,
+        "executions": 464,
+        "registrationSha256": "57842dcc36feace12149aca061c57557fe5da09b3ff62f893786dc4e0fd81a7e",
+        "allExpectedInputFullActionEventTracesAndOutcomesExact": true,
+        "zeroEngineModelOrTimingFailures": true,
+        "phases": {
+            "offline72": {
+                "arms": {
+                    "stock": {
+                        "fights": 72,
+                        "fightCpuMicros": 251051145,
+                        "fightWallMicros": 232259797,
+                        "decisionMicros": 231129088,
+                        "decisionCount": 3559,
+                        "meanDecisionMicros": 64942.1432986794,
+                        "decisionTailMicros": {
+                            "0.5": 50290,
+                            "0.9": 149573,
+                            "0.95": 177115,
+                            "0.99": 239686,
+                            "1": 396744
+                        },
+                        "rolloutTurns": 803242
+                    },
+                    "mixture": {
+                        "fights": 72,
+                        "fightCpuMicros": 245877342,
+                        "fightWallMicros": 235071523,
+                        "decisionMicros": 233934220,
+                        "decisionCount": 3522,
+                        "meanDecisionMicros": 66420.84611016468,
+                        "decisionTailMicros": {
+                            "0.5": 51451,
+                            "0.9": 153462,
+                            "0.95": 180658,
+                            "0.99": 240567,
+                            "1": 410440
+                        },
+                        "rolloutTurns": 789731
+                    },
+                    "both": {
+                        "fights": 72,
+                        "fightCpuMicros": 253031790,
+                        "fightWallMicros": 239263763,
+                        "decisionMicros": 238128865,
+                        "decisionCount": 3594,
+                        "meanDecisionMicros": 66257.33583750695,
+                        "decisionTailMicros": {
+                            "0.5": 52310,
+                            "0.9": 151292,
+                            "0.95": 178838,
+                            "0.99": 236232,
+                            "1": 354204
+                        },
+                        "rolloutTurns": 817351
+                    }
+                },
+                "ratiosVsStock": {
+                    "mixture": {
+                        "fightCpuMicros": 0.9793914383461585,
+                        "fightWallMicros": 1.0121059521980036,
+                        "decisionMicros": 1.0121366463402477,
+                        "meanDecisionMicros": 1.0227695412620506
+                    },
+                    "both": {
+                        "fightCpuMicros": 1.0078894083514338,
+                        "fightWallMicros": 1.030155739781345,
+                        "decisionMicros": 1.0302851409165774,
+                        "meanDecisionMicros": 1.0202517575186696
+                    }
+                }
+            },
+            "live72": {
+                "arms": {
+                    "stock": {
+                        "fights": 72,
+                        "fightCpuMicros": 224980439,
+                        "fightWallMicros": 217489324,
+                        "decisionMicros": 216532112,
+                        "decisionCount": 3559,
+                        "meanDecisionMicros": 60840.71705535263,
+                        "decisionTailMicros": {
+                            "0.5": 47350,
+                            "0.9": 140614,
+                            "0.95": 168459,
+                            "0.99": 225786,
+                            "1": 297781
+                        },
+                        "rolloutTurns": 828725
+                    },
+                    "mixture": {
+                        "fights": 72,
+                        "fightCpuMicros": 224050332,
+                        "fightWallMicros": 217654410,
+                        "decisionMicros": 216717521,
+                        "decisionCount": 3522,
+                        "meanDecisionMicros": 61532.51590005679,
+                        "decisionTailMicros": {
+                            "0.5": 47281,
+                            "0.9": 143845,
+                            "0.95": 172141,
+                            "0.99": 226808,
+                            "1": 348767
+                        },
+                        "rolloutTurns": 803145
+                    },
+                    "both": {
+                        "fights": 72,
+                        "fightCpuMicros": 228222742,
+                        "fightWallMicros": 221425692,
+                        "decisionMicros": 220452736,
+                        "decisionCount": 3594,
+                        "meanDecisionMicros": 61339.10294936004,
+                        "decisionTailMicros": {
+                            "0.5": 47567,
+                            "0.9": 141603,
+                            "0.95": 167284,
+                            "0.99": 216184,
+                            "1": 296910
+                        },
+                        "rolloutTurns": 817351
+                    }
+                },
+                "ratiosVsStock": {
+                    "mixture": {
+                        "fightCpuMicros": 0.9958658316957057,
+                        "fightWallMicros": 1.0007590533501314,
+                        "decisionMicros": 1.0008562656055375,
+                        "meanDecisionMicros": 1.011370655675783
+                    },
+                    "both": {
+                        "fightCpuMicros": 1.0144114884583366,
+                        "fightWallMicros": 1.018099132075099,
+                        "decisionMicros": 1.0181064321766742,
+                        "meanDecisionMicros": 1.0081916505611528
+                    }
+                }
+            },
+            "preservedSlow12": {
+                "arms": {
+                    "stock": {
+                        "fights": 12,
+                        "fightCpuMicros": 35964808,
+                        "fightWallMicros": 34618762,
+                        "decisionMicros": 34459477,
+                        "decisionCount": 592,
+                        "meanDecisionMicros": 58208.57601351351,
+                        "decisionTailMicros": {
+                            "0.5": 46219,
+                            "0.9": 133189,
+                            "0.95": 163297,
+                            "0.99": 212760,
+                            "1": 267052
+                        },
+                        "rolloutTurns": 126888
+                    },
+                    "mixture": {
+                        "fights": 12,
+                        "fightCpuMicros": 35042205,
+                        "fightWallMicros": 33948417,
+                        "decisionMicros": 33797655,
+                        "decisionCount": 569,
+                        "meanDecisionMicros": 59398.33919156415,
+                        "decisionTailMicros": {
+                            "0.5": 47229,
+                            "0.9": 136902,
+                            "0.95": 170847,
+                            "0.99": 218663,
+                            "1": 259596
+                        },
+                        "rolloutTurns": 117771
+                    },
+                    "both": {
+                        "fights": 12,
+                        "fightCpuMicros": 43124219,
+                        "fightWallMicros": 41314439,
+                        "decisionMicros": 41134441,
+                        "decisionCount": 661,
+                        "meanDecisionMicros": 62230.62178517398,
+                        "decisionTailMicros": {
+                            "0.5": 49688,
+                            "0.9": 143157,
+                            "0.95": 168887,
+                            "0.99": 211197,
+                            "1": 243222
+                        },
+                        "rolloutTurns": 147566
+                    }
+                },
+                "ratiosVsStock": {
+                    "mixture": {
+                        "fightCpuMicros": 0.9743470617165536,
+                        "fightWallMicros": 0.980636367065928,
+                        "decisionMicros": 0.9807941948741706,
+                        "meanDecisionMicros": 1.0204396544209298
+                    },
+                    "both": {
+                        "fightCpuMicros": 1.19906712695366,
+                        "fightWallMicros": 1.1934117979146683,
+                        "decisionMicros": 1.1937047390475486,
+                        "meanDecisionMicros": 1.069097133912479
+                    }
+                }
+            }
+        },
+        "gates": {
+            "offline72/mixture/fightCpuMicros<=1.10": true,
+            "offline72/mixture/fightWallMicros<=1.10": true,
+            "offline72/mixture/decisionMicros<=1.10": true,
+            "offline72/mixture/meanDecisionMicros<=1.10": true,
+            "offline72/both/fightCpuMicros<=1.10": true,
+            "offline72/both/fightWallMicros<=1.10": true,
+            "offline72/both/decisionMicros<=1.10": true,
+            "offline72/both/meanDecisionMicros<=1.10": true,
+            "live72/mixture/fightCpuMicros<=1.10": true,
+            "live72/mixture/fightWallMicros<=1.10": true,
+            "live72/mixture/decisionMicros<=1.10": true,
+            "live72/mixture/meanDecisionMicros<=1.10": true,
+            "live72/both/fightCpuMicros<=1.10": true,
+            "live72/both/fightWallMicros<=1.10": true,
+            "live72/both/decisionMicros<=1.10": true,
+            "live72/both/meanDecisionMicros<=1.10": true,
+            "preservedSlow12/mixture/fightCpuMicros<=1.10": true,
+            "preservedSlow12/mixture/fightWallMicros<=1.10": true,
+            "preservedSlow12/mixture/decisionMicros<=1.10": true,
+            "preservedSlow12/mixture/meanDecisionMicros<=1.10": true,
+            "preservedSlow12/both/fightCpuMicros<=1.10": false,
+            "preservedSlow12/both/fightWallMicros<=1.10": false,
+            "preservedSlow12/both/decisionMicros<=1.10": false,
+            "preservedSlow12/both/meanDecisionMicros<=1.10": true
+        },
+        "costGatePassed": false,
+        "rawSha256": {
+            "baseline.jsonl": "4b6f1ce40a0fc05c6bca887163fd9f649801c1ddb08544f84c41d4e7c25747f9",
+            "candidate.jsonl": "96d31dc985d4c547743da55163021e0a188699a97ab04fd2c6c3f136f5ecc92e"
+        },
+        "originalFailedCostGateUnchanged": true,
+        "defaultChanged": false,
+        "confirmationOpened": false,
+        "scope": "New native-context/exact-live-pruning implementation, same frozen strategy/model/budget. One active fight in two isolated nice19 actors; actual clocks and pure v10 reference. Includes mandatory old12 regression gate. Reused cost controls do not qualify fresh strength or production2-vCPU latency; passing only opens independent confirmation."
+    },
+    "independentVerification": {
+        "passed": true,
+        "at": "2026-11-17T22:00:40.522Z",
+        "independentRawIntegerTimesAndRatiosExact": true,
+        "costGatePassed": false,
+        "analysisSha256": "6c0641384bc6fd582cff7b1df88f88f368018c5be4971a3f8a644ce1550fb2cf"
+    },
+    "admissionSha256": "505f602e7c9254b86cf5e4f2dbee51fe1d9a78d322cffcf1e6ae3d1fb28efa50",
+    "policySourceSha256": "afcb5b44789a1c0d2e4a5c5f054bebf5d8b58b90f30142e77698da1a3947d50f",
+    "observedOverall72LiveBothCpuRatio": 1.0144114884583366,
+    "observedPreserved12LiveBothCpuRatio": 1.19906712695366,
+    "operationEvidence": {
+        "samePreserved12ActualDecisions": {
+            "stock": 592,
+            "both": 661
+        },
+        "originalUnprunedBothRolloutTurns": 152872,
+        "newExactlyPrunedBothRolloutTurns": 147566,
+        "changeInActualFullTraces": false,
+        "limits": "Operation counts compare identical action/event trajectories; timings across distinct runs/hardware loads cannot identify a causal absolute speedup."
+    },
+    "conclusion": "Every expected input/full action/event trace/outcome and every engine/model/clock quality control passed. All offline72 and live72 aggregate cost gates passed; preserved slow12 both-driver CPU/wall/complete-decision-total gates failed, while per-decision mean passed. The registered complete gate remains failed. No confirmation allocated/opened, default change or deployment.",
+    "originalFailureRetained": true,
+    "confirmationAllocated": false,
+    "defaultChanged": false
+}

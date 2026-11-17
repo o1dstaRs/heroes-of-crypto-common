@@ -57,3 +57,48 @@ scheduling requests before warmup and retain Unix nice19. Other workloads remain
 The old failed cost result remains failed regardless of this new implementation. Passing the new
 cost gate only opens independent fresh confirmation of the unchanged strategy. It does not establish
 production two-vCPU latency, general ranked win rates, final qualification or permission to promote.
+
+## Completed: full-matrix cost passes, preserved stress gate fails
+
+All **464 real-clock executions** completed, with every original input, full action/event trace and
+outcome exact. There were zero engine/model or timing-fallback/circuit/degradation failures. The
+[independently verified result](evidence/barrel_forecast_runtime_results_20261117.json) preserves
+all raw integer sums, ratios, original gates and source identity.
+
+| Phase                 | Entrant CPU | Both-driver CPU | Entrant mean decision | Both-driver mean decision |
+| --------------------- | ----------: | --------------: | --------------------: | ------------------------: |
+| Offline 72            |      −2.06% |          +0.79% |                +2.28% |                    +2.03% |
+| Live 72               |      −0.41% |          +1.44% |                +1.14% |                    +0.82% |
+| Preserved live twelve |      −2.57% |     **+19.91%** |                +2.04% |                    +6.91% |
+
+Every full-matrix ratio passed +10%. The original twelve still failed both-driver total CPU, wall
+(+19.34%) and complete-decision time (+19.37%), so the **registered complete cost gate failed**.
+Per-decision mean passed even in that stress group. Neither the full-matrix result nor a later budget
+target rewrites this failed gate. Confirmation remains unallocated/unopened and serving is unchanged.
+
+The same twelve still have 592 stock/661 both-driver decisions with identical full game traces.
+Certified pruning reduces their both-driver projected turns from 152,872 to 147,566, without changing
+actual actions. This is operation evidence; cross-run absolute timings do not isolate causal speedup.
+A further implementation hypothesis may hoist invariant sample validation out of the projected-unit
+loop and use a stable primitive context field. It must have a distinct source identity, exact controls
+and a prospectively fixed test. No strategy/action/score/model retuning on the opened bank.
+
+## Prospective overall-average budget
+
+After both completed studies, the user selected **overall average (+10%)** for the next independent
+study. The historical subgroup failures above remain failed. The distinct
+`barrel-forecast-loop-invariant-context-live-bounds-implementation-v2` hoists unchanged model assignment
+outside the per-unit loop and uses a stable primitive context field. No action, score, model or budget
+changes. Its 95,040 guard comparisons match the frozen strategy, with zero RNG draws.
+
+The 444-execution equivalence registration is
+`36ed17b8c51d54947c0f68146ea512589b6b2503ae9bb9cd316f1578839deb18`, with a November 17
+22:43:07 UTC cutoff. It preserves all original cases and failed subgroups. After exact controls pass,
+a separate real-clock cost registration must prospectively require the complete balanced 72-case
+CPU, wall, complete-decision total and mean ratios to remain within +10%, in both entrant-only and
+both-driver modes, offline and live. The original twelve must still run and be reported explicitly;
+they are descriptive under the new target. No repeated unchanged study until pass.
+
+Fresh confirmation remains unallocated. The user has since adopted terrain-aware profile v11; any
+new default-strength comparison must apply that same placement to both arms. Frozen v10 equivalence
+controls retain their original baseline. There is no automatic serving activation or deployment.

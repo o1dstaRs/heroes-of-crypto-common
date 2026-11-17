@@ -925,6 +925,26 @@ nice-19 actors; offline and live 72-case ratios AND the original twelve slow cas
 extension or subset rescue. Original cost failure remains failed; no confirmation/default/deploy opens
 from equivalence alone. Exact patches/hashes are preserved without modifying serving source.
 
+The native-context v1 real-clock study completed all 464 executions and **failed** its complete
+registered gate. Preserve `docs/evidence/barrel_forecast_runtime_results_20261117.json`. All full
+traces/outcomes/inputs and independent integer checks agree, with zero model/action/timing failures.
+Both-driver live72 CPU was +1.44% (mean decision +0.82%), but preserved slow12 CPU was +19.91%
+(mean decision +6.91%); three slow12 total-cost gates failed. Do not waive that gate or rerun unchanged.
+All 72-case aggregate gates passed; both facts remain explicit. Pruning removed projected turns on
+identical trajectories, while the two-AI sample still uses 661 versus 592 actual decisions. No fresh
+confirmation/default/deploy opened. Further loop-invariant/context-layout work needs a distinct source,
+exact equivalence and a fixed study; no action/model/score changes or old-result rewriting.
+
+The user explicitly selected **overall average (+10%)** for the next independent study on
+November 17 after both historical cost studies closed. This supersedes their subgroup veto only
+for future registrations; neither old failure is rewritten. A new prospective study must retain
+all 72 balanced cases, both actual-driver modes, real clocks, exact complete traces and quality
+controls. Report the original slow twelve explicitly. Their cost is descriptive under this new
+user-selected target. The separate loop-invariant/stable-context v2 implementation is frozen under
+`36ed17b8c51d54947c0f68146ea512589b6b2503ae9bb9cd316f1578839deb18` for 444 equivalence
+executions; cost and fresh strength remain pending. Any fresh default comparison must use adopted
+terrain-aware v11 on both arms, while the already-frozen v10 implementation controls stay v10.
+
 ## Closed terrain-placement reflection screen
 
 The November 17 audit confirmed a missing actual-terrain input in split/final placement: all 48
