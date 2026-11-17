@@ -86,4 +86,36 @@ gate closes the rule unchanged, without a subgroup rescue or extra batch. Only p
 registered quiet-host serial full-fight/complete-decision timing within +10% and at least 756 fresh
 paired families. No qualification or confirmation bank is allocated; development cannot promote it.
 
-The registered screen is running. No additional strength result or default change is claimed.
+## Completed screen and regression audit
+
+All **2,592 fresh fights** completed, with no rejected actions, callback/model errors or missing starts.
+The adopted v9 scored **53.298611%** and the forecast rule **53.645833%**: **+0.347222 points**, whole-
+family 95% **−2.141204 to +2.893519**. The accepted neural reference scored 53.009259%; its contrast is
+only descriptive. Independent Bun integer reconstruction matched every outcome and all 20,000 resamples.
+See the [closed result fixture](evidence/barrel_forecast_intent_results_20261117.json).
+
+Coverage passed: 131,005 projected intentions changed, affecting 540 full traces on 206 families.
+Strength did not pass: the estimate missed +0.5 points, its interval crossed zero, and map, own-doctrine
+and opponent-style safety gates failed. Blocked regressed **−3.298611 points**, five-point doctrine
+**−1.388889**, pressure opponents **−1.157407** and shooter opponents **−1.851852**. All original gates
+and unfavorable slices remain unchanged. The rule is closed and inactive; qualification, independent
+confirmation and quiet-host serial cost qualification remain unopened.
+
+The Mac shard took 896.044 seconds and the 9800X3D shard 1,425.117 seconds. Both finished before the
+registered cutoff and all workers exited. Concurrent CPU totals are descriptive and cannot replace
+serial serving qualification or rescue failed strength. Source CI passed and the pre-screen common
+suite passed all 8,165 tests. No GPU was used in these CPU combat simulations.
+
+All 68 worsened and 74 improved outcome pairs were then replayed: **284 diagnostic fights**. Every
+original input, full action/event trace and score matched. At all 142 first divergences, the actor and
+raw native incumbent were identical while the final selected action differed. Thus changed forecasts
+can alter ordinary root target selection despite unchanged root-incumbent construction. The first raw
+incumbent was a ranged attack in 29 regressions and 33 gains; disabling ranged roots would remove both.
+For example, a Blocked-map Cyclops retargeted from Elf to Zena, and a Normal-map Arbalester retargeted
+from Monk to Wolf Rider. These are localized regression examples, not isolated causal proofs or
+qualified exclusion rules. Returned search values can contain pruning bounds and are not calibrated
+win probabilities.
+
+Further useful-clear diagnostics preserve this failed policy and all its results. Any constrained
+revision needs a distinct identity, unchanged original evidence, fresh channels and comparison against
+the subsequently adopted v10 default. No map, unit-name or favorable outcome subset is promoted.

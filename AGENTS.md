@@ -784,20 +784,20 @@ Do not retune it on this bank, substitute more walking for a strength gain or we
 Further native-forecast consistency work needs a distinct candidate and fresh channels, retaining
 this result, the adopted barrel correction and the earlier failed own-barrel/search-reply studies.
 
-## Registered barrel forecast-intent experiment
+## Closed barrel forecast-intent experiment
 
-`barrel-forecast-native-intent-v1` is a distinct running forecast-only hypothesis on the adopted v9
-baseline. Read `docs/barrel_forecast_intent_research.md` and preserve its registration fixture's full
-scanned raw/permuted reservations, including rejected/unused scans. Strength registration is
-`b9f7c9300dab52009a9d2164954a26f549edc355d82e63d2c43a187302a61e02`.
-It keeps earlier native move/wait/defend intentions only inside the entrant driver's projected melee
-barrel cleanup, symmetrically for both future armies. Native root incumbents and selection code stay
-unchanged; different forecast values may change actual chosen actions. It adds no rollout or model.
+`barrel-forecast-native-intent-v1` completed on its frozen adopted v9 comparator. Read
+`docs/barrel_forecast_intent_research.md` and preserve both registration/result fixtures, including all
+scanned raw/permuted reservations. All 2,592 fresh fights and 144 functional/cold executions completed.
+Primary gain was **+0.347222 points**, whole-family 95% **−2.141204 to +2.893519**. Strength, confidence,
+map, own-doctrine and opponent-style gates failed; coverage passed. Blocked regressed −3.298611 points.
+The rule remains inactive, with qualification, confirmation and serial timing unopened. Do not retune
+it on this bank, rescue a favorable slice or infer a gain from unchanged/favorable concurrent CPU cost.
 
-All 144 functional/cold executions passed, including 18 exact cross-host fights. The fresh screen is
-216 legal draft families / 2,592 three-arm fights. Six local and four 9800X3D nice19 workers share a
-fixed November17 18:25:26 UTC cutoff, with no automatic retry, extension or post-combat reassignment.
-Inspect both live processes and terminal receipts before intervening. Keep full primary/confidence,
-map/doctrine/style, coverage and +10% serial cost gates. No qualification/confirmation is reserved and
-no default changes automatically. Preserve the adopted barrel correction, closed shortlist rule,
-failed own-barrel guard and searched-reply study; do not rescue a failed gate or favorable subgroup.
+All 68 worsened and 74 improved pairs received exact full-trace/input/score replays (284 diagnostic
+fights). Every first divergence retained the same actor and raw native incumbent but changed the final
+choice. Ordinary shot retargets occur among both regressions and gains. This localizes changed forecast
+valuations; it does not qualify a root-action filter or prove every useful-clear mechanism. Preserve the
+inactive helper, source seals, original gates, all losing cases and the independent integer/bootstrap
+verification. Further constrained forecast work needs a distinct candidate and fresh games against the
+subsequently adopted v10 default. Keep the confirmed barrel deliberation and accepted neural pair intact.

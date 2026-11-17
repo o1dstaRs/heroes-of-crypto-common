@@ -1,0 +1,470 @@
+{
+    "id": "barrel-forecast-native-intent-v1",
+    "status": "closed-failed-development-strength-gates",
+    "sourceCommonCommit": "96e5499b7850148ddcec709cf8cd8f7634149cfe",
+    "sourceServerCommit": "ae63b150413c04aa934e72792c6b8d3d15921306",
+    "candidateSourceSha256": "43059e83b2e8c9c0a21596f9abc85ca3097b1fc45d2bbf5f121f4421d69ed2aa",
+    "development": {
+        "id": "barrel-forecast-native-intent-v1-development",
+        "at": "2026-11-17T16:52:19.712620+00:00",
+        "complete": true,
+        "families": 216,
+        "fights": 2592,
+        "primary": {
+            "meanDelta": 0.003472222222222222,
+            "wholeFamily95CI": [-0.02141203703703704, 0.028935185185185185]
+        },
+        "secondaryAcceptedReference": {
+            "meanDelta": 0.00636574074074074,
+            "wholeFamily95CI": [-0.020833333333333332, 0.03356481481481482],
+            "descriptiveOnly": true
+        },
+        "armScores": {
+            "stock": 0.5329861111111112,
+            "forecast": 0.5364583333333334,
+            "accepted": 0.5300925925925926
+        },
+        "by": {
+            "map": {
+                "1": {
+                    "families": 72,
+                    "meanDelta": 0.015625
+                },
+                "3": {
+                    "families": 72,
+                    "meanDelta": 0.027777777777777776
+                },
+                "4": {
+                    "families": 72,
+                    "meanDelta": -0.03298611111111111
+                }
+            },
+            "ownDoctrine": {
+                "see-all": {
+                    "families": 72,
+                    "meanDelta": -0.013888888888888888
+                },
+                "see-none": {
+                    "families": 72,
+                    "meanDelta": 0.026041666666666668
+                },
+                "three-reveals": {
+                    "families": 72,
+                    "meanDelta": -0.001736111111111111
+                }
+            },
+            "opponentDoctrine": {
+                "see-all": {
+                    "families": 72,
+                    "meanDelta": 0.008680555555555556
+                },
+                "see-none": {
+                    "families": 72,
+                    "meanDelta": -0.012152777777777778
+                },
+                "three-reveals": {
+                    "families": 72,
+                    "meanDelta": 0.013888888888888888
+                }
+            },
+            "style": {
+                "caster": {
+                    "families": 54,
+                    "meanDelta": 0.032407407407407406
+                },
+                "current": {
+                    "families": 54,
+                    "meanDelta": 0.011574074074074073
+                },
+                "pressure": {
+                    "families": 54,
+                    "meanDelta": -0.011574074074074073
+                },
+                "shooter": {
+                    "families": 54,
+                    "meanDelta": -0.018518518518518517
+                }
+            },
+            "host": {
+                "hft": {
+                    "families": 108,
+                    "meanDelta": 0.006944444444444444
+                },
+                "local": {
+                    "families": 108,
+                    "meanDelta": 0.0
+                }
+            }
+        },
+        "gates": {
+            "minimumHalfPointGain": false,
+            "positiveLower95": false,
+            "mapNoncatastrophic": false,
+            "ownDoctrineNoncatastrophic": false,
+            "opponentStyleNoncatastrophic": false,
+            "changedFamiliesAtLeast24": true
+        },
+        "strengthGatePassed": false,
+        "changedCases": 540,
+        "changedFamilies": 206,
+        "primaryCaseOutcomeTransitions": {
+            "1->1": 389,
+            "1->0": 61,
+            "0->0": 329,
+            "0->1": 61,
+            "0.5->1": 5,
+            "0->0.5": 8,
+            "0.5->0.5": 4,
+            "0.5->0": 2,
+            "1->0.5": 5
+        },
+        "changedForecastCounts": {
+            "boundaries": 5250411,
+            "changed": 131005,
+            "ownFuture": 61272,
+            "enemyFuture": 69733
+        },
+        "retainedIntentCounts": {
+            "move_unit": 103192,
+            "wait_turn": 27520,
+            "defend_turn": 293
+        },
+        "concurrentDescriptiveCostOnly": {
+            "local": {
+                "stock": {
+                    "cpuMs": 1695013.963,
+                    "elapsedMs": 1790903.551921
+                },
+                "forecast": {
+                    "cpuMs": 1666670.793,
+                    "elapsedMs": 1748260.9556830006
+                },
+                "accepted": {
+                    "cpuMs": 1672879.987,
+                    "elapsedMs": 1760935.072537
+                }
+            },
+            "hft": {
+                "stock": {
+                    "cpuMs": 1961027.26,
+                    "elapsedMs": 1875998.309236001
+                },
+                "forecast": {
+                    "cpuMs": 1939436.939,
+                    "elapsedMs": 1864941.919455001
+                },
+                "accepted": {
+                    "cpuMs": 1974390.921,
+                    "elapsedMs": 1886206.9345009995
+                }
+            }
+        },
+        "hostStatuses": {
+            "local": {
+                "complete": true,
+                "host": "local",
+                "expectedCases": 432,
+                "completedCases": 432,
+                "fights": 1296,
+                "errors": [],
+                "elapsedSeconds": 896.044,
+                "controllerPid": 69505,
+                "liveWorkerPids": [],
+                "registrationSha256": "b9f7c9300dab52009a9d2164954a26f549edc355d82e63d2c43a187302a61e02",
+                "absoluteDeadlineEpoch": 1794939926.678887
+            },
+            "hft": {
+                "complete": true,
+                "host": "hft",
+                "expectedCases": 432,
+                "completedCases": 432,
+                "fights": 1296,
+                "errors": [],
+                "elapsedSeconds": 1425.117,
+                "controllerPid": 3749485,
+                "liveWorkerPids": [],
+                "registrationSha256": "b9f7c9300dab52009a9d2164954a26f549edc355d82e63d2c43a187302a61e02",
+                "absoluteDeadlineEpoch": 1794939926.678887
+            }
+        },
+        "serialTimingQualified": false,
+        "registrationSha256": "b9f7c9300dab52009a9d2164954a26f549edc355d82e63d2c43a187302a61e02",
+        "rawSha256": {
+            "development-local/worker-0.jsonl": "c6198cecc2f15836d53f914008a0cd90a36d90a162f332cc86f5b4cee51e8225",
+            "development-local/worker-1.jsonl": "8df09d20d59d906612f48ef7de9ceef7ead0cad4b5aed93525885a50f14a8874",
+            "development-local/worker-2.jsonl": "393e5b6a93975327b7ee41ca1e73a6fd3d5aba87ea0452b6874fedb433d0256b",
+            "development-local/worker-3.jsonl": "82b5f2a21fe5018e004902bb6246946dd11a62c85decbd17678ec44c481d39c2",
+            "development-local/worker-4.jsonl": "8e69f2816f9c5aa317d1d64a9545e131e08b680c73a6a2a448095a85f836efa8",
+            "development-local/worker-5.jsonl": "13a0dd5f2b0e64845fbc0ed2356ed3bde4e67a410d1741aebc038eaf9638b8e0",
+            "development-hft/worker-0.jsonl": "56246f145cccc1e79fb46663f583a1c4dceb59c727d7f59da002fa821d7266f0",
+            "development-hft/worker-1.jsonl": "49420cd7573d7c2821274203dc16aa6abef4383dcb055de9a4b30993b7b99d8e",
+            "development-hft/worker-2.jsonl": "6dd2d2950de281830833e13e05259a727704c0ce81846ffd7ec8219811b74179",
+            "development-hft/worker-3.jsonl": "099d76f693c99006d21df56dc7deb7d7e07831c11e6fe66284718611d2bf2b89"
+        },
+        "defaultChanged": false,
+        "modelFitted": false,
+        "scope": "Barrel-conditioned legal draft families with real public ranked Setup and full adopted A19 continuation. Not an unconditional global win rate. A development result cannot promote the candidate."
+    },
+    "functionalAdmission": {
+        "at": "2026-11-17T16:14:52.205940+00:00",
+        "passed": true,
+        "smokeExecutions": 108,
+        "coldExecutions": 18,
+        "allColdCompleteTracesAndForecastWitnessesExact": true,
+        "allObserverPairsExact": 36,
+        "negativePairsExact": 12,
+        "changedForecastDecisions": 4177,
+        "maps": [1, 3, 4],
+        "functionalRegistrationSha256": "af3962458dc9d5b405136c4143e246cb39f7312c519f005f1132fb141ef96173",
+        "strengthOutcomeAnalysisOpened": false
+    },
+    "independentSeedVerification": {
+        "passed": true,
+        "at": "2026-11-17T16:22:19.953Z",
+        "families": 216,
+        "scannedPreimages": 28966,
+        "fullScannedRawAndDerivedChannels": 463432,
+        "reservedChannels": 442368,
+        "shaPreimagesAndNativeSeedPermutationExact": true,
+        "firstQualifyingLegalDraftSelectionExact": true,
+        "excludedPriorChannels": 20061548,
+        "priorNonoverlap": "Independently allocated Python membership assertion against sealed exclusions; this check reconstructs every reserved/scanned channel using the engine's native permutation."
+    },
+    "independentIntegerBootstrapVerification": {
+        "passed": true,
+        "at": "2026-11-17T16:52:20.006Z",
+        "rows": 2592,
+        "families": 216,
+        "exactIntegerHalfPointDelta": 6,
+        "denominator": 1728,
+        "primaryCI": [-0.02141203703703704, 0.028935185185185185],
+        "secondaryCI": [-0.020833333333333332, 0.03356481481481482],
+        "independentImplementation": "Bun integer half-points and uint32 bootstrap; reconstructed every raw outcome and all 20000 resamples",
+        "sourceRegistrationSha256": "b9f7c9300dab52009a9d2164954a26f549edc355d82e63d2c43a187302a61e02"
+    },
+    "outcomeFirstDivergenceAudit": {
+        "registrationSha256": "c2c35e919be9f7a819d5d609dfcc4ef8699fa64370a358f0f8053f9cdc8086e5",
+        "status": {
+            "complete": true,
+            "completedCases": 142,
+            "expectedCases": 142,
+            "fights": 284,
+            "elapsedSeconds": 220.2
+        },
+        "scope": "All primary worsened and improved cases, both original arms. Diagnostic replays, not additional independent strength games.",
+        "gainCases": 74,
+        "regressionCases": 68,
+        "sameActorAtFirstDivergence": 142,
+        "sameRawIncumbentAtFirstDivergence": 142,
+        "allOriginalFullTracesInputsAndScoresExact": true,
+        "rawFirstIncumbentClasses": {
+            "gain": {
+                "range_attack": 33,
+                "move_unit": 3,
+                "wait_turn": 8,
+                "move_unit+melee_attack": 14,
+                "obstacle_attack": 9,
+                "cast_spell": 3,
+                "area_throw_attack": 3,
+                "melee_attack": 1
+            },
+            "regression": {
+                "range_attack": 29,
+                "obstacle_attack": 5,
+                "wait_turn": 5,
+                "cast_spell": 10,
+                "move_unit+melee_attack": 13,
+                "move_unit": 4,
+                "melee_attack": 1,
+                "area_throw_attack": 1
+            }
+        },
+        "examples": [
+            {
+                "board": 0,
+                "game": 2,
+                "direction": "regression",
+                "firstChangedTurn": 10,
+                "actor": "Arbalester",
+                "rawIncumbent": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "476d0349-a272-5d3f-9fc9-19f616b2216e",
+                        "targetId": "ce4825a2-abbc-517e-95d8-17faa4788aad",
+                        "aimCell": {
+                            "x": 1,
+                            "y": 1
+                        },
+                        "aimSide": 1
+                    }
+                ],
+                "stockDecision": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "476d0349-a272-5d3f-9fc9-19f616b2216e",
+                        "targetId": "ce4825a2-abbc-517e-95d8-17faa4788aad",
+                        "aimCell": {
+                            "x": 1,
+                            "y": 1
+                        },
+                        "aimSide": 1
+                    }
+                ],
+                "forecastDecision": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "476d0349-a272-5d3f-9fc9-19f616b2216e",
+                        "targetId": "9632de90-b7be-512e-8156-faf87da784a7",
+                        "aimCell": {
+                            "x": 6,
+                            "y": 9
+                        },
+                        "aimSide": 1
+                    }
+                ],
+                "sameActor": true,
+                "sameRawIncumbent": true
+            },
+            {
+                "board": 14,
+                "game": 2,
+                "direction": "regression",
+                "firstChangedTurn": 2,
+                "actor": "Cyclops",
+                "rawIncumbent": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "d0b590d3-1571-518c-84e2-23edc2add182",
+                        "targetId": "f685f159-c1b7-58de-ac81-b0eaa3d6e8bd",
+                        "aimCell": {
+                            "x": 1,
+                            "y": 4
+                        },
+                        "aimSide": 1
+                    }
+                ],
+                "stockDecision": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "d0b590d3-1571-518c-84e2-23edc2add182",
+                        "targetId": "e2592a5a-1a3d-5ca2-8e7f-88a75afd2984",
+                        "aimCell": {
+                            "x": 1,
+                            "y": 10
+                        },
+                        "aimSide": 1
+                    }
+                ],
+                "forecastDecision": [
+                    {
+                        "type": "range_attack",
+                        "attackerId": "d0b590d3-1571-518c-84e2-23edc2add182",
+                        "targetId": "434e0988-33b2-5a05-aea8-5aa919805c12",
+                        "aimCell": {
+                            "x": 1,
+                            "y": 7
+                        },
+                        "aimSide": 3
+                    }
+                ],
+                "sameActor": true,
+                "sameRawIncumbent": true
+            },
+            {
+                "board": 19,
+                "game": 3,
+                "direction": "regression",
+                "firstChangedTurn": 1,
+                "actor": "Valkyrie",
+                "rawIncumbent": [
+                    {
+                        "type": "wait_turn",
+                        "unitId": "16c9e631-0e64-5c6a-8f64-38e0de063fdf"
+                    }
+                ],
+                "stockDecision": [
+                    {
+                        "type": "wait_turn",
+                        "unitId": "16c9e631-0e64-5c6a-8f64-38e0de063fdf"
+                    }
+                ],
+                "forecastDecision": [
+                    {
+                        "type": "move_unit",
+                        "unitId": "16c9e631-0e64-5c6a-8f64-38e0de063fdf",
+                        "path": [
+                            {
+                                "x": 1,
+                                "y": 10
+                            },
+                            {
+                                "x": 2,
+                                "y": 10
+                            },
+                            {
+                                "x": 3,
+                                "y": 10
+                            },
+                            {
+                                "x": 4,
+                                "y": 10
+                            },
+                            {
+                                "x": 5,
+                                "y": 10
+                            },
+                            {
+                                "x": 6,
+                                "y": 10
+                            },
+                            {
+                                "x": 7,
+                                "y": 11
+                            }
+                        ],
+                        "targetCells": [
+                            {
+                                "x": 7,
+                                "y": 11
+                            }
+                        ],
+                        "hasLavaCell": false,
+                        "hasWaterCell": false
+                    }
+                ],
+                "sameActor": true,
+                "sameRawIncumbent": true
+            }
+        ],
+        "interpretation": "Changes enter through forecast values and can retarget ordinary shooting and spell decisions. Both gains and regressions include ranged roots. This does not isolate a useful-clear guard or establish a qualified subset."
+    },
+    "artifactsSha256": {
+        "development-analysis.json": "a1a58c314f54295da9504dba744fb297497c6dbe116fec65f4908b9cfc136bfe",
+        "development-families.json": "f61d54ba09d5e4e46f88d60809913633bc55273fac1d792d85566d245cf8c762",
+        "independent-development-verification.json": "cfb14d6b5b4eda78e96b170f4db4c091addf4ab0265cf07bfac5122b07024436",
+        "independent-seed-verification.json": "c3f3a40aa81b8b949c952846ff5eb40e43da334eddd303d29fa0a445ff174d42",
+        "outcome-first-divergence-summary.json": "aa9d3656cb6156ec48e3fee97aaaafa6f2536ee11f06fa994f0c365025297926",
+        "outcome-audit/worker-0.jsonl": "b4af667abacc0a52dc12424e4c009b508e2f5c7877132198cca94314107387e5",
+        "outcome-audit/worker-1.jsonl": "93fbebc42ead9e0235f60d55876b4dc49af896f277e0f6da95c9a6f34cb1481e",
+        "outcome-audit/worker-2.jsonl": "d51ca0266ac4572b8ef2fdb5c4099494ee4ff48b0c2806c26eb4d8db8d9fad7f",
+        "outcome-audit/worker-3.jsonl": "1a956c2f85483193e7e4cb17552d37aa2a66f3d251fa2e1fe5ae9c5362f24cd6",
+        "outcome-audit/worker-4.jsonl": "9a9f21ab17dc8cb330c58bc9a066f93550366f1f1f4f9add8cc6f7193ce50cb0",
+        "outcome-audit/worker-5.jsonl": "7a35e76cbf11c02eb5b05dd0b4fab79a36b39353608991f9f8d35e94d1158613"
+    },
+    "hftReturn": {
+        "at": "2026-11-17T16:52:17.527191+00:00",
+        "hftReturnSha256": "d93ea4babe288da87898d3c31b49eb3bbbf16ee882d8dbfc216e21165b1d497d",
+        "bytes": 737865,
+        "nodeAndLocalWholeFileHashesMatch": true,
+        "beforeAggregateInspection": true
+    },
+    "seeds": "Preserve and exclude every scanned preimage in barrel_forecast_intent_registration_20261117.json; eight raw plus eight native-permuted channels each. No channel substitutions.",
+    "decision": {
+        "candidateActivated": false,
+        "qualificationOpened": false,
+        "confirmationOpened": false,
+        "serialTimingQualified": false,
+        "retuneOrReopenOldBank": false,
+        "futurePolicy": "A separate mechanistic revision requires new source identity and fresh games against the subsequently adopted v10 baseline. Favorable maps or action classes cannot rescue this closed candidate."
+    }
+}
