@@ -1046,6 +1046,16 @@ Keep test labels separate, no held-out model selection, no automatic fitter/prom
 and prior failed gates. Current-v12 work must use native setup dispatch with persisted delivery flags
 and the server's actual memory/committed-turn contract; the older headless teacher is not that server.
 
+The separate initial-catalog prefix admission passed56 controls,31 real and402 hypothetical catalogs,
+zero score/rollout/engine-action requests and1,732 independently verified before/after state bodies.
+Preserve `docs/evidence/barrel_native_catalog_prefix_results_20261118.json`, including the late-stop
+attempt's15 scoring requests per epoch and failed gates. This is fixed older-v11 feasibility only.
+The inactive190-feature prototype explicitly admits immediate first-catalog metadata and spell mechanics;
+its13 tests do not establish prediction or battle strength. Missing active-roster spell recipients may
+be legal graveyard targets: retain them as incomplete information and require learned-policy abstention.
+Main-data fitting still needs a complete initial/pre-leaf provenance contract, unchanged held-out gates,
+actual native memory/UUID semantics and fresh current-v12 whole-family strength/cost. No auto promotion.
+
 The prospective final-validation source seal is
 `f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51`; read
 `docs/evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json`. The original

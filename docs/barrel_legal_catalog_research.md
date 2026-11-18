@@ -51,3 +51,39 @@ delivery-draft flags, physical-side mapping and native `commitBotSetupForTeam` d
 restoration and actual committed-turn semantics; the older headless path is a separately identified
 teacher. Fresh whole-family strength and the user's **overall-average +10%** complete fight/decision
 cost checks remain required. All earlier forecast, confidence and runtime failures stay unchanged.
+
+## Actual and hypothetical catalog feasibility
+
+The [prefix evidence](evidence/barrel_native_catalog_prefix_results_20261118.json) preserves two
+distinct implementations and both verdicts. The first tries to stop a detached native SearchDriver
+at its full-search entry. All 56 original controls pass, but 15 hypothetical prefixes per epoch request
+scoring before reaching that stop. The availability and no-scoring gates fail. No requested diagnostic
+score or engine action is executed, and the failure is not waived.
+
+The second adds a research-only void seam immediately after initial enumeration/filtering, before any
+validation probe. It retains the same cases, gates and original cutoff. All **56 original controls**,
+3,188 independently verified mutable snapshot hashes, original labels and logical/neural counters pass.
+Its first epoch checks **31 real-root and 402 hypothetical catalogs**, across all fourteen cases and
+both teams, with **zero scoring, rollout or engine-action requests**. Every checked real-root catalog
+matches the actual pre-leaf input in full JSON, ordered commands and all 157 original feature rows.
+Independent Python and Bun checks reproduce 1,732 before/after snapshot bodies, exact cold catalogs,
+features and public wait masks. Both diagnostic processes have finished. This is feasibility on these
+fixed older controls, not universal availability, current-v12 equivalence or a measured speed gain.
+
+The inactive input prototype now has a distinct 190-feature revision. It adds explicit immediate
+native-catalog and shot metadata and public spell mechanics; later narrowed catalogs, rollout scores
+and selected actions remain excluded from prediction inputs. Thirteen tests cover the two prototypes,
+31 known observations and 142 candidate plans, including synthetic negative controls. No main held-out
+label is opened for feature or recipe selection. These controls have no raw-family-seed overlap with
+the prospectively split main teacher data.
+
+A source audit catches a false legality rule before fitting: a spell recipient missing from the active
+roster can be a legal resurrection target in the graveyard. The revised prototype retains that command
+and marks the recipient information incomplete. A later learned policy must abstain in those states;
+there is no such serving policy yet. The partial masks do not certify complete spell legality.
+
+Before any main-data fit, verify the initial/pre-leaf catalog provenance for every accepted input,
+including early native returns, Healer wait rewriting and any candidate appended after an engine probe.
+Keep outside-catalog teacher choices explicit. A future override must also preserve the actual native
+controller's target-memory commit and UUID contracts. No learner, battle bank, default or deployment
+follows automatically from this admission.
