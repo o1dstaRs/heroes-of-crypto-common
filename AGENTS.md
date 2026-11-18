@@ -1009,6 +1009,22 @@ Preserve all 375 gains, 364 losses and 5,309 unchanged pairs; no subgroup, accep
 old v10 result rescues this candidate. Both frozen v11 serial-cost studies continue pending; they
 cannot rescue failed strength. No default/model/deployment changes, and no retuning or bank extension.
 
+Both v11 cost studies subsequently completed: original72/464 executions and balanced216/1,328,
+all sixteen aggregate +10% gates in each, exact original inputs/full traces/outcomes/actual turns,
+zero engine/model/timing failures and independent integer verification. Read
+`docs/evidence/barrel_forecast_model_mixture_v11_cost_results_20261118.json`. Live both-driver CPU
+was −7.09% and −4.47%, respectively; differing trajectories/decision counts do not isolate a causal
+runtime speedup. Preserve the failed strength verdict and every older cost failure. The forecast
+candidate stays inactive; current-v12 default qualification remains separate from these frozen v11 studies.
+
+The separate native-forecast live-pruning functional admission also **failed**. Read
+`docs/native_live_pruning_research.md`. All128 reused executions and 7,288 independently checked mutable
+snapshot hashes preserve committed actions/state/memory/RNG/UUID/array identity and cold controls, but54
+retained samples in two caster cases differ in private UUID counters. Preserve the exact failed gate,
+all counterexamples and zero-game packaging failure. Projected work fell4.02%; this is not CPU or strength
+evidence. No runtime study/default activation follows. Resolve per-sample UUID allocation explicitly before
+a distinct implementation study; do not rescue this attempt by ignoring the private counters.
+
 The prospective final-validation source seal is
 `f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51`; read
 `docs/evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json`. The original

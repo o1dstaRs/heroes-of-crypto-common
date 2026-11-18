@@ -215,3 +215,27 @@ Both prospectively fixed v11 serial-cost studies continue unchanged and remain p
 72-case and additional 216-case overall-average +10% checks cannot rescue failed strength. No candidate,
 model, default, budget or production deployment changes. A subsequent repair needs a distinct source,
 complete gain/loss checks and new independent evidence.
+
+## Completed v11 cost checks
+
+The preceding pending status is historical. Both unchanged studies are now complete, including independent
+raw-integer reconstruction and every registered overall-average +10% gate. The
+[completed cost evidence](evidence/barrel_forecast_model_mixture_v11_cost_results_20261118.json)
+preserves full timing aggregates, descriptive subgroups, source/registration seals and verification.
+
+| Fixed matrix       | Executions | Live entrant CPU | Live both-driver CPU | Live both-driver mean decision |
+| ------------------ | ---------: | ---------------: | -------------------: | -----------------------------: |
+| Original 72 cases  |        464 |           −4.02% |               −7.09% |                         −4.50% |
+| Balanced 216 cases |      1,328 |           −1.90% |               −4.47% |                         −3.44% |
+
+Every original input, complete action/event trace, outcome and actual-turn control matched. Both-driver
+offline controls also reproduced in live mode, with no engine, model or timing failures. All sixteen
+aggregate gates passed in each study. Subgroup and decision-tail results remain descriptive under the
+user's explicit overall-average criterion; older subgroup-gated failures remain failed.
+
+These arms play different actual trajectories and can have different decision counts. The ratios are
+the measured cost of the complete policies on these fixed matrices, not an isolated causal speedup.
+The **strength confirmation still failed** at +0.107474 points, 95% −0.752315 to +0.967262. Passing cost
+does not rescue that result, qualify a forecast repair or establish production latency on every host.
+The forecast candidate remains inactive. Subsequent default studies use the separately adopted v12
+comparator; this completed v11 source and its evidence are unchanged.
