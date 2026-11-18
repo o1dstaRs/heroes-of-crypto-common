@@ -1034,6 +1034,18 @@ the opened test. The1,865 exact third choices include move/hold/spell alternativ
 equivalents. These descriptive categories and teacher accuracy are not strength gains. No candidate
 fight/cost bank opens; future action/legality work needs a distinct source and current-v12 evidence.
 
+The separate passive legal-catalog recorder passed56 reused executions, all3,188 independently checked
+mutable hashes, original traces/counters and31 exact cold observations. Its first zero-observation
+coverage attempt remains failed. Read `docs/barrel_legal_catalog_research.md` and preserve both source
+and result fixtures. Proposed catalogs/partial scores do not certify universal legality or full means.
+The next unchanged-stock acquisition is frozen under
+`05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a`:6,048 reused v11 games,
+1,512 prospectively split families,28 admitted cross-host preflight executions and72 fixed cold controls.
+The registration fixture records collection in progress, not completed labels or a model result.
+Keep test labels separate, no held-out model selection, no automatic fitter/promotion, all fixed cutoffs
+and prior failed gates. Current-v12 work must use native setup dispatch with persisted delivery flags
+and the server's actual memory/committed-turn contract; the older headless teacher is not that server.
+
 The prospective final-validation source seal is
 `f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51`; read
 `docs/evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json`. The original
