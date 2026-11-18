@@ -54,7 +54,7 @@ integrity/model failures remain fatal. Private-work counters describe returned
 continuations, so they are lower bounds if an aborted probe exists; CPU still
 includes every attempt.
 
-The next study is prospectively frozen as
+The fresh study was prospectively frozen as
 `a19-counterfactual-dominance-fresh-v1-20261118`, seal
 `5c280d79aa39fe35d9349a5db9e9003cc547acffcc3ef03188d6629b987da683`.
 There are 1,080 new development families and 1,080 separately reserved
@@ -101,5 +101,72 @@ The deliberate compact fixture
 [`evidence/a19_counterfactual_delivery_engineering_20261118.json`](evidence/a19_counterfactual_delivery_engineering_20261118.json)
 records exact sources, registrations, failures, CPU scope, archives and the
 supplemental binding. Raw runs stay in the client's ignored
-`game/core/tmp/a19-counterfactual-dominance-20261118` capsule. No fresh strength
-or representative cost qualification is recorded in this document.
+`game/core/tmp/a19-counterfactual-dominance-20261118` capsule. That engineering
+fixture predates the fresh run and the complete cost replication below.
+
+Development subsequently stopped at **5,213/6,480** durable completed games
+on 2026-11-18 at 16:11:07 UTC. Three errors identified the same exposed board
+and a native v0.8 melee proposal refused as `attack_not_available`.
+The registered zero-error gate failed. The original run is closed incomplete;
+no full-bank score estimate, retry, failed-case exclusion or confirmation is
+authorized by that registration. All 1,080 confirmation families remain
+unopened. Independent inspection verified all 5,213 saved complete records,
+1,724 full guard fallbacks, 176 returned private continuations and their 4,226
+actual journal turns, plus all 1,595 original and supplemental source hashes.
+This prefix integrity check does not qualify an incomplete strength study.
+
+The complete source/raw/error snapshot has 12,288 verified regular files,
+archive SHA-256
+`269a1216836cf3047092e0e1cea7d90794cc868910e638ce1637bc313b4a82b6`
+(562,548,507 bytes), independently copied and hash-verified on Puffalo. Raw
+originals remain. The first archive attempt correctly stopped when its own
+actively written log changed; that failed archive and log are preserved too.
+
+Puffalo's fourth cost attempt stopped after 32 durable games at its unchanged
+90% shared-cgroup memory guard. All available source/raw/failure files were
+archived and verified locally and remotely, SHA-256
+`a31bef063cb7de9f9b152f828b97fb03306595491c353c07dd9d0fa3cbe67a3a`
+(41,195,982 bytes). No partial timing ratio was inspected or pooled. A separate
+prospective **complete** 432-game cost replication was registered on the
+9800X3D host before examining comparative timings, using the same source,
+cases, serial orders, +10% overall gates and original 21:00 UTC cutoff. Its
+timing result cannot rescue the failed development run.
+
+The refusal also reproduces with current v12: an inherited aura rule replaces
+a melee approach while retaining a move to another cell. The distinct offline
+[coherent approach study](coherent_melee_approach_research.md) investigates
+that construction bug. It does not resume this closed selector or change its
+source, score gates or confirmation boundary.
+
+The independently verified 9800X3D cost replication completed all **432 new
+games** at 2026-11-18 16:54:27 UTC: 72 fixed exposed cases, 36 families, three
+arms, both actual AI seats and two opposite serial orders. All registered
+**overall-average** cost gates passed:
+
+| Reference                   | Complete fight CPU change | Weighted CPU per actual decision change |
+| --------------------------- | ------------------------: | --------------------------------------: |
+| Current v12                 |                −7.317446% |                              −4.901321% |
+| Qualified guard, both seats |                +7.119941% |                              +6.170494% |
+
+Each arm has 144 executions. Whole adapter CPU totals were 944,751,239 µs
+for current, 817,419,772 µs for guard and 875,619,576 µs for counterfactual;
+actual SearchDriver decision totals were 7,872, 7,604 and 7,672. All private
+work is charged. These compare complete policy battles on a shared host;
+they are neither identical-state speedups nor production decision latency.
+Subgroups remain descriptive and do not introduce a stricter gate.
+
+Independent inspection verified 3,164 source bindings across both seals,
+144 original full current outcomes, complete cross-order outcome parity,
+142 exact guard fallbacks and 40 returned private continuations / 960 actual
+journal turns. All 2,498 downloaded archive members and the private Bun binary
+match their hashes. Raw return archive SHA-256 is
+`59def90c31fdfa0bbca913f2feda7130218b20c08624e5e02e0387d851a17cb0`
+(115,424,272 bytes), retained locally and on the host. The original Puffalo
+32 durable records are excluded from these totals. A local extraction check
+was stopped for inefficient repeated gzip reads and replaced with a verified
+single-read extraction; no simulation, source or cost rule changed.
+
+The [compact closeout fixture](evidence/a19_counterfactual_delivery_closeout_20261118.json)
+binds registrations, sources, terminal reasons, archives and both cost contrasts.
+Passing cost does not repair the incomplete zero-error strength gate. No
+confirmation, default change or deployment followed.

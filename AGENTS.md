@@ -92,12 +92,31 @@ charge all CPU and retain recorded guard abstentions for known private proposal 
 Fresh seal `5c280d79aa39fe35d9349a5db9e9003cc547acffcc3ef03188d6629b987da683` reserves 1,080
 development and 1,080 conditional confirmation families, both seats/three arms. Both adjusted
 strength comparisons, independent source/input/outcome checks, cold controls and both-seat serial
-overall-average +10% cost gates must pass before confirmation. All results are pending; never
-promote an interim score or change the 21:00 UTC November 18 cutoff. Preserve the supplemental
+overall-average +10% cost gates must pass before confirmation. Development subsequently closed
+incomplete at 5,213/6,480 games on a refused native melee proposal. Do not resume it, exclude that
+case or open confirmation. Preserve the complete source/raw archive and the separately registered
+9800X3D cost replication; its result cannot rescue failed strength. Never change the 21:00 UTC
+November 18 cutoff. Preserve the supplemental
 binding of 178 unchanged native project files against the ancestor archive captured before fresh
 development preflights finished; the original seal is untouched. Reserve all four roles × 32,768
 namespace preimages, raw/permuted draft offsets and six private roots per terrain, plus timing-bank
 private roots. Keep every historical failed gate and earlier held-out exclusion intact.
+The complete independent 432-game 9800X3D cost replication passed all overall gates: +7.119941%
+complete fight CPU and +6.170494% weighted CPU per actual decision versus both-seat guard; both
+were lower than current v12. Preserve `docs/evidence/a19_counterfactual_delivery_closeout_20261118.json`.
+The incomplete strength gate still fails, confirmation remains closed and no serving activation follows.
+
+The distinct inactive `coherent_melee_approach_research.ts` addresses the native final-policy bug
+that leaves an old move before a rewritten melee approach. Read `docs/coherent_melee_approach_research.md`.
+Its 648-game admission reuses 108 exposed families and compares against both current v12 and the
+unchanged confirmed Sniper guard. Native legality, original controls, source/cold parity and both
+fixed score gates remain required; functional repairs or hypothetical invocation counts do not
+qualify a strength gain. Preserve explicit movement hazards, full body geometry and unchanged-array
+identity. The serving default and accepted models remain unchanged; no fresh confirmation opens
+without a distinct prospective registration and overall-average +10% full-cost qualification.
+The completed admission recovered one guard outcome and lost none (+0.462963 pp, adjusted 95%
+interval 0 to +1.851852), but changed only three families. Its fixed coverage/confidence gates failed;
+keep the helper inactive and do not progress this closed candidate to a fresh bank or retune it.
 
 ## Closed revealed-ranged delivery screen — November 17, 2026
 
