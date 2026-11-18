@@ -1,0 +1,3069 @@
+{
+    "schema": "hoc.barrel-native-catalog-teacher-ranker-fit-results.v1",
+    "createdUtc": "2026-11-18T06:19:58.201325+00:00",
+    "scope": "Reused frozen-v11 teacher-choice development fit, not a current-v12 strength or inference-cost comparison.",
+    "registrationSha256": "195f58fdf997ef55ae486151d7b16f12c5b7639e19463dffd34a709ae47fcf8f",
+    "registration": {
+        "id": "a19-native-catalog-teacher-choice-ranker-fit-20261118-v1",
+        "registeredUtc": "2026-11-18T06:02:17.959212+00:00",
+        "inputRegistrationSha256": "1980a158e6bc5aeb355ceccfcc6f8ef7dbbbba72befaf8f7fb699dff802ef57a",
+        "features": 191,
+        "featureNames": [
+            "family_idle",
+            "family_wait",
+            "family_defend",
+            "family_move",
+            "family_melee",
+            "family_shot",
+            "family_area_throw",
+            "family_spell",
+            "family_mine",
+            "family_other",
+            "actionCount",
+            "hasAttackSelection",
+            "selectsMelee",
+            "selectsMeleeMagic",
+            "selectsRange",
+            "hasMove",
+            "movePathLengthNorm",
+            "moveDestinationXNorm",
+            "moveDestinationYNorm",
+            "moveHasLava",
+            "moveHasWater",
+            "hasUnitTarget",
+            "hasTargetCell",
+            "targetCellXNorm",
+            "targetCellYNorm",
+            "hasStandCell",
+            "standCellXNorm",
+            "standCellYNorm",
+            "hasAimCell",
+            "aimCellXNorm",
+            "aimCellYNorm",
+            "hasAimSide",
+            "aimSide_0",
+            "aimSide_1",
+            "aimSide_2",
+            "aimSide_3",
+            "spellTargetsUnit",
+            "spellTargetsCell",
+            "spellIsMass",
+            "hasShotFeatures",
+            "shot_enemyDamage",
+            "shot_friendlyFireDamage",
+            "shot_primaryTargetDamage",
+            "shot_targetFirepower",
+            "shot_targetLevel",
+            "shot_targetIsRanged",
+            "shot_targetCanCastSpells",
+            "shot_targetNotYetActed",
+            "shot_targetWoundedFraction",
+            "shot_targetFocusFire",
+            "actor.hp",
+            "actor.alive",
+            "actor.maxHp",
+            "actor.exp",
+            "actor.steps",
+            "actor.initiative",
+            "actor.armor",
+            "actor.rangeArmor",
+            "actor.shots",
+            "actor.fly",
+            "actor.properties.level",
+            "actor.properties.faction",
+            "actor.properties.morale",
+            "actor.properties.luck",
+            "actor.properties.base_attack",
+            "actor.properties.attack_mod",
+            "actor.properties.attack_damage_min",
+            "actor.properties.attack_damage_max",
+            "actor.properties.attack_multiplier",
+            "actor.properties.attack_range",
+            "actor.properties.shot_distance",
+            "actor.properties.magic_resist",
+            "actor.properties.stack_power",
+            "actor.properties.movement_type",
+            "actor.properties.footprint_width",
+            "actor.properties.footprint_height",
+            "actor.turnLegality.hasMoved",
+            "actor.turnLegality.isOnHourglass",
+            "actor.turnLegality.hourglassIncludes",
+            "actor.turnLegality.alreadyMadeTurn",
+            "actor.turnLegality.alreadyHourglass",
+            "actor.turnLegality.activeTimeDenial",
+            "actor.turnLegality.hasUnactedTeammate",
+            "actor.turnLegality.canWait",
+            "actor.ability.AI Driven",
+            "actor.ability.Double Punch",
+            "actor.ability.Rapid Charge",
+            "actor.ability.Through Shot",
+            "actor.ability.Time Denial",
+            "actor.ability.Range Null Field Aura",
+            "actor.ability.Armageddon",
+            "actor.ability.Regeneration",
+            "actor.ability.Deep Wounds Level 1",
+            "actor.ability.Deep Wounds Level 2",
+            "actor.ability.Deep Wounds Level 3",
+            "lap",
+            "activeTimeDenial",
+            "map.1",
+            "map.2",
+            "map.3",
+            "map.4",
+            "map.5",
+            "allies.count",
+            "allies.hp",
+            "allies.xp",
+            "allies.shooters",
+            "allies.casters",
+            "allies.unacted",
+            "allies.waitLegal",
+            "allies.nearest",
+            "allies.withinActorSteps",
+            "allies.maxSteps",
+            "enemies.count",
+            "enemies.hp",
+            "enemies.xp",
+            "enemies.shooters",
+            "enemies.casters",
+            "enemies.unacted",
+            "enemies.waitLegal",
+            "enemies.nearest",
+            "enemies.withinActorSteps",
+            "enemies.maxSteps",
+            "isBefore",
+            "isCleanup",
+            "pathCost",
+            "destinationNearestEnemy",
+            "destinationNearestAlly",
+            "destinationChangeEnemyDistance",
+            "destinationThreatenedByUnacted",
+            "actorThreatenedByUnacted",
+            "destinationEdgeDistance",
+            "targetIsAlly",
+            "targetMissing",
+            "targetDistance",
+            "targetHp",
+            "targetXp",
+            "targetUnacted",
+            "targetShooter",
+            "targetCaster",
+            "targetWounded",
+            "targetArmor",
+            "targetRangeArmor",
+            "targetMagicResist",
+            "barrelPresent",
+            "barrelOwn",
+            "barrelEnemy",
+            "barrelDistance",
+            "ownBarrels",
+            "enemyBarrels",
+            "spellKnown",
+            "spellRemaining",
+            "spellPower",
+            "spellDuration",
+            "spellBuff",
+            "spellSelfAllowed",
+            "spellMinimumStack",
+            "spellStackSufficient",
+            "hasNativeStaticMetadata",
+            "native.moraleDelta",
+            "native.luckDelta",
+            "native.enemiesNotYetActedFrac",
+            "native.alliesNotYetActedFrac",
+            "native.lap",
+            "native.hourglassSpent",
+            "native.spendsRangeShot",
+            "native.spendsSpellCharge",
+            "native.burnsResurrectionCharge",
+            "native.expectedDamage",
+            "native.expectedKill",
+            "hasNativeShotMetadata",
+            "native.shot.enemyDamage",
+            "native.shot.friendlyFireDamage",
+            "native.shot.primaryTargetDamage",
+            "native.shot.targetFirepower",
+            "native.shot.targetLevel",
+            "native.shot.targetIsRanged",
+            "native.shot.targetCanCastSpells",
+            "native.shot.targetNotYetActed",
+            "native.shot.targetWoundedFraction",
+            "native.shot.targetFocusFire",
+            "spell.level",
+            "spell.spell_target_type",
+            "spell.power_type",
+            "spell.multiplier_type",
+            "spell.element",
+            "spell.self_debuff_applies",
+            "spell.is_giftable",
+            "spell.maximum_gift_level",
+            "spellTargetOutsideActiveRoster",
+            "spellTargetDeadInRoster",
+            "outsideOption"
+        ],
+        "foldObservations": {
+            "test": 1757,
+            "train": 5388,
+            "validation": 1587
+        },
+        "familyCounts": {
+            "test": 285,
+            "train": 955,
+            "validation": 272
+        },
+        "recipes": [
+            {
+                "hidden": 32,
+                "l2": 1e-05,
+                "seed": 1907949600
+            },
+            {
+                "hidden": 32,
+                "l2": 0.0001,
+                "seed": 1907949600
+            },
+            {
+                "hidden": 32,
+                "l2": 0.001,
+                "seed": 1907949600
+            },
+            {
+                "hidden": 64,
+                "l2": 1e-05,
+                "seed": 1907949632
+            },
+            {
+                "hidden": 64,
+                "l2": 0.0001,
+                "seed": 1907949632
+            },
+            {
+                "hidden": 64,
+                "l2": 0.001,
+                "seed": 1907949632
+            }
+        ],
+        "steps": 400,
+        "batchDecisionGroups": 512,
+        "learningRate": 0.003,
+        "adam": {
+            "beta1": 0.9,
+            "beta2": 0.999,
+            "epsilon": 1e-08
+        },
+        "regularization": "0.5*l2*(sum(w1^2)+sum(w2^2)), no bias penalty",
+        "normalization": "Mean/std from fitting rows only; std<1e-12 constant with scale1; clip normalized8 for posterior; policy abstains if any option absz>8 or constant raw input differs>1e-8.",
+        "temperatures": [
+            0.5,
+            0.75,
+            1.0,
+            1.5,
+            2.0
+        ],
+        "selection": "Minimum validation NLL across all6 recipes and5 temperatures; ties: smaller hidden,higherL2,earlier temperature. Never select by proposal support or precision.",
+        "baseline": "Laplace1-smoothed cleanup/before/other label prior from training rows only; other mass spread across remaining valid plans plus outside; missing groups renormalized.",
+        "confidenceThreshold": 0.85001,
+        "argmaxTieEpsilon": 1e-10,
+        "proposal": "Top valid non-cleanup/non-outside plan, complete native/public-recipient input, supported normalized/constant features; no extra input masks or data exclusions.",
+        "gatesBothValidationAndTest": {
+            "minimumProposals": 100,
+            "minimumProposalFamilies": 60,
+            "minimumProposalPrecision": 0.9,
+            "minimumClusterPrecisionLower": 0.85,
+            "minimumNllImprovement": 0.03,
+            "positiveClusterNllLower": true,
+            "noEmptyObservationBootstrapResamples": true
+        },
+        "bootstrapRepetitions": 20000,
+        "validationBootstrapSeed": 1639555185,
+        "testBootstrapSeed": 1639559281,
+        "bootstrap": "NumPy PCG64, whole original families including zero-label families, ratio of totals, linear.025/.975quantiles; zero-proposal resample precision0; independent Bun checks family sums but does not reimplement RNG.",
+        "testProtocol": "Train+validation only first. If fixed selected validation fails any gate, stop WITHOUT parsing test. If all pass, one400-step refit train+validation with chosen recipe; write/hash artifact and seal before opening test once. Same fixed test gates; no source/recipe/threshold tuning after opening.",
+        "independentGate": "Bun posterior tolerance1e-9, same masked policy decisions, original families including empty cases, baseline losses, family sufficient statistics and declared gate booleans; test access must follow validation+sealed artifact.",
+        "codePreflight": {
+            "numpyTestsPassed": 4,
+            "bunTestsPassed": 5,
+            "numpySyntheticPosteriorCases": 6,
+            "realDataParsedForCodeTests": false,
+            "firstSyntheticLearningTest": "The initial120-step test reached.7827, below.9; the final test uses the full prescribed400-step training protocol and passes. No real corpus metric selected this correction."
+        },
+        "environment": {
+            "host": "puffalo",
+            "python": "3.12.3",
+            "numpy": "2.4.6",
+            "unixNice": 19,
+            "blasThreads": 2,
+            "gpuRequired": false
+        },
+        "minimumFreeBytes": 1610612736,
+        "deadlineUnix": 1794987137.959212,
+        "deadlineUtc": "2026-11-18T07:32:17.959212+00:00",
+        "termination": "One actual-data fit. No retries, source/recipe/gate changes, deadline extension or heldout reuse. Preserve failed validation/test and inactive models. This registration does not permit activation/deployment or claim combat gain.",
+        "servingDefaultChanged": false,
+        "newIndependentStrengthSamples": 0,
+        "old805LabelTestClosed": true,
+        "testPerformanceNeverPreviouslyInspected": true,
+        "files": [
+            {
+                "path": "ranker.py",
+                "bytes": 7409,
+                "sha256": "47734a389788667b4b6eed13808ab4809672cd8ef2b6e61901cea9d25a41da3a"
+            },
+            {
+                "path": "run.py",
+                "bytes": 8396,
+                "sha256": "d729ec9d68554f3057365477d13ff52fa3161695eaccab6c377aa793066236f1"
+            },
+            {
+                "path": "test_ranker.py",
+                "bytes": 2449,
+                "sha256": "018777e08e1af215ec349bba0f465a104fdc624d0e96efa6b84d089cac3ef780"
+            },
+            {
+                "path": "code-test.py",
+                "bytes": 1915,
+                "sha256": "48701fe0216ed8b4a233b3461e6b7e806a0632e4be634d97b81db86572366f79"
+            },
+            {
+                "path": "inference.ts",
+                "bytes": 2126,
+                "sha256": "1ab2442647166645be1c6d0162a1c4795bb156b60560b7c145a82b0cd3fdb30a"
+            },
+            {
+                "path": "inference.test.ts",
+                "bytes": 2259,
+                "sha256": "005301393409bf100a1235c7805f23abc523bbce13c5195755e5aed877c6653e"
+            },
+            {
+                "path": "verify.ts",
+                "bytes": 5747,
+                "sha256": "9125657f8b9bde91c99420684a7cd595c35c996a27b5e1dfd6af2b630f0bb152"
+            },
+            {
+                "path": "synthetic-inference.json",
+                "bytes": 9215,
+                "sha256": "a885b2a39d43d43ff934425c34b4c3da8a3b948d35d71c77511178e51fd442d5"
+            },
+            {
+                "path": "unit-tests.log",
+                "bytes": 732,
+                "sha256": "aefb0d18ef14809f37dc556e0191e08b9b454c3738b3376bd5d9cecb073bc2a7"
+            }
+        ],
+        "dataFiles": [
+            {
+                "path": "data/assembly-result.json",
+                "bytes": 1646,
+                "sha256": "764573ae12a881ec707ae4c8d6f68e283e0971727dc504fc8fce2ae53acf6228"
+            },
+            {
+                "path": "data/case-ledger.json",
+                "bytes": 1392524,
+                "sha256": "db8ff052162e1f741bcac18b396238c0457f565f012c38f57705950bc81ed832"
+            },
+            {
+                "path": "data/feature-names.json",
+                "bytes": 4634,
+                "sha256": "c9e0131c26e54f99ac840f4131964463bc9dd42243b32a5e024f07feac41390e"
+            },
+            {
+                "path": "data/independent-assembly-verification.json",
+                "bytes": 812,
+                "sha256": "91ec0c4790382a4e88bd393fc133c0fc4b5a4820265810b9bd0120692912f0c9"
+            },
+            {
+                "path": "data/test.jsonl.gz",
+                "bytes": 1136394,
+                "sha256": "bd784d241e167880c4e6d0dce5ea44aa490632e75bdbedefeb2fc30bddb8cd35"
+            },
+            {
+                "path": "data/train.jsonl.gz",
+                "bytes": 3515836,
+                "sha256": "02a60b44ed8c6f88c7ce7ec9fecbc45725fea3f1384799eb00198af638a8b43d"
+            },
+            {
+                "path": "data/validation.jsonl.gz",
+                "bytes": 1056883,
+                "sha256": "519131b46fd5657e8f915369852e2720a6f8adbdc28c2590a6aeae90d8e02d1c"
+            }
+        ]
+    },
+    "result": {
+        "registrationSha256": "195f58fdf997ef55ae486151d7b16f12c5b7639e19463dffd34a709ae47fcf8f",
+        "inputRegistrationSha256": "1980a158e6bc5aeb355ceccfcc6f8ef7dbbbba72befaf8f7fb699dff802ef57a",
+        "selectedRecipe": {
+            "hidden": 64,
+            "l2": 0.001,
+            "seed": 1907949632
+        },
+        "selectedTemperature": 1.5,
+        "validationPassed": false,
+        "testOpened": false,
+        "testPassed": false,
+        "modelFitted": true,
+        "modelActivated": false,
+        "newIndependentStrengthSamples": 0,
+        "classificationAccuracyIsNotWinRate": true,
+        "bootstrapVerificationScope": "NumPy whole-family bootstrap; independent Bun checks inference and sufficient statistics, not a second bootstrap RNG.",
+        "fitWallSeconds": 16.43022788502276,
+        "fitCpuSeconds": 30.907360297,
+        "stage": "validation-failed-test-unopened",
+        "dataAccessEvents": [
+            {
+                "operation": "parse-learning-rows",
+                "fold": "train",
+                "at": "2026-11-18T06:11:22.409107+00:00"
+            },
+            {
+                "operation": "parse-learning-rows",
+                "fold": "validation",
+                "at": "2026-11-18T06:11:23.307283+00:00"
+            }
+        ]
+    },
+    "validation": {
+        "observations": 1587,
+        "wholeFamilies": 272,
+        "logloss": 1.274937648774867,
+        "priorLogloss": 1.773955585936266,
+        "loglossImprovement": 0.4990179371613989,
+        "accuracy": 0.44864524259609323,
+        "proposals": 4,
+        "proposalFamilies": 4,
+        "proposalCorrect": 4,
+        "proposalPrecision": 1.0,
+        "bootstrap": {
+            "loglossImprovement95": [
+                0.4480622578290783,
+                0.5479434840928641
+            ],
+            "proposalPrecision95": [
+                1.0,
+                1.0
+            ],
+            "emptyObservationResamples": 0,
+            "repetitions": 20000,
+            "seed": 1639555185,
+            "rng": "NumPy PCG64 default_rng; whole original families; linear quantiles; zero-proposal resamples precision0"
+        },
+        "gates": {
+            "atLeast100Proposals": false,
+            "atLeast60ProposalFamilies": false,
+            "precisionAtLeast90Percent": true,
+            "familyPrecisionLowerAtLeast85Percent": true,
+            "loglossImprovementAtLeast003": true,
+            "positiveFamilyLoglossLower": true,
+            "noEmptyObservationBootstrapResamples": true
+        },
+        "passed": false
+    },
+    "selectedModelSha256": "c9bf826c8ff2362e0f336433df0fc574c714d1d8484552b7f2972df9df65d8fe",
+    "selectionHistory": [
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 1e-05,
+                "seed": 1907949600
+            },
+            "temperature": 0.5,
+            "validationLogloss": 1.6841511749664666
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 1e-05,
+                "seed": 1907949600
+            },
+            "temperature": 0.75,
+            "validationLogloss": 1.4010020153119893
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 1e-05,
+                "seed": 1907949600
+            },
+            "temperature": 1.0,
+            "validationLogloss": 1.3086752964783643
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 1e-05,
+                "seed": 1907949600
+            },
+            "temperature": 1.5,
+            "validationLogloss": 1.2789679826518536
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 1e-05,
+                "seed": 1907949600
+            },
+            "temperature": 2.0,
+            "validationLogloss": 1.301204085378526
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 0.0001,
+                "seed": 1907949600
+            },
+            "temperature": 0.5,
+            "validationLogloss": 1.6829987701889215
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 0.0001,
+                "seed": 1907949600
+            },
+            "temperature": 0.75,
+            "validationLogloss": 1.4017846324265584
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 0.0001,
+                "seed": 1907949600
+            },
+            "temperature": 1.0,
+            "validationLogloss": 1.3103187068109914
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 0.0001,
+                "seed": 1907949600
+            },
+            "temperature": 1.5,
+            "validationLogloss": 1.281154569149411
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 0.0001,
+                "seed": 1907949600
+            },
+            "temperature": 2.0,
+            "validationLogloss": 1.3034289763527662
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 0.001,
+                "seed": 1907949600
+            },
+            "temperature": 0.5,
+            "validationLogloss": 1.657010869792908
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 0.001,
+                "seed": 1907949600
+            },
+            "temperature": 0.75,
+            "validationLogloss": 1.3897067751402403
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 0.001,
+                "seed": 1907949600
+            },
+            "temperature": 1.0,
+            "validationLogloss": 1.305232935501188
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 0.001,
+                "seed": 1907949600
+            },
+            "temperature": 1.5,
+            "validationLogloss": 1.2827082178126192
+        },
+        {
+            "recipe": {
+                "hidden": 32,
+                "l2": 0.001,
+                "seed": 1907949600
+            },
+            "temperature": 2.0,
+            "validationLogloss": 1.3080394487696922
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 1e-05,
+                "seed": 1907949632
+            },
+            "temperature": 0.5,
+            "validationLogloss": 1.8758984122069473
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 1e-05,
+                "seed": 1907949632
+            },
+            "temperature": 0.75,
+            "validationLogloss": 1.502277785193814
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 1e-05,
+                "seed": 1907949632
+            },
+            "temperature": 1.0,
+            "validationLogloss": 1.3663434978347817
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 1e-05,
+                "seed": 1907949632
+            },
+            "temperature": 1.5,
+            "validationLogloss": 1.2971695223102235
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 1e-05,
+                "seed": 1907949632
+            },
+            "temperature": 2.0,
+            "validationLogloss": 1.3031438547796437
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 0.0001,
+                "seed": 1907949632
+            },
+            "temperature": 0.5,
+            "validationLogloss": 1.8737237954379826
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 0.0001,
+                "seed": 1907949632
+            },
+            "temperature": 0.75,
+            "validationLogloss": 1.5016699015185238
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 0.0001,
+                "seed": 1907949632
+            },
+            "temperature": 1.0,
+            "validationLogloss": 1.3664201230648467
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 0.0001,
+                "seed": 1907949632
+            },
+            "temperature": 1.5,
+            "validationLogloss": 1.2978256354418927
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 0.0001,
+                "seed": 1907949632
+            },
+            "temperature": 2.0,
+            "validationLogloss": 1.3039983992227544
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 0.001,
+                "seed": 1907949632
+            },
+            "temperature": 0.5,
+            "validationLogloss": 1.718989964772557
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 0.001,
+                "seed": 1907949632
+            },
+            "temperature": 0.75,
+            "validationLogloss": 1.4141618684667467
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 0.001,
+                "seed": 1907949632
+            },
+            "temperature": 1.0,
+            "validationLogloss": 1.3121769333519062
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 0.001,
+                "seed": 1907949632
+            },
+            "temperature": 1.5,
+            "validationLogloss": 1.274937648774867
+        },
+        {
+            "recipe": {
+                "hidden": 64,
+                "l2": 0.001,
+                "seed": 1907949632
+            },
+            "temperature": 2.0,
+            "validationLogloss": 1.2948481220850008
+        }
+    ],
+    "independentVerification": {
+        "passed": true,
+        "registrationSha256": "195f58fdf997ef55ae486151d7b16f12c5b7639e19463dffd34a709ae47fcf8f",
+        "observations": 1587,
+        "maxProbabilityError": 8.881784197001252e-16,
+        "allPolicyDecisionsMasksBaselinesAndFamilySufficientStatisticsExact": true,
+        "testOpened": false,
+        "testOpeningFollowedValidationAndSealedArtifact": true,
+        "summaries": [
+            {
+                "fold": "validation",
+                "observations": 1587,
+                "proposals": 4,
+                "proposalFamilies": 4,
+                "proposalCorrect": 4,
+                "allGatesAgree": true
+            }
+        ],
+        "bootstrapRngIndependentlyReimplemented": false,
+        "modelActivated": false,
+        "newIndependentStrengthSamples": 0
+    },
+    "familySufficientStatistics": [
+        {
+            "familyId": "v11-confirmation-20261117-1",
+            "observations": 12,
+            "lossImprovementSum": 0.1810841045459164,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1001",
+            "observations": 1,
+            "lossImprovementSum": 1.336249793127946,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1010",
+            "observations": 16,
+            "lossImprovementSum": 5.247042802910856,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 7
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1024",
+            "observations": 5,
+            "lossImprovementSum": 3.0569395426107198,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1025",
+            "observations": 2,
+            "lossImprovementSum": 0.23783692880660046,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1027",
+            "observations": 4,
+            "lossImprovementSum": -0.9342162105757665,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1030",
+            "observations": 6,
+            "lossImprovementSum": 3.438832441715073,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1034",
+            "observations": 8,
+            "lossImprovementSum": 4.9118909304327545,
+            "proposals": 1,
+            "proposalCorrect": 1,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1036",
+            "observations": 8,
+            "lossImprovementSum": 3.873460428156982,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1052",
+            "observations": 2,
+            "lossImprovementSum": 3.2337321554315768,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1068",
+            "observations": 21,
+            "lossImprovementSum": 23.426247196431852,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 16
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1076",
+            "observations": 2,
+            "lossImprovementSum": 1.754239846112267,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-108",
+            "observations": 12,
+            "lossImprovementSum": 10.798488699906198,
+            "proposals": 1,
+            "proposalCorrect": 1,
+            "correct": 8
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1080",
+            "observations": 8,
+            "lossImprovementSum": 7.001664561755704,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1083",
+            "observations": 5,
+            "lossImprovementSum": 1.1998434448449502,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1087",
+            "observations": 5,
+            "lossImprovementSum": 0.40267359683485493,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-109",
+            "observations": 5,
+            "lossImprovementSum": 6.059954723766936,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1094",
+            "observations": 7,
+            "lossImprovementSum": 3.57131778008644,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1098",
+            "observations": 1,
+            "lossImprovementSum": -0.278168017974173,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1108",
+            "observations": 6,
+            "lossImprovementSum": 6.923668604400706,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1119",
+            "observations": 3,
+            "lossImprovementSum": -0.4323259372213948,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1120",
+            "observations": 5,
+            "lossImprovementSum": 3.115333297214277,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1121",
+            "observations": 7,
+            "lossImprovementSum": 1.081753388840233,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1122",
+            "observations": 2,
+            "lossImprovementSum": 1.502185518891618,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1124",
+            "observations": 1,
+            "lossImprovementSum": -0.42920488415941094,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1134",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1138",
+            "observations": 13,
+            "lossImprovementSum": 9.477863575485518,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1142",
+            "observations": 2,
+            "lossImprovementSum": 0.321618437793762,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1143",
+            "observations": 8,
+            "lossImprovementSum": 6.307638519726767,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1146",
+            "observations": 6,
+            "lossImprovementSum": 1.4731583031920357,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1150",
+            "observations": 12,
+            "lossImprovementSum": 6.649058745328542,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1153",
+            "observations": 4,
+            "lossImprovementSum": 4.582587670307272,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1154",
+            "observations": 4,
+            "lossImprovementSum": 4.338880998933492,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1156",
+            "observations": 10,
+            "lossImprovementSum": 6.474662207438885,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1158",
+            "observations": 5,
+            "lossImprovementSum": 1.221883580326355,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1161",
+            "observations": 6,
+            "lossImprovementSum": 4.004798558808031,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1169",
+            "observations": 14,
+            "lossImprovementSum": 10.37867758655327,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 9
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1172",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1179",
+            "observations": 6,
+            "lossImprovementSum": 3.4390685371543075,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1190",
+            "observations": 7,
+            "lossImprovementSum": 2.486202170231532,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1197",
+            "observations": 1,
+            "lossImprovementSum": 0.7200230391728184,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-120",
+            "observations": 4,
+            "lossImprovementSum": 3.6916650745023527,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1204",
+            "observations": 18,
+            "lossImprovementSum": 13.511901096114038,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 8
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1206",
+            "observations": 5,
+            "lossImprovementSum": -0.25246647776197384,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-121",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1214",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1217",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1224",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1237",
+            "observations": 4,
+            "lossImprovementSum": 1.1913865149596492,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-124",
+            "observations": 15,
+            "lossImprovementSum": 2.44695469330314,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1247",
+            "observations": 7,
+            "lossImprovementSum": 4.422999267786831,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1248",
+            "observations": 5,
+            "lossImprovementSum": 2.667328144925138,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1250",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1253",
+            "observations": 2,
+            "lossImprovementSum": 0.33180283789716647,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1259",
+            "observations": 7,
+            "lossImprovementSum": 3.3868418836101544,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1270",
+            "observations": 5,
+            "lossImprovementSum": 4.576493538045435,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1276",
+            "observations": 7,
+            "lossImprovementSum": 3.627151031195651,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1277",
+            "observations": 5,
+            "lossImprovementSum": -0.4223777969656439,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1278",
+            "observations": 5,
+            "lossImprovementSum": 3.7302642214256023,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1279",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1287",
+            "observations": 13,
+            "lossImprovementSum": 11.191024312364961,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 9
+        },
+        {
+            "familyId": "v11-confirmation-20261117-129",
+            "observations": 16,
+            "lossImprovementSum": 6.168855791544457,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-13",
+            "observations": 11,
+            "lossImprovementSum": 5.8945458251492795,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1305",
+            "observations": 4,
+            "lossImprovementSum": 2.2958743929434697,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1306",
+            "observations": 4,
+            "lossImprovementSum": 2.100682544281673,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1310",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1312",
+            "observations": 6,
+            "lossImprovementSum": 2.0224834618385645,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1313",
+            "observations": 2,
+            "lossImprovementSum": 1.541887756974751,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-132",
+            "observations": 3,
+            "lossImprovementSum": 0.7933607045917555,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1325",
+            "observations": 2,
+            "lossImprovementSum": 1.7675491719312029,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-133",
+            "observations": 8,
+            "lossImprovementSum": 6.5301374303514,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1331",
+            "observations": 1,
+            "lossImprovementSum": 1.2519652774414496,
+            "proposals": 1,
+            "proposalCorrect": 1,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1338",
+            "observations": 6,
+            "lossImprovementSum": 2.4387742731961795,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1343",
+            "observations": 3,
+            "lossImprovementSum": 1.3743651489881885,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1344",
+            "observations": 5,
+            "lossImprovementSum": 4.1494570411979375,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1362",
+            "observations": 6,
+            "lossImprovementSum": 6.082305589286553,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1366",
+            "observations": 8,
+            "lossImprovementSum": 6.9443415802641795,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1372",
+            "observations": 13,
+            "lossImprovementSum": 10.016960937709925,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 7
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1376",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1381",
+            "observations": 4,
+            "lossImprovementSum": 2.196247411438301,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1382",
+            "observations": 2,
+            "lossImprovementSum": -0.18394976090841664,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1387",
+            "observations": 6,
+            "lossImprovementSum": 2.025828452566312,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-139",
+            "observations": 12,
+            "lossImprovementSum": 9.08968035064821,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1395",
+            "observations": 6,
+            "lossImprovementSum": 2.65667398275471,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1399",
+            "observations": 11,
+            "lossImprovementSum": 10.254586946996096,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 7
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1416",
+            "observations": 1,
+            "lossImprovementSum": 1.2003417263978038,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1418",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1419",
+            "observations": 27,
+            "lossImprovementSum": 15.062983451384548,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 8
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1420",
+            "observations": 8,
+            "lossImprovementSum": 8.240324620513704,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1428",
+            "observations": 1,
+            "lossImprovementSum": 0.6556379683786426,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1429",
+            "observations": 13,
+            "lossImprovementSum": 6.888224581140953,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1433",
+            "observations": 1,
+            "lossImprovementSum": 0.7077445233839923,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1434",
+            "observations": 4,
+            "lossImprovementSum": 1.847173328786508,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1447",
+            "observations": 5,
+            "lossImprovementSum": 3.428726645048828,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1451",
+            "observations": 8,
+            "lossImprovementSum": -0.01244364717134494,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1453",
+            "observations": 6,
+            "lossImprovementSum": 3.64262002129211,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-146",
+            "observations": 7,
+            "lossImprovementSum": 2.98403527012705,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1469",
+            "observations": 1,
+            "lossImprovementSum": -0.16844462749305733,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1472",
+            "observations": 9,
+            "lossImprovementSum": 4.449669074002438,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1475",
+            "observations": 10,
+            "lossImprovementSum": 6.3809362333968735,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1476",
+            "observations": 11,
+            "lossImprovementSum": 7.814004340717159,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-148",
+            "observations": 2,
+            "lossImprovementSum": 2.249748544650691,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1481",
+            "observations": 18,
+            "lossImprovementSum": 14.975019106993004,
+            "proposals": 1,
+            "proposalCorrect": 1,
+            "correct": 15
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1483",
+            "observations": 5,
+            "lossImprovementSum": 1.5527880169908523,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1484",
+            "observations": 5,
+            "lossImprovementSum": 2.5502444961795647,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1486",
+            "observations": 4,
+            "lossImprovementSum": 2.229010329266195,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1497",
+            "observations": 9,
+            "lossImprovementSum": 11.593205164136332,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 7
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1501",
+            "observations": 6,
+            "lossImprovementSum": 4.577109878174418,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1509",
+            "observations": 3,
+            "lossImprovementSum": 2.259424489872869,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-151",
+            "observations": 8,
+            "lossImprovementSum": -0.3118825314355773,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-1511",
+            "observations": 9,
+            "lossImprovementSum": 8.795114610731957,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 7
+        },
+        {
+            "familyId": "v11-confirmation-20261117-157",
+            "observations": 3,
+            "lossImprovementSum": 2.7301908586485357,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-170",
+            "observations": 2,
+            "lossImprovementSum": 0.6681501840929974,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-172",
+            "observations": 8,
+            "lossImprovementSum": 4.184848990010507,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-184",
+            "observations": 3,
+            "lossImprovementSum": 1.077790815761532,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-186",
+            "observations": 13,
+            "lossImprovementSum": 4.7816855276311765,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-193",
+            "observations": 3,
+            "lossImprovementSum": 3.3649028867083555,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-205",
+            "observations": 4,
+            "lossImprovementSum": 0.35337121125077076,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-209",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-219",
+            "observations": 11,
+            "lossImprovementSum": 4.136172458702575,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-224",
+            "observations": 9,
+            "lossImprovementSum": 4.161879855314073,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-226",
+            "observations": 3,
+            "lossImprovementSum": 0.03619303922115291,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-230",
+            "observations": 8,
+            "lossImprovementSum": 3.5118688239657283,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-232",
+            "observations": 11,
+            "lossImprovementSum": 4.429903806588129,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-234",
+            "observations": 4,
+            "lossImprovementSum": 3.841644713595609,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-244",
+            "observations": 30,
+            "lossImprovementSum": 16.922245907486612,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-249",
+            "observations": 10,
+            "lossImprovementSum": 3.739735111287331,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-25",
+            "observations": 3,
+            "lossImprovementSum": 0.7188693177383565,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-250",
+            "observations": 6,
+            "lossImprovementSum": 3.789788877620471,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-256",
+            "observations": 14,
+            "lossImprovementSum": 6.117891720966472,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 8
+        },
+        {
+            "familyId": "v11-confirmation-20261117-258",
+            "observations": 8,
+            "lossImprovementSum": 4.4739187903130215,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-259",
+            "observations": 1,
+            "lossImprovementSum": 0.5952854556719025,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-26",
+            "observations": 6,
+            "lossImprovementSum": 2.567056655224035,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-264",
+            "observations": 6,
+            "lossImprovementSum": 3.952376491070239,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-283",
+            "observations": 8,
+            "lossImprovementSum": 0.995823194264323,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-297",
+            "observations": 7,
+            "lossImprovementSum": -0.034324774695051796,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-300",
+            "observations": 8,
+            "lossImprovementSum": -3.4238224728806177,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-310",
+            "observations": 5,
+            "lossImprovementSum": 5.992086754496639,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-316",
+            "observations": 9,
+            "lossImprovementSum": 1.73178660413099,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-318",
+            "observations": 4,
+            "lossImprovementSum": 2.5943071314399955,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-328",
+            "observations": 11,
+            "lossImprovementSum": 3.7047726589241443,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-335",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-337",
+            "observations": 4,
+            "lossImprovementSum": -1.7994067174496289,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-338",
+            "observations": 5,
+            "lossImprovementSum": 0.39539986282308914,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-346",
+            "observations": 13,
+            "lossImprovementSum": 2.3655634563519836,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 7
+        },
+        {
+            "familyId": "v11-confirmation-20261117-351",
+            "observations": 3,
+            "lossImprovementSum": 2.390044801694705,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-355",
+            "observations": 17,
+            "lossImprovementSum": 14.109146546732985,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 10
+        },
+        {
+            "familyId": "v11-confirmation-20261117-357",
+            "observations": 7,
+            "lossImprovementSum": 5.26273812335989,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-36",
+            "observations": 1,
+            "lossImprovementSum": 0.7626238724454362,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-37",
+            "observations": 9,
+            "lossImprovementSum": 5.698221365778193,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 7
+        },
+        {
+            "familyId": "v11-confirmation-20261117-370",
+            "observations": 3,
+            "lossImprovementSum": 0.7453554702702208,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-372",
+            "observations": 2,
+            "lossImprovementSum": 1.1673576803113552,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-378",
+            "observations": 1,
+            "lossImprovementSum": 1.4059650516758821,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-379",
+            "observations": 4,
+            "lossImprovementSum": 4.418569002539167,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-38",
+            "observations": 5,
+            "lossImprovementSum": 2.4073225120422936,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-382",
+            "observations": 2,
+            "lossImprovementSum": 2.3250988014960674,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-384",
+            "observations": 3,
+            "lossImprovementSum": 5.341225983727813,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-389",
+            "observations": 9,
+            "lossImprovementSum": 2.0635151680073713,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-396",
+            "observations": 5,
+            "lossImprovementSum": 4.463437922486485,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-400",
+            "observations": 8,
+            "lossImprovementSum": 0.6414400265010585,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-401",
+            "observations": 4,
+            "lossImprovementSum": 0.8204158818080256,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-417",
+            "observations": 2,
+            "lossImprovementSum": -0.855747350501886,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-428",
+            "observations": 3,
+            "lossImprovementSum": -1.4776623646321352,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-436",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-450",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-462",
+            "observations": 10,
+            "lossImprovementSum": 5.051835982460666,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-466",
+            "observations": 3,
+            "lossImprovementSum": 0.13302972946228797,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-472",
+            "observations": 9,
+            "lossImprovementSum": 2.9444537122127983,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-48",
+            "observations": 9,
+            "lossImprovementSum": 2.861011959077601,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-481",
+            "observations": 3,
+            "lossImprovementSum": 1.2791530637292978,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-485",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-486",
+            "observations": 3,
+            "lossImprovementSum": 1.7582045721838808,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-487",
+            "observations": 2,
+            "lossImprovementSum": 2.3008005170937413,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-493",
+            "observations": 2,
+            "lossImprovementSum": 2.333392597571615,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-502",
+            "observations": 3,
+            "lossImprovementSum": 2.352310027970589,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-503",
+            "observations": 5,
+            "lossImprovementSum": -0.367394695801319,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-507",
+            "observations": 8,
+            "lossImprovementSum": 5.1127831867622175,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-508",
+            "observations": 2,
+            "lossImprovementSum": 1.568268969495172,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-516",
+            "observations": 6,
+            "lossImprovementSum": 3.8561735960073467,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-517",
+            "observations": 1,
+            "lossImprovementSum": 0.15956210684883998,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-523",
+            "observations": 11,
+            "lossImprovementSum": 1.981362073578097,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-529",
+            "observations": 5,
+            "lossImprovementSum": 3.8254882890900785,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-533",
+            "observations": 3,
+            "lossImprovementSum": 1.364211194891861,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-534",
+            "observations": 4,
+            "lossImprovementSum": 0.8385405959491645,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-545",
+            "observations": 1,
+            "lossImprovementSum": 0.5817800147774783,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-548",
+            "observations": 5,
+            "lossImprovementSum": 7.297354824075087,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-549",
+            "observations": 12,
+            "lossImprovementSum": 7.63798749999114,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 7
+        },
+        {
+            "familyId": "v11-confirmation-20261117-551",
+            "observations": 7,
+            "lossImprovementSum": 3.4598669940026325,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-555",
+            "observations": 6,
+            "lossImprovementSum": 1.4347510829258068,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-562",
+            "observations": 2,
+            "lossImprovementSum": 1.3143803906714115,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-568",
+            "observations": 7,
+            "lossImprovementSum": 0.2409423076073256,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-585",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-59",
+            "observations": 1,
+            "lossImprovementSum": 0.30954986471179413,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-596",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-612",
+            "observations": 8,
+            "lossImprovementSum": -2.2503501440670353,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-618",
+            "observations": 9,
+            "lossImprovementSum": 1.7736850574083056,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-620",
+            "observations": 1,
+            "lossImprovementSum": 1.0681461293247032,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-638",
+            "observations": 4,
+            "lossImprovementSum": 2.9651015507017444,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-643",
+            "observations": 7,
+            "lossImprovementSum": 2.957163764034302,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-648",
+            "observations": 1,
+            "lossImprovementSum": -0.47911957185647247,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-650",
+            "observations": 3,
+            "lossImprovementSum": 2.0848594901097925,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-661",
+            "observations": 4,
+            "lossImprovementSum": 2.0944348559139945,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-667",
+            "observations": 7,
+            "lossImprovementSum": 5.403436259313812,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-670",
+            "observations": 1,
+            "lossImprovementSum": 0.8724785968472681,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-678",
+            "observations": 7,
+            "lossImprovementSum": 7.368947527251592,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-68",
+            "observations": 4,
+            "lossImprovementSum": -1.0796523803441955,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-685",
+            "observations": 4,
+            "lossImprovementSum": 1.8642279340882497,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-69",
+            "observations": 9,
+            "lossImprovementSum": 5.230005815498071,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-690",
+            "observations": 3,
+            "lossImprovementSum": 0.837684329775018,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-708",
+            "observations": 14,
+            "lossImprovementSum": 2.477119082556229,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-716",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-720",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-721",
+            "observations": 6,
+            "lossImprovementSum": 3.5899287043256334,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-728",
+            "observations": 7,
+            "lossImprovementSum": 5.525706672626006,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-73",
+            "observations": 4,
+            "lossImprovementSum": 0.7440058994881564,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-735",
+            "observations": 3,
+            "lossImprovementSum": -1.3996090710668851,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-738",
+            "observations": 5,
+            "lossImprovementSum": 1.6622273794764781,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-740",
+            "observations": 9,
+            "lossImprovementSum": 4.642490907949365,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-751",
+            "observations": 4,
+            "lossImprovementSum": -0.16239388992145742,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-752",
+            "observations": 7,
+            "lossImprovementSum": 1.9394286207411962,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-761",
+            "observations": 6,
+            "lossImprovementSum": 6.20846174385211,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 5
+        },
+        {
+            "familyId": "v11-confirmation-20261117-765",
+            "observations": 8,
+            "lossImprovementSum": 1.8045043800415477,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-768",
+            "observations": 1,
+            "lossImprovementSum": -0.42554706117987173,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-771",
+            "observations": 4,
+            "lossImprovementSum": 3.1447583953474654,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-773",
+            "observations": 7,
+            "lossImprovementSum": -2.3210283360633914,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-779",
+            "observations": 3,
+            "lossImprovementSum": 2.4044577977704065,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-782",
+            "observations": 3,
+            "lossImprovementSum": -11.848521873298477,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-787",
+            "observations": 10,
+            "lossImprovementSum": 4.346547196505811,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-793",
+            "observations": 8,
+            "lossImprovementSum": 4.635739854596674,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-806",
+            "observations": 6,
+            "lossImprovementSum": 1.6184250171648074,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-810",
+            "observations": 4,
+            "lossImprovementSum": 1.4939478681728255,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-814",
+            "observations": 13,
+            "lossImprovementSum": 4.532086432978248,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-820",
+            "observations": 14,
+            "lossImprovementSum": 11.831877953731194,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-821",
+            "observations": 4,
+            "lossImprovementSum": -1.5309731904131396,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-822",
+            "observations": 7,
+            "lossImprovementSum": 3.3545599153018477,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-824",
+            "observations": 2,
+            "lossImprovementSum": 3.3341101746742803,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-825",
+            "observations": 9,
+            "lossImprovementSum": 2.4498983263889547,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-83",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-831",
+            "observations": 9,
+            "lossImprovementSum": 0.4491657374582789,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 4
+        },
+        {
+            "familyId": "v11-confirmation-20261117-835",
+            "observations": 9,
+            "lossImprovementSum": 3.0177175104990472,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-846",
+            "observations": 10,
+            "lossImprovementSum": 9.595115715242244,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-858",
+            "observations": 2,
+            "lossImprovementSum": 1.2327351700370168,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-859",
+            "observations": 3,
+            "lossImprovementSum": 1.6224613930176754,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-86",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-870",
+            "observations": 3,
+            "lossImprovementSum": -1.6806815547786633,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-873",
+            "observations": 10,
+            "lossImprovementSum": 0.6791352108435724,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-883",
+            "observations": 8,
+            "lossImprovementSum": 1.6007831547782776,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-884",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-888",
+            "observations": 13,
+            "lossImprovementSum": 12.259982482683412,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 7
+        },
+        {
+            "familyId": "v11-confirmation-20261117-893",
+            "observations": 5,
+            "lossImprovementSum": 2.8200394432706792,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-895",
+            "observations": 14,
+            "lossImprovementSum": 8.05264933753797,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-898",
+            "observations": 6,
+            "lossImprovementSum": 1.4054454007509118,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-899",
+            "observations": 2,
+            "lossImprovementSum": 0.16191065157155093,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-901",
+            "observations": 5,
+            "lossImprovementSum": 1.7750970516142142,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-902",
+            "observations": 7,
+            "lossImprovementSum": 0.758426689555618,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-903",
+            "observations": 6,
+            "lossImprovementSum": 5.630779460090629,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-906",
+            "observations": 3,
+            "lossImprovementSum": 1.4714525253244561,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        },
+        {
+            "familyId": "v11-confirmation-20261117-91",
+            "observations": 14,
+            "lossImprovementSum": 2.302998453073679,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 8
+        },
+        {
+            "familyId": "v11-confirmation-20261117-912",
+            "observations": 1,
+            "lossImprovementSum": 0.0366293027641027,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-913",
+            "observations": 12,
+            "lossImprovementSum": 9.883514415078409,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 6
+        },
+        {
+            "familyId": "v11-confirmation-20261117-915",
+            "observations": 2,
+            "lossImprovementSum": 0.6529456889460605,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-918",
+            "observations": 13,
+            "lossImprovementSum": 7.075544570040643,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 9
+        },
+        {
+            "familyId": "v11-confirmation-20261117-931",
+            "observations": 22,
+            "lossImprovementSum": 12.577332063046534,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 10
+        },
+        {
+            "familyId": "v11-confirmation-20261117-933",
+            "observations": 11,
+            "lossImprovementSum": 0.5002641270719594,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-935",
+            "observations": 2,
+            "lossImprovementSum": 2.228731794141037,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 2
+        },
+        {
+            "familyId": "v11-confirmation-20261117-939",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-952",
+            "observations": 3,
+            "lossImprovementSum": 2.1601821364493388,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-962",
+            "observations": 0,
+            "lossImprovementSum": 0.0,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 0
+        },
+        {
+            "familyId": "v11-confirmation-20261117-977",
+            "observations": 2,
+            "lossImprovementSum": 0.6995950574929024,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-98",
+            "observations": 6,
+            "lossImprovementSum": 0.7705497701893032,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-987",
+            "observations": 2,
+            "lossImprovementSum": 0.707468666493001,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 1
+        },
+        {
+            "familyId": "v11-confirmation-20261117-994",
+            "observations": 10,
+            "lossImprovementSum": 3.4718656503446867,
+            "proposals": 0,
+            "proposalCorrect": 0,
+            "correct": 3
+        }
+    ],
+    "rawFileManifest": [
+        {
+            "path": "registration.json",
+            "bytes": 11776,
+            "sha256": "195f58fdf997ef55ae486151d7b16f12c5b7639e19463dffd34a709ae47fcf8f"
+        },
+        {
+            "path": "fit-result.json",
+            "bytes": 1070,
+            "sha256": "ae958be0c4629e8e702e7b2440e344c3c17829c39c73afe693f64b0af05d114b"
+        },
+        {
+            "path": "selection-history.json",
+            "bytes": 4932,
+            "sha256": "b4444a44de8437093a53a482fb7af879c29eddc208917a971ded57b2dcd7b2ca"
+        },
+        {
+            "path": "validation-result.json",
+            "bytes": 56740,
+            "sha256": "dfafad8fad2c6d61209b36c3730315d24dc6dd973f7704d775c2f2ae169fb035"
+        },
+        {
+            "path": "validation-selected-model.json",
+            "bytes": 392598,
+            "sha256": "c9bf826c8ff2362e0f336433df0fc574c714d1d8484552b7f2972df9df65d8fe"
+        },
+        {
+            "path": "validation-predictions.jsonl.gz",
+            "bytes": 170909,
+            "sha256": "aac75494690e0fa274dbb231f498a99ad57c167ae847f85b8d71f3e2398eefa3"
+        },
+        {
+            "path": "independent-verification.json",
+            "bytes": 657,
+            "sha256": "bcae7cc5f44de700bd71eda0318cc172c07d5fbeaaa3890cd3fd1c9db777d1be"
+        },
+        {
+            "path": "status.json",
+            "bytes": 464,
+            "sha256": "e7badf24bbe6724e6ccaf2b453621272bb7d61946aca616bc0038212c984e517"
+        },
+        {
+            "path": "launch.json",
+            "bytes": 214,
+            "sha256": "d7d562604c38e22e8b6fc2294a47421d51181a5853b348eb44a02d8953eb4cbf"
+        },
+        {
+            "path": "return-manifest.json",
+            "bytes": 4465,
+            "sha256": "36d4a718e9ae0a66cee343d84686eaecc302e5856a815c892d019aa7f2734802"
+        },
+        {
+            "path": "data-access-events.json",
+            "bytes": 238,
+            "sha256": "fa08cc427199315af77c0c951cfadfe19827ec005c10e43266b1544292263e45"
+        },
+        {
+            "path": "unit-tests.log",
+            "bytes": 732,
+            "sha256": "aefb0d18ef14809f37dc556e0191e08b9b454c3738b3376bd5d9cecb073bc2a7"
+        },
+        {
+            "path": "synthetic-inference.json",
+            "bytes": 9215,
+            "sha256": "a885b2a39d43d43ff934425c34b4c3da8a3b948d35d71c77511178e51fd442d5"
+        },
+        {
+            "path": "transport-input.tar.gz",
+            "bytes": 3620075,
+            "sha256": "a22123f34de9210baefb108e707465e1e2d5fdaddb386483f320b3d2d36f4ecc"
+        },
+        {
+            "path": "transport-return.tar.gz",
+            "bytes": 3787232,
+            "sha256": "f942f7652523fa67089b1362840360a1fd82529fc16743920dc90300569caa02"
+        }
+    ],
+    "sources": [
+        {
+            "path": "ranker.py",
+            "sha256": "47734a389788667b4b6eed13808ab4809672cd8ef2b6e61901cea9d25a41da3a",
+            "body": "\"\"\"Small deterministic ragged-choice MLP; no game-policy or engine imports.\"\"\"\nimport os\nfor _name in ['OPENBLAS_NUM_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS','VECLIB_MAXIMUM_THREADS']:os.environ[_name]='2'\nimport numpy as np\n\nPARAMETERS=['w1','b1','w2']\ndef packed(rows):\n lengths=np.array([len(r['features'])for r in rows],dtype=np.int64);starts=np.r_[0,np.cumsum(lengths)[:-1]]\n return{'x':np.concatenate([np.array(r['features'],dtype=np.float64)for r in rows]),'valid':np.concatenate([np.array(r['valid'],dtype=bool)for r in rows]),\n 'lengths':lengths,'starts':starts,'groups':np.repeat(np.arange(len(rows)),lengths),'targets':starts+np.array([r['targetIndex']for r in rows]),'rows':rows}\ndef scaler(data):\n mean=data['x'].mean(axis=0);std=data['x'].std(axis=0);constant=std<1e-12\n return{'mean':mean,'scale':np.where(constant,1.,std),'constant':constant}\ndef transformed(data,scale):\n raw=(data['x']-scale['mean'])/scale['scale'];outside=(np.abs(raw)>8).any(axis=1)|((np.abs(data['x']-scale['mean'])>1e-8)&scale['constant']).any(axis=1)\n result={**data,'x':np.clip(raw,-8,8),'ood':np.maximum.reduceat(outside,data['starts'])};return result\ndef initial(width,hidden,seed):\n rng=np.random.default_rng(seed)\n return{'w1':rng.normal(0,1/np.sqrt(width),(width,hidden)),'b1':np.zeros(hidden),'w2':rng.normal(0,1/np.sqrt(hidden),hidden)}\ndef logits(model,x):return np.tanh(x@model['w1']+model['b1'])@model['w2']\ndef probabilities(values,data,temperature=1):\n z=np.where(data['valid'],values/temperature,-1e100);maxima=np.maximum.reduceat(z,data['starts']);e=np.exp(z-maxima[data['groups']]);e[~data['valid']]=0\n totals=np.add.reduceat(e,data['starts']);assert np.all(totals>0)\n return e/totals[data['groups']]\ndef objective_gradient(model,data,l2):\n x=data['x'];hidden=np.tanh(x@model['w1']+model['b1']);p=probabilities(hidden@model['w2'],data)\n count=len(data['starts']);loss=float(-np.log(np.maximum(p[data['targets']],1e-300)).mean()+.5*l2*(np.square(model['w1']).sum()+np.square(model['w2']).sum()))\n derivative=p.copy();derivative[data['targets']]-=1;derivative/=count\n dh=derivative[:,None]*model['w2'][None,:]*(1-np.square(hidden))\n return loss,{'w1':x.T@dh+l2*model['w1'],'b1':dh.sum(axis=0),'w2':hidden.T@derivative+l2*model['w2']}\ndef subset(data,indices):\n sizes=data['lengths'][indices];starts=np.r_[0,np.cumsum(sizes)[:-1]]\n selected=np.concatenate([np.arange(data['starts'][i],data['starts'][i]+data['lengths'][i])for i in indices])\n return{'x':data['x'][selected],'valid':data['valid'][selected],'lengths':sizes,'starts':starts,'groups':np.repeat(np.arange(len(indices)),sizes),\n 'targets':starts+(data['targets'][indices]-data['starts'][indices])}\ndef train(data,hidden,l2,seed,steps=400,batch=512,rate=.003,progress=None):\n model=initial(data['x'].shape[1],hidden,seed);first={k:np.zeros_like(v)for k,v in model.items()};second={k:np.zeros_like(v)for k,v in model.items()};rng=np.random.default_rng(seed^0x36b92871)\n for step in range(1,steps+1):\n  indices=rng.integers(0,len(data['starts']),size=min(batch,len(data['starts'])));loss,grad=objective_gradient(model,subset(data,indices),l2)\n  assert np.isfinite(loss)and all(np.isfinite(v).all()for v in grad.values())\n  for k in PARAMETERS:\n   first[k]=.9*first[k]+.1*grad[k];second[k]=.999*second[k]+.001*np.square(grad[k]);model[k]-=rate*(first[k]/(1-.9**step))/(np.sqrt(second[k]/(1-.999**step))+1e-8)\n  if progress and step%100==0:progress(step,loss)\n return model\ndef class_prior(rows):\n counts=np.ones(3,dtype=np.float64)\n for r in rows:counts[0 if r['targetIndex']==r['cleanupIndex']else 1 if r['targetIndex']==r['beforeIndex']else 2]+=1\n return counts/counts.sum()\ndef prior_probabilities(data,prior):\n values=[]\n for r in data['rows']:\n  kinds=np.full(len(r['valid']),2,dtype=int);kinds[r['cleanupIndex']]=0;kinds[r['beforeIndex']]=1;valid=np.array(r['valid']);counts=np.bincount(kinds[valid],minlength=3)\n  mass=np.where(counts>0,prior,0);mass/=mass.sum();values.extend(np.where(valid,mass[kinds]/np.maximum(counts[kinds],1),0))\n return np.array(values)\ndef evaluation(data,model,temperature,prior,threshold=.85001):\n p=probabilities(logits(model,data['x']),data,temperature);base=prior_probabilities(data,prior);pred=[];confidence=[];proposal=[];correct=[]\n for i,r in enumerate(data['rows']):\n  start=data['starts'][i];q=p[start:start+data['lengths'][i]];which=int(np.flatnonzero(q>=q.max()-1e-10)[0]);pred.append(which);confidence.append(float(q[which]));correct.append(which==r['targetIndex'])\n  proposal.append(r['allowInference']and not bool(data['ood'][i])and which not in[r['cleanupIndex'],r['outsideIndex']]and float(q[which])>=threshold)\n loss=-np.log(np.maximum(p[data['targets']],1e-300));prior_loss=-np.log(np.maximum(base[data['targets']],1e-300))\n return{'probabilities':p,'losses':loss,'priorLosses':prior_loss,'predicted':np.array(pred),'confidence':np.array(confidence),'proposal':np.array(proposal,dtype=bool),'correct':np.array(correct,dtype=bool)}\ndef family_statistics(rows,evaluation,families):\n index={f:i for i,f in enumerate(families)};stats=np.zeros((len(families),5),dtype=np.float64)\n for i,r in enumerate(rows):\n  j=index[r['familyId']];stats[j]+=[1,evaluation['priorLosses'][i]-evaluation['losses'][i],evaluation['proposal'][i],evaluation['proposal'][i]and evaluation['correct'][i],evaluation['correct'][i]]\n return stats\ndef bootstrap(stats,seed,repetitions=20000):\n rng=np.random.default_rng(seed);loss=[];precision=[];empty=0\n for start in range(0,repetitions,500):\n  indices=rng.integers(0,len(stats),size=(min(500,repetitions-start),len(stats)));s=stats[indices].sum(axis=1);empty+=int((s[:,0]==0).sum())\n  loss.extend(np.divide(s[:,1],s[:,0],out=np.zeros(len(s)),where=s[:,0]>0));precision.extend(np.divide(s[:,3],s[:,2],out=np.zeros(len(s)),where=s[:,2]>0))\n return{'loglossImprovement95':np.quantile(loss,[.025,.975],method='linear').tolist(),'proposalPrecision95':np.quantile(precision,[.025,.975],method='linear').tolist(),\n 'emptyObservationResamples':empty,'repetitions':repetitions,'seed':seed,'rng':'NumPy PCG64 default_rng; whole original families; linear quantiles; zero-proposal resamples precision0'}\ndef summary(rows,e,all_families,seed):\n stats=family_statistics(rows,e,all_families);n=int(e['proposal'].sum());correct=int((e['proposal']&e['correct']).sum());families=int((stats[:,2]>0).sum());ci=bootstrap(stats,seed)\n result={'observations':len(rows),'wholeFamilies':len(all_families),'logloss':float(e['losses'].mean()),'priorLogloss':float(e['priorLosses'].mean()),\n 'loglossImprovement':float((e['priorLosses']-e['losses']).mean()),'accuracy':float(e['correct'].mean()),'proposals':n,'proposalFamilies':families,'proposalCorrect':correct,\n 'proposalPrecision':correct/n if n else None,'bootstrap':ci,'familyStatistics':[{'familyId':f,'observations':int(s[0]),'lossImprovementSum':float(s[1]),'proposals':int(s[2]),'proposalCorrect':int(s[3]),'correct':int(s[4])}for f,s in zip(all_families,stats)]}\n result['gates']={'atLeast100Proposals':n>=100,'atLeast60ProposalFamilies':families>=60,'precisionAtLeast90Percent':n>0 and correct/n>=.9,\n 'familyPrecisionLowerAtLeast85Percent':ci['proposalPrecision95'][0]>=.85,'loglossImprovementAtLeast003':result['loglossImprovement']>=.03,\n 'positiveFamilyLoglossLower':ci['loglossImprovement95'][0]>0,'noEmptyObservationBootstrapResamples':ci['emptyObservationResamples']==0};result['passed']=all(result['gates'].values());return result\n"
+        },
+        {
+            "path": "run.py",
+            "sha256": "d729ec9d68554f3057365477d13ff52fa3161695eaccab6c377aa793066236f1",
+            "body": "\"\"\"One registered choice-model development fit. Test parsing requires validation and a sealed refit.\"\"\"\nfrom pathlib import Path\nimport datetime,gzip,hashlib,json,os,shutil,sys,time\nfrom ranker import np,packed,scaler,transformed,train,logits,probabilities,class_prior,evaluation,summary\np=Path(__file__).resolve().parent;regraw=(p/'registration.json').read_bytes();reg=json.loads(regraw);seal=hashlib.sha256(regraw).hexdigest()\nsha=lambda b:hashlib.sha256(b).hexdigest();started=time.monotonic();cpu=time.process_time();events=[]\nstate={'complete':False,'stage':'integrity','pid':os.getpid(),'registrationSha256':seal,'testOpened':False,'modelActivated':False,'errors':[]}\ndef write(name,value):\n with(p/name).open('x')as f:json.dump(value,f,indent=2,allow_nan=False);f.write('\\n')\ndef save():\n state['at']=datetime.datetime.now(datetime.timezone.utc).isoformat();state['elapsedSeconds']=time.monotonic()-started\n tmp=p/'status.tmp';tmp.write_text(json.dumps(state,indent=2)+'\\n');tmp.replace(p/'status.json')\ndef check():\n assert time.time()<reg['deadlineUnix'],'Fixed fit cutoff, no retry or extension';assert shutil.disk_usage(p).free>=reg['minimumFreeBytes']\ndef load(fold):\n events.append({'operation':'parse-learning-rows','fold':fold,'at':datetime.datetime.now(datetime.timezone.utc).isoformat()})\n with gzip.open(p/'data'/f'{fold}.jsonl.gz','rt')as f:rows=[json.loads(line)for line in f]\n assert rows and len(rows)==reg['foldObservations'][fold]\n for r in rows:\n  assert r['fold']==fold and all(len(x)==reg['features']and np.isfinite(x).all()for x in r['features'])\n  assert r['valid'][r['targetIndex']]and r['valid'][r['outsideIndex']]\n return rows\ndef artifact(model,scale,prior,recipe,temperature,stage):\n return{'schema':'hoc.a19-barrel-forward-choice-mlp.v1','id':'barrel-native-catalog-ranker-20261118-v1','stage':stage,\n 'registrationSha256':seal,'sourceInputRegistrationSha256':reg['inputRegistrationSha256'],'features':reg['featureNames'],\n 'featureSchema':'barrel-public-native-static-catalog-features-v2-plus-outside','recipe':recipe,'temperature':temperature,\n 'mean':scale['mean'].tolist(),'scale':scale['scale'].tolist(),'constant':scale['constant'].astype(int).tolist(),\n 'weights':{k:v.tolist()for k,v in model.items()},'prior':prior.tolist(),'confidenceThreshold':reg['confidenceThreshold'],'argmaxTieEpsilon':1e-10,\n 'oodRule':'Any option abs(raw normalized)>8 or constant input differs by>1e-8 causes policy abstention; clip8 only stabilizes posterior evaluation.',\n 'scope':'Inactive teacher-choice fit on reused frozen-v11 states. Not a qualified current-v12 forecast or combat policy.',\n 'qualifiedForActivation':False,'independentStrengthSamples':0,'servingDefaultChanged':False}\ndef emit_predictions(name,rows,data,model,temperature,prior):\n e=evaluation(data,model,temperature,prior,reg['confidenceThreshold'])\n with gzip.open(p/name,'xt',compresslevel=1)as f:\n  for i,r in enumerate(rows):\n   start=data['starts'][i];row={'rowId':r['rowId'],'familyId':r['familyId'],'targetIndex':r['targetIndex'],'predictedIndex':int(e['predicted'][i]),'confidence':float(e['confidence'][i]),\n    'probabilities':e['probabilities'][start:start+data['lengths'][i]].tolist(),'loss':float(e['losses'][i]),'priorLoss':float(e['priorLosses'][i]),\n    'proposal':bool(e['proposal'][i]),'correct':bool(e['correct'][i]),'ood':bool(data['ood'][i])};f.write(json.dumps(row,allow_nan=False,separators=(',',':'))+'\\n')\n return e\nsave()\ntry:\n check();assert np.__version__==reg['environment']['numpy']\n for f in reg['files']:assert sha((p/f['path']).read_bytes())==f['sha256'],f['path']\n for f in reg['dataFiles']:assert sha((p/f['path']).read_bytes())==f['sha256'],f['path']\n for f in ['assembly-result.json','independent-assembly-verification.json']:\n  r=json.loads((p/'data'/f).read_text());assert r['passed']and r['registrationSha256']==reg['inputRegistrationSha256']\n ledger=json.loads((p/'data/case-ledger.json').read_text());assert len(ledger)==6048 and len({r['familyId']for r in ledger})==1512\n families={fold:sorted({r['familyId']for r in ledger if r['fold']==fold})for fold in['train','validation','test']}\n assert{fold:len(fs)for fold,fs in families.items()}==reg['familyCounts']\n train_rows=load('train');val_rows=load('validation');train_raw=packed(train_rows);sc= scaler(train_raw);tr=transformed(train_raw,sc);val=transformed(packed(val_rows),sc);prior=class_prior(train_rows)\n selected=None;history=[];state['stage']='fixed-six-recipe-training';save()\n for recipe in reg['recipes']:\n  check();state['recipe']=recipe;save()\n  def progress(step,loss):\n   check();state['step']=step;state['trainingBatchLoss']=loss;save()\n  model=train(tr,recipe['hidden'],recipe['l2'],recipe['seed'],reg['steps'],reg['batchDecisionGroups'],reg['learningRate'],progress)\n  values=logits(model,val['x'])\n  for temperature in reg['temperatures']:\n   q=probabilities(values,val,temperature);loss=float(-np.log(np.maximum(q[val['targets']],1e-300)).mean());entry={'recipe':recipe,'temperature':temperature,'validationLogloss':loss};history.append(entry)\n   key=(loss,recipe['hidden'],-recipe['l2'],reg['temperatures'].index(temperature))\n   if selected is None or key<selected['key']:selected={'key':key,'recipe':recipe,'temperature':temperature,'model':{k:v.copy()for k,v in model.items()}}\n write('selection-history.json',history);assert selected\n model=selected['model'];temperature=selected['temperature'];recipe=selected['recipe'];write('validation-selected-model.json',artifact(model,sc,prior,recipe,temperature,'validation-selected-not-final'))\n e=emit_predictions('validation-predictions.jsonl.gz',val_rows,val,model,temperature,prior);val_result=summary(val_rows,e,families['validation'],reg['validationBootstrapSeed']);write('validation-result.json',val_result)\n result={'registrationSha256':seal,'inputRegistrationSha256':reg['inputRegistrationSha256'],'selectedRecipe':recipe,'selectedTemperature':temperature,\n 'validationPassed':val_result['passed'],'testOpened':False,'testPassed':False,'modelFitted':True,'modelActivated':False,'newIndependentStrengthSamples':0,\n 'classificationAccuracyIsNotWinRate':True,'bootstrapVerificationScope':'NumPy whole-family bootstrap; independent Bun checks inference and sufficient statistics, not a second bootstrap RNG.',\n 'fitWallSeconds':time.monotonic()-started,'fitCpuSeconds':time.process_time()-cpu}\n if not val_result['passed']:\n  result['stage']='validation-failed-test-unopened';state['stage']=result['stage']\n else:\n  check();state['stage']='fixed-refit-train-and-validation';save();combined=train_rows+val_rows;raw_combined=packed(combined);sc_final=scaler(raw_combined);data_final=transformed(raw_combined,sc_final)\n  final=train(data_final,recipe['hidden'],recipe['l2'],recipe['seed'],reg['steps'],reg['batchDecisionGroups'],reg['learningRate'],lambda step,loss:(check(),state.update({'refitStep':step}),save()))\n  final_prior=class_prior(combined);write('candidate-model.json',artifact(final,sc_final,final_prior,recipe,temperature,'sealed-before-test'))\n  model_sha=sha((p/'candidate-model.json').read_bytes());write('candidate-seal.json',{'candidateSha256':model_sha,'registrationSha256':seal,'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'testReadBeforeSeal':False})\n  write('test-opened.json',{'candidateSha256':model_sha,'registrationSha256':seal,'at':datetime.datetime.now(datetime.timezone.utc).isoformat()});state.update({'testOpened':True,'stage':'single-fixed-heldout-evaluation'});save()\n  test_rows=load('test');test=transformed(packed(test_rows),sc_final);e=emit_predictions('test-predictions.jsonl.gz',test_rows,test,final,temperature,final_prior)\n  test_result=summary(test_rows,e,families['test'],reg['testBootstrapSeed']);write('test-result.json',test_result)\n  result.update({'testOpened':True,'testPassed':test_result['passed'],'candidateSha256':model_sha,'stage':'test-passed-pending-hypothetical-strength-cost'if test_result['passed']else'test-failed-inactive-no-retuning'})\n result['fitWallSeconds']=time.monotonic()-started;result['fitCpuSeconds']=time.process_time()-cpu;result['dataAccessEvents']=events\n write('data-access-events.json',events);write('fit-result.json',result);state.update({'complete':True,'stage':result['stage']});print(json.dumps(result))\nexcept BaseException as error:state['errors'].append(repr(error));state['stage']='failed-preserve-all-no-retry';raise\nfinally:save()\n"
+        },
+        {
+            "path": "test_ranker.py",
+            "sha256": "018777e08e1af215ec349bba0f465a104fdc624d0e96efa6b84d089cac3ef780",
+            "body": "import unittest\nimport numpy as np\nfrom ranker import packed,initial,objective_gradient,train,logits,probabilities,class_prior,prior_probabilities,family_statistics,bootstrap\nclass RankerTests(unittest.TestCase):\n def test_gradient_matches_finite_differences_for_ragged_masked_choices(self):\n  rng=np.random.default_rng(17);rows=[{'features':rng.normal(size=(n,5)).tolist(),'valid':[True]*(n-1)+[True],'targetIndex':n-1}for n in[2,4,3]];rows[1]['valid'][1]=False\n  data=packed(rows);model=initial(5,4,31);loss,gradient=objective_gradient(model,data,.003)\n  for k in model:\n   for flat in range(min(7,model[k].size)):\n    index=np.unravel_index(flat,model[k].shape);original=model[k][index];epsilon=1e-5;model[k][index]=original+epsilon;plus=objective_gradient(model,data,.003)[0];model[k][index]=original-epsilon;minus=objective_gradient(model,data,.003)[0];model[k][index]=original\n    self.assertAlmostEqual((plus-minus)/(2*epsilon),gradient[k][index],places=6)\n  self.assertTrue(np.isfinite(loss));p=probabilities(logits(model,data['x']),data);self.assertEqual(p[data['starts'][1]+1],0)\n  for start,n in zip(data['starts'],data['lengths']):self.assertAlmostEqual(p[start:start+n].sum(),1)\n def test_optimizer_learns_a_known_candidate_signal_without_using_metadata(self):\n  rows=[{'features':[[2,0],[-2,0],[0,1]],'valid':[True,True,True],'targetIndex':0}for _ in range(24)];data=packed(rows);model=train(data,8,1e-4,41,steps=400,batch=16)\n  p=probabilities(logits(model,data['x']),data);self.assertGreater(float(p[0]),.9)\n def test_class_prior_renormalizes_only_available_groups(self):\n  rows=[{'features':[[0],[0],[0]],'valid':[True,False,True],'targetIndex':0,'cleanupIndex':0,'beforeIndex':1}];prior=np.array([.3,.2,.5]);p=prior_probabilities(packed(rows),prior)\n  np.testing.assert_allclose(p,[.375,0,.625]);np.testing.assert_allclose(class_prior(rows),[.5,.25,.25])\n def test_family_sums_and_zero_proposal_bootstrap_are_conservative(self):\n  rows=[{'familyId':'a'},{'familyId':'a'},{'familyId':'b'}];e={'priorLosses':np.array([1,2,3]),'losses':np.array([.5,1,2]),'proposal':np.array([False,False,False]),'correct':np.array([True,False,True])}\n  s=family_statistics(rows,e,['a','b','empty']);np.testing.assert_allclose(s,[[2,1.5,0,0,1],[1,1,0,0,1],[0,0,0,0,0]])\n  ci=bootstrap(s,99,repetitions=200);self.assertEqual(ci['proposalPrecision95'],[0,0]);self.assertGreater(ci['emptyObservationResamples'],0)\nif __name__=='__main__':unittest.main()\n"
+        },
+        {
+            "path": "code-test.py",
+            "sha256": "48701fe0216ed8b4a233b3461e6b7e806a0632e4be634d97b81db86572366f79",
+            "body": "import os\nfor name in ['OPENBLAS_NUM_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS','VECLIB_MAXIMUM_THREADS']:os.environ[name]='2'\nfrom pathlib import Path\nimport hashlib,json,subprocess,sys\nfrom ranker import np,initial,packed,transformed,logits,probabilities\np=Path(__file__).resolve().parent\nresult=subprocess.run([sys.executable,'-m','unittest','-v','test_ranker'],cwd=p,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)\nwith(p/'unit-tests.log').open('x')as f:f.write(result.stdout)\nassert result.returncode==0,result.stdout\nrng=np.random.default_rng(51);weights=initial(5,4,73);mean=np.arange(5)/10;scale=np.linspace(.8,1.4,5);constant=np.array([False,False,False,False,True]);rows=[]\nfor i,n in enumerate([3,4,6,5,3,7]):\n x=rng.normal(size=(n,5));x[:,4]=mean[4]\n if i%2:x[0,4]+=1\n if i==2:x[1,0]=22\n valid=[True]*n\n if i%2:valid[1]=False\n rows.append({'features':x.tolist(),'valid':valid,'cleanupIndex':0,'beforeIndex':1,'outsideIndex':n-1,'allowInference':True,'targetIndex':n-1})\nraw=packed(rows);d=transformed(raw,{'mean':mean,'scale':scale,'constant':constant});prob=probabilities(logits(weights,d['x']),d,.75)\nmodel={'features':['f'+str(i)for i in range(5)],'mean':mean.tolist(),'scale':scale.tolist(),'constant':constant.astype(int).tolist(),'weights':{k:v.tolist()for k,v in weights.items()},'temperature':.75,'confidenceThreshold':.85001,'argmaxTieEpsilon':1e-10,'prior':[.3,.2,.5]}\nfixture={'syntheticOnly':True,'realDataParsed':False,'model':model,'cases':[{'row':r,'probabilities':prob[d['starts'][i]:d['starts'][i]+d['lengths'][i]].tolist(),'ood':bool(d['ood'][i])}for i,r in enumerate(rows)]}\nwith(p/'synthetic-inference.json').open('x')as f:json.dump(fixture,f,indent=2);f.write('\\n')\nprint(json.dumps({'unitTestsPassed':4,'syntheticPosteriorCases':6,'realDataParsed':False,'fixtureSha256':hashlib.sha256((p/'synthetic-inference.json').read_bytes()).hexdigest(),'numpy':np.__version__}))\n"
+        },
+        {
+            "path": "inference.ts",
+            "sha256": "1ab2442647166645be1c6d0162a1c4795bb156b60560b7c145a82b0cd3fdb30a",
+            "body": "import assert from \"node:assert/strict\";\nexport interface Model{features:string[];mean:number[];scale:number[];constant:number[];temperature:number;confidenceThreshold:number;argmaxTieEpsilon:number;prior:number[];weights:{w1:number[][];b1:number[];w2:number[]};}\nexport interface ChoiceInput{features:number[][];valid:boolean[];cleanupIndex:number;outsideIndex:number;allowInference:boolean;beforeIndex:number;}\nexport function infer(model:Model,row:ChoiceInput){\n const d=model.mean.length,h=model.weights.w2.length;assert.equal(d,model.features.length);assert.equal(row.features.length,row.valid.length);assert(row.valid[row.outsideIndex]);\n let ood=false;const values=row.features.map(x=>{\n  assert.equal(x.length,d);const normalized=x.map((v,i)=>{assert(Number.isFinite(v)&&model.scale[i]>0);const z=(v-model.mean[i])/model.scale[i];if(Math.abs(z)>8||model.constant[i]&&Math.abs(v-model.mean[i])>1e-8)ood=true;return Math.max(-8,Math.min(8,z));});\n  let value=0;for(let j=0;j<h;j++){let activation=model.weights.b1[j];for(let i=0;i<d;i++)activation+=normalized[i]*model.weights.w1[i][j];value+=Math.tanh(activation)*model.weights.w2[j];}return value/model.temperature;\n });\n const maximum=Math.max(...values.filter((_,i)=>row.valid[i])),exps=values.map((v,i)=>row.valid[i]?Math.exp(v-maximum):0),total=exps.reduce((a,b)=>a+b,0),probabilities=exps.map(v=>v/total);\n const maxp=Math.max(...probabilities);const predictedIndex=probabilities.findIndex((p,i)=>row.valid[i]&&p>=maxp-model.argmaxTieEpsilon),confidence=probabilities[predictedIndex];\n const proposal=row.allowInference&&!ood&&predictedIndex!==row.cleanupIndex&&predictedIndex!==row.outsideIndex&&confidence>=model.confidenceThreshold;\n return{probabilities,predictedIndex,confidence,proposal,ood};\n}\nexport function priorProbabilities(model:Model,row:ChoiceInput){\n const kind=row.valid.map((_,i)=>i===row.cleanupIndex?0:i===row.beforeIndex?1:2),counts=[0,0,0];row.valid.forEach((v,i)=>{if(v)counts[kind[i]]++;});\n const mass=model.prior.map((p,i)=>counts[i]?p:0),total=mass.reduce((a,b)=>a+b,0);return kind.map((k,i)=>row.valid[i]?mass[k]/total/counts[k]:0);\n}\n"
+        },
+        {
+            "path": "inference.test.ts",
+            "sha256": "005301393409bf100a1235c7805f23abc523bbce13c5195755e5aed877c6653e",
+            "body": "import {test,expect} from \"bun:test\";\nimport {readFileSync} from \"node:fs\";\nimport {infer,priorProbabilities,type Model} from \"./inference\";\nconst model:Model={features:[\"signal\"],mean:[0],scale:[1],constant:[0],temperature:1,confidenceThreshold:.85001,argmaxTieEpsilon:1e-10,prior:[.3,.2,.5],weights:{w1:[[1]],b1:[0],w2:[10]}};\nconst row={features:[[4],[-4],[0]],valid:[true,true,true],cleanupIndex:1,beforeIndex:0,outsideIndex:2,allowInference:true};\ntest(\"stable masked choice posterior and high-confidence policy predicate\",()=>{\n const p=infer(model,row);expect(p.proposal).toBe(true);expect(p.predictedIndex).toBe(0);expect(p.probabilities[0]).toBeCloseTo(Math.exp(10*Math.tanh(4))/(Math.exp(10*Math.tanh(4))+Math.exp(-10*Math.tanh(4))+1),12);\n const masked=infer(model,{...row,valid:[false,true,true]});expect(masked.probabilities[0]).toBe(0);expect(masked.predictedIndex).toBe(2);expect(masked.proposal).toBe(false);\n});\ntest(\"incomplete public information and unsupported inputs cause abstention\",()=>{\n expect(infer(model,{...row,allowInference:false}).proposal).toBe(false);expect(infer(model,{...row,features:[[9],[-4],[0]]}).ood).toBe(true);expect(infer(model,{...row,features:[[9],[-4],[0]]}).proposal).toBe(false);\n expect(infer({...model,constant:[1]},row).proposal).toBe(false);\n});\ntest(\"predictor does not inspect labels, case identifiers or outcomes\",()=>{\n const guarded=new Proxy(row,{get(target,key){if(![\"features\",\"valid\",\"cleanupIndex\",\"beforeIndex\",\"outsideIndex\",\"allowInference\"].includes(String(key)))throw new Error(\"Forbidden data field\");return Reflect.get(target,key);}});expect(infer(model,guarded)).toEqual(infer(model,row));\n});\ntest(\"baseline redistributes unavailable category mass without touching labels\",()=>{\n const p=priorProbabilities(model,{...row,valid:[false,true,true]});p.forEach((v,i)=>expect(v).toBeCloseTo([0,.375,.625][i],12));\n});\ntest(\"independent NumPy synthetic posteriors agree including ragged masks and clipping\",()=>{\n const fixture=JSON.parse(readFileSync(import.meta.dir+\"/synthetic-inference.json\",\"utf8\"));for(const c of fixture.cases){const p=infer(fixture.model,c.row);p.probabilities.forEach((v,i)=>expect(Math.abs(v-c.probabilities[i])).toBeLessThan(1e-9));expect(p.ood).toBe(c.ood);}\n});\n"
+        },
+        {
+            "path": "verify.ts",
+            "sha256": "9125657f8b9bde91c99420684a7cd595c35c996a27b5e1dfd6af2b630f0bb152",
+            "body": "/** Independent posterior, abstention, baseline, decision and family-sufficient-statistic verification. */\nimport assert from \"node:assert/strict\";\nimport {createHash} from \"node:crypto\";\nimport {readFileSync,writeFileSync,createReadStream,existsSync} from \"node:fs\";\nimport {createInterface} from \"node:readline\";\nimport {createGunzip,gunzipSync} from \"node:zlib\";\nimport {infer,priorProbabilities,type Model} from \"./inference\";\nconst p=import.meta.dir,read=(f:string)=>JSON.parse(readFileSync(`${p}/${f}`,\"utf8\")),sha=(b:Buffer)=>createHash(\"sha256\").update(b).digest(\"hex\"),reg=read(\"registration.json\"),seal=sha(readFileSync(`${p}/registration.json`)),result=read(\"fit-result.json\");\nassert.equal(result.registrationSha256,seal);for(const f of reg.files)assert.equal(sha(readFileSync(`${p}/${f.path}`)),f.sha256);for(const f of reg.dataFiles)assert.equal(sha(readFileSync(`${p}/${f.path}`)),f.sha256);\nconst events=read(\"data-access-events.json\");assert.deepEqual(events.map((e:any)=>e.fold),result.testOpened?[\"train\",\"validation\",\"test\"]:[\"train\",\"validation\"]);\nassert.equal(result.testOpened,existsSync(`${p}/test-opened.json`));if(result.testOpened){assert(result.validationPassed);const opened=read(\"test-opened.json\"),sealed=read(\"candidate-seal.json\");assert.equal(sha(readFileSync(`${p}/candidate-model.json`)),opened.candidateSha256);assert.equal(opened.candidateSha256,sealed.candidateSha256);assert(sealed.at<=opened.at&&!sealed.testReadBeforeSeal);}\nconst summaries:any[]=[];let total=0,maxError=0;\nfor(const fold of result.testOpened?[\"validation\",\"test\"]:[\"validation\"]){\n const model=read(fold===\"validation\"?\"validation-selected-model.json\":\"candidate-model.json\")as Model,primary=read(`${fold}-result.json`);\n const predictions=new Map<string,any>();for(const line of gunzipSync(readFileSync(`${p}/${fold}-predictions.jsonl.gz`)).toString().trim().split(\"\\n\")){const r=JSON.parse(line);assert(!predictions.has(r.rowId));predictions.set(r.rowId,r);}\n const originalFamilies=[...new Set(read(\"data/case-ledger.json\").filter((r:any)=>r.fold===fold).map((r:any)=>r.familyId))].sort();assert.deepEqual(primary.familyStatistics.map((r:any)=>r.familyId),originalFamilies);assert.equal(primary.bootstrap.repetitions,20000);assert.equal(primary.bootstrap.seed,fold===\"validation\"?reg.validationBootstrapSeed:reg.testBootstrapSeed);\n const fs=new Map<string,any>();for(const f of primary.familyStatistics)fs.set(f.familyId,{familyId:f.familyId,observations:0,lossImprovementSum:0,proposals:0,proposalCorrect:0,correct:0});\n let n=0,correct=0,proposals=0,proposalCorrect=0,lossSum=0,priorSum=0;\n for await(const line of createInterface({input:createReadStream(`${p}/data/${fold}.jsonl.gz`).pipe(createGunzip()),crlfDelay:Infinity})){\n  const row=JSON.parse(line),expected=predictions.get(row.rowId);assert(expected);predictions.delete(row.rowId);const out=infer(model,row),prior=priorProbabilities(model,row),loss=-Math.log(Math.max(out.probabilities[row.targetIndex],1e-300)),priorLoss=-Math.log(Math.max(prior[row.targetIndex],1e-300));\n  assert.equal(out.probabilities.length,expected.probabilities.length);out.probabilities.forEach((v,i)=>{const error=Math.abs(v-expected.probabilities[i]);maxError=Math.max(maxError,error);assert(error<=1e-9);});\n  assert.equal(out.predictedIndex,expected.predictedIndex);assert.equal(out.proposal,expected.proposal);assert.equal(out.ood,expected.ood);assert.equal(row.targetIndex,expected.targetIndex);assert(Math.abs(loss-expected.loss)<1e-9&&Math.abs(priorLoss-expected.priorLoss)<1e-9);\n  const c=out.predictedIndex===row.targetIndex,pc=out.proposal&&c;n++;correct+=+c;proposals+=+out.proposal;proposalCorrect+=+pc;lossSum+=loss;priorSum+=priorLoss;\n  const f=fs.get(row.familyId);assert(f);f.observations++;f.lossImprovementSum+=priorLoss-loss;f.proposals+=+out.proposal;f.proposalCorrect+=+pc;f.correct+=+c;\n }\n assert.equal(predictions.size,0);assert.equal(n,primary.observations);assert.equal(correct/n,primary.accuracy);assert.equal(proposals,primary.proposals);assert.equal(proposalCorrect,primary.proposalCorrect);\n assert(Math.abs(lossSum/n-primary.logloss)<1e-9&&Math.abs(priorSum/n-primary.priorLogloss)<1e-9);for(const f of primary.familyStatistics){const observed=fs.get(f.familyId);for(const k of[\"observations\",\"proposals\",\"proposalCorrect\",\"correct\"])assert.equal(observed[k],f[k]);assert(Math.abs(observed.lossImprovementSum-f.lossImprovementSum)<1e-8);}\n const proposalFamilies=[...fs.values()].filter(f=>f.proposals>0).length;assert.equal(proposalFamilies,primary.proposalFamilies);\n const gates={atLeast100Proposals:proposals>=100,atLeast60ProposalFamilies:proposalFamilies>=60,precisionAtLeast90Percent:proposals>0&&proposalCorrect/proposals>=.9,familyPrecisionLowerAtLeast85Percent:primary.bootstrap.proposalPrecision95[0]>=.85,loglossImprovementAtLeast003:(priorSum-lossSum)/n>=.03,positiveFamilyLoglossLower:primary.bootstrap.loglossImprovement95[0]>0,noEmptyObservationBootstrapResamples:primary.bootstrap.emptyObservationResamples===0};assert.deepEqual(gates,primary.gates);assert.equal(Object.values(gates).every(Boolean),primary.passed);\n summaries.push({fold,observations:n,proposals,proposalFamilies,proposalCorrect,allGatesAgree:true});total+=n;\n}\nconst verification={passed:true,registrationSha256:seal,observations:total,maxProbabilityError:maxError,allPolicyDecisionsMasksBaselinesAndFamilySufficientStatisticsExact:true,testOpened:result.testOpened,testOpeningFollowedValidationAndSealedArtifact:true,summaries,bootstrapRngIndependentlyReimplemented:false,modelActivated:false,newIndependentStrengthSamples:0};writeFileSync(`${p}/independent-verification.json`,JSON.stringify(verification,null,2)+\"\\n\",{flag:\"wx\"});console.log(JSON.stringify(verification));\n"
+        },
+        {
+            "path": "install-and-launch.py",
+            "sha256": "7a750cf41850a3b98df87fee081f9d12990cf3810484b0b2540621e5506495dd",
+            "body": "from pathlib import Path\nimport datetime,hashlib,json,os,shutil,subprocess,sys,tarfile,time\np=Path(__file__).resolve().parent\na=p/'transport-input.tar.gz'\nsha=lambda b:hashlib.sha256(b).hexdigest()\nassert sha(a.read_bytes())=='a22123f34de9210baefb108e707465e1e2d5fdaddb386483f320b3d2d36f4ecc'\nwith tarfile.open(a)as t:\n ms=t.getmembers();assert len(ms)==len({m.name for m in ms})\n assert all(m.isfile()and not m.name.startswith('/')and'..'not in Path(m.name).parts for m in ms)\n regmember=t.extractfile('registration.json').read();assert sha(regmember)=='195f58fdf997ef55ae486151d7b16f12c5b7639e19463dffd34a709ae47fcf8f';reg=json.loads(regmember)\n assert {m.name for m in ms}=={f['path']for f in reg['files']+reg['dataFiles']}|{'registration.json'}\n for m in ms:\n  b=t.extractfile(m).read();dest=p/m.name;dest.parent.mkdir(parents=True,exist_ok=True)\n  if dest.exists():assert dest.is_file()and not dest.is_symlink()and dest.read_bytes()==b,('Existing registered file differs',m.name)\n  else:\n   with dest.open('xb')as out:out.write(b)\nfor f in reg['files']+reg['dataFiles']:\n b=(p/f['path']).read_bytes();assert len(b)==f['bytes']and sha(b)==f['sha256'],f['path']\nassert time.time()<reg['deadlineUnix']and shutil.disk_usage(p).free>=reg['minimumFreeBytes']\nassert not(p/'status.json').exists()and not(p/'fit-result.json').exists()\nlaunch={'registrationSha256':sha(regmember),'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'stage':'launching-once','nice':19,'blasThreads':2}\nwith(p/'launch.json').open('x')as f:json.dump(launch,f,indent=2);f.write('\\n')\nenv=os.environ.copy()\nfor key in ['OPENBLAS_NUM_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS','VECLIB_MAXIMUM_THREADS']:env[key]='2'\nwith(p/'fit.log').open('xb')as log:\n proc=subprocess.Popen(['nice','-n','19',sys.executable,'run.py'],cwd=p,env=env,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)\nlaunch.update({'stage':'launched','pid':proc.pid});tmp=p/'launch.tmp';tmp.write_text(json.dumps(launch,indent=2)+'\\n');tmp.replace(p/'launch.json');print(json.dumps(launch))\n"
+        },
+        {
+            "path": "export-results.py",
+            "sha256": "add59e4c9fa3af1cb9b40352cf6b0ad2b351f439f1678d03f72a7f857db326d2",
+            "body": "from pathlib import Path\nimport datetime,hashlib,json,tarfile\np=Path(__file__).resolve().parent\nstatus=json.loads((p/'status.json').read_text());assert status['complete']and not status['errors'],status\nreg=json.loads((p/'registration.json').read_text());sha=lambda b:hashlib.sha256(b).hexdigest()\nnames=[r['path']for r in reg['files']+reg['dataFiles']]+['registration.json','launch.json','status.json','fit-result.json','fit.log','data-access-events.json','selection-history.json','validation-selected-model.json','validation-predictions.jsonl.gz','validation-result.json','install-and-launch.py','export-results.py']\nresult=json.loads((p/'fit-result.json').read_text())\nif result['testOpened']:names+=['candidate-model.json','candidate-seal.json','test-opened.json','test-predictions.jsonl.gz','test-result.json']\nassert len(names)==len(set(names))\nmanifest={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'registrationSha256':sha((p/'registration.json').read_bytes()),'files':[]}\nfor name in names:\n f=p/name;assert f.is_file()and not f.is_symlink();b=f.read_bytes();manifest['files'].append({'path':name,'bytes':len(b),'sha256':sha(b)})\nwith(p/'return-manifest.json').open('x')as f:json.dump(manifest,f,indent=2);f.write('\\n')\nwith tarfile.open(p/'transport-return.tar.gz','x:gz')as t:\n for name in names+['return-manifest.json']:t.add(p/name,arcname=name,recursive=False)\na=p/'transport-return.tar.gz';print(json.dumps({'archiveSha256':sha(a.read_bytes()),'archiveBytes':a.stat().st_size,'registrationSha256':manifest['registrationSha256'],'files':len(names),'stage':result['stage']}))\n"
+        }
+    ],
+    "testUnopened": true,
+    "old805LabelTestRemainsClosed": true,
+    "qualifiedForActivation": false,
+    "newIndependentStrengthSamples": 0,
+    "servingDefaultChanged": false,
+    "interpretation": "All confidence gates stay fixed. Only4 proposals across4 families fails minimum100/60 support; 4/4 is inadequate evidence despite the bootstrap interval. No final refit/test/activation follows. The model improves validation logloss but accuracy is teacher agreement, not win rate.",
+    "limitations": [
+        "Recipe and temperature selected on validation; its performance is development evidence, not independent confirmation.",
+        "Independent Bun reimplements posterior, masking, abstention, baseline and whole-family sufficient statistics; NumPy bootstrap RNG is not independently reimplemented.",
+        "Previous157 numeric input features have separate functional/metamorphic checks, not complete independent Python reimplementation.",
+        "Recorded wall/CPU are fitting cost, not gameplay inference cost or a speedup."
+    ]
+}

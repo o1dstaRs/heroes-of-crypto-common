@@ -1066,6 +1066,15 @@ reimplemented in Python. No held-out model metric or fitter has opened. Keep the
 Further learning needs its own frozen fit/confidence gates and sealed artifact before test evaluation,
 then actual/hypothetical validation and fresh current-v12 strength/overall-average+10% cost. No default changed.
 
+The separately registered native-catalog ranker fit is now complete and failed validation support:
+4 confident proposals across4 families, below the fixed100/60 minimums. Preserve
+`docs/evidence/barrel_native_catalog_ranker_fit_results_20261118.json` and read
+`docs/barrel_native_catalog_ranker_research.md`. Its validation logloss improvement0.49902 and44.8645%
+teacher agreement are development prediction metrics, not combat gains. No final refit or test parsing
+occurred; the new1,757-decision test and older805-label test remain unopened/closed respectively.
+Keep all6 recipes/30 temperature results and failed gates. Independent Bun checks all1,587 validation
+posteriors, decisions and family sufficient statistics, not NumPy's bootstrap RNG. No default changed.
+
 The prospective final-validation source seal is
 `f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51`; read
 `docs/evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json`. The original
