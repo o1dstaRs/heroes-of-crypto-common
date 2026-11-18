@@ -100,3 +100,40 @@ contains 3,058 independently verified regular files, SHA-256
 validation and the all-case interpretation dossier are retained separately.
 The common build compiler, strict owned source/test types and full client
 `bun run check` passed. Serving code does not import the helper.
+
+## Closed native-builder atomicity experiment
+
+A separately frozen engineering hypothesis, `a19-atomic-retarget-engineering-20261118`, moved the
+repair into the two inherited v0.4 retarget builders before downstream scorers. Two fixed variants
+were specified before their full-game probes: `prefix` aligns an existing explicit move with the
+selected approach; `complete` also converts a standalone retargeted approach into an explicit move
+and strike. Both preserve the original native strike path metadata used by charge classification.
+The published late repair, its admission and every previous failed gate remain unchanged.
+
+Ten native-engine tests / 116 assertions passed, covering both teams and all four body shapes,
+explicit movement, source-array identity, physical state and RNG preservation. Four serial full
+executions of the one exposed failed case compared the original guard, saved late repair and both
+early variants. The original guard retained its known refused melee proposal. All three repairs
+completed without that error. The early variants changed one root proposal each and respectively
+257 and 836 hypothetical proposals, but **every one of their 66 captured completed-event-batch
+physical states exactly matched the saved late repair**, including the final result. That is no
+new tactical behavior in this fixture. Invocation counts and metadata changes cannot substitute
+for a distinct actual opportunity or a measured strength improvement.
+
+An independent Python verifier checked all 1,436 frozen source hashes, native journal turns,
+authoritative terminal outcomes, full physical-state sequences rather than only their digests,
+the original helper hash and the focused test log. The source result's `nativeTurns` field was
+mislabeled: 66 is the number of captured event-batch snapshots; the repair variants each completed
+67 actual native turns. The guard completed 77 turns / 76 snapshots. Preserve that original field
+and its explicit correction together; neither source nor result was rewritten.
+
+The declared distinctness gate was not met. Both variants are closed at engineering: no reused
+admission tournament, new battle seeds, fresh strength bank, cost qualification, confirmation,
+serving change or deployment followed. One exposed case does not prove global equivalence or
+safety. The [compact engineering fixture](evidence/atomic_melee_retarget_engineering_20261118.json)
+preserves the registration, every source binding, four execution summaries, source-label correction
+and verification receipts. The complete source/raw archive has SHA-256
+`bd98526cf9d4f1b45d087d56fd36ffcc14a4114fa0229f060ba1408626f5fbe9`,
+24,221,007 bytes and 1,579 verified regular members; all member hashes were independently checked
+locally and on its Puffalo backup. The later default-v13 Sniper adoption is separate; these frozen
+experiments retain their original entrant-scoped guard reference.
