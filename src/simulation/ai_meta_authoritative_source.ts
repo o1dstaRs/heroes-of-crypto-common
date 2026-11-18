@@ -10,7 +10,7 @@ export function aiMetaAuthoritativeSource() {
     const source = captureGitSourceStatus(root);
     const actual = fingerprintSourceTree(
         root,
-        ["src", "configuration", "generated", "schema", "protobuf"],
+        ["src", "configuration", "generated", "schema", "protobuf", "patches"],
         ["package.json", "bun.lock"],
     );
     const current = {
@@ -57,11 +57,17 @@ export function freezeAiMetaAuthoritativeSource(destination: string) {
         "AGENTS.md",
     ])
         cpSync(resolve(root, name), resolve(destination, name), { recursive: true, force: false, errorOnExist: true });
+    if (existsSync(resolve(root, "patches")))
+        cpSync(resolve(root, "patches"), resolve(destination, "patches"), {
+            recursive: true,
+            force: false,
+            errorOnExist: true,
+        });
     if (
         JSON.stringify(aiMetaAuthoritativeSource()) !== JSON.stringify(before) ||
         fingerprintSourceTree(
             destination,
-            ["src", "configuration", "generated", "schema", "protobuf"],
+            ["src", "configuration", "generated", "schema", "protobuf", "patches"],
             ["package.json", "bun.lock"],
         ) !== before.serverSha256
     )
