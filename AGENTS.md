@@ -1075,6 +1075,13 @@ occurred; the new1,757-decision test and older805-label test remain unopened/clo
 Keep all6 recipes/30 temperature results and failed gates. Independent Bun checks all1,587 validation
 posteriors, decisions and family sufficient statistics, not NumPy's bootstrap RNG. No default changed.
 
+The separate train/validation identifiability audit verifies all6,975 records in Python and Bun:
+zero validation targets have an identical valid feature rival, so duplicated option vectors do not
+explain the four-proposal support failure. Preserve
+`docs/evidence/barrel_catalog_identifiability_results_20261118.json`. Its structural ceilings and
+observed repeated-input conflicts are not model accuracy or strength. The fitted weights, failed gates
+and unopened1,757-label test remain unchanged; do not treat this diagnostic as permission to activate.
+
 The distinct root-scoped mixture reused admission is registered at
 `6eda742bd48db1366e7ec95c898578b97c80f974a2cab7fb6b654542bc3bb438`; read
 `docs/barrel_root_scoped_mixture_research.md` and its registration fixture. It retains all6,048 old-v11

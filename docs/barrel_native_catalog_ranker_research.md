@@ -48,3 +48,23 @@ parity nor combat strength. Preserve this failed support result and its frozen r
 continuation still needs legal public inputs, the actual committed-turn/memory contract, independent
 fresh whole-family strength and the user's **overall-average +10%** complete fight/decision compute
 bound. There is no automatic activation or deployment.
+
+## Feature identifiability audit
+
+The separate [train/validation audit](evidence/barrel_catalog_identifiability_results_20261118.json)
+checks whether distinct actions have identical allowed feature vectors. A shared scorer gives equal
+probability to every valid option with the same vector; with two such options neither can exceed
+one half. This could make a confidence gate unreachable even with perfect fitting.
+
+Independent Python and Bun reconstruction agree on all **6,975 already-opened training/validation
+records**. Five training targets have an identical valid feature rival; **zero of the 1,587 validation
+targets do**. Before OOD abstention and assuming perfect learning, 1,126 validation records in 233
+families could therefore supply a correct high-confidence alternative. This is a structural ceiling,
+not achieved support or a claim of learnability. Duplicate vectors do not explain the four-proposal
+validation result.
+
+Complete ordered inputs repeat with contradictory selected labels in eight training groups and one
+validation group. This audit does not identify whether those differences come from missing state,
+private search chance or another source. It does not prove other labels are predictable. No feature,
+threshold, model weight or failed gate changes; the new held-out test remains unopened. All model and
+battle-strength claims retain their previous limits.

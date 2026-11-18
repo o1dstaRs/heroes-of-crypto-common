@@ -1,0 +1,138 @@
+{
+    "schema": "hoc.barrel-catalog-trainval-identifiability-results.v1",
+    "createdUtc": "2026-11-18T08:01:15.604708+00:00",
+    "registration": {
+        "id": "barrel-teacher-trainval-identifiability-audit-20261118-v1",
+        "at": "2026-11-18T07:51:40.712451+00:00",
+        "method": "Within-row exact numeric feature equivalence among valid options; repeated complete ordered allowed inputs and their observed target counts. No fitted metrics, threshold change, feature selection or test parsing.",
+        "fixedConfidenceThreshold": 0.85001,
+        "testAllowed": false,
+        "fitRegistrationSha256": "195f58fdf997ef55ae486151d7b16f12c5b7639e19463dffd34a709ae47fcf8f",
+        "auditSourceFiles": [
+            {
+                "path": "audit.py",
+                "sha256": "d8915889b94e2caafad980a9560d0c65939243a531f9bb266c1d8b707b5953a0"
+            },
+            {
+                "path": "verify.ts",
+                "sha256": "281282de5beeecf9ad4e16e40876014fac1fc3d99205110200491a854d8315d5"
+            }
+        ],
+        "files": [
+            {
+                "path": "data/train.jsonl.gz",
+                "sha256": "02a60b44ed8c6f88c7ce7ec9fecbc45725fea3f1384799eb00198af638a8b43d"
+            },
+            {
+                "path": "data/validation.jsonl.gz",
+                "sha256": "519131b46fd5657e8f915369852e2720a6f8adbdc28c2590a6aeae90d8e02d1c"
+            },
+            {
+                "path": "data/case-ledger.json",
+                "sha256": "db8ff052162e1f741bcac18b396238c0457f565f012c38f57705950bc81ed832"
+            }
+        ]
+    },
+    "registrationSha256": "e6b1930d34d1df96eb118d188cb91055998cf7ebfa37383baf3ad816db670443",
+    "result": {
+        "passed": true,
+        "registrationSha256": "e6b1930d34d1df96eb118d188cb91055998cf7ebfa37383baf3ad816db670443",
+        "scope": "Post-fit train/validation representation identifiability only. No test parsed, recipe changed, model trained or candidate battle result inspected.",
+        "theorem": "A shared scalar scorer assigns equal softmax mass to k identical valid option vectors; each probability is at most1/k. Thus a target with k>=2 cannot pass the unchanged.85001 threshold. Upper bounds assume perfect learning and ignore current OOD abstention; they are not measured model performance or combat strength.",
+        "folds": {
+            "train": {
+                "records": 5388,
+                "originalFamilies": 955,
+                "targetHasIdenticalValidFeatureRival": 5,
+                "targetFeatureGroupSizeHistogram": {
+                    "1": 5383,
+                    "2": 5
+                },
+                "largestTargetFeatureGroup": 2,
+                "validFeatureGroups": 34060,
+                "duplicatedValidFeatureGroups": 347,
+                "alternativeTeacherTargets": 3780,
+                "aliasedAlternativeTeacherTargets": 5,
+                "completeInputAlternativeTeacherTargets": 3780,
+                "structuralHighConfidenceCorrectAlternativeUpperBoundBeforeOod": 3775,
+                "structuralHighConfidenceCorrectAlternativeFamilyUpperBoundBeforeOod": 808,
+                "distinctOrderedInputs": 5374,
+                "repeatedOrderedInputs": 14,
+                "contradictoryOrderedInputs": 8,
+                "maximumDeterministicCorrectOnTheseObservedInputs": 5380
+            },
+            "validation": {
+                "records": 1587,
+                "originalFamilies": 272,
+                "targetHasIdenticalValidFeatureRival": 0,
+                "targetFeatureGroupSizeHistogram": {
+                    "1": 1587
+                },
+                "largestTargetFeatureGroup": 1,
+                "validFeatureGroups": 10460,
+                "duplicatedValidFeatureGroups": 71,
+                "alternativeTeacherTargets": 1126,
+                "aliasedAlternativeTeacherTargets": 0,
+                "completeInputAlternativeTeacherTargets": 1126,
+                "structuralHighConfidenceCorrectAlternativeUpperBoundBeforeOod": 1126,
+                "structuralHighConfidenceCorrectAlternativeFamilyUpperBoundBeforeOod": 233,
+                "distinctOrderedInputs": 1583,
+                "repeatedOrderedInputs": 4,
+                "contradictoryOrderedInputs": 1,
+                "maximumDeterministicCorrectOnTheseObservedInputs": 1586
+            }
+        },
+        "combined": {
+            "records": 6975,
+            "distinctOrderedInputs": 6957,
+            "contradictoryOrderedInputs": 9,
+            "maximumDeterministicCorrectOnTheseObservedInputs": 6966
+        },
+        "testParsed": false,
+        "newIndependentStrengthSamples": 0,
+        "defaultChanged": false
+    },
+    "independentVerification": {
+        "passed": true,
+        "registrationSha256": "e6b1930d34d1df96eb118d188cb91055998cf7ebfa37383baf3ad816db670443",
+        "records": 6975,
+        "allPrimaryIntegerCountsExact": true,
+        "testParsed": false,
+        "modelFitted": false,
+        "newIndependentStrengthSamples": 0
+    },
+    "sourceBodies": [
+        {
+            "path": "audit.py",
+            "sha256": "d8915889b94e2caafad980a9560d0c65939243a531f9bb266c1d8b707b5953a0",
+            "body": "from pathlib import Path\nimport collections,gzip,hashlib,json\np=Path(__file__).resolve().parent;source=p.parent;regraw=(p/'registration.json').read_bytes();reg=json.loads(regraw);sha=lambda b:hashlib.sha256(b).hexdigest()\nfor f in reg['files']:assert sha((source/f['path']).read_bytes())==f['sha256']\nledger=json.loads((source/'data/case-ledger.json').read_text());folds={};all_groups={}\nfor fold in ['train','validation']:\n groups={};rows=0;aliased=0;max_size=0;size_hist=collections.Counter();alternative=0;alternative_aliased=0;allowed_alternative=0;upper_records=0;upper_families=set();candidate_groups=0;duplicate_candidate_groups=0\n with gzip.open(source/'data'/f'{fold}.jsonl.gz','rt')as f:\n  for line in f:\n   row=json.loads(line);assert row['fold']==fold;rows+=1;features=[tuple(v)for v in row['features']];counts=collections.Counter(x for x,valid in zip(features,row['valid'])if valid);target=row['targetIndex'];assert row['valid'][target]\n   size=counts[features[target]];size_hist[size]+=1;aliased+=size>1;max_size=max(max_size,size);candidate_groups+=len(counts);duplicate_candidate_groups+=sum(n>1 for n in counts.values())\n   is_alternative=target not in[row['cleanupIndex'],row['outsideIndex']];alternative+=is_alternative;alternative_aliased+=is_alternative and size>1\n   if is_alternative and row['allowInference']:\n    allowed_alternative+=1\n    if size==1:upper_records+=1;upper_families.add(row['familyId'])\n   # Ordered complete model input only. IDs/folds/teacher labels do not enter the signature.\n   key=(tuple(features),tuple(row['valid']),row['cleanupIndex'],row['beforeIndex'],row['outsideIndex'],row['allowInference'])\n   groups.setdefault(key,collections.Counter())[target]+=1;all_groups.setdefault(key,collections.Counter())[target]+=1\n families={r['familyId']for r in ledger if r['fold']==fold}\n folds[fold]={'records':rows,'originalFamilies':len(families),'targetHasIdenticalValidFeatureRival':aliased,'targetFeatureGroupSizeHistogram':dict(sorted(size_hist.items())),'largestTargetFeatureGroup':max_size,\n 'validFeatureGroups':candidate_groups,'duplicatedValidFeatureGroups':duplicate_candidate_groups,'alternativeTeacherTargets':alternative,'aliasedAlternativeTeacherTargets':alternative_aliased,'completeInputAlternativeTeacherTargets':allowed_alternative,\n 'structuralHighConfidenceCorrectAlternativeUpperBoundBeforeOod':upper_records,'structuralHighConfidenceCorrectAlternativeFamilyUpperBoundBeforeOod':len(upper_families),\n 'distinctOrderedInputs':len(groups),'repeatedOrderedInputs':sum(sum(c.values())>1 for c in groups.values()),'contradictoryOrderedInputs':sum(len(c)>1 for c in groups.values()),'maximumDeterministicCorrectOnTheseObservedInputs':sum(max(c.values())for c in groups.values())}\nresult={'passed':True,'registrationSha256':sha(regraw),'scope':'Post-fit train/validation representation identifiability only. No test parsed, recipe changed, model trained or candidate battle result inspected.',\n 'theorem':'A shared scalar scorer assigns equal softmax mass to k identical valid option vectors; each probability is at most1/k. Thus a target with k>=2 cannot pass the unchanged.85001 threshold. Upper bounds assume perfect learning and ignore current OOD abstention; they are not measured model performance or combat strength.',\n 'folds':folds,'combined':{'records':sum(r['records']for r in folds.values()),'distinctOrderedInputs':len(all_groups),'contradictoryOrderedInputs':sum(len(c)>1 for c in all_groups.values()),'maximumDeterministicCorrectOnTheseObservedInputs':sum(max(c.values())for c in all_groups.values())},'testParsed':False,'newIndependentStrengthSamples':0,'defaultChanged':False}\nwith(p/'result.json').open('x')as f:json.dump(result,f,indent=2,allow_nan=False);f.write('\\n')\nprint(json.dumps(result))\n"
+        },
+        {
+            "path": "verify.ts",
+            "sha256": "281282de5beeecf9ad4e16e40876014fac1fc3d99205110200491a854d8315d5",
+            "body": "import assert from \"node:assert/strict\";\nimport {createHash} from \"node:crypto\";\nimport {readFileSync,writeFileSync} from \"node:fs\";\nimport {gunzipSync} from \"node:zlib\";\nconst p=import.meta.dir,source=`${p}/..`,read=(f:string)=>JSON.parse(readFileSync(`${source}/${f}`,\"utf8\")),sha=(b:Buffer)=>createHash(\"sha256\").update(b).digest(\"hex\"),regraw=readFileSync(`${p}/registration.json`),reg=JSON.parse(regraw.toString()),primary=JSON.parse(readFileSync(`${p}/result.json`,\"utf8\")),ledger=read(\"data/case-ledger.json\");\nfor(const f of reg.files)assert.equal(sha(readFileSync(`${source}/${f.path}`)),f.sha256);\nconst allGroups=new Map<string,Map<number,number>>(),folds:Record<string,unknown>={};\nfor(const fold of[\"train\",\"validation\"]){\n const groups=new Map<string,Map<number,number>>(),familySet=new Set<string>(),hist=new Map<number,number>();let records=0,aliased=0,maxSize=0,alt=0,altAliased=0,allowedAlt=0,upperRecords=0,validGroups=0,duplicateGroups=0;\n for(const line of gunzipSync(readFileSync(`${source}/data/${fold}.jsonl.gz`)).toString().trim().split(\"\\n\")){\n  const r=JSON.parse(line);assert.equal(r.fold,fold);records++;const counts=new Map<string,number>();r.features.forEach((v:number[],i:number)=>{if(r.valid[i]){const key=JSON.stringify(v);counts.set(key,(counts.get(key)??0)+1);}});assert(r.valid[r.targetIndex]);const size=counts.get(JSON.stringify(r.features[r.targetIndex]))!;hist.set(size,(hist.get(size)??0)+1);aliased+=+(size>1);maxSize=Math.max(maxSize,size);validGroups+=counts.size;duplicateGroups+=[...counts.values()].filter(n=>n>1).length;\n  const alternative=![r.cleanupIndex,r.outsideIndex].includes(r.targetIndex);alt+=+alternative;altAliased+=+(alternative&&size>1);if(alternative&&r.allowInference){allowedAlt++;if(size===1){upperRecords++;familySet.add(r.familyId);}}\n  const key=JSON.stringify([r.features,r.valid,r.cleanupIndex,r.beforeIndex,r.outsideIndex,r.allowInference]);for(const map of[groups,allGroups]){const c=map.get(key)??new Map<number,number>();c.set(r.targetIndex,(c.get(r.targetIndex)??0)+1);map.set(key,c);}\n }\n const data={records,originalFamilies:new Set(ledger.filter((r:any)=>r.fold===fold).map((r:any)=>r.familyId)).size,targetHasIdenticalValidFeatureRival:aliased,targetFeatureGroupSizeHistogram:Object.fromEntries([...hist].sort(([a],[b])=>a-b)),largestTargetFeatureGroup:maxSize,validFeatureGroups:validGroups,duplicatedValidFeatureGroups:duplicateGroups,alternativeTeacherTargets:alt,aliasedAlternativeTeacherTargets:altAliased,completeInputAlternativeTeacherTargets:allowedAlt,structuralHighConfidenceCorrectAlternativeUpperBoundBeforeOod:upperRecords,structuralHighConfidenceCorrectAlternativeFamilyUpperBoundBeforeOod:familySet.size,distinctOrderedInputs:groups.size,repeatedOrderedInputs:[...groups.values()].filter(c=>[...c.values()].reduce((a,b)=>a+b,0)>1).length,contradictoryOrderedInputs:[...groups.values()].filter(c=>c.size>1).length,maximumDeterministicCorrectOnTheseObservedInputs:[...groups.values()].reduce((a,c)=>a+Math.max(...c.values()),0)};\n assert.deepEqual(data,primary.folds[fold]);folds[fold]=data;\n}\nconst combined={records:Object.values(primary.folds).reduce((a:number,r:any)=>a+r.records,0),distinctOrderedInputs:allGroups.size,contradictoryOrderedInputs:[...allGroups.values()].filter(c=>c.size>1).length,maximumDeterministicCorrectOnTheseObservedInputs:[...allGroups.values()].reduce((a,c)=>a+Math.max(...c.values()),0)};assert.deepEqual(combined,primary.combined);assert.equal(primary.registrationSha256,sha(regraw));const out={passed:true,registrationSha256:sha(regraw),records:combined.records,allPrimaryIntegerCountsExact:true,testParsed:false,modelFitted:false,newIndependentStrengthSamples:0};writeFileSync(`${p}/independent-verification.json`,JSON.stringify(out,null,2)+\"\\n\",{flag:\"wx\"});console.log(JSON.stringify(out));\n"
+        }
+    ],
+    "rawOutputs": [
+        {
+            "path": "registration.json",
+            "bytes": 1198,
+            "sha256": "e6b1930d34d1df96eb118d188cb91055998cf7ebfa37383baf3ad816db670443"
+        },
+        {
+            "path": "result.json",
+            "bytes": 2473,
+            "sha256": "44c7b8f75893a0bd3f91f157f63b3613a367bce440023a18f706268d6b7ece9b"
+        },
+        {
+            "path": "independent-verification.json",
+            "bytes": 257,
+            "sha256": "4c101429d3e48c5337b2b0ffaffa3cdaf3430a269eaf86150cf40fd553bff5a2"
+        }
+    ],
+    "interpretation": "Within-row identical option features cannot explain the failed validation confidence coverage: zero validation teacher targets have an identical valid rival. The ordered-input collisions account for only one validation conflict and eight training conflicts. This does not establish that the remaining labels are predictable, that omitted state/private chance is unimportant, or that a larger model will improve combat. Keep the failed hard-policy gates, original weights and unopened1757-label test unchanged.",
+    "newModelFitted": false,
+    "teacherTestParsed": false,
+    "newIndependentStrengthSamples": 0,
+    "defaultChanged": false
+}
