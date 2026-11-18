@@ -1,0 +1,585 @@
+{
+    "schema": "hoc.barrel-actual-root-scoped-mixture-reused-admission-registration.v1",
+    "createdUtc": "2026-11-18T06:57:06.852170+00:00",
+    "stateAtPublication": "Original local attempt failed disk admission without dispatching an actor. Original node attempt failed startup stdout parsing with no completed game records. Separate stream-only v2 keeps policy/cases/gates/cutoff and requires a ready handshake before dispatch. Stream-v2 code tests and closed-stdin ready rehearsal passed; the new controller launched at07:00:58 UTC.",
+    "registrationSha256": "e2ab7db93a9526e33e2f432ea83d1b96dd4575180fc64452e25e9ff1eea731dc",
+    "registration": {
+        "id": "barrel-actual-melee-root-scoped-mixture-reused-v11-20261118-puffalo-startup-v1",
+        "registeredUtc": "2026-11-18T06:54:03.272690+00:00",
+        "parentRegistrationSha256": "1a31dd5fbba8544bf25ad96c3d10ab47165f4ddeabaf8602d9096f83c1dbb3ff",
+        "scope": "Distinct reused full-v11-bank admission after broad-mixture fresh confirmation and richer predictor support failed. No new population strength, model metric, timing qualification or activation.",
+        "candidate": "Enable the exact old balanced native/intent R2 mixture and its bounded live implementation only when this actual A19 root incumbent contains an own-actor melee attack on a currently present deployment barrel. Both owners qualify. Other actual roots retain the exact native/old implementation. Future controllers, sample assignment, H64/R2, candidate lists, root/neural arbitration and incumbent-memory commit otherwise unchanged. No memory-normalization change is bundled.",
+        "sameAllArms": "Original frozen-v11 engine, public legal draft/paid setup/terrain placement and accepted neural models. All6959 parent-protected files immutable. Only new root admission and diagnostic counters are added in this capsule. Parent sources are read-only relative symlinks, not a new working-tree edit.",
+        "hypothesis": "Reducing direct forecast-model changes outside actual barrel decisions may recover some broad-policy regressions; ordinary shot-to-shot changes also produced gains, so no net benefit is assumed.",
+        "codeTests": {
+            "passed": 4,
+            "assertions": 40,
+            "candidateGamesBeforeRegistration": 0,
+            "cases": "Both barrel owners, real-root-only gating, ordinary attacks/moves/holds/ranged cleanup/neutral stones/wrong actor exclusion, deterministic read-only command and RNG/UUID invariance."
+        },
+        "preflight": {
+            "fixedCases": 12,
+            "styles": 4,
+            "maps": 3,
+            "modes": [
+                "stock",
+                "mixture",
+                "scoped",
+                "scoped-both"
+            ],
+            "executions": 48,
+            "workers": 2,
+            "gate": "All24 original stock/mixture inputs, complete traces, scores, actual commands and logical quality exact. Both scoped modes activate at least once in total. No case/source adjustment after observations."
+        },
+        "main": {
+            "cases": 6048,
+            "wholeFamilies": 1512,
+            "modes": [
+                "scoped"
+            ],
+            "fixedOriginalComparators": [
+                "stock",
+                "mixture"
+            ],
+            "caseBook": "cases.json",
+            "allOldGainsLossesAndUnchangedCasesRetained": true,
+            "noSamplingOrSubgroupRescue": true
+        },
+        "cold": {
+            "cases": 36,
+            "epochs": 2,
+            "executions": 72,
+            "workers": 2,
+            "selection": "First original case for every style/map/own-doctrine cell, independent of outcomes; two separate new-process epochs; exact main input/full trace/outcome/actual commands/logical quality/root counts/witnesses."
+        },
+        "admissionGates": {
+            "allSourceInputQualityColdAndOriginalControlsExact": true,
+            "scoreStrictlyHigherThanStock": true,
+            "scoreStrictlyHigherThanBroadMixture": true,
+            "fewerRegressionsThanBroadMixture": true,
+            "atLeast24ScopedRoots": true
+        },
+        "requiredAttribution": "Report every recovered loss, lost old gain and introduced loss. Zero scoped-root games must retain original stock full traces, outcomes and actual-command hashes. All integer counts independently reconstructed by Bun.",
+        "analysis": "Only after complete collection and both cold epochs; score half-points and all slices retained. No fresh-population confidence claim from reused admission. No interim score inspection or policy tuning.",
+        "independentVerification": "Bun verifies raw row hashes/identities, source manifest, primary integers, untouched original actual-command hashes and declared gates. Python separately verifies24 original preflight controls, quality and both36-case cold epochs; independent Bun does not reimplement those latter comparisons.",
+        "localWorkers": 8,
+        "unixNice": 19,
+        "host": "Puffalo Xeon",
+        "gpuRequired": false,
+        "puffaloPhase": true,
+        "minimumFreeBytes": 4294967296,
+        "deadlineUnix": 1794995102.6140978,
+        "deadlineUtc": "2026-11-18T09:45:02.607548+00:00",
+        "termination": "One run, fixed3-hour cutoff. No retry, extension, source/gate change or case reassignment after game execution. Preserve partial results and failed controls. Stop if preflight fails. A pass does not activate anything.",
+        "nextGateIfPassed": "Separately registered fresh current-v12 authoritative-memory/committed-turn qualification, including native durable delivery/setup dispatch, then independent fresh confirmation and overall-average+10% full-fight/complete-decision CPU/wall/total/mean cost for both actual-driver scopes. No automatic promotion.",
+        "teacherTestLabelsParsed": false,
+        "richerRankerRecipeRetuned": false,
+        "newIndependentStrengthSamples": 0,
+        "servingDefaultChanged": false,
+        "files": [
+            {
+                "path": "root-scope.ts",
+                "bytes": 1018,
+                "sha256": "ab4088c02a5d0b086aed516147fbfb6f7e6d4351a3e2aaa80a2232b47abd79a7"
+            },
+            {
+                "path": "root-scope.test.ts",
+                "bytes": 2788,
+                "sha256": "a27d3fd63eae9373316c920633cd6d2d1c7806413358207fa368bfa8f5af4ad5"
+            },
+            {
+                "path": "actor.ts",
+                "bytes": 6900,
+                "sha256": "48a173feae96a2a3f4e5b34392f8cb1a8a09106697509cad87d783aee63d0437"
+            },
+            {
+                "path": "run.py",
+                "bytes": 8582,
+                "sha256": "3dbe6dae4371d328f31ae662ccb2126b592549a71f7040c72d7f00bdfd4710fc"
+            },
+            {
+                "path": "verify.ts",
+                "bytes": 3622,
+                "sha256": "be2281eae701c4b46b92dc5f22781cdd573abe8df0949e282f48e8e5728ddc88"
+            },
+            {
+                "path": "unit-tests.log",
+                "bytes": 506,
+                "sha256": "27b359966f081c0dc87534afbcd4727b94849415ddb99416fe558929fa81a94a"
+            },
+            {
+                "path": "preflight-cases.json",
+                "bytes": 3457,
+                "sha256": "0c837722f474a836872ec613ac7666d26fc8e5f39bb4ec5af8a632c2012c2792"
+            },
+            {
+                "path": "preflight-controls.json",
+                "bytes": 800030,
+                "sha256": "122009567d354cc660e7cbc427900fc6f82812a35d58ada1283e2ca7220dcb84"
+            },
+            {
+                "path": "cases.json",
+                "bytes": 2679742,
+                "sha256": "a3d08854f2157323fbdf11d405bec413fb176e019fb71a4330f916dde815bab7"
+            },
+            {
+                "path": "original-trace-index.json",
+                "bytes": 5396601,
+                "sha256": "1a50e7602630c877e72db4d6291c996b15d5425852a56596162a3fb7fa697eee"
+            },
+            {
+                "path": "cold-cases.json",
+                "bytes": 15857,
+                "sha256": "57b344f0900f01f8a144f5c067784d91db986251edfc45dfa2d3d3e106e2f5f0"
+            }
+        ],
+        "startupOnlyAmendment": {
+            "originalRegistrationSha256": "12258d61def5b850ce9adf462e3981a50e4c75824f42ad13acbaaa30532a912a",
+            "reason": "Local4GiB disk floor rejected before any actor/game. Move unchanged unstarted8-worker experiment to Puffalo with33GiB free; preserve original3-hour cutoff, candidate, all cases, sources and gates.",
+            "originalState": {
+                "complete": false,
+                "stage": "failed-preserve-all-no-retry",
+                "pid": 68063,
+                "registrationSha256": "12258d61def5b850ce9adf462e3981a50e4c75824f42ad13acbaaa30532a912a",
+                "phaseCompleted": 0,
+                "errors": [
+                    "AssertionError()"
+                ],
+                "newIndependentStrengthSamples": 0,
+                "defaultChanged": false,
+                "at": "2026-11-18T06:45:02.655545+00:00",
+                "elapsedSeconds": 0.00038737524300813675
+            },
+            "candidateGamesExecuted": 0,
+            "sourceOrGateChange": false,
+            "cutoffExtended": false,
+            "original4GiBDiskFloorRetained": true
+        }
+    },
+    "originalLocalRegistrationSha256": "12258d61def5b850ce9adf462e3981a50e4c75824f42ad13acbaaa30532a912a",
+    "originalLocalRegistration": {
+        "id": "barrel-actual-melee-root-scoped-mixture-reused-v11-20261118-v1",
+        "registeredUtc": "2026-11-18T06:45:02.607548+00:00",
+        "parentRegistrationSha256": "1a31dd5fbba8544bf25ad96c3d10ab47165f4ddeabaf8602d9096f83c1dbb3ff",
+        "scope": "Distinct reused full-v11-bank admission after broad-mixture fresh confirmation and richer predictor support failed. No new population strength, model metric, timing qualification or activation.",
+        "candidate": "Enable the exact old balanced native/intent R2 mixture and its bounded live implementation only when this actual A19 root incumbent contains an own-actor melee attack on a currently present deployment barrel. Both owners qualify. Other actual roots retain the exact native/old implementation. Future controllers, sample assignment, H64/R2, candidate lists, root/neural arbitration and incumbent-memory commit otherwise unchanged. No memory-normalization change is bundled.",
+        "sameAllArms": "Original frozen-v11 engine, public legal draft/paid setup/terrain placement and accepted neural models. All6959 parent-protected files immutable. Only new root admission and diagnostic counters are added in this capsule. Parent sources are read-only relative symlinks, not a new working-tree edit.",
+        "hypothesis": "Reducing direct forecast-model changes outside actual barrel decisions may recover some broad-policy regressions; ordinary shot-to-shot changes also produced gains, so no net benefit is assumed.",
+        "codeTests": {
+            "passed": 4,
+            "assertions": 40,
+            "candidateGamesBeforeRegistration": 0,
+            "cases": "Both barrel owners, real-root-only gating, ordinary attacks/moves/holds/ranged cleanup/neutral stones/wrong actor exclusion, deterministic read-only command and RNG/UUID invariance."
+        },
+        "preflight": {
+            "fixedCases": 12,
+            "styles": 4,
+            "maps": 3,
+            "modes": [
+                "stock",
+                "mixture",
+                "scoped",
+                "scoped-both"
+            ],
+            "executions": 48,
+            "workers": 2,
+            "gate": "All24 original stock/mixture inputs, complete traces, scores, actual commands and logical quality exact. Both scoped modes activate at least once in total. No case/source adjustment after observations."
+        },
+        "main": {
+            "cases": 6048,
+            "wholeFamilies": 1512,
+            "modes": [
+                "scoped"
+            ],
+            "fixedOriginalComparators": [
+                "stock",
+                "mixture"
+            ],
+            "caseBook": "cases.json",
+            "allOldGainsLossesAndUnchangedCasesRetained": true,
+            "noSamplingOrSubgroupRescue": true
+        },
+        "cold": {
+            "cases": 36,
+            "epochs": 2,
+            "executions": 72,
+            "workers": 2,
+            "selection": "First original case for every style/map/own-doctrine cell, independent of outcomes; two separate new-process epochs; exact main input/full trace/outcome/actual commands/logical quality/root counts/witnesses."
+        },
+        "admissionGates": {
+            "allSourceInputQualityColdAndOriginalControlsExact": true,
+            "scoreStrictlyHigherThanStock": true,
+            "scoreStrictlyHigherThanBroadMixture": true,
+            "fewerRegressionsThanBroadMixture": true,
+            "atLeast24ScopedRoots": true
+        },
+        "requiredAttribution": "Report every recovered loss, lost old gain and introduced loss. Zero scoped-root games must retain original stock full traces, outcomes and actual-command hashes. All integer counts independently reconstructed by Bun.",
+        "analysis": "Only after complete collection and both cold epochs; score half-points and all slices retained. No fresh-population confidence claim from reused admission. No interim score inspection or policy tuning.",
+        "independentVerification": "Bun verifies raw row hashes/identities, source manifest, primary integers, untouched original actual-command hashes and declared gates. Python separately verifies24 original preflight controls, quality and both36-case cold epochs; independent Bun does not reimplement those latter comparisons.",
+        "localWorkers": 8,
+        "unixNice": 19,
+        "host": "local M4 Max",
+        "gpuRequired": false,
+        "puffaloPhase": false,
+        "minimumFreeBytes": 4294967296,
+        "deadlineUnix": 1794995102.6140978,
+        "deadlineUtc": "2026-11-18T09:45:02.607548+00:00",
+        "termination": "One run, fixed3-hour cutoff. No retry, extension, source/gate change or case reassignment after game execution. Preserve partial results and failed controls. Stop if preflight fails. A pass does not activate anything.",
+        "nextGateIfPassed": "Separately registered fresh current-v12 authoritative-memory/committed-turn qualification, including native durable delivery/setup dispatch, then independent fresh confirmation and overall-average+10% full-fight/complete-decision CPU/wall/total/mean cost for both actual-driver scopes. No automatic promotion.",
+        "teacherTestLabelsParsed": false,
+        "richerRankerRecipeRetuned": false,
+        "newIndependentStrengthSamples": 0,
+        "servingDefaultChanged": false,
+        "files": [
+            {
+                "path": "root-scope.ts",
+                "bytes": 1018,
+                "sha256": "ab4088c02a5d0b086aed516147fbfb6f7e6d4351a3e2aaa80a2232b47abd79a7"
+            },
+            {
+                "path": "root-scope.test.ts",
+                "bytes": 2788,
+                "sha256": "a27d3fd63eae9373316c920633cd6d2d1c7806413358207fa368bfa8f5af4ad5"
+            },
+            {
+                "path": "actor.ts",
+                "bytes": 6900,
+                "sha256": "48a173feae96a2a3f4e5b34392f8cb1a8a09106697509cad87d783aee63d0437"
+            },
+            {
+                "path": "run.py",
+                "bytes": 8582,
+                "sha256": "3dbe6dae4371d328f31ae662ccb2126b592549a71f7040c72d7f00bdfd4710fc"
+            },
+            {
+                "path": "verify.ts",
+                "bytes": 3622,
+                "sha256": "be2281eae701c4b46b92dc5f22781cdd573abe8df0949e282f48e8e5728ddc88"
+            },
+            {
+                "path": "unit-tests.log",
+                "bytes": 506,
+                "sha256": "27b359966f081c0dc87534afbcd4727b94849415ddb99416fe558929fa81a94a"
+            },
+            {
+                "path": "preflight-cases.json",
+                "bytes": 3457,
+                "sha256": "0c837722f474a836872ec613ac7666d26fc8e5f39bb4ec5af8a632c2012c2792"
+            },
+            {
+                "path": "preflight-controls.json",
+                "bytes": 800030,
+                "sha256": "122009567d354cc660e7cbc427900fc6f82812a35d58ada1283e2ca7220dcb84"
+            },
+            {
+                "path": "cases.json",
+                "bytes": 2679742,
+                "sha256": "a3d08854f2157323fbdf11d405bec413fb176e019fb71a4330f916dde815bab7"
+            },
+            {
+                "path": "original-trace-index.json",
+                "bytes": 5396601,
+                "sha256": "1a50e7602630c877e72db4d6291c996b15d5425852a56596162a3fb7fa697eee"
+            },
+            {
+                "path": "cold-cases.json",
+                "bytes": 15857,
+                "sha256": "57b344f0900f01f8a144f5c067784d91db986251edfc45dfa2d3d3e106e2f5f0"
+            }
+        ]
+    },
+    "originalLocalTerminalState": {
+        "complete": false,
+        "stage": "failed-preserve-all-no-retry",
+        "pid": 68063,
+        "registrationSha256": "12258d61def5b850ce9adf462e3981a50e4c75824f42ad13acbaaa30532a912a",
+        "phaseCompleted": 0,
+        "errors": [
+            "AssertionError()"
+        ],
+        "newIndependentStrengthSamples": 0,
+        "defaultChanged": false,
+        "at": "2026-11-18T06:45:02.655545+00:00",
+        "elapsedSeconds": 0.00038737524300813675
+    },
+    "transport": {
+        "archiveSha256": "861fdfa4240cda7fac101a2ecb4d698d5d9673c3f8e66be76e569bc8c2a3eb39",
+        "archiveBytes": 63869339,
+        "regularManifestMembersVerified": 6972,
+        "linksCreatedFromFixedRelativeAllowlist": true,
+        "installedDependencies": "Existing own frozen-v11 campaign package bytes; new physical common metadata link retains one engine source."
+    },
+    "nodeLaunch": {
+        "at": "2026-11-18T06:56:06.867295+00:00",
+        "pid": 1135513,
+        "registrationSha256": "e2ab7db93a9526e33e2f432ea83d1b96dd4575180fc64452e25e9ff1eea731dc",
+        "unixNice": 19,
+        "workers": 8,
+        "nodeCodeTestsPassed": true,
+        "deadlineUtc": "2026-11-18T09:45:02.607548+00:00"
+    },
+    "sourceBodies": [
+        {
+            "path": "root-scope.ts",
+            "sha256": "ab4088c02a5d0b086aed516147fbfb6f7e6d4351a3e2aaa80a2232b47abd79a7",
+            "body": "/** Inactive root-admission hypothesis; no policy hook is installed by importing this file. */\nimport type { GameAction } from \"./sources/common/src/engine/actions\";\nimport type { IDecisionContext } from \"./sources/common/src/ai/ai_strategy\";\nimport type { Unit } from \"./sources/common/src/units/unit\";\nimport { PBTypes } from \"./sources/common/src/generated/protobuf/v1/types\";\nimport { getCellForPosition } from \"./sources/common/src/grid/grid_math\";\nexport function isActualMeleeBarrelRoot(unit:Unit,incumbent:readonly GameAction[],context:IDecisionContext|undefined):boolean {\n if(context?.decisionOrigin!==\"root\"||unit.getAttackTypeSelection()===PBTypes.AttackVals.RANGE)return false;\n const strike=incumbent.find(a=>a.type===\"obstacle_attack\");\n if(!strike||strike.type!==\"obstacle_attack\"||strike.attackerId!==unit.getId())return false;\n const cell=getCellForPosition(context.grid.getSettings(),strike.targetPosition);\n return context.grid.getArtifactBarrels().some(b=>b.cell.x===cell.x&&b.cell.y===cell.y);\n}\n"
+        },
+        {
+            "path": "root-scope.test.ts",
+            "sha256": "a27d3fd63eae9373316c920633cd6d2d1c7806413358207fa368bfa8f5af4ad5",
+            "body": "import { test, expect } from \"bun:test\";\nimport { isActualMeleeBarrelRoot } from \"./root-scope\";\nimport { PBTypes } from \"./sources/common/src/generated/protobuf/v1/types\";\nimport { captureDeterministicRandomState } from \"./sources/common/src/utils/lib\";\nconst holder = (selection = PBTypes.AttackVals.MELEE) => ({ getId: () => \"actor\", getAttackTypeSelection: () => selection }) as any;\nconst context = (barrels: any[] = [{ cell: { x: 3, y: 5 }, team: 1 }], origin = \"root\") => ({ decisionOrigin: origin, grid: { getSettings: () => ({ getMaxX: () => 0, getCellSize: () => 10 }), getArtifactBarrels: () => barrels } }) as any;\nconst strike: any = { type: \"obstacle_attack\", attackerId: \"actor\", targetPosition: { x: 35, y: 55 } };\ntest(\"both armies' deployment barrels qualify at the exact real melee root\", () => {\n    for (const team of [1, 2]) expect(isActualMeleeBarrelRoot(holder(), [strike], context([{ cell: { x: 3, y: 5 }, team }]))).toBe(true);\n});\ntest(\"ordinary shots, attacks, moves and holds stay outside the direct intervention\", () => {\n    for (const actions of [[{ type: \"range_attack\", attackerId: \"actor\", targetId: \"enemy\" }], [{ type: \"melee_attack\", attackerId: \"actor\", targetId: \"enemy\" }], [{ type: \"move_unit\", unitId: \"actor\", path: [] }], [{ type: \"wait_turn\", unitId: \"actor\" }], [{ type: \"defend_turn\", unitId: \"actor\" }], []]) expect(isActualMeleeBarrelRoot(holder(), actions as any, context())).toBe(false);\n    expect(isActualMeleeBarrelRoot(holder(PBTypes.AttackVals.RANGE), [strike], context())).toBe(false);\n});\ntest(\"neutral stones, other barrel cells, wrong actors and non-root calls stay native\", () => {\n    expect(isActualMeleeBarrelRoot(holder(), [strike], context([]))).toBe(false);\n    expect(isActualMeleeBarrelRoot(holder(), [strike], context([{ cell: { x: 4, y: 5 }, team: 2 }]))).toBe(false);\n    expect(isActualMeleeBarrelRoot(holder(), [{ ...strike, attackerId: \"other\" }], context())).toBe(false);\n    for (const origin of [\"rollout\", \"leaf\", \"reply\", \"\"]) expect(isActualMeleeBarrelRoot(holder(), [strike], context(undefined, origin))).toBe(false);\n    expect(isActualMeleeBarrelRoot(new Proxy({}, { get() { throw Error(\"No unit inspection without root context\"); } }) as any, [strike], undefined)).toBe(false);\n});\ntest(\"admission is deterministic, read-only and preserves random/UUID state and command references\", () => {\n    const before = captureDeterministicRandomState(), actions = Object.freeze([Object.freeze(strike)]), ctx = context(), unit = holder(), text = JSON.stringify(actions);\n    for (let i = 0; i < 20; i++) expect(isActualMeleeBarrelRoot(unit, actions, ctx)).toBe(true);\n    expect(actions[0]).toBe(strike); expect(JSON.stringify(actions)).toBe(text); expect(captureDeterministicRandomState()).toEqual(before);\n});\n"
+        },
+        {
+            "path": "actor.ts",
+            "sha256": "48a173feae96a2a3f4e5b34392f8cb1a8a09106697509cad87d783aee63d0437",
+            "body": "import {isActualMeleeBarrelRoot} from \"./root-scope\";\nimport assert from \"node:assert/strict\";\nimport { appendFileSync } from \"node:fs\";\nimport { createInterface } from \"node:readline\";\nimport { gzipSync } from \"node:zlib\";\nimport { buildChoice } from \"./build-choice\";\nimport { fightNative, hash } from \"./native\";\nimport { SearchDriver } from \"./sources/common/src/simulation/search_driver\";\nimport { permuteRankedDraftSeed } from \"./sources/common/src/simulation/ranked_draft_eval\";\nimport { getA19NeuralModel } from \"./sources/common/src/simulation/a19_neural_model\";\nimport { loadLockedA19FullPolicyPair } from \"./sources/common/src/simulation/v0_9/a19_full_policy_checkpoint\";\nimport { V08_A19_PROFILE_SCHEMA } from \"./sources/common/src/ai/versions/v0_8_a19_profile\";\nimport { environment } from \"./profiles\";\n\nassert.equal(V08_A19_PROFILE_SCHEMA, \"hoc.v0_8_a19_production_profile.v11\");\nassert.equal(environment.SEARCH_A19_MELEE_BARREL_DELIBERATION, \"1\");\nassert.equal(environment.SEARCH_A19_NIGHTMARE_WALL_MOVEMENT, \"1\");\nassert.equal(environment.SEARCH_ROLLOUTS, \"2\");\nassert.equal(environment.SEARCH_HORIZON, \"64\");\nassert.equal(environment.SEARCH_A19_ROLLOUT_ALLOCATION, \"uniform\");\nconst [output, implementation] = process.argv.slice(2);\nassert([\"baseline\", \"candidate\"].includes(implementation));\nconst g = globalThis as any, proto = SearchDriver.prototype as any;\nconst choose = proto.chooseDecision, model = getA19NeuralModel(), predict = model.predict;\nconst accepted = loadLockedA19FullPolicyPair();\nassert.equal(accepted.pairSha256, \"675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68\");\nmodel.predict = (observation: any) => {\n    if (g.__mode === \"accepted\" && g.__modelActorTeam === g.__team) {\n        g.__acceptedCalls++;\n        return accepted.predict(observation);\n    }\n    return predict.call(model, observation);\n};\nproto.chooseDecision = function (unit: any, ...args: any[]) {\n    g.__modelActorTeam = unit.getTeam();\n    if (implementation === \"candidate\") {\n        const eligible=isActualMeleeBarrelRoot(unit,args[1],args[2]);\n        const scoped=(g.__mode === \"scoped-both\"||(g.__mode === \"scoped\"&&unit.getTeam()===g.__team))&&eligible;\n        const active = scoped || g.__mode === \"both\" || (g.__mode === \"mixture\" && unit.getTeam() === g.__team);\n        if(scoped){g.__scopedRoots++;if(g.__scopedWitnesses.length<8)g.__scopedWitnesses.push({unitId:unit.getId(),team:unit.getTeam(),lap:args[2].fightProperties.getCurrentLap(),incumbent:structuredClone(args[1])});}\n        if(g.__mode === \"scoped\"||g.__mode === \"scoped-both\"){\n          g.__scopedDecisions++;\n          assert.equal(active,scoped,\"No direct activation outside a registered actual melee-barrel root\");\n        }\n        this.barrelForecastMixture = active;\n        this.liveCertifiedBounds = active;\n        if (active) g.__mixtureRoots++;\n    }\n    return choose.call(this, unit, ...args);\n};\n\nfor await (const line of createInterface({ input: process.stdin })) {\n    const { job, registrationSha256 } = JSON.parse(line);\n    const team = (job.game < 2) === (job.game % 2 === 0) ? 2 : 1;\n    const combatSeed = permuteRankedDraftSeed(job.seed + 6 + Number(job.game >= 2));\n    const modes: string[] = job.modes ?? [\"stock\", \"mixture\", \"accepted\"];\n    const rotation = (job.board + job.game) % modes.length;\n    const ordered = [...modes.slice(rotation), ...modes.slice(0, rotation)];\n    let consumedHash: string | undefined;\n    for (const mode of ordered) {\n        assert(implementation !== \"baseline\" || mode === \"stock\");\n        g.__mode = \"stock\";\n        g.__mixtureLiveMode = false;\n        const built = buildChoice(job, \"current\", \"current\", team);\n        if (job.draftConfigSha256) assert.equal(hash(built.drafted.config), job.draftConfigSha256[Number(job.game >= 2)]);\n        const inputSha256 = hash({ config: built.opening.config, teams: built.opening.teams, terrain: built.opening.terrain, combatSeed });\n        if (consumedHash) assert.equal(inputSha256, consumedHash, \"An arm changed the funded native opening\");\n        consumedHash = inputSha256;\n        if (job.expectedInputSha256) assert.equal(inputSha256, job.expectedInputSha256);\n        g.__mode = mode;\n        g.__team = team;\n        g.__acceptedCalls = 0;\n        g.__mixtureRoots = 0; g.__scopedRoots=0;g.__scopedDecisions=0;g.__scopedWitnesses=[];\n        g.__mixtureLiveMode = !!job.live;\n        const actualTurns: any[] = [], decisionMicros: any[] = [];\n        g.__rushTurn = (r: any) => actualTurns.push({ unitId: r.unitId, creatureName: r.creatureName, rawIncumbent: r.rawIncumbent, chosenDecision: r.chosenDecision });\n        g.__mixtureDecisionCompleted = (o: any) => {\n            assert.equal(o.context.a19BarrelIntentForecast, undefined, \"Projected flag reached an actual root\");\n            assert(Number.isFinite(o.context.decisionStartedAtMs));\n            decisionMicros.push({ team: o.unit.getTeam(), micros: Math.max(0, Math.round((performance.now() - o.context.decisionStartedAtMs) * 1000)) });\n        };\n        const cpu = process.cpuUsage(), started = performance.now();\n        const fought = fightNative(structuredClone(built.opening), combatSeed);\n        const fightWallMicros = Math.round((performance.now() - started) * 1000), used = process.cpuUsage(cpu);\n        assert.equal(fought.result.endReason, \"elimination\");\n        const score = fought.result.winner === \"draw\" ? .5 : Number(fought.result.winner === (team === 2 ? \"green\" : \"red\"));\n        if (mode === \"mixture\") assert(g.__mixtureRoots > 0);\n        if (mode === \"accepted\") assert(g.__acceptedCalls > 0);\n        for (const w of fought.quality.work) for (const k of [\"deadlineFallbacks\", \"circuitSkipped\", \"circuitWaitArbitrations\", \"degradedDecisions\"]) assert.equal(w[k] ?? 0, 0);\n        if (job.expectedTraceSha256?.[mode]) {\n            assert.equal(fought.traceSha256, job.expectedTraceSha256[mode]);\n            assert.equal(score, job.expectedScore[mode]);\n        }\n        const row = { ...job, mode, implementation, team, registrationSha256, inputSha256, traceSha256: fought.traceSha256,\n            score, winner: fought.result.winner, fightCpuMicros: used.user + used.system, fightWallMicros,\n            decisionMicros, actualTurns, scopedRoots:g.__scopedRoots,scopedDecisions:g.__scopedDecisions,scopedWitnesses:g.__scopedWitnesses, mixtureRoots: g.__mixtureRoots, acceptedModelCalls: g.__acceptedCalls,\n            acceptedPairSha256: mode === \"accepted\" ? accepted.pairSha256 : undefined, quality: fought.quality };\n        const raw = JSON.stringify(row) + \"\\n\";\n        // Concatenated gzip members preserve every original JSONL byte; compression is outside all timers.\n        appendFileSync(output, output.endsWith(\".gz\") ? gzipSync(raw, { level: 1 }) : raw);\n    }\n    console.log(JSON.stringify({ verified: true, board: job.board, game: job.game, rows: modes.length }));\n}\n"
+        },
+        {
+            "path": "run.py",
+            "sha256": "3dbe6dae4371d328f31ae662ccb2126b592549a71f7040c72d7f00bdfd4710fc",
+            "body": "from pathlib import Path\nimport concurrent.futures,datetime,gzip,hashlib,json,os,shutil,subprocess,threading,time\n\np=Path(__file__).resolve().parent\nold=p.parent/'barrel-forecast-mixture-v11-confirmation-20261117'\nregraw=(p/'registration.json').read_bytes();reg=json.loads(regraw);seal=hashlib.sha256(regraw).hexdigest()\nsha=lambda b:hashlib.sha256(b).hexdigest()\nstate={'complete':False,'stage':'integrity','pid':os.getpid(),'registrationSha256':seal,'phaseCompleted':0,'errors':[],'newIndependentStrengthSamples':0,'defaultChanged':False}\nlock=threading.Lock();processes=[];began=time.monotonic()\ndef read(name):return json.loads((p/name).read_text())\ndef write(name,obj):\n with(p/name).open('x')as f:json.dump(obj,f,indent=2,allow_nan=False);f.write('\\n')\ndef save():\n with lock:\n  state['at']=datetime.datetime.now(datetime.timezone.utc).isoformat();state['elapsedSeconds']=time.monotonic()-began\n  tmp=p/'status.tmp';tmp.write_text(json.dumps(state,indent=2)+'\\n');tmp.replace(p/'status.json')\ndef check():\n assert time.time()<reg['deadlineUnix'],'Fixed cutoff; no retry or extension'\n assert shutil.disk_usage(p).free>=reg['minimumFreeBytes']\ndef integrity():\n check()\n for f in reg['files']:assert sha((p/f['path']).read_bytes())==f['sha256'],f['path']\n assert sha((old/'strength-registration.json').read_bytes())==reg['parentRegistrationSha256']\n for f in json.loads((old/'strength-registration.json').read_text())['files']:\n  assert sha((old/f['path']).read_bytes())==f['sha256'],f['path']\ndef rows(phase):\n for f in sorted((p/phase).glob('worker-*.jsonl.gz')):\n  with gzip.open(f,'rt')as inp:\n   for line in inp:yield json.loads(line)\ndef run_phase(name,jobs,workers):\n integrity();dest=p/name;dest.mkdir();state.update({'stage':name,'phaseCompleted':0,'phaseExpected':len(jobs),'workers':workers});save()\n def work(i):\n  output=dest/f'worker-{i}.jsonl.gz'\n  with(dest/f'worker-{i}.stderr.log').open('x')as log:\n   proc=subprocess.Popen(['nice','-n','19','bun','--preload','./alias.ts','./actor.ts',str(output),'candidate'],cwd=p,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=log,text=True,start_new_session=True)\n   with lock:processes.append(proc)\n   try:\n    for job in jobs[i::workers]:\n     check();proc.stdin.write(json.dumps({'job':job,'registrationSha256':seal},separators=(',',':'))+'\\n');proc.stdin.flush()\n     line=proc.stdout.readline();assert line,('Actor exited',i,proc.poll())\n     ack=json.loads(line);assert ack['verified']and ack['board']==job['board']and ack['game']==job['game']and ack['rows']==len(job['modes'])\n     with lock:state['phaseCompleted']+=1\n     save()\n    proc.stdin.close();assert proc.wait(timeout=30)==0\n   finally:\n    if proc.poll()is None:proc.terminate();proc.wait(timeout=10)\n with concurrent.futures.ThreadPoolExecutor(max_workers=workers)as pool:\n  try:\n   pending={pool.submit(work,i)for i in range(workers)}\n   while pending:\n    check();done,pending=concurrent.futures.wait(pending,timeout=5,return_when=concurrent.futures.FIRST_COMPLETED)\n    for future in done:future.result()\n  except BaseException:\n   for proc in processes:\n    if proc.poll()is None:proc.terminate()\n   raise\n assert state['phaseCompleted']==len(jobs);integrity()\ndef quality(r):\n assert r['registrationSha256']==seal and r['score']in[0,.5,1]\n assert r['quality']['rejected']==0\n for n in r['quality']['neural']:\n  for k in['modelErrors','missingStart','deadlineAbstentions','inferenceOverruns']:assert n[k]==0\n for w in r['quality']['work']:\n  for k in['deadlineFallbacks','circuitSkipped','circuitWaitArbitrations','degradedDecisions']:assert w.get(k,0)==0\ndef stable(r):\n return{k:r[k]for k in['inputSha256','traceSha256','score','winner','actualTurns','quality','scopedRoots','scopedDecisions','scopedWitnesses']}\nsave()\ntry:\n integrity();cases=read('cases.json');index={(r['board'],r['game']):r['arms']for r in read('original-trace-index.json')}\n assert len(cases)==len(index)==6048 and len({c['board']for c in cases})==1512\n pre=read('preflight-cases.json');controls=read('preflight-controls.json')\n run_phase('preflight',[{**c,'modes':['stock','mixture','scoped','scoped-both']}for c in pre],2)\n checked=0;activated=0;seen=set()\n for r in rows('preflight'):\n  quality(r);key=(r['board'],r['game'],r['mode']);assert key not in seen;seen.add(key)\n  if r['mode']in['stock','mixture']:\n   expected=controls[f\"{r['board']}-{r['game']}-{r['mode']}\"]\n   for k in expected:assert r[k]==expected[k],(key,k)\n   checked+=1\n  else:activated+=r['scopedRoots']\n assert len(seen)==48 and checked==24 and activated>0\n write('preflight-verification.json',{'passed':True,'originalControls':checked,'executions':len(seen),'scopedActivations':activated,'newIndependentStrengthSamples':0})\n run_phase('collection',[{**c,'modes':['scoped']}for c in cases],reg['localWorkers'])\n cold=read('cold-cases.json')\n for epoch in[1,2]:run_phase(f'cold-{epoch}',[{**c,'modes':['scoped']}for c in cold],2)\n state['stage']='complete-bank-admission-analysis';save();integrity()\n cold_keys={(c['board'],c['game'])for c in cold};cold_main={};seen=set();counts={'stockHalfPoints':0,'mixtureHalfPoints':0,'scopedHalfPoints':0,'oldGains':0,'oldLosses':0,'scopedGains':0,'scopedLosses':0,'recoveredOldLossesFull':0,'recoveredOldLossesPartial':0,'oldGainsLostFull':0,'oldGainsLostPartial':0,'newLossesFromPreviouslyUnchanged':0,'untouchedExactCases':0,'scopedRoots':0,'scopedDecisions':0};cells={}\n for r in rows('collection'):\n  quality(r);key=(r['board'],r['game']);assert key in index and key not in seen;seen.add(key);original=index[key];assert r['mode']=='scoped'and r['inputSha256']==original['stock']['inputSha256']==original['mixture']['inputSha256']\n  a=int(2*original['stock']['score']);b=int(2*original['mixture']['score']);c=int(2*r['score'])\n  counts['stockHalfPoints']+=a;counts['mixtureHalfPoints']+=b;counts['scopedHalfPoints']+=c\n  counts['oldGains']+=b>a;counts['oldLosses']+=b<a;counts['scopedGains']+=c>a;counts['scopedLosses']+=c<a\n  counts['recoveredOldLossesFull']+=b<a and c>=a;counts['recoveredOldLossesPartial']+=b<c<a\n  counts['oldGainsLostFull']+=b>a and c<=a;counts['oldGainsLostPartial']+=a<c<b;counts['newLossesFromPreviouslyUnchanged']+=b==a and c<a\n  counts['scopedRoots']+=r['scopedRoots'];counts['scopedDecisions']+=r['scopedDecisions']\n  if not r['scopedRoots']:\n   assert r['traceSha256']==original['stock']['traceSha256']and c==a;counts['untouchedExactCases']+=1\n  for label,value in[('map',r['map']),('style',r['opponentStyle']),('ownDoctrine',r['ownDoctrine']),('opponentDoctrine',r['opponentDoctrine'])]:\n   cell=cells.setdefault(f'{label}:{value}',{'cases':0,'stockHalfPoints':0,'mixtureHalfPoints':0,'scopedHalfPoints':0});cell['cases']+=1;cell['stockHalfPoints']+=a;cell['mixtureHalfPoints']+=b;cell['scopedHalfPoints']+=c\n  if key in cold_keys:cold_main[key]=stable(r)\n assert len(seen)==6048 and len({a for a,b in seen})==1512 and len(cold_main)==36\n for epoch in[1,2]:\n  got=set()\n  for r in rows(f'cold-{epoch}'):\n   quality(r);key=(r['board'],r['game']);assert key in cold_main and key not in got and stable(r)==cold_main[key];got.add(key)\n  assert got==cold_keys\n gates={'allSourceInputQualityColdAndOriginalControlsExact':True,'scoreStrictlyHigherThanStock':counts['scopedHalfPoints']>counts['stockHalfPoints'],'scoreStrictlyHigherThanBroadMixture':counts['scopedHalfPoints']>counts['mixtureHalfPoints'],'fewerRegressionsThanBroadMixture':counts['scopedLosses']<counts['oldLosses'],'atLeast24ScopedRoots':counts['scopedRoots']>=24}\n result={'registrationSha256':seal,'complete':True,'cases':6048,'wholeFamilies':1512,'counts':counts,'slicesDescriptiveOnly':cells,'gates':gates,'passedReusedAdmission':all(gates.values()),'independentStrengthSamples':0,'defaultChanged':False,'testTeacherLabelsParsed':False,'elapsedSeconds':time.monotonic()-began,'interpretation':'Complete reused-bank diagnostic only; no new population strength or speed claim. Both gains and regressions retained. A pass only permits separately frozen current-v12 authoritative-memory qualification and overall-average+10% cost.'}\n write('analysis.json',result)\n with(p/'independent-verification.log').open('x')as log:subprocess.run(['nice','-n','19','bun','./verify.ts'],cwd=p,stdout=log,stderr=subprocess.STDOUT,check=True)\n assert read('independent-verification.json')['passed'];state.update({'complete':True,'stage':'complete-verified-reused-admission'})\nexcept BaseException as error:\n state['errors'].append(repr(error));state['stage']='failed-preserve-all-no-retry'\n for proc in processes:\n  if proc.poll()is None:proc.terminate()\n raise\nfinally:save()\n"
+        },
+        {
+            "path": "verify.ts",
+            "sha256": "be2281eae701c4b46b92dc5f22781cdd573abe8df0949e282f48e8e5728ddc88",
+            "body": "import assert from \"node:assert/strict\";\nimport {createHash} from \"node:crypto\";\nimport {readFileSync,readdirSync,createReadStream,writeFileSync} from \"node:fs\";\nimport {createInterface} from \"node:readline\";\nimport {createGunzip} from \"node:zlib\";\nconst p=import.meta.dir,read=(f:string)=>JSON.parse(readFileSync(`${p}/${f}`,\"utf8\")),sha=(b:Buffer|string)=>createHash(\"sha256\").update(b).digest(\"hex\"),reg=read(\"registration.json\"),seal=sha(readFileSync(`${p}/registration.json`));\nfor(const f of reg.files)assert.equal(sha(readFileSync(`${p}/${f.path}`)),f.sha256);\nconst index=new Map<string,any>(read(\"original-trace-index.json\").map((r:any)=>[`${r.board}-${r.game}`,r.arms])),analysis=read(\"analysis.json\"),seen=new Set<string>();\nconst counts:any={stockHalfPoints:0,mixtureHalfPoints:0,scopedHalfPoints:0,oldGains:0,oldLosses:0,scopedGains:0,scopedLosses:0,recoveredOldLossesFull:0,recoveredOldLossesPartial:0,oldGainsLostFull:0,oldGainsLostPartial:0,newLossesFromPreviouslyUnchanged:0,untouchedExactCases:0,scopedRoots:0,scopedDecisions:0};\nfor(const f of readdirSync(`${p}/collection`).filter(f=>f.endsWith(\".jsonl.gz\")).sort())for await(const line of createInterface({input:createReadStream(`${p}/collection/${f}`).pipe(createGunzip()),crlfDelay:Infinity})){\n const r=JSON.parse(line),key=`${r.board}-${r.game}`,original=index.get(key);assert(original&&!seen.has(key));seen.add(key);assert.equal(r.registrationSha256,seal);assert.equal(r.mode,\"scoped\");assert.equal(r.inputSha256,original.stock.inputSha256);\n const a=2*original.stock.score,b=2*original.mixture.score,c=2*r.score;assert([0,1,2].includes(c));counts.stockHalfPoints+=a;counts.mixtureHalfPoints+=b;counts.scopedHalfPoints+=c;\n for(const[k,v]of Object.entries({oldGains:b>a,oldLosses:b<a,scopedGains:c>a,scopedLosses:c<a,recoveredOldLossesFull:b<a&&c>=a,recoveredOldLossesPartial:b<c&&c<a,oldGainsLostFull:b>a&&c<=a,oldGainsLostPartial:a<c&&c<b,newLossesFromPreviouslyUnchanged:b===a&&c<a}))counts[k]+=+v;\n counts.scopedRoots+=r.scopedRoots;counts.scopedDecisions+=r.scopedDecisions;assert(r.scopedRoots<=r.scopedDecisions);\n if(!r.scopedRoots){assert.equal(r.traceSha256,original.stock.traceSha256);assert.equal(c,a);assert.equal(sha(JSON.stringify(r.actualTurns)),original.stock.actualTurnsSha256);counts.untouchedExactCases++;}\n assert.equal(r.quality.rejected,0);for(const w of r.quality.work)for(const k of[\"deadlineFallbacks\",\"circuitSkipped\",\"circuitWaitArbitrations\",\"degradedDecisions\"])assert.equal(w[k]??0,0);\n}\nassert.equal(seen.size,6048);assert.deepEqual(counts,analysis.counts);assert.equal(analysis.registrationSha256,seal);\nconst gates={allSourceInputQualityColdAndOriginalControlsExact:true,scoreStrictlyHigherThanStock:counts.scopedHalfPoints>counts.stockHalfPoints,scoreStrictlyHigherThanBroadMixture:counts.scopedHalfPoints>counts.mixtureHalfPoints,fewerRegressionsThanBroadMixture:counts.scopedLosses<counts.oldLosses,atLeast24ScopedRoots:counts.scopedRoots>=24};\nassert.deepEqual(gates,analysis.gates);assert.equal(Object.values(gates).every(Boolean),analysis.passedReusedAdmission);\nconst result={passed:true,registrationSha256:seal,cases:seen.size,allPrimaryIntegerCountsAndDeclaredGatesExact:true,allUntouchedFullTracesAndActualTurnHashesExact:true,coverageLimit:\"Primary integers and untouched rows independently reconstructed. Python checks original preflight and two cold epochs; Bun does not separately rerun those comparisons.\",newIndependentStrengthSamples:0,defaultChanged:false};\nwriteFileSync(`${p}/independent-verification.json`,JSON.stringify(result,null,2)+\"\\n\",{flag:\"wx\"});console.log(JSON.stringify(result));\n"
+        },
+        {
+            "path": "install-and-launch.py",
+            "sha256": "82cafc984663761117104ac58f6ab1d76b98921c773dd5e0728e972bbb4d8702",
+            "body": "from pathlib import Path\nimport datetime,hashlib,json,os,shutil,subprocess,sys,tarfile,time\nroot=Path(__file__).resolve().parent;a=root/'startup-transport.tar.gz';sha=lambda b:hashlib.sha256(b).hexdigest()\nassert sha(a.read_bytes())=='861fdfa4240cda7fac101a2ecb4d698d5d9673c3f8e66be76e569bc8c2a3eb39'\nwith tarfile.open(a)as t:\n members=t.getmembers();assert len(members)==len({m.name for m in members})and all(m.isfile()and not m.name.startswith('/')and'..'not in Path(m.name).parts for m in members)\n manifest=json.loads(t.extractfile('bundle-manifest.json').read());assert manifest['registrationSha256']=='e2ab7db93a9526e33e2f432ea83d1b96dd4575180fc64452e25e9ff1eea731dc'\n assert {m.name for m in members}=={r['path']for r in manifest['files']}|{'bundle-manifest.json'}\n for r in manifest['files']:\n  b=t.extractfile(r['path']).read();assert len(b)==r['bytes']and sha(b)==r['sha256'];dest=root/r['path'];dest.parent.mkdir(parents=True,exist_ok=True)\n  if dest.exists():assert dest.is_file()and not dest.is_symlink()and dest.read_bytes()==b,r['path']\n  else:\n   with dest.open('xb')as f:f.write(b)\n with(root/'bundle-manifest.json').open('x')as f:json.dump(manifest,f,indent=2);f.write('\\n')\np=root/manifest['newCapsuleName'];parent=root/manifest['parentCapsuleName'];reg=json.loads((p/'registration.json').read_text())\nassert sha((p/'registration.json').read_bytes())==manifest['registrationSha256']and time.time()<reg['deadlineUnix']and shutil.disk_usage(p).free>=reg['minimumFreeBytes']\nfor name,target in manifest['relativeLinks'].items():\n assert '/'not in name and not(p/name).exists();os.symlink(target,p/name,target_is_directory=name=='sources')\n# Reuse only this campaign's already installed package bytes; common metadata resolves to the new frozen physical copy.\nexisting=Path.home()/'hoc-research/barrel-forecast-mixture-v11-confirmation-20261117/candidate/node_modules';assert existing.is_dir()\nmodules=parent/'candidate/node_modules';modules.mkdir()\nfor source in existing.iterdir():\n if source.name=='@heroesofcrypto':continue\n os.symlink(source.resolve(),modules/source.name,target_is_directory=source.is_dir())\nscope=modules/'@heroesofcrypto';scope.mkdir();os.symlink('../../sources/common',scope/'common',target_is_directory=True)\nos.symlink(os.path.relpath(modules,p),p/'node_modules',target_is_directory=True)\nassert shutil.which('bun')\nwith(p/'node-unit-tests.log').open('x')as log:subprocess.run(['nice','-n','19','bun','test','--preload','./alias.ts','./root-scope.test.ts'],cwd=p,stdout=log,stderr=subprocess.STDOUT,check=True,timeout=60)\nassert not(p/'status.json').exists()\nlaunch={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'registrationSha256':manifest['registrationSha256'],'stage':'launching-once','all6972TransportMembersExact':True,'nodeCodeTestsPassed':True,'deadlineUtc':reg['deadlineUtc'],'unixNice':19,'workers':reg['localWorkers']}\nwith(p/'launch.json').open('x')as f:json.dump(launch,f,indent=2);f.write('\\n')\nwith(p/'controller.log').open('xb')as log:proc=subprocess.Popen(['nice','-n','19',sys.executable,'run.py'],cwd=p,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)\nlaunch.update({'stage':'launched','pid':proc.pid});tmp=p/'launch.tmp';tmp.write_text(json.dumps(launch,indent=2)+'\\n');tmp.replace(p/'launch.json');print(json.dumps(launch))\n"
+        }
+    ],
+    "newIndependentStrengthSamples": 0,
+    "heldoutTeacherTestParsed": false,
+    "fittedRankerRetuned": false,
+    "defaultChanged": false,
+    "interpretation": "This is a distinct scoped policy hypothesis, not a demonstrated regression repair. Original attribution included ordinary ranged retargets in both gains and losses. Full reused6048-case evidence must account for both before any fresh current-v12 qualification. Local disk failure executed zero games; host-only startup amendment retains source/gates/all cases/original cutoff.",
+    "failedFirstNodeState": {
+        "complete": false,
+        "stage": "failed-preserve-all-no-retry",
+        "pid": 1135513,
+        "registrationSha256": "e2ab7db93a9526e33e2f432ea83d1b96dd4575180fc64452e25e9ff1eea731dc",
+        "phaseCompleted": 0,
+        "errors": [
+            "JSONDecodeError('Expecting value: line 1 column 1 (char 0)')"
+        ],
+        "newIndependentStrengthSamples": 0,
+        "defaultChanged": false,
+        "at": "2026-11-18T06:56:07.908166+00:00",
+        "elapsedSeconds": 0.9805100009543821,
+        "phaseExpected": 12,
+        "workers": 2
+    },
+    "firstNodeCompletedRecords": 0,
+    "firstNodeActualStartsProvenAbsent": false,
+    "streamV2RegistrationSha256": "35982f4a3cfc8b6507a745aefcde526eb170d1b2182e921a26f83dd7299dfac8",
+    "streamV2Registration": {
+        "id": "barrel-actual-melee-root-scoped-mixture-reused-v11-20261118-puffalo-stream-v2",
+        "registeredUtc": "2026-11-18T06:59:44.391461+00:00",
+        "parentRegistrationSha256": "1a31dd5fbba8544bf25ad96c3d10ab47165f4ddeabaf8602d9096f83c1dbb3ff",
+        "scope": "Distinct reused full-v11-bank admission after broad-mixture fresh confirmation and richer predictor support failed. No new population strength, model metric, timing qualification or activation.",
+        "candidate": "Enable the exact old balanced native/intent R2 mixture and its bounded live implementation only when this actual A19 root incumbent contains an own-actor melee attack on a currently present deployment barrel. Both owners qualify. Other actual roots retain the exact native/old implementation. Future controllers, sample assignment, H64/R2, candidate lists, root/neural arbitration and incumbent-memory commit otherwise unchanged. No memory-normalization change is bundled.",
+        "sameAllArms": "Original frozen-v11 engine, public legal draft/paid setup/terrain placement and accepted neural models. All6959 parent-protected files immutable. Only new root admission and diagnostic counters are added in this capsule. Parent sources are read-only relative symlinks, not a new working-tree edit.",
+        "hypothesis": "Reducing direct forecast-model changes outside actual barrel decisions may recover some broad-policy regressions; ordinary shot-to-shot changes also produced gains, so no net benefit is assumed.",
+        "codeTests": {
+            "passed": 4,
+            "assertions": 40,
+            "candidateGamesBeforeRegistration": "No completed/scored candidate records from the failed stream attempt; actual starts are not proven absent. No outcome used for this operational amendment.",
+            "cases": "Both barrel owners, real-root-only gating, ordinary attacks/moves/holds/ranged cleanup/neutral stones/wrong actor exclusion, deterministic read-only command and RNG/UUID invariance."
+        },
+        "preflight": {
+            "fixedCases": 12,
+            "styles": 4,
+            "maps": 3,
+            "modes": [
+                "stock",
+                "mixture",
+                "scoped",
+                "scoped-both"
+            ],
+            "executions": 48,
+            "workers": 2,
+            "gate": "All24 original stock/mixture inputs, complete traces, scores, actual commands and logical quality exact. Both scoped modes activate at least once in total. No case/source adjustment after observations."
+        },
+        "main": {
+            "cases": 6048,
+            "wholeFamilies": 1512,
+            "modes": [
+                "scoped"
+            ],
+            "fixedOriginalComparators": [
+                "stock",
+                "mixture"
+            ],
+            "caseBook": "cases.json",
+            "allOldGainsLossesAndUnchangedCasesRetained": true,
+            "noSamplingOrSubgroupRescue": true
+        },
+        "cold": {
+            "cases": 36,
+            "epochs": 2,
+            "executions": 72,
+            "workers": 2,
+            "selection": "First original case for every style/map/own-doctrine cell, independent of outcomes; two separate new-process epochs; exact main input/full trace/outcome/actual commands/logical quality/root counts/witnesses."
+        },
+        "admissionGates": {
+            "allSourceInputQualityColdAndOriginalControlsExact": true,
+            "scoreStrictlyHigherThanStock": true,
+            "scoreStrictlyHigherThanBroadMixture": true,
+            "fewerRegressionsThanBroadMixture": true,
+            "atLeast24ScopedRoots": true
+        },
+        "requiredAttribution": "Report every recovered loss, lost old gain and introduced loss. Zero scoped-root games must retain original stock full traces, outcomes and actual-command hashes. All integer counts independently reconstructed by Bun.",
+        "analysis": "Only after complete collection and both cold epochs; score half-points and all slices retained. No fresh-population confidence claim from reused admission. No interim score inspection or policy tuning.",
+        "independentVerification": "Bun verifies raw row hashes/identities, source manifest, primary integers, untouched original actual-command hashes and declared gates. Python separately verifies24 original preflight controls, quality and both36-case cold epochs; independent Bun does not reimplement those latter comparisons.",
+        "localWorkers": 8,
+        "unixNice": 19,
+        "host": "Puffalo Xeon",
+        "gpuRequired": false,
+        "puffaloPhase": true,
+        "minimumFreeBytes": 4294967296,
+        "deadlineUnix": 1794995102.6140978,
+        "deadlineUtc": "2026-11-18T09:45:02.607548+00:00",
+        "termination": "One run, fixed3-hour cutoff. No retry, extension, source/gate change or case reassignment after game execution. Preserve partial results and failed controls. Stop if preflight fails. A pass does not activate anything.",
+        "nextGateIfPassed": "Separately registered fresh current-v12 authoritative-memory/committed-turn qualification, including native durable delivery/setup dispatch, then independent fresh confirmation and overall-average+10% full-fight/complete-decision CPU/wall/total/mean cost for both actual-driver scopes. No automatic promotion.",
+        "teacherTestLabelsParsed": false,
+        "richerRankerRecipeRetuned": false,
+        "newIndependentStrengthSamples": 0,
+        "servingDefaultChanged": false,
+        "files": [
+            {
+                "path": "root-scope.ts",
+                "bytes": 1018,
+                "sha256": "ab4088c02a5d0b086aed516147fbfb6f7e6d4351a3e2aaa80a2232b47abd79a7"
+            },
+            {
+                "path": "root-scope.test.ts",
+                "bytes": 2788,
+                "sha256": "a27d3fd63eae9373316c920633cd6d2d1c7806413358207fa368bfa8f5af4ad5"
+            },
+            {
+                "path": "actor.ts",
+                "bytes": 7014,
+                "sha256": "bd4b30f73fa05f2710c6c4c5904032fee42877b342f939db0fc789216eb9663d"
+            },
+            {
+                "path": "run.py",
+                "bytes": 9024,
+                "sha256": "46af605287ecb500799b432eeed1aa01c7b1653036602c6760ed37f9503e412e"
+            },
+            {
+                "path": "verify.ts",
+                "bytes": 3622,
+                "sha256": "be2281eae701c4b46b92dc5f22781cdd573abe8df0949e282f48e8e5728ddc88"
+            },
+            {
+                "path": "unit-tests.log",
+                "bytes": 506,
+                "sha256": "27b359966f081c0dc87534afbcd4727b94849415ddb99416fe558929fa81a94a"
+            },
+            {
+                "path": "preflight-cases.json",
+                "bytes": 3457,
+                "sha256": "0c837722f474a836872ec613ac7666d26fc8e5f39bb4ec5af8a632c2012c2792"
+            },
+            {
+                "path": "preflight-controls.json",
+                "bytes": 800030,
+                "sha256": "122009567d354cc660e7cbc427900fc6f82812a35d58ada1283e2ca7220dcb84"
+            },
+            {
+                "path": "cases.json",
+                "bytes": 2679742,
+                "sha256": "a3d08854f2157323fbdf11d405bec413fb176e019fb71a4330f916dde815bab7"
+            },
+            {
+                "path": "original-trace-index.json",
+                "bytes": 5396601,
+                "sha256": "1a50e7602630c877e72db4d6291c996b15d5425852a56596162a3fb7fa697eee"
+            },
+            {
+                "path": "cold-cases.json",
+                "bytes": 15857,
+                "sha256": "57b344f0900f01f8a144f5c067784d91db986251edfc45dfa2d3d3e106e2f5f0"
+            }
+        ],
+        "startupOnlyAmendment": {
+            "originalRegistrationSha256": "12258d61def5b850ce9adf462e3981a50e4c75824f42ad13acbaaa30532a912a",
+            "reason": "Local4GiB disk floor rejected before any actor/game. Move unchanged unstarted8-worker experiment to Puffalo with33GiB free; preserve original3-hour cutoff, candidate, all cases, sources and gates.",
+            "originalState": {
+                "complete": false,
+                "stage": "failed-preserve-all-no-retry",
+                "pid": 68063,
+                "registrationSha256": "12258d61def5b850ce9adf462e3981a50e4c75824f42ad13acbaaa30532a912a",
+                "phaseCompleted": 0,
+                "errors": [
+                    "AssertionError()"
+                ],
+                "newIndependentStrengthSamples": 0,
+                "defaultChanged": false,
+                "at": "2026-11-18T06:45:02.655545+00:00",
+                "elapsedSeconds": 0.00038737524300813675
+            },
+            "candidateGamesExecuted": 0,
+            "sourceOrGateChange": false,
+            "cutoffExtended": false,
+            "original4GiBDiskFloorRetained": true
+        },
+        "startupStdoutLines": [
+            "Consuming Development config",
+            "[ranked-setup] enabled artifact-fit-v6:v07-nonfight-4eda84635fe7"
+        ],
+        "readyHandshake": {
+            "ready": true,
+            "profile": "hoc.v0_8_a19_production_profile.v11",
+            "acceptedPairSha256": "675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68"
+        },
+        "streamOnlyAmendment": {
+            "previousRegistrationSha256": "e2ab7db93a9526e33e2f432ea83d1b96dd4575180fc64452e25e9ff1eea731dc",
+            "reason": "Module imports print two fixed non-JSON startup lines; the old controller dispatched inputs before trying to parse that output as an acknowledgement. Both worker logs and completed-record files are empty. A separate no-input import probe reproduced the exact two lines and executed no games. Preserve the failed run, original intelligence/gates/cases and original cutoff.",
+            "gameBegunInFailedAttemptProvenAbsent": false,
+            "completedGameRecords": 0,
+            "scoredOutcomesInspected": false,
+            "controllerChange": "Consume and retain the two exact registered module banners, then require exact JSON ready identity before dispatching any game. Actor adds only this startup console handshake. No broad log skipping or altered AI callback.",
+            "policyBodyByteExactAfterRemovingReadyPrint": true,
+            "cutoffExtended": false
+        }
+    },
+    "streamV2SourceBodies": [
+        {
+            "path": "actor.ts",
+            "sha256": "bd4b30f73fa05f2710c6c4c5904032fee42877b342f939db0fc789216eb9663d",
+            "body": "import {isActualMeleeBarrelRoot} from \"./root-scope\";\nimport assert from \"node:assert/strict\";\nimport { appendFileSync } from \"node:fs\";\nimport { createInterface } from \"node:readline\";\nimport { gzipSync } from \"node:zlib\";\nimport { buildChoice } from \"./build-choice\";\nimport { fightNative, hash } from \"./native\";\nimport { SearchDriver } from \"./sources/common/src/simulation/search_driver\";\nimport { permuteRankedDraftSeed } from \"./sources/common/src/simulation/ranked_draft_eval\";\nimport { getA19NeuralModel } from \"./sources/common/src/simulation/a19_neural_model\";\nimport { loadLockedA19FullPolicyPair } from \"./sources/common/src/simulation/v0_9/a19_full_policy_checkpoint\";\nimport { V08_A19_PROFILE_SCHEMA } from \"./sources/common/src/ai/versions/v0_8_a19_profile\";\nimport { environment } from \"./profiles\";\n\nassert.equal(V08_A19_PROFILE_SCHEMA, \"hoc.v0_8_a19_production_profile.v11\");\nassert.equal(environment.SEARCH_A19_MELEE_BARREL_DELIBERATION, \"1\");\nassert.equal(environment.SEARCH_A19_NIGHTMARE_WALL_MOVEMENT, \"1\");\nassert.equal(environment.SEARCH_ROLLOUTS, \"2\");\nassert.equal(environment.SEARCH_HORIZON, \"64\");\nassert.equal(environment.SEARCH_A19_ROLLOUT_ALLOCATION, \"uniform\");\nconst [output, implementation] = process.argv.slice(2);\nassert([\"baseline\", \"candidate\"].includes(implementation));\nconst g = globalThis as any, proto = SearchDriver.prototype as any;\nconst choose = proto.chooseDecision, model = getA19NeuralModel(), predict = model.predict;\nconst accepted = loadLockedA19FullPolicyPair();\nassert.equal(accepted.pairSha256, \"675b438406b6ee3aa313feb1e382843a0442bc9970bc28810abc19d30d26aa68\");\nmodel.predict = (observation: any) => {\n    if (g.__mode === \"accepted\" && g.__modelActorTeam === g.__team) {\n        g.__acceptedCalls++;\n        return accepted.predict(observation);\n    }\n    return predict.call(model, observation);\n};\nproto.chooseDecision = function (unit: any, ...args: any[]) {\n    g.__modelActorTeam = unit.getTeam();\n    if (implementation === \"candidate\") {\n        const eligible=isActualMeleeBarrelRoot(unit,args[1],args[2]);\n        const scoped=(g.__mode === \"scoped-both\"||(g.__mode === \"scoped\"&&unit.getTeam()===g.__team))&&eligible;\n        const active = scoped || g.__mode === \"both\" || (g.__mode === \"mixture\" && unit.getTeam() === g.__team);\n        if(scoped){g.__scopedRoots++;if(g.__scopedWitnesses.length<8)g.__scopedWitnesses.push({unitId:unit.getId(),team:unit.getTeam(),lap:args[2].fightProperties.getCurrentLap(),incumbent:structuredClone(args[1])});}\n        if(g.__mode === \"scoped\"||g.__mode === \"scoped-both\"){\n          g.__scopedDecisions++;\n          assert.equal(active,scoped,\"No direct activation outside a registered actual melee-barrel root\");\n        }\n        this.barrelForecastMixture = active;\n        this.liveCertifiedBounds = active;\n        if (active) g.__mixtureRoots++;\n    }\n    return choose.call(this, unit, ...args);\n};\n\nconsole.log(JSON.stringify({ready:true,profile:V08_A19_PROFILE_SCHEMA,acceptedPairSha256:accepted.pairSha256}));\n\nfor await (const line of createInterface({ input: process.stdin })) {\n    const { job, registrationSha256 } = JSON.parse(line);\n    const team = (job.game < 2) === (job.game % 2 === 0) ? 2 : 1;\n    const combatSeed = permuteRankedDraftSeed(job.seed + 6 + Number(job.game >= 2));\n    const modes: string[] = job.modes ?? [\"stock\", \"mixture\", \"accepted\"];\n    const rotation = (job.board + job.game) % modes.length;\n    const ordered = [...modes.slice(rotation), ...modes.slice(0, rotation)];\n    let consumedHash: string | undefined;\n    for (const mode of ordered) {\n        assert(implementation !== \"baseline\" || mode === \"stock\");\n        g.__mode = \"stock\";\n        g.__mixtureLiveMode = false;\n        const built = buildChoice(job, \"current\", \"current\", team);\n        if (job.draftConfigSha256) assert.equal(hash(built.drafted.config), job.draftConfigSha256[Number(job.game >= 2)]);\n        const inputSha256 = hash({ config: built.opening.config, teams: built.opening.teams, terrain: built.opening.terrain, combatSeed });\n        if (consumedHash) assert.equal(inputSha256, consumedHash, \"An arm changed the funded native opening\");\n        consumedHash = inputSha256;\n        if (job.expectedInputSha256) assert.equal(inputSha256, job.expectedInputSha256);\n        g.__mode = mode;\n        g.__team = team;\n        g.__acceptedCalls = 0;\n        g.__mixtureRoots = 0; g.__scopedRoots=0;g.__scopedDecisions=0;g.__scopedWitnesses=[];\n        g.__mixtureLiveMode = !!job.live;\n        const actualTurns: any[] = [], decisionMicros: any[] = [];\n        g.__rushTurn = (r: any) => actualTurns.push({ unitId: r.unitId, creatureName: r.creatureName, rawIncumbent: r.rawIncumbent, chosenDecision: r.chosenDecision });\n        g.__mixtureDecisionCompleted = (o: any) => {\n            assert.equal(o.context.a19BarrelIntentForecast, undefined, \"Projected flag reached an actual root\");\n            assert(Number.isFinite(o.context.decisionStartedAtMs));\n            decisionMicros.push({ team: o.unit.getTeam(), micros: Math.max(0, Math.round((performance.now() - o.context.decisionStartedAtMs) * 1000)) });\n        };\n        const cpu = process.cpuUsage(), started = performance.now();\n        const fought = fightNative(structuredClone(built.opening), combatSeed);\n        const fightWallMicros = Math.round((performance.now() - started) * 1000), used = process.cpuUsage(cpu);\n        assert.equal(fought.result.endReason, \"elimination\");\n        const score = fought.result.winner === \"draw\" ? .5 : Number(fought.result.winner === (team === 2 ? \"green\" : \"red\"));\n        if (mode === \"mixture\") assert(g.__mixtureRoots > 0);\n        if (mode === \"accepted\") assert(g.__acceptedCalls > 0);\n        for (const w of fought.quality.work) for (const k of [\"deadlineFallbacks\", \"circuitSkipped\", \"circuitWaitArbitrations\", \"degradedDecisions\"]) assert.equal(w[k] ?? 0, 0);\n        if (job.expectedTraceSha256?.[mode]) {\n            assert.equal(fought.traceSha256, job.expectedTraceSha256[mode]);\n            assert.equal(score, job.expectedScore[mode]);\n        }\n        const row = { ...job, mode, implementation, team, registrationSha256, inputSha256, traceSha256: fought.traceSha256,\n            score, winner: fought.result.winner, fightCpuMicros: used.user + used.system, fightWallMicros,\n            decisionMicros, actualTurns, scopedRoots:g.__scopedRoots,scopedDecisions:g.__scopedDecisions,scopedWitnesses:g.__scopedWitnesses, mixtureRoots: g.__mixtureRoots, acceptedModelCalls: g.__acceptedCalls,\n            acceptedPairSha256: mode === \"accepted\" ? accepted.pairSha256 : undefined, quality: fought.quality };\n        const raw = JSON.stringify(row) + \"\\n\";\n        // Concatenated gzip members preserve every original JSONL byte; compression is outside all timers.\n        appendFileSync(output, output.endsWith(\".gz\") ? gzipSync(raw, { level: 1 }) : raw);\n    }\n    console.log(JSON.stringify({ verified: true, board: job.board, game: job.game, rows: modes.length }));\n}\n"
+        },
+        {
+            "path": "run.py",
+            "sha256": "46af605287ecb500799b432eeed1aa01c7b1653036602c6760ed37f9503e412e",
+            "body": "from pathlib import Path\nimport concurrent.futures,datetime,gzip,hashlib,json,os,shutil,subprocess,threading,time\n\np=Path(__file__).resolve().parent\nold=p.parent/'barrel-forecast-mixture-v11-confirmation-20261117'\nregraw=(p/'registration.json').read_bytes();reg=json.loads(regraw);seal=hashlib.sha256(regraw).hexdigest()\nsha=lambda b:hashlib.sha256(b).hexdigest()\nstate={'complete':False,'stage':'integrity','pid':os.getpid(),'registrationSha256':seal,'phaseCompleted':0,'errors':[],'newIndependentStrengthSamples':0,'defaultChanged':False}\nlock=threading.Lock();processes=[];began=time.monotonic()\ndef read(name):return json.loads((p/name).read_text())\ndef write(name,obj):\n with(p/name).open('x')as f:json.dump(obj,f,indent=2,allow_nan=False);f.write('\\n')\ndef save():\n with lock:\n  state['at']=datetime.datetime.now(datetime.timezone.utc).isoformat();state['elapsedSeconds']=time.monotonic()-began\n  tmp=p/'status.tmp';tmp.write_text(json.dumps(state,indent=2)+'\\n');tmp.replace(p/'status.json')\ndef check():\n assert time.time()<reg['deadlineUnix'],'Fixed cutoff; no retry or extension'\n assert shutil.disk_usage(p).free>=reg['minimumFreeBytes']\ndef integrity():\n check()\n for f in reg['files']:assert sha((p/f['path']).read_bytes())==f['sha256'],f['path']\n assert sha((old/'strength-registration.json').read_bytes())==reg['parentRegistrationSha256']\n for f in json.loads((old/'strength-registration.json').read_text())['files']:\n  assert sha((old/f['path']).read_bytes())==f['sha256'],f['path']\ndef rows(phase):\n for f in sorted((p/phase).glob('worker-*.jsonl.gz')):\n  with gzip.open(f,'rt')as inp:\n   for line in inp:yield json.loads(line)\ndef run_phase(name,jobs,workers):\n integrity();dest=p/name;dest.mkdir();state.update({'stage':name,'phaseCompleted':0,'phaseExpected':len(jobs),'workers':workers});save()\n def work(i):\n  output=dest/f'worker-{i}.jsonl.gz'\n  with(dest/f'worker-{i}.stderr.log').open('x')as log:\n   proc=subprocess.Popen(['nice','-n','19','bun','--preload','./alias.ts','./actor.ts',str(output),'candidate'],cwd=p,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=log,text=True,start_new_session=True)\n   with lock:processes.append(proc)\n   try:\n    with(dest/f'worker-{i}.startup.stdout.log').open('x')as startup:\n     for expected in reg['startupStdoutLines']:\n      line=proc.stdout.readline();startup.write(line);startup.flush();assert line.rstrip('\\n')==expected,('Unexpected startup output before any game',line)\n     line=proc.stdout.readline();startup.write(line);startup.flush();assert json.loads(line)==reg['readyHandshake'],'Ready handshake must precede every dispatched game'\n    for job in jobs[i::workers]:\n     check();proc.stdin.write(json.dumps({'job':job,'registrationSha256':seal},separators=(',',':'))+'\\n');proc.stdin.flush()\n     line=proc.stdout.readline();assert line,('Actor exited',i,proc.poll())\n     ack=json.loads(line);assert ack['verified']and ack['board']==job['board']and ack['game']==job['game']and ack['rows']==len(job['modes'])\n     with lock:state['phaseCompleted']+=1\n     save()\n    proc.stdin.close();assert proc.wait(timeout=30)==0\n   finally:\n    if proc.poll()is None:proc.terminate();proc.wait(timeout=10)\n with concurrent.futures.ThreadPoolExecutor(max_workers=workers)as pool:\n  try:\n   pending={pool.submit(work,i)for i in range(workers)}\n   while pending:\n    check();done,pending=concurrent.futures.wait(pending,timeout=5,return_when=concurrent.futures.FIRST_COMPLETED)\n    for future in done:future.result()\n  except BaseException:\n   for proc in processes:\n    if proc.poll()is None:proc.terminate()\n   raise\n assert state['phaseCompleted']==len(jobs);integrity()\ndef quality(r):\n assert r['registrationSha256']==seal and r['score']in[0,.5,1]\n assert r['quality']['rejected']==0\n for n in r['quality']['neural']:\n  for k in['modelErrors','missingStart','deadlineAbstentions','inferenceOverruns']:assert n[k]==0\n for w in r['quality']['work']:\n  for k in['deadlineFallbacks','circuitSkipped','circuitWaitArbitrations','degradedDecisions']:assert w.get(k,0)==0\ndef stable(r):\n return{k:r[k]for k in['inputSha256','traceSha256','score','winner','actualTurns','quality','scopedRoots','scopedDecisions','scopedWitnesses']}\nsave()\ntry:\n integrity();cases=read('cases.json');index={(r['board'],r['game']):r['arms']for r in read('original-trace-index.json')}\n assert len(cases)==len(index)==6048 and len({c['board']for c in cases})==1512\n pre=read('preflight-cases.json');controls=read('preflight-controls.json')\n run_phase('preflight',[{**c,'modes':['stock','mixture','scoped','scoped-both']}for c in pre],2)\n checked=0;activated=0;seen=set()\n for r in rows('preflight'):\n  quality(r);key=(r['board'],r['game'],r['mode']);assert key not in seen;seen.add(key)\n  if r['mode']in['stock','mixture']:\n   expected=controls[f\"{r['board']}-{r['game']}-{r['mode']}\"]\n   for k in expected:assert r[k]==expected[k],(key,k)\n   checked+=1\n  else:activated+=r['scopedRoots']\n assert len(seen)==48 and checked==24 and activated>0\n write('preflight-verification.json',{'passed':True,'originalControls':checked,'executions':len(seen),'scopedActivations':activated,'newIndependentStrengthSamples':0})\n run_phase('collection',[{**c,'modes':['scoped']}for c in cases],reg['localWorkers'])\n cold=read('cold-cases.json')\n for epoch in[1,2]:run_phase(f'cold-{epoch}',[{**c,'modes':['scoped']}for c in cold],2)\n state['stage']='complete-bank-admission-analysis';save();integrity()\n cold_keys={(c['board'],c['game'])for c in cold};cold_main={};seen=set();counts={'stockHalfPoints':0,'mixtureHalfPoints':0,'scopedHalfPoints':0,'oldGains':0,'oldLosses':0,'scopedGains':0,'scopedLosses':0,'recoveredOldLossesFull':0,'recoveredOldLossesPartial':0,'oldGainsLostFull':0,'oldGainsLostPartial':0,'newLossesFromPreviouslyUnchanged':0,'untouchedExactCases':0,'scopedRoots':0,'scopedDecisions':0};cells={}\n for r in rows('collection'):\n  quality(r);key=(r['board'],r['game']);assert key in index and key not in seen;seen.add(key);original=index[key];assert r['mode']=='scoped'and r['inputSha256']==original['stock']['inputSha256']==original['mixture']['inputSha256']\n  a=int(2*original['stock']['score']);b=int(2*original['mixture']['score']);c=int(2*r['score'])\n  counts['stockHalfPoints']+=a;counts['mixtureHalfPoints']+=b;counts['scopedHalfPoints']+=c\n  counts['oldGains']+=b>a;counts['oldLosses']+=b<a;counts['scopedGains']+=c>a;counts['scopedLosses']+=c<a\n  counts['recoveredOldLossesFull']+=b<a and c>=a;counts['recoveredOldLossesPartial']+=b<c<a\n  counts['oldGainsLostFull']+=b>a and c<=a;counts['oldGainsLostPartial']+=a<c<b;counts['newLossesFromPreviouslyUnchanged']+=b==a and c<a\n  counts['scopedRoots']+=r['scopedRoots'];counts['scopedDecisions']+=r['scopedDecisions']\n  if not r['scopedRoots']:\n   assert r['traceSha256']==original['stock']['traceSha256']and c==a;counts['untouchedExactCases']+=1\n  for label,value in[('map',r['map']),('style',r['opponentStyle']),('ownDoctrine',r['ownDoctrine']),('opponentDoctrine',r['opponentDoctrine'])]:\n   cell=cells.setdefault(f'{label}:{value}',{'cases':0,'stockHalfPoints':0,'mixtureHalfPoints':0,'scopedHalfPoints':0});cell['cases']+=1;cell['stockHalfPoints']+=a;cell['mixtureHalfPoints']+=b;cell['scopedHalfPoints']+=c\n  if key in cold_keys:cold_main[key]=stable(r)\n assert len(seen)==6048 and len({a for a,b in seen})==1512 and len(cold_main)==36\n for epoch in[1,2]:\n  got=set()\n  for r in rows(f'cold-{epoch}'):\n   quality(r);key=(r['board'],r['game']);assert key in cold_main and key not in got and stable(r)==cold_main[key];got.add(key)\n  assert got==cold_keys\n gates={'allSourceInputQualityColdAndOriginalControlsExact':True,'scoreStrictlyHigherThanStock':counts['scopedHalfPoints']>counts['stockHalfPoints'],'scoreStrictlyHigherThanBroadMixture':counts['scopedHalfPoints']>counts['mixtureHalfPoints'],'fewerRegressionsThanBroadMixture':counts['scopedLosses']<counts['oldLosses'],'atLeast24ScopedRoots':counts['scopedRoots']>=24}\n result={'registrationSha256':seal,'complete':True,'cases':6048,'wholeFamilies':1512,'counts':counts,'slicesDescriptiveOnly':cells,'gates':gates,'passedReusedAdmission':all(gates.values()),'independentStrengthSamples':0,'defaultChanged':False,'testTeacherLabelsParsed':False,'elapsedSeconds':time.monotonic()-began,'interpretation':'Complete reused-bank diagnostic only; no new population strength or speed claim. Both gains and regressions retained. A pass only permits separately frozen current-v12 authoritative-memory qualification and overall-average+10% cost.'}\n write('analysis.json',result)\n with(p/'independent-verification.log').open('x')as log:subprocess.run(['nice','-n','19','bun','./verify.ts'],cwd=p,stdout=log,stderr=subprocess.STDOUT,check=True)\n assert read('independent-verification.json')['passed'];state.update({'complete':True,'stage':'complete-verified-reused-admission'})\nexcept BaseException as error:\n state['errors'].append(repr(error));state['stage']='failed-preserve-all-no-retry'\n for proc in processes:\n  if proc.poll()is None:proc.terminate()\n raise\nfinally:save()\n"
+        },
+        {
+            "path": "verify.ts",
+            "sha256": "be2281eae701c4b46b92dc5f22781cdd573abe8df0949e282f48e8e5728ddc88",
+            "body": "import assert from \"node:assert/strict\";\nimport {createHash} from \"node:crypto\";\nimport {readFileSync,readdirSync,createReadStream,writeFileSync} from \"node:fs\";\nimport {createInterface} from \"node:readline\";\nimport {createGunzip} from \"node:zlib\";\nconst p=import.meta.dir,read=(f:string)=>JSON.parse(readFileSync(`${p}/${f}`,\"utf8\")),sha=(b:Buffer|string)=>createHash(\"sha256\").update(b).digest(\"hex\"),reg=read(\"registration.json\"),seal=sha(readFileSync(`${p}/registration.json`));\nfor(const f of reg.files)assert.equal(sha(readFileSync(`${p}/${f.path}`)),f.sha256);\nconst index=new Map<string,any>(read(\"original-trace-index.json\").map((r:any)=>[`${r.board}-${r.game}`,r.arms])),analysis=read(\"analysis.json\"),seen=new Set<string>();\nconst counts:any={stockHalfPoints:0,mixtureHalfPoints:0,scopedHalfPoints:0,oldGains:0,oldLosses:0,scopedGains:0,scopedLosses:0,recoveredOldLossesFull:0,recoveredOldLossesPartial:0,oldGainsLostFull:0,oldGainsLostPartial:0,newLossesFromPreviouslyUnchanged:0,untouchedExactCases:0,scopedRoots:0,scopedDecisions:0};\nfor(const f of readdirSync(`${p}/collection`).filter(f=>f.endsWith(\".jsonl.gz\")).sort())for await(const line of createInterface({input:createReadStream(`${p}/collection/${f}`).pipe(createGunzip()),crlfDelay:Infinity})){\n const r=JSON.parse(line),key=`${r.board}-${r.game}`,original=index.get(key);assert(original&&!seen.has(key));seen.add(key);assert.equal(r.registrationSha256,seal);assert.equal(r.mode,\"scoped\");assert.equal(r.inputSha256,original.stock.inputSha256);\n const a=2*original.stock.score,b=2*original.mixture.score,c=2*r.score;assert([0,1,2].includes(c));counts.stockHalfPoints+=a;counts.mixtureHalfPoints+=b;counts.scopedHalfPoints+=c;\n for(const[k,v]of Object.entries({oldGains:b>a,oldLosses:b<a,scopedGains:c>a,scopedLosses:c<a,recoveredOldLossesFull:b<a&&c>=a,recoveredOldLossesPartial:b<c&&c<a,oldGainsLostFull:b>a&&c<=a,oldGainsLostPartial:a<c&&c<b,newLossesFromPreviouslyUnchanged:b===a&&c<a}))counts[k]+=+v;\n counts.scopedRoots+=r.scopedRoots;counts.scopedDecisions+=r.scopedDecisions;assert(r.scopedRoots<=r.scopedDecisions);\n if(!r.scopedRoots){assert.equal(r.traceSha256,original.stock.traceSha256);assert.equal(c,a);assert.equal(sha(JSON.stringify(r.actualTurns)),original.stock.actualTurnsSha256);counts.untouchedExactCases++;}\n assert.equal(r.quality.rejected,0);for(const w of r.quality.work)for(const k of[\"deadlineFallbacks\",\"circuitSkipped\",\"circuitWaitArbitrations\",\"degradedDecisions\"])assert.equal(w[k]??0,0);\n}\nassert.equal(seen.size,6048);assert.deepEqual(counts,analysis.counts);assert.equal(analysis.registrationSha256,seal);\nconst gates={allSourceInputQualityColdAndOriginalControlsExact:true,scoreStrictlyHigherThanStock:counts.scopedHalfPoints>counts.stockHalfPoints,scoreStrictlyHigherThanBroadMixture:counts.scopedHalfPoints>counts.mixtureHalfPoints,fewerRegressionsThanBroadMixture:counts.scopedLosses<counts.oldLosses,atLeast24ScopedRoots:counts.scopedRoots>=24};\nassert.deepEqual(gates,analysis.gates);assert.equal(Object.values(gates).every(Boolean),analysis.passedReusedAdmission);\nconst result={passed:true,registrationSha256:seal,cases:seen.size,allPrimaryIntegerCountsAndDeclaredGatesExact:true,allUntouchedFullTracesAndActualTurnHashesExact:true,coverageLimit:\"Primary integers and untouched rows independently reconstructed. Python checks original preflight and two cold epochs; Bun does not separately rerun those comparisons.\",newIndependentStrengthSamples:0,defaultChanged:false};\nwriteFileSync(`${p}/independent-verification.json`,JSON.stringify(result,null,2)+\"\\n\",{flag:\"wx\"});console.log(JSON.stringify(result));\n"
+        },
+        {
+            "path": "install-and-launch-v2.py",
+            "sha256": "b7fd96186330ba213f69075eb2123f3baba0ebe0b5cff395f0e5c46475c1744d",
+            "body": "from pathlib import Path\nimport datetime,hashlib,json,os,shutil,subprocess,sys,tarfile,time\nroot=Path(__file__).resolve().parent;sha=lambda b:hashlib.sha256(b).hexdigest();a=root/'startup-delta.tar.gz'\nassert sha(a.read_bytes())=='50f4ab87bf4c86b249e01dff118c3aabea96eb37aed64dc02bdd99efa390e562'\nwith tarfile.open(a)as t:\n ms=t.getmembers();assert len(ms)==len({m.name for m in ms})and all(m.isfile()and not m.name.startswith('/')and'..'not in Path(m.name).parts for m in ms)\n manifest=json.loads(t.extractfile('delta-manifest.json').read());assert manifest['registrationSha256']=='35982f4a3cfc8b6507a745aefcde526eb170d1b2182e921a26f83dd7299dfac8'\n assert {m.name for m in ms}=={r['path']for r in manifest['files']}|{'delta-manifest.json'}\n for r in manifest['files']:\n  b=t.extractfile(r['path']).read();assert len(b)==r['bytes']and sha(b)==r['sha256'];dest=root/r['path'];dest.parent.mkdir(parents=True,exist_ok=True)\n  with dest.open('xb')as f:f.write(b)\np=root/manifest['newCapsuleName'];reg=json.loads((p/'registration.json').read_text());assert time.time()<reg['deadlineUnix']and shutil.disk_usage(p).free>=reg['minimumFreeBytes']\nfor name,target in manifest['relativeLinks'].items():assert '/'not in name;os.symlink(target,p/name,target_is_directory=name=='sources')\nmodules=root/'barrel-forecast-mixture-v11-confirmation-20261117/candidate/node_modules';assert modules.is_dir();os.symlink(os.path.relpath(modules,p),p/'node_modules',target_is_directory=True)\nwith(p/'node-unit-tests.log').open('x')as log:subprocess.run(['nice','-n','19','bun','test','--preload','./alias.ts','./root-scope.test.ts'],cwd=p,stdout=log,stderr=subprocess.STDOUT,check=True,timeout=60)\n# A closed stdin cannot dispatch any game: verify the full startup/ready protocol before the real controller.\nprobe=subprocess.run(['nice','-n','19','bun','--preload','./alias.ts','./actor.ts','no-input-probe.jsonl.gz','candidate'],cwd=p,input='',text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=60,check=True)\nwith(p/'no-input-probe.stdout.log').open('x')as f:f.write(probe.stdout)\nwith(p/'no-input-probe.stderr.log').open('x')as f:f.write(probe.stderr)\nlines=probe.stdout.splitlines();assert lines[:-1]==reg['startupStdoutLines']and json.loads(lines[-1])==reg['readyHandshake'];assert not(p/'no-input-probe.jsonl.gz').exists()\nlaunch={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'registrationSha256':'35982f4a3cfc8b6507a745aefcde526eb170d1b2182e921a26f83dd7299dfac8','stage':'launching-once','nodeCodeTestsPassed':True,'noInputReadyHandshakePassed':True,'deadlineUtc':reg['deadlineUtc'],'unixNice':19,'workers':reg['localWorkers']}\nwith(p/'launch.json').open('x')as f:json.dump(launch,f,indent=2);f.write('\\n')\nwith(p/'controller.log').open('xb')as log:proc=subprocess.Popen(['nice','-n','19',sys.executable,'run.py'],cwd=p,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)\nlaunch.update({'stage':'launched','pid':proc.pid});tmp=p/'launch.tmp';tmp.write_text(json.dumps(launch,indent=2)+'\\n');tmp.replace(p/'launch.json');print(json.dumps(launch))\n"
+        }
+    ],
+    "streamV2Transport": {
+        "sha256": "50f4ab87bf4c86b249e01dff118c3aabea96eb37aed64dc02bdd99efa390e562",
+        "bytes": 1739197
+    },
+    "streamV2NodeLaunch": {
+        "at": "2026-11-18T07:00:58.709908+00:00",
+        "registrationSha256": "35982f4a3cfc8b6507a745aefcde526eb170d1b2182e921a26f83dd7299dfac8",
+        "pid": 1149136,
+        "nodeCodeTestsPassed": true,
+        "noInputReadyHandshakePassed": true,
+        "unixNice": 19,
+        "workers": 8,
+        "deadlineUtc": "2026-11-18T09:45:02.607548+00:00"
+    }
+}

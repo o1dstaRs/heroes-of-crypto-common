@@ -1075,6 +1075,17 @@ occurred; the new1,757-decision test and older805-label test remain unopened/clo
 Keep all6 recipes/30 temperature results and failed gates. Independent Bun checks all1,587 validation
 posteriors, decisions and family sufficient statistics, not NumPy's bootstrap RNG. No default changed.
 
+The distinct root-scoped mixture reused admission is registered at
+`35982f4a3cfc8b6507a745aefcde526eb170d1b2182e921a26f83dd7299dfac8`; read
+`docs/barrel_root_scoped_mixture_research.md` and its registration fixture. It retains all6,048 old-v11
+cases/1,512 families and compares both recovered regressions and erased gains. Only actual melee
+deployment-barrel incumbents enable the old mixture; ordinary root choices otherwise stay native.
+Preserve the zero-actor local disk failure and node startup-stream failure with zero completed records;
+actual starts in the latter are not proven absent. Stream-only v2 adds a ready handshake before any
+dispatch and retains policy/cases/gates plus the original November18 09:45 UTC cutoff. No ranker tuning,
+teacher-test parsing, fresh strength claim or default change. Only a complete passing reused admission
+permits separately registered current-v12 authoritative-memory qualification and overall-average+10% cost.
+
 The prospective final-validation source seal is
 `f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51`; read
 `docs/evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json`. The original
