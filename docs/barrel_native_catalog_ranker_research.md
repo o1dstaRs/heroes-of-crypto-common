@@ -31,6 +31,12 @@ fixed 0.85001 confidence threshold. All four agree with the teacher, but the fix
 bootstrap interval do not replace those failed gates. No threshold is lowered, no final refit is
 performed and the test is not parsed. The older opened 805-label test remains closed too.
 
+Post-fit diagnostics on the already-opened validation records find only **23 high-confidence**
+predictions: nineteen barrel clears, three waits and one move. All four alternatives already pass
+public completeness and distribution checks. Those guards therefore do not cause the coverage failure.
+Of 1,587 decisions, 189 have some out-of-range feature and seventeen have incomplete public input;
+none removes an otherwise high-confidence alternative. No recipe or threshold changes follow.
+
 The fit finishes on Puffalo in **16.43 seconds wall / 30.91 seconds CPU**, using two low-priority BLAS
 threads. These are training costs, not inference latency or measured gameplay speed. Independent
 Bun verification reproduces all 1,587 validation posteriors within **8.89e-16**, exactly matches all

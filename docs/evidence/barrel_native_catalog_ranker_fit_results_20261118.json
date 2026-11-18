@@ -3065,5 +3065,152 @@
         "Independent Bun reimplements posterior, masking, abstention, baseline and whole-family sufficient statistics; NumPy bootstrap RNG is not independently reimplemented.",
         "Previous157 numeric input features have separate functional/metamorphic checks, not complete independent Python reimplementation.",
         "Recorded wall/CPU are fitting cost, not gameplay inference cost or a speedup."
-    ]
+    ],
+    "postFitValidationOnlyDiagnostics": {
+        "sha256": "daef407f33502f5b75e21a83ca822f8e8128068c33e773b4adaf8b02c030c01e",
+        "method": "Join existing validation rows and emitted posterior rows by exact rowId; cumulative confidence/alternative/public-completeness/OOD admission counts and fixed posterior bins, without refit or test parsing.",
+        "result": {
+            "scope": "Post-fit development diagnostics on the already-opened validation fold only; no refit, gate change or test parsing.",
+            "registrationSha256": "195f58fdf997ef55ae486151d7b16f12c5b7639e19463dffd34a709ae47fcf8f",
+            "funnel": {
+                "all": 1587,
+                "highConfidence": 23,
+                "highConfidenceAlternative": 4,
+                "completeHighConfidenceAlternative": 4,
+                "admissibleProposal": 4,
+                "allOod": 189,
+                "allIncomplete": 17
+            },
+            "confidenceBins": [
+                {
+                    "lo": 0,
+                    "hi": 0.25,
+                    "n": 78,
+                    "correct": 17
+                },
+                {
+                    "lo": 0.25,
+                    "hi": 0.5,
+                    "n": 973,
+                    "correct": 365
+                },
+                {
+                    "lo": 0.5,
+                    "hi": 0.65,
+                    "n": 373,
+                    "correct": 200
+                },
+                {
+                    "lo": 0.65,
+                    "hi": 0.75,
+                    "n": 102,
+                    "correct": 78
+                },
+                {
+                    "lo": 0.75,
+                    "hi": 0.85001,
+                    "n": 38,
+                    "correct": 31
+                },
+                {
+                    "lo": 0.85001,
+                    "hi": 0.95,
+                    "n": 16,
+                    "correct": 14
+                },
+                {
+                    "lo": 0.95,
+                    "hi": 1.00001,
+                    "n": 7,
+                    "correct": 7
+                }
+            ],
+            "targetPredictedConfusion": [
+                {
+                    "target": "before",
+                    "prediction": "before",
+                    "n": 197
+                },
+                {
+                    "target": "before",
+                    "prediction": "cleanup",
+                    "n": 84
+                },
+                {
+                    "target": "before",
+                    "prediction": "other",
+                    "n": 75
+                },
+                {
+                    "target": "cleanup",
+                    "prediction": "before",
+                    "n": 93
+                },
+                {
+                    "target": "cleanup",
+                    "prediction": "cleanup",
+                    "n": 218
+                },
+                {
+                    "target": "cleanup",
+                    "prediction": "other",
+                    "n": 149
+                },
+                {
+                    "target": "other",
+                    "prediction": "before",
+                    "n": 96
+                },
+                {
+                    "target": "other",
+                    "prediction": "cleanup",
+                    "n": 206
+                },
+                {
+                    "target": "other",
+                    "prediction": "other",
+                    "n": 468
+                },
+                {
+                    "target": "outside",
+                    "prediction": "before",
+                    "n": 1
+                }
+            ],
+            "predictedActionKinds": {
+                "family_move": {
+                    "n": 542,
+                    "correct": 245,
+                    "highConfidence": 1,
+                    "admissible": 1
+                },
+                "family_spell": {
+                    "n": 144,
+                    "correct": 46,
+                    "highConfidence": 0,
+                    "admissible": 0
+                },
+                "family_wait": {
+                    "n": 387,
+                    "correct": 202,
+                    "highConfidence": 3,
+                    "admissible": 3
+                },
+                "family_mine": {
+                    "n": 508,
+                    "correct": 218,
+                    "highConfidence": 19,
+                    "admissible": 0
+                },
+                "family_defend": {
+                    "n": 6,
+                    "correct": 1,
+                    "highConfidence": 0,
+                    "admissible": 0
+                }
+            },
+            "oodFeaturesAmongRejectedHighConfidenceAlternatives": [],
+            "testUnopened": true
+        }
+    }
 }
