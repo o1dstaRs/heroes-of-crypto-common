@@ -1082,6 +1082,13 @@ explain the four-proposal support failure. Preserve
 observed repeated-input conflicts are not model accuracy or strength. The fitted weights, failed gates
 and unopened1,757-label test remain unchanged; do not treat this diagnostic as permission to activate.
 
+The separate fixed-normalization audit also verifies all6,975 opened records in Python and Bun:
+clipping introduces zero additional valid-option aliases or contradictory ordered-input groups.
+Preserve `docs/evidence/barrel_catalog_normalization_results_20261118.json`. Validation has412 clipped
+coordinates across189 OOD rows;979 complete, in-range alternative targets retain unique vectors.
+This necessary-condition ceiling does not prove learnability or achieved support. It does not rule out
+soft distance/optimization effects; keep all failed gates, weights, thresholds and tests unchanged.
+
 The distinct root-scoped mixture reused admission is registered at
 `6eda742bd48db1366e7ec95c898578b97c80f974a2cab7fb6b654542bc3bb438`; read
 `docs/barrel_root_scoped_mixture_research.md` and its registration fixture. It retains all6,048 old-v11

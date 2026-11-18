@@ -68,3 +68,23 @@ validation group. This audit does not identify whether those differences come fr
 private search chance or another source. It does not prove other labels are predictable. No feature,
 threshold, model weight or failed gate changes; the new held-out test remains unopened. All model and
 battle-strength claims retain their previous limits.
+
+## Fixed normalization audit
+
+The separate [normalization audit](evidence/barrel_catalog_normalization_results_20261118.json)
+checks the actual selected model's normalized, clipped inputs, rather than only raw feature vectors.
+Independent Python and Bun reconstruction agree on input-group counts, per-feature clipping counts
+and OOD-row counts across all 6,975 opened records. Both reconstruct binary64 vectors under the
+original normalization rule. No fitter is imported.
+
+Clipping introduces **zero additional valid-option aliases or contradictory ordered-input groups**.
+The five aliased training targets and zero aliased validation targets remain unchanged; the combined
+nine contradictory input groups also remain unchanged. Validation has 412 clipped coordinates across
+189 rows. Before OOD, 1,126 complete-input alternative targets have unique vectors; after the unchanged
+OOD rule, 979 do. Those are necessary-condition ceilings under perfect learning, not achieved support
+or evidence of learnability.
+
+This rules out newly identical clipped vectors as an explanation of the four-proposal validation
+result. It does not prove clipping preserves every useful distinction in feature distances or rule
+out optimization effects. No feature, weight, temperature, threshold, mask or original gate changes;
+the 1,757-decision test remains unopened. This diagnostic supplies no combat gain or compute claim.
