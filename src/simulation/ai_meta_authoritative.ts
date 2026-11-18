@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { plugin } from "bun";
 import { createAIStrategy } from "../ai/index";
 import type { ISetupAugmentChoice } from "../ai/setup/setup_ship";
 import {
@@ -45,6 +44,7 @@ import {
     type IAiMetaDraftEvidence,
 } from "./ai_meta_evidence";
 import { aiMetaServerRoot } from "./ai_meta_authoritative_source";
+import { assertAuthoritativeMetaCommon } from "./ai_meta_authoritative_resolution";
 import { premiumStudyDoctrine, PREMIUM_META_CURRENT_STUDY } from "./ai_meta_study";
 import type { IAiMetaRuntimeAdapter } from "./ai_meta_runtime_adapter";
 import type { IMatchConfig } from "./battle_engine";
@@ -387,18 +387,7 @@ function nativeOpening(server: Server, prepared: Prepared, aIsGreen: boolean) {
 }
 
 export async function loadAuthoritativeMetaAdapter(): Promise<IAiMetaRuntimeAdapter> {
-    const common = resolve(import.meta.dir, "../..");
-    plugin({
-        name: "ai-meta-single-common-instance",
-        setup(build) {
-            build.onResolve({ filter: /^@heroesofcrypto\/common(?:\/.*)?$/ }, ({ path }) => ({
-                path:
-                    path === "@heroesofcrypto/common"
-                        ? resolve(common, "src/index.ts")
-                        : resolve(common, path.slice("@heroesofcrypto/common/".length)),
-            }));
-        },
-    });
+    await assertAuthoritativeMetaCommon();
     const load = (path: string) => import(pathToFileURL(resolve(aiMetaServerRoot(), path)).href);
     const [session, decider, placement] = await Promise.all([
         load("src/api/game/v1/play_session.ts"),

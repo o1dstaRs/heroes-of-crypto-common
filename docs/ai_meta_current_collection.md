@@ -7,6 +7,16 @@ retries. The sibling server is resolved relative to the source tree, or through
 `HOC_SERVER_LOC`. Both server and common source bytes and dependency manifests
 are recorded. Freeze both trees before running on a shared main checkout.
 
+Install dependencies inside the isolated frozen trees, then link the frozen
+server's `node_modules/@heroesofcrypto/common` to that capsule's common tree.
+Preserve the installed package separately before replacing that dependency entry.
+Do this only inside the owned capsule, never in the shared server checkout. A
+separate installed copy has separate RNG/UUID/fight-state singletons, even when
+its source bytes match. Bun runtime resolver hooks did not bind those imports in
+the tested runtime. The adapter now checks real resolved paths and module identity
+before any draft/setup; an unbound dependency fails closed. Repeat the identity
+check after every install, which can replace the link.
+
 The adapter uses the native public ranked Setup contract, funded purchases,
 support splits, initial spellbooks, final formations and accepted barrel cells.
 Every fight checks the applied opening before full A19 deterministic-work combat.
