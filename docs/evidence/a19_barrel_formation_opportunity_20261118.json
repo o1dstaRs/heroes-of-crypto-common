@@ -1,0 +1,2428 @@
+{
+    "schema": "hoc.a19-barrel-formation-opportunity.v1",
+    "studyId": "a19-barrel-formation-opportunity-20261118",
+    "researchOnly": true,
+    "registration": {
+        "schema": 1,
+        "id": "a19-barrel-formation-opportunity-20261118-packaging-v2",
+        "registeredAtUtc": "2026-11-18T20:33:14.131563+00:00",
+        "hypothesis": "On known ranged/support-heavy seven-point barrel-map armies, a legal existing free-template proposal may expose an actual starting-formation opportunity omitted by the current narrow terrain reflection. This is a bounded counterfactual diagnosis, not a fitted or default policy.",
+        "inputOnlySelection": "First three lexicographic families in the complete coverage census whose named entrant is doctrine3, Block map4, fewer than2 offensive melee types, at least2 native shooting bodies and a valid accepted native model input. Both physical seats; no score selection.",
+        "families": ["defer-map-fresh-m4-d31-f000", "defer-map-fresh-m4-d32-f003", "defer-map-fresh-m4-d33-f001"],
+        "fixedProposals": "Unchanged canonical layout.propose indices0..7, generated from current native final terrain choice. Native identity control, detached observer control, cloned index0 control, seven fixed alternatives. No subset, coefficient or outcome-selected selector.",
+        "intervention": "Only named entrant, public complete setup, fully funded doctrine3, actual Board stage before fight, no delivery selection applied. Wrap native terrainAwareFormation and return the chosen legal public/own template through original authoritative placement. Preserve every other native layer and all future A19 combat.",
+        "quality": [
+            "Original native full outcomes exact for all6 inputs",
+            "Observation and cloned index0 full outcomes exact",
+            "At least1 eligible actual terrain callback per game and same first pre-intervention state across branches",
+            "Native public/own input only; valid complete footprints; no neutral collisions; no RNG draw or UUID allocation and immediate state hashes unchanged while making catalog",
+            "Each outcome-changing alternative replayed exactly, including gains and losses",
+            "All source/raw/errors/cases kept; entire final live formation and barrel allocation recorded"
+        ],
+        "repeats": "Repeat every one of42 fixed alternatives whose terminal score differs from its native case, with exact full outcome required. No additional seed or independent strength sample.",
+        "cutoffUtc": "2026-11-18T22:00:00Z",
+        "automaticRetryOrExtension": false,
+        "newSeeds": false,
+        "independentExposedFamilies": 3,
+        "defaultChanged": false,
+        "newModelOrWeights": false,
+        "strengthOrCostQualification": false,
+        "publicTerrainFeatures": "Count canonical neutral-barrel line-of-sight intersections for fixed hypothetical enemy back-line cells as a descriptive diagnostic only; do not select a proposal with it.",
+        "priorClosedStudies": "The failed map-delay, paid-placement, native-formation ablation, terrain-reflection confidence gate and donation studies stay unchanged; this does not retune any of them.",
+        "sourceCommits": {
+            "server": "10e69554dd8062db1685c40f8c5110600a432d49",
+            "common": "5c73747f806d9ec6751bd19670c650095779c0f9"
+        },
+        "coverageVerificationSha256": "55c4cf8a8db7646e8b16ed5b6c04a89a80c26522e0e6a83479efed1a03b884c8",
+        "originalRegistrationSha256": "d057a5c9918bcd5629cc68c44fffa2fce7391b2ee2ae9ac5d10599482fc78229",
+        "zeroGamePackagingCorrection": {
+            "schema": 1,
+            "atUtc": "2026-11-18T20:33:14.131052+00:00",
+            "status": "zero-native-game packaging failure",
+            "compiler": "Type-only XY import used the package root instead of the canonical utils/math export.",
+            "launcher": "Python syntax error unmatched closing parenthesis, before execution of any statement or child launch.",
+            "observedTerminalLauncherExit": 1,
+            "nativeGamesLaunched": 0,
+            "nativeGamesCompleted": 0,
+            "outcomesDiscarded": 0,
+            "oldFilesPreserved": [
+                "probe.ts",
+                "owned-supervisor.py",
+                "registration.json",
+                "source-freeze.json",
+                "typecheck.log",
+                "supervisor.log"
+            ],
+            "correction": "New v2 packaging identity fixes only the erased type import and launcher syntax; same candidate variants, six cases, seeds, comparisons, repeats and original22Z cutoff. No intelligence tuning or extension."
+        },
+        "intelligencePolicyChanged": false
+    },
+    "sourceFreeze": {
+        "path": "source-freeze-v2.json",
+        "sha256": "f257706809d8f247e20c3f99e0ba233a90bed16ac15c7b43ed5aaa52487d07b0",
+        "bytes": 613681
+    },
+    "nativeSourceCommits": {
+        "server": "10e69554dd8062db1685c40f8c5110600a432d49",
+        "common": "5c73747f806d9ec6751bd19670c650095779c0f9"
+    },
+    "inputAndVerificationBindings": [
+        {
+            "path": "registration.json",
+            "sha256": "d057a5c9918bcd5629cc68c44fffa2fce7391b2ee2ae9ac5d10599482fc78229",
+            "bytes": 3129
+        },
+        {
+            "path": "probe.ts",
+            "sha256": "ab256423c6caa4a32cc7358d846fb4ba7ff178cf4eaf19e8ba7fcaf79628726b",
+            "bytes": 13219
+        },
+        {
+            "path": "owned-supervisor.py",
+            "sha256": "b34376e5ca03d102794bda67975f43c666062b284fbfee295988f21ba89bd662",
+            "bytes": 3389
+        },
+        {
+            "path": "source-freeze.json",
+            "sha256": "174df2eb4c3bdaa01f465e3d0a410470f27a452a2ad03880d57a842351659584",
+            "bytes": 612514
+        },
+        {
+            "path": "initial-packaging-failure.json",
+            "sha256": "85f55855486406ff56d864a0cc20d673c15cafcbb1b7d33f475334c1310f3ab8",
+            "bytes": 848
+        },
+        {
+            "path": "registration-v2.json",
+            "sha256": "8d01f136e048bb7c650cbcb5e4facea8e08d6063114fdaa2677bb25395a813a8",
+            "bytes": 4200
+        },
+        {
+            "path": "probe-v2.ts",
+            "sha256": "49de84da867d4b2f19cfa5e3f919667c2a7e9500be61e0ed23b315dadec98daf",
+            "bytes": 13293
+        },
+        {
+            "path": "owned-supervisor-v2.py",
+            "sha256": "cbcb705ecb9dece86d9743067123ed0096b288a4cf92df771654161cfc0d15cb",
+            "bytes": 3444
+        },
+        {
+            "path": "cases.json",
+            "sha256": "6e12ab28f6fddcc3000117a68bc9885e77df6538959c696403ebd42ff40b5679",
+            "bytes": 14706
+        },
+        {
+            "path": "original-current-outcomes.json",
+            "sha256": "ff91cca221ed243656fcdde2d933cdde349de081590ef1764980b0b388357161",
+            "bytes": 870816
+        },
+        {
+            "path": "runtime-environment.json",
+            "sha256": "abd63b1759e60ef80e4219d363897477413b9396c3a43aa25644fe2ec1faa594",
+            "bytes": 247
+        },
+        {
+            "path": "typecheck-own-v2.json",
+            "sha256": "81e194eec2ceb28d52a966d46db71f84a83aaac4a4348f8546524f12a430fd88",
+            "bytes": 126
+        },
+        {
+            "path": "typecheck-v2.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+        },
+        {
+            "path": "source-freeze-v2.json",
+            "sha256": "f257706809d8f247e20c3f99e0ba233a90bed16ac15c7b43ed5aaa52487d07b0",
+            "bytes": 613681
+        },
+        {
+            "path": "supervisor-control-freeze-v2.json",
+            "sha256": "711eb40b9974b37629430078ba5d593aec8d2ed701507fa485bd9150728b0a4a",
+            "bytes": 904
+        },
+        {
+            "path": "verify-opportunities.py",
+            "sha256": "2e30ea8985dd1a45c7da634791af6ec32dc6622a87a4163d67cfcdb2e2ed3c03",
+            "bytes": 7880
+        },
+        {
+            "path": "independent-hash.mjs",
+            "sha256": "1eacfad2f06a5dcdcf3a9db08abaae7fdd1c22fe95fef839e9ae9432930a71fa",
+            "bytes": 783
+        },
+        {
+            "path": "replay-catalogs.ts",
+            "sha256": "98dbf49c9508c9b2caefd2ff66914680fabd8a0649564f421245291e569439eb",
+            "bytes": 2174
+        },
+        {
+            "path": "independent-catalog-replay.log",
+            "sha256": "d2d080df40a4044936fa64527bb3734eb1aec50e0267f5621d279acf9c004f3a",
+            "bytes": 1220
+        },
+        {
+            "path": "catalog-replay-v1-erratum.json",
+            "sha256": "ff5c0e88e72b28d4f0afd17a79b6d27b3d97405c0ae0ee9d16274b4a44819242",
+            "bytes": 946
+        },
+        {
+            "path": "replay-catalogs-v2.ts",
+            "sha256": "099829b27a180e331d2d4aa06253413fd1f1407f95ebf91a4c10a5c233dbd570",
+            "bytes": 2306
+        },
+        {
+            "path": "independent-catalog-replay-v2.json",
+            "sha256": "b55beff3ff942e6b8517c2d875816036a19dcb2efc5b03cadd5b29a096826e7e",
+            "bytes": 288
+        },
+        {
+            "path": "independent-opportunity-verification.json",
+            "sha256": "4edd9e462a35491de9adc7c3e7ddedd2bfc72dbcc4cc720f5387d595ae56b6ae",
+            "bytes": 12891
+        }
+    ],
+    "failureHistory": [
+        {
+            "schema": 1,
+            "atUtc": "2026-11-18T20:33:14.131052+00:00",
+            "status": "zero-native-game packaging failure",
+            "compiler": "Type-only XY import used the package root instead of the canonical utils/math export.",
+            "launcher": "Python syntax error unmatched closing parenthesis, before execution of any statement or child launch.",
+            "observedTerminalLauncherExit": 1,
+            "nativeGamesLaunched": 0,
+            "nativeGamesCompleted": 0,
+            "outcomesDiscarded": 0,
+            "oldFilesPreserved": [
+                "probe.ts",
+                "owned-supervisor.py",
+                "registration.json",
+                "source-freeze.json",
+                "typecheck.log",
+                "supervisor.log"
+            ],
+            "correction": "New v2 packaging identity fixes only the erased type import and launcher syntax; same candidate variants, six cases, seeds, comparisons, repeats and original22Z cutoff. No intelligence tuning or extension."
+        },
+        {
+            "atUtc": "2026-11-18T20:41:06.553405+00:00",
+            "status": "first catalog verifier failed serialized-property-order assumption",
+            "sourceSha256": "98dbf49c9508c9b2caefd2ff66914680fabd8a0649564f421245291e569439eb",
+            "failedLogSha256": "d2d080df40a4044936fa64527bb3734eb1aec50e0267f5621d279acf9c004f3a",
+            "reason": "Native propose seeds its private deterministic generator with JSON.stringify of body properties in native constructor order. Detached archive transport sorts keys. Semantic deep equality did not certify identical generator input order.",
+            "correction": "Reconstruct every detached envelope with original buildPlacementInput, compare full semantic body/context equality, then call unchanged propose with reconstructed native object order. Actual probe already used the original constructor and no native battle or intelligence/source/gate/seed was changed.",
+            "newBattlesExecuted": 0,
+            "priorFailedVerifierPreserved": true
+        }
+    ],
+    "cases": [
+        {
+            "channels": [
+                1231270405, 3532712318, 632170843, 4183792776, 295587143, 3398980999, 3358619340, 495250745, 3923740959,
+                3895086091, 2751596625, 1363143993, 737673699, 3891870951, 3618873054, 849367567, 4278330283, 49481940,
+                2530978231, 1561050942, 2309150330, 4180440208, 1701944130, 3287444740, 3072664526, 1701075162,
+                4065381450, 3090136216, 3930503040, 2644618527, 3236557892, 773288371, 3371474365, 1502370528,
+                296079127, 1810725175, 3052188565
+            ],
+            "family": "defer-map-fresh-m4-d31-f000",
+            "id": "defer-map-fresh-m4-d31-f000-seat1",
+            "input": {
+                "amounts": [
+                    [2, 164],
+                    [33, 124],
+                    [14, 30],
+                    [6, 22],
+                    [54, 8],
+                    [39, 2],
+                    [32, 132],
+                    [47, 91],
+                    [5, 24],
+                    [55, 50],
+                    [17, 8],
+                    [57, 2]
+                ],
+                "candidateTeam": 1,
+                "game": {
+                    "gridType": 4,
+                    "hideOpponentRosterDuringSetup": false,
+                    "leftArtifactTier1": 7,
+                    "leftArtifactTier2": 17,
+                    "leftDeliveryDraftOverrideUsed": false,
+                    "lowerCreatureIds": [2, 33, 14, 6, 54, 39],
+                    "lowerDoctrine": 1,
+                    "rightArtifactTier1": 14,
+                    "rightArtifactTier2": 17,
+                    "rightDeliveryDraftOverrideUsed": false,
+                    "unitAmount": 1,
+                    "upperCreatureIds": [32, 47, 5, 55, 17, 57],
+                    "upperDoctrine": 3
+                },
+                "maxTicks": 3000,
+                "setupSeed": 3052188565,
+                "synergyVariants": {
+                    "Chaos": 2,
+                    "Life": 2,
+                    "Might": 2,
+                    "Nature": 2
+                },
+                "terrainSeed": 296079127
+            },
+            "tags": {
+                "bank": "reused-admission",
+                "doctrine": "3",
+                "draftOrder": "0",
+                "opponentDoctrine": "1",
+                "seat": "1",
+                "terrain": "4"
+            }
+        },
+        {
+            "channels": [
+                1231270405, 3532712318, 632170843, 4183792776, 295587143, 3398980999, 3358619340, 495250745, 3923740959,
+                3895086091, 2751596625, 1363143993, 737673699, 3891870951, 3618873054, 849367567, 4278330283, 49481940,
+                2530978231, 1561050942, 2309150330, 4180440208, 1701944130, 3287444740, 3072664526, 1701075162,
+                4065381450, 3090136216, 3930503040, 2644618527, 3236557892, 773288371, 3371474365, 1502370528,
+                296079127, 1810725175, 3052188565
+            ],
+            "family": "defer-map-fresh-m4-d31-f000",
+            "id": "defer-map-fresh-m4-d31-f000-seat2",
+            "input": {
+                "amounts": [
+                    [32, 132],
+                    [47, 91],
+                    [5, 24],
+                    [55, 50],
+                    [17, 8],
+                    [57, 2],
+                    [2, 164],
+                    [33, 124],
+                    [14, 30],
+                    [6, 22],
+                    [54, 8],
+                    [39, 2]
+                ],
+                "candidateTeam": 2,
+                "game": {
+                    "gridType": 4,
+                    "hideOpponentRosterDuringSetup": false,
+                    "leftArtifactTier1": 14,
+                    "leftArtifactTier2": 17,
+                    "leftDeliveryDraftOverrideUsed": false,
+                    "lowerCreatureIds": [32, 47, 5, 55, 17, 57],
+                    "lowerDoctrine": 3,
+                    "rightArtifactTier1": 7,
+                    "rightArtifactTier2": 17,
+                    "rightDeliveryDraftOverrideUsed": false,
+                    "unitAmount": 1,
+                    "upperCreatureIds": [2, 33, 14, 6, 54, 39],
+                    "upperDoctrine": 1
+                },
+                "maxTicks": 3000,
+                "setupSeed": 1502370528,
+                "synergyVariants": {
+                    "Chaos": 2,
+                    "Life": 2,
+                    "Might": 2,
+                    "Nature": 2
+                },
+                "terrainSeed": 296079127
+            },
+            "tags": {
+                "bank": "reused-admission",
+                "doctrine": "3",
+                "draftOrder": "0",
+                "opponentDoctrine": "1",
+                "seat": "2",
+                "terrain": "4"
+            }
+        },
+        {
+            "channels": [
+                169415937, 2236792777, 131751293, 943505374, 419232700, 2505457170, 3305060537, 350639749, 223905616,
+                2604654155, 1851877911, 3041834957, 3786149835, 279325276, 20080502, 703554487, 4022674842, 1648958347,
+                1167065083, 4251711067, 1113099734, 3557277292, 478091440, 3844393294, 985924570, 3303140570,
+                2516325947, 347996476, 12125801, 4217530678, 4142817512, 2923655440, 1779492207, 3341131498, 894416767,
+                1508237012, 2623737575
+            ],
+            "family": "defer-map-fresh-m4-d32-f003",
+            "id": "defer-map-fresh-m4-d32-f003-seat1",
+            "input": {
+                "amounts": [
+                    [47, 91],
+                    [3, 125],
+                    [4, 25],
+                    [6, 22],
+                    [54, 8],
+                    [29, 2],
+                    [12, 109],
+                    [49, 139],
+                    [5, 24],
+                    [55, 50],
+                    [17, 8],
+                    [57, 2]
+                ],
+                "candidateTeam": 1,
+                "game": {
+                    "gridType": 4,
+                    "hideOpponentRosterDuringSetup": false,
+                    "leftArtifactTier1": 2,
+                    "leftArtifactTier2": 6,
+                    "leftDeliveryDraftOverrideUsed": false,
+                    "lowerCreatureIds": [47, 3, 4, 6, 54, 29],
+                    "lowerDoctrine": 2,
+                    "rightArtifactTier1": 8,
+                    "rightArtifactTier2": 17,
+                    "rightDeliveryDraftOverrideUsed": false,
+                    "unitAmount": 1,
+                    "upperCreatureIds": [12, 49, 5, 55, 17, 57],
+                    "upperDoctrine": 3
+                },
+                "maxTicks": 3000,
+                "setupSeed": 2623737575,
+                "synergyVariants": {
+                    "Chaos": 1,
+                    "Life": 2,
+                    "Might": 2,
+                    "Nature": 2
+                },
+                "terrainSeed": 894416767
+            },
+            "tags": {
+                "bank": "reused-admission",
+                "doctrine": "3",
+                "draftOrder": "0",
+                "opponentDoctrine": "2",
+                "seat": "1",
+                "terrain": "4"
+            }
+        },
+        {
+            "channels": [
+                169415937, 2236792777, 131751293, 943505374, 419232700, 2505457170, 3305060537, 350639749, 223905616,
+                2604654155, 1851877911, 3041834957, 3786149835, 279325276, 20080502, 703554487, 4022674842, 1648958347,
+                1167065083, 4251711067, 1113099734, 3557277292, 478091440, 3844393294, 985924570, 3303140570,
+                2516325947, 347996476, 12125801, 4217530678, 4142817512, 2923655440, 1779492207, 3341131498, 894416767,
+                1508237012, 2623737575
+            ],
+            "family": "defer-map-fresh-m4-d32-f003",
+            "id": "defer-map-fresh-m4-d32-f003-seat2",
+            "input": {
+                "amounts": [
+                    [12, 109],
+                    [49, 139],
+                    [5, 24],
+                    [55, 50],
+                    [17, 8],
+                    [57, 2],
+                    [47, 91],
+                    [3, 125],
+                    [4, 25],
+                    [6, 22],
+                    [54, 8],
+                    [29, 2]
+                ],
+                "candidateTeam": 2,
+                "game": {
+                    "gridType": 4,
+                    "hideOpponentRosterDuringSetup": false,
+                    "leftArtifactTier1": 8,
+                    "leftArtifactTier2": 17,
+                    "leftDeliveryDraftOverrideUsed": false,
+                    "lowerCreatureIds": [12, 49, 5, 55, 17, 57],
+                    "lowerDoctrine": 3,
+                    "rightArtifactTier1": 2,
+                    "rightArtifactTier2": 6,
+                    "rightDeliveryDraftOverrideUsed": false,
+                    "unitAmount": 1,
+                    "upperCreatureIds": [47, 3, 4, 6, 54, 29],
+                    "upperDoctrine": 2
+                },
+                "maxTicks": 3000,
+                "setupSeed": 3341131498,
+                "synergyVariants": {
+                    "Chaos": 1,
+                    "Life": 2,
+                    "Might": 2,
+                    "Nature": 2
+                },
+                "terrainSeed": 894416767
+            },
+            "tags": {
+                "bank": "reused-admission",
+                "doctrine": "3",
+                "draftOrder": "0",
+                "opponentDoctrine": "2",
+                "seat": "2",
+                "terrain": "4"
+            }
+        },
+        {
+            "channels": [
+                4243713913, 3589951245, 1326580225, 1076274176, 3253194947, 307063648, 568806662, 478847509, 3573490938,
+                1010423342, 1464710126, 803161561, 3911897790, 2059794312, 2593561047, 1550316232, 2244865238,
+                2767585656, 312674643, 2878400921, 3609411934, 3328938772, 211354794, 3410296754, 2231107549,
+                2351115869, 3336822659, 2478250158, 3670195231, 1213848901, 3721804088, 3181692786, 205745703,
+                213998181, 416823874, 1005777923, 3244699726
+            ],
+            "family": "defer-map-fresh-m4-d33-f001",
+            "id": "defer-map-fresh-m4-d33-f001-seat1",
+            "input": {
+                "amounts": [
+                    [13, 81],
+                    [47, 91],
+                    [55, 50],
+                    [52, 24],
+                    [50, 8],
+                    [40, 2],
+                    [49, 139],
+                    [11, 73],
+                    [25, 25],
+                    [6, 22],
+                    [54, 8],
+                    [57, 2]
+                ],
+                "candidateTeam": 1,
+                "game": {
+                    "gridType": 4,
+                    "hideOpponentRosterDuringSetup": false,
+                    "leftArtifactTier1": 11,
+                    "leftArtifactTier2": 2,
+                    "leftDeliveryDraftOverrideUsed": false,
+                    "lowerCreatureIds": [13, 47, 55, 52, 50, 40],
+                    "lowerDoctrine": 3,
+                    "rightArtifactTier1": 5,
+                    "rightArtifactTier2": 17,
+                    "rightDeliveryDraftOverrideUsed": false,
+                    "unitAmount": 1,
+                    "upperCreatureIds": [49, 11, 25, 6, 54, 57],
+                    "upperDoctrine": 3
+                },
+                "maxTicks": 3000,
+                "setupSeed": 213998181,
+                "synergyVariants": {
+                    "Chaos": 2,
+                    "Life": 2,
+                    "Might": 2,
+                    "Nature": 1
+                },
+                "terrainSeed": 416823874
+            },
+            "tags": {
+                "bank": "reused-admission",
+                "doctrine": "3",
+                "draftOrder": "1",
+                "opponentDoctrine": "3",
+                "seat": "1",
+                "terrain": "4"
+            }
+        },
+        {
+            "channels": [
+                4243713913, 3589951245, 1326580225, 1076274176, 3253194947, 307063648, 568806662, 478847509, 3573490938,
+                1010423342, 1464710126, 803161561, 3911897790, 2059794312, 2593561047, 1550316232, 2244865238,
+                2767585656, 312674643, 2878400921, 3609411934, 3328938772, 211354794, 3410296754, 2231107549,
+                2351115869, 3336822659, 2478250158, 3670195231, 1213848901, 3721804088, 3181692786, 205745703,
+                213998181, 416823874, 1005777923, 3244699726
+            ],
+            "family": "defer-map-fresh-m4-d33-f001",
+            "id": "defer-map-fresh-m4-d33-f001-seat2",
+            "input": {
+                "amounts": [
+                    [49, 139],
+                    [11, 73],
+                    [25, 25],
+                    [6, 22],
+                    [54, 8],
+                    [57, 2],
+                    [13, 81],
+                    [47, 91],
+                    [55, 50],
+                    [52, 24],
+                    [50, 8],
+                    [40, 2]
+                ],
+                "candidateTeam": 2,
+                "game": {
+                    "gridType": 4,
+                    "hideOpponentRosterDuringSetup": false,
+                    "leftArtifactTier1": 5,
+                    "leftArtifactTier2": 17,
+                    "leftDeliveryDraftOverrideUsed": false,
+                    "lowerCreatureIds": [49, 11, 25, 6, 54, 57],
+                    "lowerDoctrine": 3,
+                    "rightArtifactTier1": 11,
+                    "rightArtifactTier2": 2,
+                    "rightDeliveryDraftOverrideUsed": false,
+                    "unitAmount": 1,
+                    "upperCreatureIds": [13, 47, 55, 52, 50, 40],
+                    "upperDoctrine": 3
+                },
+                "maxTicks": 3000,
+                "setupSeed": 3244699726,
+                "synergyVariants": {
+                    "Chaos": 2,
+                    "Life": 2,
+                    "Might": 2,
+                    "Nature": 1
+                },
+                "terrainSeed": 416823874
+            },
+            "tags": {
+                "bank": "reused-admission",
+                "doctrine": "3",
+                "draftOrder": "1",
+                "opponentDoctrine": "3",
+                "seat": "2",
+                "terrain": "4"
+            }
+        }
+    ],
+    "completeExecutions": [
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-clone0.json.gz",
+                "sha256": "35ccfd2b0e1b9a29ad676b2ba168d1d473f6f4400328dfbd7786e5694f7b743a",
+                "bytes": 16542
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "clone0",
+            "proposal": 0,
+            "repeat": false,
+            "score": 1,
+            "digest": "9d9db484a20bce78a586ff44d7c33e3e9bd69d22ceec34e7b71d72cc8e164d54",
+            "actualSearchDriverDecisions": 49,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-native.json.gz",
+                "sha256": "6508696c4510d344f4a6b33d0941213adda39cbbc89a2e0bc5d8b6c6d838d6b8",
+                "bytes": 9870
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "native",
+            "proposal": null,
+            "repeat": false,
+            "score": 1,
+            "digest": "9d9db484a20bce78a586ff44d7c33e3e9bd69d22ceec34e7b71d72cc8e164d54",
+            "actualSearchDriverDecisions": 49,
+            "qualityErrors": [],
+            "rootFrames": 0,
+            "firstRootStateHash": null,
+            "firstCatalogHash": null
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-observed.json.gz",
+                "sha256": "931c8e0ed139acc7f43fc931adeae2d44341b7e6d83815ea050a7ab099d1e80f",
+                "bytes": 16550
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "observed",
+            "proposal": null,
+            "repeat": false,
+            "score": 1,
+            "digest": "9d9db484a20bce78a586ff44d7c33e3e9bd69d22ceec34e7b71d72cc8e164d54",
+            "actualSearchDriverDecisions": 49,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal1.json.gz",
+                "sha256": "abf424fdbffee3ba2248209ce57e92904a0c5e7c1ddf1d75f4a8be64cfe354d9",
+                "bytes": 16542
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal1",
+            "proposal": 1,
+            "repeat": false,
+            "score": 1,
+            "digest": "9d9db484a20bce78a586ff44d7c33e3e9bd69d22ceec34e7b71d72cc8e164d54",
+            "actualSearchDriverDecisions": 49,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal2-repeat.json.gz",
+                "sha256": "aed2ed3990d6efa0830acaaa9d940aeae0697e77d01edf342400631ac29dd746",
+                "bytes": 16658
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal2",
+            "proposal": 2,
+            "repeat": true,
+            "score": 0,
+            "digest": "46c60034673ea8a2f04ec43c5ec273a0ee03400e32aea949100e84014a01119f",
+            "actualSearchDriverDecisions": 53,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal2.json.gz",
+                "sha256": "84bc7fa2bbe3d6fdf5c36681431f39dea201444da4dca55c4b289ea168737ccd",
+                "bytes": 16658
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal2",
+            "proposal": 2,
+            "repeat": false,
+            "score": 0,
+            "digest": "46c60034673ea8a2f04ec43c5ec273a0ee03400e32aea949100e84014a01119f",
+            "actualSearchDriverDecisions": 53,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal3-repeat.json.gz",
+                "sha256": "ca8c12f613fdd8599eb4a8408c72b481b777e087bf38e20b183e70335fb61b68",
+                "bytes": 17977
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal3",
+            "proposal": 3,
+            "repeat": true,
+            "score": 0,
+            "digest": "ba3092e67e117b717b33a8ea654bdae4cad90912013373c17d35c31dfcbf8dae",
+            "actualSearchDriverDecisions": 63,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal3.json.gz",
+                "sha256": "f5095d2d1f90f1bb394c5e06d6eff6783447d396e1e3ca8d0fe07cceecc76ad7",
+                "bytes": 17978
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal3",
+            "proposal": 3,
+            "repeat": false,
+            "score": 0,
+            "digest": "ba3092e67e117b717b33a8ea654bdae4cad90912013373c17d35c31dfcbf8dae",
+            "actualSearchDriverDecisions": 63,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal4.json.gz",
+                "sha256": "367a7a38d08227526cfe9261922dd9135559167f222a55e8d2fddbadd7269700",
+                "bytes": 16838
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal4",
+            "proposal": 4,
+            "repeat": false,
+            "score": 1,
+            "digest": "7be3901a518c5becd7a10fc47121ac9ee8416d00b88b4d25594548e8bfd1786d",
+            "actualSearchDriverDecisions": 47,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal5-repeat.json.gz",
+                "sha256": "0952fd0566e80c798d274fb3b32250bf451953269ea8185ef8417715368865a0",
+                "bytes": 18678
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal5",
+            "proposal": 5,
+            "repeat": true,
+            "score": 0.5,
+            "digest": "2834bdee082c28bddf5e5e54542b295d7a5d43f4d03e594111b0f2e0acfa5c77",
+            "actualSearchDriverDecisions": 70,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal5.json.gz",
+                "sha256": "12b6b2c52125e860ad237c67f09cf1e076f04192efef372b235603ea5992f002",
+                "bytes": 18677
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal5",
+            "proposal": 5,
+            "repeat": false,
+            "score": 0.5,
+            "digest": "2834bdee082c28bddf5e5e54542b295d7a5d43f4d03e594111b0f2e0acfa5c77",
+            "actualSearchDriverDecisions": 70,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal6-repeat.json.gz",
+                "sha256": "cfe559e35c766b3b4752150895240d9aeaa4d4547726db2948f52a045f4e1f50",
+                "bytes": 16709
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal6",
+            "proposal": 6,
+            "repeat": true,
+            "score": 0,
+            "digest": "a0b36846504d0d9af34d520974d25cc04af2839f338b6e1c052c4c257ade8f71",
+            "actualSearchDriverDecisions": 47,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal6.json.gz",
+                "sha256": "e0125a968c914df100ecd5f76f60c2108aa62ec79e3aef8b76e6ecafffb25a11",
+                "bytes": 16710
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal6",
+            "proposal": 6,
+            "repeat": false,
+            "score": 0,
+            "digest": "a0b36846504d0d9af34d520974d25cc04af2839f338b6e1c052c4c257ade8f71",
+            "actualSearchDriverDecisions": 47,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal7-repeat.json.gz",
+                "sha256": "84d44261e607a21cca1fbded90e3af46728fe855be8abcd3bf738a828655e7eb",
+                "bytes": 16020
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal7",
+            "proposal": 7,
+            "repeat": true,
+            "score": 0,
+            "digest": "3d3a02d0a5a421964318f5209907e5732581e0bfcbefb0a5e601c7a323464efe",
+            "actualSearchDriverDecisions": 43,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat1-proposal7.json.gz",
+                "sha256": "ab19be56be00d9eb31c9b3f8f360a0ca957a321ccc47828edb2d03a5407dde4d",
+                "bytes": 16020
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+            "mode": "proposal7",
+            "proposal": 7,
+            "repeat": false,
+            "score": 0,
+            "digest": "3d3a02d0a5a421964318f5209907e5732581e0bfcbefb0a5e601c7a323464efe",
+            "actualSearchDriverDecisions": 43,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "580177ae8b600929e322386b146640f59ec4b692607fca1b7534aa05592acebf",
+            "firstCatalogHash": "7732fb3ab774c2b3caa133c25517390ab6421bf173a381c449b1bad4143df90e"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-clone0.json.gz",
+                "sha256": "74f48f8b9359229e53c0049bbeac3a9944045b7115e6dd30b5b6f1e1a3cde88a",
+                "bytes": 17754
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "clone0",
+            "proposal": 0,
+            "repeat": false,
+            "score": 0,
+            "digest": "4fb543e3f9df0863346061eb676830f4f8804eee823fd623248fc0aca9bb07b8",
+            "actualSearchDriverDecisions": 64,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "d16d75e7cdf50476fd43518d4cf502c3153c8f6cd8c251d35b8618e0d52a4cdb",
+            "firstCatalogHash": "6d97dc1c86e9ac6f0d57e9cf8575026a685faca96c9bc0022e772513c373acb6"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-native.json.gz",
+                "sha256": "8dc431fa038250770fa2081008011d9f1fd1ed047db0fea025fcb7d929a1a4fb",
+                "bytes": 11003
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "native",
+            "proposal": null,
+            "repeat": false,
+            "score": 0,
+            "digest": "4fb543e3f9df0863346061eb676830f4f8804eee823fd623248fc0aca9bb07b8",
+            "actualSearchDriverDecisions": 64,
+            "qualityErrors": [],
+            "rootFrames": 0,
+            "firstRootStateHash": null,
+            "firstCatalogHash": null
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-observed.json.gz",
+                "sha256": "f11dc3fe8c0eb054c8fceea38567308186d4d1c2665e7854e8a76cd44c4b334e",
+                "bytes": 17762
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "observed",
+            "proposal": null,
+            "repeat": false,
+            "score": 0,
+            "digest": "4fb543e3f9df0863346061eb676830f4f8804eee823fd623248fc0aca9bb07b8",
+            "actualSearchDriverDecisions": 64,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "d16d75e7cdf50476fd43518d4cf502c3153c8f6cd8c251d35b8618e0d52a4cdb",
+            "firstCatalogHash": "6d97dc1c86e9ac6f0d57e9cf8575026a685faca96c9bc0022e772513c373acb6"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-proposal1.json.gz",
+                "sha256": "0770f759360be0a16005014cff24e943910ef0bb36900612cd6176378857095a",
+                "bytes": 17086
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "proposal1",
+            "proposal": 1,
+            "repeat": false,
+            "score": 0,
+            "digest": "45fc6f56c4bf2f9376aaf179d2aee8030bd34abe5ccfbb1afa29912581c98b58",
+            "actualSearchDriverDecisions": 56,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "d16d75e7cdf50476fd43518d4cf502c3153c8f6cd8c251d35b8618e0d52a4cdb",
+            "firstCatalogHash": "6d97dc1c86e9ac6f0d57e9cf8575026a685faca96c9bc0022e772513c373acb6"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-proposal2-repeat.json.gz",
+                "sha256": "5ce415e6c9515bb58602e3be935723db6a91d40a1b425064f6215338f1cd9973",
+                "bytes": 17567
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "proposal2",
+            "proposal": 2,
+            "repeat": true,
+            "score": 1,
+            "digest": "eba38a022637343d8a8cc18c43a6619b22446a99c8e77f42442e2cc88ada7f5b",
+            "actualSearchDriverDecisions": 62,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "d16d75e7cdf50476fd43518d4cf502c3153c8f6cd8c251d35b8618e0d52a4cdb",
+            "firstCatalogHash": "6d97dc1c86e9ac6f0d57e9cf8575026a685faca96c9bc0022e772513c373acb6"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-proposal2.json.gz",
+                "sha256": "4cb80fe883760d84ca659e860ac23157b453aaaea850886b46fc4d538831e6a7",
+                "bytes": 17567
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "proposal2",
+            "proposal": 2,
+            "repeat": false,
+            "score": 1,
+            "digest": "eba38a022637343d8a8cc18c43a6619b22446a99c8e77f42442e2cc88ada7f5b",
+            "actualSearchDriverDecisions": 62,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "d16d75e7cdf50476fd43518d4cf502c3153c8f6cd8c251d35b8618e0d52a4cdb",
+            "firstCatalogHash": "6d97dc1c86e9ac6f0d57e9cf8575026a685faca96c9bc0022e772513c373acb6"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-proposal3.json.gz",
+                "sha256": "450270816a3408e2e95d20e5156852a4a42b8213e50d4dc5dde97fac6d7a7105",
+                "bytes": 17056
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "proposal3",
+            "proposal": 3,
+            "repeat": false,
+            "score": 0,
+            "digest": "54a547874a628b2e3f7d2eccaed3ad1741a02898b3731d2f7ecf9a7f1ca1bdb0",
+            "actualSearchDriverDecisions": 53,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "d16d75e7cdf50476fd43518d4cf502c3153c8f6cd8c251d35b8618e0d52a4cdb",
+            "firstCatalogHash": "6d97dc1c86e9ac6f0d57e9cf8575026a685faca96c9bc0022e772513c373acb6"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-proposal4.json.gz",
+                "sha256": "edc996e2d4769359a3c83a0e6473a62bf65d2ce20465bf9b33fd1de21c2d248b",
+                "bytes": 17841
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "proposal4",
+            "proposal": 4,
+            "repeat": false,
+            "score": 0,
+            "digest": "286d504c6c1a293e370c2bbf85c9fd8105e26f95e7b13f66f5ce879324762d7c",
+            "actualSearchDriverDecisions": 59,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "d16d75e7cdf50476fd43518d4cf502c3153c8f6cd8c251d35b8618e0d52a4cdb",
+            "firstCatalogHash": "6d97dc1c86e9ac6f0d57e9cf8575026a685faca96c9bc0022e772513c373acb6"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-proposal5.json.gz",
+                "sha256": "4d842baac772a2ffaddbf0c253e3488b6d6aae6cc2a5426733ce9cdb0da42629",
+                "bytes": 16844
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "proposal5",
+            "proposal": 5,
+            "repeat": false,
+            "score": 0,
+            "digest": "24bac91a0a882672d9f3930ad8a48c41f7f1b49d4ed305d6bee358becc000d28",
+            "actualSearchDriverDecisions": 47,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "d16d75e7cdf50476fd43518d4cf502c3153c8f6cd8c251d35b8618e0d52a4cdb",
+            "firstCatalogHash": "6d97dc1c86e9ac6f0d57e9cf8575026a685faca96c9bc0022e772513c373acb6"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-proposal6.json.gz",
+                "sha256": "5c8bd9d06ee53c496a469b06e3b0e031c23a4edddc4e1155d08f6d336173cbaa",
+                "bytes": 16160
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "proposal6",
+            "proposal": 6,
+            "repeat": false,
+            "score": 0,
+            "digest": "99bd8f71511f5fde3f872e5fc016a0b9aec4f4b2764e0acf5137191dc4c4a330",
+            "actualSearchDriverDecisions": 41,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "d16d75e7cdf50476fd43518d4cf502c3153c8f6cd8c251d35b8618e0d52a4cdb",
+            "firstCatalogHash": "6d97dc1c86e9ac6f0d57e9cf8575026a685faca96c9bc0022e772513c373acb6"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d31-f000-seat2-proposal7.json.gz",
+                "sha256": "0b1ea4f3a6299e9640dd8fcd1b72691adc5ab743906395fb6e35a19705d381db",
+                "bytes": 18454
+            },
+            "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+            "mode": "proposal7",
+            "proposal": 7,
+            "repeat": false,
+            "score": 0,
+            "digest": "02daec82d973760eac1f53107d2ab33a58543a62ef38857961b5c980d8e07552",
+            "actualSearchDriverDecisions": 65,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "d16d75e7cdf50476fd43518d4cf502c3153c8f6cd8c251d35b8618e0d52a4cdb",
+            "firstCatalogHash": "6d97dc1c86e9ac6f0d57e9cf8575026a685faca96c9bc0022e772513c373acb6"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat1-clone0.json.gz",
+                "sha256": "1b29b91ec030b9a8dd35f609654e03aa843e4042a672a3adbeda7ec8b26e4934",
+                "bytes": 17463
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+            "mode": "clone0",
+            "proposal": 0,
+            "repeat": false,
+            "score": 0,
+            "digest": "9b2a808fa1a59fa674291d18b3d28fe8543971b583b6e33ffeea6a9a43ba0bb4",
+            "actualSearchDriverDecisions": 57,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "7aa596e4726272028238a71afdccc41ed67207599ce835193406a5354bca3e99",
+            "firstCatalogHash": "42b91dc52905d86c8033d34f1b931d4774fabdc85f0b3b65e671030174b69691"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat1-native.json.gz",
+                "sha256": "66c8831e41c61be93b1e5c31b860a65b09853e87fe6cbb1631b84da22829ba29",
+                "bytes": 10976
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+            "mode": "native",
+            "proposal": null,
+            "repeat": false,
+            "score": 0,
+            "digest": "9b2a808fa1a59fa674291d18b3d28fe8543971b583b6e33ffeea6a9a43ba0bb4",
+            "actualSearchDriverDecisions": 57,
+            "qualityErrors": [],
+            "rootFrames": 0,
+            "firstRootStateHash": null,
+            "firstCatalogHash": null
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat1-observed.json.gz",
+                "sha256": "ba5c85c5e29cabc2d2c072c6236c84a010b9446505ee6b9f7add1a5a488b95dc",
+                "bytes": 17471
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+            "mode": "observed",
+            "proposal": null,
+            "repeat": false,
+            "score": 0,
+            "digest": "9b2a808fa1a59fa674291d18b3d28fe8543971b583b6e33ffeea6a9a43ba0bb4",
+            "actualSearchDriverDecisions": 57,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "7aa596e4726272028238a71afdccc41ed67207599ce835193406a5354bca3e99",
+            "firstCatalogHash": "42b91dc52905d86c8033d34f1b931d4774fabdc85f0b3b65e671030174b69691"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat1-proposal1.json.gz",
+                "sha256": "a51d6f51d53c79a2067c7294305d33e309463b0fd9552c3815e9a8ecde4dfab5",
+                "bytes": 17464
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+            "mode": "proposal1",
+            "proposal": 1,
+            "repeat": false,
+            "score": 0,
+            "digest": "9b2a808fa1a59fa674291d18b3d28fe8543971b583b6e33ffeea6a9a43ba0bb4",
+            "actualSearchDriverDecisions": 57,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "7aa596e4726272028238a71afdccc41ed67207599ce835193406a5354bca3e99",
+            "firstCatalogHash": "42b91dc52905d86c8033d34f1b931d4774fabdc85f0b3b65e671030174b69691"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat1-proposal2.json.gz",
+                "sha256": "47ae5d0b11148a2315f78c91e629820fc3094dfae59afb5b9221a64d8ed6f1b7",
+                "bytes": 17463
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+            "mode": "proposal2",
+            "proposal": 2,
+            "repeat": false,
+            "score": 0,
+            "digest": "9b2a808fa1a59fa674291d18b3d28fe8543971b583b6e33ffeea6a9a43ba0bb4",
+            "actualSearchDriverDecisions": 57,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "7aa596e4726272028238a71afdccc41ed67207599ce835193406a5354bca3e99",
+            "firstCatalogHash": "42b91dc52905d86c8033d34f1b931d4774fabdc85f0b3b65e671030174b69691"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat1-proposal3.json.gz",
+                "sha256": "8854b092bb9420387c3c080feda2824b72ac3afab8a11683894e4c9cab9c4e39",
+                "bytes": 16589
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+            "mode": "proposal3",
+            "proposal": 3,
+            "repeat": false,
+            "score": 0,
+            "digest": "9108121d861ce4100a7c3d1c929db8b72ea1b4f64d9318086bac219396e058ca",
+            "actualSearchDriverDecisions": 44,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "7aa596e4726272028238a71afdccc41ed67207599ce835193406a5354bca3e99",
+            "firstCatalogHash": "42b91dc52905d86c8033d34f1b931d4774fabdc85f0b3b65e671030174b69691"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat1-proposal4.json.gz",
+                "sha256": "0b18dca2c946d9f06f9499e704e904133dc343e9ec85a51acd9e7e9ff2a6b68e",
+                "bytes": 17525
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+            "mode": "proposal4",
+            "proposal": 4,
+            "repeat": false,
+            "score": 0,
+            "digest": "03d0964caf832cc9cf3459b345aeeba5bd85c03bf387776097540a2d4a374eab",
+            "actualSearchDriverDecisions": 57,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "7aa596e4726272028238a71afdccc41ed67207599ce835193406a5354bca3e99",
+            "firstCatalogHash": "42b91dc52905d86c8033d34f1b931d4774fabdc85f0b3b65e671030174b69691"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat1-proposal5.json.gz",
+                "sha256": "b914750cf8a398e096b365db646cf316220ced0eb560699093fbcf2dcbf14bbc",
+                "bytes": 17464
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+            "mode": "proposal5",
+            "proposal": 5,
+            "repeat": false,
+            "score": 0,
+            "digest": "9b2a808fa1a59fa674291d18b3d28fe8543971b583b6e33ffeea6a9a43ba0bb4",
+            "actualSearchDriverDecisions": 57,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "7aa596e4726272028238a71afdccc41ed67207599ce835193406a5354bca3e99",
+            "firstCatalogHash": "42b91dc52905d86c8033d34f1b931d4774fabdc85f0b3b65e671030174b69691"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat1-proposal6.json.gz",
+                "sha256": "14576dce4128096ee2d807856b2c4c06c7d5a146fe68fc38b0307ca832ed34ef",
+                "bytes": 17464
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+            "mode": "proposal6",
+            "proposal": 6,
+            "repeat": false,
+            "score": 0,
+            "digest": "9b2a808fa1a59fa674291d18b3d28fe8543971b583b6e33ffeea6a9a43ba0bb4",
+            "actualSearchDriverDecisions": 57,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "7aa596e4726272028238a71afdccc41ed67207599ce835193406a5354bca3e99",
+            "firstCatalogHash": "42b91dc52905d86c8033d34f1b931d4774fabdc85f0b3b65e671030174b69691"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat1-proposal7.json.gz",
+                "sha256": "567c7969ee8191b876ae6fb8b739a5c7e65b413ef94e26a1b69324c6dc46b583",
+                "bytes": 16078
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+            "mode": "proposal7",
+            "proposal": 7,
+            "repeat": false,
+            "score": 0,
+            "digest": "3c6e7406bc684ed308dec96c574dffd76e0f32fe17e6ad341d55013eff488cc1",
+            "actualSearchDriverDecisions": 40,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "7aa596e4726272028238a71afdccc41ed67207599ce835193406a5354bca3e99",
+            "firstCatalogHash": "42b91dc52905d86c8033d34f1b931d4774fabdc85f0b3b65e671030174b69691"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-clone0.json.gz",
+                "sha256": "c40238d4128cfa9681a2f45586f3a49e931850b6eaea91f39f42b894509672e8",
+                "bytes": 16522
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "clone0",
+            "proposal": 0,
+            "repeat": false,
+            "score": 0,
+            "digest": "d92d6bd0b5fdd6541a2990498f6dace4e4bce49daa9bdebff3d248fec3b9c47f",
+            "actualSearchDriverDecisions": 42,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-native.json.gz",
+                "sha256": "e29cce94421efe55c291b32a4bba4a1bf421001f859969114f9bc979b9e00028",
+                "bytes": 10109
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "native",
+            "proposal": null,
+            "repeat": false,
+            "score": 0,
+            "digest": "d92d6bd0b5fdd6541a2990498f6dace4e4bce49daa9bdebff3d248fec3b9c47f",
+            "actualSearchDriverDecisions": 42,
+            "qualityErrors": [],
+            "rootFrames": 0,
+            "firstRootStateHash": null,
+            "firstCatalogHash": null
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-observed.json.gz",
+                "sha256": "2fcebd050a8d5bae3adfcace246371e63259ce1d73ffa36ae7db33471fc10e36",
+                "bytes": 16530
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "observed",
+            "proposal": null,
+            "repeat": false,
+            "score": 0,
+            "digest": "d92d6bd0b5fdd6541a2990498f6dace4e4bce49daa9bdebff3d248fec3b9c47f",
+            "actualSearchDriverDecisions": 42,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-proposal1.json.gz",
+                "sha256": "572889f9d541c395ac2da84cbdfcfeffae1de36fa384da90e26b46aa44bcdc2c",
+                "bytes": 16522
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "proposal1",
+            "proposal": 1,
+            "repeat": false,
+            "score": 0,
+            "digest": "d92d6bd0b5fdd6541a2990498f6dace4e4bce49daa9bdebff3d248fec3b9c47f",
+            "actualSearchDriverDecisions": 42,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-proposal2.json.gz",
+                "sha256": "2752b0969e7c793b22cbee9235bad92da0676cb1d2a042a294cc97c5fe78b998",
+                "bytes": 16522
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "proposal2",
+            "proposal": 2,
+            "repeat": false,
+            "score": 0,
+            "digest": "d92d6bd0b5fdd6541a2990498f6dace4e4bce49daa9bdebff3d248fec3b9c47f",
+            "actualSearchDriverDecisions": 42,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-proposal3-repeat.json.gz",
+                "sha256": "b90cf1b6c5487398734613a9d65492263895c556a00712a74d18f860980c04f5",
+                "bytes": 16527
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "proposal3",
+            "proposal": 3,
+            "repeat": true,
+            "score": 1,
+            "digest": "e6db05bd5c0f3690254a12b2dd99323b4bb68427f1dd26a00ab5ed221034fe1b",
+            "actualSearchDriverDecisions": 41,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-proposal3.json.gz",
+                "sha256": "3966b9d63a19e46a77c629679cea2b7deaefad9af0d477f5ad2f48daef233222",
+                "bytes": 16528
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "proposal3",
+            "proposal": 3,
+            "repeat": false,
+            "score": 1,
+            "digest": "e6db05bd5c0f3690254a12b2dd99323b4bb68427f1dd26a00ab5ed221034fe1b",
+            "actualSearchDriverDecisions": 41,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-proposal4.json.gz",
+                "sha256": "075b90d4a1d0510bacd361871e3d1f49ab90cfc7f6e7ad03230534934a955620",
+                "bytes": 17751
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "proposal4",
+            "proposal": 4,
+            "repeat": false,
+            "score": 0,
+            "digest": "cf2835bde90522b6c43da921031086c1c6f991ca3493e4ea0088f88e6cf2d14f",
+            "actualSearchDriverDecisions": 58,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-proposal5.json.gz",
+                "sha256": "b9aac55fefcdc101c8e824a6f06549b66bc9033762b61bbe01e16a169a393d63",
+                "bytes": 16522
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "proposal5",
+            "proposal": 5,
+            "repeat": false,
+            "score": 0,
+            "digest": "d92d6bd0b5fdd6541a2990498f6dace4e4bce49daa9bdebff3d248fec3b9c47f",
+            "actualSearchDriverDecisions": 42,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-proposal6.json.gz",
+                "sha256": "060946a7c8651031d42994b813be9690e0b4afc6f31ecaebaac935236ca6ad27",
+                "bytes": 16522
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "proposal6",
+            "proposal": 6,
+            "repeat": false,
+            "score": 0,
+            "digest": "d92d6bd0b5fdd6541a2990498f6dace4e4bce49daa9bdebff3d248fec3b9c47f",
+            "actualSearchDriverDecisions": 42,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-proposal7-repeat.json.gz",
+                "sha256": "6ad6a31bf46c718cce186aea894a83e14fa6eff65058227acc46f6c0fa7bfda9",
+                "bytes": 17270
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "proposal7",
+            "proposal": 7,
+            "repeat": true,
+            "score": 1,
+            "digest": "34f6d37a4d565e4886041807939f74400cd9d22b9626f19311d091f719858ba1",
+            "actualSearchDriverDecisions": 48,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d32-f003-seat2-proposal7.json.gz",
+                "sha256": "82bbbe3cb82e64c7b833bddc25d26fdc66302dce6b74d8849b4dc7ab71b7c7f6",
+                "bytes": 17270
+            },
+            "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+            "mode": "proposal7",
+            "proposal": 7,
+            "repeat": false,
+            "score": 1,
+            "digest": "34f6d37a4d565e4886041807939f74400cd9d22b9626f19311d091f719858ba1",
+            "actualSearchDriverDecisions": 48,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "b23d149a09086296afd7533c4979c7d4f5aac30a0bafe111d60332b20eda2cf1",
+            "firstCatalogHash": "e51a9de9ab191a3ecfcf63959fe127b8dc2c9b09b8dc3b93231ea9a514bc2280"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-clone0.json.gz",
+                "sha256": "848c628eb3c474aacc719c56dd88a3687f5dbb233b5a2a959283284a1002f858",
+                "bytes": 22879
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "clone0",
+            "proposal": 0,
+            "repeat": false,
+            "score": 1,
+            "digest": "9b36964f6ab7173d9afdfb1cc62a0bc5b9a405db2cd630909a698d124a6d5254",
+            "actualSearchDriverDecisions": 66,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-native.json.gz",
+                "sha256": "9332e368f95d77284af84fface202b885ceac35cb74128a29a52d20c17790997",
+                "bytes": 13914
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "native",
+            "proposal": null,
+            "repeat": false,
+            "score": 1,
+            "digest": "9b36964f6ab7173d9afdfb1cc62a0bc5b9a405db2cd630909a698d124a6d5254",
+            "actualSearchDriverDecisions": 66,
+            "qualityErrors": [],
+            "rootFrames": 0,
+            "firstRootStateHash": null,
+            "firstCatalogHash": null
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-observed.json.gz",
+                "sha256": "2f1ad214a18bf029696b5cc2dfa21c5d14a01e71b44ff009f77490c979f1a1ad",
+                "bytes": 22887
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "observed",
+            "proposal": null,
+            "repeat": false,
+            "score": 1,
+            "digest": "9b36964f6ab7173d9afdfb1cc62a0bc5b9a405db2cd630909a698d124a6d5254",
+            "actualSearchDriverDecisions": 66,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-proposal1.json.gz",
+                "sha256": "613b1d3e12845ef88b0f40919cf053a8e4f2c2ba2edd1910a5e388b9046b646d",
+                "bytes": 22878
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "proposal1",
+            "proposal": 1,
+            "repeat": false,
+            "score": 1,
+            "digest": "9b36964f6ab7173d9afdfb1cc62a0bc5b9a405db2cd630909a698d124a6d5254",
+            "actualSearchDriverDecisions": 66,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-proposal2.json.gz",
+                "sha256": "1adcc8a272d74a3ace055190fcf95ed42a1c199d57119bb6f3fde48a6a89bcbb",
+                "bytes": 22068
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "proposal2",
+            "proposal": 2,
+            "repeat": false,
+            "score": 1,
+            "digest": "7de456c3bbacfb88b56154622785b25f213d928027ef87fa3298d8925cd33ba9",
+            "actualSearchDriverDecisions": 54,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-proposal3.json.gz",
+                "sha256": "acc6425c0150be73a38ebe3fc3a3b7bbaaec37a45c253120ec6c3651f09dbd18",
+                "bytes": 23605
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "proposal3",
+            "proposal": 3,
+            "repeat": false,
+            "score": 1,
+            "digest": "886843892114dc9941cd7dc087ad6d1a5209e664981ea101cef87a54289dee1c",
+            "actualSearchDriverDecisions": 74,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-proposal4.json.gz",
+                "sha256": "75c599310bea21ed439acb5d7531725827b9b48320dd24ae118483c3dc6a80ad",
+                "bytes": 23180
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "proposal4",
+            "proposal": 4,
+            "repeat": false,
+            "score": 1,
+            "digest": "947c9b81526b1353469b66606c12c8425a980d40e1238ee924f2ba1bb87a70df",
+            "actualSearchDriverDecisions": 65,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-proposal5-repeat.json.gz",
+                "sha256": "44ef38ca02d31e0cfaf58260b1c62c1ca0e03ced7ab52d31dbff8741a25441d4",
+                "bytes": 22882
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "proposal5",
+            "proposal": 5,
+            "repeat": true,
+            "score": 0,
+            "digest": "cb887c3a383b35cfcd1e6789cf5e40dcd3a5efd97f807f2e742892598b835ee6",
+            "actualSearchDriverDecisions": 61,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-proposal5.json.gz",
+                "sha256": "83b9b19b17ac10a269a771cfdee4986915151c62d36095410e7d2d92827ac4c7",
+                "bytes": 22882
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "proposal5",
+            "proposal": 5,
+            "repeat": false,
+            "score": 0,
+            "digest": "cb887c3a383b35cfcd1e6789cf5e40dcd3a5efd97f807f2e742892598b835ee6",
+            "actualSearchDriverDecisions": 61,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-proposal6.json.gz",
+                "sha256": "7e13b677ff61755c30dc33e291d3a5de894979b42f611bfbfae20e5da0253083",
+                "bytes": 22922
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "proposal6",
+            "proposal": 6,
+            "repeat": false,
+            "score": 1,
+            "digest": "11674a4c407536ca3b73b20a72259e5e85226965475926cc5b356974fcafbace",
+            "actualSearchDriverDecisions": 61,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-proposal7-repeat.json.gz",
+                "sha256": "c2f6697a66b7f2ce7463c9238f4cca8ce2d2aeb1f0d71973d2c4e5872a169930",
+                "bytes": 22111
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "proposal7",
+            "proposal": 7,
+            "repeat": true,
+            "score": 0,
+            "digest": "1aa9960f7393983a7423c39a156cdde2e898b28f0759ecabfa24b826361ba0d9",
+            "actualSearchDriverDecisions": 51,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat1-proposal7.json.gz",
+                "sha256": "9951493c71c2b61931b45fef1ff9af0dcbf89e9f819733e7ed73da1f1757d510",
+                "bytes": 22111
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+            "mode": "proposal7",
+            "proposal": 7,
+            "repeat": false,
+            "score": 0,
+            "digest": "1aa9960f7393983a7423c39a156cdde2e898b28f0759ecabfa24b826361ba0d9",
+            "actualSearchDriverDecisions": 51,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "dfd0da99ad774fb94d3f6ee228f83f4b5d5af940856b1ff98ca83c1a22ba14e2",
+            "firstCatalogHash": "c9760a0b9db731210680a5a791adb227ed2a1dc6da08cd5bcecd53e846109b48"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-clone0.json.gz",
+                "sha256": "bcf62f1143c757e3af714a8c44082d2610bb69b560cb153c49ffc1c96e512d36",
+                "bytes": 20784
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "clone0",
+            "proposal": 0,
+            "repeat": false,
+            "score": 0,
+            "digest": "2cb0f54e90829d5f821faafbd1dc1965d9c48a6b18d04bf94bcc80ebb6925a71",
+            "actualSearchDriverDecisions": 39,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-native.json.gz",
+                "sha256": "0887f989f4b63b0c0cd9d0a33b044016a0d2a93e0ea6c6bd8daf29a7cd36d544",
+                "bytes": 12175
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "native",
+            "proposal": null,
+            "repeat": false,
+            "score": 0,
+            "digest": "2cb0f54e90829d5f821faafbd1dc1965d9c48a6b18d04bf94bcc80ebb6925a71",
+            "actualSearchDriverDecisions": 39,
+            "qualityErrors": [],
+            "rootFrames": 0,
+            "firstRootStateHash": null,
+            "firstCatalogHash": null
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-observed.json.gz",
+                "sha256": "4c83d30617b7856afe2f7dae073662de0424faa20cb0cab70b48bbdf39a49eaf",
+                "bytes": 20793
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "observed",
+            "proposal": null,
+            "repeat": false,
+            "score": 0,
+            "digest": "2cb0f54e90829d5f821faafbd1dc1965d9c48a6b18d04bf94bcc80ebb6925a71",
+            "actualSearchDriverDecisions": 39,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-proposal1.json.gz",
+                "sha256": "04a52fa89a3390e1efd6f03db35bfadb55f408572ff676ec77fd87d44390217b",
+                "bytes": 20782
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "proposal1",
+            "proposal": 1,
+            "repeat": false,
+            "score": 0,
+            "digest": "2cb0f54e90829d5f821faafbd1dc1965d9c48a6b18d04bf94bcc80ebb6925a71",
+            "actualSearchDriverDecisions": 39,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-proposal2.json.gz",
+                "sha256": "9cfd4faaddf61e47ec3d83150963f96875a6913f07901d1c837d2d3504043497",
+                "bytes": 22163
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "proposal2",
+            "proposal": 2,
+            "repeat": false,
+            "score": 0,
+            "digest": "a205f57c8b2bb88966e94b184416e86058bcaf26507964732d6525586a1281a4",
+            "actualSearchDriverDecisions": 66,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-proposal3-repeat.json.gz",
+                "sha256": "1ec5b703ef74fca4e290088c3e12e8a5e1ba777d5559376358116f08605b5c51",
+                "bytes": 22741
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "proposal3",
+            "proposal": 3,
+            "repeat": true,
+            "score": 1,
+            "digest": "6163d68829c337390c13aaf1d8c422f9f69e1bc9867cd074127411cdb2de925f",
+            "actualSearchDriverDecisions": 69,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-proposal3.json.gz",
+                "sha256": "245dcb7e5b78da7f2f09b3d0293ad6cefcb4e054fc748ee7362c90de48ac76a2",
+                "bytes": 22742
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "proposal3",
+            "proposal": 3,
+            "repeat": false,
+            "score": 1,
+            "digest": "6163d68829c337390c13aaf1d8c422f9f69e1bc9867cd074127411cdb2de925f",
+            "actualSearchDriverDecisions": 69,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-proposal4-repeat.json.gz",
+                "sha256": "be462cbeddec1d782200b97baeea7202da97b3bf63dfd97ccf7694210287bdf2",
+                "bytes": 21325
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "proposal4",
+            "proposal": 4,
+            "repeat": true,
+            "score": 1,
+            "digest": "56cdc38a1f6ed5a1d447045c4db49f1b1a17f907cb95517ca6aaba89da748541",
+            "actualSearchDriverDecisions": 54,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-proposal4.json.gz",
+                "sha256": "aff00e20e3022b9d068fa811e029fabb8fa2b3220242f41a3d887082f6e37924",
+                "bytes": 21325
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "proposal4",
+            "proposal": 4,
+            "repeat": false,
+            "score": 1,
+            "digest": "56cdc38a1f6ed5a1d447045c4db49f1b1a17f907cb95517ca6aaba89da748541",
+            "actualSearchDriverDecisions": 54,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-proposal5.json.gz",
+                "sha256": "40c4f07c818ceb9eedbd75489bdc0f00c5ab82f759f5a710fb44d8d3035a5444",
+                "bytes": 22288
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "proposal5",
+            "proposal": 5,
+            "repeat": false,
+            "score": 0,
+            "digest": "c3ddea847647aa46199e14a25d5b21f38071ebb0fbb2b028fdb149594414b3e1",
+            "actualSearchDriverDecisions": 58,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-proposal6.json.gz",
+                "sha256": "b15d9104d7491c9258daaa601d44cd895e9700e3182541ae9001ee598eea66c7",
+                "bytes": 23387
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "proposal6",
+            "proposal": 6,
+            "repeat": false,
+            "score": 0,
+            "digest": "d5e814923d1336ba548f57700cd21dabc8dda2f26f5e155528ec8a052c0d9364",
+            "actualSearchDriverDecisions": 75,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        },
+        {
+            "file": {
+                "path": "defer-map-fresh-m4-d33-f001-seat2-proposal7.json.gz",
+                "sha256": "fcaed953e9545a1e5da5b00925d88edffa8c0f1edfd389641bbd97640b664e4f",
+                "bytes": 22683
+            },
+            "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+            "mode": "proposal7",
+            "proposal": 7,
+            "repeat": false,
+            "score": 0,
+            "digest": "06c2c44f1f2ac5c226f7e199f823e38641a151338c48bb3a1880d8f3f7628d14",
+            "actualSearchDriverDecisions": 69,
+            "qualityErrors": [],
+            "rootFrames": 1,
+            "firstRootStateHash": "365a142c23c62f0614313180d4af9fe71c0f426e1ad727aab11e75f507a7d1f1",
+            "firstCatalogHash": "5f23418a47424063b9b1871a27cf02be5eda68adf433e728e31229ce12de22bb"
+        }
+    ],
+    "independentVerification": {
+        "schema": 1,
+        "atUtc": "2026-11-18T20:41:16.152221+00:00",
+        "passed": true,
+        "verifiedSourceBindings": 2817,
+        "sourceFreezeSha256": "f257706809d8f247e20c3f99e0ba233a90bed16ac15c7b43ed5aaa52487d07b0",
+        "allOriginalNativeObservationCloneControlsExact": 18,
+        "nativeFullGames": 72,
+        "actualSearchDriverDecisions": 3914,
+        "independentExposedFamilies": 3,
+        "namedEntrantCases": 6,
+        "singleActualBoardCallbackPerObservedGame": true,
+        "allSelectedFormationBodiesAppearAtAuthoritativeOpening": true,
+        "allNativePaidLevelsUnchanged": true,
+        "allFirstStatesAndCatalogsExact": true,
+        "zeroCatalogRngAndUuidChanges": true,
+        "independentContentHashes": 660,
+        "canonicalProposalReplays": 528,
+        "fixedAlternativeOutcomes": {
+            "unchanged": 30,
+            "worsened": 7,
+            "improved": 5
+        },
+        "allChangedOutcomesRepeatedExactly": 12,
+        "casesWithAtLeastOneImprovedAlternative": 3,
+        "results": [
+            {
+                "caseId": "defer-map-fresh-m4-d31-f000-seat1",
+                "family": "defer-map-fresh-m4-d31-f000",
+                "nativeScore": 1,
+                "distinctFirstGeometryProposals": 7,
+                "alternatives": [
+                    {
+                        "proposal": 1,
+                        "score": 1,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 28,
+                        "nativeBlockedPublicRays": 28
+                    },
+                    {
+                        "proposal": 2,
+                        "score": 0,
+                        "delta": -1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 28,
+                        "nativeBlockedPublicRays": 28
+                    },
+                    {
+                        "proposal": 3,
+                        "score": 0,
+                        "delta": -1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 27,
+                        "nativeBlockedPublicRays": 28
+                    },
+                    {
+                        "proposal": 4,
+                        "score": 1,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 31,
+                        "nativeBlockedPublicRays": 28
+                    },
+                    {
+                        "proposal": 5,
+                        "score": 0.5,
+                        "delta": -0.5,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 24,
+                        "nativeBlockedPublicRays": 28
+                    },
+                    {
+                        "proposal": 6,
+                        "score": 0,
+                        "delta": -1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 28,
+                        "nativeBlockedPublicRays": 28
+                    },
+                    {
+                        "proposal": 7,
+                        "score": 0,
+                        "delta": -1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 32,
+                        "nativeBlockedPublicRays": 28
+                    }
+                ],
+                "atLeastOneImprovedAlternative": false
+            },
+            {
+                "caseId": "defer-map-fresh-m4-d31-f000-seat2",
+                "family": "defer-map-fresh-m4-d31-f000",
+                "nativeScore": 0,
+                "distinctFirstGeometryProposals": 8,
+                "alternatives": [
+                    {
+                        "proposal": 1,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 26,
+                        "nativeBlockedPublicRays": 26
+                    },
+                    {
+                        "proposal": 2,
+                        "score": 1,
+                        "delta": 1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 26,
+                        "nativeBlockedPublicRays": 26
+                    },
+                    {
+                        "proposal": 3,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 27,
+                        "nativeBlockedPublicRays": 26
+                    },
+                    {
+                        "proposal": 4,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 26,
+                        "nativeBlockedPublicRays": 26
+                    },
+                    {
+                        "proposal": 5,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 29,
+                        "nativeBlockedPublicRays": 26
+                    },
+                    {
+                        "proposal": 6,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 31,
+                        "nativeBlockedPublicRays": 26
+                    },
+                    {
+                        "proposal": 7,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 22,
+                        "nativeBlockedPublicRays": 26
+                    }
+                ],
+                "atLeastOneImprovedAlternative": true
+            },
+            {
+                "caseId": "defer-map-fresh-m4-d32-f003-seat1",
+                "family": "defer-map-fresh-m4-d32-f003",
+                "nativeScore": 0,
+                "distinctFirstGeometryProposals": 4,
+                "alternatives": [
+                    {
+                        "proposal": 1,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 16,
+                        "nativeBlockedPublicRays": 16
+                    },
+                    {
+                        "proposal": 2,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 16,
+                        "nativeBlockedPublicRays": 16
+                    },
+                    {
+                        "proposal": 3,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 17,
+                        "nativeBlockedPublicRays": 16
+                    },
+                    {
+                        "proposal": 4,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 16,
+                        "nativeBlockedPublicRays": 16
+                    },
+                    {
+                        "proposal": 5,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 16,
+                        "nativeBlockedPublicRays": 16
+                    },
+                    {
+                        "proposal": 6,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 16,
+                        "nativeBlockedPublicRays": 16
+                    },
+                    {
+                        "proposal": 7,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 21,
+                        "nativeBlockedPublicRays": 16
+                    }
+                ],
+                "atLeastOneImprovedAlternative": false
+            },
+            {
+                "caseId": "defer-map-fresh-m4-d32-f003-seat2",
+                "family": "defer-map-fresh-m4-d32-f003",
+                "nativeScore": 0,
+                "distinctFirstGeometryProposals": 4,
+                "alternatives": [
+                    {
+                        "proposal": 1,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 15,
+                        "nativeBlockedPublicRays": 15
+                    },
+                    {
+                        "proposal": 2,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 15,
+                        "nativeBlockedPublicRays": 15
+                    },
+                    {
+                        "proposal": 3,
+                        "score": 1,
+                        "delta": 1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 17,
+                        "nativeBlockedPublicRays": 15
+                    },
+                    {
+                        "proposal": 4,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 15,
+                        "nativeBlockedPublicRays": 15
+                    },
+                    {
+                        "proposal": 5,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 15,
+                        "nativeBlockedPublicRays": 15
+                    },
+                    {
+                        "proposal": 6,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 15,
+                        "nativeBlockedPublicRays": 15
+                    },
+                    {
+                        "proposal": 7,
+                        "score": 1,
+                        "delta": 1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 16,
+                        "nativeBlockedPublicRays": 15
+                    }
+                ],
+                "atLeastOneImprovedAlternative": true
+            },
+            {
+                "caseId": "defer-map-fresh-m4-d33-f001-seat1",
+                "family": "defer-map-fresh-m4-d33-f001",
+                "nativeScore": 1,
+                "distinctFirstGeometryProposals": 7,
+                "alternatives": [
+                    {
+                        "proposal": 1,
+                        "score": 1,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 32,
+                        "nativeBlockedPublicRays": 32
+                    },
+                    {
+                        "proposal": 2,
+                        "score": 1,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 33,
+                        "nativeBlockedPublicRays": 32
+                    },
+                    {
+                        "proposal": 3,
+                        "score": 1,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 33,
+                        "nativeBlockedPublicRays": 32
+                    },
+                    {
+                        "proposal": 4,
+                        "score": 1,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 32,
+                        "nativeBlockedPublicRays": 32
+                    },
+                    {
+                        "proposal": 5,
+                        "score": 0,
+                        "delta": -1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 31,
+                        "nativeBlockedPublicRays": 32
+                    },
+                    {
+                        "proposal": 6,
+                        "score": 1,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 31,
+                        "nativeBlockedPublicRays": 32
+                    },
+                    {
+                        "proposal": 7,
+                        "score": 0,
+                        "delta": -1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 31,
+                        "nativeBlockedPublicRays": 32
+                    }
+                ],
+                "atLeastOneImprovedAlternative": false
+            },
+            {
+                "caseId": "defer-map-fresh-m4-d33-f001-seat2",
+                "family": "defer-map-fresh-m4-d33-f001",
+                "nativeScore": 0,
+                "distinctFirstGeometryProposals": 7,
+                "alternatives": [
+                    {
+                        "proposal": 1,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": false,
+                        "blockedPublicRays": 36,
+                        "nativeBlockedPublicRays": 36
+                    },
+                    {
+                        "proposal": 2,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 36,
+                        "nativeBlockedPublicRays": 36
+                    },
+                    {
+                        "proposal": 3,
+                        "score": 1,
+                        "delta": 1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 36,
+                        "nativeBlockedPublicRays": 36
+                    },
+                    {
+                        "proposal": 4,
+                        "score": 1,
+                        "delta": 1,
+                        "repeatedExactly": true,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 34,
+                        "nativeBlockedPublicRays": 36
+                    },
+                    {
+                        "proposal": 5,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 32,
+                        "nativeBlockedPublicRays": 36
+                    },
+                    {
+                        "proposal": 6,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 32,
+                        "nativeBlockedPublicRays": 36
+                    },
+                    {
+                        "proposal": 7,
+                        "score": 0,
+                        "delta": 0,
+                        "repeatedExactly": false,
+                        "openingPositionsChanged": true,
+                        "blockedPublicRays": 34,
+                        "nativeBlockedPublicRays": 36
+                    }
+                ],
+                "atLeastOneImprovedAlternative": true
+            }
+        ],
+        "newGeneralPolicyDefined": false,
+        "newModelFitted": false,
+        "freshStrengthOrComputeQualification": false,
+        "defaultChanged": false,
+        "earlierZeroGamePackagingFailurePreserved": true
+    },
+    "canonicalCatalogReplay": {
+        "schema": 1,
+        "atUtc": "2026-11-18T20:41:07.103Z",
+        "passed": true,
+        "frames": 66,
+        "exactCanonicalProposals": 528,
+        "acceptedModelEnvelopesReconstructed": 66,
+        "newBattles": 0,
+        "nativeBuilderRestoresBodyPropertyOrder": true,
+        "originalDetachedOrderAttemptPreserved": true
+    },
+    "closeout": {
+        "schema": 1,
+        "atUtc": "2026-11-18T20:45:49.039238+00:00",
+        "id": "a19-barrel-formation-opportunity-20261118",
+        "status": "closed-complete-exposed-opportunity-diagnosis",
+        "nativeWorkflowSeconds": 238.941815,
+        "timeScope": "One serial nice19 M4 actor for all72 full games and all native/pure-root/source controls; includes source checks and evidence output, excludes preparation/independent verification. No cost/latency qualification.",
+        "physicalNativeGames": 72,
+        "actualSearchDriverDecisions": 3914,
+        "independentExposedFamilies": 3,
+        "nativeEntrantCases": 6,
+        "initialNativeScorePoints": 2,
+        "fixedAlternativeScores": {
+            "carry-depth": 2,
+            "area-separation": 2,
+            "chain-break": 3,
+            "ray-break": 3,
+            "support-cluster": 0.5,
+            "public-kit-blend": 1,
+            "explore": 1
+        },
+        "all42AlternativeTradeoffs": {
+            "unchanged": 30,
+            "worsened": 7,
+            "improved": 5
+        },
+        "casesWithWinningAlternatives": 3,
+        "independentVerificationFileSha256": "4edd9e462a35491de9adc7c3e7ddedd2bfc72dbcc4cc720f5387d595ae56b6ae",
+        "descriptiveBlockedRayChanges": {
+            "improved": {
+                "fewer": 1,
+                "equal": 2,
+                "more": 2
+            },
+            "worsened": {
+                "fewer": 4,
+                "equal": 2,
+                "more": 1
+            },
+            "unchanged": {
+                "fewer": 5,
+                "equal": 17,
+                "more": 8
+            }
+        },
+        "failedNativeFieldOrderReplayPreserved": true,
+        "initialZeroNativeGamePackagingFailurePreserved": true,
+        "conclusion": "There is replayed free-formation headroom on three exposed cases, with real losses from other choices. No future seed, general selector, trained weights, independent strength/cost qualification, default change or deployment. Do not select or qualify a blanket template from these six examples. A distinct data/learning plan must preserve native constructor field order, current-v13 complete formation, legal public terrain/active effects, all alternatives and current reference; fresh full-policy confirmation and both overall-average+10% CPU metrics remain required."
+    },
+    "completeArchive": {
+        "path": "closed-formation-opportunity-return.tar.gz",
+        "sha256": "cbb135cda9d52c6e681e23043c424298eac219dd689cac8d29a58273491294e0",
+        "bytes": 44172563,
+        "verifiedRegularMembers": 2911,
+        "allMembersVerified": true,
+        "indexSha256": "40c64b49897b3bffc7a2586308cb08efdfc780791aa8e1badaaea55a918d7499",
+        "sourceBindings": 2817,
+        "nativeRegularSourceFiles": 2800,
+        "rawOriginalsRemoved": false
+    },
+    "puffaloBackup": {
+        "atUtc": "2026-11-18T20:48:07.508665+00:00",
+        "remotePath": "hoc-research/a19-barrel-formation-opportunity-20261118/closed-formation-opportunity-return.tar.gz",
+        "sha256": "cbb135cda9d52c6e681e23043c424298eac219dd689cac8d29a58273491294e0",
+        "bytes": 44172563,
+        "allMembersVerified": true,
+        "verifiedRegularMembers": 2911
+    },
+    "fixedProposalsNotGeneralPolicy": true,
+    "freshStrengthFamilies": 0,
+    "newWeightsFitted": false,
+    "newStrengthOrComputeQualification": false,
+    "defaultChanged": false,
+    "deploymentPerformed": false
+}

@@ -55,6 +55,32 @@ The completed admission failed: −5.56 points versus current, simultaneous 95% 
 funding/cold controls and both family bootstraps passed independent audit. Keep this fixed candidate
 closed without fresh/cost progression, slice rescue or retuning; no default changed.
 
+## Native placement coverage and free-template diagnosis — November 18, 2026
+
+Read `docs/a19_native_placement_coverage_research.md` before broadening the learned placement
+domain. The complete current-v13 observation used 452 physical games on 108 exposed families;
+all 432 main native/observed outcomes match the original controls. At the final funded placement
+call, 136/144 seven-point seats have valid model inputs and geometry; five-/six-point doctrines
+remain outside the trained domain. No seat has a quantity mismatch there. Fight-start amounts
+cannot establish an earlier model rejection. Preserve the initial wrong-field audit, intermediate
+funding verifier correction and every raw call. These are source-verified reachable branches,
+not instrumented neural-call counts, strength, cost or live-frequency estimates.
+
+The separate `docs/a19_barrel_formation_opportunity_research.md` records 72 full counterfactual
+games / 3,914 actual decisions on three exposed barrel-map families, both seats. All 18 native,
+observed and cloned-placement controls match. Among 42 fixed free-template alternatives, five
+improve, seven worsen and 30 retain the terminal score; all twelve changes replay exactly. Three
+cases have a winning alternative, but no general selector or new weights are qualified. Preserve
+all losses, the six-case selection, original cutoffs and unchanged paid levels. Do not activate
+or qualify a blanket template from these outcomes or rescue an earlier closed study.
+
+Detached JSON sorts body keys, while the existing `layout.propose` private seed uses native body
+property order. Reconstruct with `buildPlacementInput` before regenerating archived proposals;
+semantic object equality alone is insufficient. The corrected replay matches all 528 proposals
+across 66 frames; retain its first failed attempt. Future public-terrain/active-synergy learning
+needs a distinct complete plan, independent family splits, fresh full-policy strength/confirmation
+and overall-average +10% full-fight / weighted actual-decision CPU gates. Neither diagnosis changes v13.
+
 ## Original Sniper donor qualification — November 18, 2026
 
 The following records the study's completion before explicit adoption; see `docs/sniper_donor_adoption.md`
