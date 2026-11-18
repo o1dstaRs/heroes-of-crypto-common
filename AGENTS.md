@@ -54,6 +54,25 @@ source/raw backup on Puffalo. Raw CPU metadata is whole-process scoped; only ser
 counterbalanced runs attribute per-case cost. This work does not advance the closed incomplete
 root-scoped forecast, failed terrain repair or held-out teacher data, or alter their gates/cutoffs.
 
+## Closed joint delivery utility screen — November 18, 2026
+
+Read `docs/a19_joint_delivery_utility_research.md` and preserve
+`docs/evidence/a19_joint_delivery_utility_results_20261118.json`. The single fixed
+`a19-joint-contact-shooting-utility-v1` adds XP-weighted actual own attack and native range falloff
+to the saved melee-contact proxy. All 648 logical rows / 666 physical games on 108 **reused** families
+completed. It gained +9.49 points against current v12 but **zero against the qualified Sniper guard**
+(adjusted 95% −2.78 to +3.24), three recovered outcomes and three given back. Only eight families
+changed against that comparator. The incremental gate failed; no fresh bank, cost qualification,
+confirmation, default change or deployment followed. Do not rescue the current-only gain, fewer
+regressions, or a favorable subgroup, tune this closed recipe or weaken its gates.
+
+Every original 432 current/guard complete outcome, 648 semantic input/cache/report records, 1,387
+sealed source hashes and all cold/persistent/cached controls passed. The complete existing development
+bank and all its old typed channels remain reserved by the unchanged Sniper evidence; no new seed
+allocation was made. Preserve the independently confirmed Sniper guard as the stronger established
+reference. A distinct continuation must value the real tradeoffs and pass both current and matched
+free/qualified-guard comparisons with fresh independent evaluation and overall-average CPU limits.
+
 ## Closed revealed-ranged delivery screen — November 17, 2026
 
 Read `docs/revealed_ranged_delivery_research.md` before revisiting early public shooter/caster reveals,
