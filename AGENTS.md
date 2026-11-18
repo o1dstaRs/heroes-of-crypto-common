@@ -73,6 +73,32 @@ allocation was made. Preserve the independently confirmed Sniper guard as the st
 reference. A distinct continuation must value the real tradeoffs and pass both current and matched
 free/qualified-guard comparisons with fresh independent evaluation and overall-average CPU limits.
 
+## Counterfactual delivery research — November 18, 2026
+
+Read `docs/a19_counterfactual_delivery_research.md` and preserve its engineering fixture. No new
+strength gain or serving activation is established; the confirmed Sniper guard remains the stronger
+research reference. The cheap private-policy pilot stopped on illegal proposals after 13 real games.
+The distinct 48-game H8 pilot preserved every real guard outcome but failed its turn-count gate by
+omitting automatic skips. Keep both originals closed, including failed diagnostics and +70.50%
+forced-probe CPU; none qualifies strength or representative cost.
+
+The corrected `a19-counterfactual-dominance-v1` uses the unchanged failed joint proxy only to propose
+one paid plan, then requires strict native-leaf superiority over the actual guard in all three fixed
+unknown-budget scenarios. Use legally public enemy artifacts; never private doctrine, augments,
+deployment, future randomness or the all-AI visibility bypass. Count automatic completed turns and
+stop at a whole native event boundary. Keep private work outside the actual decision denominator,
+charge all CPU and retain recorded guard abstentions for known private proposal refusals.
+
+Fresh seal `5c280d79aa39fe35d9349a5db9e9003cc547acffcc3ef03188d6629b987da683` reserves 1,080
+development and 1,080 conditional confirmation families, both seats/three arms. Both adjusted
+strength comparisons, independent source/input/outcome checks, cold controls and both-seat serial
+overall-average +10% cost gates must pass before confirmation. All results are pending; never
+promote an interim score or change the 21:00 UTC November 18 cutoff. Preserve the supplemental
+binding of 178 unchanged native project files against the ancestor archive captured before fresh
+development preflights finished; the original seal is untouched. Reserve all four roles × 32,768
+namespace preimages, raw/permuted draft offsets and six private roots per terrain, plus timing-bank
+private roots. Keep every historical failed gate and earlier held-out exclusion intact.
+
 ## Closed revealed-ranged delivery screen — November 17, 2026
 
 Read `docs/revealed_ranged_delivery_research.md` before revisiting early public shooter/caster reveals,
