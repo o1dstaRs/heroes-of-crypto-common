@@ -994,6 +994,18 @@ strength or timing claim. No existing frozen file, policy, model or score gate c
 still requires 216 exact executions. Each later validation phase gets its own fixed cutoff and
 does not extend the unchanged strength-collection cutoff. No automatic default change or deployment.
 
+The completed-control transfer rehearsal caught a local Python3.9 `tarfile.extractall(filter=...)`
+compatibility error before any fresh return. Preserve
+`docs/evidence/barrel_forecast_v11_transport_control_rehearsal_20261118.json`. Only the observer was
+stopped while waiting; no battle was restarted. Operational supervisor v2
+`5ac80d26d5be909b734ac77c2924292ac6e2947367452797f6a1f3529206b0f0` copies only manifest-listed
+regular members into a temporary directory, rejects links/absolute/parent paths and checks all SHA
+values. Its real SSH/archive/SCP/portable extraction roundtrip matches all five existing control
+files byte for byte. All 6,959 intelligence/input and ten validation files, seeds, models, gates
+and cutoffs remain exact. This control supplies no new strength or timing claim. Keep both old
+observer source/registration and the failed rehearsal; use the v2 supervisor handle in local resume
+state, and never duplicate or restart the existing experiments.
+
 ## Closed ranged counter-shot screens
 
 Read `docs/ranged_countershot_safety_research.md` before continuing the November 17 human-match

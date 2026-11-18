@@ -174,3 +174,19 @@ full trace, outcome and actual action; both-driver activation also ran. These ar
 without new strength or timing claims. All 6,959 frozen research files remain unchanged.
 The original 36-case, three-arm, two-host cold check still requires 216 exact replays after both
 strength shards finish and before score aggregation. No candidate/default change or deployment.
+
+## Completed-control transport rehearsal
+
+Before any fresh confirmation return, the actual transport functions were exercised on the five
+files from the completed Puffalo preflight. The rehearsal caught an operational compatibility bug:
+local Python 3.9 rejects the `tarfile.extractall(filter=...)` argument. No fresh score was opened and
+no battle worker was restarted. The first supervisor was stopped while only observing the run.
+
+The [preserved correction](evidence/barrel_forecast_v11_transport_control_rehearsal_20261118.json)
+uses exact manifest-listed regular-file copying into a new temporary directory, rejects links and
+absolute/parent paths, and verifies every SHA-256 before accepting the return. The real SSH/archive/
+SCP/extraction roundtrip now passes: all five remote and existing local files match byte for byte.
+The original source, observer registration and failed rehearsal remain preserved. All 6,959 frozen
+intelligence/input files, ten sealed validation files, seeds, models, gates and cutoffs remain exact.
+The replacement observer continues the same fixed pipeline. This control adds no strength or
+performance evidence and changes no serving default.

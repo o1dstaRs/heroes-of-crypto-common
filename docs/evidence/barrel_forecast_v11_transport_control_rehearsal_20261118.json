@@ -1,0 +1,59 @@
+{
+    "schema": "hoc.barrel_forecast_v11.transport_control_rehearsal.v1",
+    "at": "2026-11-18T00:17:01.511757+00:00",
+    "state": "control-rehearsal-passed-after-portable-extraction-correction",
+    "erratum": {
+        "at": "2026-11-18T00:07:59.612239+00:00",
+        "state": "control-rehearsal-caught-supervisor-python-compatibility-error-before-fresh-result-transfer",
+        "originalSupervisorSha256": "19bbc573cb76b126d28ddd1ab4c6628e86a460a09eee137fbb16545e20934f2c",
+        "originalSupervisorPid": 10475,
+        "oldSupervisorStoppedAt": "waiting-confirmation",
+        "python": "3.9.6 (default, Apr 30 2025, 02:07:17) \n[Clang 17.0.0 (clang-1700.0.13.5)]",
+        "error": "TypeError: extractall() got an unexpected keyword argument 'filter'",
+        "fix": "New supervisor v2 copies only exact manifest-listed regular tar members into a fresh temporary directory, rejects absolute/parent/link members, then verifies every SHA256. Compatible with Python3.9 without changing data or installing packages.",
+        "battleController5085StillLive": true,
+        "anyBattleOrExperimentRestarted": false,
+        "anyFreshConfirmationResultOpened": false,
+        "anyModelSourceSeedOrGateChanged": false,
+        "originalSourceLogAndRegistrationPreserved": true
+    },
+    "newOperationalRegistration": {
+        "id": "barrel-forecast-v11-postcollection-supervisor-v2",
+        "at": "2026-11-18T00:10:00.068371+00:00",
+        "sourceSha256": "5ac80d26d5be909b734ac77c2924292ac6e2947367452797f6a1f3529206b0f0",
+        "supersedesOperationalSupervisorSha256": "19bbc573cb76b126d28ddd1ab4c6628e86a460a09eee137fbb16545e20934f2c",
+        "strengthRegistrationSha256": "1a31dd5fbba8544bf25ad96c3d10ab47165f4ddeabaf8602d9096f83c1dbb3ff",
+        "validationSealSha256": "f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51",
+        "change": "Only localtar extraction now uses validated regular-file copying compatiblewithPython3.9. Same exact phase plan, inputs, all frozen source/model/seed/criteria and original cutoffs. Formerobserver stopped in waiting phase; no experiment restarted.",
+        "rehearsal": {
+            "passed": true,
+            "at": "2026-11-18T00:08:04.693725+00:00",
+            "scope": "Actual completed REUSED preflight archive/SSH/SCP/SHA/portable regular-file extraction and existing-file verification, using exact supervisorv2 functions. No freshresults opened, no newfight orintelligence/timing claim.",
+            "sourceSha256": "5ac80d26d5be909b734ac77c2924292ac6e2947367452797f6a1f3529206b0f0",
+            "files": 5,
+            "archiveSha256": "00d7e64858c2900a03a0b6ef5edad31ff4dda7b6f5e6b903310c43beb5855f0e",
+            "allRemoteAndLocalControlBytesExact": true,
+            "originalFailedRehearsalPreserved": true,
+            "freshStrengthScoresInspected": false
+        },
+        "freshDataTransferredBeforeFix": false,
+        "noPromotionDeploymentOrExperimentRetry": true
+    },
+    "actualCompletedControlRoundtrip": {
+        "passed": true,
+        "at": "2026-11-18T00:08:04.693725+00:00",
+        "scope": "Actual completed REUSED preflight archive/SSH/SCP/SHA/portable regular-file extraction and existing-file verification, using exact supervisorv2 functions. No freshresults opened, no newfight orintelligence/timing claim.",
+        "sourceSha256": "5ac80d26d5be909b734ac77c2924292ac6e2947367452797f6a1f3529206b0f0",
+        "files": 5,
+        "archiveSha256": "00d7e64858c2900a03a0b6ef5edad31ff4dda7b6f5e6b903310c43beb5855f0e",
+        "allRemoteAndLocalControlBytesExact": true,
+        "originalFailedRehearsalPreserved": true,
+        "freshStrengthScoresInspected": false
+    },
+    "operationalPatch": "--- a/finish-confirmation-pipeline.py\n+++ b/finish-confirmation-pipeline-v2.py\n@@ -1,6 +1,6 @@\n \"\"\"Finalize the fixed campaign; no policy selection, retries, promotion, or deployment.\"\"\"\n from pathlib import Path\n-import datetime,gzip,hashlib,json,os,shlex,subprocess,tarfile,tempfile,time\n+import datetime,gzip,hashlib,json,os,shlex,shutil,subprocess,tarfile,tempfile,time\n \n p=Path(__file__).resolve().parent\n helper=Path.home()/'.codex/skills/puffalo-node-access/scripts/puffalo-status.sh'\n@@ -73,7 +73,14 @@\n   temp=Path(temporary)\n   with tarfile.open(archive)as tf:\n    assert all(m.name.startswith(directory+'/')for m in tf.getmembers())\n-   tf.extractall(temp,filter='data')\n+   members=tf.getmembers();expected={item['path']for item in info['files']}\n+   assert len(members)==len(expected)and {member.name for member in members}==expected\n+   for member in members:\n+    name=Path(member.name)\n+    assert member.isfile()and not name.is_absolute()and '..'not in name.parts\n+    target=temp/name;target.parent.mkdir(parents=True,exist_ok=True)\n+    stream=tf.extractfile(member);assert stream is not None\n+    with stream,target.open('xb')as output:shutil.copyfileobj(stream,output)\n   for item in info['files']:assert hashlib.sha256((temp/item['path']).read_bytes()).hexdigest()==item['sha256'],item['path']\n   if(p/directory).exists():\n    for item in info['files']:assert hashlib.sha256((p/item['path']).read_bytes()).hexdigest()==item['sha256'],item['path']\n",
+    "all6959IntelligenceInputsAnd10ValidationFilesExact": true,
+    "noExperimentRestartSourceModelSeedGateOrDeadlineChange": true,
+    "noFreshStrengthScoresInspected": true,
+    "defaultChanged": false,
+    "deployed": false
+}
