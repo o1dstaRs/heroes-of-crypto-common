@@ -374,6 +374,10 @@ function nativeOpening(server: Server, prepared: Prepared, aIsGreen: boolean) {
                     .sort((a, b) => a.index - b.index),
             };
         });
+        // Replacing the other army can split its strongest stack and refresh every unit's
+        // relative power. Capture kits only after both placements have settled; the earlier
+        // per-team observation can otherwise retain a power that will not enter combat.
+        for (const team of data) team.kits = kits(session.unitsHolder.getAllAllies(team.team));
         return {
             teams: data,
             terrain: terrain(session.grid.getScatteredMountainsStanding()),
