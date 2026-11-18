@@ -774,13 +774,13 @@ export class PremiumEvidenceSnapshot {
         recipe: string,
     ) {
         if (!validId(input.creatureId)) throw new Error("Invalid combat metric creature ID");
-        const { scope, parameters, matched } = this.matchingArmies(input);
+        const { scope, parameters, matched, perFight } = this.matchingArmies(input);
         const names = Object.keys(descriptions);
         const grouped = `SELECT c.family_id,COUNT(*) samples,COUNT(DISTINCT m.a_is_green) fights,${names
             .map((name) => `AVG(json_extract(m.payload,'$.${name}')) ${name}`)
             .join(",")}
-            FROM (SELECT a.id army_id,f.id family_id ${matched}) c
-            JOIN ${table} m ON m.army_id=c.army_id WHERE m.creature_id=? GROUP BY c.family_id`;
+            FROM (SELECT a.id army_id,f.id family_id${perFight ? ",af.a_is_green" : ""} ${matched}) c
+            JOIN ${table} m ON m.army_id=c.army_id${perFight ? " AND m.a_is_green=c.a_is_green" : ""} WHERE m.creature_id=? GROUP BY c.family_id`;
         const row = this.db
             .query<Record<string, number | null>, (string | number)[]>(
                 `SELECT COUNT(*) families,SUM(samples) samples,SUM(fights) fights,${names
@@ -797,7 +797,7 @@ export class PremiumEvidenceSnapshot {
             evidenceId: createHash("sha256")
                 .update(this.manifest.snapshotId)
                 .update(recipe)
-                .update("distinct-fights-v2")
+                .update(perFight ? "applied-plan-fights-v3" : "distinct-fights-v2")
                 .update(JSON.stringify({ scope, creatureId: input.creatureId }))
                 .digest("hex")
                 .slice(0, 24),

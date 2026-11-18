@@ -99,6 +99,12 @@ describe("immutable Premium evidence snapshots", () => {
         db.exec("UPDATE family SET partition='train'");
         db.exec("UPDATE army_fight SET augment_plan='P0-A0-M0-S0-V0',score=1 WHERE army_id=1 AND a_is_green=1");
         db.exec("UPDATE army_fight SET score=0 WHERE army_id=1 AND a_is_green=0");
+        db.exec(
+            "UPDATE health_unit_metric SET payload=json_set(payload,'$.damageHp',11) WHERE army_id=1 AND a_is_green=1",
+        );
+        db.exec(
+            "UPDATE health_unit_metric SET payload=json_set(payload,'$.damageHp',999) WHERE army_id=1 AND a_is_green=0",
+        );
         db.close();
         const snapshot = new PremiumEvidenceSnapshot(path, sourceSha256, { allowDevelopment: true });
         try {
@@ -107,6 +113,16 @@ describe("immutable Premium evidence snapshots", () => {
             expect(result.independentFamilies).toBe(1);
             expect(result.fights).toBe(1);
             expect(result.armyObservations).toBe(1);
+            const metricsScope = {
+                cohort: "ranked-draft" as const,
+                augmentPlanId: "P0-A0-M0-S0-V0",
+                creatureId: captured.armyA.creatureIds[0],
+            };
+            const health = snapshot.unitHealthMetrics(metricsScope);
+            expect(health.fights).toBe(1);
+            expect(health.armyFightObservations).toBe(1);
+            expect(health.metrics.damageHp.mean).toBe(11);
+            expect(snapshot.unitCombatMetrics(metricsScope).armyFightObservations).toBe(1);
             const payoffs = [...snapshot.trainingSetupPayoffs("ranked-draft")];
             expect(payoffs).toHaveLength(4);
             expect(payoffs.every((row) => row.partition === "train")).toBe(true);
