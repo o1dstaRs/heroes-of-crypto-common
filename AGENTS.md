@@ -1,5 +1,26 @@
 # Agent guidance
 
+## Frozen public-context placement learning — November 18, 2026
+
+Read `docs/a19_public_placement_value_learning.md` before new placement learning or seed allocation.
+The separate inactive study freezes 1,152 legally drafted families, 864 training / 288 validation,
+four seat/future cases per family and eight fixed free proposals: 36,864 logical full-native labels.
+Its exact source/input/fitter registration is in
+`docs/evidence/a19_public_placement_value_registration_20261118.json`. All controls and losses stay;
+neither its data nor internal validation qualify a new template, default or combat artifact.
+Keep the current v13, locked weights, old failed studies and unopened teacher tests unchanged.
+Both final eighty-epoch artifacts must be sealed before validation; the old-feature ablation is
+descriptive and cannot replace a failed primary. Fresh strength/confirmation and overall-average
++10% full-fight / weighted actual-decision CPU, including both-AI activation, remain required.
+
+Exclude **all six roles × 32,768 scanned preimages**, including rejected, unused and unselected
+roots, for namespace `native-public-placement-value-data-20261118-v1`. Roles are `draft`, `setup-a`,
+`setup-b`, `reverse-a`, `reverse-b`, `terrain`. Expand the fixture's little-endian SHA-256 recipe,
+raw/permuted draft offsets zero through 31 and terrain `sim-<root>` search hash explicitly;
+generic integer collection does not reconstruct this compact reservation. Exact raw arrays and
+complete archives remain in the client's ignored capsule and both research hosts. No automatic
+retry, cutoff extension, serving promotion or deployment is authorized by this registration.
+
 ## Explicit Sniper donor protection adoption — November 18, 2026
 
 The user requested “lock it in and continue” after reviewing the confirmed Sniper guard. Current
