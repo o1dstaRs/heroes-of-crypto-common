@@ -1076,13 +1076,15 @@ Keep all6 recipes/30 temperature results and failed gates. Independent Bun check
 posteriors, decisions and family sufficient statistics, not NumPy's bootstrap RNG. No default changed.
 
 The distinct root-scoped mixture reused admission is registered at
-`35982f4a3cfc8b6507a745aefcde526eb170d1b2182e921a26f83dd7299dfac8`; read
+`6eda742bd48db1366e7ec95c898578b97c80f974a2cab7fb6b654542bc3bb438`; read
 `docs/barrel_root_scoped_mixture_research.md` and its registration fixture. It retains all6,048 old-v11
 cases/1,512 families and compares both recovered regressions and erased gains. Only actual melee
 deployment-barrel incumbents enable the old mixture; ordinary root choices otherwise stay native.
 Preserve the zero-actor local disk failure and node startup-stream failure with zero completed records;
-actual starts in the latter are not proven absent. Stream-only v2 adds a ready handshake before any
-dispatch and retains policy/cases/gates plus the original November18 09:45 UTC cutoff. No ranker tuning,
+actual starts in the latter are not proven absent. Preserve the second stream failure too. V3 retains
+the ready handshake and original campaign parser/environment, logging every stdout line. Exclude only
+raw work.msTotal wall timing from logical-counter equality; retain it in raw records. All intelligence,
+cases/gates and the original November18 09:45 UTC cutoff stay fixed. No ranker tuning,
 teacher-test parsing, fresh strength claim or default change. Only a complete passing reused admission
 permits separately registered current-v12 authoritative-memory qualification and overall-average+10% cost.
 

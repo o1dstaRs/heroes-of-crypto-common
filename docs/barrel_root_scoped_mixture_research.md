@@ -38,9 +38,17 @@ the exact two banners without dispatching a game. Preserve this failed attempt t
 A distinct stream-only v2 consumes and records the two exact banners, then requires a JSON ready
 handshake identifying the fixed profile and accepted model pair **before sending any game**. A
 closed-stdin rehearsal must pass first. The actor changes only its startup print; removing that print
-restores the previous actor bytes exactly. Controller startup handling changes, while the policy,
-cases, intelligence source, gates and original cutoff stay fixed. This registration contains no
-completed candidate gain. There is no broad log skipping, interim outcome tuning or activation.
+restores the previous actor bytes exactly. That attempt then encounters normal placement text before
+an acknowledgement and also stops without completed records. Both failures remain preserved.
+
+A one-game, original-stock transport rehearsal reproduces its exact input, complete trace, score and
+actual commands. The only quality difference is `work[0].msTotal`, a wall-clock timer rather than a
+logical work counter. The separate stream-v3 controller restores the original campaign's proven
+parse/log/until-verified contract and explicit `HOC_A19_CONTEXT_POLICY=on` environment. It retains
+every stdout line, still requires readiness before dispatch, and excludes only `work[*].msTotal`
+from logical-quality equality while saving that field in every raw record. Every other counter stays
+required. Its actor is byte-identical to v2; policy, cases, score gates and original cutoff remain
+unchanged. This registration contains no completed candidate gain or interim outcome-based adjustment.
 
 A passing complete admission only permits separately registered fresh work against the actual
 current-v12 server, including durable delivery/setup dispatch and its committed-turn/target-memory
