@@ -45,6 +45,28 @@ Their original sealed bytes were supplied without changing the registration. The
 retry, reassignment, fitting, promotion or deployment. The initial registration fixture records a
 running collection, not a completed dataset or model result.
 
+The [completion evidence](evidence/barrel_catalog_teacher_complete_results_20261118.json) now records
+all **6,048 main games, 28 preflight and 72 cold executions** passing their original controls.
+Collection produces **8,732 main decision records**. Independent verification checks all 6,148
+control rows and 320,412 lightweight frames, complete producer hashes, canonical wait masks and exact
+cross-host cold labels. These lightweight frames carry memory/reference/RNG/UUID/array-identity
+controls; they are not full mutable battle snapshots. Preflight, transfers, collection and cold checks
+finish in **3,761 seconds**. This is acquisition wall time, not inference latency or a speedup claim.
+
+The separate, prospectively frozen input assembly also completes with **zero input violations**.
+It retains every case and the original family folds, including zero-observation cases, missing-catalog
+abstentions and outside-catalog selected actions. Each option has 190 explicit public/static features;
+an additional indicator distinguishes the outside option. A source-bound AST audit and complete
+eligibility/incumbent checks constrain all accepted inputs to the original catalog path: the only
+later list append needs a productive tier, which is disabled for these barrel incumbents and the sole
+Healer wait rewrite. This is an implementation-specific contract, not a general purity theorem.
+
+Independent Python verification checks every source-label join, fold, partial mask, outside/shared-state
+row and all 33 added static/mechanics/recipient fields. It does not independently reimplement the
+earlier 157-feature numeric extractor, which has separate functional and metamorphic checks. No
+held-out class or model-performance metric is inspected for feature or recipe selection. No learner
+has been fitted. The original registration fixture remains the unchanged record of its earlier state.
+
 Any later serving comparison must use the then-current v12 authoritative policy, including persisted
 delivery-draft flags, physical-side mapping and native `commitBotSetupForTeam` dispatch. Calling only
 `policy.pickAugments` bypasses that dispatcher. Combat must also preserve the server's incumbent-memory
@@ -82,8 +104,8 @@ roster can be a legal resurrection target in the graveyard. The revised prototyp
 and marks the recipient information incomplete. A later learned policy must abstain in those states;
 there is no such serving policy yet. The partial masks do not certify complete spell legality.
 
-Before any main-data fit, verify the initial/pre-leaf catalog provenance for every accepted input,
-including early native returns, Healer wait rewriting and any candidate appended after an engine probe.
-Keep outside-catalog teacher choices explicit. A future override must also preserve the actual native
+The completed input assembly verifies the initial/pre-leaf provenance checks on every accepted input,
+including early native returns, Healer wait rewriting and the guarded candidate append. Missing native
+catalogs and outside-catalog choices remain explicit. A future override must preserve the actual native
 controller's target-memory commit and UUID contracts. No learner, battle bank, default or deployment
 follows automatically from this admission.

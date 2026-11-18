@@ -1056,6 +1056,16 @@ be legal graveyard targets: retain them as incomplete information and require le
 Main-data fitting still needs a complete initial/pre-leaf provenance contract, unchanged held-out gates,
 actual native memory/UUID semantics and fresh current-v12 whole-family strength/cost. No auto promotion.
 
+The full reused-v11 acquisition and subsequent input assembly have now completed:6,148 original/preflight/
+cold controls,8,732 main observations and320,412 lightweight frames independently verified; zero input
+contract violations. Preserve `docs/evidence/barrel_catalog_teacher_complete_results_20261118.json`.
+All6,048 source cases/1,512 original family folds remain, including empty cases and explicit unsupported/
+outside options. The source-bound productive-tier/Healer-wait contract and all33 added static fields,
+labels/masks/outside rows pass independent checks; the earlier157 numeric features are not separately
+reimplemented in Python. No held-out model metric or fitter has opened. Keep the old805-label test closed.
+Further learning needs its own frozen fit/confidence gates and sealed artifact before test evaluation,
+then actual/hypothetical validation and fresh current-v12 strength/overall-average+10% cost. No default changed.
+
 The prospective final-validation source seal is
 `f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51`; read
 `docs/evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json`. The original

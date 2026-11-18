@@ -1,0 +1,1081 @@
+{
+    "schema": "hoc.barrel-catalog-teacher-complete-results.v1",
+    "createdUtc": "2026-11-18T05:31:47.647588+00:00",
+    "scope": "Completed reused frozen-v11 stock teacher and fixed public-input integrity. No independent strength sample, fitted learner or serving activation.",
+    "acquisitionRegistrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+    "originalRegistrationFixture": "barrel_catalog_teacher_registration_20261118.json",
+    "completedUtc": "2026-11-18T05:21:14.887473+00:00",
+    "elapsedIncludingPreflightTransferAndColdSeconds": 3761.025087,
+    "completeAcquisition": {
+        "passed": true,
+        "phase": "complete",
+        "registrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+        "preflightFights": 28,
+        "collectionFights": 6048,
+        "coldFights": 72,
+        "allOriginalInputsFullTracesOutcomesTurnsAndLogicalCountersExact": true,
+        "allProducerPayloadHashesAndWaitMasksPassed": true,
+        "allCrossHostPreflightAndApplicableColdLabelHashesExact": true,
+        "wholeFamiliesKeptInOneProspectiveFold": true,
+        "collectionObservations": 8732,
+        "heldoutPerformanceNotInspected": true,
+        "fitterStarted": false,
+        "newIndependentStrengthSamples": 0,
+        "defaultChanged": false,
+        "rawFiles": [
+            {
+                "path": "preflight-local/worker-0-labels.preflight.jsonl.gz",
+                "bytes": 243932,
+                "sha256": "480aba07793eef9b7bd03442d83fce05ee3aa0d62654659a7e304ea893315887"
+            },
+            {
+                "path": "preflight-local/worker-0.jsonl.gz",
+                "bytes": 156244,
+                "sha256": "24c60ed146e77cfa4539ce06b560e7ba8fd2c39fdf1bdcfa6883146efe5c3f61"
+            },
+            {
+                "path": "preflight-local/worker-1-labels.preflight.jsonl.gz",
+                "bytes": 54774,
+                "sha256": "2b536b8317f7c6eb8791f653d666fd712fbb0b98e2b1fab6a5d58b4192a24048"
+            },
+            {
+                "path": "preflight-local/worker-1.jsonl.gz",
+                "bytes": 106365,
+                "sha256": "489e3b9d75ae5b10e332004de831a0aa748bee30c525aacf7436481fed2b75ec"
+            },
+            {
+                "path": "preflight-puffalo/worker-0-labels.preflight.jsonl.gz",
+                "bytes": 107480,
+                "sha256": "14691b8ff8e9787673fa2116a6d5aa8be5d1611ed9358d3a9fd4058568cee3c1"
+            },
+            {
+                "path": "preflight-puffalo/worker-0.jsonl.gz",
+                "bytes": 103638,
+                "sha256": "1a2f73c81c2beb2114fd4f8156182647287d93da5a7e671ede4d43679d0afcfe"
+            },
+            {
+                "path": "preflight-puffalo/worker-1-labels.preflight.jsonl.gz",
+                "bytes": 191226,
+                "sha256": "fc7b6a9e26413a777a6890e6015b8591962e01dc1c067f990d7909af451f7930"
+            },
+            {
+                "path": "preflight-puffalo/worker-1.jsonl.gz",
+                "bytes": 159013,
+                "sha256": "f4bf76222bf68096a00d0dc720498d9b887740b40c5fb586445f3ee1ae1d29ac"
+            },
+            {
+                "path": "collection-local/worker-0-labels.test.jsonl.gz",
+                "bytes": 2085444,
+                "sha256": "b43d41d1e5057a6e248c919939a4dbc31a05084ecdf817f5451780a17ba6e8a4"
+            },
+            {
+                "path": "collection-local/worker-0-labels.train.jsonl.gz",
+                "bytes": 5555193,
+                "sha256": "1da895e3ac56f78c1665a44111806a5d6417e3f24398c8909a4557b1b8fabb93"
+            },
+            {
+                "path": "collection-local/worker-0-labels.validation.jsonl.gz",
+                "bytes": 1615781,
+                "sha256": "8c94e566a9321f9c29ccac757885f15c336f256b0f00fcaf742c3b7c28363df3"
+            },
+            {
+                "path": "collection-local/worker-0.jsonl.gz",
+                "bytes": 11498829,
+                "sha256": "021b760a568483fb182e78dd7fbf8d8c78f1493466fe097236b343f992713344"
+            },
+            {
+                "path": "collection-local/worker-1-labels.test.jsonl.gz",
+                "bytes": 2050932,
+                "sha256": "899900df1786070cf51f57c2efd2fdaeb2d074afe4724b6597de68facb77565c"
+            },
+            {
+                "path": "collection-local/worker-1-labels.train.jsonl.gz",
+                "bytes": 5791934,
+                "sha256": "f5e63a852a8633dac782889ac3361bed8e1b4b208397d74e77f3a574924fec35"
+            },
+            {
+                "path": "collection-local/worker-1-labels.validation.jsonl.gz",
+                "bytes": 1794459,
+                "sha256": "b05adc9d4b99deb1f6b75ff40a32f5a41d6b8877e33ba2b8de88c1a7aa46fb2f"
+            },
+            {
+                "path": "collection-local/worker-1.jsonl.gz",
+                "bytes": 11643190,
+                "sha256": "b4f944a3b1f339bf9a9e39c0bbf79c8e37a7306daba51c5bbce0c8d214320279"
+            },
+            {
+                "path": "collection-local/worker-2-labels.test.jsonl.gz",
+                "bytes": 1655338,
+                "sha256": "0d13d553f2e5a3a74acffd25a6fafd171134cf338ba0b5037a2988727e63cf85"
+            },
+            {
+                "path": "collection-local/worker-2-labels.train.jsonl.gz",
+                "bytes": 5044787,
+                "sha256": "a955c138257babd369deba962d4ebf2584f7b064fcaf3c4aeb784b7e849e54cc"
+            },
+            {
+                "path": "collection-local/worker-2-labels.validation.jsonl.gz",
+                "bytes": 1238297,
+                "sha256": "18bb0a0ccfcaff12c338962a89c11a624e872c777b6a9d7dd1937485b8249262"
+            },
+            {
+                "path": "collection-local/worker-2.jsonl.gz",
+                "bytes": 11130298,
+                "sha256": "72b1f4fdc56367345f53b36693d9a387ebd367a231edf8daf9a74d09d062c305"
+            },
+            {
+                "path": "collection-local/worker-3-labels.test.jsonl.gz",
+                "bytes": 1656499,
+                "sha256": "adfd6781c2659bb218fc2e2683c8c33931704b9cad7de1ee48453ce1b669b746"
+            },
+            {
+                "path": "collection-local/worker-3-labels.train.jsonl.gz",
+                "bytes": 5925773,
+                "sha256": "1cd1b1c0ee1c85d1c7b5618a45e9c83566bee0ce560c6c192bfc96febd175135"
+            },
+            {
+                "path": "collection-local/worker-3-labels.validation.jsonl.gz",
+                "bytes": 1849378,
+                "sha256": "19d0d281436a20d396785f4f6bf258185fe2437166d1d8138fe1167d80cb5da1"
+            },
+            {
+                "path": "collection-local/worker-3.jsonl.gz",
+                "bytes": 11316323,
+                "sha256": "9a30487ae0c780252c640b25de22d88ac98af88ba39d7edb7a6fb3ab6c0a2a03"
+            },
+            {
+                "path": "collection-local/worker-4-labels.test.jsonl.gz",
+                "bytes": 1972448,
+                "sha256": "3d11444de241fdf5fac5de1ccc5b4474c1e5ffc2cc05d2c33c7d16a641da8cde"
+            },
+            {
+                "path": "collection-local/worker-4-labels.train.jsonl.gz",
+                "bytes": 5676294,
+                "sha256": "d7fe0f665f7b2a848d690bfd78327f8c0ce75a4a43affb1bd4b7c6ba913e197a"
+            },
+            {
+                "path": "collection-local/worker-4-labels.validation.jsonl.gz",
+                "bytes": 1527323,
+                "sha256": "40e953471b19802469fcd9ee0e478e9eb13fecd0f8aca8674ef8a2967033ca14"
+            },
+            {
+                "path": "collection-local/worker-4.jsonl.gz",
+                "bytes": 11502486,
+                "sha256": "7daa5522e68611b58c106751c39e49d78c5eb624ff6a504169b6feda824e632a"
+            },
+            {
+                "path": "collection-local/worker-5-labels.test.jsonl.gz",
+                "bytes": 1834982,
+                "sha256": "d9c2aa5c19df0bc5ce7dd04b11fc2cbbdd9ebea1dfde25592cfb07e0c299509b"
+            },
+            {
+                "path": "collection-local/worker-5-labels.train.jsonl.gz",
+                "bytes": 5016959,
+                "sha256": "a591c2df1973ec50b49b9f19e7de6017ffe101fc0a1c7e45604572576bdebba8"
+            },
+            {
+                "path": "collection-local/worker-5-labels.validation.jsonl.gz",
+                "bytes": 1966705,
+                "sha256": "2b6666e8f222ee98ac9decc2f0e9b607551cc7580443ad71e2769310dba6ff6b"
+            },
+            {
+                "path": "collection-local/worker-5.jsonl.gz",
+                "bytes": 11407957,
+                "sha256": "6345c59256b9e9c155cfc5c66c5a3b56738e58f39f3b5c78eb8e406d674555e7"
+            },
+            {
+                "path": "collection-local/worker-6-labels.test.jsonl.gz",
+                "bytes": 1735270,
+                "sha256": "218f3b92ae5a97fd90866f0f4026d2b8363c9c440cca9dd1672ec68caed9e119"
+            },
+            {
+                "path": "collection-local/worker-6-labels.train.jsonl.gz",
+                "bytes": 5601231,
+                "sha256": "101fff4f8201bcf6d23230ee47ae09978339904ab87b84ab409843d718a04a0f"
+            },
+            {
+                "path": "collection-local/worker-6-labels.validation.jsonl.gz",
+                "bytes": 1511701,
+                "sha256": "719446b07815001aac5a3cacdbb05ca515c382a36606be81f354f38d8e97f493"
+            },
+            {
+                "path": "collection-local/worker-6.jsonl.gz",
+                "bytes": 11241344,
+                "sha256": "1a0a245ebcb9a9295e1f97ef525c084f3bf340713552a83e6f3b1417e85bce49"
+            },
+            {
+                "path": "collection-local/worker-7-labels.test.jsonl.gz",
+                "bytes": 2044353,
+                "sha256": "bf258fd061b8815186981b36039cd3b03e71e6af98fbad050569f456f46b65de"
+            },
+            {
+                "path": "collection-local/worker-7-labels.train.jsonl.gz",
+                "bytes": 5291365,
+                "sha256": "31ab05310e3469332c56f7fab8156ab6e7d6210c2cdf462ad45eee876df14cbf"
+            },
+            {
+                "path": "collection-local/worker-7-labels.validation.jsonl.gz",
+                "bytes": 1697718,
+                "sha256": "0268f5b8c14b6e41fc105204660757a8f0cdd4fb97cbd14f0378af9821c48bfc"
+            },
+            {
+                "path": "collection-local/worker-7.jsonl.gz",
+                "bytes": 11403897,
+                "sha256": "345b8aba5bf13e4255e29a4696ad6c9e3f81b7e16b3fcecbde6c276dd0e7bddc"
+            },
+            {
+                "path": "collection-puffalo/worker-0-labels.test.jsonl.gz",
+                "bytes": 484820,
+                "sha256": "568fc8325ca3a887b7da1c62e3427dce71bb6b5fc3c597b4844623219fd7f7a6"
+            },
+            {
+                "path": "collection-puffalo/worker-0-labels.train.jsonl.gz",
+                "bytes": 1729678,
+                "sha256": "3d61a903c1c36017ffdd1aee46abb3940e06b9cb8a1e9229c9395323b393ef3e"
+            },
+            {
+                "path": "collection-puffalo/worker-0-labels.validation.jsonl.gz",
+                "bytes": 739737,
+                "sha256": "df0d7ad56734561a62a74346f7c9d6d11661937c94da3efc8efde0694b9d48c7"
+            },
+            {
+                "path": "collection-puffalo/worker-0.jsonl.gz",
+                "bytes": 3841161,
+                "sha256": "d0efb472af2e404f654fe95d6861e88c31f3fca48581933764d02972084f3c62"
+            },
+            {
+                "path": "collection-puffalo/worker-1-labels.test.jsonl.gz",
+                "bytes": 410496,
+                "sha256": "0e4e8527cebccf3c023a9c67756d4d5f9e4eb14b526a689e5f3bc2a93e340afc"
+            },
+            {
+                "path": "collection-puffalo/worker-1-labels.train.jsonl.gz",
+                "bytes": 2085363,
+                "sha256": "fe8ca44906f0beb47dbccfef64d80425d9f4ac7a74ef1e982549b7b37d47d802"
+            },
+            {
+                "path": "collection-puffalo/worker-1-labels.validation.jsonl.gz",
+                "bytes": 470179,
+                "sha256": "b2fb195d2a281e6134c2f77f9ebd09f7b66665c64ad77bf7f3823ecba426d0ba"
+            },
+            {
+                "path": "collection-puffalo/worker-1.jsonl.gz",
+                "bytes": 3585921,
+                "sha256": "1af3dc5f412702f811f99bcff353b90cfb59d94f295a7954270665d0c45d9e71"
+            },
+            {
+                "path": "collection-puffalo/worker-2-labels.test.jsonl.gz",
+                "bytes": 608788,
+                "sha256": "26ae3d9f7fdfce6bd17dd43e986128fc5a3a297f8bfa06447f828b28d69d4f22"
+            },
+            {
+                "path": "collection-puffalo/worker-2-labels.train.jsonl.gz",
+                "bytes": 2090228,
+                "sha256": "a62a57e09a4bba01fb5b6f687cfc9f1f5756fa715c011fadcc67a5b0935953aa"
+            },
+            {
+                "path": "collection-puffalo/worker-2-labels.validation.jsonl.gz",
+                "bytes": 846929,
+                "sha256": "daef6440d10a19bbc9ac98fa26a4cafefa282f39d72b206914f636e68c71629f"
+            },
+            {
+                "path": "collection-puffalo/worker-2.jsonl.gz",
+                "bytes": 4017998,
+                "sha256": "80b284dec11a39f3bd997d2cdce4f286ded9c8e703f5498b628c9c74f4739576"
+            },
+            {
+                "path": "collection-puffalo/worker-3-labels.test.jsonl.gz",
+                "bytes": 464989,
+                "sha256": "4bfc3595b496b9dfea6347e2e6f0948f0d709395c0a3e3f30f88ece5a32c4b6c"
+            },
+            {
+                "path": "collection-puffalo/worker-3-labels.train.jsonl.gz",
+                "bytes": 2031587,
+                "sha256": "02f2a775ce0efefebe51c8dc28b8a9b01eae70195dedafa17674ebeb35c4ef0d"
+            },
+            {
+                "path": "collection-puffalo/worker-3-labels.validation.jsonl.gz",
+                "bytes": 544601,
+                "sha256": "19d15144c6eb52aeefc45688e8754f7420ce61f8c18fa35cc01cc39b377a15cc"
+            },
+            {
+                "path": "collection-puffalo/worker-3.jsonl.gz",
+                "bytes": 3803742,
+                "sha256": "0a437b71649078ea0678aae5b88856ce06f9bf26e8e0bb4f033ca6799ebe3992"
+            },
+            {
+                "path": "cold-local/worker-0-labels.test.jsonl.gz",
+                "bytes": 19806,
+                "sha256": "009665277ee94905804a013001cf3f8c89bb8ef1fecb21c96507021294ba058f"
+            },
+            {
+                "path": "cold-local/worker-0-labels.train.jsonl.gz",
+                "bytes": 169224,
+                "sha256": "3b7f2f1b7e4cd87219a365ad0256b72a6cef2f77e44b8f095f363f4e5050615d"
+            },
+            {
+                "path": "cold-local/worker-0-labels.validation.jsonl.gz",
+                "bytes": 62695,
+                "sha256": "17930e17fd614925c916fb49ace8fc46cabcb4069164a786d032638351daba02"
+            },
+            {
+                "path": "cold-local/worker-0.jsonl.gz",
+                "bytes": 321822,
+                "sha256": "247eedf39ff2e25f5b286e295d47e24227a7103fd18323d9f00ae122da5e8212"
+            },
+            {
+                "path": "cold-local/worker-1-labels.test.jsonl.gz",
+                "bytes": 25318,
+                "sha256": "91a141698e90b1afe6de57e3d7f8e7c1f1493af7f9c5c17efa7e99eaa8cf2716"
+            },
+            {
+                "path": "cold-local/worker-1-labels.train.jsonl.gz",
+                "bytes": 45425,
+                "sha256": "f696743d4d9db56ce3466e0fa4eb49fa9610b34fa6cd5eec1bdbea5905234dcb"
+            },
+            {
+                "path": "cold-local/worker-1-labels.validation.jsonl.gz",
+                "bytes": 88200,
+                "sha256": "60339fe0088b38d1f1783ff85e30b5527660bcc4e87166742ebbecbf367b97bd"
+            },
+            {
+                "path": "cold-local/worker-1.jsonl.gz",
+                "bytes": 287951,
+                "sha256": "0bd9ed259d5d16ae373d3b54b21c4eca466db5ab3231f4d0db7d333bc04244b8"
+            },
+            {
+                "path": "cold-puffalo/worker-0-labels.test.jsonl.gz",
+                "bytes": 19806,
+                "sha256": "43fdf4d9521845e74f151e2b3e23e1d751a36271eec30835b6dcd6699fe6fdc4"
+            },
+            {
+                "path": "cold-puffalo/worker-0-labels.train.jsonl.gz",
+                "bytes": 169351,
+                "sha256": "e6c2413280322f74213b215ccf63bfe8e86157ed329b6bf8d2d5f3ac9d9bb907"
+            },
+            {
+                "path": "cold-puffalo/worker-0-labels.validation.jsonl.gz",
+                "bytes": 42321,
+                "sha256": "e4cb35dc66ada0c61faae7a6f1eeb638d60241ed12905886f2837c11d72d72d4"
+            },
+            {
+                "path": "cold-puffalo/worker-0.jsonl.gz",
+                "bytes": 309125,
+                "sha256": "9dd9cbb3ba5a8ed4d5cc653c8f4f5123e2c0a2d797e94e978c9e6fb904ed933c"
+            },
+            {
+                "path": "cold-puffalo/worker-1-labels.test.jsonl.gz",
+                "bytes": 25318,
+                "sha256": "58ba1097dc09906100561ab38aaa901d17884973803f2a5309369cd7c684a569"
+            },
+            {
+                "path": "cold-puffalo/worker-1-labels.train.jsonl.gz",
+                "bytes": 45298,
+                "sha256": "2aaf9bc7583828037a00a098aa336476713fa1c740f8448e32a5f319cbe117c7"
+            },
+            {
+                "path": "cold-puffalo/worker-1-labels.validation.jsonl.gz",
+                "bytes": 108574,
+                "sha256": "4abebeadd9cc5474ab282060338fa60bd1e1383f3dbdbb4a12d4e82c47c51f21"
+            },
+            {
+                "path": "cold-puffalo/worker-1.jsonl.gz",
+                "bytes": 300691,
+                "sha256": "2b33ec61ab641dad31795dad511e025e5ab856066f5d432a91255870cce63496"
+            }
+        ]
+    },
+    "independentCompleteAcquisition": {
+        "passed": true,
+        "phase": "complete",
+        "registrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+        "independentlyVerifiedControlRows": 6148,
+        "independentlyVerifiedLightFrames": 320412,
+        "collectionObservations": 8732,
+        "allOriginalInputsFullTracesOutcomesTurnsLogicalCountersAndPayloadByteHashesExact": true,
+        "allPublicLegalityMasksPassed": true,
+        "allApplicableCrossHostPreflightAndColdControlsExact": true,
+        "heldoutPerformanceNotInspected": true,
+        "newIndependentStrengthSamples": 0,
+        "modelFitted": false,
+        "defaultChanged": false,
+        "rawFiles": [
+            {
+                "path": "preflight-local/worker-0-labels.preflight.jsonl.gz",
+                "bytes": 243932,
+                "sha256": "480aba07793eef9b7bd03442d83fce05ee3aa0d62654659a7e304ea893315887"
+            },
+            {
+                "path": "preflight-local/worker-0.jsonl.gz",
+                "bytes": 156244,
+                "sha256": "24c60ed146e77cfa4539ce06b560e7ba8fd2c39fdf1bdcfa6883146efe5c3f61"
+            },
+            {
+                "path": "preflight-local/worker-1-labels.preflight.jsonl.gz",
+                "bytes": 54774,
+                "sha256": "2b536b8317f7c6eb8791f653d666fd712fbb0b98e2b1fab6a5d58b4192a24048"
+            },
+            {
+                "path": "preflight-local/worker-1.jsonl.gz",
+                "bytes": 106365,
+                "sha256": "489e3b9d75ae5b10e332004de831a0aa748bee30c525aacf7436481fed2b75ec"
+            },
+            {
+                "path": "preflight-puffalo/worker-0-labels.preflight.jsonl.gz",
+                "bytes": 107480,
+                "sha256": "14691b8ff8e9787673fa2116a6d5aa8be5d1611ed9358d3a9fd4058568cee3c1"
+            },
+            {
+                "path": "preflight-puffalo/worker-0.jsonl.gz",
+                "bytes": 103638,
+                "sha256": "1a2f73c81c2beb2114fd4f8156182647287d93da5a7e671ede4d43679d0afcfe"
+            },
+            {
+                "path": "preflight-puffalo/worker-1-labels.preflight.jsonl.gz",
+                "bytes": 191226,
+                "sha256": "fc7b6a9e26413a777a6890e6015b8591962e01dc1c067f990d7909af451f7930"
+            },
+            {
+                "path": "preflight-puffalo/worker-1.jsonl.gz",
+                "bytes": 159013,
+                "sha256": "f4bf76222bf68096a00d0dc720498d9b887740b40c5fb586445f3ee1ae1d29ac"
+            },
+            {
+                "path": "collection-local/worker-0-labels.test.jsonl.gz",
+                "bytes": 2085444,
+                "sha256": "b43d41d1e5057a6e248c919939a4dbc31a05084ecdf817f5451780a17ba6e8a4"
+            },
+            {
+                "path": "collection-local/worker-0-labels.train.jsonl.gz",
+                "bytes": 5555193,
+                "sha256": "1da895e3ac56f78c1665a44111806a5d6417e3f24398c8909a4557b1b8fabb93"
+            },
+            {
+                "path": "collection-local/worker-0-labels.validation.jsonl.gz",
+                "bytes": 1615781,
+                "sha256": "8c94e566a9321f9c29ccac757885f15c336f256b0f00fcaf742c3b7c28363df3"
+            },
+            {
+                "path": "collection-local/worker-0.jsonl.gz",
+                "bytes": 11498829,
+                "sha256": "021b760a568483fb182e78dd7fbf8d8c78f1493466fe097236b343f992713344"
+            },
+            {
+                "path": "collection-local/worker-1-labels.test.jsonl.gz",
+                "bytes": 2050932,
+                "sha256": "899900df1786070cf51f57c2efd2fdaeb2d074afe4724b6597de68facb77565c"
+            },
+            {
+                "path": "collection-local/worker-1-labels.train.jsonl.gz",
+                "bytes": 5791934,
+                "sha256": "f5e63a852a8633dac782889ac3361bed8e1b4b208397d74e77f3a574924fec35"
+            },
+            {
+                "path": "collection-local/worker-1-labels.validation.jsonl.gz",
+                "bytes": 1794459,
+                "sha256": "b05adc9d4b99deb1f6b75ff40a32f5a41d6b8877e33ba2b8de88c1a7aa46fb2f"
+            },
+            {
+                "path": "collection-local/worker-1.jsonl.gz",
+                "bytes": 11643190,
+                "sha256": "b4f944a3b1f339bf9a9e39c0bbf79c8e37a7306daba51c5bbce0c8d214320279"
+            },
+            {
+                "path": "collection-local/worker-2-labels.test.jsonl.gz",
+                "bytes": 1655338,
+                "sha256": "0d13d553f2e5a3a74acffd25a6fafd171134cf338ba0b5037a2988727e63cf85"
+            },
+            {
+                "path": "collection-local/worker-2-labels.train.jsonl.gz",
+                "bytes": 5044787,
+                "sha256": "a955c138257babd369deba962d4ebf2584f7b064fcaf3c4aeb784b7e849e54cc"
+            },
+            {
+                "path": "collection-local/worker-2-labels.validation.jsonl.gz",
+                "bytes": 1238297,
+                "sha256": "18bb0a0ccfcaff12c338962a89c11a624e872c777b6a9d7dd1937485b8249262"
+            },
+            {
+                "path": "collection-local/worker-2.jsonl.gz",
+                "bytes": 11130298,
+                "sha256": "72b1f4fdc56367345f53b36693d9a387ebd367a231edf8daf9a74d09d062c305"
+            },
+            {
+                "path": "collection-local/worker-3-labels.test.jsonl.gz",
+                "bytes": 1656499,
+                "sha256": "adfd6781c2659bb218fc2e2683c8c33931704b9cad7de1ee48453ce1b669b746"
+            },
+            {
+                "path": "collection-local/worker-3-labels.train.jsonl.gz",
+                "bytes": 5925773,
+                "sha256": "1cd1b1c0ee1c85d1c7b5618a45e9c83566bee0ce560c6c192bfc96febd175135"
+            },
+            {
+                "path": "collection-local/worker-3-labels.validation.jsonl.gz",
+                "bytes": 1849378,
+                "sha256": "19d0d281436a20d396785f4f6bf258185fe2437166d1d8138fe1167d80cb5da1"
+            },
+            {
+                "path": "collection-local/worker-3.jsonl.gz",
+                "bytes": 11316323,
+                "sha256": "9a30487ae0c780252c640b25de22d88ac98af88ba39d7edb7a6fb3ab6c0a2a03"
+            },
+            {
+                "path": "collection-local/worker-4-labels.test.jsonl.gz",
+                "bytes": 1972448,
+                "sha256": "3d11444de241fdf5fac5de1ccc5b4474c1e5ffc2cc05d2c33c7d16a641da8cde"
+            },
+            {
+                "path": "collection-local/worker-4-labels.train.jsonl.gz",
+                "bytes": 5676294,
+                "sha256": "d7fe0f665f7b2a848d690bfd78327f8c0ce75a4a43affb1bd4b7c6ba913e197a"
+            },
+            {
+                "path": "collection-local/worker-4-labels.validation.jsonl.gz",
+                "bytes": 1527323,
+                "sha256": "40e953471b19802469fcd9ee0e478e9eb13fecd0f8aca8674ef8a2967033ca14"
+            },
+            {
+                "path": "collection-local/worker-4.jsonl.gz",
+                "bytes": 11502486,
+                "sha256": "7daa5522e68611b58c106751c39e49d78c5eb624ff6a504169b6feda824e632a"
+            },
+            {
+                "path": "collection-local/worker-5-labels.test.jsonl.gz",
+                "bytes": 1834982,
+                "sha256": "d9c2aa5c19df0bc5ce7dd04b11fc2cbbdd9ebea1dfde25592cfb07e0c299509b"
+            },
+            {
+                "path": "collection-local/worker-5-labels.train.jsonl.gz",
+                "bytes": 5016959,
+                "sha256": "a591c2df1973ec50b49b9f19e7de6017ffe101fc0a1c7e45604572576bdebba8"
+            },
+            {
+                "path": "collection-local/worker-5-labels.validation.jsonl.gz",
+                "bytes": 1966705,
+                "sha256": "2b6666e8f222ee98ac9decc2f0e9b607551cc7580443ad71e2769310dba6ff6b"
+            },
+            {
+                "path": "collection-local/worker-5.jsonl.gz",
+                "bytes": 11407957,
+                "sha256": "6345c59256b9e9c155cfc5c66c5a3b56738e58f39f3b5c78eb8e406d674555e7"
+            },
+            {
+                "path": "collection-local/worker-6-labels.test.jsonl.gz",
+                "bytes": 1735270,
+                "sha256": "218f3b92ae5a97fd90866f0f4026d2b8363c9c440cca9dd1672ec68caed9e119"
+            },
+            {
+                "path": "collection-local/worker-6-labels.train.jsonl.gz",
+                "bytes": 5601231,
+                "sha256": "101fff4f8201bcf6d23230ee47ae09978339904ab87b84ab409843d718a04a0f"
+            },
+            {
+                "path": "collection-local/worker-6-labels.validation.jsonl.gz",
+                "bytes": 1511701,
+                "sha256": "719446b07815001aac5a3cacdbb05ca515c382a36606be81f354f38d8e97f493"
+            },
+            {
+                "path": "collection-local/worker-6.jsonl.gz",
+                "bytes": 11241344,
+                "sha256": "1a0a245ebcb9a9295e1f97ef525c084f3bf340713552a83e6f3b1417e85bce49"
+            },
+            {
+                "path": "collection-local/worker-7-labels.test.jsonl.gz",
+                "bytes": 2044353,
+                "sha256": "bf258fd061b8815186981b36039cd3b03e71e6af98fbad050569f456f46b65de"
+            },
+            {
+                "path": "collection-local/worker-7-labels.train.jsonl.gz",
+                "bytes": 5291365,
+                "sha256": "31ab05310e3469332c56f7fab8156ab6e7d6210c2cdf462ad45eee876df14cbf"
+            },
+            {
+                "path": "collection-local/worker-7-labels.validation.jsonl.gz",
+                "bytes": 1697718,
+                "sha256": "0268f5b8c14b6e41fc105204660757a8f0cdd4fb97cbd14f0378af9821c48bfc"
+            },
+            {
+                "path": "collection-local/worker-7.jsonl.gz",
+                "bytes": 11403897,
+                "sha256": "345b8aba5bf13e4255e29a4696ad6c9e3f81b7e16b3fcecbde6c276dd0e7bddc"
+            },
+            {
+                "path": "collection-puffalo/worker-0-labels.test.jsonl.gz",
+                "bytes": 484820,
+                "sha256": "568fc8325ca3a887b7da1c62e3427dce71bb6b5fc3c597b4844623219fd7f7a6"
+            },
+            {
+                "path": "collection-puffalo/worker-0-labels.train.jsonl.gz",
+                "bytes": 1729678,
+                "sha256": "3d61a903c1c36017ffdd1aee46abb3940e06b9cb8a1e9229c9395323b393ef3e"
+            },
+            {
+                "path": "collection-puffalo/worker-0-labels.validation.jsonl.gz",
+                "bytes": 739737,
+                "sha256": "df0d7ad56734561a62a74346f7c9d6d11661937c94da3efc8efde0694b9d48c7"
+            },
+            {
+                "path": "collection-puffalo/worker-0.jsonl.gz",
+                "bytes": 3841161,
+                "sha256": "d0efb472af2e404f654fe95d6861e88c31f3fca48581933764d02972084f3c62"
+            },
+            {
+                "path": "collection-puffalo/worker-1-labels.test.jsonl.gz",
+                "bytes": 410496,
+                "sha256": "0e4e8527cebccf3c023a9c67756d4d5f9e4eb14b526a689e5f3bc2a93e340afc"
+            },
+            {
+                "path": "collection-puffalo/worker-1-labels.train.jsonl.gz",
+                "bytes": 2085363,
+                "sha256": "fe8ca44906f0beb47dbccfef64d80425d9f4ac7a74ef1e982549b7b37d47d802"
+            },
+            {
+                "path": "collection-puffalo/worker-1-labels.validation.jsonl.gz",
+                "bytes": 470179,
+                "sha256": "b2fb195d2a281e6134c2f77f9ebd09f7b66665c64ad77bf7f3823ecba426d0ba"
+            },
+            {
+                "path": "collection-puffalo/worker-1.jsonl.gz",
+                "bytes": 3585921,
+                "sha256": "1af3dc5f412702f811f99bcff353b90cfb59d94f295a7954270665d0c45d9e71"
+            },
+            {
+                "path": "collection-puffalo/worker-2-labels.test.jsonl.gz",
+                "bytes": 608788,
+                "sha256": "26ae3d9f7fdfce6bd17dd43e986128fc5a3a297f8bfa06447f828b28d69d4f22"
+            },
+            {
+                "path": "collection-puffalo/worker-2-labels.train.jsonl.gz",
+                "bytes": 2090228,
+                "sha256": "a62a57e09a4bba01fb5b6f687cfc9f1f5756fa715c011fadcc67a5b0935953aa"
+            },
+            {
+                "path": "collection-puffalo/worker-2-labels.validation.jsonl.gz",
+                "bytes": 846929,
+                "sha256": "daef6440d10a19bbc9ac98fa26a4cafefa282f39d72b206914f636e68c71629f"
+            },
+            {
+                "path": "collection-puffalo/worker-2.jsonl.gz",
+                "bytes": 4017998,
+                "sha256": "80b284dec11a39f3bd997d2cdce4f286ded9c8e703f5498b628c9c74f4739576"
+            },
+            {
+                "path": "collection-puffalo/worker-3-labels.test.jsonl.gz",
+                "bytes": 464989,
+                "sha256": "4bfc3595b496b9dfea6347e2e6f0948f0d709395c0a3e3f30f88ece5a32c4b6c"
+            },
+            {
+                "path": "collection-puffalo/worker-3-labels.train.jsonl.gz",
+                "bytes": 2031587,
+                "sha256": "02f2a775ce0efefebe51c8dc28b8a9b01eae70195dedafa17674ebeb35c4ef0d"
+            },
+            {
+                "path": "collection-puffalo/worker-3-labels.validation.jsonl.gz",
+                "bytes": 544601,
+                "sha256": "19d15144c6eb52aeefc45688e8754f7420ce61f8c18fa35cc01cc39b377a15cc"
+            },
+            {
+                "path": "collection-puffalo/worker-3.jsonl.gz",
+                "bytes": 3803742,
+                "sha256": "0a437b71649078ea0678aae5b88856ce06f9bf26e8e0bb4f033ca6799ebe3992"
+            },
+            {
+                "path": "cold-local/worker-0-labels.test.jsonl.gz",
+                "bytes": 19806,
+                "sha256": "009665277ee94905804a013001cf3f8c89bb8ef1fecb21c96507021294ba058f"
+            },
+            {
+                "path": "cold-local/worker-0-labels.train.jsonl.gz",
+                "bytes": 169224,
+                "sha256": "3b7f2f1b7e4cd87219a365ad0256b72a6cef2f77e44b8f095f363f4e5050615d"
+            },
+            {
+                "path": "cold-local/worker-0-labels.validation.jsonl.gz",
+                "bytes": 62695,
+                "sha256": "17930e17fd614925c916fb49ace8fc46cabcb4069164a786d032638351daba02"
+            },
+            {
+                "path": "cold-local/worker-0.jsonl.gz",
+                "bytes": 321822,
+                "sha256": "247eedf39ff2e25f5b286e295d47e24227a7103fd18323d9f00ae122da5e8212"
+            },
+            {
+                "path": "cold-local/worker-1-labels.test.jsonl.gz",
+                "bytes": 25318,
+                "sha256": "91a141698e90b1afe6de57e3d7f8e7c1f1493af7f9c5c17efa7e99eaa8cf2716"
+            },
+            {
+                "path": "cold-local/worker-1-labels.train.jsonl.gz",
+                "bytes": 45425,
+                "sha256": "f696743d4d9db56ce3466e0fa4eb49fa9610b34fa6cd5eec1bdbea5905234dcb"
+            },
+            {
+                "path": "cold-local/worker-1-labels.validation.jsonl.gz",
+                "bytes": 88200,
+                "sha256": "60339fe0088b38d1f1783ff85e30b5527660bcc4e87166742ebbecbf367b97bd"
+            },
+            {
+                "path": "cold-local/worker-1.jsonl.gz",
+                "bytes": 287951,
+                "sha256": "0bd9ed259d5d16ae373d3b54b21c4eca466db5ab3231f4d0db7d333bc04244b8"
+            },
+            {
+                "path": "cold-puffalo/worker-0-labels.test.jsonl.gz",
+                "bytes": 19806,
+                "sha256": "43fdf4d9521845e74f151e2b3e23e1d751a36271eec30835b6dcd6699fe6fdc4"
+            },
+            {
+                "path": "cold-puffalo/worker-0-labels.train.jsonl.gz",
+                "bytes": 169351,
+                "sha256": "e6c2413280322f74213b215ccf63bfe8e86157ed329b6bf8d2d5f3ac9d9bb907"
+            },
+            {
+                "path": "cold-puffalo/worker-0-labels.validation.jsonl.gz",
+                "bytes": 42321,
+                "sha256": "e4cb35dc66ada0c61faae7a6f1eeb638d60241ed12905886f2837c11d72d72d4"
+            },
+            {
+                "path": "cold-puffalo/worker-0.jsonl.gz",
+                "bytes": 309125,
+                "sha256": "9dd9cbb3ba5a8ed4d5cc653c8f4f5123e2c0a2d797e94e978c9e6fb904ed933c"
+            },
+            {
+                "path": "cold-puffalo/worker-1-labels.test.jsonl.gz",
+                "bytes": 25318,
+                "sha256": "58ba1097dc09906100561ab38aaa901d17884973803f2a5309369cd7c684a569"
+            },
+            {
+                "path": "cold-puffalo/worker-1-labels.train.jsonl.gz",
+                "bytes": 45298,
+                "sha256": "2aaf9bc7583828037a00a098aa336476713fa1c740f8448e32a5f319cbe117c7"
+            },
+            {
+                "path": "cold-puffalo/worker-1-labels.validation.jsonl.gz",
+                "bytes": 108574,
+                "sha256": "4abebeadd9cc5474ab282060338fa60bd1e1383f3dbdbb4a12d4e82c47c51f21"
+            },
+            {
+                "path": "cold-puffalo/worker-1.jsonl.gz",
+                "bytes": 300691,
+                "sha256": "2b33ec61ab641dad31795dad511e025e5ab856066f5d432a91255870cce63496"
+            }
+        ]
+    },
+    "phaseStatus": {
+        "preflight-local": {
+            "complete": true,
+            "stage": "preflight",
+            "host": "local",
+            "fights": 14,
+            "expectedFights": 14,
+            "observations": 31,
+            "errors": [],
+            "controllerPid": 92097,
+            "registrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+            "absoluteDeadlineEpoch": 1794977237.7063098,
+            "elapsedSeconds": 30.076,
+            "liveWorkerPids": []
+        },
+        "preflight-puffalo": {
+            "complete": true,
+            "stage": "preflight",
+            "host": "puffalo",
+            "fights": 14,
+            "expectedFights": 14,
+            "observations": 31,
+            "errors": [],
+            "controllerPid": 656622,
+            "registrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+            "absoluteDeadlineEpoch": 1794977237.7063098,
+            "elapsedSeconds": 141.043,
+            "liveWorkerPids": []
+        },
+        "collection-local": {
+            "complete": true,
+            "stage": "collection",
+            "host": "local",
+            "fights": 5184,
+            "expectedFights": 5184,
+            "observations": 7450,
+            "errors": [],
+            "controllerPid": 92718,
+            "registrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+            "absoluteDeadlineEpoch": 1794993437.7063098,
+            "elapsedSeconds": 3022.324,
+            "liveWorkerPids": []
+        },
+        "collection-puffalo": {
+            "complete": true,
+            "stage": "collection",
+            "host": "puffalo",
+            "fights": 864,
+            "expectedFights": 864,
+            "observations": 1282,
+            "errors": [],
+            "controllerPid": 1995455,
+            "registrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+            "absoluteDeadlineEpoch": 1794993437.7063098,
+            "elapsedSeconds": 3334.343,
+            "liveWorkerPids": []
+        },
+        "cold-local": {
+            "complete": true,
+            "stage": "cold",
+            "host": "local",
+            "fights": 36,
+            "expectedFights": 36,
+            "observations": 41,
+            "errors": [],
+            "controllerPid": 29637,
+            "registrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+            "absoluteDeadlineEpoch": 1794995237.7063098,
+            "elapsedSeconds": 54.079,
+            "liveWorkerPids": []
+        },
+        "cold-puffalo": {
+            "complete": true,
+            "stage": "cold",
+            "host": "puffalo",
+            "fights": 36,
+            "expectedFights": 36,
+            "observations": 41,
+            "errors": [],
+            "controllerPid": 1489005,
+            "registrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+            "absoluteDeadlineEpoch": 1794995237.7063098,
+            "elapsedSeconds": 201.111,
+            "liveWorkerPids": []
+        }
+    },
+    "completedReturnReceipts": {
+        "preflight": {
+            "archive": "hoc-research/barrel-catalog-teacher-v11-20261118/return-preflight-puffalo.tar.gz",
+            "bytes": 522017,
+            "sha256": "55ff8346371b0b8e60b0d19126bb7c894cfa839a05b8950b2f210ba8c5235fd0",
+            "manifestSha256": "7884e027edd66dbe80575b9613b6a1ca9f0102ca26592d6ad4497e810ab70897"
+        },
+        "collection": {
+            "archive": "hoc-research/barrel-catalog-teacher-v11-20261118/return-collection-puffalo.tar.gz",
+            "bytes": 25255216,
+            "sha256": "565d86b3c066c1c0da7cbfa8806ee4ef8723e3baa65f639d00322302518d8998",
+            "manifestSha256": "a79e5329bd62d7088d7acd21c448573ed926d7677efa4b2b79e95ea0982e1a91"
+        },
+        "cold": {
+            "archive": "hoc-research/barrel-catalog-teacher-v11-20261118/return-cold-puffalo.tar.gz",
+            "bytes": 925823,
+            "sha256": "6103babd255bbcb81fa96d7c700344682d8235dbf7c80a0f70852408fa29e005",
+            "manifestSha256": "3c6f1b3f7c328f479de9976601df2140d6e46d7f4b5ed316575f7b6492ab49c3"
+        }
+    },
+    "allObservationCaseFamilyFoldsUnchanged": true,
+    "rawRecordsRemainOutsideGit": true,
+    "inputAssembly": {
+        "registrationSha256": "1980a158e6bc5aeb355ceccfcc6f8ef7dbbbba72befaf8f7fb699dff802ef57a",
+        "registration": {
+            "id": "barrel-static-catalog-learning-input-integrity-20261118-v2",
+            "registeredUtc": "2026-11-18T05:23:19.473284+00:00",
+            "parentRegistrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+            "parentCases": 6048,
+            "parentFamilies": 1512,
+            "features": 191,
+            "composition": "190 explicit public/static candidate values plus one outside-option indicator. IDs only join public actors/targets; only first native catalog, before and cleanup proposals. All later forecasts/actions/outcomes stay outside X.",
+            "folds": "Preserve original955/272/285 whole-family train/validation/test assignment and every zero-observation case. Separate compressed feature files. No held-out class/performance output or model/threshold/recipe selection.",
+            "sourceContract": "Bound AST facts: sole later list append requires productive tier, disabled for eligible barrels or the only Healer wait rewrite. No direct list mutation or engine action-parameter property write. Complete source eligibility/incumbent/static-lap checks required on every observation; not a transitive program-purity theorem.",
+            "unknownAndMissingPolicy": "Retain missing native catalogs and missing/dead spell recipients as explicit inference abstentions. Retain every outside-catalog selected action as an outside-option label. Never call graveyard recipients illegal merely because they are absent from active units.",
+            "gates": [
+                "Parent complete6048 original controls,28 preflight and72 cold executions pass both frozen verifiers; verify every raw file SHA before assembly.",
+                "All6048 cases/1512 family folds and all source observations retained. All eligible source paths, first-catalog shape, raw incumbent/Healer rewrite, finite static metadata and lap exact. Zero accepted teacher actions falsely masked.",
+                "Independent Python verifies every source-label/action-key join, fold/case ledger, all33 new static/mechanics/recipient values, partial masks, original-proposal flags and outside/shared-state construction.",
+                "No heldout class/performance metric, fitter, new battle, default or deployment. The old805-label test remains closed. Any input violation stops the phase with all rows and counterexamples preserved."
+            ],
+            "minimumFreeBytes": 2147483648,
+            "deadlineUnix": 1794984799.473284,
+            "deadlineUtc": "2026-11-18T06:53:19.473284+00:00",
+            "termination": "One complete assembly and independent verification attempt after fully verified parent. No parent actor restart, retry, cutoff extension, row omission or input gate relaxation.",
+            "modelFitterChosenOrStarted": false,
+            "newIndependentStrengthSamples": 0,
+            "defaultChanged": false,
+            "files": [
+                {
+                    "path": "source-contract.ts",
+                    "bytes": 6508,
+                    "sha256": "a0e0fdbd12d1d733b1bf733d4bf8f5614aef52fd83a9c8d49557eba2c140a06f"
+                },
+                {
+                    "path": "source-contract.json",
+                    "bytes": 2089,
+                    "sha256": "91a64f4a082e2243f78fc26f937dd6bf7348651f23c046766f6a2a6b1c8a47cc"
+                },
+                {
+                    "path": "prepare.ts",
+                    "bytes": 8593,
+                    "sha256": "123fc4d45fa3c689b9e6300e27cfed491a31fbe5f58a0a569dfa99c1ce5a7afc"
+                },
+                {
+                    "path": "verify.py",
+                    "bytes": 8273,
+                    "sha256": "f0f81a1a6876354e0cab3e1fd383eb485a4c2b65316135844bb94dfa30750bef"
+                },
+                {
+                    "path": "finish.py",
+                    "bytes": 1890,
+                    "sha256": "20b251468659c60773b653d22fa44b52415a1a47f1ed03ea2d6f587af0bbee52"
+                },
+                {
+                    "path": "../barrel-public-action-representation-v1-20261118/representation.ts",
+                    "bytes": 10823,
+                    "sha256": "19eba24a7d9e4f56d6efb9db2cd27fd2aa26cd14294dcb122a153e8c95e495d1"
+                },
+                {
+                    "path": "../barrel-public-action-representation-v2-20261118/representation.ts",
+                    "bytes": 3591,
+                    "sha256": "35704c3fa0160f7f154a5e911129ea1458003ed8712d4ccf8c02a2c2deeda84c"
+                },
+                {
+                    "path": "../barrel-public-action-representation-v2-20261118/combined-prototype-tests.log",
+                    "bytes": 2087,
+                    "sha256": "b7053d4e6593228328366294b8cf2b479b78e4d9d3a675689c0204708c8d8854"
+                },
+                {
+                    "path": "../barrel-native-catalog-replay-functional-v2-20261118/catalog-independent-verification.json",
+                    "bytes": 952,
+                    "sha256": "fa47892e41229ae2b64c68c119e5d49d9dfee20cfdf154ebeeebd82a4eb078c7"
+                }
+            ]
+        },
+        "sourceContract": {
+            "passed": true,
+            "schema": "barrel-initial-catalog-source-contract-v1",
+            "parserVersion": "6.0.3",
+            "sourceFiles": [
+                {
+                    "path": "src/simulation/search_driver.ts",
+                    "sha256": "c30a4c3a3bcba7ca83964ab3963c3400783bc08c7f2af8281b64168f75db7b96"
+                },
+                {
+                    "path": "src/engine/action_engine.ts",
+                    "sha256": "60d43cee795f36b34d2f523d459a5ef6becad17dbb431c0111d9e755389b58cb"
+                },
+                {
+                    "path": "src/ai/candidates.ts",
+                    "sha256": "896f58905e7c12b52923e602970dd4701fd763faa94fc3337973443bbf62916e"
+                }
+            ],
+            "onlyPostEnumerationDirectListAppend": "candidates=[...candidates,expandedProductiveFallback]",
+            "appendEnclosingConditions": [
+                "expandedProductiveFallback",
+                "!boundedProductiveFallback && prioritizeProductiveActions",
+                "prioritizeProductiveActions && !this.observeOnly"
+            ],
+            "appendRequiresProductiveTier": true,
+            "productiveTierDisabledForDeliberateBarrels": true,
+            "onlyOuterIncumbentRewrite": "wait_turn",
+            "waitNotInForcedProductiveKinds": true,
+            "noDirectListMutators": true,
+            "noActionParameterPropertyAssignmentsInEngine": true,
+            "frozenNativeV08SearchAndBarrelDeliberationEnabled": true,
+            "dataRequirements": [
+                "Eligible observed cleanup is a melee deployment-barrel fallback with pre-cleanup movement/hold and no explicit combat/spell.",
+                "First native input, when present, starts with the cleanup incumbent or the one Healer wait rewrite. Missing native catalogs remain explicit abstentions.",
+                "No post-probe candidate append can occur on these paths: a retained barrel disables productive tier; a wait rewrite is outside its hard-passive kind set.",
+                "Only first native input metadata is admitted. Later shortlist outputs, query scores, action attempts and actual choices are excluded from X."
+            ],
+            "limitation": "These source-bound facts plus full functional/cold controls and complete data checks establish this input contract for the frozen implementation; this is not a general transitive-purity proof or current-v12 qualification.",
+            "modelFitted": false,
+            "defaultChanged": false
+        },
+        "primary": {
+            "passed": true,
+            "registrationSha256": "1980a158e6bc5aeb355ceccfcc6f8ef7dbbbba72befaf8f7fb699dff802ef57a",
+            "parentRegistrationSha256": "05a09addf03a216f0e2270d9e2013fdb73c70ad0554dfe3471b1050c6462ec9a",
+            "completeSourceCases": 6048,
+            "completeSourceFamilies": 1512,
+            "observations": 8732,
+            "featureCount": 191,
+            "inputViolations": 0,
+            "allFamiliesKeepOriginalProspectiveFolds": true,
+            "allZeroObservationCasesRetained": true,
+            "allMissingCatalogAndRecipientCasesRetainedAsAbstentions": true,
+            "allOutsideCatalogActualChoicesRetainedAsOutsideLabels": true,
+            "heldoutClassOrPerformanceMetricsNotInspected": true,
+            "modelFitted": false,
+            "defaultChanged": false,
+            "newIndependentStrengthSamples": 0,
+            "files": [
+                {
+                    "path": "prepared/train.jsonl.gz",
+                    "bytes": 3515836,
+                    "sha256": "02a60b44ed8c6f88c7ce7ec9fecbc45725fea3f1384799eb00198af638a8b43d"
+                },
+                {
+                    "path": "prepared/validation.jsonl.gz",
+                    "bytes": 1056883,
+                    "sha256": "519131b46fd5657e8f915369852e2720a6f8adbdc28c2590a6aeae90d8e02d1c"
+                },
+                {
+                    "path": "prepared/test.jsonl.gz",
+                    "bytes": 1136394,
+                    "sha256": "bd784d241e167880c4e6d0dce5ea44aa490632e75bdbedefeb2fc30bddb8cd35"
+                },
+                {
+                    "path": "prepared/feature-names.json",
+                    "sha256": "c9e0131c26e54f99ac840f4131964463bc9dd42243b32a5e024f07feac41390e"
+                },
+                {
+                    "path": "prepared/case-ledger.json",
+                    "sha256": "db8ff052162e1f741bcac18b396238c0457f565f012c38f57705950bc81ed832"
+                },
+                {
+                    "path": "prepared/input-violations.json",
+                    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+                }
+            ]
+        },
+        "independent": {
+            "passed": true,
+            "registrationSha256": "1980a158e6bc5aeb355ceccfcc6f8ef7dbbbba72befaf8f7fb699dff802ef57a",
+            "sourceCasesVerified": 6048,
+            "wholeSourceFamiliesVerified": 1512,
+            "observationLabelJoinsVerified": 8732,
+            "featureCount": 191,
+            "allProducerFileHashesExact": true,
+            "allOutsideAndOriginalFoldCasesRetained": true,
+            "allActualTargetsPartialMasksOutsideRowsAnd33StaticSuffixFieldsIndependentlyVerified": true,
+            "scope": "Validates exact source-label joins, explicit33-feature suffix, flags and outside/shared-state construction. Earlier157-feature numeric implementation has separate metamorphic/functional tests; not fully reimplemented here.",
+            "heldoutClassOrPerformanceMetricsNotInspected": true,
+            "modelFitted": false,
+            "defaultChanged": false,
+            "newIndependentStrengthSamples": 0
+        },
+        "sourceFiles": [
+            {
+                "path": "source-contract.ts",
+                "sha256": "a0e0fdbd12d1d733b1bf733d4bf8f5614aef52fd83a9c8d49557eba2c140a06f",
+                "body": "/** Source-bound provenance facts; this does not claim a general transitive program-purity theorem. */\nimport assert from \"node:assert/strict\";\nimport {readFileSync,writeFileSync} from \"node:fs\";\nimport {createHash} from \"node:crypto\";\nimport ts from \"typescript\";\nimport {environment} from \"../barrel-catalog-teacher-v11-20261118/profiles\";\nconst base=import.meta.dir+\"/../barrel-catalog-teacher-v11-20261118/sources/common/\",sha=(b:Buffer)=>createHash(\"sha256\").update(b).digest(\"hex\");\nconst driverRaw=readFileSync(base+\"src/simulation/search_driver.ts\"),engineRaw=readFileSync(base+\"src/engine/action_engine.ts\"),candidateRaw=readFileSync(base+\"src/ai/candidates.ts\");\nconst sf=ts.createSourceFile(\"search_driver.ts\",driverRaw.toString(),ts.ScriptTarget.Latest,true),ef=ts.createSourceFile(\"action_engine.ts\",engineRaw.toString(),ts.ScriptTarget.Latest,true);\nconst found:ts.Node[]=[];function visit(n:ts.Node,cb:(n:ts.Node)=>void){cb(n);ts.forEachChild(n,c=>visit(c,cb));}\nvisit(sf,n=>{if(ts.isClassDeclaration(n)&&n.name?.text===\"SearchDriver\")found.push(n);});assert.equal(found.length,1);const klass=found[0]as ts.ClassDeclaration;\nconst method=(name:string)=>{const m=klass.members.find(m=>ts.isMethodDeclaration(m)&&m.name.getText(sf)===name)as ts.MethodDeclaration;assert(m?.body);return m;};\nconst choose=method(\"chooseSearchDecision\"),outer=method(\"chooseDecision\"),squeeze=(n:ts.Node)=>n.getText(sf).replace(/\\s+/g,\"\");\nfunction bareAssignments(body:ts.Node,name:string){const out:ts.BinaryExpression[]=[];visit(body,n=>{if(ts.isBinaryExpression(n)&&[\"=\",\"+=\",\"-=\",\"*=\",\"/=\",\"??=\",\"&&=\",\"||=\"].includes(n.operatorToken.getText(sf))&&ts.isIdentifier(n.left)&&n.left.text===name)out.push(n);});return out;}\nconst candidateAssignments=bareAssignments(choose.body!,\"candidates\");assert.equal(candidateAssignments.length,1);const assignment=candidateAssignments[0];\nassert.equal(squeeze(assignment),\"candidates=[...candidates,expandedProductiveFallback]\");\nfunction positiveConjunct(n:ts.Expression,name:string):boolean{return ts.isIdentifier(n)&&n.text===name||ts.isParenthesizedExpression(n)&&positiveConjunct(n.expression,name)||ts.isBinaryExpression(n)&&n.operatorToken.kind===ts.SyntaxKind.AmpersandAmpersandToken&&(positiveConjunct(n.left,name)||positiveConjunct(n.right,name));}\nlet node:ts.Node|undefined=assignment.parent,positiveGuard=false;const parents:string[]=[];\nwhile(node&&node!==choose){if(ts.isIfStatement(node)){parents.push(node.expression.getText(sf));positiveGuard||=positiveConjunct(node.expression,\"prioritizeProductiveActions\");}node=node.parent;}\nassert(positiveGuard);\nlet predicate:ts.VariableDeclaration|undefined;visit(choose.body!,n=>{if(ts.isVariableDeclaration(n)&&ts.isIdentifier(n.name)&&n.name.text===\"prioritizeProductiveActions\")predicate=n;});assert(predicate?.initializer);\nassert.equal(squeeze(predicate.initializer),\"isV08Search&&!deliberateBarrel&&V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS.has(incumbentKind)\");\nconst directMutators:string[]=[];visit(choose.body!,n=>{if(ts.isCallExpression(n)&&ts.isPropertyAccessExpression(n.expression)&&ts.isIdentifier(n.expression.expression)&&n.expression.expression.text===\"candidates\"&&[\"push\",\"pop\",\"shift\",\"unshift\",\"splice\",\"sort\",\"reverse\",\"copyWithin\",\"fill\"].includes(n.expression.name.text))directMutators.push(n.getText(sf));});assert.deepEqual(directMutators,[]);\nconst rewrites=bareAssignments(outer.body!,\"incumbent\");assert.equal(rewrites.length,1);assert(ts.isArrayLiteralExpression(rewrites[0].right));assert.equal(rewrites[0].right.elements.length,1);\nassert.equal(squeeze(rewrites[0].right),'[{type:\"wait_turn\",unitId:unit.getId()}]');\nlet force:ts.VariableDeclaration|undefined;visit(sf,n=>{if(ts.isVariableDeclaration(n)&&ts.isIdentifier(n.name)&&n.name.text===\"V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS\")force=n;});assert(force?.initializer&&ts.isNewExpression(force.initializer));\nconst arg=force.initializer.arguments?.[0];assert(arg&&ts.isArrayLiteralExpression(arg));const forceKinds=arg.elements.map(x=>{assert(ts.isStringLiteral(x));return x.text;});assert.deepEqual(forceKinds,[\"idle\",\"defend\",\"mine\"]);assert(!forceKinds.includes(\"wait\"));\nfunction rootName(n:ts.Expression):string|undefined{if(ts.isIdentifier(n))return n.text;if(ts.isPropertyAccessExpression(n)||ts.isElementAccessExpression(n))return rootName(n.expression);return undefined;}\nconst actionWrites:string[]=[];visit(ef,n=>{if(ts.isBinaryExpression(n)&&[\"=\",\"+=\",\"-=\",\"*=\",\"/=\",\"??=\",\"&&=\",\"||=\"].includes(n.operatorToken.getText(ef))&&rootName(n.left)===\"action\"&&!ts.isIdentifier(n.left))actionWrites.push(n.getText(ef));});assert.deepEqual(actionWrites,[]);\nassert.equal(environment.V07_SEARCH,\"1\");assert.equal(environment.SEARCH_A19_MELEE_BARREL_DELIBERATION,\"1\");assert(environment.SEARCH_VERSIONS.split(\",\").includes(\"v0.8\"));\nconst result={passed:true,schema:\"barrel-initial-catalog-source-contract-v1\",parserVersion:ts.version,sourceFiles:[{path:\"src/simulation/search_driver.ts\",sha256:sha(driverRaw)},{path:\"src/engine/action_engine.ts\",sha256:sha(engineRaw)},{path:\"src/ai/candidates.ts\",sha256:sha(candidateRaw)}],\n onlyPostEnumerationDirectListAppend:squeeze(assignment),appendEnclosingConditions:parents,appendRequiresProductiveTier:true,productiveTierDisabledForDeliberateBarrels:true,\n onlyOuterIncumbentRewrite:\"wait_turn\",waitNotInForcedProductiveKinds:true,noDirectListMutators:true,noActionParameterPropertyAssignmentsInEngine:true,\n frozenNativeV08SearchAndBarrelDeliberationEnabled:true,\n dataRequirements:[\"Eligible observed cleanup is a melee deployment-barrel fallback with pre-cleanup movement/hold and no explicit combat/spell.\",\"First native input, when present, starts with the cleanup incumbent or the one Healer wait rewrite. Missing native catalogs remain explicit abstentions.\",\"No post-probe candidate append can occur on these paths: a retained barrel disables productive tier; a wait rewrite is outside its hard-passive kind set.\",\"Only first native input metadata is admitted. Later shortlist outputs, query scores, action attempts and actual choices are excluded from X.\"],\n limitation:\"These source-bound facts plus full functional/cold controls and complete data checks establish this input contract for the frozen implementation; this is not a general transitive-purity proof or current-v12 qualification.\",\n modelFitted:false,defaultChanged:false};\nwriteFileSync(import.meta.dir+\"/source-contract.json\",JSON.stringify(result,null,2)+\"\\n\",{flag:\"wx\"});console.log(JSON.stringify(result));\n"
+            },
+            {
+                "path": "prepare.ts",
+                "sha256": "123fc4d45fa3c689b9e6300e27cfed491a31fbe5f58a0a569dfa99c1ce5a7afc",
+                "body": "/** One complete, source-bound assembly. No class/performance summaries, fitter or policy. */\nimport assert from \"node:assert/strict\";\nimport {createHash} from \"node:crypto\";\nimport {appendFileSync,closeSync,createReadStream,mkdirSync,openSync,readFileSync,readdirSync,writeFileSync} from \"node:fs\";\nimport {createInterface} from \"node:readline\";\nimport {createGunzip,gzipSync} from \"node:zlib\";\nimport {FEATURE_NAMES,observationInput,project,actionKey} from \"../barrel-public-action-representation-v2-20261118/representation\";\nconst p=import.meta.dir,parent=p+\"/../barrel-catalog-teacher-v11-20261118\",read=(f:string)=>JSON.parse(readFileSync(f,\"utf8\")),hash=(v:unknown)=>createHash(\"sha256\").update(JSON.stringify(v)).digest(\"hex\"),sha=(b:Buffer)=>createHash(\"sha256\").update(b).digest(\"hex\");\nconst raw=readFileSync(p+\"/registration.json\"),reg=JSON.parse(raw.toString()),seal=sha(raw);for(const f of reg.files)assert.equal(sha(readFileSync(p+\"/\"+f.path)),f.sha256,f.path);\nassert(Date.now()/1000<reg.deadlineUnix);\nconst prefix=read(p+\"/../barrel-native-catalog-replay-functional-v2-20261118/catalog-independent-verification.json\");assert(prefix.verificationPassed&&prefix.admissionPassed);\nassert.equal(sha(readFileSync(parent+\"/registration.json\")),reg.parentRegistrationSha256);\nconst complete=read(parent+\"/complete-verification.json\"),independent=read(parent+\"/independent-complete-verification.json\");assert(complete.passed&&independent.passed);assert.equal(complete.registrationSha256,reg.parentRegistrationSha256);assert.equal(independent.registrationSha256,reg.parentRegistrationSha256);\nfor(const f of complete.rawFiles)assert.equal(sha(readFileSync(parent+\"/\"+f.path)),f.sha256,f.path);\nconst contract=read(p+\"/source-contract.json\");assert(contract.passed);for(const f of contract.sourceFiles)assert.equal(sha(readFileSync(parent+\"/sources/common/\"+f.path)),f.sha256,f.path);\nconst casebook=read(parent+\"/cases-all.json\"),expected=new Map<string,any>(casebook.map((j:any)=>[j.caseId,j]));assert.equal(expected.size,6048);\nconst features=[...FEATURE_NAMES,\"outsideOption\"],outsideKeep=features.map(n=>n.startsWith(\"actor.\")||n.startsWith(\"allies.\")||n.startsWith(\"enemies.\")||n.startsWith(\"map.\")||n===\"lap\"||n===\"activeTimeDenial\");assert.equal(features.length,191);\nconst out=p+\"/prepared\";mkdirSync(out);for(const fold of[\"train\",\"validation\",\"test\"])closeSync(openSync(out+\"/\"+fold+\".jsonl.gz\",\"wx\"));\nconst control=new Map<string,any>(),seen=new Set<string>(),families=new Map<string,string>(),caseRows:any[]=[],violations:any[]=[];let rows=0;\nasync function* lines(file:string){for await(const line of createInterface({input:createReadStream(file).pipe(createGunzip()),crlfDelay:Infinity}))yield JSON.parse(line);}\nfor(const host of[\"local\",\"puffalo\"]){\n const stem=\"collection-\"+host;\n for(const f of readdirSync(parent+\"/\"+stem).filter(f=>/^worker-\\d+\\.jsonl\\.gz$/.test(f)))for await(const r of lines(parent+\"/\"+stem+\"/\"+f)){\n  const j=expected.get(r.caseId);assert(j);assert(!control.has(r.caseId));assert.equal(j.assignedHost,host);control.set(r.caseId,{labels:r.labels,labelsDigest:r.labelsDigest,labelPayloadSha256:r.labelPayloadSha256});\n }\n}\nassert.equal(control.size,6048);\nconst explicit=new Set([\"melee_attack\",\"range_attack\",\"area_throw_attack\",\"cast_spell\",\"obstacle_attack\"]);\nfor(const host of[\"local\",\"puffalo\"]){\n const stem=\"collection-\"+host;\n for(const f of readdirSync(parent+\"/\"+stem).filter(f=>/^worker-\\d+-labels\\.(train|validation|test)\\.jsonl\\.gz$/.test(f)).sort())for await(const r of lines(parent+\"/\"+stem+\"/\"+f)){\n  assert(Date.now()/1000<reg.deadlineUnix);assert(r.jobId.startsWith(\"collection/\"));const caseId=r.jobId.slice(11),j=expected.get(caseId),c=control.get(caseId);assert(j&&c);assert(!seen.has(caseId));seen.add(caseId);\n  assert.equal(j.assignedHost,host);assert.equal(r.familyId,j.familyId);assert.equal(r.fold,j.fold);assert.equal(hash(r),c.labelPayloadSha256);assert.equal(hash(r.labels),c.labelsDigest);assert.equal(r.labels.length,c.labels);\n  const prior=families.get(r.familyId);if(prior)assert.equal(prior,r.fold);else families.set(r.familyId,r.fold);\n  caseRows.push({caseId,familyId:r.familyId,fold:r.fold,observations:r.labels.length,sourceLabelPayloadSha256:c.labelPayloadSha256});\n  for(const o of r.labels){\n   const rowId=caseId+\"/\"+o.ordinal,input=observationInput(o),actor=input.publicState.units.find((u:any)=>u.id===input.actorId);assert(actor);\n   const fail=(condition:boolean,reason:string)=>{if(!condition)violations.push({rowId,reason});};\n   fail(actor.attackSelection!==2,\"recorded ranged actor at melee-only boundary\");fail(!o.before.some((a:any)=>explicit.has(a.type))&&o.before.some((a:any)=>[\"move_unit\",\"wait_turn\",\"defend_turn\"].includes(a.type)),\"invalid pre-cleanup eligibility\");\n   const strike=o.cleanup.find((a:any)=>a.type===\"obstacle_attack\"),g=input.publicState.gridGeometry;\n   const cell=strike?{x:Math.floor((strike.targetPosition.x+g.maxX)/g.cellSize),y:Math.floor(strike.targetPosition.y/g.cellSize)}:undefined;\n   fail(!!strike&&strike.attackerId===o.unitId&&input.publicState.barrels.some((b:any)=>b.cell.x===cell!.x&&b.cell.y===cell!.y),\"not a deployment-barrel incumbent\");\n   if(input.nativeCatalog.length){\n    const first=input.nativeCatalog[0],root=o.rootRecords[0],isOriginal=actionKey(first.actions)===actionKey(o.cleanup),isWaitRewrite=actor.name===\"Healer\"&&first.actions.length===1&&first.actions[0].type===\"wait_turn\"&&first.actions[0].unitId===o.unitId;\n    fail(root.version===\"v0.8\"&&first.kind===\"incumbent\"&&actionKey(root.rawIncumbent)===actionKey(o.cleanup)&&(isOriginal||isWaitRewrite),\"initial catalog is outside the proven barrel/Healer-wait source paths\");\n    for(const candidate of input.nativeCatalog){\n     fail(!!candidate.features&&Object.values(candidate.features).every(v=>typeof v===\"number\"&&Number.isFinite(v)),\"invalid static candidate metadata\");\n     fail(candidate.features?.lap===o.lap,\"static metadata lap does not match pre-decision state\");\n    }\n   }\n   const proposals=project(input),actual=actionKey(o.chosenDecision),target=proposals.findIndex(p=>p.key===actual),cleanupIndex=proposals.findIndex(p=>p.isCleanup),beforeIndex=proposals.findIndex(p=>p.isBefore),outsideIndex=proposals.length;\n   assert(cleanupIndex>=0&&beforeIndex>=0&&cleanupIndex!==beforeIndex);const valid=proposals.map(p=>!p.blockedByPublicMask);valid.push(true);\n   fail(target<0||valid[target],\"actual accepted teacher choice marked invalid by public mask\");\n   const matrix=proposals.map(p=>[...p.features,0]),outside=matrix[0].map((v,i)=>outsideKeep[i]?v:0);outside[outside.length-1]=1;matrix.push(outside);\n   assert(matrix.every(x=>x.length===191&&x.every(Number.isFinite)));\n   const row={schema:\"barrel-static-catalog-learning-row-v2\",rowId,familyId:r.familyId,fold:r.fold,\n    targetIndex:target<0?outsideIndex:target,cleanupIndex,beforeIndex,outsideIndex,valid,\n    allowInference:input.nativeCatalog.length>0&&!proposals.some(p=>p.requiresUnavailablePublicRecipient),features:matrix};\n   appendFileSync(out+\"/\"+r.fold+\".jsonl.gz\",gzipSync(JSON.stringify(row)+\"\\n\",{level:1}));rows++;\n  }\n }\n}\nassert.equal(seen.size,6048);assert.equal(families.size,1512);assert.equal(rows,complete.collectionObservations);\nconst inventory=[\"train\",\"validation\",\"test\"].map(fold=>{const raw=readFileSync(out+\"/\"+fold+\".jsonl.gz\");return{path:\"prepared/\"+fold+\".jsonl.gz\",bytes:raw.length,sha256:sha(raw)};});\nwriteFileSync(out+\"/feature-names.json\",JSON.stringify(features,null,2)+\"\\n\",{flag:\"wx\"});writeFileSync(out+\"/case-ledger.json\",JSON.stringify(caseRows,null,2)+\"\\n\",{flag:\"wx\"});writeFileSync(out+\"/input-violations.json\",JSON.stringify(violations,null,2)+\"\\n\",{flag:\"wx\"});\nconst result={passed:violations.length===0,registrationSha256:seal,parentRegistrationSha256:reg.parentRegistrationSha256,\n completeSourceCases:seen.size,completeSourceFamilies:families.size,observations:rows,featureCount:191,inputViolations:violations.length,\n allFamiliesKeepOriginalProspectiveFolds:true,allZeroObservationCasesRetained:true,allMissingCatalogAndRecipientCasesRetainedAsAbstentions:true,\n allOutsideCatalogActualChoicesRetainedAsOutsideLabels:true,heldoutClassOrPerformanceMetricsNotInspected:true,modelFitted:false,defaultChanged:false,newIndependentStrengthSamples:0,\n files:[...inventory,...[\"feature-names.json\",\"case-ledger.json\",\"input-violations.json\"].map(f=>({path:\"prepared/\"+f,sha256:sha(readFileSync(out+\"/\"+f))}))]};\nwriteFileSync(p+\"/assembly-result.json\",JSON.stringify(result,null,2)+\"\\n\",{flag:\"wx\"});console.log(JSON.stringify({...result,files:undefined}));\n"
+            },
+            {
+                "path": "verify.py",
+                "sha256": "f0f81a1a6876354e0cab3e1fd383eb485a4c2b65316135844bb94dfa30750bef",
+                "body": "\"\"\"Independent label joins, masks, explicit static feature suffix, folds and outside-option checks.\"\"\"\nfrom pathlib import Path\nimport gzip,hashlib,json,math\np=Path(__file__).resolve().parent;parent=p.parent/'barrel-catalog-teacher-v11-20261118';sha=lambda b:hashlib.sha256(b).hexdigest()\nregraw=(p/'registration.json').read_bytes();reg=json.loads(regraw);seal=sha(regraw);primary=json.loads((p/'assembly-result.json').read_text());assert primary['passed']and primary['registrationSha256']==seal\nfor f in reg['files']:assert sha((p/f['path']).read_bytes())==f['sha256'],f['path']\nfor f in primary['files']:assert sha((p/f['path']).read_bytes())==f['sha256']\nfeatures=json.loads((p/'prepared/feature-names.json').read_text());assert len(features)==191 and features[-1]=='outsideOption'\nsource_cases={j['caseId']:j for j in json.loads((parent/'cases-all.json').read_text())};rows={};families={}\nfor fold in ['train','validation','test']:\n for line in gzip.open(p/f'prepared/{fold}.jsonl.gz','rt'):\n  r=json.loads(line);assert r['fold']==fold and r['rowId']not in rows;rows[r['rowId']]=r\n  prior=families.setdefault(r['familyId'],fold);assert prior==fold\n  assert len(r['features'])==len(r['valid'])==r['outsideIndex']+1 and r['valid'][-1]and 0<=r['targetIndex']<len(r['features'])and r['valid'][r['targetIndex']]\n  for i,x in enumerate(r['features']):assert len(x)==191 and all(type(v)in[int,float]and math.isfinite(v)for v in x)and x[-1]==(1 if i==r['outsideIndex']else 0)\n  for index,name in enumerate(features[:-1]):\n   keep=name.startswith(('actor.','allies.','enemies.','map.'))or name in['lap','activeTimeDenial']\n   assert r['features'][-1][index]==(r['features'][0][index]if keep else 0)\ndef normalized(actions):\n out=[]\n for original in actions:\n  a=dict(original)\n  if a['type']in['move_unit','melee_attack','obstacle_attack']:a['hasLavaCell']=bool(a.get('hasLavaCell',False));a['hasWaterCell']=bool(a.get('hasWaterCell',False))\n  if'targetCells'in a:a['targetCells']=sorted(a['targetCells'],key=lambda c:(c['x'],c['y']))\n  out.append(a)\n return out\nstatic_names=['moraleDelta','luckDelta','enemiesNotYetActedFrac','alliesNotYetActedFrac','lap','hourglassSpent','spendsRangeShot','spendsSpellCharge','burnsResurrectionCharge','expectedDamage','expectedKill']\nshot_names=['enemyDamage','friendlyFireDamage','primaryTargetDamage','targetFirepower','targetLevel','targetIsRanged','targetCanCastSpells','targetNotYetActed','targetWoundedFraction','targetFocusFire']\nspell_names=['level','spell_target_type','power_type','multiplier_type','element','self_debuff_applies','is_giftable','maximum_gift_level']\nchecked=set();source_counts={};verified=0\nfor host in ['local','puffalo']:\n for f in sorted((parent/f'collection-{host}').glob('worker-*-labels.*.jsonl.gz')):\n  for line in gzip.open(f,'rt'):\n   payload=json.loads(line);case_id=payload['jobId'][11:];j=source_cases[case_id];assert case_id not in checked;checked.add(case_id);source_counts[case_id]=len(payload['labels'])\n   assert j['familyId']==payload['familyId']and j['fold']==payload['fold']and j['assignedHost']==host\n   for o in payload['labels']:\n    key=case_id+'/'+str(o['ordinal']);r=rows.pop(key);assert r['familyId']==j['familyId']and r['fold']==j['fold'];verified+=1\n    units=o['publicState']['units'];actor=next(u for u in units if u['id']==o['unitId']);roots=o['rootRecords'];native=roots[0]['shortlists'][0]['input']if roots and roots[0]['shortlists']else[]\n    assert actor['attackSelection']!=2 and not any(a['type']in['melee_attack','range_attack','area_throw_attack','cast_spell','obstacle_attack']for a in o['before'])and any(a['type']in['move_unit','wait_turn','defend_turn']for a in o['before'])\n    strike=next(a for a in o['cleanup']if a['type']=='obstacle_attack');g=o['publicState']['gridGeometry'];cell={'x':math.floor((strike['targetPosition']['x']+g['maxX'])/g['cellSize']),'y':math.floor(strike['targetPosition']['y']/g['cellSize'])}\n    assert strike['attackerId']==o['unitId']and any(b['cell']==cell for b in o['publicState']['barrels'])\n    if native:\n     first=native[0];same=normalized(first['actions'])==normalized(o['cleanup']);wait=actor['name']=='Healer'and first['actions']==[{'type':'wait_turn','unitId':o['unitId']}]\n     assert roots[0]['version']=='v0.8'and first['kind']=='incumbent'and normalized(roots[0]['rawIncumbent'])==normalized(o['cleanup'])and(same or wait)\n     for candidate in native:assert candidate.get('features')and all(type(v)in[int,float]and math.isfinite(v)for v in candidate['features'].values())and candidate['features']['lap']==o['lap']\n    plans=[];records=[]\n    for actions in[c['actions']for c in native]+[o['cleanup'],o['before']]:\n     norm=normalized(actions)\n     if norm not in plans:plans.append(norm);records.append(next((c for c in native if normalized(c['actions'])==norm),None))\n    assert len(plans)==r['outsideIndex'];actual=normalized(o['chosenDecision']);target=plans.index(actual)if actual in plans else len(plans);assert target==r['targetIndex']\n    assert r['cleanupIndex']==plans.index(normalized(o['cleanup']))and r['beforeIndex']==plans.index(normalized(o['before']))\n    requires_abstention=False\n    for i,(actions,record)in enumerate(zip(plans,records)):\n     row=r['features'][i];cast=next((a for a in actions if a['type']=='cast_spell'),None);attack=next((a for a in actions if a['type']in['range_attack','melee_attack']),None)\n     spell=next((s for s in actor['spells']if cast and s['name']==cast['spellName']),None)\n     recipient=next((u for u in units if cast and cast.get('targetId')and u['id']==cast['targetId']),None);attack_target=next((u for u in units if attack and attack.get('targetId')and u['id']==attack['targetId']),None)\n     missing=bool(cast and cast.get('targetId')and recipient is None);dead=bool(recipient and recipient['dead']);requires_abstention|=missing or dead\n     blocked=(any(a['type']=='wait_turn'for a in actions)and not actor['turnLegality']['canWait'])or bool(attack and attack.get('targetId')and(attack_target is None or attack_target['dead']))or bool(cast and(spell is None or spell['remaining']<=0))\n     assert r['valid'][i]==(not blocked)\n     static=record.get('features')if record else None;shot=record.get('shotFeatures')if record else None;sp=spell['properties']if spell else{}\n     expected={'hasNativeStaticMetadata':int(static is not None),'hasNativeShotMetadata':int(shot is not None),'spellTargetOutsideActiveRoster':int(missing),'spellTargetDeadInRoster':int(dead)}\n     expected.update({'native.'+k:(static.get(k,0)if static else 0)for k in static_names});expected.update({'native.shot.'+k:(shot.get(k,0)if shot else 0)for k in shot_names});expected.update({'spell.'+k:sp.get(k,0)for k in spell_names})\n     for name,value in expected.items():assert row[features.index(name)]==value,(key,name)\n     assert row[features.index('isCleanup')]==(i==r['cleanupIndex'])and row[features.index('isBefore')]==(i==r['beforeIndex'])\n    assert r['allowInference']==(bool(native)and not requires_abstention)\nassert not rows and len(checked)==6048 and verified==primary['observations']\nledger=json.loads((p/'prepared/case-ledger.json').read_text());assert len(ledger)==6048 and len({r['caseId']for r in ledger})==6048 and len({r['familyId']for r in ledger})==1512\nfor r in ledger:assert r['observations']==source_counts[r['caseId']]and r['familyId']==source_cases[r['caseId']]['familyId']and r['fold']==source_cases[r['caseId']]['fold']\nresult={'passed':True,'registrationSha256':seal,'sourceCasesVerified':6048,'wholeSourceFamiliesVerified':1512,'observationLabelJoinsVerified':verified,'featureCount':191,\n 'allProducerFileHashesExact':True,'allOutsideAndOriginalFoldCasesRetained':True,'allActualTargetsPartialMasksOutsideRowsAnd33StaticSuffixFieldsIndependentlyVerified':True,\n 'scope':'Validates exact source-label joins, explicit33-feature suffix, flags and outside/shared-state construction. Earlier157-feature numeric implementation has separate metamorphic/functional tests; not fully reimplemented here.',\n 'heldoutClassOrPerformanceMetricsNotInspected':True,'modelFitted':False,'defaultChanged':False,'newIndependentStrengthSamples':0}\nwith(p/'independent-assembly-verification.json').open('x')as f:f.write(json.dumps(result,indent=2)+'\\n')\nprint(json.dumps(result))\n"
+            },
+            {
+                "path": "finish.py",
+                "sha256": "20b251468659c60773b653d22fa44b52415a1a47f1ed03ea2d6f587af0bbee52",
+                "body": "from pathlib import Path\nimport datetime,hashlib,json,os,shutil,subprocess,time\np=Path(__file__).resolve().parent;parent=p.parent/'barrel-catalog-teacher-v11-20261118';regraw=(p/'registration.json').read_bytes();reg=json.loads(regraw);seal=hashlib.sha256(regraw).hexdigest()\nstate={'complete':False,'stage':'waiting-for-fully-verified-parent','supervisorPid':os.getpid(),'registrationSha256':seal,'errors':[],'modelFitterChosenOrStarted':False,'defaultChanged':False}\ndef save():\n state['at']=datetime.datetime.now(datetime.timezone.utc).isoformat();f=p/'supervisor-status.tmp';f.write_text(json.dumps(state,indent=2)+'\\n');f.replace(p/'supervisor-status.json')\nsave()\ntry:\n while True:\n  assert time.time()<reg['deadlineUnix'],'Fixed input-assembly cutoff; no extension'\n  s=json.loads((parent/'operations-status.json').read_text());assert not s['errors'],s\n  if s['complete']:break\n  os.kill(s['operationsPid'],0)\n  time.sleep(20)\n assert shutil.disk_usage(p).free>=reg['minimumFreeBytes']\n state['stage']='one-complete-source-bound-assembly';save()\n with(p/'prepare.log').open('x')as log:subprocess.run(['nice','-n','19','bun',str(p/'prepare.ts')],cwd=p,stdout=log,stderr=subprocess.STDOUT,check=True)\n result=json.loads((p/'assembly-result.json').read_text());assert result['passed'],'Input contract failed; preserve every row and violation without fitting'\n state['stage']='independent-python-assembly-verification';save()\n with(p/'verify.log').open('x')as log:subprocess.run(['nice','-n','19','python3',str(p/'verify.py')],cwd=p,stdout=log,stderr=subprocess.STDOUT,check=True)\n assert json.loads((p/'independent-assembly-verification.json').read_text())['passed']\n state.update({'complete':True,'stage':'complete-verified-learning-inputs-no-fitter'})\nexcept BaseException as error:state['errors'].append(repr(error));state['stage']='failed-preserve-all-no-retry';raise\nfinally:save()\n"
+            }
+        ]
+    },
+    "independentCoverageLimit": "Python fully verifies all original/cold control and producer-byte joins; input assembly independently verifies labels, masks,33 added static/mechanics/recipient fields and outside/shared-state construction. It does not reimplement the earlier157-feature numeric extractor; that has separate functional/metamorphic checks.",
+    "heldoutClassOrPerformanceMetricsNotInspected": true,
+    "old805LabelTestRemainsClosed": true,
+    "modelFitted": false,
+    "newIndependentStrengthSamples": 0,
+    "defaultChanged": false,
+    "nextGate": "A separately frozen learner, validation recipe selection without test metrics, one sealed model before any held-out model evaluation, independent inference/aggregates and fresh current-v12 authoritative whole-family strength/overall-average+10% cost. Preserve every earlier failure and original sources."
+}
