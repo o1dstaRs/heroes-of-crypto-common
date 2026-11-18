@@ -732,14 +732,21 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
     const studyProfile = String(asRecord(asRecord(summary.provenance).fightProfile).studyProfile);
     const searchProfile = asRecord(asRecord(asRecord(summary.provenance).fightProfile).search);
     const complementaryR2 = searchProfile.rollouts === 2 && searchProfile.chanceSampling === "actor-antithetic";
-    const premiumStudy = ["premium-ranked-v1", "premium-ranked-v2", "premium-ranked-v3", "premium-ranked-v4"].includes(
-        studyProfile,
-    );
+    const nativeStudy = studyProfile === "premium-ranked-current-v1";
+    const premiumStudy = [
+        "premium-ranked-v1",
+        "premium-ranked-v2",
+        "premium-ranked-v3",
+        "premium-ranked-v4",
+        "premium-ranked-current-v1",
+    ].includes(studyProfile);
     const premiumSetupNotice =
         studyProfile === "premium-ranked-v1"
             ? "This historical profile restricts opponent identities during augment setup; it does not match current ranked public-roster Setup. "
             : "Augment setup uses the public opponent roster; opponent positions, artifacts, augments and splits stay private. ";
-    const augmentDomainNotice = ["premium-ranked-v3", "premium-ranked-v4"].includes(studyProfile)
+    const augmentDomainNotice = ["premium-ranked-v3", "premium-ranked-v4", "premium-ranked-current-v1"].includes(
+        studyProfile,
+    )
         ? "All six augment axes, including Empower, are eligible for collection. "
         : "Historical collection covers five augment axes only; Empower allocations are unmeasured. ";
     const learningNotice =
@@ -824,6 +831,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
         categories: RANKING_DEFINITIONS,
         mapDefinitions,
         interactions,
+        doctrines: asRecord(summary.doctrines),
     };
     const heroStyle = background ? ` style="--hero-image:url('${background}')"` : "";
     const sectionNavigationHtml = [
@@ -831,6 +839,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
         { id: "overview", label: "Overview" },
         { id: "rankings", label: "Rankings" },
         { id: "patterns", label: "Patterns" },
+        ...(summary.doctrines ? [{ id: "doctrines", label: "Doctrines" }] : []),
         ...(interactions ? [{ id: "interactions", label: "Co-play" }] : []),
         { id: "full-rankings", label: "Full table" },
         { id: "method", label: "Method" },
@@ -1007,7 +1016,7 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
   }
   <aside class="notice" aria-label="Interpretation caveat">
     <div class="notice-mark">!</div>
-    <div><h2>${premiumStudy ? "Premium coverage study · exploratory evidence" : "Controlled strength and associative composition"}</h2><p>${premiumStudy ? premiumSetupNotice + augmentDomainNotice + learningNotice + "Ranked draft artifacts are retained from visible offers; these artifact charts use synthetic setup exploration, not the draft decision table. Missing chart rows must not be read as zero strength. Augment exploration spans the actual 5/6/7-point doctrine budgets. Unit and synergy results are composition-confounded associations; no Premium advisor has been fitted or evaluated. This coverage pilot does not establish counter-pick gains or optimal formations. Premium charts use conservative family-bounded 95% intervals instead of the legacy summary variance intervals." : "Artifact and augment score rates use the policy's 20% uniform exploration assignments, breaking the link between a strong army and its usual item choice. Synergy rows instead track exact faction, choice, and active level under the deployed deterministic setup policy; they remain composition-confounded associations, not randomized causal effects. Augment plans are the causal unit; individual levels remain compositional diagnostics."}</p></div>
+    <div><h2>${nativeStudy ? "Current policy · observational evidence" : premiumStudy ? "Premium coverage study · exploratory evidence" : "Controlled strength and associative composition"}</h2><p>${nativeStudy ? "Ranked-draft uses current server draft decisions and native funded setup, splits, spellbooks, formations and barrels. Default decisions are deterministic; doctrines are independently uniform. Prescribed-army cohorts bypass drafting and assign synthetic artifacts. Upgrade rows use the purchases actually applied in each physical seat. All charts are composition-confounded associations, not randomized effects or improvements over another AI. Full A19 deterministic combat uses the v0.8 engine label. No model is fitted or promoted. " : premiumStudy ? premiumSetupNotice + augmentDomainNotice + learningNotice + "Ranked draft artifacts are retained from visible offers; these artifact charts use synthetic setup exploration, not the draft decision table. Missing chart rows must not be read as zero strength. Augment exploration spans the actual 5/6/7-point doctrine budgets. Unit and synergy results are composition-confounded associations; no Premium advisor has been fitted or evaluated. This coverage pilot does not establish counter-pick gains or optimal formations. Premium charts use conservative family-bounded 95% intervals instead of the legacy summary variance intervals." : "Artifact and augment score rates use the policy's 20% uniform exploration assignments, breaking the link between a strong army and its usual item choice. Synergy rows instead track exact faction, choice, and active level under the deployed deterministic setup policy; they remain composition-confounded associations, not randomized causal effects. Augment plans are the causal unit; individual levels remain compositional diagnostics."}</p></div>
   </aside>
   ${
       partialRun
@@ -1070,6 +1079,14 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
     </div>
   </section>
 
+  ${
+      summary.doctrines
+          ? `<section id="doctrines" data-report-section aria-labelledby="doctrines-title">
+    <div class="section-head"><div><p class="eyebrow">Actual assignments · selected cohort and map</p><h2 id="doctrines-title">Doctrine outcomes and matchups</h2></div><p>W/D/L counts army outcomes, so both armies are observed in every fight. Seat mirrors and both armies share one independent family. Conservative weighted whole-family 95% intervals; pooled self-play is 50% by symmetry.</p></div>
+    <div class="table-wrap"><table><thead><tr><th>Own doctrine</th><th>Opponent</th><th>Assignments</th><th>Families</th><th>W / D / L</th><th>Score</th><th>95% interval</th></tr></thead><tbody id="doctrine-body"></tbody></table></div>
+  </section>`
+          : ""
+  }
   <section id="method" data-report-section aria-labelledby="method-title">
     <div class="section-head"><div><p class="eyebrow">Reproducibility</p><h2 id="method-title">Method and provenance</h2></div><p>Keep these identifiers with screenshots or exported conclusions so the result remains traceable.</p></div>
     <div class="details-grid">
@@ -1143,7 +1160,8 @@ function renderTypeFilter(){var select=document.getElementById("type-filter");if
 function td(text,className){return node("td",className||"",text)}
 function renderTable(){var body=document.getElementById("ranking-body");var values=tableRows();body.replaceChildren();values.forEach(function(row){var line=node("tr");var hasSupport=supported(row);line.append(td(row.categoryLabel));var entry=td("");var wrap=node("div","table-entry");mountArt(wrap,row);var copy=node("div");copy.append(node("strong","",row.name));copy.append(node("span","type-chip",row.key));wrap.append(copy);entry.append(wrap);line.append(entry);line.append(td(cohortLabel(row.cohort)));line.append(td(mapLabel(row.map),mapIsNonLive(row.map)?"negative":""));line.append(td(sample(row)));line.append(td(finite(row.wins)?numberFormat.format(row.wins):"—"));line.append(td(finite(row.losses)?numberFormat.format(row.losses):"—"));line.append(td(finite(row.draws)?numberFormat.format(row.draws):"—"));line.append(td(hasSupport?rate(row.scoreRate):"—","rate-cell"));line.append(td(hasSupport?rate(row.winRate):"—"));line.append(td(hasSupport&&finite(row.ciLow)&&finite(row.ciHigh)?rate(row.ciLow)+" – "+rate(row.ciHigh):"—"));line.append(td(rate(row.pickRate)));line.append(td(hasSupport?lift(row.liftPp):"—",hasSupport?tone(row.liftPp):"neutral"));body.append(line)});if(!values.length){var line=node("tr");var empty=td("No ranking rows match the selected cohort, map, and table filters.","empty");empty.colSpan=13;line.append(empty);body.append(line)}document.getElementById("table-total").textContent=numberFormat.format(values.length)+" rows"}
 function bindTable(){var search=document.getElementById("table-search");search.addEventListener("input",function(){state.query=search.value.trim();renderTable()});var select=document.getElementById("type-filter");select.addEventListener("change",function(){state.type=select.value;renderTable()});document.querySelectorAll("[data-sort]").forEach(function(button){button.addEventListener("click",function(){var key=button.getAttribute("data-sort");if(state.sort===key)state.direction*=-1;else{state.sort=key;state.direction=key==="name"||key==="categoryLabel"||key==="cohort"||key==="map"?1:-1}renderTable()})})}
-function renderAll(){renderTabs();renderCoverage();renderLeaders();renderForests();renderScatter();renderHeatmap();renderTable()}
+function renderDoctrines(){var body=document.getElementById("doctrine-body");if(!body)return;body.replaceChildren();var names={1:"Scout",2:"Spymaster",3:"Battle Trance",all:"All"};var values=DATA.doctrines&&Array.isArray(DATA.doctrines.rows)?DATA.doctrines.rows:[];values.filter(function(row){return row.cohort===state.cohort&&String(row.map)===String(state.map)}).forEach(function(row){var line=node("tr");line.append(td(names[row.ownDoctrine]||String(row.ownDoctrine)),td(names[row.opponentDoctrine]||String(row.opponentDoctrine)),td(numberFormat.format(row.assignments)),td(numberFormat.format(row.families)),td(row.wins+" / "+row.draws+" / "+row.losses),td(row.scoreRate===null?"Unsupported":rate(row.scoreRate)),td(row.families?rate(row.ciLow)+" – "+rate(row.ciHigh):"—"));body.append(line)})}
+function renderAll(){renderTabs();renderCoverage();renderLeaders();renderForests();renderScatter();renderHeatmap();renderTable();renderDoctrines()}
 function initReportNavigation(){var links=Array.from(document.querySelectorAll("[data-report-jump]"));var sections=Array.from(document.querySelectorAll("[data-report-section]"));if(!links.length||!sections.length||!("IntersectionObserver" in window))return;var setActive=function(id){links.forEach(function(link){var active=link.getAttribute("data-report-jump")===id;link.classList.toggle("active",active);if(active)link.setAttribute("aria-current","true");else link.removeAttribute("aria-current")})};var observer=new IntersectionObserver(function(entries){var visible=entries.filter(function(entry){return entry.isIntersecting}).sort(function(left,right){return left.boundingClientRect.top-right.boundingClientRect.top})[0];if(visible)setActive(visible.target.id)},{rootMargin:"-28% 0px -62% 0px",threshold:0});sections.forEach(function(section){observer.observe(section)})}
 renderTypeFilter();renderMapFilter();bindTable();renderInteractions();renderAll();initReportNavigation();
 })();

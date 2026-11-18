@@ -63,6 +63,8 @@ export interface IReaggregateAiMetaResult {
 
 export interface IReaggregateAiMetaOptions {
     allowPartial?: boolean;
+    /** Explicit metric correction from complete immutable raw records; never changes outcomes. */
+    recomputeAll?: boolean;
 }
 
 const isRecord = (value: unknown): value is UnknownRecord =>
@@ -477,6 +479,7 @@ export async function reaggregateAiMetaSummary(
     if (!isRecord(parsed)) throw new Error("Summary root must be an object");
     if (parsed.schemaVersion !== AI_META_SCHEMA_VERSION) throw new Error("Summary schemaVersion is incompatible");
     const partialSource = parsed.complete !== true;
+    if (partialSource && options.recomputeAll) throw new Error("Metric corrections require complete raw coverage");
     if (partialSource && !options.allowPartial) {
         throw new Error("Only a complete AI meta summary can be reaggregated without allowPartial");
     }
@@ -557,6 +560,7 @@ export async function reaggregateAiMetaSummary(
                 generatedAt: new Date().toISOString(),
                 sourceSummary: basename(summaryPath),
                 sourceComplete: parsed.complete === true,
+                recomputedAllRankingDimensions: Boolean(options.recomputeAll),
                 partialDiagnostic: partialSource,
                 liveMaps: [...AI_META_MAPS],
                 recordedMaps: [...declaredMaps],
@@ -570,15 +574,18 @@ export async function reaggregateAiMetaSummary(
         },
         rankings: partialSource
             ? (parsed.rankings as unknown as IAiMetaRankings)
-            : preserveAllMapRankings(parsed, computedRankings),
+            : options.recomputeAll
+              ? computedRankings
+              : preserveAllMapRankings(parsed, computedRankings),
         interactions: aggregation.interactions(),
+        doctrines: aggregation.doctrines.result(),
     };
     publishJsonAtomically(outputPath, enriched);
     return { outputPath, pairs: expectedPairs, games: expectedGames, maps: declaredMaps, cohorts };
 }
 
 const USAGE =
-    "Usage: bun src/simulation/reaggregate_ai_meta_summary.ts <ai-meta.summary.json> [output.summary.json] [--allow-partial]";
+    "Usage: bun src/simulation/reaggregate_ai_meta_summary.ts <ai-meta.summary.json> [output.summary.json] [--allow-partial] [--recompute-all]";
 
 export async function main(argv: readonly string[] = process.argv.slice(2)): Promise<void> {
     if (argv.includes("--help") || argv.includes("-h")) {
@@ -586,9 +593,10 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
         return;
     }
     const allowPartial = argv.includes("--allow-partial");
-    const positional = argv.filter((argument) => argument !== "--allow-partial");
+    const recomputeAll = argv.includes("--recompute-all");
+    const positional = argv.filter((argument) => !["--allow-partial", "--recompute-all"].includes(argument));
     if (!positional[0] || positional.length > 2) throw new Error(USAGE);
-    const result = await reaggregateAiMetaSummary(positional[0], positional[1], { allowPartial });
+    const result = await reaggregateAiMetaSummary(positional[0], positional[1], { allowPartial, recomputeAll });
     console.log(
         `AI meta maps: ${result.games.toLocaleString()} fights, ${result.cohorts.length} cohorts, ` +
             `${result.maps.length} recorded maps -> ${result.outputPath}`,

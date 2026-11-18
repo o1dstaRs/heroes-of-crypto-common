@@ -91,6 +91,30 @@ afterAll(() => {
 });
 
 describe("immutable Premium evidence snapshots", () => {
+    it("conditions upgrade scores on the purchases in that fight, keeping both seats in one family", async () => {
+        const input = save("per-fight-query", [captured]);
+        const path = join(directory, "per-fight-query", "snapshot.sqlite");
+        await buildPremiumEvidenceSnapshot(input, path, { development: true });
+        const db = new Database(path);
+        db.exec("UPDATE family SET partition='train'");
+        db.exec("UPDATE army_fight SET augment_plan='P0-A0-M0-S0-V0',score=1 WHERE army_id=1 AND a_is_green=1");
+        db.exec("UPDATE army_fight SET score=0 WHERE army_id=1 AND a_is_green=0");
+        db.close();
+        const snapshot = new PremiumEvidenceSnapshot(path, sourceSha256, { allowDevelopment: true });
+        try {
+            const result = snapshot.query({ cohort: "ranked-draft", augmentPlanId: "P0-A0-M0-S0-V0" });
+            expect(result.scoreRate).toBe(1);
+            expect(result.independentFamilies).toBe(1);
+            expect(result.fights).toBe(1);
+            expect(result.armyObservations).toBe(1);
+            const payoffs = [...snapshot.trainingSetupPayoffs("ranked-draft")];
+            expect(payoffs).toHaveLength(4);
+            expect(payoffs.every((row) => row.partition === "train")).toBe(true);
+        } finally {
+            snapshot.close();
+        }
+        await expect(auditPremiumEvidence(input, path)).rejects.toThrow("army_fight differs");
+    });
     it("completes a batch only with an audited SQLite snapshot, and retries without rerunning games", async () => {
         const input = save("automatic-outputs", [captured]);
         const folder = join(directory, "automatic-outputs");

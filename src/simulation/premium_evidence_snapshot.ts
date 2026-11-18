@@ -93,6 +93,17 @@ CREATE TABLE army (
     UNIQUE(family_id, side)
 ) STRICT;
 CREATE INDEX army_setup ON army(artifact_t1, artifact_t2, doctrine, augment_plan, family_id);
+CREATE TABLE army_fight (
+    army_id INTEGER NOT NULL REFERENCES army(id), a_is_green INTEGER NOT NULL CHECK(a_is_green IN (0,1)),
+    score REAL NOT NULL CHECK(score IN (0,0.5,1)), augment_plan TEXT NOT NULL,
+    applied_augments TEXT NOT NULL CHECK(json_valid(applied_augments)),
+    PRIMARY KEY(army_id, a_is_green)
+) STRICT;
+CREATE INDEX army_fight_setup ON army_fight(augment_plan, army_id);
+CREATE TABLE setup_payoff (
+    army_id INTEGER NOT NULL REFERENCES army(id), a_is_green INTEGER NOT NULL CHECK(a_is_green IN (0,1)),
+    payload TEXT NOT NULL CHECK(json_valid(payload)), PRIMARY KEY(army_id, a_is_green)
+) STRICT;
 CREATE TABLE unit (army_id INTEGER NOT NULL REFERENCES army(id), creature_id INTEGER NOT NULL, PRIMARY KEY(army_id, creature_id)) STRICT;
 CREATE INDEX unit_lookup ON unit(creature_id, army_id);
 CREATE TABLE synergy (
@@ -211,6 +222,32 @@ export function canonicalPremiumEvidenceQuery(query: IPremiumEvidenceQuery): IPr
 export class PremiumEvidenceSnapshot {
     public readonly manifest: IPremiumSnapshotManifest;
     private readonly db: Database;
+    /** Post-setup diagnostics only. Outcomes and effective combat stats must never become draft-time inputs. */
+    public *trainingSetupPayoffs(cohort: AiMetaCohort) {
+        if (!AI_META_COHORTS.includes(cohort) || !this.manifest.capabilities?.includes("observed-setup-payoff-v1"))
+            throw new Error("A supported explicit cohort and observed setup payoff capability are required");
+        for (const row of this.db
+            .query<
+                {
+                    familyId: string;
+                    side: "a" | "b";
+                    aIsGreen: number;
+                    score: number;
+                    augmentPlanId: string;
+                    payload: string;
+                },
+                [string]
+            >(
+                "SELECT f.id familyId,a.side,d.a_is_green aIsGreen,g.score,g.augment_plan augmentPlanId,d.payload FROM setup_payoff d JOIN army a ON a.id=d.army_id JOIN family f ON f.id=a.family_id JOIN army_fight g ON g.army_id=a.id AND g.a_is_green=d.a_is_green WHERE f.partition='train' AND f.cohort=? ORDER BY f.id,a.side,d.a_is_green DESC",
+            )
+            .iterate(cohort))
+            yield {
+                ...row,
+                payload: JSON.parse(row.payload) as unknown,
+                partition: "train" as const,
+                use: "post-setup-diagnostics-not-draft-input" as const,
+            };
+    }
     /** Add only own artifacts and original PUBLIC rolled variants; deliberately never select level/purchases. */
     public *trainingContextualMatchups(cohorts: readonly AiMetaCohort[]) {
         const contextQuery = this.db.query<
@@ -448,7 +485,9 @@ export class PremiumEvidenceSnapshot {
         equals("a.artifact_t1", scope.artifactT1);
         equals("a.artifact_t2", scope.artifactT2);
         equals("a.doctrine", scope.doctrine);
-        equals("a.augment_plan", scope.augmentPlanId);
+        const perFight =
+            this.manifest.capabilities?.includes("per-fight-setups-v1") && scope.augmentPlanId !== undefined;
+        equals(perFight ? "af.augment_plan" : "a.augment_plan", scope.augmentPlanId);
         for (const id of scope.ownUnits!) {
             where.push("EXISTS(SELECT 1 FROM unit u WHERE u.army_id=a.id AND u.creature_id=?)");
             parameters.push(id);
@@ -467,14 +506,14 @@ export class PremiumEvidenceSnapshot {
             parameters.push(choice.faction, choice.synergy);
             if (level !== undefined) parameters.push(Number(level));
         }
-        const matched = `FROM army a JOIN family f ON f.id=a.family_id WHERE ${where.join(" AND ")}`;
-        return { scope, parameters, matched };
+        const matched = `FROM army a JOIN family f ON f.id=a.family_id ${perFight ? "JOIN army_fight af ON af.army_id=a.id" : ""} WHERE ${where.join(" AND ")}`;
+        return { scope, parameters, matched, scoreColumn: perFight ? "af.score" : "a.score", perFight };
     }
     public query(input: IPremiumEvidenceQuery): IPremiumEvidenceResult {
-        const { scope, parameters, matched } = this.matchingArmies(input);
+        const { scope, parameters, matched, scoreColumn, perFight } = this.matchingArmies(input);
         const result = this.db
             .query<{ n: number; observations: number | null; score: number | null }, (string | number)[]>(
-                `SELECT COUNT(*) n, SUM(observations) observations, AVG(score) score FROM (SELECT f.id, AVG(a.score) score, COUNT(*) observations ${matched} GROUP BY f.id)`,
+                `SELECT COUNT(*) n, SUM(observations) observations, AVG(score) score FROM (SELECT f.id, AVG(${scoreColumn}) score, COUNT(DISTINCT a.id) observations ${matched} GROUP BY f.id)`,
             )
             .get(...parameters)!;
         const n = result.n;
@@ -492,7 +531,13 @@ export class PremiumEvidenceSnapshot {
             status: n === 0 ? "no_evidence" : n < 50 ? "limited_evidence" : "supported",
             evidenceKind: "observational-association",
             independentFamilies: n,
-            fights: n * 2,
+            fights: perFight
+                ? this.db
+                      .query<{ n: number }, (string | number)[]>(
+                          `SELECT COUNT(*) n FROM (SELECT f.id, af.a_is_green ${matched} GROUP BY f.id, af.a_is_green)`,
+                      )
+                      .get(...parameters)!.n
+                : n * 2,
             armyObservations: result.observations ?? 0,
             scoreRate: result.score,
             interval95:
@@ -532,7 +577,17 @@ export class PremiumEvidenceSnapshot {
                     doctrine: army.doctrine,
                     artifactT1: army.artifact_t1,
                     artifactT2: army.artifact_t2,
-                    augmentPlanId: army.augment_plan,
+                    augmentPlanId:
+                        this.manifest.studyProfile === "premium-ranked-current-v1" ? null : army.augment_plan,
+                    ...(this.manifest.capabilities?.includes("per-fight-setups-v1")
+                        ? {
+                              fightObservations: this.db
+                                  .query<{ aIsGreen: number; score: number; augmentPlanId: string }, [number]>(
+                                      "SELECT a_is_green aIsGreen,score,augment_plan augmentPlanId FROM army_fight WHERE army_id=? ORDER BY a_is_green DESC",
+                                  )
+                                  .all(army.id),
+                          }
+                        : {}),
                     observedScore: army.score,
                     creatureIds: this.db
                         .query<{ creature_id: number }, [number]>(

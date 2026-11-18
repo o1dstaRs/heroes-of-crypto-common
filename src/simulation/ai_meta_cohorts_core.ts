@@ -233,8 +233,9 @@ export const AI_META_SYNERGY_DEFINITIONS: readonly IAiMetaSynergyDefinition[] = 
 export function aiMetaSynergyVariantsForPair(
     setupSeed: number,
     combatSeed: number,
+    authoritative = false,
 ): ReturnType<typeof synergyVariantsForSeed> {
-    return synergyVariantsForSeed(`ai-meta:${setupSeed}:${combatSeed}`);
+    return synergyVariantsForSeed(authoritative ? `sim-${combatSeed}` : `ai-meta:${setupSeed}:${combatSeed}`);
 }
 
 export function aiMetaSynergiesForVariants(
@@ -377,6 +378,7 @@ export interface IAiMetaRunOptions {
     studyProfile?: AiMetaStudy;
     nativeV09?: boolean;
     lockedV09Draft?: boolean;
+    authoritativeRanked?: boolean;
 }
 
 interface ICatalogEntry {
@@ -557,7 +559,7 @@ export const pickAiMetaRankedCreature = (
         tier1ArtifactId,
     );
 
-const materializeRankedRoster = (creatureIds: readonly number[]): IArmyUnitSpec[] =>
+export const materializeRankedRoster = (creatureIds: readonly number[]): IArmyUnitSpec[] =>
     creatureIds.map((creatureId) => {
         const info = creatureInfo(creatureId);
         if (!info) throw new Error(`AI meta ranked draft selected unknown creature id ${creatureId}`);
@@ -880,6 +882,7 @@ export function generateMetaMatchup(
     options: IAiMetaRunOptions,
     pair: number,
     mapOverride?: AiMetaMap,
+    draftGenerator: typeof generateRankedRosters = generateRankedRosters,
 ): IGeneratedMatchup {
     if (!Number.isInteger(pair) || pair < 0 || pair >= options.games / AI_META_GAMES_PER_MATCHUP) {
         throw new RangeError(`pair ${pair} is outside this ${options.games}-game cohort`);
@@ -892,10 +895,10 @@ export function generateMetaMatchup(
     let rosterB: IArmyUnitSpec[];
     let rankedDraft: IAiMetaDraftEvidence | undefined;
     if (archetypeA === "ranked" && archetypeB === "ranked") {
-        const generated = generateRankedRosters(
+        const generated = draftGenerator(
             hashSimulationParts(setupSeed, "live-ranked-pick"),
             map,
-            aiMetaSynergyVariantsForPair(setupSeed, combatSeed),
+            aiMetaSynergyVariantsForPair(setupSeed, combatSeed, options.authoritativeRanked),
             options.collectEvidence === true,
             options.studyProfile,
             options.nativeV09 || options.lockedV09Draft,
@@ -1227,6 +1230,7 @@ export function prepareMetaPair(
     options: IAiMetaRunOptions,
     pair: number,
     mapOverride?: AiMetaMap,
+    draftGenerator?: typeof generateRankedRosters,
 ): Omit<IAiMetaPairRecord, "games"> {
     if (options.studyProfile && !isPremiumMetaStudy(options.studyProfile))
         throw new Error("Unknown AI meta study profile");
@@ -1235,7 +1239,7 @@ export function prepareMetaPair(
     if (premiumStudy && process.env.AI_META_ARTIFACT_UNIFORM === "1")
         throw new Error("Premium study fixes artifact exploration at 20%");
     if (premiumStudy && !options.collectEvidence) throw new Error("Premium study requires evidence capture");
-    const matchup = generateMetaMatchup(options, pair, mapOverride);
+    const matchup = generateMetaMatchup(options, pair, mapOverride, draftGenerator);
     const setup = (side: "a" | "b") =>
         premiumStudy
             ? {
@@ -1248,7 +1252,11 @@ export function prepareMetaPair(
               }
             : undefined;
     const map = mapOverride ?? matchup.map;
-    const synergyVariants = aiMetaSynergyVariantsForPair(matchup.setupSeed, matchup.combatSeed);
+    const synergyVariants = aiMetaSynergyVariantsForPair(
+        matchup.setupSeed,
+        matchup.combatSeed,
+        options.authoritativeRanked,
+    );
     return {
         schemaVersion: AI_META_SCHEMA_VERSION,
         cohort: options.cohort,

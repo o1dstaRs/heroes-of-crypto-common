@@ -21,6 +21,39 @@ import { renderAiMetaReport } from "../../src/simulation/render_ai_meta_report";
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
 describe("render_ai_meta_report", () => {
+    test("keeps native policy observations and doctrine matchups explicit", () => {
+        const doctrines = {
+            schema: "ai-meta-doctrines-v1",
+            rows: [
+                {
+                    cohort: "all",
+                    map: "live",
+                    ownDoctrine: 1,
+                    opponentDoctrine: 2,
+                    families: 2,
+                    assignments: 2,
+                    wins: 2,
+                    draws: 1,
+                    losses: 1,
+                    scoreRate: 0.625,
+                    ciLow: 0,
+                    ciHigh: 1,
+                },
+            ],
+        };
+        const html = renderAiMetaReport({
+            provenance: { fightProfile: { studyProfile: "premium-ranked-current-v1" } },
+            doctrines,
+            rankings: {},
+        });
+        expect(html).toContain("Current policy · observational evidence");
+        expect(html).toContain('id="doctrine-body"');
+        expect(html).toContain("purchases actually applied in each physical seat");
+        const embedded = JSON.parse(
+            html.match(/<script type="application\/json" id="report-data">([\s\S]*?)<\/script>/)![1],
+        );
+        expect(embedded.doctrines).toEqual(doctrines);
+    });
     test("puts actual run dates and measured duration in the compact header", () => {
         const html = renderAiMetaReport({
             generatedAt: "2026-11-05T07:04:34.858Z",

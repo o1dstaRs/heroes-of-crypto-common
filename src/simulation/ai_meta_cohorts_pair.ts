@@ -34,6 +34,7 @@ import { validateAiMetaEvidence, type IAiMetaFightEvidence, type IAiMetaFormatio
 import { summarizePremiumParticipation } from "./ai_meta_participation";
 import { summarizePremiumCombatMetrics } from "./ai_meta_combat_metrics";
 import { AI_META_OFFLINE_SEARCH_ENVIRONMENT } from "./ai_meta_search_budget";
+import type { IAiMetaRuntimeAdapter } from "./ai_meta_runtime_adapter";
 
 export const aiMetaMatchConfig = (
     green: IAiMetaArmy,
@@ -113,7 +114,10 @@ export function playMetaPair(
     pair: number,
     strategyProfileId: AiMetaStrategyProfileId,
     offlineDeterministicWork = false,
+    adapter?: IAiMetaRuntimeAdapter,
 ): IAiMetaPairRecord {
+    if (Boolean(options.authoritativeRanked) !== Boolean(adapter))
+        throw new Error("Authoritative collection requires its native adapter");
     if ((strategyProfileId === AI_META_NATIVE_V09_STRATEGY_PROFILE) !== Boolean(options.nativeV09))
         throw new Error("Native v0.9 combat and draft profile must be selected together");
     if (options.collectEvidence && !offlineDeterministicWork) {
@@ -127,7 +131,7 @@ export function playMetaPair(
         process.env.SIM_RECORD_SPELL_EFFECTS = "1";
     }
     try {
-        const record = playMetaPairInner(options, pair, strategyProfileId, offlineDeterministicWork);
+        const record = playMetaPairInner(options, pair, strategyProfileId, offlineDeterministicWork, adapter);
         if (options.collectEvidence) validateAiMetaEvidence(record);
         return record;
     } finally {
@@ -171,7 +175,7 @@ function fightEvidence(
                 ...((side === "green" ? config.greenTacticalSplitStacks : config.redTacticalSplitStacks) ?? []),
             ],
             placements: result.placements[side],
-            augments: army.augment.augments,
+            augments: [...((side === "green" ? config.greenAugments : config.redAugments) ?? [])],
         };
     };
     const greenFormation = formation("green", green);
@@ -255,9 +259,11 @@ function playMetaPairInner(
     pair: number,
     strategyProfileId: AiMetaStrategyProfileId,
     offlineDeterministicWork: boolean,
+    adapter?: IAiMetaRuntimeAdapter,
 ): IAiMetaPairRecord {
-    const prepared = prepareMetaPair(options, pair);
-    const synergyVariants = aiMetaSynergyVariantsForPair(prepared.setupSeed, prepared.combatSeed);
+    const prepared = adapter?.preparePair(options, pair) ?? prepareMetaPair(options, pair);
+    const synergyVariants =
+        prepared.evidence?.synergyVariants ?? aiMetaSynergyVariantsForPair(prepared.setupSeed, prepared.combatSeed);
     // Finite search budgets replace the live move deadline, so outcomes stop depending on host speed and load.
     const searchBudget =
         offlineDeterministicWork && !options.nativeV09
@@ -286,7 +292,7 @@ function playMetaPairInner(
         return { decisions, config: learning ? { researchFormationSelector: selector } : {} };
     };
     const aFormation = formationCollection(true);
-    const aConfig = {
+    let aConfig = {
         ...aiMetaMatchConfig(
             prepared.armyA,
             prepared.armyB,
@@ -300,10 +306,11 @@ function playMetaPairInner(
         ...aFormation.config,
         ...(options.collectEvidence ? { headlessEvents: false } : {}),
     };
+    if (adapter) aConfig = adapter.configureFight(prepared, true, aConfig);
     const aCapture = capturePremiumFight(aConfig, Boolean(options.studyProfile));
     const aGreen = aCapture.result;
     const bFormation = formationCollection(false);
-    const bConfig = {
+    let bConfig = {
         ...aiMetaMatchConfig(
             prepared.armyB,
             prepared.armyA,
@@ -317,6 +324,7 @@ function playMetaPairInner(
         ...bFormation.config,
         ...(options.collectEvidence ? { headlessEvents: false } : {}),
     };
+    if (adapter) bConfig = adapter.configureFight(prepared, false, bConfig);
     const bCapture = capturePremiumFight(bConfig, Boolean(options.studyProfile));
     const bGreen = bCapture.result;
     const record: IAiMetaPairRecord = {

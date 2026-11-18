@@ -12,6 +12,8 @@ import {
     PREMIUM_META_FULL_AUGMENTS_SCHEMA,
     PREMIUM_META_POLICY_LEARNING_STUDY,
     PREMIUM_META_POLICY_LEARNING_SCHEMA,
+    PREMIUM_META_CURRENT_STUDY,
+    PREMIUM_META_CURRENT_SCHEMA,
     isFullAugmentStudy,
     isPublicSetupStudy,
     PREMIUM_META_EVIDENCE_SCHEMA,
@@ -47,6 +49,7 @@ import { summarizePremiumParticipation, type IPremiumCombatParticipation } from 
 import { summarizePremiumCombatMetrics, type IPremiumCombatMetrics } from "./ai_meta_combat_metrics";
 import { validatePremiumHealthLedger, type IPremiumHealthObservation } from "./ai_meta_health_ledger";
 import { validateMetaFormationDecision, type IMetaFormationDecision } from "./ai_meta_formation_learning";
+import { aiMetaPlanFromAppliedAugments } from "./ai_meta_actual_setup";
 
 /** Additive archive extension: legacy schema-1 balance readers may continue to ignore this field. */
 export const AI_META_EVIDENCE_SCHEMA = "premium-cohort-evidence-v1";
@@ -124,6 +127,7 @@ export interface IAiMetaDraftDecision {
 }
 
 export interface IAiMetaDraftEvidence {
+    authoritativeState?: Record<"a" | "b", { v3: boolean; contextual: boolean; delivery: boolean }>;
     seed: number;
     policy: string;
     /** Prevent treating a captured observation as proof the old selector used every feature. */
@@ -196,6 +200,19 @@ export interface IAiMetaFightEvidence {
     healthLedger?: IPremiumHealthObservation[];
 }
 
+export interface IAiMetaNativeOpenings {
+    schema: "native-ranked-openings-v1";
+    openings: {
+        nativeMethod: string;
+        teams: {
+            team: number;
+            roster: IArmyUnitSpec[];
+            augments: ISetupAugmentChoice[];
+            positions: { x: number; y: number }[];
+        }[];
+    }[];
+}
+
 export interface IAiMetaEvidence {
     schema:
         | typeof AI_META_EVIDENCE_SCHEMA
@@ -203,7 +220,9 @@ export interface IAiMetaEvidence {
         | "premium-cohort-evidence-v3"
         | typeof PREMIUM_META_EVIDENCE_SCHEMA
         | typeof PREMIUM_META_FULL_AUGMENTS_SCHEMA
-        | typeof PREMIUM_META_POLICY_LEARNING_SCHEMA;
+        | typeof PREMIUM_META_POLICY_LEARNING_SCHEMA
+        | typeof PREMIUM_META_CURRENT_SCHEMA;
+    authoritativeSetup?: IAiMetaNativeOpenings;
     studyProfile?: AiMetaStudy;
     scenarioId: string;
     partition: "train" | "validation" | "test";
@@ -248,7 +267,9 @@ function validatePremiumDraft(record: IAiMetaPairRecord): void {
     const evidence = record.evidence!;
     const draft = evidence.rankedDraft;
     if (!draft) return;
-    const nativeV09 = draft.policy === `${V09_DEFAULT_DRAFT_BASE_POLICY_SPEC}+${V09_DEFAULT_DRAFT_MODEL_ID}`;
+    const nativeV09 =
+        evidence.studyProfile === PREMIUM_META_CURRENT_STUDY ||
+        draft.policy === `${V09_DEFAULT_DRAFT_BASE_POLICY_SPEC}+${V09_DEFAULT_DRAFT_MODEL_ID}`;
     const rng = makeRng(draft.seed);
     const randomInt = (max: number) => Math.floor(rng() * max);
     let state = createPickSimState(randomInt);
@@ -324,6 +345,7 @@ export function validateAiMetaEvidence(record: IAiMetaPairRecord): void {
             PREMIUM_META_EVIDENCE_SCHEMA,
             PREMIUM_META_FULL_AUGMENTS_SCHEMA,
             PREMIUM_META_POLICY_LEARNING_SCHEMA,
+            PREMIUM_META_CURRENT_SCHEMA,
         ].includes(evidence.schema) ||
         evidence.fights?.length !== 2
     ) {
@@ -342,7 +364,8 @@ export function validateAiMetaEvidence(record: IAiMetaPairRecord): void {
         if (
             fullAugments !==
             (evidence.schema === PREMIUM_META_FULL_AUGMENTS_SCHEMA ||
-                evidence.schema === PREMIUM_META_POLICY_LEARNING_SCHEMA)
+                evidence.schema === PREMIUM_META_POLICY_LEARNING_SCHEMA ||
+                evidence.schema === PREMIUM_META_CURRENT_SCHEMA)
         )
             throw new Error("Premium augment domain does not match the evidence schema");
         if (
@@ -350,6 +373,12 @@ export function validateAiMetaEvidence(record: IAiMetaPairRecord): void {
             (evidence.schema === PREMIUM_META_POLICY_LEARNING_SCHEMA)
         )
             throw new Error("Premium learning study and schema disagree");
+        if (
+            (evidence.studyProfile === PREMIUM_META_CURRENT_STUDY) !==
+                (evidence.schema === PREMIUM_META_CURRENT_SCHEMA) ||
+            (evidence.studyProfile === PREMIUM_META_CURRENT_STUDY && !evidence.authoritativeSetup)
+        )
+            throw new Error("Current-ranked evidence requires an authoritative setup receipt");
         if (
             !isPremiumMetaStudy(evidence.studyProfile) ||
             evidence.geometry.orientation !== "ranked-sides" ||
@@ -454,6 +483,42 @@ export function validateAiMetaEvidence(record: IAiMetaPairRecord): void {
         }
     }
     for (const [index, fight] of evidence.fights.entries()) {
+        if (evidence.studyProfile === PREMIUM_META_CURRENT_STUDY) {
+            const receipt = evidence.authoritativeSetup;
+            const opening = receipt?.openings[index];
+            if (
+                receipt?.schema !== "native-ranked-openings-v1" ||
+                receipt.openings.length !== 2 ||
+                opening?.teams.length !== 2 ||
+                opening.nativeMethod !== "commitBotSetupForTeam/rePlaceTeam"
+            )
+                throw new Error("Missing exact native opening receipt");
+            for (const side of ["a", "b"] as const) {
+                const team = (side === "a") === fight.aIsGreen ? PBTypes.TeamVals.LEFT : PBTypes.TeamVals.RIGHT;
+                const native = opening.teams.find((row) => row.team === team);
+                const formation = fight.formations[side];
+                if (
+                    !native ||
+                    JSON.stringify(native.augments) !== JSON.stringify(formation.augments) ||
+                    JSON.stringify(native.roster) !== JSON.stringify(formation.expandedRoster)
+                )
+                    throw new Error("Applied native roster or purchases differ from receipt");
+                const plan = aiMetaPlanFromAppliedAugments(formation.augments);
+                if (
+                    premiumAugmentPlanCost(plan) >
+                    getUpgradePoints(side === "a" ? record.armyA.doctrine : record.armyB.doctrine)
+                )
+                    throw new Error("Unfunded native purchases");
+                if (
+                    native.positions.length !== formation.unitIdsByStack.length ||
+                    native.positions.some((position, i) => {
+                        const actual = formation.placements.find((p) => p.unitId === formation.unitIdsByStack[i]);
+                        return !actual || actual.cell.x !== position.x || actual.cell.y !== position.y;
+                    })
+                )
+                    throw new Error("Applied positions differ from native receipt");
+            }
+        }
         if (evidence.studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY) {
             if (!fight.formationChoices) throw new Error("Learning capture lacks formation choices");
             for (const side of ["a", "b"] as const) {
@@ -498,15 +563,24 @@ export function validateAiMetaEvidence(record: IAiMetaPairRecord): void {
         )
             throw new Error("Premium fight capture disagrees with paired outcome or action count");
         if (
-            ["premium-cohort-evidence-v3", PREMIUM_META_EVIDENCE_SCHEMA, PREMIUM_META_FULL_AUGMENTS_SCHEMA].includes(
-                evidence.schema,
-            ) &&
+            [
+                "premium-cohort-evidence-v3",
+                PREMIUM_META_EVIDENCE_SCHEMA,
+                PREMIUM_META_FULL_AUGMENTS_SCHEMA,
+                PREMIUM_META_POLICY_LEARNING_SCHEMA,
+                PREMIUM_META_CURRENT_SCHEMA,
+            ].includes(evidence.schema) &&
             fight.totalActions > 0 &&
             (!fight.firstDecisionState?.units.length || !fight.executionTrace?.length)
         )
             throw new Error("Premium evidence is missing effective starting units or turn execution traces");
         if (
-            [PREMIUM_META_EVIDENCE_SCHEMA, PREMIUM_META_FULL_AUGMENTS_SCHEMA].includes(evidence.schema) &&
+            [
+                PREMIUM_META_EVIDENCE_SCHEMA,
+                PREMIUM_META_FULL_AUGMENTS_SCHEMA,
+                PREMIUM_META_POLICY_LEARNING_SCHEMA,
+                PREMIUM_META_CURRENT_SCHEMA,
+            ].includes(evidence.schema) &&
             fight.totalActions > 0 &&
             (!fight.firstDecisionState?.board || !fight.committedEventBatches?.length)
         )

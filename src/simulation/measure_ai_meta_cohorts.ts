@@ -23,7 +23,8 @@ import {
     premiumAugmentPlanId,
     type IPremiumAugmentPlan,
 } from "../ai/setup/premium_augment_plans";
-import { createWriteStream, existsSync, lstatSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, lstatSync, mkdirSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { once } from "node:events";
 import { arch, availableParallelism, cpus, platform, release, totalmem } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
@@ -85,6 +86,10 @@ import { fingerprintSourceTree } from "./source_tree_fingerprint";
 import { AI_META_EVIDENCE_SCHEMA } from "./ai_meta_evidence";
 import { AI_META_OFFLINE_SEARCH_ENVIRONMENT } from "./ai_meta_search_budget";
 import { aiMetaOutputContract, finalizeAiMetaOutputs } from "./ai_meta_outputs";
+import { AiMetaPairCheckpoints, openAiMetaRun } from "./ai_meta_checkpoint";
+import { AiMetaDoctrineCollector } from "./ai_meta_doctrines";
+import { aiMetaActualArmy } from "./ai_meta_actual_setup";
+import { aiMetaAuthoritativeSource, aiMetaServerRoot } from "./ai_meta_authoritative_source";
 
 interface ICountedOutcome {
     score: number;
@@ -236,6 +241,8 @@ export interface ICohortQuality {
     endReasons: Record<string, number>;
     seconds: number;
     gamesPerSecond: number;
+    newlySimulatedGames?: number;
+    reusedGames?: number;
     rawPath: string;
 }
 
@@ -256,6 +263,7 @@ export interface IAiMetaSummary {
     cohorts: ICohortQuality[];
     rankings: IAiMetaRankings;
     interactions?: IAiMetaUnitInteractionAnalysis;
+    doctrines?: ReturnType<AiMetaDoctrineCollector["result"]>;
 }
 
 const emptyBucket = (): IMetricBucket => ({
@@ -315,6 +323,7 @@ function bucketFor(map: Map<string, IMetricBucket>, key: string): IMetricBucket 
 }
 
 export class AiMetaAccumulator {
+    private setupAssignments = 0;
     private readonly units = new Map<string, IMetricBucket>();
     private readonly artifactsT1 = new Map<string, IMetricBucket>();
     private readonly artifactsT2 = new Map<string, IMetricBucket>();
@@ -374,6 +383,8 @@ export class AiMetaAccumulator {
                 if (!this.augmentLevels.has(`Empower:${level}`))
                     this.augmentLevels.set(`Empower:${level}`, emptyBucket());
         this.pairs += 1;
+        this.setupAssignments +=
+            record.evidence?.studyProfile === "premium-ranked-current-v1" ? record.games.length * 2 : 2;
         this.games += record.games.length;
         this.mapGames[String(record.map)] = (this.mapGames[String(record.map)] ?? 0) + record.games.length;
         if (rosterSignature(record.armyA.roster) === rosterSignature(record.armyB.roster)) {
@@ -393,11 +404,42 @@ export class AiMetaAccumulator {
         const outcomeA = sideOutcome(record.games, "a");
         const outcomeB = sideOutcome(record.games, "b");
         this.addUnits(record.armyA, record.armyB, outcomeA, outcomeB);
-        this.addArtifact(this.artifactsT1, record.armyA, record.armyB, outcomeA, outcomeB, 1);
-        this.addArtifact(this.artifactsT2, record.armyA, record.armyB, outcomeA, outcomeB, 2);
-        this.addAugmentPlans(record.armyA, record.armyB, outcomeA, outcomeB);
-        this.addAugmentLevels(record.armyA, record.armyB, outcomeA, outcomeB);
+        const observational = record.evidence?.studyProfile === "premium-ranked-current-v1";
+        this.addArtifact(this.artifactsT1, record.armyA, record.armyB, outcomeA, outcomeB, 1, observational);
+        this.addArtifact(this.artifactsT2, record.armyA, record.armyB, outcomeA, outcomeB, 2, observational);
+        if (record.evidence?.studyProfile === "premium-ranked-current-v1") this.addActualSetups(record);
+        else {
+            this.addAugmentPlans(record.armyA, record.armyB, outcomeA, outcomeB);
+            this.addAugmentLevels(record.armyA, record.armyB, outcomeA, outcomeB);
+        }
         this.addSynergies(record.armyA, record.armyB, outcomeA, outcomeB);
+    }
+    private addActualSetups(record: IAiMetaPairRecord): void {
+        const clusters = new Map<IMetricBucket, ICountedOutcome[]>();
+        for (const [index, game] of record.games.entries())
+            for (const side of ["a", "b"] as const) {
+                const army = aiMetaActualArmy(record, index, side);
+                const buckets = [bucketFor(this.augmentPlans, army.augment.planId)];
+                for (const kind of ["Placement", "Armor", "Might", "Sniper", "Movement", "Empower"] as const)
+                    buckets.push(
+                        bucketFor(
+                            this.augmentLevels,
+                            `${kind}:${army.augment.plan[kind.toLowerCase() as keyof IPremiumAugmentPlan] ?? 0}`,
+                        ),
+                    );
+                for (const bucket of buckets) {
+                    bucket.selections++;
+                    bucket.exploitSelections++;
+                    const outcomes = clusters.get(bucket) ?? [];
+                    outcomes.push(sideOutcome([game], side));
+                    clusters.set(bucket, outcomes);
+                }
+            }
+        // Every selected observation from both physical seats stays in the same independent family.
+        for (const [bucket, outcomes] of clusters) {
+            bucket.policy.addCluster(outcomes);
+            bucket.strength.addCluster(outcomes);
+        }
     }
     private addUnits(
         armyA: IAiMetaArmy,
@@ -431,6 +473,7 @@ export class AiMetaAccumulator {
         outcomeA: ICountedOutcome,
         outcomeB: ICountedOutcome,
         tier: 1 | 2,
+        observational = false,
     ): void {
         const choiceA = tier === 1 ? armyA.artifactT1 : armyA.artifactT2;
         const choiceB = tier === 1 ? armyB.artifactT1 : armyB.artifactT2;
@@ -450,13 +493,13 @@ export class AiMetaAccumulator {
                 ...(choiceA.mode === "explore" ? [outcomeA] : []),
                 ...(choiceB.mode === "explore" ? [outcomeB] : []),
             ];
-            bucketA.strength.addCluster(randomized);
+            bucketA.strength.addCluster(observational ? [outcomeA, outcomeB] : randomized);
             return;
         }
         bucketA.policy.add(outcomeA);
         bucketB.policy.add(outcomeB);
-        if (choiceA.mode === "explore") bucketA.strength.add(outcomeA);
-        if (choiceB.mode === "explore") bucketB.strength.add(outcomeB);
+        if (observational || choiceA.mode === "explore") bucketA.strength.add(outcomeA);
+        if (observational || choiceB.mode === "explore") bucketB.strength.add(outcomeB);
     }
     private addAugmentPlans(
         armyA: IAiMetaArmy,
@@ -618,12 +661,17 @@ export class AiMetaAccumulator {
             }),
         );
         const augmentPlans = [...this.augmentPlans.entries()].map(([key, bucket]) =>
-            this.metricRow(key, key, bucket, { kind: "plan", imageKey: "board_augment_256" }),
+            this.metricRow(key, key, bucket, {
+                kind: "plan",
+                imageKey: "board_augment_256",
+                pickRate: this.setupAssignments ? bucket.selections / this.setupAssignments : 0,
+            }),
         );
         const augmentLevels = [...this.augmentLevels.entries()].map(([key, bucket]) => {
             const [kind, level] = key.split(":");
             return this.metricRow(key, `${kind} L${level}`, bucket, {
                 kind,
+                pickRate: this.setupAssignments ? bucket.selections / this.setupAssignments : 0,
                 level: Number(level),
                 imageKey: `${kind.toLowerCase() === "placement" ? "board" : kind.toLowerCase()}_augment_256`,
             });
@@ -677,6 +725,7 @@ const dimensionKey = (cohort: string, map: AiMetaMapDimension): string => `${coh
 
 /** Aggregate every record across cohort and map dimensions without changing the pair-cluster statistics. */
 export class AiMetaAggregation {
+    public readonly doctrines = new AiMetaDoctrineCollector();
     private readonly dimensions = new Map<string, AiMetaAccumulator>();
     private readonly unitInteractions = new AiMetaUnitInteractionCollector();
     private accumulator(cohort: string, map: AiMetaMapDimension): AiMetaAccumulator {
@@ -696,6 +745,7 @@ export class AiMetaAggregation {
             throw new Error(`Unknown AI meta map in pair record: ${record.map}`);
         }
         primeUnitLevels(record);
+        this.doctrines.add(record);
         this.unitInteractions.add(record);
         for (const [cohort, map] of [
             ["all", "all"],
@@ -751,7 +801,8 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
-export type AiMetaFightProfileId = "a13" | "a19" | "a19-work" | "v09-native" | "v09-draft-a19-work";
+export type AiMetaFightProfileId =
+    "a13" | "a19" | "a19-work" | "v09-native" | "v09-draft-a19-work" | "ranked-current-a19-work";
 
 export interface IAiMetaFightProfile {
     id: AiMetaFightProfileId;
@@ -762,6 +813,7 @@ export interface IAiMetaFightProfile {
     fightVersion?: string;
     nativeV09?: boolean;
     lockedV09Draft?: boolean;
+    authoritativeRanked?: boolean;
     /** Finite search operation budgets decide every move instead of wall-clock deadlines (host-independent). */
     offlineDeterministicWork?: boolean;
 }
@@ -776,6 +828,26 @@ const definedEnvironment = (
     );
 
 const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFightProfile>> = Object.freeze({
+    "ranked-current-a19-work": Object.freeze({
+        id: "ranked-current-a19-work",
+        title: "Heroes of Crypto — Current Ranked Draft and Native Setup / A19 Combat",
+        fightVersion: "v0.8",
+        authoritativeRanked: true,
+        provenance: Object.freeze({
+            ...V08_A19_PROFILE,
+            name: "ranked-current+v0.8-a19-work",
+            searchBudget: "offline-deterministic-work",
+            collectionPopulation:
+                "current-ranked-draft-and-native-setup; prescribed cohorts use synthetic artifact assignments",
+        }),
+        workerEnvironment: definedEnvironment({
+            ...buildV08A19SearchEnvironment(),
+            V08_A19_SEARCH: "1",
+            HOC_A19_CONTEXT_POLICY: "on",
+        }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+        offlineDeterministicWork: true,
+    }),
     "v09-draft-a19-work": Object.freeze({
         id: "v09-draft-a19-work",
         title: "Heroes of Crypto — Locked v0.9 Draft + A19 Combat Meta Cohorts",
@@ -901,7 +973,13 @@ export function resolveAiMetaFightProfile(profileId: string | undefined): IAiMet
             `Unknown AI meta fight profile ${normalized}; expected ${Object.keys(AI_META_FIGHT_PROFILES).join(", ")}`,
         );
     }
-    return profile;
+    return profile.authoritativeRanked
+        ? {
+              ...profile,
+              provenance: { ...profile.provenance, authoritativeSource: aiMetaAuthoritativeSource() },
+              workerEnvironment: { ...profile.workerEnvironment, HOC_SERVER_LOC: aiMetaServerRoot() },
+          }
+        : profile;
 }
 
 const AI_META_FIXED_ENVIRONMENT = {
@@ -951,6 +1029,8 @@ export interface IAiMetaWorkerPoolOptions {
     pairStart?: number;
     /** Number of global pair indexes to dispatch. Defaults to the remainder of the cohort. */
     pairCount?: number;
+    /** Verified missing fixed cases; never renumber their seeds on recovery. */
+    pairIndexes?: readonly number[];
     /** Alternate worker entry used by lifecycle tests; production always uses the real cohort worker. */
     workerUrl?: URL;
 }
@@ -959,7 +1039,7 @@ export async function runAiMetaWorkerPool(
     options: IAiMetaRunOptions,
     concurrency: number,
     fightProfile: IAiMetaFightProfile,
-    onRecord: (record: IAiMetaPairRecord, completed: number, total: number) => void,
+    onRecord: (record: IAiMetaPairRecord, completed: number, total: number) => unknown | Promise<unknown>,
     workerPoolOptions: IAiMetaWorkerPoolOptions = {},
 ): Promise<IAiMetaWorkerPoolStats> {
     const recycleAfterPairs = workerPoolOptions.recycleAfterPairs ?? AI_META_WORKER_RECYCLE_PAIRS;
@@ -968,18 +1048,26 @@ export async function runAiMetaWorkerPool(
     }
     const fullPairCount = options.games / AI_META_GAMES_PER_MATCHUP;
     const pairStart = workerPoolOptions.pairStart ?? 0;
-    const total = workerPoolOptions.pairCount ?? fullPairCount - pairStart;
+    const windowCount = workerPoolOptions.pairCount ?? fullPairCount - pairStart;
     if (
         !Number.isSafeInteger(pairStart) ||
         pairStart < 0 ||
-        !Number.isSafeInteger(total) ||
-        total < 1 ||
-        pairStart + total > fullPairCount
+        !Number.isSafeInteger(windowCount) ||
+        windowCount < 1 ||
+        pairStart + windowCount > fullPairCount
     ) {
         throw new RangeError(
-            `pair window must be inside [0, ${fullPairCount}); got start ${pairStart}, count ${total}`,
+            `pair window must be inside [0, ${fullPairCount}); got start ${pairStart}, count ${windowCount}`,
         );
     }
+    const indexes = workerPoolOptions.pairIndexes ?? Array.from({ length: windowCount }, (_, i) => pairStart + i);
+    if (
+        new Set(indexes).size !== indexes.length ||
+        indexes.some((pair) => !Number.isSafeInteger(pair) || pair < pairStart || pair >= pairStart + windowCount)
+    )
+        throw new Error("Missing-case schedule contains duplicate or out-of-window pair indexes");
+    const total = indexes.length;
+    if (!total) return { workersStarted: 0, workersRecycled: 0 };
     const poolSize = Math.max(1, Math.min(Math.floor(concurrency), total));
     const workerUrl = workerPoolOptions.workerUrl ?? new URL("./ai_meta_cohorts_worker.ts", import.meta.url);
     const workerEnvironment = sanitizedAiMetaEnvironment(process.env, fightProfile);
@@ -1015,6 +1103,7 @@ export async function runAiMetaWorkerPool(
                         ...options,
                         nativeV09: fightProfile.nativeV09 ?? options.nativeV09,
                         lockedV09Draft: fightProfile.lockedV09Draft ?? options.lockedV09Draft,
+                        authoritativeRanked: fightProfile.authoritativeRanked ?? options.authoritativeRanked,
                     },
                     strategyProfileId: fightProfile.strategyProfileId,
                     offlineDeterministicWork: fightProfile.offlineDeterministicWork === true,
@@ -1027,6 +1116,7 @@ export async function runAiMetaWorkerPool(
             let pairsHandled = 0;
             let expectedExit = false;
             let recycleOnExit = false;
+            let assignedPair: number | undefined;
             const stop = (recycle = false): void => {
                 if (expectedExit) return;
                 expectedExit = true;
@@ -1038,10 +1128,11 @@ export async function runAiMetaWorkerPool(
                     stop();
                     return;
                 }
-                worker.postMessage({ type: "pair", pair: pairStart + dispatched });
+                assignedPair = indexes[dispatched];
+                worker.postMessage({ type: "pair", pair: assignedPair });
                 dispatched += 1;
             };
-            worker.on("message", (message: WorkerReply) => {
+            const handleMessage = async (message: WorkerReply) => {
                 if (settled) return;
                 if (message.type === "ready") {
                     dispatch();
@@ -1051,14 +1142,20 @@ export async function runAiMetaWorkerPool(
                     fail(new Error(message.error));
                     return;
                 }
-                completed += 1;
+                if (assignedPair === undefined || message.record.pair !== assignedPair) {
+                    fail(new Error("Worker returned an unexpected or duplicate fixed pair"));
+                    return;
+                }
+                assignedPair = undefined;
                 pairsHandled += 1;
                 try {
-                    onRecord(message.record, completed, total);
+                    await onRecord(message.record, completed + 1, total);
                 } catch (error) {
                     fail(error);
                     return;
                 }
+                if (settled) return;
+                completed += 1;
                 if (completed === total) {
                     settled = true;
                     cleanup();
@@ -1068,6 +1165,9 @@ export async function runAiMetaWorkerPool(
                 } else {
                     dispatch();
                 }
+            };
+            worker.on("message", (message: WorkerReply) => {
+                void handleMessage(message).catch(fail);
             });
             worker.on("error", fail);
             worker.on("exit", (code) => {
@@ -1125,6 +1225,7 @@ export interface IAiMetaSourceIdentity {
     commonDirty: boolean;
     commonStatus: string[];
     sourceSha256: string;
+    dependencySha256?: string;
     frozenSource?: IAiMetaFrozenSource;
     runtime: string;
     executionHost: {
@@ -1148,6 +1249,7 @@ export function captureAiMetaSourceIdentity(): IAiMetaSourceIdentity {
         commonDirty: frozenSource?.commonDirty ?? Boolean(status),
         commonStatus: frozenSource?.commonStatus ?? status.split("\n").filter(Boolean),
         sourceSha256,
+        dependencySha256: fingerprintSourceTree(process.cwd(), [], ["package.json", "bun.lock"]),
         ...(frozenSource ? { frozenSource } : {}),
         runtime: `bun ${process.versions.bun ?? "unknown"}`,
         executionHost: {
@@ -1164,7 +1266,11 @@ export function captureAiMetaSourceIdentity(): IAiMetaSourceIdentity {
 
 function assertAiMetaSourceIdentity(expected: IAiMetaSourceIdentity): void {
     const current = captureAiMetaSourceIdentity();
-    if (current.commonCommit !== expected.commonCommit || current.sourceSha256 !== expected.sourceSha256) {
+    if (
+        current.commonCommit !== expected.commonCommit ||
+        current.sourceSha256 !== expected.sourceSha256 ||
+        current.dependencySha256 !== expected.dependencySha256
+    ) {
         throw new Error(
             "AI meta source changed between cohort worker waves; preserving the partial run instead of mixing source identities",
         );
@@ -1248,7 +1354,7 @@ function writeSummary(
                 draftExplorationRate:
                     aiMetaStudyFromEnvironment() &&
                     (aiMetaStudyFromEnvironment() === PREMIUM_META_POLICY_LEARNING_STUDY ||
-                        (!fightProfile.nativeV09 && !fightProfile.lockedV09Draft))
+                        (!fightProfile.nativeV09 && !fightProfile.lockedV09Draft && !fightProfile.authoritativeRanked))
                         ? 0.2
                         : 0,
                 ...(aiMetaStudyFromEnvironment() === PREMIUM_META_POLICY_LEARNING_STUDY
@@ -1262,6 +1368,16 @@ function writeSummary(
                       }
                     : {}),
                 artifactExplorationRate: process.env.AI_META_ARTIFACT_UNIFORM === "1" ? 1 : AI_META_EXPLORATION_RATE,
+                ...(fightProfile.authoritativeRanked
+                    ? {
+                          draftExplorationRate: 0,
+                          setupExecutionContract: "native-current-public-ranked-setup",
+                          setupAttribution: "per-fight-actual-purchases",
+                          rankedArtifactExplorationRate: 0,
+                          prescribedArtifactExplorationRate: 0.2,
+                          decisionLabels: "observational-not-paired-alternatives",
+                      }
+                    : {}),
             },
             selectionPolicy: aiMetaStudyFromEnvironment() ?? AI_META_POLICY,
             rankedDraftPolicy: {
@@ -1326,14 +1442,19 @@ function writeSummary(
             stackSizing: "expBudget (1000 XP per stack)",
             doctrineAndSynergies: `${aiMetaStudyFromEnvironment() ? "uniform doctrines (5/6/7 points)" : "SEE_NONE (7 points)"} with ${AI_META_SYNERGY_POLICY_SPEC} faction synergy picks`,
             nonMirroredGuarantee: "Opposing rosters have distinct signatures and no shared creature identities.",
-            seatControl: "Each distinct matchup is fought twice with the complete armies and setups swapping seats.",
-            interpretation: aiMetaStudyFromEnvironment()
-                ? "Premium coverage study: ranked-draft retains draft artifacts; synthetic artifact sampling uses no enemy roster. Augment setup visibility follows the recorded study profile. Draft actions explore visible attempts, including collisions. Results are associations under the recorded continuation, not proven advisor improvements."
-                : "Artifact and augment strength uses uniform exploration assignments; policyScoreRate describes all contextual-policy selections. Synergy rows are exact active choice/level associations confounded by faction composition, not randomized causal effects. Tier-1/Tier-2 contextual selection is a post-draft oracle, not deployable live timing.",
+            seatControl: fightProfile.authoritativeRanked
+                ? "Each distinct army pair swaps physical seats; native terrain-sensitive purchases and formation are re-evaluated and recorded per fight."
+                : "Each distinct matchup is fought twice with the complete armies and setups swapping seats.",
+            interpretation: fightProfile.authoritativeRanked
+                ? "Current native ranked draft and public Setup; prescribed cohorts bypass drafting and use synthetic artifacts. All rates are observational associations, with actual per-fight purchases and whole-family uncertainty. Independent uniform doctrines do not imply counterfactual outcome labels."
+                : aiMetaStudyFromEnvironment()
+                  ? "Premium coverage study: ranked-draft retains draft artifacts; synthetic artifact sampling uses no enemy roster. Augment setup visibility follows the recorded study profile. Draft actions explore visible attempts, including collisions. Results are associations under the recorded continuation, not proven advisor improvements."
+                  : "Artifact and augment strength uses uniform exploration assignments; policyScoreRate describes all contextual-policy selections. Synergy rows are exact active choice/level associations confounded by faction composition, not randomized causal effects. Tier-1/Tier-2 contextual selection is a post-draft oracle, not deployable live timing.",
             ...runIdentity,
         },
         cohorts: qualities,
         rankings: aggregation.rows(),
+        doctrines: aggregation.doctrines.result(),
         ...(complete ? { interactions: aggregation.interactions() } : {}),
     };
     writeFileSync(path, `${JSON.stringify(summary, null, 2)}\n`);
@@ -1355,6 +1476,7 @@ async function runCohort(
     outDir: string,
     aggregation: AiMetaAggregation,
     runIdentity: IAiMetaSourceIdentity,
+    registrationHash: string,
 ): Promise<ICohortRunResult> {
     const options: IAiMetaRunOptions = {
         cohort,
@@ -1362,43 +1484,64 @@ async function runCohort(
         baseSeed,
         collectEvidence: process.env.AI_META_COLLECT_EVIDENCE === "1",
         studyProfile: aiMetaStudyFromEnvironment(),
+        authoritativeRanked: fightProfile.authoritativeRanked,
     };
     const accumulator = new AiMetaAccumulator(cohort);
     const rawPath = join(outDir, `${cohort}.pairs.jsonl.gz`);
-    const output = createWriteStream(rawPath);
-    const gzip = createGzip({ level: 6 });
-    gzip.pipe(output);
+    const checkpoints = new AiMetaPairCheckpoints(outDir, registrationHash, options);
+    const indexes = Array.from({ length: pairCount }, (_, i) => pairStart + i);
+    const missing = indexes.filter((pair) => !checkpoints.read(pair));
     const cohortStarted = Date.now();
     const windowGames = pairCount * AI_META_GAMES_PER_MATCHUP;
     let lastPrinted = 0;
     console.log(`\n[${cohort}] ${AI_META_COHORT_DESCRIPTIONS[cohort]} (${workers} workers)`);
-    await preserveAiMetaRawCapture(gzip, output, () =>
-        runAiMetaWorkerPool(
-            options,
-            workers,
-            fightProfile,
-            (record, completed, total) => {
-                accumulator.add(record);
-                aggregation.add(record);
-                gzip.write(`${JSON.stringify(record)}\n`);
-                const now = Date.now();
-                if (completed === total || now - lastPrinted >= 10_000) {
-                    const games = completed * AI_META_GAMES_PER_MATCHUP;
-                    const elapsed = Math.max(0.001, (now - cohortStarted) / 1000);
-                    console.log(
-                        `  [${cohort}] ${games.toLocaleString()}/${windowGames.toLocaleString()} games ` +
-                            `(${(games / elapsed).toFixed(1)}/s, ${Math.floor((100 * completed) / total)}%)`,
-                    );
-                    lastPrinted = now;
-                }
+    await runAiMetaWorkerPool(
+        options,
+        workers,
+        fightProfile,
+        (record, completed, total) => {
+            checkpoints.save(record);
+            const now = Date.now();
+            if (completed === total || now - lastPrinted >= 10_000) {
+                const games = completed * AI_META_GAMES_PER_MATCHUP;
+                const elapsed = Math.max(0.001, (now - cohortStarted) / 1000);
+                console.log(
+                    `  [${cohort}] ${games.toLocaleString()}/${windowGames.toLocaleString()} games ` +
+                        `(${(games / elapsed).toFixed(1)}/s, ${Math.floor((100 * completed) / total)}%)`,
+                );
+                lastPrinted = now;
+            }
+        },
+        {
+            beforeWorkerStart: () => {
+                assertAiMetaSourceIdentity(runIdentity);
+                if (
+                    fightProfile.authoritativeRanked &&
+                    JSON.stringify(aiMetaAuthoritativeSource()) !==
+                        JSON.stringify(fightProfile.provenance.authoritativeSource)
+                )
+                    throw new Error("Authoritative source changed; preserve the partial collection");
             },
-            {
-                beforeWorkerStart: () => assertAiMetaSourceIdentity(runIdentity),
-                pairStart,
-                pairCount,
-            },
-        ),
+            pairStart,
+            pairCount,
+            pairIndexes: missing,
+        },
     );
+    // Rebuild the derived archive in fixed order after every pair is durable. A killed
+    // collector can lose at most its in-flight pair; completed checkpoints remain valid.
+    const output = createWriteStream(`${rawPath}.pending`);
+    const gzip = createGzip({ level: 6 });
+    gzip.pipe(output);
+    await preserveAiMetaRawCapture(gzip, output, async () => {
+        for (const pair of indexes) {
+            const record = checkpoints.read(pair);
+            if (!record) throw new Error(`Missing fixed pair ${cohort}/${pair}`);
+            accumulator.add(record);
+            aggregation.add(record);
+            if (!gzip.write(`${JSON.stringify(record)}\n`)) await once(gzip, "drain");
+        }
+    });
+    renameSync(`${rawPath}.pending`, rawPath);
     const seconds = (Date.now() - cohortStarted) / 1000;
     const quality: ICohortQuality = {
         cohort,
@@ -1415,7 +1558,9 @@ async function runCohort(
         mapGames: accumulator.mapGames,
         endReasons: accumulator.endReasons,
         seconds,
-        gamesPerSecond: accumulator.games / Math.max(0.001, seconds),
+        gamesPerSecond: (missing.length * 2) / Math.max(0.001, seconds),
+        newlySimulatedGames: missing.length * 2,
+        reusedGames: (pairCount - missing.length) * 2,
         rawPath: basename(rawPath),
     };
     console.log(
@@ -1423,13 +1568,14 @@ async function runCohort(
             `rejections ${quality.rejectedActions}; roster violations ` +
             `${quality.distinctRosterViolations + quality.overlappingCreatureViolations}`,
     );
+    console.log(`  [${cohort}] simulated ${missing.length * 2}; reused ${(pairCount - missing.length) * 2} fights`);
     return { accumulator, quality };
 }
 
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "<fight-profile=a13|a19|a19-work|v09-native|v09-draft-a19-work> [pair-start=0] [pair-count=all]. " +
+    "<fight-profile=a13|a19|a19-work|v09-native|v09-draft-a19-work|ranked-current-a19-work> [pair-start=0] [pair-count=all]. " +
     "Defaults to premium-ranked-v4 learning capture and an audited premium.sqlite (a19-work or v09-draft-a19-work). " +
     "Outcome-only research requires AI_META_OUTPUT_MODE=legacy-oracle explicitly. " +
     "Sharded drivers set AI_META_SHARD=1 and finalize the merged study with ai_meta_outputs.ts.";
@@ -1496,61 +1642,107 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
     if (!completePairWindow && (cohorts.length !== 1 || parallelCohorts !== 1)) {
         throw new Error("A sliced AI-meta invocation must contain exactly one cohort and parallelCohorts=1");
     }
-    if (existsSync(outDir) && (lstatSync(outDir).isSymbolicLink() || readdirSync(outDir).length))
+    const resume = process.env.AI_META_RESUME === "1";
+    if (existsSync(outDir) && (lstatSync(outDir).isSymbolicLink() || (!resume && readdirSync(outDir).length)))
         throw new Error(`Refusing non-empty or symlink output directory: ${outDir}`);
     mkdirSync(outDir, { recursive: true });
     const summaryPath = join(outDir, "ai-meta.summary.json");
-    const startedAt = new Date().toISOString();
     // Freeze identity before workers load the simulation. A shared main working tree may
     // keep changing while this multi-hour run is in progress.
     const runIdentity = captureAiMetaSourceIdentity();
-    const aggregation = new AiMetaAggregation();
-    const qualities: ICohortQuality[] = [];
-
-    console.log(
-        `AI meta: ${cohorts.length} cohorts x ${gamesPerCohort.toLocaleString()} non-mirrored fights, ` +
-            `${concurrency} total workers across ${parallelCohorts} parallel cohorts, seed ${baseSeed}, ` +
-            `profile ${fightProfile.id} -> ${outDir}`,
+    const run = openAiMetaRun(
+        outDir,
+        {
+            gamesPerCohort,
+            baseSeed,
+            cohorts,
+            pairStart,
+            pairCount,
+            concurrency,
+            parallelCohorts,
+            fightProfile,
+            outputContract,
+            runIdentity,
+        },
+        resume,
     );
-    if (!completePairWindow) {
-        console.log(
-            `Pair window [${pairStart.toLocaleString()}, ${(pairStart + pairCount).toLocaleString()}) of ` +
-                `${fullPairCount.toLocaleString()} (${(pairCount * AI_META_GAMES_PER_MATCHUP).toLocaleString()} fights).`,
-        );
-    }
-    console.log(
-        `Policy ${aiMetaStudyFromEnvironment() ?? AI_META_POLICY}; exploration ${(AI_META_EXPLORATION_RATE * 100).toFixed(0)}% per setup component.`,
-    );
-    if (outputContract.mode === "legacy-oracle")
-        console.log("Explicit legacy-oracle run: no Premium SQLite will be generated.");
-
-    for (let offset = 0; offset < cohorts.length; offset += parallelCohorts) {
-        assertAiMetaSourceIdentity(runIdentity);
-        const wave = cohorts.slice(offset, offset + parallelCohorts);
-        const workersBase = Math.floor(concurrency / wave.length);
-        const extraWorkers = concurrency % wave.length;
-        const results = await Promise.all(
-            wave.map((cohort, index) =>
-                runCohort(
-                    cohort,
-                    gamesPerCohort,
-                    baseSeed,
-                    pairStart,
-                    pairCount,
-                    workersBase + Number(index < extraWorkers),
-                    fightProfile,
-                    outDir,
-                    aggregation,
-                    runIdentity,
-                ),
-            ),
-        );
-        for (const result of results) {
-            qualities.push(result.quality);
+    try {
+        const startedAt: string = run.registration.startedAt;
+        const existingCapture = join(outDir, "ai-meta.captured-summary.json");
+        if (resume && existsSync(existingCapture)) {
+            await finalizeAiMetaOutputs(existingCapture, { publishSummaryPath: summaryPath });
+            console.log("Completed artifact-only recovery; zero simulations.");
+            return;
         }
+        const aggregation = new AiMetaAggregation();
+        const qualities: ICohortQuality[] = [];
+
+        console.log(
+            `AI meta: ${cohorts.length} cohorts x ${gamesPerCohort.toLocaleString()} non-mirrored fights, ` +
+                `${concurrency} total workers across ${parallelCohorts} parallel cohorts, seed ${baseSeed}, ` +
+                `profile ${fightProfile.id} -> ${outDir}`,
+        );
+        if (!completePairWindow) {
+            console.log(
+                `Pair window [${pairStart.toLocaleString()}, ${(pairStart + pairCount).toLocaleString()}) of ` +
+                    `${fullPairCount.toLocaleString()} (${(pairCount * AI_META_GAMES_PER_MATCHUP).toLocaleString()} fights).`,
+            );
+        }
+        console.log(
+            `Policy ${aiMetaStudyFromEnvironment() ?? AI_META_POLICY}; exploration ${(AI_META_EXPLORATION_RATE * 100).toFixed(0)}% per setup component.`,
+        );
+        if (outputContract.mode === "legacy-oracle")
+            console.log("Explicit legacy-oracle run: no Premium SQLite will be generated.");
+
+        for (let offset = 0; offset < cohorts.length; offset += parallelCohorts) {
+            assertAiMetaSourceIdentity(runIdentity);
+            const wave = cohorts.slice(offset, offset + parallelCohorts);
+            const workersBase = Math.floor(concurrency / wave.length);
+            const extraWorkers = concurrency % wave.length;
+            const results = await Promise.all(
+                wave.map((cohort, index) =>
+                    runCohort(
+                        cohort,
+                        gamesPerCohort,
+                        baseSeed,
+                        pairStart,
+                        pairCount,
+                        workersBase + Number(index < extraWorkers),
+                        fightProfile,
+                        outDir,
+                        aggregation,
+                        runIdentity,
+                        run.registration.identitySha256,
+                    ),
+                ),
+            );
+            for (const result of results) {
+                qualities.push(result.quality);
+            }
+            writeSummary(
+                summaryPath,
+                false,
+                startedAt,
+                cohorts,
+                gamesPerCohort,
+                pairStart,
+                pairCount,
+                baseSeed,
+                concurrency,
+                parallelCohorts,
+                fightProfile,
+                runIdentity,
+                qualities,
+                aggregation,
+            );
+        }
+
+        const shard = process.env.AI_META_SHARD === "1" || !completePairWindow;
+        const finalizePremium = !shard && outputContract.mode === "premium";
+        const capturedPath = finalizePremium ? join(outDir, "ai-meta.captured-summary.json") : summaryPath;
         writeSummary(
-            summaryPath,
-            false,
+            capturedPath,
+            !shard,
             startedAt,
             cohorts,
             gamesPerCohort,
@@ -1564,37 +1756,19 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
             qualities,
             aggregation,
         );
+        if (finalizePremium) {
+            console.log("Capture finished; building and auditing Premium SQLite before completing the batch.");
+            const outputs = await finalizeAiMetaOutputs(capturedPath, { publishSummaryPath: summaryPath });
+            console.log(`Premium snapshot: ${join(outDir, outputs.snapshot.path)} (${outputs.snapshot.status})`);
+        }
+        console.log(
+            `\n${shard ? "Shard captured (merge/finalization required)" : "Complete"}: ` +
+                `${qualities.reduce((sum, quality) => sum + quality.games, 0).toLocaleString()} fights.`,
+        );
+        console.log(`Summary: ${summaryPath}`);
+    } finally {
+        run.close();
     }
-
-    const shard = process.env.AI_META_SHARD === "1" || !completePairWindow;
-    const finalizePremium = !shard && outputContract.mode === "premium";
-    const capturedPath = finalizePremium ? join(outDir, "ai-meta.captured-summary.json") : summaryPath;
-    writeSummary(
-        capturedPath,
-        !shard,
-        startedAt,
-        cohorts,
-        gamesPerCohort,
-        pairStart,
-        pairCount,
-        baseSeed,
-        concurrency,
-        parallelCohorts,
-        fightProfile,
-        runIdentity,
-        qualities,
-        aggregation,
-    );
-    if (finalizePremium) {
-        console.log("Capture finished; building and auditing Premium SQLite before completing the batch.");
-        const outputs = await finalizeAiMetaOutputs(capturedPath, { publishSummaryPath: summaryPath });
-        console.log(`Premium snapshot: ${join(outDir, outputs.snapshot.path)} (${outputs.snapshot.status})`);
-    }
-    console.log(
-        `\n${shard ? "Shard captured (merge/finalization required)" : "Complete"}: ` +
-            `${qualities.reduce((sum, quality) => sum + quality.games, 0).toLocaleString()} fights.`,
-    );
-    console.log(`Summary: ${summaryPath}`);
 }
 
 if ((import.meta as unknown as { main?: boolean }).main) {

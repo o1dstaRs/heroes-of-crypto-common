@@ -1,4 +1,6 @@
 import { Database } from "bun:sqlite";
+import { aiMetaActualArmy } from "./ai_meta_actual_setup";
+import { aiMetaSetupPayoff } from "./ai_meta_setup_payoff";
 import { createReadStream, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -100,6 +102,8 @@ export function auditPremiumFormationGeometry(fight: IAiMetaFightEvidence): stri
 }
 
 export class PremiumEvidenceAudit {
+    public readonly setupHashes = new Map<string, string>();
+    public readonly payoffHashes = new Map<string, string>();
     public readonly learningHashes = new Map<string, string>();
     public readonly learningCounts: Record<string, number> = {};
     public readonly learningZeroProbabilityAlternatives: Record<string, number> = {};
@@ -240,6 +244,31 @@ export class PremiumEvidenceAudit {
             if (!once.has(table)) once.set(table, new Set());
             once.get(table)!.add(key);
         };
+        for (const [index, game] of record.games.entries())
+            for (const side of ["a", "b"] as const) {
+                const key = JSON.stringify([evidence.scenarioId, side, Number(game.aIsGreen)]);
+                const actual = aiMetaActualArmy(record, index, side);
+                const score = game.winner === side ? 1 : game.winner === "draw" ? 0.5 : 0;
+                this.setupHashes.set(
+                    key,
+                    createHash("sha256")
+                        .update(
+                            JSON.stringify([
+                                score,
+                                actual.augment.planId,
+                                evidence.fights![index].formations[side].augments,
+                            ]),
+                        )
+                        .digest("hex"),
+                );
+                this.payoffHashes.set(
+                    key,
+                    createHash("sha256")
+                        .update(JSON.stringify(aiMetaSetupPayoff(record, index, side)))
+                        .digest("hex"),
+                );
+                add(this.plans, actual.augment.planId);
+            }
         for (const [army, opponent] of [
             [record.armyA, record.armyB],
             [record.armyB, record.armyA],
@@ -621,6 +650,36 @@ export async function auditPremiumEvidence(summaryPath: string, snapshotPath?: s
         { supports: number[]; milliseconds: number[]; zero: number; limited: number; supported: number }
     > = {};
     if (snapshotPath) {
+        const setupDb = new Database(snapshotPath, { readonly: true });
+        try {
+            const manifest = JSON.parse(
+                setupDb.query<{ value: string }, []>("SELECT value FROM metadata WHERE key='manifest'").get()!.value,
+            );
+            for (const [table, capability, hashes] of [
+                ["army_fight", "per-fight-setups-v1", audit.setupHashes],
+                ["setup_payoff", "observed-setup-payoff-v1", audit.payoffHashes],
+            ] as const) {
+                if (!manifest.capabilities?.includes(capability)) continue;
+                const remaining = new Map(hashes);
+                for (const row of setupDb
+                    .query<Record<string, string | number>, []>(
+                        `SELECT a.family_id,a.side,d.* FROM ${table} d JOIN army a ON a.id=d.army_id`,
+                    )
+                    .iterate()) {
+                    const key = JSON.stringify([row.family_id, row.side, row.a_is_green]);
+                    const text =
+                        table === "army_fight"
+                            ? JSON.stringify([row.score, row.augment_plan, JSON.parse(String(row.applied_augments))])
+                            : String(row.payload);
+                    if (remaining.get(key) !== createHash("sha256").update(text).digest("hex"))
+                        throw new Error(`${table} differs from registered raw fight`);
+                    remaining.delete(key);
+                }
+                if (remaining.size) throw new Error(`${table} has missing raw fight observations`);
+            }
+        } finally {
+            setupDb.close();
+        }
         if (audit.learningHashes.size) {
             const db = new Database(snapshotPath, { readonly: true });
             try {

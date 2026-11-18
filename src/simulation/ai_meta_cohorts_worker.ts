@@ -35,6 +35,9 @@ process.env.FIGHT_MELEE_ROSTERS = "0";
 
 if (!parentPort) throw new Error("ai_meta_cohorts_worker must run in a worker thread");
 const { options, strategyProfileId, offlineDeterministicWork = false } = workerData as IAiMetaWorkerData;
+const adapter = options.authoritativeRanked
+    ? await (await import("./ai_meta_authoritative")).loadAuthoritativeMetaAdapter()
+    : undefined;
 
 parentPort.on("message", (message: WorkerRequest) => {
     if (message.type === "stop") {
@@ -44,7 +47,7 @@ parentPort.on("message", (message: WorkerRequest) => {
     try {
         parentPort!.postMessage({
             type: "result",
-            record: playMetaPair(options, message.pair, strategyProfileId, offlineDeterministicWork),
+            record: playMetaPair(options, message.pair, strategyProfileId, offlineDeterministicWork, adapter),
         } satisfies WorkerResponse);
     } catch (error) {
         parentPort!.postMessage({

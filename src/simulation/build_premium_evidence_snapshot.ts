@@ -1,4 +1,6 @@
 import { Database } from "bun:sqlite";
+import { aiMetaActualArmy } from "./ai_meta_actual_setup";
+import { aiMetaSetupPayoff } from "./ai_meta_setup_payoff";
 import { summarizePremiumParticipation, PREMIUM_PARTICIPATION_SCHEMA } from "./ai_meta_participation";
 import {
     summarizePremiumHealth,
@@ -30,6 +32,7 @@ import {
     PREMIUM_META_FULL_AUGMENTS_STUDY,
     PREMIUM_META_FULL_AUGMENTS_SCHEMA,
     PREMIUM_META_POLICY_LEARNING_SCHEMA,
+    PREMIUM_META_CURRENT_SCHEMA,
     PREMIUM_META_POLICY_LEARNING_STUDY,
     isFullAugmentStudy,
     PREMIUM_META_EVIDENCE_SCHEMA,
@@ -68,6 +71,7 @@ export async function buildPremiumEvidenceSnapshot(
             PREMIUM_META_EVIDENCE_SCHEMA,
             PREMIUM_META_FULL_AUGMENTS_SCHEMA,
             PREMIUM_META_POLICY_LEARNING_SCHEMA,
+            PREMIUM_META_CURRENT_SCHEMA,
         ].includes(provenance?.fightProfile?.evidenceSchema) ||
         provenance?.fightProfile?.searchBudget !== "offline-deterministic-work" ||
         !/^[a-f0-9]{64}$/.test(provenance?.sourceSha256 ?? "") ||
@@ -122,6 +126,8 @@ export async function buildPremiumEvidenceSnapshot(
         const addSource = db.query("INSERT INTO source VALUES (?, ?, ?, ?)");
         const addFamily = db.query("INSERT INTO family VALUES (?, ?, ?, ?, ?, ?, ?)");
         const addArmy = db.query("INSERT INTO army VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        const addArmyFight = db.query("INSERT INTO army_fight VALUES (?, ?, ?, ?, ?)");
+        const addPayoff = db.query("INSERT INTO setup_payoff VALUES (?, ?, ?)");
         const addUnit = db.query("INSERT INTO unit VALUES (?, ?)");
         const addSynergy = db.query("INSERT INTO synergy VALUES (?, ?, ?, ?)");
         const addDecision = db.query("INSERT INTO decision VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -223,6 +229,21 @@ export async function buildPremiumEvidenceSnapshot(
                             army.artifactT2.id,
                             army.augment.planId,
                         );
+                        for (const [fightIndex, game] of record.games.entries()) {
+                            const actual = aiMetaActualArmy(record, fightIndex, side);
+                            addArmyFight.run(
+                                armyId,
+                                Number(game.aIsGreen),
+                                game.winner === side ? 1 : game.winner === "draw" ? 0.5 : 0,
+                                actual.augment.planId,
+                                JSON.stringify(record.evidence!.fights![fightIndex].formations[side].augments),
+                            );
+                            addPayoff.run(
+                                armyId,
+                                Number(game.aIsGreen),
+                                JSON.stringify(aiMetaSetupPayoff(record, fightIndex, side)),
+                            );
+                        }
                         for (const id of army.creatureIds) addUnit.run(armyId, id);
                         for (const [name, faction] of [
                             ["Life", PBTypes.FactionVals.LIFE],
@@ -402,6 +423,8 @@ export async function buildPremiumEvidenceSnapshot(
             modelStatus: "not-fitted",
             capabilities: [
                 "contextual-associations",
+                "per-fight-setups-v1",
+                "observed-setup-payoff-v1",
                 ...(isFullAugmentStudy(provenance.fightProfile.studyProfile) ? ["six-axis-empower-v1"] : []),
                 ...(provenance.fightProfile.studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY
                     ? ["policy-learning-decisions-v1", "randomized-draft-v1", "randomized-formation-v1"]
