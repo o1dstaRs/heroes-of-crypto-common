@@ -1025,6 +1025,15 @@ all counterexamples and zero-game packaging failure. Projected work fell4.02%; t
 evidence. No runtime study/default activation follows. Resolve per-sample UUID allocation explicitly before
 a distinct implementation study; do not rescue this attempt by ignoring the private counters.
 
+The separate observed-stock teacher acquisition completed all3,024 reused v10 games and4,220 public
+decision labels with exact original controls, independent verification and24 exact cold observations.
+Read `docs/barrel_forecast_teacher_research.md`. A frozen110-feature family-disjoint linear fit improves
+held-out choice logloss by0.063860, but has zero P(before)>=.85 proposals and **fails** its support/precision
+gates. Keep modela59b6d8d inactive, retain all folds/recipes/failures, and do not lower the threshold on
+the opened test. The1,865 exact third choices include move/hold/spell alternatives; nine are footprint-order
+equivalents. These descriptive categories and teacher accuracy are not strength gains. No candidate
+fight/cost bank opens; future action/legality work needs a distinct source and current-v12 evidence.
+
 The prospective final-validation source seal is
 `f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51`; read
 `docs/evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json`. The original
