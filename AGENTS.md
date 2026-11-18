@@ -979,6 +979,15 @@ whole families. No retries, extension, family reassignment, policy/model/source/
 interim score selection. Fixed 36-case cold replay and 72-case v11 serial cost remain required before
 claiming a confirmed serving gain. No automatic default change or deployment.
 
+The independent v11 strength confirmation has now completed and **failed**: +0.107474 score points,
+whole-family95% −0.752315 to +0.967262, across 1,512 families / 18,144 fights. Read
+`docs/evidence/barrel_forecast_model_mixture_v11_strength_results_20261118.json`. Minimum gain,
+positive lower-bound and shooter-opponent floor gates failed. All source/input/engine/neural/timing
+controls, 216 fixed cross-host cold replays and independent integer/bootstrap verification pass.
+Preserve all 375 gains, 364 losses and 5,309 unchanged pairs; no subgroup, accepted reference or pooled
+old v10 result rescues this candidate. Both frozen v11 serial-cost studies continue pending; they
+cannot rescue failed strength. No default/model/deployment changes, and no retuning or bank extension.
+
 The prospective final-validation source seal is
 `f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51`; read
 `docs/evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json`. The original

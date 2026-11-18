@@ -190,3 +190,28 @@ The original source, observer registration and failed rehearsal remain preserved
 intelligence/input files, ten sealed validation files, seeds, models, gates and cutoffs remain exact.
 The replacement observer continues the same fixed pipeline. This control adds no strength or
 performance evidence and changes no serving default.
+
+## Fresh v11 strength confirmation failed
+
+All **1,512 families / 18,144 fights** completed, followed by all **216 fixed cross-host cold replays**.
+Every source/input, authoritative-engine, neural and timing control passed. Independent Python/Bun
+integer reconstruction and all 20,000 whole-family bootstrap resamples match. The
+[complete strength result](evidence/barrel_forecast_model_mixture_v11_strength_results_20261118.json)
+retains all 6,048 matched outcomes and every family delta.
+
+Against the adopted terrain-aware v11 default, the unchanged mixture gained **+0.107474 score points**,
+whole-family 95% **−0.752315 to +0.967262**. The +0.5-point minimum gain and positive lower-bound gates
+failed. Shooter-opponent mean was **−1.091270 points**, also failing the registered −1-point floor.
+There were 375 improved, 364 worsened and 5,309 unchanged outcomes. This does not establish a stronger
+current default, nor does the interval establish equivalence or no population effect.
+
+The earlier v10 qualification remains +1.488095 points on its original bank and comparator. Neither
+result is rewritten or pooled. The different bank and comparator do not isolate terrain adoption as
+the cause of the changed estimate. Favorable slices and the descriptive accepted reference cannot
+become replacement finalists. The [old-bank regression audit](barrel_forecast_regression_audit.md)
+and its target-memory identity interaction remain separate diagnostics, without a new strength claim.
+
+Both prospectively fixed v11 serial-cost studies continue unchanged and remain pending. Their original
+72-case and additional 216-case overall-average +10% checks cannot rescue failed strength. No candidate,
+model, default, budget or production deployment changes. A subsequent repair needs a distinct source,
+complete gain/loss checks and new independent evidence.
