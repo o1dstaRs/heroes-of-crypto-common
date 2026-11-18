@@ -91,7 +91,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v11",
+            schema: "hoc.v0_8_a19_production_profile.v12",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -361,6 +361,9 @@ describe("v0.8+A19 production profile", () => {
             "final-placement-weights",
             "final-placement-relations",
             "final-placement-v2-weights",
+            "revealed-ranged-identity",
+            "revealed-ranged-draft",
+            "revealed-ranged-setup",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));

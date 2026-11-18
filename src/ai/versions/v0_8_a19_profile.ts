@@ -11,6 +11,7 @@
 
 import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
 import { A19_TERRAIN_PLACEMENT_POLICY } from "../placement/terrain_reflection";
+import { A19_REVEALED_RANGED_POLICY } from "../setup/a19_revealed_ranged_identity";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
 import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
 import { A19_NIGHTMARE_WALL_MOVEMENT_POLICY } from "../nightmare_wall_movement";
@@ -64,7 +65,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
  *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v11" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v12" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -419,6 +420,21 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/models/a19/placement_v2.json" as const,
         sha256: "690f77e18625aab335ec4fdee3e686cd42a2a2bd677399c92fe300728431275b" as const,
     }),
+    Object.freeze({
+        role: "revealed-ranged-identity" as const,
+        source: "src/ai/setup/a19_revealed_ranged_identity.ts" as const,
+        sha256: "9c0408600f435b0c4fb6e7a1a22fd7215f60cc1a0138b5fc0084e73c5639df9d" as const,
+    }),
+    Object.freeze({
+        role: "revealed-ranged-draft" as const,
+        source: "src/ai/setup/a19_revealed_ranged_draft.ts" as const,
+        sha256: "984c26414f9848cfe732c1347bcfedef68fe108fbe687e50d3c2ac41759781f7" as const,
+    }),
+    Object.freeze({
+        role: "revealed-ranged-setup" as const,
+        source: "src/ai/setup/a19_revealed_ranged_setup.ts" as const,
+        sha256: "d4edea27356e342756850dc9e65466df68a916e20f907d7ead263ebb3a2b32df" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -438,6 +454,7 @@ export const V08_A19_PROFILE = Object.freeze({
     neuralPolicy: A19_NEURAL_POLICY,
     authoritativeFinalPlacement: A19_LEARNED_FINAL_PLACEMENT_POLICY,
     terrainPlacement: A19_TERRAIN_PLACEMENT_POLICY,
+    authoritativeRevealedRangedDelivery: A19_REVEALED_RANGED_POLICY,
     wanderingMageSupport: A19_WANDERING_MAGE_SUPPORT_POLICY,
     unitSupport: A19_UNIT_SUPPORT_POLICY,
     battleMageTargets: BATTLE_MAGE_TARGET_POLICY,

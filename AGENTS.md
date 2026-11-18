@@ -1,5 +1,26 @@
 # Agent guidance
 
+## Explicit revealed-ranged delivery adoption — November 18, 2026 UTC
+
+The user explicitly requested “adopt the ones that gave gains please” after reviewing the failed
+combined arm and uncertain positive component estimates. Adopt the separate draft and setup policies
+in authoritative default A19-backed v0.8/Premium, profile v12, with `revealed-ranged-exclusive-delivery-v1`:
+a seat that consumed the delivery draft override keeps native setup; only other seats may use delivery
+setup. This new dispatch must never stack the failed combination. Read
+`docs/revealed_ranged_delivery_adoption.md`. Preserve the original +7.407407 pp draft-only,
++9.259259 pp setup-only and −1.851852 pp combined results and all failed confidence gates. This is
+explicit adoption under uncertainty, not fresh statistical qualification or an additive +16.67 pp gain.
+
+Keep the independent draft budget atomic through accepted picks, hidden-pick collisions and restart,
+including human acceptance of the default Premium suggestion. Setup previews use own fight-start
+stats, public roster/terrain and fixed hypothetical target cells, preserve the live RNG/board, and
+commit only fully funded plans. Retain Armor/Might/relevant Empower and the shooter's Sniper floor.
+Private setup, partial automatic spending, explicit policy overrides and native v0.9 remain isolated.
+The old research checkpoints/seed exclusions stay immutable. Collection using the authoritative
+server inherits this dispatcher; the existing meta oracle remains a separately labelled experiment,
+not an exact replay of authoritative setup. Future default comparisons use v12; frozen v11 studies
+keep their recorded comparators. The global wire version and accepted A19 combat weights stay unchanged.
+
 ## Closed revealed-ranged delivery screen — November 17, 2026
 
 Read `docs/revealed_ranged_delivery_research.md` before revisiting early public shooter/caster reveals,
