@@ -3647,145 +3647,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const madeOfFireBuff = statBuffs.get("Made of Fire");
         const baseStatsDiff = calculateBuffsDebuffsEffect(this.getBuffs(), this.getDebuffs());
 
-        // This refresh probes a fixed set of ability names repeatedly. The simulation path owns native Unit,
-        // Ability and factory objects, so index that path once while retaining public-method dispatch for every
-        // subclass, override and custom factory. The index is invocation-local and first-write-wins to preserve
-        // getAbility/hasAbilityActive's first-match contract even for malformed duplicate rows.
-        let useStatAbilityIndex = false;
-        let unyieldingPowerAbility: Ability | undefined;
-        let madnessAbility: Ability | undefined;
-        let mechanismAbility: Ability | undefined;
-        let heavyArmorAbility: Ability | undefined;
-        let enchantedSkinAbility: Ability | undefined;
-        let magicShieldAbility: Ability | undefined;
-        let wardguardAbility: Ability | undefined;
-        let limitedSupplyAbility: Ability | undefined;
-        let endlessQuiverAbility: Ability | undefined;
-        let skyRunnerAbility: Ability | undefined;
-        let blindFuryAbility: Ability | undefined;
-        const hasNativeOwnLayout = Object.getOwnPropertyNames(this).length === Unit.nativeOwnPropertyCount;
-        const abilities = hasNativeOwnLayout ? this.abilities : undefined;
-        const abilityFactory = hasNativeOwnLayout ? this.abilityFactory : undefined;
-        if (
-            Object.getPrototypeOf(this) === Unit.prototype &&
-            abilities !== undefined &&
-            Object.getPrototypeOf(abilities) === Array.prototype &&
-            abilityFactory !== undefined &&
-            Object.getPrototypeOf(abilityFactory) === AbilityFactory.prototype &&
-            Object.getOwnPropertyNames(abilityFactory).length === Unit.nativeAbilityFactoryOwnPropertyCount &&
-            AbilityFactory.prototype.makeAbility === Unit.nativeAbilityFactoryMakeAbility &&
-            Unit.prototype.getAbility === Unit.nativeGetAbility &&
-            Unit.prototype.hasAbilityActive === Unit.nativeHasAbilityActive &&
-            Ability.prototype.getName === Unit.nativeAbilityGetName
-        ) {
-            let nativeAbilities = true;
-            for (const ability of abilities) {
-                if (
-                    Object.getPrototypeOf(ability) !== Ability.prototype ||
-                    Object.getOwnPropertyNames(ability).length !== Unit.nativeAbilityOwnPropertyCount
-                ) {
-                    nativeAbilities = false;
-                    break;
-                }
-                const name = Unit.nativeAbilityGetName.call(ability);
-                switch (name) {
-                    case "Unyielding Power":
-                        unyieldingPowerAbility ??= ability;
-                        break;
-                    case "Madness":
-                        madnessAbility ??= ability;
-                        break;
-                    case "Mechanism":
-                        mechanismAbility ??= ability;
-                        break;
-                    case "Heavy Armor":
-                        heavyArmorAbility ??= ability;
-                        break;
-                    case "Enchanted Skin":
-                        enchantedSkinAbility ??= ability;
-                        break;
-                    case "Magic Shield":
-                        magicShieldAbility ??= ability;
-                        break;
-                    case "Wardguard":
-                        wardguardAbility ??= ability;
-                        break;
-                    case "Limited Supply":
-                        limitedSupplyAbility ??= ability;
-                        break;
-                    case "Endless Quiver":
-                        endlessQuiverAbility ??= ability;
-                        break;
-                    case "Sky Runner":
-                        skyRunnerAbility ??= ability;
-                        break;
-                    case "Blind Fury":
-                        blindFuryAbility ??= ability;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            if (nativeAbilities) {
-                useStatAbilityIndex = true;
-            }
-        }
-
-        let breakResolved = false;
-        let broken = false;
-        const hasBreakForStatAbility = (): boolean => {
-            if (!breakResolved) {
-                const effects = hasNativeOwnLayout ? this.effects : undefined;
-                const effectFactory = hasNativeOwnLayout ? this.effectFactory : undefined;
-                let canCacheBreak =
-                    effects !== undefined &&
-                    Object.getPrototypeOf(effects) === Array.prototype &&
-                    effectFactory !== undefined &&
-                    Object.getPrototypeOf(effectFactory) === EffectFactory.prototype &&
-                    Object.getOwnPropertyNames(effectFactory).length === Unit.nativeEffectFactoryOwnPropertyCount &&
-                    EffectFactory.prototype.makeEffect === Unit.nativeEffectFactoryMakeEffect &&
-                    Unit.prototype.hasEffectActive === Unit.nativeHasEffectActive &&
-                    Unit.prototype.getEffects === Unit.nativeGetEffects &&
-                    Effect.prototype.getName === Unit.nativeEffectGetName;
-                if (canCacheBreak) {
-                    for (const effect of effects!) {
-                        if (
-                            Object.getPrototypeOf(effect) !== Effect.prototype ||
-                            Object.getOwnPropertyNames(effect).length !== Unit.nativeEffectOwnPropertyCount
-                        ) {
-                            canCacheBreak = false;
-                            break;
-                        }
-                    }
-                }
-                if (!canCacheBreak) {
-                    return this.hasEffectActive("Break");
-                }
-                broken = effects!.some((effect) => Unit.nativeEffectGetName.call(effect) === "Break");
-                breakResolved = true;
-            }
-            return broken;
-        };
-        const getStatAbility = (indexedAbility: Ability | undefined, abilityName: string): Ability | undefined => {
-            if (!useStatAbilityIndex) {
-                return this.getAbility(abilityName);
-            }
-            if (!indexedAbility) {
-                return undefined;
-            }
-            return hasBreakForStatAbility() ? undefined : indexedAbility;
-        };
-        const hasStatAbilityActive = (indexedAbility: Ability | undefined, abilityName: string): boolean => {
-            if (!useStatAbilityIndex) {
-                return this.hasAbilityActive(abilityName);
-            }
-            if (!indexedAbility) {
-                return false;
-            }
-            return !hasBreakForStatAbility();
-        };
-
-        const hasUnyieldingPower = hasStatAbilityActive(unyieldingPowerAbility, "Unyielding Power");
+        const hasUnyieldingPower = this.hasAbilityActive("Unyielding Power");
 
         // The HP-cap twin of the authoritative guards below: a ranked snapshot's hp/max_hp arrive as the
         // server's FINAL numbers (pendant, Boost Health, Unyielding laps all folded in), and the ranked
@@ -3915,7 +3777,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.morale += parseInt(this.getBuffProperties("Crown of Command")[0] || "0", 10);
             }
         }
-        if (hasStatAbilityActive(madnessAbility, "Madness") || hasStatAbilityActive(mechanismAbility, "Mechanism")) {
+        if (this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism")) {
             this.unitProperties.morale = 0;
         } else {
             let lockedMorale = false;
@@ -4021,7 +3883,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             baseArmorMultiplier = (100 - weakeningBeamDebuff.getPower()) / 100;
         }
 
-        heavyArmorAbility = getStatAbility(heavyArmorAbility, "Heavy Armor");
+        const heavyArmorAbility = this.getAbility("Heavy Armor");
         if (heavyArmorAbility) {
             baseArmorMultiplier =
                 baseArmorMultiplier *
@@ -4141,7 +4003,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 2,
             );
         }
-        enchantedSkinAbility = getStatAbility(enchantedSkinAbility, "Enchanted Skin");
+        const enchantedSkinAbility = this.getAbility("Enchanted Skin");
         if (enchantedSkinAbility) {
             this.unitProperties.magic_resist_mod = enchantedSkinAbility.getPower();
         } else {
@@ -4149,12 +4011,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             // here outranked the resistance recomputed below and kept a Broken Black Dragon immune to magic.
             this.unitProperties.magic_resist_mod = 0;
             const magicResists: number[] = [this.getMagicResist() / 100];
-            magicShieldAbility = getStatAbility(magicShieldAbility, "Magic Shield");
+            const magicShieldAbility = this.getAbility("Magic Shield");
             if (magicShieldAbility) {
                 magicResists.push(this.calculateAbilityMultiplier(magicShieldAbility, synergyAbilityPowerIncrease));
             }
 
-            wardguardAbility = getStatAbility(wardguardAbility, "Wardguard");
+            const wardguardAbility = this.getAbility("Wardguard");
             if (wardguardAbility) {
                 magicResists.push(this.calculateAbilityMultiplier(wardguardAbility, synergyAbilityPowerIncrease));
             }
@@ -4194,10 +4056,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // A ranked client's count is authoritative (range_shots_authoritative): the server applied this cap to
         // the FULL quiver, while a rebuilt unit's maxRangeShots is only the remaining count, so re-capping
         // here compounded it — a stack-power-1 Arbalester the server had at 4 (2 capped + Zena's 2) showed 2.
-        if (
-            hasStatAbilityActive(limitedSupplyAbility, "Limited Supply") &&
-            !this.unitProperties.range_shots_authoritative
-        ) {
+        if (this.hasAbilityActive("Limited Supply") && !this.unitProperties.range_shots_authoritative) {
             const actualStackPowerCoeff = this.getStackPower() / MAX_UNIT_STACK_POWER;
             // Rallying Volley's once-only arrows sit above the unit's own Limited Supply cap.
             this.unitProperties.range_shots = Math.min(
@@ -4206,7 +4065,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
-        endlessQuiverAbility = getStatAbility(endlessQuiverAbility, "Endless Quiver");
+        const endlessQuiverAbility = this.getAbility("Endless Quiver");
         if (endlessQuiverAbility) {
             this.unitProperties.range_shots_mod = endlessQuiverAbility.getPower();
         } else if (this.unitProperties.range_shots_mod) {
@@ -4223,7 +4082,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // STEPS
         this.unitProperties.steps_mod =
             roundUnitStat(stepsMoraleMultiplier * this.getMorale(), 1) + synergyMovementStepsIncrease;
-        skyRunnerAbility = getStatAbility(skyRunnerAbility, "Sky Runner");
+        const skyRunnerAbility = this.getAbility("Sky Runner");
         if (hasFightStarted && hasUnyieldingPower && !lapAlreadyAdjusted) {
             this.initialUnitProperties.steps += 1;
         }
@@ -4472,7 +4331,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.attack_mod -= (this.unitProperties.base_attack * weaknessDebuff.getPower()) / 100;
         }
 
-        if (hasStatAbilityActive(blindFuryAbility, "Blind Fury")) {
+        if (this.hasAbilityActive("Blind Fury")) {
             this.unitProperties.attack_mod +=
                 (1 -
                     this.unitProperties.amount_alive /
@@ -5233,19 +5092,4 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return this.unitProperties.max_hp;
     }
-    // Captured once during module initialization so a later instance/prototype override cannot accidentally
-    // authorize the stat-refresh fast path. Rollback hooks do not wrap these read-only methods.
-    private static readonly nativeGetAbility = Unit.prototype.getAbility;
-    private static readonly nativeHasAbilityActive = Unit.prototype.hasAbilityActive;
-    private static readonly nativeHasEffectActive = Unit.prototype.hasEffectActive;
-    private static readonly nativeGetEffects = Unit.prototype.getEffects;
-    private static readonly nativeAbilityGetName = Ability.prototype.getName;
-    private static readonly nativeEffectGetName = Effect.prototype.getName;
-    private static readonly nativeAbilityFactoryMakeAbility = AbilityFactory.prototype.makeAbility;
-    private static readonly nativeEffectFactoryMakeEffect = EffectFactory.prototype.makeEffect;
-    private static readonly nativeOwnPropertyCount = 27;
-    private static readonly nativeAbilityOwnPropertyCount = 4;
-    private static readonly nativeEffectOwnPropertyCount = 2;
-    private static readonly nativeAbilityFactoryOwnPropertyCount = 1;
-    private static readonly nativeEffectFactoryOwnPropertyCount = 0;
 }

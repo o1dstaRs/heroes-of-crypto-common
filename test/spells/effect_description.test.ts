@@ -61,6 +61,27 @@ describe("effect description placeholders", () => {
         expect(fillEffectPowerPlaceholders("{}%", 25 * 1.2, 0)).toBe("30%");
     });
 
+    it("preserves the original text across mixed templates, powers and positional counts", () => {
+        const bodies = ["", "Grants 15 armor.", "{}", "{} then {}", "Reflects {}%. Gives {}% chance.", "{{}} {}"];
+        const powers = [0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.MIN_VALUE, 1.5, 25 * 1.2, 0.00005, 1e21];
+        const counts = [-1, 0, 0.5, 1, 2, Number.NaN, Number.POSITIVE_INFINITY];
+
+        for (const body of bodies) {
+            for (const power of powers) {
+                for (const count of counts) {
+                    // Frozen eager-format oracle: keep tooltip output independent of the lazy fast paths.
+                    let expected = body;
+                    if (Number.isFinite(power) && power > 0) {
+                        const text = String(Number(power.toFixed(4)));
+                        let seen = 0;
+                        expected = body.replace(/\{\}/g, (match) => (seen++ < count ? match : text));
+                    }
+                    expect(fillEffectPowerPlaceholders(body, power, count)).toBe(expected);
+                }
+            }
+        }
+    });
+
     it("counts only the properties the caller actually supplied", () => {
         expect(positionalPropertyCount(undefined, undefined)).toBe(0);
         expect(positionalPropertyCount(3, undefined)).toBe(1);

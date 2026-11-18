@@ -41,9 +41,17 @@ export const fillEffectPowerPlaceholders = (body: string, power: number, positio
         return body;
     }
 
-    const text = formatEffectPower(power);
+    // Stat refreshes repeatedly reapply already-filled blessings and descriptions whose placeholders
+    // belong entirely to positional properties. Format a power only when it will appear in the text.
+    if (!body.includes("{}")) {
+        return body;
+    }
+
+    let text: string | undefined;
     let seen = 0;
-    return body.replace(PLACEHOLDER, (match) => (seen++ < positionalPropertyCount ? match : text));
+    return body.replace(PLACEHOLDER, (match) =>
+        seen++ < positionalPropertyCount ? match : (text ??= formatEffectPower(power)),
+    );
 };
 
 /** How many placeholders the caller's own spell properties will consume. */
