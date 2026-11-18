@@ -1,0 +1,1106 @@
+{
+    "schema": 1,
+    "id": "a19-caster-wait-counterfactual-20261118",
+    "status": "closed-counterfactual-no-missed-win-established",
+    "registration": {
+        "schema": 1,
+        "id": "a19-caster-wait-counterfactual-20261118",
+        "registeredAtUtc": "2026-11-18T18:16:14.297641+00:00",
+        "scope": "Engineering-only exhaustive bounded native-catalog counterfactual at the one retained exposed screen wait. No policy fitting, strength bank, new seeds, promotion or deployment.",
+        "serverCommit": "e9d8a6096dae92343271c37103bdd1bd9cfb3852",
+        "commonPackagePin": "github:o1dstaRs/heroes-of-crypto-common#81eb8aee0b501ce469e3fe85dfe3a7f8dbd31c14",
+        "sourceAuthority": "Committed current-v13 server and its installed native common copied into a private source capsule; peer working-tree Premium edits excluded.",
+        "case": "fresh-m1-d12-f000-seat1",
+        "inputSha256": "09684ecf576f6c1500d6b4a3a28d64ad303159baa78bf1826bf12f1602077954",
+        "originalControlKey": "6bbd68598fd21938bfe28eb582c3b797888595a4a5cfd85a99c3d9ebaf3614d8",
+        "reusedTypedChannelsOnly": true,
+        "newSeedChannels": 0,
+        "fixedRoot": {
+            "unitId": "73696d00-0000-4000-8000-000000000009",
+            "name": "Hyena",
+            "lap": 2,
+            "ownShotOutput": 16039,
+            "enemyShotOutput": 5948,
+            "recognizedRangedPostureIncumbent": "wait_turn",
+            "actualNativeSelected": "wait_turn"
+        },
+        "catalog": {
+            "generator": "Native enumerateCandidates after unchanged A19 selection at the matching root",
+            "options": {
+                "maxMoveDestinations": 6,
+                "maxMeleePairs": 8,
+                "maxShotAims": 6,
+                "maxAreaThrowCells": 4,
+                "enrichIncumbentMetadata": true,
+                "includeMountainAttacks": true
+            },
+            "branching": "Every returned distinct native action array, deduplicated by typed command content; no omission by forecast, target, loss or outcome."
+        },
+        "fixedSequence": [
+            "Untouched native full control exact against original outcome",
+            "Enumeration observer full control exact, RNG/UUID and root state unchanged",
+            "Clone of retained native wait preserves complete outcome and target memory",
+            "All frozen native catalog alternatives through the real authoritative engine and unchanged future A19; exact replay of each branch if any apparent improvement"
+        ],
+        "qualityGates": [
+            "Exactly one matching root and unchanged full prefix",
+            "Correct actual actor team from native Unit, not roster/order inference",
+            "All original native outcomes, funded openings and full journals retained",
+            "Native command acceptance and zero refusals/circuits/quarantine; no silent action fallback",
+            "No extra hypothetical search observer or candidate reservation changes",
+            "Full native control/observer/clone-wait parity before interpretation",
+            "All source hashes unchanged before/after"
+        ],
+        "inferenceLimit": "Oracle counterfactual on one exposed scenario with coupled native future randomness; cannot qualify a deployable policy, global strength, CPU or future-information use. A favorable branch is only a possible missed opportunity.",
+        "costLimitForAnyLaterPolicy": "Overall-average complete CPU and weighted CPU per actual SearchDriver decision <=+10%; diagnostic fork costs do not qualify a future policy.",
+        "fixedCutoffUtc": "2026-11-18T21:00:00Z",
+        "automaticRetryOrExtension": false,
+        "defaultChanged": false,
+        "deploymentPerformed": false
+    },
+    "input": {
+        "setupSeed": 4120914536,
+        "terrainSeed": 1584809577,
+        "candidateTeam": 1,
+        "maxTicks": 3000,
+        "game": {
+            "lowerCreatureIds": [33, 49, 4, 6, 50, 57],
+            "upperCreatureIds": [31, 1, 16, 5, 17, 39],
+            "gridType": 1,
+            "unitAmount": 1,
+            "lowerDoctrine": 2,
+            "upperDoctrine": 1,
+            "leftArtifactTier1": 14,
+            "leftArtifactTier2": 5,
+            "rightArtifactTier1": 13,
+            "rightArtifactTier2": 15,
+            "leftDeliveryDraftOverrideUsed": false,
+            "rightDeliveryDraftOverrideUsed": false,
+            "hideOpponentRosterDuringSetup": false
+        },
+        "amounts": [
+            [33, 124],
+            [49, 139],
+            [4, 25],
+            [6, 22],
+            [50, 8],
+            [57, 2],
+            [31, 200],
+            [1, 100],
+            [16, 26],
+            [5, 24],
+            [17, 8],
+            [39, 2]
+        ],
+        "synergyVariants": {
+            "Life": 1,
+            "Nature": 2,
+            "Chaos": 2,
+            "Might": 2
+        },
+        "parameters": {
+            "disableDeliverySetup": false
+        }
+    },
+    "reusedReservedChannels": [
+        3303445282, 261823221, 2320165, 1551325983, 2722760555, 1434430570, 3614345866, 945245560, 2121336352,
+        4006106453, 2903494171, 80071059, 1187992556, 3352186418, 2011732877, 3903569549, 4098302964, 3336419874,
+        1004134708, 2665320404, 2652651084, 2304006330, 2688837711, 3891164295, 3173645617, 739688360, 689815174,
+        1996684645, 660939492, 1447350753, 782120106, 672154966, 1197104004, 4120914536, 1584809577, 3036161061,
+        3506967518
+    ],
+    "sourceIdentity": {
+        "serverCommit": "e9d8a6096dae92343271c37103bdd1bd9cfb3852",
+        "commonPin": "github:o1dstaRs/heroes-of-crypto-common#81eb8aee0b501ce469e3fe85dfe3a7f8dbd31c14",
+        "sourceBindings": 2990,
+        "sourceFreezeSha256": "8a7e50e2e3e5ca4794c6c3b2472c72cec398336c0d5651451ebdcca8cf2224ed",
+        "completeBindingsInVerifiedArchive": true
+    },
+    "nativeRoot": {
+        "actorTeam": 1,
+        "ordinal": 13,
+        "lap": 2,
+        "actorId": "73696d00-0000-4000-8000-000000000009",
+        "actor": "Hyena",
+        "beforeHash": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+        "nativeSelected": [
+            {
+                "type": "wait_turn",
+                "unitId": "73696d00-0000-4000-8000-000000000009"
+            }
+        ],
+        "nativeIncumbent": [
+            {
+                "type": "wait_turn",
+                "unitId": "73696d00-0000-4000-8000-000000000009"
+            }
+        ],
+        "nativeSelectedWasIncumbent": true,
+        "RNGDrawsDuringEnumeration": 0,
+        "UUIDSequenceBeforeAndAfter": 13
+    },
+    "boundedNativeCatalog": [
+        {
+            "actions": [
+                {
+                    "type": "wait_turn",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "id": "native-0",
+            "kind": "incumbent",
+            "signature": "06e4fb6720e821b06b9cbe92587617d29afa64f97686674502831b2c31d82733"
+        },
+        {
+            "actions": [
+                {
+                    "type": "defend_turn",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "id": "native-1",
+            "kind": "defend",
+            "signature": "ade57c8f37e01fc37200ba307851e4566c4117464e4d9d44bca85a4464fd3afa"
+        },
+        {
+            "actions": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 6
+                        },
+                        {
+                            "x": 6,
+                            "y": 6
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 6,
+                            "y": 6
+                        },
+                        {
+                            "x": 5,
+                            "y": 6
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "id": "native-2",
+            "kind": "move",
+            "signature": "237741e87a99c73fb5084c6daa23a931b24a24dcf8080faea5eecfdff40eeab7"
+        },
+        {
+            "actions": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 6
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 6
+                        },
+                        {
+                            "x": 6,
+                            "y": 6
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "id": "native-3",
+            "kind": "move",
+            "signature": "73834ffcbe692dbe986c1a2c5f5413e66b20ec411b5d1708745c4c2933902b12"
+        },
+        {
+            "actions": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 6
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "id": "native-4",
+            "kind": "move",
+            "signature": "a047199ffd2a17974b62d3add1ce720d0659ccb8bb1ef3aed031f26c7309f2d3"
+        },
+        {
+            "actions": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 5
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 5
+                        },
+                        {
+                            "x": 6,
+                            "y": 5
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "id": "native-5",
+            "kind": "move",
+            "signature": "4f8ba11560eeb6734985dd4bc6e6ce364d11ad1eb3b605894ec4f6499159e78e"
+        },
+        {
+            "actions": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 7
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 7
+                        },
+                        {
+                            "x": 6,
+                            "y": 7
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "id": "native-6",
+            "kind": "move",
+            "signature": "89e0157818da0a6e45ce0a090bbd1f6e197a1b0fca6e0c87bba94c0703e6f094"
+        },
+        {
+            "actions": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 7
+                        },
+                        {
+                            "x": 7,
+                            "y": 8
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 8
+                        },
+                        {
+                            "x": 6,
+                            "y": 8
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "id": "native-7",
+            "kind": "move",
+            "signature": "b22f75fcfa9c3abcb998e8f5a491d62402e1e4053033ad45065c3fac67fa71f5"
+        }
+    ],
+    "verifiedExecutions": [
+        {
+            "mode": "branch-native-1",
+            "authoritativeWinner": 1,
+            "actorScore": 1,
+            "actualSearchDriverDecisions": 77,
+            "nativeCompletedTurnEvents": 81,
+            "digest": "62a4a2b2b897dfa671358d50b79188b68d025142db0a2f997c290c7ea3bd1295",
+            "selectedAtRoot": [
+                {
+                    "type": "defend_turn",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "branch-native-2",
+            "authoritativeWinner": 1,
+            "actorScore": 1,
+            "actualSearchDriverDecisions": 43,
+            "nativeCompletedTurnEvents": 46,
+            "digest": "5e3cd8f1b32b19c6347905dd9289a75a5057f9994137067cc1b12e0c1ede4890",
+            "selectedAtRoot": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 6
+                        },
+                        {
+                            "x": 6,
+                            "y": 6
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 6,
+                            "y": 6
+                        },
+                        {
+                            "x": 5,
+                            "y": 6
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "branch-native-3",
+            "authoritativeWinner": 2,
+            "actorScore": 0,
+            "actualSearchDriverDecisions": 75,
+            "nativeCompletedTurnEvents": 77,
+            "digest": "d8a5d427eff9abbf4bd5589873a70f3df509d6f03a8dbc0c42e62c719c478df5",
+            "selectedAtRoot": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 6
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 6
+                        },
+                        {
+                            "x": 6,
+                            "y": 6
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "branch-native-4",
+            "authoritativeWinner": 0,
+            "actorScore": 0.5,
+            "actualSearchDriverDecisions": 66,
+            "nativeCompletedTurnEvents": 69,
+            "digest": "5f32c856257c3a920d4d3709c0959409d799d41fdbf53137d06e44043f48b62e",
+            "selectedAtRoot": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 6
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "branch-native-5",
+            "authoritativeWinner": 2,
+            "actorScore": 0,
+            "actualSearchDriverDecisions": 52,
+            "nativeCompletedTurnEvents": 55,
+            "digest": "6145fd1011a1521bddd3a5e24504f180102d3a5aeae597c683a9fe4fd0e46bf7",
+            "selectedAtRoot": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 5
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 5
+                        },
+                        {
+                            "x": 6,
+                            "y": 5
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "branch-native-6",
+            "authoritativeWinner": 1,
+            "actorScore": 1,
+            "actualSearchDriverDecisions": 79,
+            "nativeCompletedTurnEvents": 84,
+            "digest": "eba87b77de33eb62f0a2af9209d91ceddd9743095b14fc8955cb8121325f2617",
+            "selectedAtRoot": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 7
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 7
+                        },
+                        {
+                            "x": 6,
+                            "y": 7
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "branch-native-7",
+            "authoritativeWinner": 2,
+            "actorScore": 0,
+            "actualSearchDriverDecisions": 62,
+            "nativeCompletedTurnEvents": 66,
+            "digest": "0dc9aa249ea9533d14eff84cbeb480cdc36948360ffd69c3abbacf3ebc35223b",
+            "selectedAtRoot": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 7
+                        },
+                        {
+                            "x": 7,
+                            "y": 8
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 8
+                        },
+                        {
+                            "x": 6,
+                            "y": 8
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "clone-wait",
+            "authoritativeWinner": 1,
+            "actorScore": 1,
+            "actualSearchDriverDecisions": 47,
+            "nativeCompletedTurnEvents": 48,
+            "digest": "a2fc3d7cd233684b25472d8590a8e4c352f5b6fd3b2f81ce849cb8f14538df86",
+            "selectedAtRoot": [
+                {
+                    "type": "wait_turn",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "native",
+            "authoritativeWinner": 1,
+            "actorScore": 1,
+            "actualSearchDriverDecisions": 47,
+            "nativeCompletedTurnEvents": 48,
+            "digest": "a2fc3d7cd233684b25472d8590a8e4c352f5b6fd3b2f81ce849cb8f14538df86",
+            "selectedAtRoot": null,
+            "beforeRootStateSha256": null,
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "observed",
+            "authoritativeWinner": 1,
+            "actorScore": 1,
+            "actualSearchDriverDecisions": 47,
+            "nativeCompletedTurnEvents": 48,
+            "digest": "a2fc3d7cd233684b25472d8590a8e4c352f5b6fd3b2f81ce849cb8f14538df86",
+            "selectedAtRoot": [
+                {
+                    "type": "wait_turn",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "repeat-native-3",
+            "authoritativeWinner": 2,
+            "actorScore": 0,
+            "actualSearchDriverDecisions": 75,
+            "nativeCompletedTurnEvents": 77,
+            "digest": "d8a5d427eff9abbf4bd5589873a70f3df509d6f03a8dbc0c42e62c719c478df5",
+            "selectedAtRoot": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 6
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 6
+                        },
+                        {
+                            "x": 6,
+                            "y": 6
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "repeat-native-4",
+            "authoritativeWinner": 0,
+            "actorScore": 0.5,
+            "actualSearchDriverDecisions": 66,
+            "nativeCompletedTurnEvents": 69,
+            "digest": "5f32c856257c3a920d4d3709c0959409d799d41fdbf53137d06e44043f48b62e",
+            "selectedAtRoot": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 6
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "repeat-native-5",
+            "authoritativeWinner": 2,
+            "actorScore": 0,
+            "actualSearchDriverDecisions": 52,
+            "nativeCompletedTurnEvents": 55,
+            "digest": "6145fd1011a1521bddd3a5e24504f180102d3a5aeae597c683a9fe4fd0e46bf7",
+            "selectedAtRoot": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 6
+                        },
+                        {
+                            "x": 7,
+                            "y": 5
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 5
+                        },
+                        {
+                            "x": 6,
+                            "y": 5
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        },
+        {
+            "mode": "repeat-native-7",
+            "authoritativeWinner": 2,
+            "actorScore": 0,
+            "actualSearchDriverDecisions": 62,
+            "nativeCompletedTurnEvents": 66,
+            "digest": "0dc9aa249ea9533d14eff84cbeb480cdc36948360ffd69c3abbacf3ebc35223b",
+            "selectedAtRoot": [
+                {
+                    "hasLavaCell": false,
+                    "hasWaterCell": false,
+                    "path": [
+                        {
+                            "x": 10,
+                            "y": 6
+                        },
+                        {
+                            "x": 9,
+                            "y": 6
+                        },
+                        {
+                            "x": 8,
+                            "y": 7
+                        },
+                        {
+                            "x": 7,
+                            "y": 8
+                        }
+                    ],
+                    "targetCells": [
+                        {
+                            "x": 7,
+                            "y": 8
+                        },
+                        {
+                            "x": 6,
+                            "y": 8
+                        }
+                    ],
+                    "type": "move_unit",
+                    "unitId": "73696d00-0000-4000-8000-000000000009"
+                }
+            ],
+            "beforeRootStateSha256": "79b86c0dfb74755c2e0ff5fe1aca38d7e35db1bfb588beef38aa3dab3340f9a1",
+            "terminal": true,
+            "qualityErrors": []
+        }
+    ],
+    "independentVerification": {
+        "atUtc": "2026-11-18T18:26:41.554143+00:00",
+        "qualityPassed": true,
+        "sourceHashChecks": 2990,
+        "independentJSContentHashChecks": 34,
+        "physicalGames": 14,
+        "exposedFamilies": 1,
+        "originalNativeAndObserverAndCloneCompleteOutcomeExact": true,
+        "cloneWaitMemoryExactExceptRecordedArrayReferenceFlag": true,
+        "arrayReferenceFlagChangedOnlyAtRootIndex": [12],
+        "allBeforeRootPhysicalStateAndJournalPrefixesExact": true,
+        "allFundedOpeningsExact": true,
+        "allRootCommandsAcceptedByAuthoritativeEngine": true,
+        "allEnumerationNativeRandomDrawCounts": 0,
+        "allNativeUUIDSequencesPreserved": true,
+        "rootActorTeam": 1,
+        "retainedWaitWins": true,
+        "defendAlsoWins": true,
+        "sixBoundedNativeMoves": {
+            "wins": 2,
+            "draws": 1,
+            "losses": 3
+        },
+        "allFourOutcomeChangingAlternativesRepeatedExactly": true,
+        "outcomes": [
+            {
+                "mode": "branch-native-1",
+                "authoritativeWinner": 1,
+                "actorScore": 1,
+                "actualSearchDriverDecisions": 77,
+                "nativeCompletedTurnEvents": 81,
+                "digest": "62a4a2b2b897dfa671358d50b79188b68d025142db0a2f997c290c7ea3bd1295"
+            },
+            {
+                "mode": "branch-native-2",
+                "authoritativeWinner": 1,
+                "actorScore": 1,
+                "actualSearchDriverDecisions": 43,
+                "nativeCompletedTurnEvents": 46,
+                "digest": "5e3cd8f1b32b19c6347905dd9289a75a5057f9994137067cc1b12e0c1ede4890"
+            },
+            {
+                "mode": "branch-native-3",
+                "authoritativeWinner": 2,
+                "actorScore": 0,
+                "actualSearchDriverDecisions": 75,
+                "nativeCompletedTurnEvents": 77,
+                "digest": "d8a5d427eff9abbf4bd5589873a70f3df509d6f03a8dbc0c42e62c719c478df5"
+            },
+            {
+                "mode": "branch-native-4",
+                "authoritativeWinner": 0,
+                "actorScore": 0.5,
+                "actualSearchDriverDecisions": 66,
+                "nativeCompletedTurnEvents": 69,
+                "digest": "5f32c856257c3a920d4d3709c0959409d799d41fdbf53137d06e44043f48b62e"
+            },
+            {
+                "mode": "branch-native-5",
+                "authoritativeWinner": 2,
+                "actorScore": 0,
+                "actualSearchDriverDecisions": 52,
+                "nativeCompletedTurnEvents": 55,
+                "digest": "6145fd1011a1521bddd3a5e24504f180102d3a5aeae597c683a9fe4fd0e46bf7"
+            },
+            {
+                "mode": "branch-native-6",
+                "authoritativeWinner": 1,
+                "actorScore": 1,
+                "actualSearchDriverDecisions": 79,
+                "nativeCompletedTurnEvents": 84,
+                "digest": "eba87b77de33eb62f0a2af9209d91ceddd9743095b14fc8955cb8121325f2617"
+            },
+            {
+                "mode": "branch-native-7",
+                "authoritativeWinner": 2,
+                "actorScore": 0,
+                "actualSearchDriverDecisions": 62,
+                "nativeCompletedTurnEvents": 66,
+                "digest": "0dc9aa249ea9533d14eff84cbeb480cdc36948360ffd69c3abbacf3ebc35223b"
+            },
+            {
+                "mode": "clone-wait",
+                "authoritativeWinner": 1,
+                "actorScore": 1,
+                "actualSearchDriverDecisions": 47,
+                "nativeCompletedTurnEvents": 48,
+                "digest": "a2fc3d7cd233684b25472d8590a8e4c352f5b6fd3b2f81ce849cb8f14538df86"
+            },
+            {
+                "mode": "native",
+                "authoritativeWinner": 1,
+                "actorScore": 1,
+                "actualSearchDriverDecisions": 47,
+                "nativeCompletedTurnEvents": 48,
+                "digest": "a2fc3d7cd233684b25472d8590a8e4c352f5b6fd3b2f81ce849cb8f14538df86"
+            },
+            {
+                "mode": "observed",
+                "authoritativeWinner": 1,
+                "actorScore": 1,
+                "actualSearchDriverDecisions": 47,
+                "nativeCompletedTurnEvents": 48,
+                "digest": "a2fc3d7cd233684b25472d8590a8e4c352f5b6fd3b2f81ce849cb8f14538df86"
+            },
+            {
+                "mode": "repeat-native-3",
+                "authoritativeWinner": 2,
+                "actorScore": 0,
+                "actualSearchDriverDecisions": 75,
+                "nativeCompletedTurnEvents": 77,
+                "digest": "d8a5d427eff9abbf4bd5589873a70f3df509d6f03a8dbc0c42e62c719c478df5"
+            },
+            {
+                "mode": "repeat-native-4",
+                "authoritativeWinner": 0,
+                "actorScore": 0.5,
+                "actualSearchDriverDecisions": 66,
+                "nativeCompletedTurnEvents": 69,
+                "digest": "5f32c856257c3a920d4d3709c0959409d799d41fdbf53137d06e44043f48b62e"
+            },
+            {
+                "mode": "repeat-native-5",
+                "authoritativeWinner": 2,
+                "actorScore": 0,
+                "actualSearchDriverDecisions": 52,
+                "nativeCompletedTurnEvents": 55,
+                "digest": "6145fd1011a1521bddd3a5e24504f180102d3a5aeae597c683a9fe4fd0e46bf7"
+            },
+            {
+                "mode": "repeat-native-7",
+                "authoritativeWinner": 2,
+                "actorScore": 0,
+                "actualSearchDriverDecisions": 62,
+                "nativeCompletedTurnEvents": 66,
+                "digest": "0dc9aa249ea9533d14eff84cbeb480cdc36948360ffd69c3abbacf3ebc35223b"
+            }
+        ],
+        "newSeedChannels": 0,
+        "newPolicyOrStrengthQualified": false,
+        "scope": "One exposed root, six bounded native catalog moves plus defend, same starting RNG and native future policies. Not every legal board move or independent strength/cost evidence. A feature omission and subsequent enemy cast do not establish that the retained wait is bad."
+    },
+    "archive": {
+        "path": "closed-counterfactual-return.tar.gz",
+        "sha256": "2734fa7d7ef3c8b58acf6df3de227c497fa54d852d4926d62ef538096ca9a471",
+        "bytes": 43324338,
+        "verifiedRegularMembers": 3011,
+        "allMembersVerified": true,
+        "indexSha256": "cd7f32dd9596dab6ea492788b32658c07f3986ce4e47c9e687fb197d9861701d",
+        "sourceBindings": 2990
+    },
+    "puffaloBackup": {
+        "atUtc": "2026-11-18T18:34:22.203559+00:00",
+        "remotePath": "hoc-research/a19-caster-wait-counterfactual-20261118/closed-counterfactual-return.tar.gz",
+        "sha256": "2734fa7d7ef3c8b58acf6df3de227c497fa54d852d4926d62ef538096ca9a471",
+        "bytes": 43324338,
+        "allMembersVerified": true,
+        "verifiedRegularMembers": 3011
+    },
+    "newSeedChannels": 0,
+    "freshStrengthOrCostQualified": false,
+    "defaultChanged": false,
+    "deploymentPerformed": false
+}

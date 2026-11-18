@@ -33,6 +33,28 @@ server inherits this dispatcher; the existing meta oracle remains a separately l
 not an exact replay of authoritative setup. This adoption established v12, now retained within v13; frozen v11 studies
 keep their recorded comparators. The global wire version and accepted A19 combat weights stay unchanged.
 
+## Caster-screen and draft-commitment research — November 18, 2026
+
+Read `docs/a19_caster_screen_counterfactual_research.md` before changing screen waits merely
+because the ranged-output feature omits offensive spellbooks. The one retained exposed v13
+Hyena wait wins; among six bounded native move alternatives, three lose and one draws. All 14
+full games, original controls, target-memory semantics, source/RNG/prefix checks and repeated
+changed outcomes passed independent verification. This is a counterexample to the inference
+that a feature omission proves a bad wait, not a new strength or timing policy. No default changed.
+
+The distinct inactive `map-visible-contextual-override-v1` defers only the extra contextual
+allowance while the native public map is absent, retaining V3 and delivery. Read
+`docs/map_visible_contextual_draft_timing_research.md`. Preserve all 36 five-point exact draft
+controls and the fixed 108-family / 648-logical-game reused admission against both current v13
+and contextual-disabled matched draft. Do not infer hidden maps, spend a budget twice, reuse old
+confirmation channels, rewrite failed contextual gates or promote a reused score. Fresh independent
+strength and overall-average +10% complete draft/fight CPU and weighted CPU per actual decision
+remain required. The fixed admission cutoff is November 18 21:00 UTC with no automatic extension.
+The completed admission failed: −5.56 points versus current, simultaneous 95% interval −10.65 to
+−1.39; +2.78 versus the disabled head remains uncertain. All 648 outcomes, native quality/source/
+funding/cold controls and both family bootstraps passed independent audit. Keep this fixed candidate
+closed without fresh/cost progression, slice rescue or retuning; no default changed.
+
 ## Original Sniper donor qualification — November 18, 2026
 
 The following records the study's completion before explicit adoption; see `docs/sniper_donor_adoption.md`
