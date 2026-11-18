@@ -1,5 +1,17 @@
 # Agent guidance
 
+## Explicit Sniper donor protection adoption — November 18, 2026
+
+The user requested “lock it in and continue” after reviewing the confirmed Sniper guard. Current
+default A19-backed v0.8/Premium is profile v13. Read `docs/sniper_donor_adoption.md`; preserve
+checkpoint `a19-preserve-sniper-20261118`, its exact eligibility and unchanged evidence fixture.
+Reject Sniper-reducing delivery plans before preview only in the qualified public complete-setup
+population. Keep the exclusive draft allowance, legal visibility, standard own quantities, existing
+geometry and A19 combat. Retain already funded v12 plans through restart and preserve Premium undo.
+New default comparisons use v13; frozen studies keep their original controls. The +8.10-point
+held-out gain is conditional, not an unconditional ranked or human win rate. No model retraining
+or deployment is implied. Further broadening requires separate qualification.
+
 ## Explicit revealed-ranged delivery adoption — November 18, 2026 UTC
 
 The user explicitly requested “adopt the ones that gave gains please” after reviewing the failed
@@ -18,10 +30,13 @@ commit only fully funded plans. Retain Armor/Might/relevant Empower and the shoo
 Private setup, partial automatic spending, explicit policy overrides and native v0.9 remain isolated.
 The old research checkpoints/seed exclusions stay immutable. Collection using the authoritative
 server inherits this dispatcher; the existing meta oracle remains a separately labelled experiment,
-not an exact replay of authoritative setup. Future default comparisons use v12; frozen v11 studies
+not an exact replay of authoritative setup. This adoption established v12, now retained within v13; frozen v11 studies
 keep their recorded comparators. The global wire version and accepted A19 combat weights stay unchanged.
 
-## Confirmed, unpromoted Sniper donor protection — November 18, 2026
+## Original Sniper donor qualification — November 18, 2026
+
+The following records the study's completion before explicit adoption; see `docs/sniper_donor_adoption.md`
+for current dispatch. Preserve the original unpromoted fixture and consumed confirmation bank.
 
 Read `docs/a19_delivery_donor_research.md` and preserve its compact evidence fixture. The separate
 terrain-after-delivery repair failed reused admission (16 points, current 16, free 17) and stays
@@ -43,7 +58,8 @@ budget, native fully funded Sniper>=2 and Placement=Movement=0, with the declare
 Every paid plan cuts Sniper there, so the guard equals existing free-forward; no paid superiority is
 established. Preserve current behavior outside this population. Retain this unchanged checkpoint as
 a comparator for future setup research; do not tune on its consumed confirmation bank, silently
-broaden dispatch, alter combat models or automatically activate it. The user's +10% compute limit
+broaden dispatch or alter combat models. The subsequent explicit activation is limited to that scope.
+The user's +10% compute limit
 is on the overall average; slower subgroups are descriptive, not separate qualification gates.
 
 See the document's exact typed seed recipes: exclude all 4 roles × 20,480 V2 preimages and all

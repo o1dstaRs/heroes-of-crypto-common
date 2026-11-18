@@ -91,11 +91,15 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v12",
+            schema: "hoc.v0_8_a19_production_profile.v13",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
             researchOnly: false,
+            authoritativeSniperDonorProtection: {
+                id: "sniper-donor-preservation-v1",
+                checkpoint: "a19-preserve-sniper-20261118",
+            },
         });
         expect(V08_A19_SEARCH).toMatchObject({
             gate: 0.03,

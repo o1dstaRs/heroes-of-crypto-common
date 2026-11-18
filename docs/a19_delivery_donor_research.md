@@ -1,9 +1,14 @@
 # Delivery setup: price the shooting investment
 
-Status, November 18, 2026: **independently confirmed, unpromoted research checkpoint**
+Status at study completion, November 18, 2026: **independently confirmed, unpromoted research checkpoint**
 `a19-preserve-sniper-20261118`. Fresh development and held-out strength, source/state controls and
 serial CPU qualification passed unchanged. No serving default, learned weights, client/server common
 pin or production deployment changed. The accepted melee-barrel correction remains enabled.
+
+The user subsequently adopted this unchanged checkpoint into profile v13. See
+[Sniper donor adoption](sniper_donor_adoption.md) for the live integration scope. All original
+research results, failed gates, source archives and unpromoted fixture metadata below are historical
+and remain unchanged.
 
 The public delivery planner measures eligible melee contact with twelve hypothetical backline cells,
 weighted by stack experience. Its fully funded Movement/Placement plans preserve Armor and Might but
@@ -162,8 +167,8 @@ least two and the actual unused exclusive-delivery budget. It does not qualify S
 other AI versions, partial/private setup, or human/Premium integration. Preserve current behavior
 outside that population. The guard leaves exactly the matched existing free-forward plan here;
 it does not establish paid superiority or isolate a single ranged stat as the cause of every gain.
-Keep the unchanged checkpoint as a required reference for further setup research. Integrating or
-deploying it is separate work and has not occurred.
+Keep the unchanged checkpoint as a required reference for further setup research. Integration and
+deployment were separate work at study completion; the later adoption is recorded above.
 
 The capsule is `game/core/tmp/barrel-sniper-donor-fresh-20261118`. Preserve the original failed
 unscored allocator as well: v1 accepted 826 roots where 6,912 were required, before any draft census or

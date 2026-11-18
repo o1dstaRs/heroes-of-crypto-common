@@ -11,7 +11,7 @@
 
 import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
 import { A19_TERRAIN_PLACEMENT_POLICY } from "../placement/terrain_reflection";
-import { A19_REVEALED_RANGED_POLICY } from "../setup/a19_revealed_ranged_identity";
+import { A19_REVEALED_RANGED_POLICY, A19_SNIPER_DONOR_POLICY } from "../setup/a19_revealed_ranged_identity";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
 import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
 import { A19_NIGHTMARE_WALL_MOVEMENT_POLICY } from "../nightmare_wall_movement";
@@ -65,7 +65,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
  *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v12" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v13" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -423,7 +423,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "revealed-ranged-identity" as const,
         source: "src/ai/setup/a19_revealed_ranged_identity.ts" as const,
-        sha256: "9c0408600f435b0c4fb6e7a1a22fd7215f60cc1a0138b5fc0084e73c5639df9d" as const,
+        sha256: "bae448ebd270582379646f019d94dec2aa136654de443a4bb60fdd8faf8803c3" as const,
     }),
     Object.freeze({
         role: "revealed-ranged-draft" as const,
@@ -455,6 +455,7 @@ export const V08_A19_PROFILE = Object.freeze({
     authoritativeFinalPlacement: A19_LEARNED_FINAL_PLACEMENT_POLICY,
     terrainPlacement: A19_TERRAIN_PLACEMENT_POLICY,
     authoritativeRevealedRangedDelivery: A19_REVEALED_RANGED_POLICY,
+    authoritativeSniperDonorProtection: A19_SNIPER_DONOR_POLICY,
     wanderingMageSupport: A19_WANDERING_MAGE_SUPPORT_POLICY,
     unitSupport: A19_UNIT_SUPPORT_POLICY,
     battleMageTargets: BATTLE_MAGE_TARGET_POLICY,
