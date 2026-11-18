@@ -1,0 +1,2720 @@
+{
+    "schemaVersion": 1,
+    "id": "a19-delivery-donor-regression-20261118",
+    "createdAtUtc": "2026-11-18T11:11:43.810396+00:00",
+    "scope": "Deliberately versioned compact research reference: exposed development diagnosis and exact inactive candidate, not raw simulations, an independent strength result or promotion.",
+    "defaultChanged": false,
+    "productionDeployed": false,
+    "freshStrengthFamiliesInThisResult": 0,
+    "currentNativeSources": {
+        "server": "91b6a9112ec2a9b39236d13902badb7c52e93ba3",
+        "installedCommon": "87f8edf71c1471fe6dbe10c62792655d70a6c437",
+        "guardSeal": "3de4383e8a4b552860f0280cf02dc796989efa0b7bb9b519b91f74f72e925846"
+    },
+    "sourceFinding": {
+        "previewUtility": "XP-weighted eligible melee contact against12 fixed public hypothetical cells; no ranged attack or range term.",
+        "funding": "Preserves native Armor/Might/relevant Empower, funds additional Movement/Placement from Sniper first, floor1 with shooters.",
+        "sniperStatBonuses": {
+            "level1": {
+                "baseAttackPercent": 8,
+                "shotDistancePercent": 20
+            },
+            "level2": {
+                "baseAttackPercent": 17,
+                "shotDistancePercent": 40
+            },
+            "level3": {
+                "baseAttackPercent": 27,
+                "shotDistancePercent": 70
+            }
+        },
+        "limitation": "Attack-stat bonuses are not direct measured army DPS. The source omission does not prove every movement trade harmful."
+    },
+    "finalPlacementFactorial": {
+        "passedDiagnostic": true,
+        "sealSha256": "d3726ad543d901908b0042a6f6d57c6ea490763e9d17b03558e405b33b3757a6",
+        "knownCases": 28,
+        "originalFamilies": 14,
+        "physicalGames": 224,
+        "cachedLogicalResults": 112,
+        "exactOriginalParentControls": 56,
+        "scoreTotals": {
+            "old-old": 19,
+            "entrant-only": 18,
+            "opponent-only": 15,
+            "both": 16
+        },
+        "entrantOnlyDeltaPoints": -3.5714285714285716,
+        "opponentOnlyBenefitPoints": 14.285714285714286,
+        "bothSideCandidateDeltaPoints": -10.714285714285714,
+        "meanIndividualSideBenefitPoints": 5.357142857142857,
+        "entrantGains": 1,
+        "entrantLosses": 2,
+        "opponentGains": 5,
+        "opponentLosses": 1,
+        "allFundingDraftTotalsLegalCellsAndColdControlsVerified": true,
+        "freshStrengthFamilies": 0,
+        "newForecastInstalled": false,
+        "defaultOrProductionChanged": false,
+        "interpretation": "Exposed small diagnostic only. Both-side cohort scores do not estimate individual AI strength. Entrant/opponent controls isolate the existing final-placement bugfix under the shared frozen current engine; no general strength or cost qualification.",
+        "cases": [
+            {
+                "caseId": "existing-placement-fixture-benchmark-0-1",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 0
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "existing-placement-fixture-benchmark-0-2",
+                "score": {
+                    "old-old": 0,
+                    "entrant-only": 0,
+                    "opponent-only": 0,
+                    "both": 0
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "existing-placement-fixture-benchmark-1-1",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 0,
+                    "both": 0
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 1
+            },
+            {
+                "caseId": "existing-placement-fixture-benchmark-1-2",
+                "score": {
+                    "old-old": 0,
+                    "entrant-only": 0,
+                    "opponent-only": 0,
+                    "both": 0
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-0-0-delivery-0",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-0-0-delivery-1",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-1-1-delivery-0",
+                "score": {
+                    "old-old": 0,
+                    "entrant-only": 0,
+                    "opponent-only": 0,
+                    "both": 0
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-1-1-delivery-1",
+                "score": {
+                    "old-old": 0,
+                    "entrant-only": 0,
+                    "opponent-only": 0,
+                    "both": 0
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-189-0-delivery-0",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-189-0-delivery-1",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-190-1-delivery-0",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-190-1-delivery-1",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-191-2-delivery-0",
+                "score": {
+                    "old-old": 0,
+                    "entrant-only": 0,
+                    "opponent-only": 0,
+                    "both": 0
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-191-2-delivery-1",
+                "score": {
+                    "old-old": 0,
+                    "entrant-only": 0,
+                    "opponent-only": 0,
+                    "both": 0
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-2-2-delivery-0",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 0,
+                    "opponent-only": 0,
+                    "both": 0
+                },
+                "entrantDelta": -1,
+                "opponentBenefit": 1
+            },
+            {
+                "caseId": "known-2-2-delivery-1",
+                "score": {
+                    "old-old": 0,
+                    "entrant-only": 0,
+                    "opponent-only": 0,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-378-0-delivery-0",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-378-0-delivery-1",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-379-1-delivery-0",
+                "score": {
+                    "old-old": 0,
+                    "entrant-only": 0,
+                    "opponent-only": 0,
+                    "both": 0
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-379-1-delivery-1",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-380-2-delivery-0",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 0,
+                    "opponent-only": 0,
+                    "both": 0
+                },
+                "entrantDelta": -1,
+                "opponentBenefit": 1
+            },
+            {
+                "caseId": "known-380-2-delivery-1",
+                "score": {
+                    "old-old": 0,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 0
+                },
+                "entrantDelta": 1,
+                "opponentBenefit": -1
+            },
+            {
+                "caseId": "known-567-0-delivery-0",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-567-0-delivery-1",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-568-1-delivery-0",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 0,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 1
+            },
+            {
+                "caseId": "known-568-1-delivery-1",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 0,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 1
+            },
+            {
+                "caseId": "known-569-2-delivery-0",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            },
+            {
+                "caseId": "known-569-2-delivery-1",
+                "score": {
+                    "old-old": 1,
+                    "entrant-only": 1,
+                    "opponent-only": 1,
+                    "both": 1
+                },
+                "entrantDelta": 0,
+                "opponentBenefit": 0
+            }
+        ]
+    },
+    "failedTerrainRecheck": {
+        "registration": {
+            "id": "terrain-recheck-after-delivery-known-admission-20261118",
+            "at": "2026-11-18T10:03:47.367763+00:00",
+            "scope": "Distinct placement-order repair, not a retry/extension/current-v12 forecast promotion from the incomplete old root-scoped bank. No ranker/model tuning or teacher test parsing.",
+            "rootBankStatus": "Original root mixture stopped at fixed cutoff4590/6048; no score aggregation or admission. Preserved separately.",
+            "policy": "Keep original terrain pass; when native funded delivery changes a Nightmare formation, reapply the same adopted public terrain optimizer before barrels. Apply identical recheck in every paid/free forward setup preview.",
+            "state": "Session-local research team sets only. Candidate cache signatures distinguish repair/free settings. No global policy changes, concealed enemy information, new weights or live-server writes.",
+            "matchedFree": "Same native base upgrade plan; restrict the existing funded-delivery catalog to cost0 plans. Preserve real budget enforcement, existing Armor/Might/relevant Empower/Sniper floors.",
+            "cases": 28,
+            "families": 14,
+            "logicalPerEpoch": 112,
+            "physicalColdReference": 112,
+            "expectedPooledDistinct": 40,
+            "publicApplicabilityDedup": "Only map4 and seats with delivery draft override unused can change. Normalize repair/free sets to empty using those public input facts; no battle outcomes, teacher labels or selected private plans enter normalization. All logical records/families remain.",
+            "requiredControls": [
+                "All28 original current-parent outcome/trace/opening/final records exact with only declared new diagnostic fields removed",
+                "Cold/persistent/cache exact per full semantic input",
+                "Actual final terrain gets exact returned funded delivery map; at least one actual repair and one preview recheck",
+                "Actual terrain passes preserve live draw counter, source identity and UUID sequence; preview witnesses preserve source identity/UUID sequence",
+                "All games terminal and full native A19/search; unchanged drafted amount, legal placements and actual spend<=budget",
+                "Repair entrant total strictly beats both current and matched free for reused admission"
+            ],
+            "qualifiedStrength": false,
+            "newFreshSeedFamilies": 0,
+            "noSubgroupRescue": true,
+            "mainServingDefaultChanged": false,
+            "baselineNewDiagnosticFields": [
+                "recheckActualFrames",
+                "recheckPreviewCalls",
+                "unchangedTerrainRandomStateChecks",
+                "observedLiveRandomDraws",
+                "leftSetupBudget",
+                "rightSetupBudget",
+                "leftSetupSpend",
+                "rightSetupSpend"
+            ],
+            "sourceFiles": [
+                {
+                    "path": "adapter.ts",
+                    "sha256": "b5625d849db8f8a1b624a0f8ab7c480ba1e5ac306f5b61082d4a59b0bcb5951b"
+                },
+                {
+                    "path": "activation.test.ts",
+                    "sha256": "f5c22e8803dd2a6f4fe006f9fc86a56fc5b755e44bdd1eb5ebe556e6baaede58"
+                },
+                {
+                    "path": "verify.py",
+                    "sha256": "479dab087205404e79e9d2b977e588a4e2003c918ed268334644585f9f3a961f"
+                }
+            ]
+        },
+        "result": {
+            "complete": true,
+            "passedKnownAdmission": false,
+            "gates": {
+                "allBaselineSourceColdFundingAndNativeControlsExact": true,
+                "nativePreviewAndActualRepairActivate": true,
+                "entrantScoreHigherThanCurrent": false,
+                "entrantScoreHigherThanMatchedFree": false
+            },
+            "sealSha256": "0056ac8133113cce328a243c01db6dd3dc8670bafd94aa7339bd91a2259111de",
+            "knownCases": 28,
+            "families": 14,
+            "physicalGames": 152,
+            "logicalPerEpoch": 112,
+            "scoreTotals": {
+                "current": 16,
+                "repair-entrant": 16,
+                "free-entrant": 17,
+                "repair-both": 16
+            },
+            "repairVsCurrentPoints": 0.0,
+            "repairVsMatchedFreePoints": -3.5714285714285716,
+            "actualRepairFrames": 3,
+            "previewRepairCalls": 25,
+            "originalBaselineControlsExact": 28,
+            "freshStrengthFamilies": 0,
+            "defaultChanged": false,
+            "interpretation": "Complete reused diagnostic only. A pass permits prospectively registered fresh current-v12 entrant/free/both testing and independent confirmation within overall-average+10% complete fight/decision cost; not default activation. All original gains/losses and failed prior studies retained.",
+            "cases": [
+                {
+                    "caseId": "existing-placement-fixture-benchmark-0-1",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "existing-placement-fixture-benchmark-0-2",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "existing-placement-fixture-benchmark-1-1",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "existing-placement-fixture-benchmark-1-2",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "known-0-0-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-0-0-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-1-1-delivery-0",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "known-1-1-delivery-1",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "known-189-0-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-189-0-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-190-1-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-190-1-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-191-2-delivery-0",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "known-191-2-delivery-1",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "known-2-2-delivery-0",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 1,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "known-2-2-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-378-0-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-378-0-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-379-1-delivery-0",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "known-379-1-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-380-2-delivery-0",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "known-380-2-delivery-1",
+                    "score": {
+                        "current": 0,
+                        "repair-entrant": 0,
+                        "free-entrant": 0,
+                        "repair-both": 0
+                    }
+                },
+                {
+                    "caseId": "known-567-0-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-567-0-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-568-1-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-568-1-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-569-2-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                },
+                {
+                    "caseId": "known-569-2-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "repair-entrant": 1,
+                        "free-entrant": 1,
+                        "repair-both": 1
+                    }
+                }
+            ]
+        },
+        "archive": {
+            "complete": true,
+            "archive": "benchmark-evidence.tar.gz",
+            "archiveSha256": "5845ea9d8f8dad293ee1f4fc1f4e5c73c8a486c970b3fc2d6bcb0d3a559fcf63",
+            "archiveBytes": 11962468,
+            "sourceFiles": 294,
+            "uncompressedBytes": 149975087,
+            "removedOnlyVerifiedLargeDuplicateBytes": 149826301,
+            "smallOriginalBytesRetained": 148786,
+            "scope": "Lossless archive of completed owned research output only. Every original byte verified in archive before removing large duplicate originals; source/seals/inputs/results untouched."
+        }
+    },
+    "sniperGuard": {
+        "registration": {
+            "id": "sniper-donor-preservation-known-diagnostic-20261118",
+            "at": "2026-11-18T10:39:56.708216+00:00",
+            "hypothesis": "The melee-only reach proxy ignores lost ranged power. Filter native funded delivery plans whose Sniper level is below fully funded native base before any preview. Retain native placement/combat, all existing free movement options and harmless non-Sniper donor plans. No terrain recheck or score/threshold tuning.",
+            "scope": "New hypothesis, not a retry/extension/subset rescue of failed terrain repair or incomplete root-scoped forecast.",
+            "arms": [
+                {
+                    "id": "current",
+                    "parameters": {
+                        "mode": "current"
+                    }
+                },
+                {
+                    "id": "protect-entrant",
+                    "parameters": {
+                        "mode": "protect-entrant"
+                    }
+                },
+                {
+                    "id": "free-entrant",
+                    "parameters": {
+                        "mode": "free-entrant"
+                    }
+                }
+            ],
+            "cases": 28,
+            "families": 14,
+            "freshFamilies": 0,
+            "knownDiagnosticGates": [
+                "All28 native-parent controls exact; all cold/persistent/cache/full funding/legal placements and RNG/UUID preview restoration pass",
+                "Native actual skipped donor-plan previews and committed Sniper preservation",
+                "Guard total score strictly higher than current, no new paired outcome losses, not below free-only control"
+            ],
+            "strengthGateUnchanged": {
+                "minFamilies": 30,
+                "minGain": 0.0015,
+                "minChangedFamilies": 10,
+                "confidence": 0.95
+            },
+            "paidPlanCondition": "No independent paid superiority or placement promotion is established by equality with matched free. Fresh paid research must beat its matched free control.",
+            "computeLimit": {
+                "overallAverageIncreasePercent": 10,
+                "perSubgroup": false,
+                "slowerSubgroupsReported": true
+            },
+            "sourceModelDefaultAndProductionUnchanged": true,
+            "historicalExampleTags": "Original exposed v1 example army tags retain their known physical-seat mislabel; actual candidateTeam and scored armies unchanged."
+        },
+        "result": {
+            "complete": true,
+            "passedKnownDiagnostic": true,
+            "gates": {
+                "sourceNativeColdPoolCacheFundingAndPlacementExact": true,
+                "actualDonorPlanPruningAndPreservation": true,
+                "higherScoreThanCurrent": true,
+                "noNewOutcomeLossesOnKnownBank": true,
+                "notWorseThanFree": true
+            },
+            "sealSha256": "3de4383e8a4b552860f0280cf02dc796989efa0b7bb9b519b91f74f72e925846",
+            "knownCases": 28,
+            "families": 14,
+            "physicalGames": 144,
+            "logicalPerEpoch": 84,
+            "originalCurrentControlsExact": 28,
+            "scoreTotals": {
+                "current": 16,
+                "protect-entrant": 19.5,
+                "free-entrant": 19.5
+            },
+            "guardVsCurrentPoints": 12.5,
+            "guardVsFreePoints": 0.0,
+            "gains": 4,
+            "losses": 0,
+            "changedCases": [
+                "existing-placement-fixture-benchmark-0-1",
+                "existing-placement-fixture-benchmark-0-2",
+                "existing-placement-fixture-benchmark-1-1",
+                "existing-placement-fixture-benchmark-1-2",
+                "known-1-1-delivery-0",
+                "known-190-1-delivery-0",
+                "known-2-2-delivery-0",
+                "known-379-1-delivery-0"
+            ],
+            "prunedPlanPreviews": 48,
+            "freshStrengthFamilies": 0,
+            "terrainRecheckEnabled": false,
+            "defaultChanged": false,
+            "interpretation": "Exposed reused development diagnosis only; score does not establish independent strength. Any continuation requires separately registered fresh current-v12 study and independent confirmation, both score and overall-average+10% cost gates. No rescue or extension of earlier failed terrain/root-mixture studies.",
+            "cases": [
+                {
+                    "caseId": "existing-placement-fixture-benchmark-0-1",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "existing-placement-fixture-benchmark-0-2",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 0,
+                        "free-entrant": 0
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "existing-placement-fixture-benchmark-1-1",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 0,
+                        "free-entrant": 0
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "existing-placement-fixture-benchmark-1-2",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 0,
+                        "free-entrant": 0
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "known-0-0-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "known-0-0-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-1-1-delivery-0",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 0.5,
+                        "free-entrant": 0.5
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "known-1-1-delivery-1",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 0,
+                        "free-entrant": 0
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-189-0-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "known-189-0-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-190-1-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "known-190-1-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-191-2-delivery-0",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 0,
+                        "free-entrant": 0
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-191-2-delivery-1",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 0,
+                        "free-entrant": 0
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-2-2-delivery-0",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "known-2-2-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-378-0-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "known-378-0-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-379-1-delivery-0",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "known-379-1-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-380-2-delivery-0",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 0,
+                        "free-entrant": 0
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-380-2-delivery-1",
+                    "score": {
+                        "current": 0,
+                        "protect-entrant": 0,
+                        "free-entrant": 0
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-567-0-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 4
+                },
+                {
+                    "caseId": "known-567-0-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-568-1-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-568-1-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-569-2-delivery-0",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                },
+                {
+                    "caseId": "known-569-2-delivery-1",
+                    "score": {
+                        "current": 1,
+                        "protect-entrant": 1,
+                        "free-entrant": 1
+                    },
+                    "guardPruned": 0
+                }
+            ]
+        },
+        "independentBunVerification": {
+            "qualityPassed": true,
+            "verifiedSourceFiles": 1371,
+            "coldPersistentCachedRowsExact": 84,
+            "physicalGames": 144,
+            "integerHalfPointTotals": {
+                "current": 32,
+                "protect-entrant": 39,
+                "free-entrant": 39
+            },
+            "familyMeanGainPoints": 12.5,
+            "gains": 4,
+            "losses": 0,
+            "independentFreshFamilies": 0,
+            "servingChanged": false
+        },
+        "nativeScenarioInputs": [
+            {
+                "id": "existing-placement-fixture-benchmark-0-1",
+                "family": "benchmark-0",
+                "channels": [366183173, 3834712693, 3671065718],
+                "tags": {
+                    "terrain": "normal",
+                    "seat": "1",
+                    "purpose": "exposed-final-placement-functional",
+                    "army": "Leprechaun, Dryad, Battle Mage, Beholder, Cyclops, Frenzied Boar",
+                    "opponent": "Peasant, Arbalester, Trent, Elf, Zena, Angel"
+                },
+                "input": {
+                    "setupSeed": 366183173,
+                    "terrainSeed": 3834712693,
+                    "candidateTeam": 1,
+                    "maxTicks": 3000,
+                    "game": {
+                        "lowerCreatureIds": [23, 47, 55, 6, 17, 43],
+                        "upperCreatureIds": [31, 33, 52, 24, 50, 40],
+                        "gridType": 3,
+                        "unitAmount": 8,
+                        "lowerDoctrine": 1,
+                        "upperDoctrine": 2,
+                        "leftKnownOpponentCreatureIds": [31, 33, 52],
+                        "rightKnownOpponentCreatureIds": [23, 47, 55, 6, 17, 43],
+                        "leftArtifactTier1": 6,
+                        "leftArtifactTier2": 7,
+                        "rightArtifactTier1": 4,
+                        "rightArtifactTier2": 15,
+                        "hideOpponentRosterDuringSetup": false
+                    },
+                    "amounts": [
+                        [23, 148],
+                        [47, 91],
+                        [55, 50],
+                        [6, 22],
+                        [17, 8],
+                        [43, 2],
+                        [31, 200],
+                        [33, 124],
+                        [52, 24],
+                        [24, 26],
+                        [50, 8],
+                        [40, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 2,
+                        "Nature": 2,
+                        "Chaos": 1,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "existing-placement-fixture-benchmark-0-2",
+                "family": "benchmark-0",
+                "channels": [366183173, 3834712693, 3671065718],
+                "tags": {
+                    "terrain": "normal",
+                    "seat": "2",
+                    "purpose": "exposed-final-placement-functional",
+                    "army": "Leprechaun, Dryad, Battle Mage, Beholder, Cyclops, Frenzied Boar",
+                    "opponent": "Peasant, Arbalester, Trent, Elf, Zena, Angel"
+                },
+                "input": {
+                    "setupSeed": 366183173,
+                    "terrainSeed": 3834712693,
+                    "candidateTeam": 2,
+                    "maxTicks": 3000,
+                    "game": {
+                        "lowerCreatureIds": [31, 33, 52, 24, 50, 40],
+                        "upperCreatureIds": [23, 47, 55, 6, 17, 43],
+                        "gridType": 3,
+                        "unitAmount": 8,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 1,
+                        "leftKnownOpponentCreatureIds": [23, 47, 55, 6, 17, 43],
+                        "rightKnownOpponentCreatureIds": [31, 33, 52],
+                        "leftArtifactTier1": 4,
+                        "leftArtifactTier2": 15,
+                        "rightArtifactTier1": 6,
+                        "rightArtifactTier2": 7,
+                        "hideOpponentRosterDuringSetup": false
+                    },
+                    "amounts": [
+                        [23, 148],
+                        [47, 91],
+                        [55, 50],
+                        [6, 22],
+                        [17, 8],
+                        [43, 2],
+                        [31, 200],
+                        [33, 124],
+                        [52, 24],
+                        [24, 26],
+                        [50, 8],
+                        [40, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 2,
+                        "Nature": 2,
+                        "Chaos": 1,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "existing-placement-fixture-benchmark-1-1",
+                "family": "benchmark-1",
+                "channels": [3167378191, 2045224894, 2919126935],
+                "tags": {
+                    "terrain": "lava",
+                    "seat": "1",
+                    "purpose": "exposed-final-placement-functional",
+                    "army": "Leprechaun, Dryad, Battle Mage, Beholder, Cyclops, Frenzied Boar",
+                    "opponent": "Peasant, Arbalester, Trent, Elf, Zena, Angel"
+                },
+                "input": {
+                    "setupSeed": 3167378191,
+                    "terrainSeed": 2045224894,
+                    "candidateTeam": 1,
+                    "maxTicks": 3000,
+                    "game": {
+                        "lowerCreatureIds": [23, 47, 55, 6, 17, 43],
+                        "upperCreatureIds": [31, 33, 52, 24, 50, 40],
+                        "gridType": 3,
+                        "unitAmount": 8,
+                        "lowerDoctrine": 1,
+                        "upperDoctrine": 2,
+                        "leftKnownOpponentCreatureIds": [31, 33, 52],
+                        "rightKnownOpponentCreatureIds": [23, 47, 55, 6, 17, 43],
+                        "leftArtifactTier1": 6,
+                        "leftArtifactTier2": 7,
+                        "rightArtifactTier1": 4,
+                        "rightArtifactTier2": 15,
+                        "hideOpponentRosterDuringSetup": false
+                    },
+                    "amounts": [
+                        [23, 148],
+                        [47, 91],
+                        [55, 50],
+                        [6, 22],
+                        [17, 8],
+                        [43, 2],
+                        [31, 200],
+                        [33, 124],
+                        [52, 24],
+                        [24, 26],
+                        [50, 8],
+                        [40, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 2,
+                        "Nature": 2,
+                        "Chaos": 1,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "existing-placement-fixture-benchmark-1-2",
+                "family": "benchmark-1",
+                "channels": [3167378191, 2045224894, 2919126935],
+                "tags": {
+                    "terrain": "lava",
+                    "seat": "2",
+                    "purpose": "exposed-final-placement-functional",
+                    "army": "Leprechaun, Dryad, Battle Mage, Beholder, Cyclops, Frenzied Boar",
+                    "opponent": "Peasant, Arbalester, Trent, Elf, Zena, Angel"
+                },
+                "input": {
+                    "setupSeed": 3167378191,
+                    "terrainSeed": 2045224894,
+                    "candidateTeam": 2,
+                    "maxTicks": 3000,
+                    "game": {
+                        "lowerCreatureIds": [31, 33, 52, 24, 50, 40],
+                        "upperCreatureIds": [23, 47, 55, 6, 17, 43],
+                        "gridType": 3,
+                        "unitAmount": 8,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 1,
+                        "leftKnownOpponentCreatureIds": [23, 47, 55, 6, 17, 43],
+                        "rightKnownOpponentCreatureIds": [31, 33, 52],
+                        "leftArtifactTier1": 4,
+                        "leftArtifactTier2": 15,
+                        "rightArtifactTier1": 6,
+                        "rightArtifactTier2": 7,
+                        "hideOpponentRosterDuringSetup": false
+                    },
+                    "amounts": [
+                        [23, 148],
+                        [47, 91],
+                        [55, 50],
+                        [6, 22],
+                        [17, 8],
+                        [43, 2],
+                        [31, 200],
+                        [33, 124],
+                        [52, 24],
+                        [24, 26],
+                        [50, 8],
+                        [40, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 2,
+                        "Nature": 2,
+                        "Chaos": 1,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-0-0-delivery-0",
+                "family": "exposed-barrel-0",
+                "channels": [408052349, 2011199140, 4244941076, 2849070681],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "1",
+                    "opponent": "current",
+                    "seat": "2",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "adf0f6fa22ffd8e63a86606ee835c389608780df7670795d62b84df784de9ef1"
+                },
+                "input": {
+                    "setupSeed": 408052349,
+                    "terrainSeed": 2011199140,
+                    "candidateTeam": 2,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [23, 1, 16, 5, 17, 57],
+                        "upperCreatureIds": [11, 12, 34, 6, 7, 39],
+                        "gridType": 1,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 5,
+                        "leftArtifactTier2": 4,
+                        "rightArtifactTier1": 11,
+                        "rightArtifactTier2": 6,
+                        "leftKnownOpponentCreatureIds": [11, 12, 34, 6, 7, 39],
+                        "rightKnownOpponentCreatureIds": [23, 1, 16, 5, 17, 57],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [23, 148],
+                        [1, 100],
+                        [16, 26],
+                        [5, 24],
+                        [17, 8],
+                        [57, 2],
+                        [11, 73],
+                        [12, 109],
+                        [34, 29],
+                        [6, 22],
+                        [7, 9],
+                        [39, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 2,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-0-0-delivery-1",
+                "family": "exposed-barrel-0",
+                "channels": [408052349, 2011199140, 4244941076, 2849070681],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "1",
+                    "opponent": "current",
+                    "seat": "2",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "adf0f6fa22ffd8e63a86606ee835c389608780df7670795d62b84df784de9ef1"
+                },
+                "input": {
+                    "setupSeed": 408052349,
+                    "terrainSeed": 2011199140,
+                    "candidateTeam": 2,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [23, 1, 16, 5, 17, 57],
+                        "upperCreatureIds": [11, 12, 34, 6, 7, 39],
+                        "gridType": 1,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 5,
+                        "leftArtifactTier2": 4,
+                        "rightArtifactTier1": 11,
+                        "rightArtifactTier2": 6,
+                        "leftKnownOpponentCreatureIds": [11, 12, 34, 6, 7, 39],
+                        "rightKnownOpponentCreatureIds": [23, 1, 16, 5, 17, 57],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [23, 148],
+                        [1, 100],
+                        [16, 26],
+                        [5, 24],
+                        [17, 8],
+                        [57, 2],
+                        [11, 73],
+                        [12, 109],
+                        [34, 29],
+                        [6, 22],
+                        [7, 9],
+                        [39, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 2,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-1-1-delivery-0",
+                "family": "exposed-barrel-1",
+                "channels": [2643790792, 947088377, 449078701, 1199008264],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "3",
+                    "opponent": "current",
+                    "seat": "1",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "16f419ea8dc4e5d6880a35632974cb3727cdd14248b50b6786580064d9d33d5a"
+                },
+                "input": {
+                    "setupSeed": 2643790792,
+                    "terrainSeed": 947088377,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [32, 31, 24, 55, 17, 39],
+                        "upperCreatureIds": [49, 33, 6, 52, 50, 40],
+                        "gridType": 3,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 6,
+                        "rightArtifactTier1": 10,
+                        "rightArtifactTier2": 14,
+                        "leftKnownOpponentCreatureIds": [49, 33, 6, 52, 50, 40],
+                        "rightKnownOpponentCreatureIds": [32, 31, 24, 55, 17, 39],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [32, 132],
+                        [31, 200],
+                        [24, 26],
+                        [55, 50],
+                        [17, 8],
+                        [39, 2],
+                        [49, 139],
+                        [33, 124],
+                        [6, 22],
+                        [52, 24],
+                        [50, 8],
+                        [40, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-1-1-delivery-1",
+                "family": "exposed-barrel-1",
+                "channels": [2643790792, 947088377, 449078701, 1199008264],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "3",
+                    "opponent": "current",
+                    "seat": "1",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "16f419ea8dc4e5d6880a35632974cb3727cdd14248b50b6786580064d9d33d5a"
+                },
+                "input": {
+                    "setupSeed": 2643790792,
+                    "terrainSeed": 947088377,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [32, 31, 24, 55, 17, 39],
+                        "upperCreatureIds": [49, 33, 6, 52, 50, 40],
+                        "gridType": 3,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 6,
+                        "rightArtifactTier1": 10,
+                        "rightArtifactTier2": 14,
+                        "leftKnownOpponentCreatureIds": [49, 33, 6, 52, 50, 40],
+                        "rightKnownOpponentCreatureIds": [32, 31, 24, 55, 17, 39],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [32, 132],
+                        [31, 200],
+                        [24, 26],
+                        [55, 50],
+                        [17, 8],
+                        [39, 2],
+                        [49, 139],
+                        [33, 124],
+                        [6, 22],
+                        [52, 24],
+                        [50, 8],
+                        [40, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-2-2-delivery-0",
+                "family": "exposed-barrel-2",
+                "channels": [1351602466, 962010468, 2462145684, 2435387133],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "4",
+                    "opponent": "current",
+                    "seat": "1",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "343e98804c7b8adb7a9e6998c7f556fa9611e5a2f8d201cc3e63bc82b35ce5f7"
+                },
+                "input": {
+                    "setupSeed": 1351602466,
+                    "terrainSeed": 962010468,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [1, 47, 6, 24, 17, 39],
+                        "upperCreatureIds": [12, 33, 55, 5, 37, 29],
+                        "gridType": 4,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 3,
+                        "leftArtifactTier2": 8,
+                        "rightArtifactTier1": 11,
+                        "rightArtifactTier2": 5,
+                        "leftKnownOpponentCreatureIds": [12, 33, 55, 5, 37, 29],
+                        "rightKnownOpponentCreatureIds": [1, 47, 6, 24, 17, 39],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [1, 100],
+                        [47, 91],
+                        [6, 22],
+                        [24, 26],
+                        [17, 8],
+                        [39, 2],
+                        [12, 109],
+                        [33, 124],
+                        [55, 50],
+                        [5, 24],
+                        [37, 9],
+                        [29, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 1,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-2-2-delivery-1",
+                "family": "exposed-barrel-2",
+                "channels": [1351602466, 962010468, 2462145684, 2435387133],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "4",
+                    "opponent": "current",
+                    "seat": "1",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "343e98804c7b8adb7a9e6998c7f556fa9611e5a2f8d201cc3e63bc82b35ce5f7"
+                },
+                "input": {
+                    "setupSeed": 1351602466,
+                    "terrainSeed": 962010468,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [1, 47, 6, 24, 17, 39],
+                        "upperCreatureIds": [12, 33, 55, 5, 37, 29],
+                        "gridType": 4,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 3,
+                        "leftArtifactTier2": 8,
+                        "rightArtifactTier1": 11,
+                        "rightArtifactTier2": 5,
+                        "leftKnownOpponentCreatureIds": [12, 33, 55, 5, 37, 29],
+                        "rightKnownOpponentCreatureIds": [1, 47, 6, 24, 17, 39],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [1, 100],
+                        [47, 91],
+                        [6, 22],
+                        [24, 26],
+                        [17, 8],
+                        [39, 2],
+                        [12, 109],
+                        [33, 124],
+                        [55, 50],
+                        [5, 24],
+                        [37, 9],
+                        [29, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 1,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-189-0-delivery-0",
+                "family": "exposed-barrel-189",
+                "channels": [22667738, 136674253, 4043662895, 1336015121],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "1",
+                    "opponent": "shooter",
+                    "seat": "2",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "4bdbe9884da17f86ecfafcad930ee798bb8b22399d27053f74f093b42978c8aa"
+                },
+                "input": {
+                    "setupSeed": 22667738,
+                    "terrainSeed": 136674253,
+                    "candidateTeam": 2,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [11, 47, 16, 52, 17, 20],
+                        "upperCreatureIds": [49, 33, 34, 6, 54, 40],
+                        "gridType": 1,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 1,
+                        "leftArtifactTier2": 14,
+                        "rightArtifactTier1": 11,
+                        "rightArtifactTier2": 17,
+                        "leftKnownOpponentCreatureIds": [49, 33, 34, 6, 54, 40],
+                        "rightKnownOpponentCreatureIds": [11, 47, 16, 52, 17, 20],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [11, 73],
+                        [47, 91],
+                        [16, 26],
+                        [52, 24],
+                        [17, 8],
+                        [20, 2],
+                        [49, 139],
+                        [33, 124],
+                        [34, 29],
+                        [6, 22],
+                        [54, 8],
+                        [40, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 1,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-189-0-delivery-1",
+                "family": "exposed-barrel-189",
+                "channels": [22667738, 136674253, 4043662895, 1336015121],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "1",
+                    "opponent": "shooter",
+                    "seat": "2",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "4bdbe9884da17f86ecfafcad930ee798bb8b22399d27053f74f093b42978c8aa"
+                },
+                "input": {
+                    "setupSeed": 22667738,
+                    "terrainSeed": 136674253,
+                    "candidateTeam": 2,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [11, 47, 16, 52, 17, 20],
+                        "upperCreatureIds": [49, 33, 34, 6, 54, 40],
+                        "gridType": 1,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 1,
+                        "leftArtifactTier2": 14,
+                        "rightArtifactTier1": 11,
+                        "rightArtifactTier2": 17,
+                        "leftKnownOpponentCreatureIds": [49, 33, 34, 6, 54, 40],
+                        "rightKnownOpponentCreatureIds": [11, 47, 16, 52, 17, 20],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [11, 73],
+                        [47, 91],
+                        [16, 26],
+                        [52, 24],
+                        [17, 8],
+                        [20, 2],
+                        [49, 139],
+                        [33, 124],
+                        [34, 29],
+                        [6, 22],
+                        [54, 8],
+                        [40, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 1,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-190-1-delivery-0",
+                "family": "exposed-barrel-190",
+                "channels": [1536022554, 1447975920, 4084622283, 4078190500],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "3",
+                    "opponent": "shooter",
+                    "seat": "1",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "24677ebe7c069ad0ccf3eea6d2ac2df1cc62b3f232acdcaef5b3230007338ce7"
+                },
+                "input": {
+                    "setupSeed": 1536022554,
+                    "terrainSeed": 1447975920,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [32, 1, 5, 24, 54, 29],
+                        "upperCreatureIds": [23, 22, 6, 55, 17, 57],
+                        "gridType": 3,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 13,
+                        "leftArtifactTier2": 14,
+                        "rightArtifactTier1": 11,
+                        "rightArtifactTier2": 6,
+                        "leftKnownOpponentCreatureIds": [23, 22, 6, 55, 17, 57],
+                        "rightKnownOpponentCreatureIds": [32, 1, 5, 24, 54, 29],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [32, 132],
+                        [1, 100],
+                        [5, 24],
+                        [24, 26],
+                        [54, 8],
+                        [29, 2],
+                        [23, 148],
+                        [22, 139],
+                        [6, 22],
+                        [55, 50],
+                        [17, 8],
+                        [57, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 2,
+                        "Chaos": 1,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-190-1-delivery-1",
+                "family": "exposed-barrel-190",
+                "channels": [1536022554, 1447975920, 4084622283, 4078190500],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "3",
+                    "opponent": "shooter",
+                    "seat": "1",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "24677ebe7c069ad0ccf3eea6d2ac2df1cc62b3f232acdcaef5b3230007338ce7"
+                },
+                "input": {
+                    "setupSeed": 1536022554,
+                    "terrainSeed": 1447975920,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [32, 1, 5, 24, 54, 29],
+                        "upperCreatureIds": [23, 22, 6, 55, 17, 57],
+                        "gridType": 3,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 13,
+                        "leftArtifactTier2": 14,
+                        "rightArtifactTier1": 11,
+                        "rightArtifactTier2": 6,
+                        "leftKnownOpponentCreatureIds": [23, 22, 6, 55, 17, 57],
+                        "rightKnownOpponentCreatureIds": [32, 1, 5, 24, 54, 29],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [32, 132],
+                        [1, 100],
+                        [5, 24],
+                        [24, 26],
+                        [54, 8],
+                        [29, 2],
+                        [23, 148],
+                        [22, 139],
+                        [6, 22],
+                        [55, 50],
+                        [17, 8],
+                        [57, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 2,
+                        "Chaos": 1,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-191-2-delivery-0",
+                "family": "exposed-barrel-191",
+                "channels": [1118405194, 3550250106, 161923581, 2407224357],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "4",
+                    "opponent": "shooter",
+                    "seat": "1",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "d9a15694b1b0d130510d6a4d4dc5337bb8703833bbc39dd6e4f107f47d153bcc"
+                },
+                "input": {
+                    "setupSeed": 1118405194,
+                    "terrainSeed": 3550250106,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [47, 33, 51, 4, 50, 39],
+                        "upperCreatureIds": [31, 49, 35, 55, 37, 29],
+                        "gridType": 4,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 17,
+                        "rightArtifactTier1": 10,
+                        "rightArtifactTier2": 14,
+                        "leftKnownOpponentCreatureIds": [31, 49, 35, 55, 37, 29],
+                        "rightKnownOpponentCreatureIds": [47, 33, 51, 4, 50, 39],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [47, 91],
+                        [33, 124],
+                        [51, 31],
+                        [4, 25],
+                        [50, 8],
+                        [39, 2],
+                        [31, 200],
+                        [49, 139],
+                        [35, 23],
+                        [55, 50],
+                        [37, 9],
+                        [29, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 1,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-191-2-delivery-1",
+                "family": "exposed-barrel-191",
+                "channels": [1118405194, 3550250106, 161923581, 2407224357],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "4",
+                    "opponent": "shooter",
+                    "seat": "1",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "d9a15694b1b0d130510d6a4d4dc5337bb8703833bbc39dd6e4f107f47d153bcc"
+                },
+                "input": {
+                    "setupSeed": 1118405194,
+                    "terrainSeed": 3550250106,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [47, 33, 51, 4, 50, 39],
+                        "upperCreatureIds": [31, 49, 35, 55, 37, 29],
+                        "gridType": 4,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 17,
+                        "rightArtifactTier1": 10,
+                        "rightArtifactTier2": 14,
+                        "leftKnownOpponentCreatureIds": [31, 49, 35, 55, 37, 29],
+                        "rightKnownOpponentCreatureIds": [47, 33, 51, 4, 50, 39],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [47, 91],
+                        [33, 124],
+                        [51, 31],
+                        [4, 25],
+                        [50, 8],
+                        [39, 2],
+                        [31, 200],
+                        [49, 139],
+                        [35, 23],
+                        [55, 50],
+                        [37, 9],
+                        [29, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 1,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-378-0-delivery-0",
+                "family": "exposed-barrel-378",
+                "channels": [3198729247, 468948434, 3298747279, 3240600164],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "1",
+                    "opponent": "caster",
+                    "seat": "2",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "9f310b1fe1b0ecfdf3def069d954680dca54fbda4696ab8a5ae34c25eadc90cd"
+                },
+                "input": {
+                    "setupSeed": 3198729247,
+                    "terrainSeed": 468948434,
+                    "candidateTeam": 2,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [33, 31, 16, 6, 50, 29],
+                        "upperCreatureIds": [47, 49, 26, 55, 17, 57],
+                        "gridType": 1,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 15,
+                        "rightArtifactTier1": 7,
+                        "rightArtifactTier2": 17,
+                        "leftKnownOpponentCreatureIds": [47, 49, 26, 55, 17, 57],
+                        "rightKnownOpponentCreatureIds": [33, 31, 16, 6, 50, 29],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [33, 124],
+                        [31, 200],
+                        [16, 26],
+                        [6, 22],
+                        [50, 8],
+                        [29, 2],
+                        [47, 91],
+                        [49, 139],
+                        [26, 36],
+                        [55, 50],
+                        [17, 8],
+                        [57, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-378-0-delivery-1",
+                "family": "exposed-barrel-378",
+                "channels": [3198729247, 468948434, 3298747279, 3240600164],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "1",
+                    "opponent": "caster",
+                    "seat": "2",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "9f310b1fe1b0ecfdf3def069d954680dca54fbda4696ab8a5ae34c25eadc90cd"
+                },
+                "input": {
+                    "setupSeed": 3198729247,
+                    "terrainSeed": 468948434,
+                    "candidateTeam": 2,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [33, 31, 16, 6, 50, 29],
+                        "upperCreatureIds": [47, 49, 26, 55, 17, 57],
+                        "gridType": 1,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 15,
+                        "rightArtifactTier1": 7,
+                        "rightArtifactTier2": 17,
+                        "leftKnownOpponentCreatureIds": [47, 49, 26, 55, 17, 57],
+                        "rightKnownOpponentCreatureIds": [33, 31, 16, 6, 50, 29],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [33, 124],
+                        [31, 200],
+                        [16, 26],
+                        [6, 22],
+                        [50, 8],
+                        [29, 2],
+                        [47, 91],
+                        [49, 139],
+                        [26, 36],
+                        [55, 50],
+                        [17, 8],
+                        [57, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-379-1-delivery-0",
+                "family": "exposed-barrel-379",
+                "channels": [4097388399, 1770758757, 1059613394, 381527968],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "3",
+                    "opponent": "caster",
+                    "seat": "1",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "c7789007511801277f268278c32092c02878df42214a8b40d4b01b53e2f16de0"
+                },
+                "input": {
+                    "setupSeed": 4097388399,
+                    "terrainSeed": 1770758757,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [22, 49, 25, 5, 54, 57],
+                        "upperCreatureIds": [46, 11, 16, 52, 50, 40],
+                        "gridType": 3,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 17,
+                        "rightArtifactTier1": 8,
+                        "rightArtifactTier2": 15,
+                        "leftKnownOpponentCreatureIds": [46, 11, 16, 52, 50, 40],
+                        "rightKnownOpponentCreatureIds": [22, 49, 25, 5, 54, 57],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [22, 139],
+                        [49, 139],
+                        [25, 25],
+                        [5, 24],
+                        [54, 8],
+                        [57, 2],
+                        [46, 91],
+                        [11, 73],
+                        [16, 26],
+                        [52, 24],
+                        [50, 8],
+                        [40, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 2,
+                        "Nature": 2,
+                        "Chaos": 1,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-379-1-delivery-1",
+                "family": "exposed-barrel-379",
+                "channels": [4097388399, 1770758757, 1059613394, 381527968],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "3",
+                    "opponent": "caster",
+                    "seat": "1",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "c7789007511801277f268278c32092c02878df42214a8b40d4b01b53e2f16de0"
+                },
+                "input": {
+                    "setupSeed": 4097388399,
+                    "terrainSeed": 1770758757,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [22, 49, 25, 5, 54, 57],
+                        "upperCreatureIds": [46, 11, 16, 52, 50, 40],
+                        "gridType": 3,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 17,
+                        "rightArtifactTier1": 8,
+                        "rightArtifactTier2": 15,
+                        "leftKnownOpponentCreatureIds": [46, 11, 16, 52, 50, 40],
+                        "rightKnownOpponentCreatureIds": [22, 49, 25, 5, 54, 57],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [22, 139],
+                        [49, 139],
+                        [25, 25],
+                        [5, 24],
+                        [54, 8],
+                        [57, 2],
+                        [46, 91],
+                        [11, 73],
+                        [16, 26],
+                        [52, 24],
+                        [50, 8],
+                        [40, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 2,
+                        "Nature": 2,
+                        "Chaos": 1,
+                        "Might": 2
+                    }
+                }
+            },
+            {
+                "id": "known-380-2-delivery-0",
+                "family": "exposed-barrel-380",
+                "channels": [140550447, 1074888747, 57637513, 3871804117],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "4",
+                    "opponent": "caster",
+                    "seat": "1",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "ee1746b9d085180d7dd0f679140a666864c8e2801f4043c0add2562d83f08fdc"
+                },
+                "input": {
+                    "setupSeed": 140550447,
+                    "terrainSeed": 1074888747,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [1, 31, 5, 4, 37, 40],
+                        "upperCreatureIds": [47, 33, 26, 24, 7, 39],
+                        "gridType": 4,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 5,
+                        "leftArtifactTier2": 2,
+                        "rightArtifactTier1": 11,
+                        "rightArtifactTier2": 16,
+                        "leftKnownOpponentCreatureIds": [47, 33, 26, 24, 7, 39],
+                        "rightKnownOpponentCreatureIds": [1, 31, 5, 4, 37, 40],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [1, 100],
+                        [31, 200],
+                        [5, 24],
+                        [4, 25],
+                        [37, 9],
+                        [40, 2],
+                        [47, 91],
+                        [33, 124],
+                        [26, 36],
+                        [24, 26],
+                        [7, 9],
+                        [39, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-380-2-delivery-1",
+                "family": "exposed-barrel-380",
+                "channels": [140550447, 1074888747, 57637513, 3871804117],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "4",
+                    "opponent": "caster",
+                    "seat": "1",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "ee1746b9d085180d7dd0f679140a666864c8e2801f4043c0add2562d83f08fdc"
+                },
+                "input": {
+                    "setupSeed": 140550447,
+                    "terrainSeed": 1074888747,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [1, 31, 5, 4, 37, 40],
+                        "upperCreatureIds": [47, 33, 26, 24, 7, 39],
+                        "gridType": 4,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 5,
+                        "leftArtifactTier2": 2,
+                        "rightArtifactTier1": 11,
+                        "rightArtifactTier2": 16,
+                        "leftKnownOpponentCreatureIds": [47, 33, 26, 24, 7, 39],
+                        "rightKnownOpponentCreatureIds": [1, 31, 5, 4, 37, 40],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [1, 100],
+                        [31, 200],
+                        [5, 24],
+                        [4, 25],
+                        [37, 9],
+                        [40, 2],
+                        [47, 91],
+                        [33, 124],
+                        [26, 36],
+                        [24, 26],
+                        [7, 9],
+                        [39, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-567-0-delivery-0",
+                "family": "exposed-barrel-567",
+                "channels": [3732026427, 1566328227, 786739027, 3789266610],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "1",
+                    "opponent": "pressure",
+                    "seat": "2",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "e606eb5d49e898e092dad2233ba667b8db0c339e3c1dd07984077998af35dded"
+                },
+                "input": {
+                    "setupSeed": 3732026427,
+                    "terrainSeed": 1566328227,
+                    "candidateTeam": 2,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [33, 31, 35, 5, 50, 29],
+                        "upperCreatureIds": [22, 49, 6, 14, 37, 9],
+                        "gridType": 1,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 6,
+                        "rightArtifactTier1": 8,
+                        "rightArtifactTier2": 15,
+                        "leftKnownOpponentCreatureIds": [22, 49, 6, 14, 37, 9],
+                        "rightKnownOpponentCreatureIds": [33, 31, 35, 5, 50, 29],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [33, 124],
+                        [31, 200],
+                        [35, 23],
+                        [5, 24],
+                        [50, 8],
+                        [29, 2],
+                        [22, 139],
+                        [49, 139],
+                        [6, 22],
+                        [14, 30],
+                        [37, 9],
+                        [9, 1]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-567-0-delivery-1",
+                "family": "exposed-barrel-567",
+                "channels": [3732026427, 1566328227, 786739027, 3789266610],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "1",
+                    "opponent": "pressure",
+                    "seat": "2",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "e606eb5d49e898e092dad2233ba667b8db0c339e3c1dd07984077998af35dded"
+                },
+                "input": {
+                    "setupSeed": 3732026427,
+                    "terrainSeed": 1566328227,
+                    "candidateTeam": 2,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [33, 31, 35, 5, 50, 29],
+                        "upperCreatureIds": [22, 49, 6, 14, 37, 9],
+                        "gridType": 1,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 6,
+                        "rightArtifactTier1": 8,
+                        "rightArtifactTier2": 15,
+                        "leftKnownOpponentCreatureIds": [22, 49, 6, 14, 37, 9],
+                        "rightKnownOpponentCreatureIds": [33, 31, 35, 5, 50, 29],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [33, 124],
+                        [31, 200],
+                        [35, 23],
+                        [5, 24],
+                        [50, 8],
+                        [29, 2],
+                        [22, 139],
+                        [49, 139],
+                        [6, 22],
+                        [14, 30],
+                        [37, 9],
+                        [9, 1]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-568-1-delivery-0",
+                "family": "exposed-barrel-568",
+                "channels": [1715263617, 185094313, 2180386803, 1880374144],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "3",
+                    "opponent": "pressure",
+                    "seat": "1",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "76eed90e3a005643eac64ab12b0d5ec0cf7a2513466fd1b012c332f4edbbaf40"
+                },
+                "input": {
+                    "setupSeed": 1715263617,
+                    "terrainSeed": 185094313,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [2, 22, 55, 53, 27, 9],
+                        "upperCreatureIds": [31, 47, 36, 24, 50, 29],
+                        "gridType": 3,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 13,
+                        "rightArtifactTier1": 9,
+                        "rightArtifactTier2": 17,
+                        "leftKnownOpponentCreatureIds": [31, 47, 36, 24, 50, 29],
+                        "rightKnownOpponentCreatureIds": [2, 22, 55, 53, 27, 9],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [2, 164],
+                        [22, 139],
+                        [55, 50],
+                        [53, 27],
+                        [27, 12],
+                        [9, 1],
+                        [31, 200],
+                        [47, 91],
+                        [36, 40],
+                        [24, 26],
+                        [50, 8],
+                        [29, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-568-1-delivery-1",
+                "family": "exposed-barrel-568",
+                "channels": [1715263617, 185094313, 2180386803, 1880374144],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "3",
+                    "opponent": "pressure",
+                    "seat": "1",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "76eed90e3a005643eac64ab12b0d5ec0cf7a2513466fd1b012c332f4edbbaf40"
+                },
+                "input": {
+                    "setupSeed": 1715263617,
+                    "terrainSeed": 185094313,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [2, 22, 55, 53, 27, 9],
+                        "upperCreatureIds": [31, 47, 36, 24, 50, 29],
+                        "gridType": 3,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 13,
+                        "rightArtifactTier1": 9,
+                        "rightArtifactTier2": 17,
+                        "leftKnownOpponentCreatureIds": [31, 47, 36, 24, 50, 29],
+                        "rightKnownOpponentCreatureIds": [2, 22, 55, 53, 27, 9],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [2, 164],
+                        [22, 139],
+                        [55, 50],
+                        [53, 27],
+                        [27, 12],
+                        [9, 1],
+                        [31, 200],
+                        [47, 91],
+                        [36, 40],
+                        [24, 26],
+                        [50, 8],
+                        [29, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 1,
+                        "Nature": 1,
+                        "Chaos": 2,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-569-2-delivery-0",
+                "family": "exposed-barrel-569",
+                "channels": [2720347673, 2625397072, 3979139734, 1558058343],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "4",
+                    "opponent": "pressure",
+                    "seat": "1",
+                    "deliveryBudget": "both-unused",
+                    "sourceDraftSha256": "40afd3de36dac5ae97e02d893eab11c83b73d5a7ce1d010caf2a059ddbc12887"
+                },
+                "input": {
+                    "setupSeed": 2720347673,
+                    "terrainSeed": 2625397072,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [12, 22, 16, 51, 37, 9],
+                        "upperCreatureIds": [1, 49, 53, 24, 50, 39],
+                        "gridType": 4,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 17,
+                        "rightArtifactTier1": 13,
+                        "rightArtifactTier2": 5,
+                        "leftKnownOpponentCreatureIds": [1, 49, 53, 24, 50, 39],
+                        "rightKnownOpponentCreatureIds": [12, 22, 16, 51, 37, 9],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": false,
+                        "rightDeliveryDraftOverrideUsed": false
+                    },
+                    "amounts": [
+                        [12, 109],
+                        [22, 139],
+                        [16, 26],
+                        [51, 31],
+                        [37, 9],
+                        [9, 1],
+                        [1, 100],
+                        [49, 139],
+                        [53, 27],
+                        [24, 26],
+                        [50, 8],
+                        [39, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 2,
+                        "Nature": 1,
+                        "Chaos": 1,
+                        "Might": 1
+                    }
+                }
+            },
+            {
+                "id": "known-569-2-delivery-1",
+                "family": "exposed-barrel-569",
+                "channels": [2720347673, 2625397072, 3979139734, 1558058343],
+                "tags": {
+                    "purpose": "known-bank-functional-only",
+                    "map": "4",
+                    "opponent": "pressure",
+                    "seat": "1",
+                    "deliveryBudget": "both-consumed",
+                    "sourceDraftSha256": "40afd3de36dac5ae97e02d893eab11c83b73d5a7ce1d010caf2a059ddbc12887"
+                },
+                "input": {
+                    "setupSeed": 2720347673,
+                    "terrainSeed": 2625397072,
+                    "candidateTeam": 1,
+                    "maxTicks": 4000,
+                    "game": {
+                        "lowerCreatureIds": [12, 22, 16, 51, 37, 9],
+                        "upperCreatureIds": [1, 49, 53, 24, 50, 39],
+                        "gridType": 4,
+                        "unitAmount": 1,
+                        "lowerDoctrine": 2,
+                        "upperDoctrine": 2,
+                        "leftArtifactTier1": 11,
+                        "leftArtifactTier2": 17,
+                        "rightArtifactTier1": 13,
+                        "rightArtifactTier2": 5,
+                        "leftKnownOpponentCreatureIds": [1, 49, 53, 24, 50, 39],
+                        "rightKnownOpponentCreatureIds": [12, 22, 16, 51, 37, 9],
+                        "hideOpponentRosterDuringSetup": false,
+                        "leftDeliveryDraftOverrideUsed": true,
+                        "rightDeliveryDraftOverrideUsed": true
+                    },
+                    "amounts": [
+                        [12, 109],
+                        [22, 139],
+                        [16, 26],
+                        [51, 31],
+                        [37, 9],
+                        [9, 1],
+                        [1, 100],
+                        [49, 139],
+                        [53, 27],
+                        [24, 26],
+                        [50, 8],
+                        [39, 2]
+                    ],
+                    "synergyVariants": {
+                        "Life": 2,
+                        "Nature": 1,
+                        "Chaos": 1,
+                        "Might": 1
+                    }
+                }
+            }
+        ],
+        "nativePlaySessionPatch": "--- src/api/game/v1/play_session.ts\n+++ src/api/game/v1/play_session.sniper_donor_guard.ts\n@@ -1071,6 +1071,16 @@\n     private readonly deliveryDraftOverrideUsed = new Set<TeamType>();\n     private readonly deliverySetupApplied = new Map<TeamType, { signature: string; plan: IA19DeliveryPlan }>();\n     private readonly deliverySetupCache = new Map<TeamType, { signature: string; plan: IA19DeliveryPlan | null }>();\n+    private readonly researchSniperProtectionTeams = new Set<TeamType>();\n+    private readonly researchFreeDeliveryTeams = new Set<TeamType>();\n+    private researchDeliveryCatalogWitness?: (event: {\n+        team: TeamType;\n+        protectSniper: boolean;\n+        freeOnly: boolean;\n+        nativeSniper: number;\n+        catalog: { id: string; sniper: number; cost: number }[];\n+        retained: string[];\n+    }) => void;\n     private readonly gameId: string;\n     private readonly nowMillis: () => number;\n     private readonly aiTakeoverMs: number;\n@@ -7468,6 +7478,8 @@\n         return JSON.stringify({\n             own: [...totals].sort(([a], [b]) => a - b),\n             context,\n+            ...(this.researchSniperProtectionTeams.has(team) ? { researchPreserveSniper: true } : {}),\n+            ...(this.researchFreeDeliveryTeams.has(team) ? { researchFreeOnly: true } : {}),\n             base: policy.pickAugments(\n                 this.fightProperties.getUpgradePoints(team),\n                 this.creatureIdsForTeam(team),\n@@ -7508,7 +7520,18 @@\n             selected = { signature, plan: null };\n             try {\n                 let best = this.previewDeliverySetup(team, policy, base, false);\n-                for (const plan of a19FundedDeliveryPlans(base, own)) {\n+                const catalog = a19FundedDeliveryPlans(base, own);\n+                const protectSniper = this.researchSniperProtectionTeams.has(team);\n+                const freeOnly = this.researchFreeDeliveryTeams.has(team);\n+                const retained = catalog.filter((plan) =>\n+                    (!protectSniper || plan.levels.Sniper >= levels.Sniper) && (!freeOnly || plan.cost === 0),\n+                );\n+                this.researchDeliveryCatalogWitness?.({\n+                    team, protectSniper, freeOnly, nativeSniper: levels.Sniper,\n+                    catalog: catalog.map((plan) => ({ id: plan.id, sniper: plan.levels.Sniper, cost: plan.cost })),\n+                    retained: retained.map((plan) => plan.id),\n+                });\n+                for (const plan of retained) {\n                     const score = this.previewDeliverySetup(team, policy, plan.augments, true);\n                     if (score > best + 1e-9 && (plan.cost === 0 || score >= best + 0.25)) {\n                         best = score;\n",
+        "sourceFiles": {
+            "prepare.py": {
+                "sha256": "dc368f77c58b59e654508e375435805b7fb30eabb920d38d93dce3c3f0933bd3",
+                "text": "from pathlib import Path\nimport datetime, hashlib, io, json, shutil, subprocess, tarfile\n\np = Path(__file__).resolve().parent\nclient = p.parents[3]\nserver = client.parent / 'heroes-of-crypto-server'\nparent = p.parent / 'barrel-terrain-delivery-recheck-20261118'\nfrozen = p / 'frozen-server'\nassert not frozen.exists()\ncommit = subprocess.check_output(['git','-C',str(server),'rev-parse','HEAD'], text=True).strip()\nassert commit == '91b6a9112ec2a9b39236d13902badb7c52e93ba3'\nraw = subprocess.check_output(['git','-C',str(server),'archive',commit])\nfrozen.mkdir()\nwith tarfile.open(fileobj=io.BytesIO(raw)) as archive:\n    archive.extractall(frozen, filter='data')\n(frozen/'node_modules').symlink_to(server/'node_modules', target_is_directory=True)\n(p/'node_modules').symlink_to(server/'node_modules', target_is_directory=True)\noriginal = (frozen/'src/api/game/v1/play_session.ts').read_text()\nmodified = original\nold = '    private readonly deliverySetupCache = new Map<TeamType, { signature: string; plan: IA19DeliveryPlan | null }>();'\nnew = old + '''\n    private readonly researchSniperProtectionTeams = new Set<TeamType>();\n    private readonly researchFreeDeliveryTeams = new Set<TeamType>();\n    private researchDeliveryCatalogWitness?: (event: {\n        team: TeamType;\n        protectSniper: boolean;\n        freeOnly: boolean;\n        nativeSniper: number;\n        catalog: { id: string; sniper: number; cost: number }[];\n        retained: string[];\n    }) => void;'''\nassert modified.count(old)==1\nmodified=modified.replace(old,new)\nold='''            own: [...totals].sort(([a], [b]) => a - b),\n            context,\n            base: policy.pickAugments('''\nnew='''            own: [...totals].sort(([a], [b]) => a - b),\n            context,\n            ...(this.researchSniperProtectionTeams.has(team) ? { researchPreserveSniper: true } : {}),\n            ...(this.researchFreeDeliveryTeams.has(team) ? { researchFreeOnly: true } : {}),\n            base: policy.pickAugments('''\nassert modified.count(old)==1\nmodified=modified.replace(old,new)\nold='''                for (const plan of a19FundedDeliveryPlans(base, own)) {'''\nnew='''                const catalog = a19FundedDeliveryPlans(base, own);\n                const protectSniper = this.researchSniperProtectionTeams.has(team);\n                const freeOnly = this.researchFreeDeliveryTeams.has(team);\n                const retained = catalog.filter((plan) =>\n                    (!protectSniper || plan.levels.Sniper >= levels.Sniper) && (!freeOnly || plan.cost === 0),\n                );\n                this.researchDeliveryCatalogWitness?.({\n                    team, protectSniper, freeOnly, nativeSniper: levels.Sniper,\n                    catalog: catalog.map((plan) => ({ id: plan.id, sniper: plan.levels.Sniper, cost: plan.cost })),\n                    retained: retained.map((plan) => plan.id),\n                });\n                for (const plan of retained) {'''\nassert modified.count(old)==1\nmodified=modified.replace(old,new)\ncandidate=frozen/'src/api/game/v1/play_session.sniper_donor_guard.ts'\ncandidate.write_text(modified)\nadapter=(frozen/'src/simulation/ai_iteration/ranked_adapter.ts').read_text()\nassert adapter.count('from \"../../api/game/v1/play_session\";')==1\n(frozen/'src/simulation/ai_iteration/ranked_adapter.sniper_donor_guard.ts').write_text(adapter.replace('from \"../../api/game/v1/play_session\";','from \"../../api/game/v1/play_session.sniper_donor_guard\";'))\n(frozen/'src/simulation/ai_iteration/sniper_guard_rng.ts').write_text('export {captureDeterministicRandomState,getDeterministicRandomSource,setDeterministicRandomSource} from \"@heroesofcrypto/common/src/utils/lib\";\\n')\nfor name in ['baseline-controls.json','known-cases.json']:\n    shutil.copyfile(parent/name,p/name)\nsnapshot={'serverCommit':commit,'sharedEnginePin':'87f8edf71c1471fe6dbe10c62792655d70a6c437','gitArchiveSha256':hashlib.sha256(raw).hexdigest(),'baselinePlaySessionSha256':hashlib.sha256(original.encode()).hexdigest(),'candidatePlaySessionSha256':hashlib.sha256(modified.encode()).hexdigest(),'candidate':'Filter existing funded delivery plans before preview when their Sniper level is below the native fully-funded base. No terrain recheck, score reweighting, hidden inputs, new splits or combat change. Separate free-only arm filters cost>0. Default source untouched.'}\n(p/'source-snapshot.json').write_text(json.dumps(snapshot,indent=2)+'\\n')\nprint(json.dumps(snapshot))\n"
+            },
+            "adapter.ts": {
+                "sha256": "45bd896a92b5cb42b3ce20df74fe0d30a917c67fa7557fa22cba9e1ea1a0fa2f",
+                "text": "import assert from \"node:assert/strict\";\nimport base, { type RankedInput } from \"./frozen-server/src/simulation/ai_iteration/ranked_adapter\";\nimport { runRankedCase } from \"./frozen-server/src/simulation/ai_iteration/ranked_adapter.sniper_donor_guard\";\nimport {\n    captureDeterministicRandomState,\n    getDeterministicRandomSource,\n    setDeterministicRandomSource,\n} from \"./frozen-server/src/simulation/ai_iteration/sniper_guard_rng\";\nimport type { IterationAdapter, Json } from \"./frozen-server/src/simulation/ai_iteration/types\";\n\ninterface Input {\n    ranked: RankedInput;\n    protectTeams: number[];\n    freeTeams: number[];\n}\nexport const newFields = [\n    \"leftSetupBudget\",\n    \"rightSetupBudget\",\n    \"leftSetupSpend\",\n    \"rightSetupSpend\",\n    \"observedLiveRandomDraws\",\n    \"deliveryPreviewCalls\",\n    \"catalogCalls\",\n    \"prunedDeliveryPlans\",\n    \"previewRngUuidChecks\",\n];\nconst modes = [\"current\", \"protect-entrant\", \"free-entrant\"];\nfunction unused(input: RankedInput, team: number) {\n    return !(team === 2 ? input.game.leftDeliveryDraftOverrideUsed : input.game.rightDeliveryDraftOverrideUsed);\n}\nexport function runObserved(input: Input, observe = true) {\n    let finalCalls = 0,\n        forced = 0,\n        mask = 0,\n        inStart = false,\n        draws = 0,\n        previews = 0,\n        randomChecks = 0,\n        fp: any;\n    const catalogs: any[] = [],\n        selections: any[] = [];\n    const outcome = runRankedCase(input.ranked, (session) => {\n        const s = session as any;\n        fp = s.fightProperties;\n        s.researchSniperProtectionTeams = new Set(input.protectTeams);\n        s.researchFreeDeliveryTeams = new Set(input.freeTeams);\n        const rng = getDeterministicRandomSource();\n        assert.ok(rng);\n        setDeterministicRandomSource(() => {\n            draws++;\n            return rng();\n        });\n        if (!observe) return;\n        s.researchDeliveryCatalogWitness = (event: any) => {\n            assert.equal(event.protectSniper, input.protectTeams.includes(event.team));\n            assert.equal(event.freeOnly, input.freeTeams.includes(event.team));\n            for (const id of event.retained) {\n                const plan = event.catalog.find((x: any) => x.id === id);\n                assert.ok(plan);\n                if (event.protectSniper) assert.ok(plan.sniper >= event.nativeSniper);\n                if (event.freeOnly) assert.equal(plan.cost, 0);\n            }\n            catalogs.push(JSON.parse(JSON.stringify(event)));\n        };\n        const start = s.tryStartFightIfReady,\n            replace = s.rePlaceTeam,\n            preview = s.previewDeliverySetup,\n            select = s.selectSetupAugmentsForTeam;\n        s.tryStartFightIfReady = function (this: any, ...args: any[]) {\n            assert.equal(inStart, false);\n            inStart = true;\n            try {\n                return start.apply(this, args);\n            } finally {\n                inStart = false;\n            }\n        };\n        s.rePlaceTeam = function (this: any, ...args: any[]) {\n            if (inStart) {\n                finalCalls++;\n                forced += Number(args[1] === true);\n                mask |= 1 << (args[0] - 1);\n            }\n            return replace.apply(this, args);\n        };\n        s.previewDeliverySetup = function (this: any, ...args: any[]) {\n            const before = captureDeterministicRandomState(),\n                d = draws;\n            const score = preview.apply(this, args);\n            const after = captureDeterministicRandomState();\n            assert.equal(after.source, before.source);\n            assert.equal(after.uuidSequence, before.uuidSequence);\n            assert.equal(draws, d);\n            previews++;\n            randomChecks++;\n            return score;\n        };\n        s.selectSetupAugmentsForTeam = function (this: any, ...args: any[]) {\n            const selected = select.apply(this, args);\n            const event = catalogs.findLast((x) => x.team === args[0]);\n            if (event) {\n                const sniper = selected.find((x: any) => x.kind === \"Sniper\")?.value ?? 0;\n                if (input.protectTeams.includes(args[0])) assert.ok(sniper >= event.nativeSniper);\n                if (args[3] === true)\n                    selections.push({\n                        team: args[0],\n                        nativeSniper: event.nativeSniper,\n                        sniper,\n                        augments: selected.map((x: any) => ({ ...x })),\n                    });\n            }\n            return selected;\n        };\n    });\n    const spend = (team: number) =>\n        fp.getAugmentPlacementLevel(team) +\n        fp.getAugmentArmor(team) +\n        fp.getAugmentMight(team) +\n        fp.getAugmentSniper(team) +\n        fp.getAugmentMovement(team) +\n        fp.getAugmentEmpower(team);\n    return {\n        ...outcome,\n        diagnostics: {\n            ...outcome.diagnostics,\n            observedFinalPlacementCalls: finalCalls,\n            observedForcedFinalPlacementCalls: forced,\n            observedFinalPlacementTeamMask: mask,\n            leftSetupBudget: fp.getUpgradePoints(2),\n            rightSetupBudget: fp.getUpgradePoints(1),\n            leftSetupSpend: spend(2),\n            rightSetupSpend: spend(1),\n            observedLiveRandomDraws: draws,\n            deliveryPreviewCalls: previews,\n            catalogCalls: catalogs.length,\n            prunedDeliveryPlans: catalogs.reduce((n, x) => n + x.catalog.length - x.retained.length, 0),\n            previewRngUuidChecks: randomChecks,\n        },\n        evidence: { ...(outcome.evidence as Record<string, Json>), sniperDonorObservation: { catalogs, selections } },\n    };\n}\nconst adapter: IterationAdapter = {\n    async prepare(testCase, arm) {\n        const params = arm.parameters as { mode: string };\n        assert.deepEqual(Object.keys(params), [\"mode\"]);\n        assert.ok(modes.includes(params.mode));\n        const ranked = (await base.prepare(testCase, { id: arm.id, parameters: {} })) as unknown as RankedInput;\n        const teams = unused(ranked, ranked.candidateTeam) ? [ranked.candidateTeam] : [];\n        return {\n            ranked: ranked as unknown as Json,\n            protectTeams: params.mode === \"protect-entrant\" ? teams : [],\n            freeTeams: params.mode === \"free-entrant\" ? teams : [],\n        };\n    },\n    execute(value) {\n        const input = value as unknown as Input;\n        assert.deepEqual(Object.keys(input).sort(), [\"freeTeams\", \"protectTeams\", \"ranked\"]);\n        for (const teams of [input.protectTeams, input.freeTeams]) {\n            assert.ok(Array.isArray(teams));\n            assert.deepEqual(teams, [...new Set(teams)].sort());\n            assert.ok(teams.every((t) => t === input.ranked.candidateTeam && unused(input.ranked, t)));\n        }\n        assert.ok(!input.protectTeams.length || !input.freeTeams.length);\n        const result = runObserved(input);\n        assert.equal(result.diagnostics.observedFinalPlacementCalls, 2);\n        assert.equal(result.diagnostics.observedForcedFinalPlacementCalls, 2);\n        assert.equal(result.diagnostics.observedFinalPlacementTeamMask, 3);\n        return result;\n    },\n};\nexport default adapter;\n"
+            },
+            "activation.test.ts": {
+                "sha256": "8c84d8c7a80233e1a4018cabcc53180e1a7694e07750893d137266d79abac34e",
+                "text": "import { expect, test } from \"bun:test\";\nimport { readFileSync } from \"node:fs\";\nimport adapter, { runObserved, newFields } from \"./adapter\";\nimport { validateOutcome } from \"./frozen-server/src/simulation/ai_iteration/identity\";\n\nconst plan = () => JSON.parse(readFileSync(import.meta.dir + \"/plan.json\", \"utf8\"));\ntest(\"consumed delivery budget makes candidate inputs exactly current\", async () => {\n    const p = plan();\n    let checks = 0;\n    for (const c of p.development) {\n        const input = (await adapter.prepare(c, p.arms[0])) as any;\n        if (\n            input.ranked.candidateTeam === 2\n                ? input.ranked.game.leftDeliveryDraftOverrideUsed\n                : input.ranked.game.rightDeliveryDraftOverrideUsed\n        ) {\n            for (const arm of p.arms) expect(await adapter.prepare(c, arm)).toEqual(input);\n            checks++;\n        }\n    }\n    expect(checks).toBeGreaterThan(0);\n});\ntest(\"actual native selector skips donor cuts before preview and preserves observer/state controls\", async () => {\n    const p = plan(),\n        c = p.development.find((x: any) => x.id === \"known-2-2-delivery-0\");\n    expect(c).toBeDefined();\n    for (const arm of p.arms) {\n        const input = (await adapter.prepare(c, arm)) as any;\n        const native = runObserved(input, false),\n            observed = await adapter.execute(input);\n        validateOutcome(native);\n        validateOutcome(observed);\n        const strip = (v: any) => {\n            const d = { ...v.diagnostics };\n            for (const k of [\n                ...newFields,\n                \"observedFinalPlacementCalls\",\n                \"observedForcedFinalPlacementCalls\",\n                \"observedFinalPlacementTeamMask\",\n            ])\n                delete d[k];\n            const evidence = { ...v.evidence };\n            delete evidence.sniperDonorObservation;\n            return { ...v, diagnostics: d, evidence };\n        };\n        expect(strip(observed)).toEqual(strip(native));\n        expect(observed.diagnostics.observedLiveRandomDraws).toBe(native.diagnostics.observedLiveRandomDraws);\n        expect(observed.diagnostics.previewRngUuidChecks).toBe(observed.diagnostics.deliveryPreviewCalls);\n        if (arm.id === \"protect-entrant\") {\n            expect(observed.diagnostics.prunedDeliveryPlans).toBeGreaterThan(0);\n            const evidence = observed.evidence as any;\n            expect(\n                evidence.sniperDonorObservation.selections.some(\n                    (x: any) => x.team === input.ranked.candidateTeam && x.nativeSniper === 3 && x.sniper === 3,\n                ),\n            ).toBe(true);\n        }\n    }\n}, 120000);\n"
+            },
+            "verify.py": {
+                "sha256": "2d5d681efb79cd16130503110de930d32ccdce3fff8957a8ef9ffe5253369dc6",
+                "text": "from pathlib import Path\nimport collections, hashlib, json\n\np=Path(__file__).resolve().parent\ns=json.loads((p/'seal.json').read_text())\nfor f in s['sources']:\n    assert hashlib.sha256((Path(s['root'])/f['path']).read_bytes()).hexdigest()==f['sha256'],f['path']\nreports=[json.loads((p/'benchmark'/stage/'development/report.json').read_text()) for stage in ['reference','pooled','resumed']]\nepochs=[[(r['caseId'],r['arm'],r['execution']['outcome']) for r in report['rows']] for report in reports]\nassert epochs[0]==epochs[1]==epochs[2]\nrows=reports[0]['rows']; assert len(rows)==84\nbaseline={x['caseId']:x['outcome'] for x in json.loads((p/'baseline-controls.json').read_text())}\nextra=['leftSetupBudget','rightSetupBudget','leftSetupSpend','rightSetupSpend','observedLiveRandomDraws','deliveryPreviewCalls','catalogCalls','prunedDeliveryPlans','previewRngUuidChecks']\ndef native(outcome):\n    v=json.loads(json.dumps(outcome))\n    for k in extra: del v['diagnostics'][k]\n    del v['evidence']['sniperDonorObservation']\n    return v\ndef amounts(outcome):\n    c=collections.Counter()\n    for unit in outcome['evidence']['opening']['units']: c[unit['team'],unit['creatureId']]+=unit['amountAlive']\n    return c\nscores=collections.Counter(); controls=0; pruned=0; changed=[]; gains=losses=0; by_case=[]\nfor case in sorted({r['caseId'] for r in rows}):\n    arms={r['arm']:r['execution']['outcome'] for r in rows if r['caseId']==case}\n    assert len(arms)==3\n    assert native(arms['current'])==baseline[case],(case,'current-parent control')\n    controls+=1\n    for mode,out in arms.items():\n        assert out['terminal'] and not out['qualityErrors'] and out['decisions']>0\n        d=out['diagnostics']\n        assert d['leftSetupSpend']<=d['leftSetupBudget'] and d['rightSetupSpend']<=d['rightSetupBudget']\n        assert d['previewRngUuidChecks']==d['deliveryPreviewCalls']\n        assert amounts(out)==amounts(arms['current'])\n        cells=set()\n        for unit in out['evidence']['opening']['units']:\n            assert unit['placed'] and unit['amountAlive']>0\n            for cell in unit['cells']:\n                key=(cell['x'],cell['y']); assert 0<=key[0]<16 and 0<=key[1]<16 and key not in cells\n                cells.add(key)\n        evidence=out['evidence']['sniperDonorObservation']\n        for event in evidence['catalogs']:\n            plans={plan['id']:plan for plan in event['catalog']}\n            for retained in event['retained']:\n                assert retained in plans\n                if event['protectSniper']: assert plans[retained]['sniper']>=event['nativeSniper']\n                if event['freeOnly']: assert plans[retained]['cost']==0\n        if mode=='protect-entrant':\n            pruned+=d['prunedDeliveryPlans']\n            for selection in evidence['selections']:\n                # Opposing native setup is unchanged and can still spend Sniper.\n                protected=any(x['team']==selection['team'] and x['protectSniper'] for x in evidence['catalogs'])\n                if protected: assert selection['sniper']>=selection['nativeSniper']\n        scores[mode]+=out['score']\n    if native(arms['protect-entrant'])!=native(arms['current']): changed.append(case)\n    delta=arms['protect-entrant']['score']-arms['current']['score']\n    gains+=delta>0; losses+=delta<0\n    by_case.append({'caseId':case,'score':{mode:out['score'] for mode,out in arms.items()},'guardPruned':arms['protect-entrant']['diagnostics']['prunedDeliveryPlans']})\nassert controls==28 and pruned>0\nassert all(not c['passed'] for c in reports[0]['comparisons'])\ngates={'sourceNativeColdPoolCacheFundingAndPlacementExact':True,'actualDonorPlanPruningAndPreservation':True,'higherScoreThanCurrent':scores['protect-entrant']>scores['current'],'noNewOutcomeLossesOnKnownBank':losses==0,'notWorseThanFree':scores['protect-entrant']>=scores['free-entrant']}\nresult={'complete':True,'passedKnownDiagnostic':all(gates.values()),'gates':gates,'sealSha256':s['sha256'],'knownCases':28,'families':14,'physicalGames':sum(reports[i]['metrics']['executedTasks'] for i in [0,1]),'logicalPerEpoch':84,'originalCurrentControlsExact':controls,'scoreTotals':dict(scores),'guardVsCurrentPoints':100*(scores['protect-entrant']-scores['current'])/28,'guardVsFreePoints':100*(scores['protect-entrant']-scores['free-entrant'])/28,'gains':gains,'losses':losses,'changedCases':changed,'prunedPlanPreviews':pruned,'freshStrengthFamilies':0,'terrainRecheckEnabled':False,'defaultChanged':False,'interpretation':'Exposed reused development diagnosis only; score does not establish independent strength. Any continuation requires separately registered fresh current-v12 study and independent confirmation, both score and overall-average+10% cost gates. No rescue or extension of earlier failed terrain/root-mixture studies.','cases':by_case}\nwith (p/'result.json').open('x') as file: json.dump(result,file,indent=2); file.write('\\n')\nprint(json.dumps({k:v for k,v in result.items() if k!='cases'}))\n"
+            },
+            "independent-check.ts": {
+                "sha256": "8706e8db00046391634971079e42f677d5216eae32d6bf3afc6858a739ac3214",
+                "text": "import assert from \"node:assert/strict\";\nimport { createHash } from \"node:crypto\";\nimport { readFileSync, writeFileSync } from \"node:fs\";\nimport { resolve } from \"node:path\";\nconst p = import.meta.dir;\nconst read = (name: string) => JSON.parse(readFileSync(resolve(p, name), \"utf8\"));\nconst seal = read(\"seal.json\");\nfor (const entry of seal.sources) assert.equal(createHash(\"sha256\").update(readFileSync(resolve(seal.root, entry.path))).digest(\"hex\"), entry.sha256);\nconst epochs = [\"reference\", \"pooled\", \"resumed\"].map(stage => read(`benchmark/${stage}/development/report.json`).rows.map((r: any) => ({ case: r.caseId, arm: r.arm, outcome: r.execution.outcome })));\nassert.deepEqual(epochs[0], epochs[1]); assert.deepEqual(epochs[0], epochs[2]); assert.equal(epochs[0].length, 84);\nconst expected = read(\"result.json\"), totals: Record<string, number> = {}, families: Record<string, { gain: number; n: number }> = {};\nconst cases = read(\"plan.json\").development;\nlet gains = 0, losses = 0;\nfor (const testCase of cases) {\n    const rows = epochs[0].filter((r: any) => r.case === testCase.id), arms = Object.fromEntries(rows.map((r: any) => [r.arm, r.outcome]));\n    assert.equal(rows.length, 3);\n    for (const [arm, out] of Object.entries(arms) as [string, any][]) { assert.ok(out.terminal); assert.deepEqual(out.qualityErrors, []); totals[arm] = (totals[arm] ?? 0) + 2 * out.score; }\n    const delta = 2 * (arms[\"protect-entrant\"].score - arms.current.score); gains += Number(delta > 0); losses += Number(delta < 0);\n    const family = families[testCase.family] ??= { gain: 0, n: 0 }; family.gain += delta; family.n++;\n}\nfor (const [arm, total] of Object.entries(totals)) assert.equal(total, 2 * expected.scoreTotals[arm]);\nassert.equal(gains, 4); assert.equal(losses, 0); assert.equal(Object.keys(families).length, 14);\nconst delta = Object.values(families).reduce((n, f) => n + f.gain / (2 * f.n), 0) / 14;\nassert.equal(delta, 0.125); assert.equal(expected.guardVsCurrentPoints, delta * 100);\nconst result = { qualityPassed: true, verifiedSourceFiles: seal.sources.length, coldPersistentCachedRowsExact: 84, physicalGames: 144, integerHalfPointTotals: totals, familyMeanGainPoints: delta * 100, gains, losses, independentFreshFamilies: 0, servingChanged: false };\nwriteFileSync(resolve(p, \"independent-check.json\"), JSON.stringify(result, null, 2) + \"\\n\", { flag: \"wx\" }); console.log(JSON.stringify(result));\n"
+            }
+        },
+        "sourceSnapshot": {
+            "serverCommit": "91b6a9112ec2a9b39236d13902badb7c52e93ba3",
+            "sharedEnginePin": "87f8edf71c1471fe6dbe10c62792655d70a6c437",
+            "gitArchiveSha256": "81ff87719c0718234c8058b3721cb03068a36968417cd6d4ffb5963180db8be0",
+            "baselinePlaySessionSha256": "8db92778416a74e67715243d292aaeffed5ac0ec1fd7ed5145b99a94551134c9",
+            "candidatePlaySessionSha256": "4ffa1de3b098f43ec8cd88e87067cb8d4bc68a2e6271d3674a854459da05bba3",
+            "candidate": "Filter existing funded delivery plans before preview when their Sniper level is below the native fully-funded base. No terrain recheck, score reweighting, hidden inputs, new splits or combat change. Separate free-only arm filters cost>0. Default source untouched."
+        },
+        "nativeBaselineControlsSha256": "97b6b64b643778e1078c4e6be61ff4b8447d1ae46b392c855b8a205e7b71e8d3",
+        "sealedSourceFileCount": 1371,
+        "benchmark": {
+            "seal": "3de4383e8a4b552860f0280cf02dc796989efa0b7bb9b519b91f74f72e925846",
+            "exactOutcomeParity": true,
+            "promotion": false,
+            "reference": {
+                "logicalTasks": 84,
+                "uniqueTasks": 60,
+                "cacheHits": 0,
+                "executedTasks": 84,
+                "elapsedMs": 131241.025792,
+                "executionWallMs": 453033.54450299987,
+                "processCpuMicros": 814231604
+            },
+            "pooled": {
+                "logicalTasks": 84,
+                "uniqueTasks": 60,
+                "cacheHits": 0,
+                "executedTasks": 60,
+                "elapsedMs": 84971.50687499999,
+                "executionWallMs": 316599.584991,
+                "processCpuMicros": 391642440
+            },
+            "resumed": {
+                "logicalTasks": 84,
+                "uniqueTasks": 60,
+                "cacheHits": 60,
+                "executedTasks": 0,
+                "elapsedMs": 357.059957999998,
+                "executionWallMs": 0,
+                "processCpuMicros": 885820
+            },
+            "pooledSpeedup": 1.5445298149774633,
+            "resumedSpeedup": 367.56018940662267
+        },
+        "legacyTags": "The4 original example fixtures preserve v1 army labels that identify the opposite physical roster. Actual candidateTeam/input/scoring are unchanged; use actual physical teams, not those legacy tags."
+    },
+    "measurementFoundation": {
+        "serverCommit": "614db3a0e9485f4c1b938355d5eadff26a5f90b9",
+        "change": "Optional raw processCpuMicros outside deterministic outcomes; retained on cache hits. Serial workers only for per-case CPU attribution; concurrent measurements overlap.",
+        "validation": {
+            "focusedPipelineTestsPassed": 10,
+            "fullServerLint": true,
+            "fullServerTypecheck": true,
+            "unitPassed": 1902,
+            "unitServiceSkipped": 15,
+            "failed": 0,
+            "assertions": 57247
+        },
+        "defaultGameplayChanged": false
+    },
+    "priorStudies": "The failed terrain repair and incomplete old root forecast retain their original decisions. No partial root score is aggregated and this new setup hypothesis does not advance that forecast."
+}

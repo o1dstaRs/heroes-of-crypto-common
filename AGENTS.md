@@ -21,6 +21,26 @@ server inherits this dispatcher; the existing meta oracle remains a separately l
 not an exact replay of authoritative setup. Future default comparisons use v12; frozen v11 studies
 keep their recorded comparators. The global wire version and accepted A19 combat weights stay unchanged.
 
+## Inactive Sniper donor-protection research — November 18, 2026
+
+Read `docs/a19_delivery_donor_research.md` and preserve its compact evidence fixture. The separate
+terrain-after-delivery repair failed reused admission (16 points, current 16, free 17) and stays
+inactive. The distinct guard skips funded delivery plans that reduce native Sniper before preview,
+with original geometry and A19 combat. Its 28-case/14-exposed-family diagnosis scored 19.5 versus 16,
+four improved outcomes and none worse; all native/cold/source/RNG controls pass. This is not fresh
+strength or paid superiority: the free-only arm also scored 19.5. No serving default changed.
+
+Fresh seal `ae9cb960941fd66c60ec66c2675549eb52e153e504ecb16b31de394ac27cef9d` reserves 108 development
+and 108 held-out families, actual legally projected current draft choices/flags, both seats and all
+three live maps/budgets. Require unchanged strength gates, independent confirmation and overall-average
++10% complete-fight/decision CPU; report slower subgroups separately. No partial-score tuning or
+automatic activation. See the document's exact typed seed recipes: exclude all 4 roles × 20,480 V2
+preimages and all 20,480 failed-V1 preimages, including rejected/unused roots and specified derived
+channels. Generic integer collection does not expand these compact namespace recipes. Actual arrays
+and scans remain in the client's ignored `game/core/tmp/barrel-sniper-donor-fresh-20261118` capsule.
+Raw CPU metadata is whole-process scoped; only serial-worker counterbalanced runs attribute per-case
+cost. This work does not advance the closed incomplete root-scoped forecast or alter its cutoff.
+
 ## Closed revealed-ranged delivery screen — November 17, 2026
 
 Read `docs/revealed_ranged_delivery_research.md` before revisiting early public shooter/caster reveals,
