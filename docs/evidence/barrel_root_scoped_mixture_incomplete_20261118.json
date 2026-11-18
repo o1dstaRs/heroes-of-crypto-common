@@ -1,0 +1,54 @@
+{
+    "schema": "hoc.barrel.root-scoped-mixture.incomplete.v1",
+    "createdUtc": "2026-11-18T10:10:52.783393+00:00",
+    "registrationSha256": "6eda742bd48db1366e7ec95c898578b97c80f974a2cab7fb6b654542bc3bb438",
+    "status": "incomplete-at-original-cutoff",
+    "terminalState": {
+        "complete": false,
+        "stage": "failed-preserve-all-no-retry",
+        "pid": 1177993,
+        "registrationSha256": "6eda742bd48db1366e7ec95c898578b97c80f974a2cab7fb6b654542bc3bb438",
+        "phaseCompleted": 4590,
+        "errors": ["AssertionError('Fixed cutoff; no retry or extension')"],
+        "newIndependentStrengthSamples": 0,
+        "defaultChanged": false,
+        "at": "2026-11-18T09:45:03.701841+00:00",
+        "elapsedSeconds": 9446.518417680054,
+        "phaseExpected": 6048,
+        "workers": 8
+    },
+    "expectedCases": 6048,
+    "acknowledgedCases": 4590,
+    "expectedColdExecutions": 72,
+    "coldPhaseReached": false,
+    "terminalArchive": {
+        "bytes": 26886138,
+        "sha256": "935a3c7109145a0b81f2ec502aec37c44bdb49f3d4ac3a880eea6c72a5e47873",
+        "manifestRegularFiles": 60,
+        "allReturnedFileHashesVerified": true,
+        "linksAbsoluteAndParentPathsRejected": true
+    },
+    "postTerminalSourceVerification": {
+        "passed": true,
+        "registeredCurrentFiles": 11,
+        "registeredParentFiles": 6959,
+        "changedProtectedFiles": [],
+        "postTerminalCases": 4590,
+        "scoreAggregated": false,
+        "researchRestarted": false,
+        "deadlineGateWaived": false,
+        "scope": "Read-only hashes of immutable source/input/model files after original cutoff; no research execution, aggregation or admission."
+    },
+    "verifierSources": {
+        "post_terminal_source_check.py": "from pathlib import Path\nimport json,hashlib\np=Path.home()/'hoc-research/barrel-root-scoped-mixture-puffalo-20261118-packet/barrel-root-scoped-mixture-puffalo-v3-20261118'\nsha=lambda f:hashlib.sha256(f.read_bytes()).hexdigest()\nreg=json.loads((p/'registration.json').read_text());assert sha(p/'registration.json')=='6eda742bd48db1366e7ec95c898578b97c80f974a2cab7fb6b654542bc3bb438'\nchanged=[]\nfor f in reg['files']:\n if sha(p/f['path'])!=f['sha256']:changed.append(f['path'])\nparent=p.parent/'barrel-forecast-mixture-v11-confirmation-20261117';assert sha(parent/'strength-registration.json')==reg['parentRegistrationSha256']\nold=json.loads((parent/'strength-registration.json').read_text())\nfor f in old['files']:\n if sha(parent/f['path'])!=f['sha256']:changed.append('parent/'+f['path'])\nstate=json.loads((p/'status.json').read_text());assert not state['complete']and state['stage']=='failed-preserve-all-no-retry'\nassert not (p/'analysis.json').exists()\nassert not changed,changed\nprint(json.dumps({'passed':True,'registeredCurrentFiles':len(reg['files']),'registeredParentFiles':len(old['files']),'changedProtectedFiles':changed,'postTerminalCases':state['phaseCompleted'],'scoreAggregated':False,'researchRestarted':False,'deadlineGateWaived':False,'scope':'Read-only hashes of immutable source/input/model files after original cutoff; no research execution, aggregation or admission.'}))\n"
+    },
+    "scoreAggregationPerformed": false,
+    "passedReusedAdmission": false,
+    "policyStrengthVerdict": "Not assessed; incomplete execution is not evidence for or against the forecast policy. No partial-score rescue or fresh-native forecast phase.",
+    "originalSourcesInputsGatesAndCutoffChanged": false,
+    "attemptRestartedOrExtended": false,
+    "previousFailuresPreserved": true,
+    "newIndependentStrengthSamples": 0,
+    "defaultChanged": false,
+    "rawArtifacts": "Retained outside Git in the original capsule completed-return and SHA-verified terminal archive."
+}

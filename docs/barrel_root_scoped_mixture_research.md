@@ -54,3 +54,16 @@ A passing complete admission only permits separately registered fresh work again
 current-v12 server, including durable delivery/setup dispatch and its committed-turn/target-memory
 contract. Independent confirmation and **overall-average +10%** full fight/complete decision cost for
 entrant and both-driver use remain required. No serving policy or production deployment changes.
+
+## Incomplete execution at the fixed cutoff
+
+The [terminal evidence](evidence/barrel_root_scoped_mixture_incomplete_20261118.json) records the
+original cutoff stopping collection at **4,590 of 6,048 acknowledged cases**. Neither cold epoch
+was reached. The controller and archive observer exited; the complete regular-file return is
+SHA-verified, and a separate read-only post-terminal check verifies every registered current and
+parent source/input/model file unchanged.
+
+No partial score was aggregated. Reused admission is not achieved, so this attempt opens no native
+forecast qualification or promotion. This is an incomplete execution, not a forecast-strength verdict.
+Keep its raw bytes, previous failures, all original gates and cutoff unchanged; do not restart, extend
+or rescue it with a selected subset. Separate placement-order debugging does not continue this policy.

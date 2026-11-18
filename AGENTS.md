@@ -1102,6 +1102,12 @@ cases/gates and the original November18 09:45 UTC cutoff stay fixed. No ranker t
 teacher-test parsing, fresh strength claim or default change. Only a complete passing reused admission
 permits separately registered current-v12 authoritative-memory qualification and overall-average+10% cost.
 
+That root-scoped attempt stopped at its original cutoff with4,590/6,048 acknowledged cases; neither
+cold epoch ran. Preserve `docs/evidence/barrel_root_scoped_mixture_incomplete_20261118.json` and the
+verified terminal archive. All11 current and6,959 parent registered files still match. No partial score
+is aggregated, no reused admission is achieved, and no forecast qualification/promotion follows. Do not
+restart, extend, rescue a subset or mistake an incomplete execution for a policy-strength verdict.
+
 The prospective final-validation source seal is
 `f42f14045131fecab5ac79d13228d595d2aa4f37d0ae5b25ab115403660eaf51`; read
 `docs/evidence/barrel_forecast_model_mixture_v11_validation_design_20261117.json`. The original
