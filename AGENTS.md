@@ -1006,6 +1006,16 @@ and cutoffs remain exact. This control supplies no new strength or timing claim.
 observer source/registration and the failed rehearsal; use the v2 supervisor handle in local resume
 state, and never duplicate or restart the existing experiments.
 
+The completed old-v10 regression audit is in `docs/barrel_forecast_regression_audit.md`. Independent
+reconstruction retains all 3,024 pairs, 208 gains and 166 losses. All 48 fixed final diagnostic replays
+and four separate memory-identity replays reproduce original full controls. Two improved cases have
+target-memory differences before their first recorded choice change: equivalent actions take different
+commit paths through array identity. Preserve both gains, every failed observer and the original cutoff.
+Actual committed turns, not inner search returns, are authoritative. The current ranked server also
+has the identity branch plus separate incumbent-memory restoration. No corrected policy was evaluated;
+do not fold a memory fix into frozen v11 confirmation or claim a new strength/calibration gain from
+these selected old cases. Keep the full evidence fixture and all earlier gates unchanged.
+
 ## Closed ranged counter-shot screens
 
 Read `docs/ranged_countershot_safety_research.md` before continuing the November 17 human-match
