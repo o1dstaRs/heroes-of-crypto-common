@@ -1,0 +1,363 @@
+{
+    "schema": 1,
+    "id": "a19-native-decline-contract-admission-20261119",
+    "status": "completed_functional_admission_no_quality_admission_or_strength_claim",
+    "registration": {
+        "schema": 1,
+        "id": "a19-native-decline-contract-admission-20261119",
+        "registeredAtUtc": "2026-11-19T02:22:14.491847+00:00",
+        "purpose": "Functional admission for a new read-only per-game native melee refusal observer. Original raw native outcome/quality warnings must remain exact; no quality normalization, proposal repair, extra search, data fitting or strength/cost claims.",
+        "serverResearchCommit": "0dcef4f5eadcfc53ab7605e6a99f1a1f016c7b49",
+        "nativeSource": "Unchanged existing completed root-screen frozen source common9c10c836/serverd5fa16b, one canonical common. New observer matches published server research module exactly.",
+        "parentPortableSourceSealSha256": "626aa51cc6144e940c1d23be0c673419531354758915f103d015fa297e64437e",
+        "inputSelection": "All twelve changed-trace native zero-warning controls plus separate known uncached original-refusal task316; every one from the preceding complete read-only audit, no score selection and zero new seeds.",
+        "budget": {
+            "canonicalMainZeroWarningGames": 24,
+            "knownOriginalWarningRawControls": 2,
+            "fixedLocalColdGames": 4,
+            "fullGamesMaximum": 30
+        },
+        "arms": ["native", "observed"],
+        "localColdCaseIndices": [0, 12],
+        "execution": "Canonical ai:iterate sealed adapter/worker/cache/records/report for twelve zero-warning native/observer pairs. The known raw warning remains outside valid cache as two explicitly declared direct controls. Four fixed local cold raw controls. No bespoke worker or report runner.",
+        "gates": [
+            "All original complete native controls exact; retained known warning/digest",
+            "All native/observer whole outcomes equal",
+            "All four fixed cold observations/outcomes exact across hosts",
+            "Every zero-warning main case retains zero warnings and no productive-refusal observation",
+            "Exactly one actual supported refusal in known diagnostic; full before-engine/before-refresh/after-refresh/before-handler/after-handler/after-engine state/alias/ref/prototype/RNG/UUID checks and no emitted events",
+            "Canonical native validateOutcome still rejects the known warning",
+            "No extra scoring/rollout/policy or other runtime project changes",
+            "All canonical sources, cache keys, records, raw winners and archives independently verified"
+        ],
+        "cutoffUtc": "2026-11-19T03:00:00Z",
+        "automaticRetryExtensionExclusion": false,
+        "oldFailedStudiesRemainClosed": true,
+        "futureDataUse": "A passing functional admission only permits prospectively registering a new complete fresh-data collection with an explicit per-game quality contract, source/input/native-winner/proof validation and raw-warning retention. No old partial labels may be fitted. Every independent strength/confirmation/overall-average+10%compute gate remains separate.",
+        "newSeeds": 0,
+        "defaultChanged": false,
+        "automaticPromotionOrDeployment": false,
+        "rawProofSupplementCommit": "8c0437fc343a343a308daa8a884184ec86d5e916"
+    },
+    "preexecutionRawEvidenceAmendment": {
+        "schema": 1,
+        "atUtc": "2026-11-19T02:28:37.585794+00:00",
+        "stage": "before payload seal and before any of the registered 30 functional games",
+        "originalPublishedObserverCommit": "0dcef4f5eadcfc53ab7605e6a99f1a1f016c7b49",
+        "supplementCommit": "8c0437fc343a343a308daa8a884184ec86d5e916",
+        "change": "Retain raw failed engine/handler results and actual handler actor/target IDs so an independent verifier can inspect every claim. No native decision, observer condition, input, gate, game budget, cutoff or original warning changes. Original prepared module/registration retained.",
+        "finalServerTestsPassed": 1933,
+        "existingDatabaseSkips": 15,
+        "typecheckPassed": true,
+        "lintErrors": 0,
+        "existingLintWarnings": 3,
+        "functionalGamesBeforeSeal": 0
+    },
+    "sourceRegistrationSha256": "df4a8cd1029858a779963123365819329ffdd32e5fe0dcbef0d72eda0ca3a52e",
+    "sourceModuleSha256": "c71ad8c4f186d362e2897320bc5ea49bc9f66d9e4fa24357847d9af45611e15f",
+    "canonicalNodeVerification": {
+        "schema": 1,
+        "passed": true,
+        "atUtc": "2026-11-19T02:29:45.321Z",
+        "canonicalMainGames": 24,
+        "knownRawControlGames": 2,
+        "canonicalSourceFiles": 6224,
+        "sourceSeal": "ed292ecbd37ee4eb72506b5548053ee99ebd2d8a9ab8472de33b4eb33f601d75",
+        "runtimeKey": "85994f6306fde5d9142f9a6f85e4270a63f90267fde462c5cba7f4ca3efe8c80",
+        "allOriginalCompleteNativeOutcomesAndObserverPairsExact": 12,
+        "knownNativeWarningStillCanonicalInvalid": true,
+        "supportedActualDeclines": 1,
+        "allSixStateBodiesAndRawHandlerEngineResultsChecked": true,
+        "rows": [
+            {
+                "caseId": "exposed-0108e69a07c43a893c88b5622e004068f9731ca101faf45b9702c81ab20164c3",
+                "arm": "native",
+                "key": "b395c53964556476f9772de38671760a4c4ee07dbe9831a8c970e14f25b0e87d",
+                "score": 1,
+                "digest": "e02734dfad5d6d2cf8e3aae2c1c606c519d5554e6e96f12a03ae25b98ab1239d",
+                "decisions": 54
+            },
+            {
+                "caseId": "exposed-0108e69a07c43a893c88b5622e004068f9731ca101faf45b9702c81ab20164c3",
+                "arm": "observed",
+                "key": "721f8aa4a812daf91ff6c15b17a1a2184eea012d34b386d9e1a4b900767ffa52",
+                "score": 1,
+                "digest": "e02734dfad5d6d2cf8e3aae2c1c606c519d5554e6e96f12a03ae25b98ab1239d",
+                "decisions": 54
+            },
+            {
+                "caseId": "exposed-125a278720665e0a5cd31df7719fe931733b3277cac13579e63437998a7fb68c",
+                "arm": "native",
+                "key": "588d0172587f3226f584fe2213f010d2b432f01b8cac847dd4622da14e3f5791",
+                "score": 0,
+                "digest": "0b9d9943d2ac422d52ce648fbf0c4e9a41b326bb037df4fbc8f412d9e4127f7f",
+                "decisions": 50
+            },
+            {
+                "caseId": "exposed-125a278720665e0a5cd31df7719fe931733b3277cac13579e63437998a7fb68c",
+                "arm": "observed",
+                "key": "fcf5b1e575811789367a54cdbcbe8ec5309f424206aaf083955dabe6939e38d3",
+                "score": 0,
+                "digest": "0b9d9943d2ac422d52ce648fbf0c4e9a41b326bb037df4fbc8f412d9e4127f7f",
+                "decisions": 50
+            },
+            {
+                "caseId": "exposed-267db04790268f9e1e0c37c690d4b0e81d66c848d9920b413c4c8926a3bc5ddf",
+                "arm": "native",
+                "key": "3036d58ff4fa9fabaadb3aaf60e1fa3512b4feac1128d038f3e0a979b279d001",
+                "score": 1,
+                "digest": "c781babf873db2b18370d44af8823877f6f624209d6dd260fa5a53fbb29a0c3f",
+                "decisions": 43
+            },
+            {
+                "caseId": "exposed-267db04790268f9e1e0c37c690d4b0e81d66c848d9920b413c4c8926a3bc5ddf",
+                "arm": "observed",
+                "key": "89d2abfdc657369c5bbaa1e42a2e540b58522943a98dbae60bf59e4ccd4157ea",
+                "score": 1,
+                "digest": "c781babf873db2b18370d44af8823877f6f624209d6dd260fa5a53fbb29a0c3f",
+                "decisions": 43
+            },
+            {
+                "caseId": "exposed-407ef36643d045938ca08b124404eec64cd31c2e54513b31e06f9067eaab8c9a",
+                "arm": "native",
+                "key": "9aad2dfc7c7a93c4c0270ef1f397c3769e4e7dab9dac353fb6808fcd0c33b390",
+                "score": 1,
+                "digest": "2e0bfe3a42d11edd5b2e429993cd7e37fa57c38d54733ec716af510b61d9f359",
+                "decisions": 41
+            },
+            {
+                "caseId": "exposed-407ef36643d045938ca08b124404eec64cd31c2e54513b31e06f9067eaab8c9a",
+                "arm": "observed",
+                "key": "82697578773cfb02c56bf4aa27ba47fdc1037bef58d922b6c80abf9e1b66a64e",
+                "score": 1,
+                "digest": "2e0bfe3a42d11edd5b2e429993cd7e37fa57c38d54733ec716af510b61d9f359",
+                "decisions": 41
+            },
+            {
+                "caseId": "exposed-6746f02fef030664425c5971fe9763620241ca22c47b1551a7bfe40ae1028336",
+                "arm": "native",
+                "key": "a6e05ff99b97f107d5415ff4aae945260df52e08cacca90efaaef166df535d5e",
+                "score": 1,
+                "digest": "017c30488cc6fbb8becb35b72301c1e77e58b9a87ed4fe48d70a813255cfb0d5",
+                "decisions": 44
+            },
+            {
+                "caseId": "exposed-6746f02fef030664425c5971fe9763620241ca22c47b1551a7bfe40ae1028336",
+                "arm": "observed",
+                "key": "2582de8049f46484863a33e3a26f899b0864fa5117a77d3b2a0c0eb39bc9858f",
+                "score": 1,
+                "digest": "017c30488cc6fbb8becb35b72301c1e77e58b9a87ed4fe48d70a813255cfb0d5",
+                "decisions": 44
+            },
+            {
+                "caseId": "exposed-a1a450fd535082450578ba59a0b6c377667c361328da7d7dc566b4c5c6ea8984",
+                "arm": "native",
+                "key": "1ee68383df2cac379f86a3c3cc94d245bb328b0932d2b299cd8276653171edb3",
+                "score": 0,
+                "digest": "8c37046c24226f5761810a21461857eed10b0fdcf9ca267fa30d6aa40e674125",
+                "decisions": 44
+            },
+            {
+                "caseId": "exposed-a1a450fd535082450578ba59a0b6c377667c361328da7d7dc566b4c5c6ea8984",
+                "arm": "observed",
+                "key": "804b21ea95b8d83b53b701bcf4f9627de8ff7caea2a88b49d6117600002f454f",
+                "score": 0,
+                "digest": "8c37046c24226f5761810a21461857eed10b0fdcf9ca267fa30d6aa40e674125",
+                "decisions": 44
+            },
+            {
+                "caseId": "exposed-bc936ab8001f465384edb12b1dee0cf52db8b38f5f845ba71ee1b642bf0e282a",
+                "arm": "native",
+                "key": "71f5e96d5e0ea3f252322008a003741725bd25eff7bd1ea2460658c043758e62",
+                "score": 0.5,
+                "digest": "69374232eaa64e35651bdeb89451cc74d9d92af78c40aae0b60aaaa3edcc8983",
+                "decisions": 61
+            },
+            {
+                "caseId": "exposed-bc936ab8001f465384edb12b1dee0cf52db8b38f5f845ba71ee1b642bf0e282a",
+                "arm": "observed",
+                "key": "faec7258246f419f734086a9328af702b330ffb49b84a4d514402c92876da302",
+                "score": 0.5,
+                "digest": "69374232eaa64e35651bdeb89451cc74d9d92af78c40aae0b60aaaa3edcc8983",
+                "decisions": 61
+            },
+            {
+                "caseId": "exposed-c17a08c0e019e52b0a4d853996cf1270bb7d232edcfbe028a8a8eea6e49dddf2",
+                "arm": "native",
+                "key": "7c6ec5c519ae49c1adff456662f7fc8be92e907f398e97f6a32baf1c19df43a7",
+                "score": 0,
+                "digest": "041f58bbbadd9e538e312a154723de80e3a68e920aba76282535b4e39ca7a333",
+                "decisions": 60
+            },
+            {
+                "caseId": "exposed-c17a08c0e019e52b0a4d853996cf1270bb7d232edcfbe028a8a8eea6e49dddf2",
+                "arm": "observed",
+                "key": "51366f63ad1bcb59dd7ae9229861a9aa5e5dc97072a592cbc311affbacfc984f",
+                "score": 0,
+                "digest": "041f58bbbadd9e538e312a154723de80e3a68e920aba76282535b4e39ca7a333",
+                "decisions": 60
+            },
+            {
+                "caseId": "exposed-cf24c64223914138392a8868423cc0541d1a196e4175b9d6904fcf273e6a6d99",
+                "arm": "native",
+                "key": "660dfd9858660a6c3edd2ac043aca252d4a4e80b5006c91923a8f68f65d781bf",
+                "score": 1,
+                "digest": "314bd557048d0b5dca8db3fbaa77b5e963274452421959870b00c59bde513dbb",
+                "decisions": 51
+            },
+            {
+                "caseId": "exposed-cf24c64223914138392a8868423cc0541d1a196e4175b9d6904fcf273e6a6d99",
+                "arm": "observed",
+                "key": "912701415899050e24d429a0a6b692c2b61ae2b35365c3d36689268059ae09fb",
+                "score": 1,
+                "digest": "314bd557048d0b5dca8db3fbaa77b5e963274452421959870b00c59bde513dbb",
+                "decisions": 51
+            },
+            {
+                "caseId": "exposed-d775eff886fa2f7872c14949ac2b5527bc15569f24f82f4c5a3646acb1c907f5",
+                "arm": "native",
+                "key": "3188c93c2f24fc63479f2313d6ba954938f403b6f82a553ce5cbd02642044b28",
+                "score": 1,
+                "digest": "0027e907f6bb1ab508e7df7bc45cc7260bcc8dcf5ac537683275f203c666e41e",
+                "decisions": 40
+            },
+            {
+                "caseId": "exposed-d775eff886fa2f7872c14949ac2b5527bc15569f24f82f4c5a3646acb1c907f5",
+                "arm": "observed",
+                "key": "99133b93e66b5f70f9ecc3eb83c93fdc046fece40f16a3b60a88ef37cd329988",
+                "score": 1,
+                "digest": "0027e907f6bb1ab508e7df7bc45cc7260bcc8dcf5ac537683275f203c666e41e",
+                "decisions": 40
+            },
+            {
+                "caseId": "exposed-eba329283dd7314a2e982e8296804322c2fdc476daa7ab2aa5935dc6362d7faa",
+                "arm": "native",
+                "key": "c47adb410dfef037fe5c1e56e660f5947494af340229e9089a9d33413fc961d7",
+                "score": 1,
+                "digest": "9d97c7a36c73cd8cc9976bd2348750e18176e55e4d94a70d717f27d558b1fdec",
+                "decisions": 51
+            },
+            {
+                "caseId": "exposed-eba329283dd7314a2e982e8296804322c2fdc476daa7ab2aa5935dc6362d7faa",
+                "arm": "observed",
+                "key": "96e188e40f65c882249164b5ae113e12b36c9ecc48e49022e376ae28ad940faa",
+                "score": 1,
+                "digest": "9d97c7a36c73cd8cc9976bd2348750e18176e55e4d94a70d717f27d558b1fdec",
+                "decisions": 51
+            },
+            {
+                "caseId": "exposed-ed9b572c5c72f9037a15d60d01e2c395f144c0666d3428a90a7d7ae97b302194",
+                "arm": "native",
+                "key": "26200056a66735a6370a569bfa0629042b459feb234ff892c0bf02c89143e586",
+                "score": 0,
+                "digest": "3d2fa4ab07705d057b7ba4c105933530225aa9f7c4482e9b3b39d9fe8f11ebf2",
+                "decisions": 51
+            },
+            {
+                "caseId": "exposed-ed9b572c5c72f9037a15d60d01e2c395f144c0666d3428a90a7d7ae97b302194",
+                "arm": "observed",
+                "key": "82f641191f45ea298a1624a47f006083874a327ce8d542c6541251c503f9cc56",
+                "score": 0,
+                "digest": "3d2fa4ab07705d057b7ba4c105933530225aa9f7c4482e9b3b39d9fe8f11ebf2",
+                "decisions": 51
+            }
+        ],
+        "pairs": [
+            {
+                "caseId": "exposed-0108e69a07c43a893c88b5622e004068f9731ca101faf45b9702c81ab20164c3",
+                "family": "placement-data-m1-op1-o0-scan0037",
+                "nativeOutcomeDigest": "271c4ddb8ed85c0a65ff6c4cf55ec2445953dc5fa91703391da1b04fc0ca9f9d"
+            },
+            {
+                "caseId": "exposed-125a278720665e0a5cd31df7719fe931733b3277cac13579e63437998a7fb68c",
+                "family": "placement-data-m1-op1-o1-scan0038",
+                "nativeOutcomeDigest": "2a363d1dd9f077e81c5f701f49bc4dfae3f0177ff595a12ee52151e491e21c54"
+            },
+            {
+                "caseId": "exposed-267db04790268f9e1e0c37c690d4b0e81d66c848d9920b413c4c8926a3bc5ddf",
+                "family": "placement-data-m1-op3-o0-scan0050",
+                "nativeOutcomeDigest": "e903bd9f25bcc539a89ce6693101bc894002c0015d4f94dcbf14d15a3fccc42f"
+            },
+            {
+                "caseId": "exposed-407ef36643d045938ca08b124404eec64cd31c2e54513b31e06f9067eaab8c9a",
+                "family": "placement-data-m1-op1-o0-scan0037",
+                "nativeOutcomeDigest": "3a35f3ad28dcf3ce7b97143df35a4a158be251db272cb64b46ff50514ae85d14"
+            },
+            {
+                "caseId": "exposed-6746f02fef030664425c5971fe9763620241ca22c47b1551a7bfe40ae1028336",
+                "family": "placement-data-m1-op1-o1-scan0020",
+                "nativeOutcomeDigest": "412335b683c7f78d711342550116237613a194c97a9a7476a3af4716b2ac7f7a"
+            },
+            {
+                "caseId": "exposed-a1a450fd535082450578ba59a0b6c377667c361328da7d7dc566b4c5c6ea8984",
+                "family": "placement-data-m1-op1-o1-scan0038",
+                "nativeOutcomeDigest": "6025a4bbf1fb4dd2d405d866c12692fe927d26fcfa0d097d567b608427b6d317"
+            },
+            {
+                "caseId": "exposed-bc936ab8001f465384edb12b1dee0cf52db8b38f5f845ba71ee1b642bf0e282a",
+                "family": "placement-data-m1-op3-o0-scan0023",
+                "nativeOutcomeDigest": "06c83f987d6199efb8294d71ed496e53e6c5583dfe34373570ad2cfe29cd1152"
+            },
+            {
+                "caseId": "exposed-c17a08c0e019e52b0a4d853996cf1270bb7d232edcfbe028a8a8eea6e49dddf2",
+                "family": "placement-data-m3-op2-o0-scan0020",
+                "nativeOutcomeDigest": "5c589c3712eb6b11c342c8944ab22d05f2e94691f2cb15bc327481dbb1b0d8e2"
+            },
+            {
+                "caseId": "exposed-cf24c64223914138392a8868423cc0541d1a196e4175b9d6904fcf273e6a6d99",
+                "family": "placement-data-m1-op1-o0-scan0055",
+                "nativeOutcomeDigest": "594ff91a83fcbce9ecaa59ed833ec73e6c474fff953b334c7a3a0a5813623af0"
+            },
+            {
+                "caseId": "exposed-d775eff886fa2f7872c14949ac2b5527bc15569f24f82f4c5a3646acb1c907f5",
+                "family": "placement-data-m1-op3-o0-scan0023",
+                "nativeOutcomeDigest": "bd8ff2b8ad15a2637d79bad327b621bc48cde12c6949cd8558ae1ff5929c5f21"
+            },
+            {
+                "caseId": "exposed-eba329283dd7314a2e982e8296804322c2fdc476daa7ab2aa5935dc6362d7faa",
+                "family": "placement-data-m3-op1-o1-scan0033",
+                "nativeOutcomeDigest": "069fb57d09dcb3306584305d85e10bd8096ff55b084399e5ee34959018abb507"
+            },
+            {
+                "caseId": "exposed-ed9b572c5c72f9037a15d60d01e2c395f144c0666d3428a90a7d7ae97b302194",
+                "family": "placement-data-m1-op3-o0-scan0000",
+                "nativeOutcomeDigest": "4f8d83f73a5decd615c3937963cb32d94e21b5233569ccdc1c1aec64ebbaa916"
+            }
+        ],
+        "notStrengthOrCostQualification": true,
+        "newSeeds": 0,
+        "defaultChanged": false
+    },
+    "independentGlobalVerification": {
+        "schema": 1,
+        "passed": true,
+        "atUtc": "2026-11-19T02:33:54.436633+00:00",
+        "mainNativeObserverPairs": 12,
+        "mainGames": 24,
+        "knownRawControls": 2,
+        "localCrossHostColdGames": 4,
+        "allCompleteOutcomesAndColdObservationsExact": true,
+        "allIndependentNativeJournalWinnersCorrect": true,
+        "allSixStateBodiesAndRawFailedResultsVerified": true,
+        "canonicalSourceFiles": 6224,
+        "canonicalSourceSeal": "ed292ecbd37ee4eb72506b5548053ee99ebd2d8a9ab8472de33b4eb33f601d75",
+        "runtimeKey": "85994f6306fde5d9142f9a6f85e4270a63f90267fde462c5cba7f4ca3efe8c80",
+        "nativeWarningStillCanonicalInvalid": true,
+        "notStrengthOrCostQualification": true,
+        "noDataFitOrClosedStudyResumption": true,
+        "defaultChanged": false
+    },
+    "archive": {
+        "sha256": "299df14c81e0b4dd895d227e99640126c2e6f442ce949ebff854104320b84d53",
+        "bytes": 2363006,
+        "members": 29,
+        "allMembersVerifiedLocally": true,
+        "newStrengthOrCostQualified": false
+    },
+    "interpretation": "One known raw native warning remains rejected by canonical validateOutcome. New read-only observer passes fixed controls and fault tests. This permits preparing a separately registered future complete-data contract; it does not qualify any training label, partial fit, strength, compute or serving/default change.",
+    "fullServerUnitTests": 1933,
+    "existingDatabaseSkips": 15,
+    "sourceTypecheckAndLintPassed": true,
+    "oldCollectionsAndAllFailedCandidatesRemainClosed": true,
+    "defaultChanged": false
+}

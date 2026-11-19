@@ -1,5 +1,24 @@
 # Agent guidance
 
+## Fresh audited placement collection preparation — November 19, 2026
+
+Read `docs/a19_public_placement_audited_learning.md` before new data work or seed allocation.
+The separate source-bound native-refusal observer passed all thirty fixed controls, keeping the
+original warning canonically invalid. This does not reopen the failed November18 collection or
+qualify strength/cost. The new complete-data registration fixes 1,152 fresh families, 36,864 logical
+labels, the unchanged 2,772-feature warm-start/final80 fitter and an explicit per-game quality
+contract. No old partial labels, validation tuning or automatic activation. Full label source and
+allocation must be sealed before fresh fights; every native warning/proof remains auditable.
+
+Reserve **all six roles ×32,768 scanned preimages** in namespace
+`native-public-placement-audited-data-20261119-v1`, including rejected/unused scans. Expand its
+little-endian SHA256 recipe, draft raw/permuted offsets0..31, setup/reverse roots and terrain raw /
+`sim-<root>` search channels explicitly; see the registration fixture. There are 2,293,215 unique
+reserved channels. Preserve all older exclusions and unopened banks. Inputs/labels/fitting cutoffs
+are November19 04:00/10:00/11:00 UTC without automatic retry/extension/exclusion or partial fitting.
+Internal admission is not fresh qualification; independent confirmation and overall-average +10%
+full-fight/weighted actual-decision CPU including both-AI use remain separate. Current v13 is unchanged.
+
 ## Closed placement collection and distinct final-root research — November 19, 2026
 
 The November 18 public-context placement collection is closed incomplete after a native melee
