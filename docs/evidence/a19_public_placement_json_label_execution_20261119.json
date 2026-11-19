@@ -1,0 +1,182 @@
+{
+    "schema": 1,
+    "registration": {
+        "schema": 1,
+        "id": "native-public-placement-json-label-execution-20261119-v1",
+        "registeredAtUtc": "2026-11-19T03:58:52.702124+00:00",
+        "parentDataAndFitRegistrationSha256": "4dd8111b7b746c38b7e42fc538e81c680c4972891915628cc000f79bc77599bb",
+        "inputBankSha256": "2954a6a8540631a3f93b62faca497afac96b077cc537963eee4eca939dfd5f23",
+        "labelPlansSha256": "4d7fb6b3376c2c8dadf5cae52c2e904539dd024133847f364546c3922a6bdf74",
+        "nativeLabelGamesLaunchedBeforeThisRegistration": 0,
+        "logicalLabelGames": 36864,
+        "independentFamilies": 1152,
+        "trainingFamilies": 864,
+        "validationFamilies": 288,
+        "nodeAllocation": {
+            "local": {
+                "families": 720,
+                "trainingFamilies": 540,
+                "validationFamilies": 180,
+                "workersPerLane": 4,
+                "lanes": 1,
+                "nice": 19,
+                "familiesPerBlock": 4,
+                "blocks": 180,
+                "logicalGames": 23040
+            },
+            "hft": {
+                "families": 288,
+                "trainingFamilies": 216,
+                "validationFamilies": 72,
+                "workersPerLane": 6,
+                "lanes": 1,
+                "nice": 19,
+                "familiesPerBlock": 12,
+                "blocks": 24,
+                "logicalGames": 9216
+            },
+            "puffalo": {
+                "families": 144,
+                "trainingFamilies": 108,
+                "validationFamilies": 36,
+                "workersPerLane": 12,
+                "lanes": 1,
+                "nice": 19,
+                "familiesPerBlock": 8,
+                "blocks": 19,
+                "logicalGames": 4608
+            }
+        },
+        "fixedHardwareAllocation": "Within each accepted cell ordinal modulo8:0..4local,5..6HFT,7Puffalo. Whole families and all seats/futures/proposals remain on one host. No reassignment after labels start.",
+        "engineeringGames": {
+            "twoLocalColdNativeEpochs": 24,
+            "newQualityContractKnownRefusalTwoColdPerHost": 6,
+            "canonicalTransportPerHostMax": 32,
+            "canonicalTransportThreeHostsMax": 96,
+            "freshIndependentFamilies": 0,
+            "noneUsedAsTrainingLabels": true,
+            "earlierTwoLinuxInputEpochsAlreadyCompleteTotal": 48
+        },
+        "qualityContract": "native-v13-audited-neutral-melee-json-labels-20261119-v1",
+        "nativeQuality": "Zero unclassified warnings; retain all native outcomes/warnings and complete six-state/ref/prototype/RNG/UUID/raw-result/event proofs, with exact optional-undefined own-key reconstruction. Unknown data or failed proof stops all hosts. No preceding inputs, retries, exclusions or partial fit.",
+        "nativeBudget": "Full A19 H64/R2, current v13, real memory/setup/funding/support/amounts/books/geometry. No extra search, policy edits, old partial labels or short fights.",
+        "storage": "All canonical raw source/seal/cache/record/journal/export files retained in per-block archives and independently verified on both nodes. Local duplicate removed only after both complete replicas verified. Group files copied to Puffalo; complete-data index does not exist until every block/source/cache/input/winner/proof/feature/funding check passes.",
+        "resourceGuard": {
+            "nice": 19,
+            "freeDiskBytes": {
+                "local": 268435456,
+                "hft": 5368709120,
+                "puffalo": 5368709120
+            },
+            "protectAllPeerWorkloads": true,
+            "globalStopOnAnyNativeQualitySourceCutoffOrStorageFailure": true,
+            "noAutomaticRetryOrReassignment": true
+        },
+        "fitAndParity": "Unchanged final80 fixed primary and descriptive ablation; both sealed before validation. No tuning, partial fit or alternate finalist. FP32 fitting, native policy parity float64 accumulation over exported float32 weights/original doubles.",
+        "cutoffsUtc": {
+            "inputSampling": "2026-11-19T04:00:00Z",
+            "labelCollection": "2026-11-19T10:00:00Z",
+            "trainingAndValidation": "2026-11-19T11:00:00Z",
+            "noAutomaticRetryOrExtension": true
+        },
+        "futureQualification": "Independent fresh full-policy strength, held confirmation and overall-average +10% full-fight/weighted actual-decision CPU inclbothAI remain required. No automatic promotion or deploy.",
+        "defaultChanged": false,
+        "foreignVerification": "Canonical seal body + full local source equality + validated declared Linux/x64 or Darwin/arm64 runtime, then semantic cache/input keys and all proof bodies. No requirement to execute a foreign absolute root. Two valid fixtures and six corruptions already checked without new games.",
+        "closedPredecessorsUnchanged": true
+    },
+    "sourceSealSha256": "6169a81cb9d75172c9f207731d4bc9a7df7765b19d1125c9537b58ed5c99c7dd",
+    "sourceFiles": 6173,
+    "relativeDependencyLinks": 27,
+    "inputBank": {
+        "schema": 1,
+        "passed": true,
+        "atUtc": "2026-11-19T03:57:12.095Z",
+        "independentFamilies": 1152,
+        "trainingFamilies": 864,
+        "validationFamilies": 288,
+        "logicalCases": 4608,
+        "fixedFutureLabelGames": 36864,
+        "nativeCombatLabels": 0,
+        "allInspectedDrafts": 4095,
+        "allUnscoredSetupCaptures": 4723,
+        "legalPhaseContextsVerified": 53739,
+        "fixedProposalsReplayed": 36864,
+        "sourceSealSha256": "168756bc6eb447c756352735b6e9e64b6dba5a741e6f86821dc0fd4b7e1e2980",
+        "boundInputFiles": [
+            {
+                "path": "all-cases.json",
+                "sha256": "9c0ee09339ee333fad4531faa52fbed23210a2b63f3b7e384bab822133d45a44"
+            },
+            {
+                "path": "native-opening-audit.json",
+                "sha256": "2f8a4354f78f360dcbf89c3c8cae0defe64cf1ca1391893869551d3da8882ff1"
+            },
+            {
+                "path": "all-family-inputs.json",
+                "sha256": "b92c82ebc522f98fa7999ddfa6915db10e57983a78de2c6cee81b77d539188e0"
+            },
+            {
+                "path": "crosshost-engineering-receipts.json",
+                "sha256": "b2c22133dc0f65e1c79a53a63b94d834028f29709911993ef9b2e79a0a9d3030"
+            },
+            {
+                "path": "all-input-scan-verification.json",
+                "sha256": "475680c2b6860c068aec3be08560b15423ea6bd20138a4ab307d23aab92fb881"
+            }
+        ]
+    },
+    "independentInputAdmission": {
+        "passed": true,
+        "atUtc": "2026-11-19T03:58:52.702124+00:00",
+        "families": 1152,
+        "cases": 4608,
+        "balancedCells": 18,
+        "trainingFamilies": 864,
+        "validationFamilies": 288,
+        "disjointClosedInputCaseIds": true,
+        "first48Next16BothSeatsFuturesAndRawMemberAuditsPassed": true,
+        "freshSeedAuditPassed": true,
+        "foreignRuntimeVerifierPassed": true,
+        "newGames": 0
+    },
+    "labelOverlay": {
+        "sha256": "a5a2cefc6c5bb25c29bc2ae9b01e23d1f3b0a8b212fd6772ea086bfa8cb9d05a",
+        "bytes": 3967575,
+        "files": 29,
+        "completeSourceFiles": 6173,
+        "sourceSealSha256": "6169a81cb9d75172c9f207731d4bc9a7df7765b19d1125c9537b58ed5c99c7dd",
+        "newLabelGames": 0
+    },
+    "prospectiveHardwareAllocation": {
+        "atUtc": "2026-11-19T03:57:14.096015+00:00",
+        "stage": "before first fresh native label and before full label source seal",
+        "basis": "Host CPU capacity and preserved earlier full-host collection throughput, not game scores or candidate outcomes. M4 gets5/8families, HFT2/8, Puff1/8; current full per-game budgets retained.",
+        "wholeFamiliesAndAll18CellsAndBothFoldsPreserved": true,
+        "localFamilies": 720,
+        "hftFamilies": 288,
+        "puffaloFamilies": 144,
+        "workersNice19": {
+            "local": 4,
+            "hft": 6,
+            "puffalo": 12
+        },
+        "logicalLabelGamesUnchanged": 36864,
+        "modelsAndGatesAndCutoffsUnchanged": true,
+        "noLaterAdaptiveReassignment": true,
+        "defaultChanged": false
+    },
+    "foreignRuntimeVerifier": {
+        "passed": true,
+        "atUtc": "2026-11-19T03:46:00.493Z",
+        "acceptedForeignRuntimeSeals": 2,
+        "rejectedCorruptions": 6,
+        "newGames": 0,
+        "oneOldNativeOutcomeAndFullProofVerified": true,
+        "sourceEntriesAndCacheKeysVerified": true,
+        "defaultChanged": false
+    },
+    "sourcesAndAllRawInputsRetainedOutsideGit": true,
+    "freshLabelsAtSeal": 0,
+    "fitNotStarted": true,
+    "defaultChanged": false
+}

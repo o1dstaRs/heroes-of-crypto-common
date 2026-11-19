@@ -10,7 +10,10 @@ Reserve all six roles ×32,768 counters in namespace
 `native-public-placement-audited-json-data-20261119-v1`: 2,293,218 unique expanded
 channels, including rejected and unused values. Explicitly exclude both preceding
 six-role reservations. No partial fitting, validation tuning, automatic retry,
-default change or promotion. Full label source/allocation still needs its own seal.
+default change or promotion. Full label source/allocation is now sealed at
+`6169a81c` with 6,173 files; read the label-execution fixture. Fixed whole-family
+allocation is 720Mac/288HFT/144Puff, four/six/twelve nice19 workers and 223 blocks.
+Only a complete independently verified 36,864-label index permits fitting.
 
 ## Audited collection stopped in engineering — November 19, 2026
 

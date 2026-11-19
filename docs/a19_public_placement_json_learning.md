@@ -42,3 +42,20 @@ Both models must be sealed before validation and an ablation cannot replace the
 fixed primary. A passing internal result still needs independent fresh full-policy
 strength, held confirmation and overall-average +10% complete-fight/weighted
 actual-decision CPU checks including both-AI use. No automatic deployment follows.
+
+The [full label-execution seal](evidence/a19_public_placement_json_label_execution_20261119.json)
+is `6169a81cb9d75172c9f207731d4bc9a7df7765b19d1125c9537b58ed5c99c7dd`,
+covering 6,173 source/input/control/pipeline/fitter files and 27 relative links.
+Both samplers and the combined input audit completed before 04:00 UTC: 4,095
+drafts, 4,723 unscored setup captures, 53,739 public phase contexts and all 36,864
+fixed proposal rows passed. No fresh combat labels existed at the seal.
+
+The fixed hardware allocation assigns cell ordinals modulo eight zero through
+four to Mac, five through six to HFT and seven to Puffalo. All whole families,
+both folds, seats and futures remain represented on each host. The 720/288/144
+families require 23,040/9,216/4,608 logical labels, respectively, on four/six/twelve
+nice19 workers. These form 180/24/19 blocks, including the fixed short final
+Puffalo blocks. Allocation uses hardware capacity and prior host throughput,
+not outcomes; no reassignment after labels start is allowed. Every raw block
+must pass independent verification and have full byte-verified replicas on both
+nodes. Only the complete verified 36,864-label index permits the fixed 5090 fits.
