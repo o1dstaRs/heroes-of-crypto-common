@@ -78,3 +78,29 @@ is also the matched free control. A passing internal result still needs separate
 fresh full-policy qualification and held-out confirmation, plus serial overall-average
 +10% complete-fight and weighted actual-decision CPU checks including both-AI use.
 Slower subgroups are descriptive. No default or deployment follows automatically.
+
+The [label-execution registration](evidence/a19_public_placement_audited_label_execution_20261119.json)
+seals all 6,171 source/input/control/fitter files and 27 relative links before fresh
+combat labels. Source identity is
+`22a4a8bff09ba28e07b03148181ab46ff09faf52271c5e4dee30506db8660a24`.
+Both input shards completed: 4,204 draft scans, 4,720 unscored setup captures and
+55,063 legally visible phase contexts were checked. All 1,152 families and their
+36,864 fixed proposal rows passed; these are still inputs, not combat labels.
+
+Within each cell, accepted ordinal modulo eight assigns zero through two to the
+local host, three through five to 9800X3D and six through seven to Puffalo. Each
+whole family stays on one host. The fixed allocation uses four/six/twelve nice19
+workers, respectively, and 13,824/13,824/9,216 logical labels. It retains both
+seats, both futures, every loss and the original 864/288 family split. No later
+outcome-based reassignment or cutoff extension is allowed. Two cold known-refusal
+controls per host, twenty-four additional local native controls and at most 96
+canonical transport executions are engineering only. They never enter fitting.
+
+Each block receives independent raw source, cache, record, winner, geometry,
+amount, spellbook, funded-level, feature and refusal-proof verification. Preserve
+complete raw archives on both nodes before removing a local duplicate. Any
+quality, source, cutoff or storage failure stops all owned collection groups;
+partial labels cannot start either fitter. The complete-data index is written
+only after all 36,864 logical labels pass. Only then may the fixed 5090 fitter
+start, after checking for competing GPU work. Neither internal fitting nor a
+passing internal result automatically activates a model.

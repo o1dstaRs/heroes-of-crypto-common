@@ -1,0 +1,382 @@
+{
+    "schema": 1,
+    "labelExecutionRegistration": {
+        "schema": 1,
+        "id": "native-public-placement-audited-label-execution-20261119-v1",
+        "registeredAtUtc": "2026-11-19T03:23:39.418930+00:00",
+        "parentDataAndFitRegistrationSha256": "4b259eea1148aa0e56ee50d7ecd353bb494985e090807273bb952dc658b04e90",
+        "inputBankSha256": "8ae9b6a336f0b74974f395ffacb652ed4dc42cee1ad299de45652d1f9ceb3a84",
+        "labelPlansSha256": "56d328cdbe6bc025485aa2c72b462b5afb1b809079b537dcc184801951d3c846",
+        "nativeLabelGamesLaunchedBeforeThisRegistration": 0,
+        "logicalLabelGames": 36864,
+        "independentFamilies": 1152,
+        "trainingFamilies": 864,
+        "validationFamilies": 288,
+        "nodeAllocation": {
+            "local": {
+                "families": 432,
+                "trainingFamilies": 324,
+                "validationFamilies": 108,
+                "workersPerLane": 4,
+                "lanes": 1,
+                "nice": 19,
+                "familiesPerBlock": 4,
+                "blocks": 108,
+                "logicalGames": 13824
+            },
+            "hft": {
+                "families": 432,
+                "trainingFamilies": 324,
+                "validationFamilies": 108,
+                "workersPerLane": 6,
+                "lanes": 1,
+                "nice": 19,
+                "familiesPerBlock": 12,
+                "blocks": 36,
+                "logicalGames": 13824
+            },
+            "puffalo": {
+                "families": 288,
+                "trainingFamilies": 216,
+                "validationFamilies": 72,
+                "workersPerLane": 12,
+                "lanes": 1,
+                "nice": 19,
+                "familiesPerBlock": 8,
+                "blocks": 36,
+                "logicalGames": 9216
+            }
+        },
+        "fixedHardwareAllocation": "Within each accepted cell ordinal modulo8:0..2 local,3..5 HFT,6..7 Puffalo. Every whole family, both seats/futures and8proposals stays on one host. Fixed before labels; no reassignment or outcome-based balancing.",
+        "engineeringGames": {
+            "twoLocalColdNativeEpochs": 24,
+            "newQualityContractKnownRefusalTwoColdPerHost": 6,
+            "canonicalTransportPerHostMax": 32,
+            "canonicalTransportThreeHostsMax": 96,
+            "freshIndependentFamilies": 0,
+            "noneUsedAsTrainingLabels": true,
+            "earlierTwoLinuxInputEpochsAlreadyCompleteTotal": 48
+        },
+        "qualityContract": "native-v13-audited-neutral-melee-labels-20261119-v1",
+        "nativeQuality": "Zero unclassified warnings; all original native warnings/outcomes retained. Every actual melee refusal needs its complete raw six-state alias/reference/prototype/RNG/UUID/handler/engine/event proof. Unknown or incomplete proof stops all hosts. Original canonical validation and failed study stay unchanged.",
+        "nativeBudget": "Full A19 H64/R2, current v13, real memory/setup/funding/support/amounts/books/geometry. No extra search, policy edits, old partial labels or short fights.",
+        "storage": "All canonical raw source/seal/cache/record/journal/export files retained in per-block archives and independently verified on both nodes. Local duplicate removed only after both complete replicas verified. Group files copied to Puffalo; complete-data index does not exist until every block/source/cache/input/winner/proof/feature/funding check passes.",
+        "resourceGuard": {
+            "nice": 19,
+            "freeDiskBytes": {
+                "local": 268435456,
+                "hft": 5368709120,
+                "puffalo": 5368709120
+            },
+            "protectAllPeerWorkloads": true,
+            "globalStopOnAnyNativeQualitySourceCutoffOrStorageFailure": true,
+            "noAutomaticRetryOrReassignment": true
+        },
+        "fitAndParity": "Unchanged final80 fixed primary and descriptive ablation; both sealed before validation. No tuning, partial fit or alternate finalist. FP32 fitting, native policy parity float64 accumulation over exported float32 weights/original doubles.",
+        "cutoffsUtc": {
+            "inputSampling": "2026-11-19T04:00:00Z",
+            "labelCollection": "2026-11-19T10:00:00Z",
+            "trainingAndValidation": "2026-11-19T11:00:00Z",
+            "noAutomaticRetryOrExtension": true
+        },
+        "futureQualification": "Independent fresh full-policy strength, held confirmation and overall-average +10% full-fight/weighted actual-decision CPU inclbothAI remain required. No automatic promotion or deploy.",
+        "defaultChanged": false
+    },
+    "sourceSealSha256": "22a4a8bff09ba28e07b03148181ab46ff09faf52271c5e4dee30506db8660a24",
+    "sourceFiles": 6171,
+    "relativeDependencyLinks": 27,
+    "labelOverlay": {
+        "sha256": "03ab52b66b40ab2e7f723c7a199b04f69625e3a744ff9b0933372281951b58ee",
+        "bytes": 3897710,
+        "files": 29,
+        "completeSourceFiles": 6171,
+        "sourceSealSha256": "22a4a8bff09ba28e07b03148181ab46ff09faf52271c5e4dee30506db8660a24",
+        "newLabelGames": 0
+    },
+    "sourceFixedAtUtc": "2026-11-19T03:24:30.214553+00:00",
+    "inputAdmission": {
+        "passed": true,
+        "atUtc": "2026-11-19T03:23:39.418930+00:00",
+        "families": 1152,
+        "cases": 4608,
+        "balancedCells": 18,
+        "trainingFamilies": 864,
+        "validationFamilies": 288,
+        "disjointOldFamilyCaseIds": true,
+        "first48Next16AndBothSeatsFuturesVerified": true,
+        "rawMemberAuditAlreadyPassed": true,
+        "sourceSeedAuditPassed": true,
+        "newGames": 0
+    },
+    "sourceAndRecipeFileHashes": [
+        {
+            "path": "all-cases.json",
+            "bytes": 20269397,
+            "sha256": "a768b20ba6cc2e9e5df0ad3e1403f05b79af3af5d240e4b9dea590af126c33dd"
+        },
+        {
+            "path": "all-family-inputs.json",
+            "bytes": 517633,
+            "sha256": "b0688fc1bbd2571e5f8f9e755279f3fa82d2157ad1dbf172bd0214665e4ac42a"
+        },
+        {
+            "path": "all-input-scan-verification.json",
+            "bytes": 1329674,
+            "sha256": "50e16228f658660d771ddf9f1edc73971b2767a79333d280e9e0258dba3e499c"
+        },
+        {
+            "path": "allocate.py",
+            "bytes": 8511,
+            "sha256": "4b1846f00d5868607194a5e162443e6bfaa6086e0eb4f0f357a800fc8f69b3d5"
+        },
+        {
+            "path": "allocated-typed-preimages.json",
+            "bytes": 492021,
+            "sha256": "fd50ad6365acda58bf1bc6c04f1b9b5041dc82e1ce8625b1360037341bbf6f86"
+        },
+        {
+            "path": "baseline-warmstart-receipt.json",
+            "bytes": 174,
+            "sha256": "759f57e51d17ba4e38cddd9395c2515196dadebfb1e275fa724180dc9e3aab05"
+        },
+        {
+            "path": "baseline-warmstart.json.gz",
+            "bytes": 5211059,
+            "sha256": "fdd40de3edda54e13eb1a45a438bfaf82c848b2aad4bacb152bac9ae5988f065"
+        },
+        {
+            "path": "collect-fit-pipeline.py",
+            "bytes": 12022,
+            "sha256": "473d13fa82d9cee8c6bdd1cac4fb1809bcda4af93774d38bc6f76206adcbb6de"
+        },
+        {
+            "path": "complete-input-bank-index.json",
+            "bytes": 1008,
+            "sha256": "8ae9b6a336f0b74974f395ffacb652ed4dc42cee1ad299de45652d1f9ceb3a84"
+        },
+        {
+            "path": "crosshost-engineering-receipts.json",
+            "bytes": 978,
+            "sha256": "48ef3ba934ea500c208f59d7bec03337a704b37234946cb55205d2b7717dec39"
+        },
+        {
+            "path": "data-adapter.ts",
+            "bytes": 4450,
+            "sha256": "8b4e75c23dd498c7837f25dca48f39cacffad6131fc71a3590d7739fb62f787e"
+        },
+        {
+            "path": "data-and-fit-registration.json",
+            "bytes": 10237,
+            "sha256": "4b259eea1148aa0e56ee50d7ecd353bb494985e090807273bb952dc658b04e90"
+        },
+        {
+            "path": "draft-parity.ts",
+            "bytes": 5006,
+            "sha256": "9493f044a50c9b5074a78f3ceb2166cd34c4e833b483f73067a2b2449494f8d1"
+        },
+        {
+            "path": "exclusion-ledgers.json",
+            "bytes": 56297,
+            "sha256": "2eadf23517591bc0667888af25f190428a709127e97b7a17862b644053797c89"
+        },
+        {
+            "path": "export-cell-labels.ts",
+            "bytes": 6969,
+            "sha256": "98fc1f632e31d47284e1a08f6c93921d03334584327a87c7c49f459ad659fc43"
+        },
+        {
+            "path": "fixed-gpu-supervisor.py",
+            "bytes": 1752,
+            "sha256": "f6d0883ee53fbdd8c864bbb6dad127bab9b47abc3b7fee3c1f38f16bb0be34b5"
+        },
+        {
+            "path": "fresh-seed-audit-before-inputs.log",
+            "bytes": 234,
+            "sha256": "dabf9f151aea07850fd8d1500e2bafd5292b7bbac6bcf7639991eacb758dfff3"
+        },
+        {
+            "path": "fresh-seed-audit-before-labels.log",
+            "bytes": 234,
+            "sha256": "863d1627458b64c16856ae18660f37d7eba381e520ee12f3a01c0dda35e85e8f"
+        },
+        {
+            "path": "independent-input-admission.json",
+            "bytes": 312,
+            "sha256": "8dbaf3f7eeb73621e506d3c0a71a9d1c2569043401b533d856c330a46a6f9e1d"
+        },
+        {
+            "path": "independent-integrity-fixture-attempt2.log",
+            "bytes": 174,
+            "sha256": "34ca2d568d3f62beabd825cd976ac9f2a3f055e7d43cad6d629d9f78c4a7d5ad"
+        },
+        {
+            "path": "independent-integrity-fixture-receipt.json",
+            "bytes": 185,
+            "sha256": "f369e7e9802547cc4078a8b91a026564359152febecbf82f5a8022d66eb56d9d"
+        },
+        {
+            "path": "input-source-seal.json",
+            "bytes": 1380907,
+            "sha256": "1f6b19210ef2288c98dde043cf106c50aba00bf55de5ab03d0b2a069c6a40a6b"
+        },
+        {
+            "path": "known-draft-controls.json",
+            "bytes": 135288,
+            "sha256": "ce9834059eb0986f4d26b43a7328530303a0c3b2096ca97a42d765fc4066d9d1"
+        },
+        {
+            "path": "known-native-decline-control.json",
+            "bytes": 955721,
+            "sha256": "7286bffb6e79d8afe9e199f2dbde3a8db2d4ba8eee7aacd587d7e745418f9783"
+        },
+        {
+            "path": "label-controller.py",
+            "bytes": 9453,
+            "sha256": "22e6798bcc85427a3cb3d0d374a01ea0619ecf9708f6445a6367a9b78fe9d96f"
+        },
+        {
+            "path": "label-execution-registration.json",
+            "bytes": 3435,
+            "sha256": "4c7c48bcac61adadcd9eb78c3c563782bd0b3a4c78b07c1b5b6d2ca900694366"
+        },
+        {
+            "path": "label-plans.json",
+            "bytes": 20776727,
+            "sha256": "56d328cdbe6bc025485aa2c72b462b5afb1b809079b537dcc184801951d3c846"
+        },
+        {
+            "path": "label-preflight.ts",
+            "bytes": 1581,
+            "sha256": "443d4ff7b25f0d47d991e2986d7ad66eebd08b7eeba0376824db8ae3e74e1948"
+        },
+        {
+            "path": "merge-inputs-executed.ts",
+            "bytes": 11406,
+            "sha256": "c9dcb0b50299af0bca651330a0315b766e58b6c8c04286c398474be87c91ce55"
+        },
+        {
+            "path": "merged-input-verification.log",
+            "bytes": 286,
+            "sha256": "0592f1a5e92b7ab09850aa3cec47a9d41070ceb244001ca32ea2d6d519c50bc2"
+        },
+        {
+            "path": "native-context.ts",
+            "bytes": 9284,
+            "sha256": "91f4a3710122426b4a2d182889df33be410c09a7adf6ca11efb1fe247ce82483"
+        },
+        {
+            "path": "native-drafts.ts",
+            "bytes": 7187,
+            "sha256": "2457aa3ff272619c0966e0b5744f74749715a7794714f95dd9314046c2bc983a"
+        },
+        {
+            "path": "native-opening-audit.json",
+            "bytes": 15088698,
+            "sha256": "ac96878a1d9a4c4799282cc4e7225075c2553c1543f6d398d973505c440ddfe6"
+        },
+        {
+            "path": "native-runtime-dependency-links.json",
+            "bytes": 5722,
+            "sha256": "fca367a83469063a278b642aa9f5b31473b763842234fc43c18b7ed7c62b689b"
+        },
+        {
+            "path": "node-control-inputs-f32-v2.json",
+            "bytes": 1350661,
+            "sha256": "2a08989ed5b2b863a7a9feecf40ca5f00a63aef70e86307285d734787fe3fbdd"
+        },
+        {
+            "path": "node-engineering.ts",
+            "bytes": 3171,
+            "sha256": "4ef5f4d02c53b0e8721b863784f0935f07139274ee3e79f69c7cf9646b65b822"
+        },
+        {
+            "path": "owned-input-supervisor.py",
+            "bytes": 2810,
+            "sha256": "f480b593631d97c23fba906c8fc59efc46d75a3e6178928c6631f7f2b4ecb96c"
+        },
+        {
+            "path": "pool.json",
+            "bytes": 1863727,
+            "sha256": "f86307ba5b0f085062eb4a72cff3aa89d6b01d5455044c515f35c23e26143218"
+        },
+        {
+            "path": "preparation-registration.json",
+            "bytes": 761,
+            "sha256": "c85ce54249e2c068493f641fbf445b06db7ac86cea612696d492b5fa1aa22a68"
+        },
+        {
+            "path": "quality-control.ts",
+            "bytes": 3408,
+            "sha256": "ce02f678adf3fe250f6c9f63fd8d1b2a9611f90cee69e07c001f7de6b640e1bb"
+        },
+        {
+            "path": "research-transport.py",
+            "bytes": 3274,
+            "sha256": "612c008b21dbfdd2f647db5020f6d3ebf5a256743b4d6ae5af29ee9d8d22a18f"
+        },
+        {
+            "path": "reserved-scanned-channels.json",
+            "bytes": 24627521,
+            "sha256": "c450f189c90217388ed74a1818252f7b8690ce80be095ba1359c1dd956289d80"
+        },
+        {
+            "path": "reserved-scanned-preimages.json",
+            "bytes": 2112226,
+            "sha256": "614e6723c48c73d25be30cbd2731086552133e1c208d75f7060e4ede489a8d41"
+        },
+        {
+            "path": "sample-inputs.ts",
+            "bytes": 4816,
+            "sha256": "affba262c6ed261dc85c4732e2d2583e584c50eb48b367fcfc104a8c214f7907"
+        },
+        {
+            "path": "sample-worker.ts",
+            "bytes": 1789,
+            "sha256": "f82ad662c9cf715a082c0b77433bfef07a9cee85d2ce01046eb0d43dc1cb4904"
+        },
+        {
+            "path": "seed-admission.json",
+            "bytes": 1276,
+            "sha256": "dc6f4285b5db2fe6520b267140467c3da906836414f3cace3543e81108e568a6"
+        },
+        {
+            "path": "seed-query-intersections.json",
+            "bytes": 734483,
+            "sha256": "b76780c1882044fa66db51029ab34ee1b82f5f08eb41eea109564bc45354223e"
+        },
+        {
+            "path": "seed-scans.json",
+            "bytes": 13545271,
+            "sha256": "edf7eea4d72f2ceb5c99939d0a351e0021bf8cbf0ddbe9a45a1fe69132016dae"
+        },
+        {
+            "path": "train-public-value.py",
+            "bytes": 9727,
+            "sha256": "37b9f9f276415630c2a70537852a0774903273798c962dbb7d8de540e56619f6"
+        },
+        {
+            "path": "transport-plan.json",
+            "bytes": 10796,
+            "sha256": "261fc02832f3fadda099b3f6dfeccf46f558d74661a39b87eeab4b2327765ff8"
+        },
+        {
+            "path": "validate-fixed-models.ts",
+            "bytes": 8064,
+            "sha256": "44c8b4f1a668619d2e39b8fca1a0d67722569ded466b4ed2728cc65ed56b0ea1"
+        },
+        {
+            "path": "verify-cache-batch.ts",
+            "bytes": 2074,
+            "sha256": "38b2799b555e035a06aee6a85f90179926de3e7e9382b66a7d03685f5c585713"
+        },
+        {
+            "path": "verify-native-label-integrity.ts",
+            "bytes": 4930,
+            "sha256": "6ac9664b66427f11b125115d8e8826944d1ca33fe4ff56553f9d5c499043594b"
+        }
+    ],
+    "sourceAndAllRawInputsRetainedOutsideGit": true,
+    "fitNotStarted": true,
+    "nativeLabelsAtSeal": 0,
+    "defaultChanged": false
+}
