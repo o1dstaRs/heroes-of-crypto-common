@@ -140,3 +140,36 @@ native validation succeed. It preserves the original label /fit cutoffs and
 cannot launch training, choose the descriptive ablation, retry a failure or
 promote a policy. Fresh full-policy strength, independent confirmation and the
 overall-average +10% CPU gates, including both-AI adoption, remain pending.
+
+## Storage failure closeout
+
+This collection is now **closed incomplete**. The local scheduler failed with
+ENOSPC while writing the completed `local-training-b011` receipt. Its exception
+handler then failed to write the failure marker on the same full filesystem.
+The independent coordinator watched marker/progress files without checking the
+controller process, so it missed the stopped scheduler. Preserve both tracebacks;
+the precise original failure time was not recorded. The external reconciliation
+at November 19 05:58 UTC triggered the original global stop on both nodes.
+
+There are 6,016 previously acknowledged labels. A separate postmortem audit of the
+completed, unacknowledged block verifies all 128 additional logical labels / 108
+unique native inputs, including source, inputs, caches, winners, geometry, features
+and refusal proofs. Both complete archive replicas also verify. The preserved
+total is **6,144 logical labels / 5,250 unique native inputs**, 768 groups and 192
+complete training families in 26 blocks. All 26 archive hashes were rechecked on
+both nodes. Interrupted prefixes remain raw, unvalidated evidence; their existence
+does not establish an exact attempted-game count or additional admitted labels.
+
+No fitter ran, no validation scores were aggregated, and no statistical admission,
+fresh strength, cost or model activation follows. Keep all source versions,
+failed states and the full JSON six-role reservation. Do not resume this bank,
+fit its partial labels, extend its cutoffs or treat a complete block as a complete
+study. The [closeout fixture](evidence/a19_public_placement_json_storage_closeout_20261119.json)
+binds the original failure, recovered data and stopped-prefix archives.
+
+The separate future guard prototype has seven passing fault-injection controls:
+missing controller without a marker, PID reuse, transient observation failure,
+validated terminal receipts, ENOSPC publication failure and an unreachable remote
+stop route. Local write failure cannot prevent attempts on every remote stop
+route. This prototype must be integrated before another campaign; it does not
+modify or reopen the frozen failed execution.

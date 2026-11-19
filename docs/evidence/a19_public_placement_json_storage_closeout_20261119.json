@@ -1,0 +1,94 @@
+{
+    "schema": 1,
+    "id": "a19-public-placement-json-storage-closeout-20261119",
+    "status": "closed-incomplete",
+    "producerSourceUnchanged": "b8d7f4ed2a53b2d81c9c9b13d99a69c7d83bd4f147001b2a9d3a71e214c2e665",
+    "independentAnalysisSourceUnchanged": "8cf5e84229d13dc341e2c24e9c3c20fc0b313c54e3afe6dcdc4953f25e456f36",
+    "failure": {
+        "localSupervisorPid": 25505,
+        "reason": "ENOSPC writing the completed local-training-b011 block receipt; ENOSPC also prevented the exception handler from writing its failure marker",
+        "exactOriginalFailureTimeNotCaptured": true,
+        "coordinatorDefect": "Used progress/failure files without checking the actual owned controller process; absence of a failure marker was mistaken for healthy collection",
+        "originalControllerLogSha256": "6dacee7d6d95a978e84e8b4f94bf5324d5728257c8962ac7b0a2a3f3567f5040",
+        "externalReconciliationAtUtc": "2026-11-19T05:58:04.555344+00:00",
+        "globalStopRequestedAtUtc": "2026-11-19T05:58:12.209839+00:00",
+        "coordinatorStoppedAtUtc": "2026-11-19T05:58:14.715617+00:00",
+        "bothRemoteControllersVerifiedMissingAtUtc": "2026-11-19T05:59:24.161102+00:00",
+        "onlyOwnedCollectionGroupsStopped": true,
+        "independentDescriptionCacheBenchmarkUnaffected": true
+    },
+    "completeVerifiedData": {
+        "acknowledgedLogicalLabelsBeforeFailureReconciliation": 6016,
+        "postmortemRecoveredBlock": "json-native-labels-local-training-b011",
+        "postmortemRecoveredLogicalLabels": 128,
+        "postmortemRecoveredUniqueNativeInputs": 108,
+        "allRecoveredSourceInputsCachesWinnersGeometryFeaturesAndRefusalProofsVerified": true,
+        "bothRecoveredFullArchiveReplicasVerified": true,
+        "totalLogicalLabels": 6144,
+        "uniquePhysicalNativeInputs": 5250,
+        "completeBlocks": 26,
+        "groups": 768,
+        "completeTrainingFamilies": 192,
+        "registeredFamiliesRequired": 1152,
+        "registeredLogicalLabelsRequired": 36864,
+        "all26CompleteArchiveHashesReverifiedOnBothNodes": true,
+        "wholeRegisteredStudyComplete": false,
+        "exactInterruptedAttemptCountNotClaimed": true
+    },
+    "rawStoppedPrefixes": {
+        "hft": {
+            "bytes": 6206672,
+            "members": 448,
+            "sha256": "e83fc945a7c0a1a748da7274f13f60953dcefa9c2062c375922e4c7ca5a008b2"
+        },
+        "puffalo": {
+            "bytes": 4305274,
+            "members": 304,
+            "sha256": "094a8a6a4ca729f76eae56a84fd2633f64dc2231ac73cfb52d35a98a0805297d"
+        },
+        "allOriginalMemberHashesVerifiedAtCreation": true,
+        "bothPrefixArchivesCrossReplicatedAndMemberVerifiedLocallyAndOnBothNodes": true,
+        "unvalidatedPrefixesNotAdmittedForFitting": true
+    },
+    "futureGuardControls": {
+        "sourceSeal": "0eecd1aef9e54a86bca4517d620c5e9e1268d740436d8a1887083dea57ecd87d",
+        "passed": 7,
+        "nativeGames": 0,
+        "checks": [
+            "Live owned controller",
+            "Missing process without failure marker",
+            "PID reused by a different process",
+            "Transient observation failure does not authorize restart",
+            "Validated complete/failure receipts and rejection of an unvalidated terminal state",
+            "Full local disk cannot prevent both remote stop attempts",
+            "One unreachable remote cannot skip the other stop route"
+        ],
+        "prototypeOnlyRequiresIntegrationBeforeAnotherCampaign": true,
+        "frozenFailedSourcesNotEdited": true
+    },
+    "completeCloseoutArchive": {
+        "bytes": 10433445,
+        "members": 21,
+        "sha256": "e5adfa8365e5ef9788eaa784176ee8325eebf2d1df6b26d5358b64c68b412059",
+        "containsOriginalFailureLogsAndUnvalidatedPrefixesAndValidBlockInventoryAndGuardSourceTests": true,
+        "allMembersAndArchiveHashVerifiedOnBothNodes": true,
+        "dependentStatisticsWatcherExplicitlyStoppedAfterDataFailure": true
+    },
+    "reservationStillExcluded": {
+        "namespace": "native-public-placement-audited-json-data-20261119-v1",
+        "roles": ["draft", "setup-a", "setup-b", "reverse-a", "reverse-b", "terrain"],
+        "countersPerRole": 32768,
+        "uniqueExpandedChannels": 2293218,
+        "includesRejectedUnusedAndUnselectedValues": true,
+        "olderClosedNamespacesRemainExcluded": true
+    },
+    "resumeOrFitPartialLabelsAuthorized": false,
+    "cutoffExtensionAuthorized": false,
+    "trainingSteps": 0,
+    "validationScoresAggregated": false,
+    "internalAdmissionAchieved": false,
+    "freshStrengthOrCostQualified": false,
+    "oldFailedStudiesOrUnopenedBanksChanged": false,
+    "defaultChanged": false,
+    "automaticPromotionOrDeployment": false
+}

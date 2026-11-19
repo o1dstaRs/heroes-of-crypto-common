@@ -1,5 +1,26 @@
 # Agent guidance
 
+## Closed JSON placement collection after storage failure — November 19, 2026
+
+The `b8d7f4ed` producer / `8cf5e842` analysis continuation is now **closed incomplete**.
+Read the storage closeout appended to `docs/a19_public_placement_json_learning.md`.
+The local controller died on ENOSPC while publishing a completed block receipt;
+its failure-marker write also failed, and the coordinator did not check process
+liveness. All owned collection jobs are stopped. Preserve 6,144 independently
+verified logical labels / 5,250 unique native inputs in 26 complete blocks,
+including the 128-label postmortem recovery, plus all unvalidated interrupted
+prefixes. There was no fit or validation-score aggregation. Do not resume this
+bank, fit partial labels, extend cutoffs or call the collection passed. All six
+roles ×32,768 counters and 2,293,218 expanded channels in its JSON namespace remain
+excluded, including rejected and unused values. Earlier closed banks stay excluded.
+
+Future copies of this pipeline must verify the owned controller's actual process
+identity, detect missing processes even without a marker, and deliver every remote
+stop despite a failed local write. Seven fault-injection controls pass for the
+separate guard prototype; integrate it before another campaign. The frozen failed
+sources stay unchanged. Independent description-cache research is separate and
+does not train this incomplete data or activate a model.
+
 ## Fresh lossless-JSON placement preparation — November 19, 2026
 
 Read `docs/a19_public_placement_json_learning.md`. The corrected recorder passed
