@@ -30,4 +30,6 @@ it("runs ordinary finite-work cohort fights through certified selection bounds",
     } finally {
         spy.mockRestore();
     }
-}, 60_000);
+    // This is a complete mirrored H64/R2 integration check, not a wall-clock performance gate. Match the
+    // isolated runner's 90-second watchdog: shared CI hosts can take over a minute without changing work.
+}, 90_000);
