@@ -161,3 +161,16 @@ outcome/telemetry preservation before validation. The original v1 remains
 unexecuted; [v2](evidence/a19_invalid_scavenger_move_diagnosis_registration_v2_20261119.json)
 keeps the TOTAL budget at two known diagnostic games and the same native runtime
 environment, exact-outcome requirement, invalid warning and 10:00 UTC deadline.
+
+Preparation v2 then failed in the setup callback before combat: it read a completed
+frame's hash from a public-selection callback. Preserve both setup-only attempts.
+The [typed v3 correction](evidence/a19_invalid_scavenger_move_diagnosis_registration_v3_20261119.json)
+completed exactly the original two-game diagnostic budget, one per node, and
+reproduced the full original native outcome on both. A separately registered
+one-game root-epoch diagnosis traced the zero-threat Backstab request. Read the
+[movement correction](a19_backstab_movement_correction.md) and its source-bound
+evidence. That correction's two full native engineering replays have zero raw
+quality errors and identical corrected outcomes, with the same winner as before.
+They are neither fresh strength evidence nor labels for this failed corpus. All
+closed-study raw archives, interrupted prefixes and diagnostic outputs remain
+replicated on both nodes; no fitting or resume is permitted.

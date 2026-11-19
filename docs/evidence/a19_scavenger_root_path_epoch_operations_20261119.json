@@ -1,0 +1,16 @@
+{
+    "schema": 1,
+    "id": "read-only-scavenger-root-path-epoch-operational-correction-20261119-v2",
+    "registeredAtUtc": "2026-11-19T09:18:16.713795+00:00",
+    "failedAttempt": "readonly-scavenger-root-path-epoch-v1-hft",
+    "failure": "The standalone source-check command completed before the process guard sampled its identity. It passed the source check, then guard failed; no Bun command started and no native combat or decision occurred.",
+    "preservedSourceAndMarkers": true,
+    "correction": "Verify immutable script and registration hashes via read-only metadata before launch. Remove only the short-lived standalone check command from the new stage. The native observer/policy/input/source and final outcome parity gate remain identical.",
+    "nativeDiagnosticGamesAlreadyExecuted": 0,
+    "totalNativeDiagnosticGamesBudget": 1,
+    "host": "hft",
+    "scriptSha256": "293cc1252a14e5ab2dcf70708d8dccc2376413c62fbf5e5097074118e5cc2c6c",
+    "originalDeadlineUnchanged": "2026-11-19T10:00:00Z",
+    "noAutomaticNativeInvalidRetry": true,
+    "oldCollectionRemainsClosed": true
+}

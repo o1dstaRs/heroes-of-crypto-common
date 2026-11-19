@@ -1,0 +1,35 @@
+{
+    "schema": 1,
+    "id": "read-only-scavenger-root-path-epoch-20261119-v1",
+    "registeredAtUtc": "2026-11-19T09:15:59.773722+00:00",
+    "scope": "Distinct exposed-case engineering diagnosis after completed two-game route validation diagnosis. Observe root policy/catalog, search and actual native apply epochs without changing any returned native value or reference. Old diagnostic quota and closed label study remain closed.",
+    "fullDiagnosticGamesBudget": 1,
+    "hostAssignments": {
+        "hft": 1,
+        "puffalo": 0
+    },
+    "originalNativeOutcomeDigest": "ffd340fa5b38d62eaf86c6242bd3a63598e266252ae1e7614626f2cf371a865b",
+    "scriptSha256": "293cc1252a14e5ab2dcf70708d8dccc2376413c62fbf5e5097074118e5cc2c6c",
+    "nativeProducer": "794b281e",
+    "operationsParent": "1f30d785",
+    "case": "paired-placement-m1-op1-o1-scan0102-team2-future1",
+    "proposal": 7,
+    "acceptance": "Exactly original full native outcome and same invalid move warning; unconditional raw preservation first. No failed observational replay or automatic retry.",
+    "trainingEligible": false,
+    "newIndependentData": false,
+    "policyEdits": 0,
+    "strengthOrCostInference": false,
+    "deadlineUtc": "2026-11-19T10:00:00Z",
+    "automaticPromotionOrDeployment": false,
+    "runtimeEnvironment": {
+        "NODE_ENV": "test",
+        "TZ": "UTC",
+        "HOC_ARANGODB_HOST": "",
+        "HOC_REDIS_HOST": "",
+        "HOC_REDIS_QUEUE": "false",
+        "HOC_REDIS_PUBSUB": "false",
+        "HOC_REDIS_SESSIONS": "false",
+        "HOC_REDIS_SHARED_STATE": "false",
+        "HOC_BOT_SEARCH": "1"
+    }
+}

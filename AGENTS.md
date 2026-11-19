@@ -1,5 +1,25 @@
 # Agent guidance
 
+## Backstab authoritative movement correction — November 19, 2026
+
+Read `docs/a19_backstab_movement_correction.md`. The Scavenger invalid move was
+traced to `preferBackstabAttackCell` asking for finite movement against a zero
+threat matrix. Threat is an authoritative movement price; the corrected request
+uses actual enemy aggro and keeps the original attack when no bonus cell fits.
+Preserve the engine's reachability checks and all fourteen Backstab tests,
+including both teams/axes and cached/direct native paths. Do not restore the
+zero-threat shortcut or treat it as a risk preference.
+
+Three complete read-only diagnostic games exactly reproduced the exposed original
+native outcome. Two separately sealed corrected engineering replays, one per node,
+have zero raw quality errors and identical full corrected outcomes; the winner is
+unchanged. This is correctness evidence, not fresh strength or final compute
+qualification. No model/profile/search-budget change or deployment follows.
+Keep the paired study closed/unfitted and exclude all five complete six-role
+namespace reservations. Future compute gates use the user's overall mean +10%
+bound for full-fight and weighted actual-search-decision CPU, including both-AI
+adoption; subgroup costs are descriptive.
+
 ## Closed paired placement after invalid native move — November 19, 2026
 
 Read the closeout in `docs/a19_public_placement_pair_learning.md`. The paired

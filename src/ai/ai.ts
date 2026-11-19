@@ -1234,17 +1234,16 @@ function preferBackstabAttackCell(
     }
 
     const unitCell = unit.getBaseCell();
-    // A backstab stand cell is adjacent to the target — and therefore adjacent to the enemy, so the
-    // team aggression weighting prices it out of the normal path even when the unit can physically step
-    // there this turn. Recompute reachability with a zero aggression matrix to get true raw-movement
-    // reach (the Scavenger accepts the slightly riskier step in exchange for the damage bonus).
-    const zeroAggr = matrix.map((row) => row.map(() => 0));
+    // Enemy threat is an authoritative movement cost, not a preference we can waive for Backstab.
+    // A zero-threat walk could advertise a four-step backstab whose real cost is six, causing the engine
+    // to reject the move and leaving later action decorators with an impossible approach. Use the same
+    // finite weighted reachability as ordinary movement; keep the original attack if no bonus cell fits.
     const backstabFootprint = footprintOf(unit);
     const knownPaths = pathHelper.getMovePath(
         unitCell,
         matrix,
         unit.getSteps(),
-        zeroAggr,
+        grid.getAggrMatrixByTeam(team === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT),
         unit.canFly(),
         unit.isSmallSize(),
         unit.canTraverseLava(),
