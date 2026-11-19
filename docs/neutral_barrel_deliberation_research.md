@@ -193,11 +193,19 @@ it unset, so no shell variable can enable it. Twelve driver tests cover melee an
 strikes against move, wait and defend, retained strikes on equal forecasts, the unchanged
 deployment-barrel and classic-mountain paths, real-forecast state restoration and switch validation.
 
+The committed code, with the switch off, was replayed against its parent commit through the stock
+ranked adapter: 212 games (132 Cemetery, 40 Normal, 40 Lava; 125 with a Barrel Barricade) and 11,387
+decisions. Every score, behavior digest and decision count is identical, so adding the switch
+changed no default play.
+
 An integration replay ran 36 development cases twice with the comparison on both seats: once through
 the research seam, once through the real engine source with the switch enabled by the profile rules
 and the stock ranked adapter. All 36 complete outcomes, digests and decision counts match, across
 406 compared strike roots. Adoption is therefore one profile rule; it needs an explicit user
-decision, a profile version bump and re-pinned fingerprints.
+decision, a profile version bump and re-pinned fingerprints. That edit was applied to a scratch copy
+of the committed source (`63c8e6b5`): the complete common suite passes with profile schema v14 and
+behavior fingerprint `397a2fc8dc8d3145…`. The server's production revision string and the client
+guidance change in the same step.
 
 ## Seeds
 
