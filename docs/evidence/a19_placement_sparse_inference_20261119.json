@@ -1,0 +1,276 @@
+{
+    "schema": 1,
+    "id": "a19-placement-exact-sparse-inference-20261119",
+    "atUtc": "2026-11-19T11:50:32.812298+00:00",
+    "kind": "Exact numerical optimization of existing v13 placement models; no new trained artifact or strength estimate",
+    "baselinePublishedCommonCommit": "780e87f98cdd1d8560da6597a2383547e304848c",
+    "runtimeSourceBeforeCommit": {
+        "src/ai/placement/adapter.ts": "5e34e7e857cc934d5d157292fbefe9b8a0ed584e8b501e2b3000bf691916df58",
+        "src/ai/placement/layout.ts": "398cfda370abc28f4a3b395b7bebeea854cb1f1e010e943ea4b03a32fdf58a41",
+        "src/ai/placement/model.ts": "ad146d7e7f9277c6c6e7bad24285c6fa423400720e78f1492d5f1ee64a6784f1",
+        "src/ai/versions/v0_8_a19_profile.ts": "d26b7facf21403cfa56fbadbd1fc173d9f2d5324c30c9e9383b4a69820b8e251",
+        "test/ai/placement_predictor.test.ts": "b784e9b67d026f3795ab24c26ffed35ad45d7a6867ce638cb46b86aeec931ac9"
+    },
+    "denseReferenceFunctionUnchanged": true,
+    "denseReferenceFunctionSha256": "18f821dd48533b89802413e1e7cdff998508aaa02c3dc9a129c8b991b7f0d3ca",
+    "modelArtifactsUnchanged": {
+        "src/ai/models/a19/placement_v1.json": "496842b113847a9ee902cc920daa23d3a2d8970c49353221f08ee34aedf26aa7",
+        "src/ai/models/a19/placement_v2.json": "690f77e18625aab335ec4fdee3e686cd42a2a2bd677399c92fe300728431275b"
+    },
+    "scope": {
+        "modelIdsAndStrictMarginUnchanged": true,
+        "candidateAndReferencePoliciesUnchanged": true,
+        "onlyImmutableFiniteTensorSnapshotsCached": true,
+        "inputZeroMaskRebuiltEveryCall": true,
+        "onlyFirstHiddenAffineLayerSkipsZeroInputs": true,
+        "remainingLayersAndLinearOutputsUseOriginalDenseEvaluator": true,
+        "nonzeroAccumulationOrderAndBinary64InputsUnchanged": true,
+        "firstHiddenReluNormalizesSignedZero": true,
+        "sourceLedgerThreeExistingEntriesRefreshed": true
+    },
+    "primaryServingBenchmark": {
+        "atUtc": "2026-11-19T11:36:42.690Z",
+        "passed": true,
+        "scope": "Actual serving finalizePlacement including input validation, proposals, two scoring stages, fallback and output Map; reused public unscored inputs, no battles or strength estimate",
+        "cases": 72,
+        "selectionsPerArm": 576,
+        "counterbalancedRounds": 8,
+        "allInputEnvelopesActuallySupported": true,
+        "allCompletePlacementMapsBitExact": true,
+        "incumbentsUnchanged": true,
+        "compilation": {
+            "cpuMicros": 5803,
+            "wallMs": 4.777833000000001
+        },
+        "denseCpuMicros": 6805686,
+        "sparseCpuMicros": 4596054,
+        "cpuRatio": 0.6753256027386512,
+        "timings": [
+            {
+                "round": 0,
+                "mode": "dense",
+                "cpuMicros": 814487,
+                "wallMs": 796.9500840000001,
+                "selections": 72
+            },
+            {
+                "round": 0,
+                "mode": "sparse",
+                "cpuMicros": 574179,
+                "wallMs": 516.5604170000001,
+                "selections": 72
+            },
+            {
+                "round": 1,
+                "mode": "sparse",
+                "cpuMicros": 526630,
+                "wallMs": 520.5102080000001,
+                "selections": 72
+            },
+            {
+                "round": 1,
+                "mode": "dense",
+                "cpuMicros": 894131,
+                "wallMs": 940.8834579999998,
+                "selections": 72
+            },
+            {
+                "round": 2,
+                "mode": "dense",
+                "cpuMicros": 848075,
+                "wallMs": 865.301708,
+                "selections": 72
+            },
+            {
+                "round": 2,
+                "mode": "sparse",
+                "cpuMicros": 579757,
+                "wallMs": 576.8842080000004,
+                "selections": 72
+            },
+            {
+                "round": 3,
+                "mode": "sparse",
+                "cpuMicros": 544799,
+                "wallMs": 554.314875,
+                "selections": 72
+            },
+            {
+                "round": 3,
+                "mode": "dense",
+                "cpuMicros": 831555,
+                "wallMs": 829.2976660000004,
+                "selections": 72
+            },
+            {
+                "round": 4,
+                "mode": "dense",
+                "cpuMicros": 889160,
+                "wallMs": 929.6367499999997,
+                "selections": 72
+            },
+            {
+                "round": 4,
+                "mode": "sparse",
+                "cpuMicros": 603013,
+                "wallMs": 623.9410419999995,
+                "selections": 72
+            },
+            {
+                "round": 5,
+                "mode": "sparse",
+                "cpuMicros": 629335,
+                "wallMs": 701.4007089999996,
+                "selections": 72
+            },
+            {
+                "round": 5,
+                "mode": "dense",
+                "cpuMicros": 836495,
+                "wallMs": 832.2970839999998,
+                "selections": 72
+            },
+            {
+                "round": 6,
+                "mode": "dense",
+                "cpuMicros": 828113,
+                "wallMs": 824.2012500000001,
+                "selections": 72
+            },
+            {
+                "round": 6,
+                "mode": "sparse",
+                "cpuMicros": 575452,
+                "wallMs": 593.4317080000001,
+                "selections": 72
+            },
+            {
+                "round": 7,
+                "mode": "sparse",
+                "cpuMicros": 562889,
+                "wallMs": 565.1903330000005,
+                "selections": 72
+            },
+            {
+                "round": 7,
+                "mode": "dense",
+                "cpuMicros": 863670,
+                "wallMs": 875.3165410000001,
+                "selections": 72
+            }
+        ],
+        "casesSha256": "a9b242c9b759314fa764da14f32fccb565f24e103aaea496bab15246a82a1b23",
+        "modelsUnchanged": true,
+        "nativeGames": 0,
+        "learningSourceUnchanged": true
+    },
+    "forwardOnlyPrototype": {
+        "atUtc": "2026-11-19T11:20:39.951Z",
+        "passed": true,
+        "scope": "Unscored input-only engineering/performance, no battle, fit or strength evidence; running learning source unchanged",
+        "cases": 72,
+        "predictions": 1152,
+        "allScoresBitExact": true,
+        "allPolicyChoicesExact": true,
+        "syntheticEdgeModels": 64,
+        "inputFeatureDensity": 0.07230835630643641,
+        "denseCpuMicros": 5252089,
+        "sparseCpuMicros": 415435,
+        "cpuRatio": 0.07909900232079083,
+        "elapsedMs": 8604.457917,
+        "sourceSha256": "f2f4edb500530b0160b4881da94cfd6f0560ea39ed826496ce6724823315e100",
+        "nativeGames": 0,
+        "productionCodeChanged": false
+    },
+    "nativeFunctionalComparison": {
+        "passed": true,
+        "knownNativeGames": 6,
+        "cases": 3,
+        "maps": [1, 3, 4],
+        "allCompleteVanillaNativeOutcomesBitExact": true,
+        "allSparseCasesActuallyCalledBothCompiledModelAccessors": true,
+        "originalMismatchedForcedFormationAssertionPreservedAsFailed": true,
+        "noCompletedVanillaDenseGameReplayed": true,
+        "records": [
+            {
+                "case": 0,
+                "map": 4,
+                "decisions": 49,
+                "predictorAccesses": [1, 1],
+                "rawWarnings": [],
+                "wholeDenseAndSparseNativeOutcomesExactlyEqual": true,
+                "outcomeSha256": "818b5c2471233eddd1ba8d48c3aadd0af1d54e320a50b6fa3799fdb8d539a621",
+                "alsoMatchesOriginalLinuxFixture": true,
+                "originalLinuxCase2WasDifferentForcedTemplate5": false
+            },
+            {
+                "case": 1,
+                "map": 3,
+                "decisions": 37,
+                "predictorAccesses": [2, 2],
+                "rawWarnings": [],
+                "wholeDenseAndSparseNativeOutcomesExactlyEqual": true,
+                "outcomeSha256": "107fafe60fa673e835976282dc2fcaaa583385dbaaa34a0d97417539278a1f38",
+                "alsoMatchesOriginalLinuxFixture": true,
+                "originalLinuxCase2WasDifferentForcedTemplate5": false
+            },
+            {
+                "case": 2,
+                "map": 1,
+                "decisions": 36,
+                "predictorAccesses": [1, 1],
+                "rawWarnings": [],
+                "wholeDenseAndSparseNativeOutcomesExactlyEqual": true,
+                "outcomeSha256": "9cdfbd2509073c35b082d418211424e83d217d921576a62a80122fdefddd98c4",
+                "alsoMatchesOriginalLinuxFixture": false,
+                "originalLinuxCase2WasDifferentForcedTemplate5": true
+            }
+        ],
+        "strengthSamples": 0,
+        "runningLearningSourceUnchanged": true
+    },
+    "preservedInitialHarnessFailure": {
+        "scope": "Correct the known functional comparison only; no fresh native strength samples or dataset retry",
+        "originalFailedHarnessPreserved": true,
+        "cause": "current-native-control.ts uses fixture.proposal; case2 is a forced-template5 control, whereas this optimization control uses vanilla placement. Two original vanilla goldens matched; the third expectation was a different declared formation.",
+        "producerSourceSha256": "89bf5cb063e32bc637ae4ce4a995238ea1629dc4c14c41efd557ccba008be12a",
+        "completedVanillaDenseControlsReusedWithoutReplaying": 3,
+        "unexecutedSparseControls": 3,
+        "nativeDataOrModelQualityReclassification": false,
+        "learningSourceAndJobsUnchanged": true,
+        "initialV2PreparationWrongCwdFailedBeforeAnyNativeGame": true,
+        "referenceHashes": {
+            "0": "818b5c2471233eddd1ba8d48c3aadd0af1d54e320a50b6fa3799fdb8d539a621",
+            "1": "107fafe60fa673e835976282dc2fcaaa583385dbaaa34a0d97417539278a1f38",
+            "2": "9cdfbd2509073c35b082d418211424e83d217d921576a62a80122fdefddd98c4"
+        }
+    },
+    "validation": {
+        "commonBuildPassed": true,
+        "commonTests": 8267,
+        "commonTestFiles": 709,
+        "commonFailedTests": 0,
+        "clientFullCheckPassed": true,
+        "focusedPlacementAndIsolationTests": 20,
+        "packedTensorAndAdoptionFixturesUnchanged": true,
+        "initialCommonBuildSourceLedgerFailurePreserved": true,
+        "sourceLedgerTestUnchangedAndPassingAfterRefreshingActualFileHashes": true,
+        "serverCommonPinAndChecks": "Pending consumer pin; server verification is recorded separately with that consumer commit."
+    },
+    "sourceEvidence": {
+        "servingSelectorScriptSha256": "eb1614fd0ec3f2456f220ac76aa867e99c36c3d37a6cf754b4b725ea6fbfb6d6",
+        "servingSelectorEvidenceSha256": "9766470b39200143fa7ab6329a6806de96d30483a8568f116a98bf0eca7eb594",
+        "nativeParityEvidenceSha256": "505acfd0c638a7b7f0c823f91cd6588c1d18e1a42da905be335df7518d02cebe",
+        "prototypeCompilerSha256": "f2f4edb500530b0160b4881da94cfd6f0560ea39ed826496ce6724823315e100"
+    },
+    "learningCampaign": {
+        "source": "a02638064972ea0c3d4e916f3d1172ad801db069e4e611c6dc177e418a5447d8",
+        "frozenSourceAndJobsUnchanged": true,
+        "partialNativeLabelsOrValidationEffectsReadForThisOptimization": false,
+        "benchUsesOnlyPublicPreviouslyCapturedInputCases": true,
+        "fitOrStrengthGatesChanged": false
+    },
+    "strengthGainClaim": null,
+    "fullFightOrProductionLatencySpeedClaim": null,
+    "automaticDeployment": false
+}

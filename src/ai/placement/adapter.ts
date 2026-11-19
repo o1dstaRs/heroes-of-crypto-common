@@ -1,6 +1,11 @@
 import { creatureIdForName, creatureInfo } from "../setup/creature_score";
-import { propose, encode, predict, chooseCandidate, valid, type PublicInput, type Point, type Body } from "./layout";
-import { getPlacementModel, getPlacementRelationModel } from "./model";
+import { propose, encode, chooseCandidate, valid, type PublicInput, type Point, type Body } from "./layout";
+import {
+    getPlacementModel,
+    getPlacementPredictor,
+    getPlacementRelationModel,
+    getPlacementRelationPredictor,
+} from "./model";
 import { relationFeatures } from "./relations";
 import { protectA19WanderingMagePlacement } from "../wandering_mage_support";
 import { protectA19HealerPlacement } from "../healer_support_setup";
@@ -120,14 +125,14 @@ export function finalizePlacement(
         const anchors = baseline as Point[];
         if (!valid(input, anchors)) return fallback();
         const model = getPlacementModel();
+        const predictModel = getPlacementPredictor();
         const options = Array.from({ length: 8 }, (_, i) => propose(input, anchors, i));
-        const scores = options.map((p) => predict(model, encode(input, p)));
+        const scores = options.map((p) => predictModel(encode(input, p)));
         const reference = chooseCandidate(scores, model.minimumGain);
         retained = new Map(units.map((u, i) => [u.getId(), { ...options[reference][i] }]));
         const relationModel = getPlacementRelationModel();
-        const relationScores = options.map((p) =>
-            predict(relationModel, relationFeatures(input, p, options[reference])),
-        );
+        const predictRelations = getPlacementRelationPredictor();
+        const relationScores = options.map((p) => predictRelations(relationFeatures(input, p, options[reference])));
         const selected = options[chooseCandidate(relationScores, relationModel.minimumGain, reference)];
         if (!valid(input, selected)) return fallback();
         return new Map(units.map((u, i) => [u.getId(), { ...selected[i] }]));

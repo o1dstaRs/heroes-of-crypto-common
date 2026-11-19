@@ -1,10 +1,12 @@
 import packed from "../models/a19/placement_v1.json";
 import relations from "../models/a19/placement_v2.json";
-import type { PlacementModel } from "./layout";
+import { compilePlacementPredictor, type PlacementModel } from "./layout";
 const EXPECTED_EXPORT = "3aa76b4c37ee49c99cab212a5a5f8f90020580f493300b61fb9e4af1bc554590";
 const EXPECTED_RELATIONS_EXPORT = "4bb2199fb9af3212a17dfaef6d73de14fb174f1c4ff8699eda96c3a4a2a3554a";
 let cached: PlacementModel | undefined;
 let cachedRelations: PlacementModel | undefined;
+let cachedPredictor: ((features: number[]) => number) | undefined;
+let cachedRelationPredictor: ((features: number[]) => number) | undefined;
 function decodeModel(
     artifact: typeof packed,
     expectedExport: string,
@@ -55,4 +57,12 @@ export function getPlacementRelationModel(): PlacementModel {
         [64, 256],
         [1, 64],
     ]));
+}
+
+export function getPlacementPredictor(): (features: number[]) => number {
+    return (cachedPredictor ??= compilePlacementPredictor(getPlacementModel()));
+}
+
+export function getPlacementRelationPredictor(): (features: number[]) => number {
+    return (cachedRelationPredictor ??= compilePlacementPredictor(getPlacementRelationModel()));
 }

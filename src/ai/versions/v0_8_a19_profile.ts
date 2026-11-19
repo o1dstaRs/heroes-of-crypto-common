@@ -383,17 +383,17 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "final-placement-adapter" as const,
         source: "src/ai/placement/adapter.ts" as const,
-        sha256: "8fadd33f35da03c2c2f8d7a902ce06f9539fc7361f8ad91c82ef31223ce34eae" as const,
+        sha256: "5e34e7e857cc934d5d157292fbefe9b8a0ed584e8b501e2b3000bf691916df58" as const,
     }),
     Object.freeze({
         role: "final-placement-proposals" as const,
         source: "src/ai/placement/layout.ts" as const,
-        sha256: "3a7668426f96442c06d22a183fe7b69125d234bb26333038b82c7c831cf7ff89" as const,
+        sha256: "398cfda370abc28f4a3b395b7bebeea854cb1f1e010e943ea4b03a32fdf58a41" as const,
     }),
     Object.freeze({
         role: "final-placement-model" as const,
         source: "src/ai/placement/model.ts" as const,
-        sha256: "83b406f2e7ed70d249980a7757cff14b3d9102bec1604e1eb22534c5afaddf62" as const,
+        sha256: "ad146d7e7f9277c6c6e7bad24285c6fa423400720e78f1492d5f1ee64a6784f1" as const,
     }),
     Object.freeze({
         role: "final-placement-seed" as const,

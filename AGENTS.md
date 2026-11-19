@@ -1,5 +1,25 @@
 # Agent guidance
 
+## Exact placement inference optimization — November 19, 2026
+
+Read `docs/a19_placement_inference_optimization.md`. Current v13 retains its
+original packed models, eight proposals, reference policy and strict 0.03 margin.
+Cached compiled predictors snapshot finite tensors and rebuild the input nonzero
+indices on every call. Skip zero products only before the first hidden ReLU,
+retain nonzero accumulation order and binary64 inputs, and keep linear outputs /
+later layers on the dense evaluator. Do not cache feature masks or regroup terms.
+The existing dense `predict` function remains the exact reference.
+
+The actual serving-selector benchmark used 72 balanced public inputs / 576
+counterbalanced selections per arm and 32.47% less warm CPU, with 5.803 ms one-time
+compilation CPU for both models. Six known complete native games reproduce all
+three dense/compiled outcome pairs exactly on the three live maps. This is
+performance/correctness evidence, not new strength or full-match latency.
+Both packed tensor identities and the profile revision remain unchanged. Keep
+`placement_predictor.test.ts` and the existing adoption/placement/isolation tests
+passing. The independent learning source `a0263806` remains frozen and running;
+its data, final 80, strength/confirmation and overall-average +10% gates stay intact.
+
 ## Fresh weighted-movement paired study — November 19, 2026
 
 Read `docs/a19_public_placement_weighted_move_learning.md` before new sampling,

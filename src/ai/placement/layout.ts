@@ -246,6 +246,45 @@ export function predict(model: PlacementModel, features: number[]): number {
     return x[0];
 }
 
+/** Compile a private snapshot of finite tensors, keeping the original accumulation order. */
+export function compilePlacementPredictor(model: PlacementModel): (features: number[]) => number {
+    assert(model.layers.length > 0, "Empty placement model");
+    const layers = model.layers.map((layer) => ({
+        weight: layer.weight.map((row) => [...row]),
+        bias: [...layer.bias],
+    }));
+    for (let l = 0; l < layers.length; l++) {
+        const layer = layers[l];
+        assert(layer.weight.length > 0 && layer.bias.length === layer.weight.length);
+        const columns = layer.weight[0].length;
+        assert(columns > 0 && layer.bias.every(Number.isFinite));
+        assert(layer.weight.every((row) => row.length === columns && row.every(Number.isFinite)));
+        if (l > 0) assert(columns === layers[l - 1].weight.length);
+    }
+    const snapshot = { id: model.id, minimumGain: model.minimumGain, layers };
+    // Without a following ReLU, omitting a zero addition could change the sign of a zero output.
+    if (layers.length === 1) return (features) => predict(snapshot, features);
+    const first = layers[0];
+    const remaining = { ...snapshot, layers: layers.slice(1) };
+    return (features) => {
+        assert(features.length === first.weight[0].length);
+        const nonzero: number[] = [];
+        for (let j = 0; j < features.length; j++) if (features[j] !== 0) nonzero.push(j);
+        const hidden = first.weight.map((row, i) => {
+            let value = first.bias[i];
+            // Finite weights times a zero input contribute only +/-0. Other additions stay
+            // in index order; the ReLU normalizes any signed-zero difference. Do not round,
+            // regroup nonzero products, or apply this shortcut to a linear output layer.
+            for (let k = 0; k < nonzero.length; k++) {
+                const j = nonzero[k];
+                value += row[j] * features[j];
+            }
+            return Math.max(0, value);
+        });
+        return predict(remaining, hidden);
+    };
+}
+
 export function chooseCandidate(scores: readonly number[], minimumGain: number, reference = 0): number {
     assert(scores.length > 0 && scores.every(Number.isFinite));
     assert(Number.isFinite(minimumGain) && minimumGain >= 0);
