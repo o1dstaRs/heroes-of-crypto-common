@@ -1,0 +1,119 @@
+{
+    "schema": 1,
+    "id": "a19-artifact-description-cache-research-20261119",
+    "nativeProducerSourceUnchanged": "b8d7f4ed2a53b2d81c9c9b13d99a69c7d83bd4f147001b2a9d3a71e214c2e665",
+    "nativeCommonSource": "9c10c8369452d56efcd8b8a4fb515b00ce141616",
+    "nativeServerSource": "8c0437fc343a343a308daa8a884184ec86d5e916",
+    "readOnlyObserverCodecSource": "751c9f0f198ed3c745a234cfcd5dee347f35d391",
+    "profile": {
+        "existingNativeGames": 1,
+        "completeOriginalOutcomeExactlyRetained": true,
+        "inputSha256": "6acc7c4ed2e2943be2d76eead0259d77b8acb1f4aae78daab133a7805e77327d",
+        "rawJsonOriginalOutcomeSha256": "74f4a30d06041f2143570b716cd41f5f5a34a46aff28fe78e9f685cc95b095f4",
+        "samplingEvidenceOnly": true,
+        "notPolicyTimingQualification": true
+    },
+    "firstCache": {
+        "sourceSeal": "7bea1b965014c4ea2fba86cde300bcbb8d40537d4eceffb0f9f4268b3ea9b0f8",
+        "sourceFiles": 5,
+        "functionalTestsPassed": 4,
+        "functionalAssertions": 26,
+        "cacheKey": [
+            "Complete current description exactly equals last generated output",
+            "Minimum damage",
+            "Effective percent",
+            "Per-attacker-stack-power constant"
+        ],
+        "unitFieldsAdded": 0,
+        "weakPerUnitDerivedCache": true,
+        "customNativeGetterChangesUseOriginalPath": true,
+        "servingImports": 0
+    },
+    "preservedEngineeringFailure": {
+        "atUtc": "2026-11-19T05:33:19.839Z",
+        "completedValidExecutions": 20,
+        "failure": "Raw JSON hash used instead of original native-context detach/hash at the first alternative input assertion",
+        "alternativeNativeGamesBeforeFailure": 0,
+        "originalSourceAndAllRecordsRetained": true
+    },
+    "canonicalHashContinuation": {
+        "sourceSeal": "c361fe9d00efc9d1611872b6d757f585dee764267f6044ed075311a3241dee7c",
+        "candidateSourceUnchanged": true,
+        "retainedExecutionsIndependentlyReverified": 20,
+        "zeroGameAlternativeInputHashPreflight": 2,
+        "onlyUnstartedExecutionsRun": 4,
+        "originalCutoffUtcUnchanged": "2026-11-19T06:15:00Z",
+        "invalidNativeOutcomesRetried": 0,
+        "casesExcluded": 0
+    },
+    "completedReusedScreen": {
+        "completedAtUtc": "2026-11-19T05:35:56.654Z",
+        "nativeExecutions": 24,
+        "logicalScenarios": 12,
+        "exposedFamilies": 5,
+        "caseIdentityIncludesKindAndControl": true,
+        "allOriginalCompleteOutcomesExactlyRetained": true,
+        "allStockCandidateFullOutputsIndependentlyDeepEqual": true,
+        "allTerminalAndQualityClean": true,
+        "stockCpuMicros": 58073038,
+        "candidateCpuMicros": 53498739,
+        "actualSearchDriverDecisionsPerArm": 595,
+        "cacheHits": 3147866,
+        "overallCpuChangePercent": -7.8768033454698845,
+        "weightedCpuPerActualDecisionChangePercent": -7.8768033454698845,
+        "cpuScope": "Original process.cpuUsage around each complete direct native game; two serial invocations, twenty plus four. Paired arm order alternates by control index.",
+        "descriptiveSubgroups": {
+            "atLeastOneLastFuse": {
+                "scenarios": 8,
+                "stockCpuMicros": 44335955,
+                "candidateCpuMicros": 39213728,
+                "changePercent": -11.553212285604308
+            },
+            "noLastFuse": {
+                "scenarios": 4,
+                "stockCpuMicros": 13737083,
+                "candidateCpuMicros": 14285011,
+                "changePercent": 3.9886779456745014
+            }
+        },
+        "newIndependentData": false,
+        "freshCurrentEngineStrengthOrFinalCostQualification": false
+    },
+    "completeOriginalArchive": {
+        "regularEvidenceFiles": 53,
+        "membersIncludingIndex": 54,
+        "bytes": 645161,
+        "sha256": "71dcd245191fb8f759fa02237afe81e401b63e84658bfa463ba045f247bc50d8",
+        "allOriginalAttemptsAndFailuresIncluded": true,
+        "hftAllMembersAndArchiveHashVerified": true,
+        "puffaloAllMembersAndArchiveHashVerified": true
+    },
+    "noArtifactFastPathRefinement": {
+        "sourceSeal": "cf3b7d6c083424dcc56e9848a6103a4e4f196ea8b535c30c231b8b9e3381d7b2",
+        "sourceFiles": 7,
+        "packetBytes": 6889,
+        "packetSha256": "59931e21be9e7e70b24194707c2c12496da98392022b07c27df4a670edb4c23e",
+        "functionalTestsPassed": 5,
+        "functionalAssertions": 28,
+        "unarmedUnitDoesNotEnterFormulaOrCacheBookkeeping": true,
+        "registeredNativeExecutions": 72,
+        "arms": ["stock", "first-cache", "refinement"],
+        "eachArmTwicePerScenario": true,
+        "armOrder": "Rotate stock/first-cache/refinement by case index modulo three; run that order then its reverse",
+        "host": "puffalo",
+        "singleSerialProcessNice19": true,
+        "launchedAtUtc": "2026-11-19T05:47:09.136189+00:00",
+        "cutoffUtc": "2026-11-19T06:30:00Z",
+        "allOriginalOutcomesMustRemainExact": true,
+        "noAutomaticRetryOrExclusionOrExtension": true,
+        "resultPendingAtRegistration": true,
+        "newIndependentData": false
+    },
+    "userComputeLimit": "Overall average +10% complete-fight CPU and weighted CPU per actual SearchDriver decision, including both-AI use; subgroup timings are descriptive",
+    "ongoingPlacementDataAndCutoffsUnchanged": true,
+    "olderFailedStudiesAndUnopenedBanksUnchanged": true,
+    "newStrengthGainEstablished": false,
+    "currentEngineAndBroadSerialCostQualificationPending": true,
+    "defaultChanged": false,
+    "automaticPromotionOrDeployment": false
+}
