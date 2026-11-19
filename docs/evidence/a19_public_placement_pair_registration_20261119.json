@@ -1,7 +1,7 @@
 {
     "schema": 1,
     "id": "native-public-placement-paired-data-20261119-v1",
-    "registeredRecipeRawSha256": "5df01e33b786c14b315f4d970ab6fa2a9bd4dcb2689d936b4cdce6726db81a49",
+    "registeredRecipeRawSha256": "1520e6cacdc03406339436cf114f5a7cdb80726113d7a12054de52c527531794",
     "registration": {
         "schema": 1,
         "id": "native-public-placement-paired-data-20261119-v1",
@@ -115,7 +115,7 @@
             "rawWarnings": "Retain every original native quality warning and all original outcome fields, exactly reconstructible with an original-outcome hash. No native outcome is changed.",
             "eligibility": "Zero unclassified native errors/warnings. Only actual native v0.8 melee attack_not_available may be classified neutral by the separately admitted source-frozen observer. Require each actual attempt to have all six full state/alias bodies, raw failed handler/engine results, matching actor IDs, exact before-engine/before-refresh and after-refresh/handler-entry/handler-exit/engine-exit equality, identical live unit references/prototypes, zero RNG draws/UUIDs/emitted events. Every observation must match a raw native warning; every matching attempt must pass. Other warnings or incomplete witnesses abort collection and remain rejected, unscored and unfitted.",
             "pipeline": "The adapter reports residual qualityErrors under THIS new data contract and retains raw quality errors and proof in evidence. The canonical validator itself is unchanged and still rejects the original known raw warning. No reinterpretation or resumption of any older study.",
-            "independentVerification": "Before any fitting, verify all logical labels, raw/native journal winners, reconstructible original outcomes, source/cache/input/geometry/funding/quantity/books and every certificate independently. Complete all36864 logical labels. Any failure stops without retry, seed substitution, case exclusion or partial fitting.",
+            "independentVerification": "Before any fitting, verify all logical labels, raw/native journal winners, reconstructible original outcomes, source/cache/input/geometry/funding/quantity/books and every certificate independently. Complete all 16128 logical labels. Any failure stops without retry, seed substitution, case exclusion or partial fitting.",
             "functionalAdmission": "Original30 native-refusal observer controls plus new fixed twelve-game lossless JSON admission on M4/HFT/Puffalo, source745404e40140c208c133decbb9c387359bd00afdb5634c9b86c84ff289c26d8c, all original native outcomes/cold states must match before new sampling. Server codec source from751c9f0; no native policy change.",
             "losslessNativeOptionalFields": "Canonical action/engine/handler projections retain an exact optionalUndefinedFields own-key list; every missing native undefined field can be reconstructed. Every full native state body and raw warning/outcome still retained. Independently require engineResult undefined keys [message], no handler undefined keys, and only known optional action fields path/hasLavaCell/hasWaterCell. Unknown unsupported data or incomplete proofs stop all hosts."
         },
