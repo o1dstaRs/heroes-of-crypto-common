@@ -1,0 +1,86 @@
+{
+    "schema": 1,
+    "id": "independent-public-placement-final-statistics-20261119",
+    "sealedAtUtc": "2026-11-19T05:13:42.209115+00:00",
+    "purpose": "Independent arithmetic verification of the unchanged fixed internal validation; not a new policy, data study, strength result or compute qualification",
+    "producerSourceUnchanged": "b8d7f4ed2a53b2d81c9c9b13d99a69c7d83bd4f147001b2a9d3a71e214c2e665",
+    "tensorAuditSourceUnchanged": "8cf5e84229d13dc341e2c24e9c3c20fc0b313c54e3afe6dcdc4953f25e456f36",
+    "statisticsSourceSeal": "fd297ba07e0801fe5bae50eebf7c296ba99c308fa65be395baf0fa3dee9c5f35",
+    "sourceRegularFiles": 9,
+    "sourcePacket": {
+        "bytes": 10282,
+        "sha256": "48d5c7da88017a84c5f91b8ccd4923fdb9a3b019950ca4f4a8480e6d4e0a90e7",
+        "replicas": {
+            "hft": "All nine source files and packet hash verified",
+            "puffalo": "All nine source files and packet hash verified"
+        }
+    },
+    "registrationSha256": "85c9f716b2fe3a19766be16a559f6c39ae33b792ab02260e7bdcb1c5327a86fe",
+    "independentAuditorSha256": "2f57abf73148b8211ccc855721ef5a7c283883ebf42ba0384ede0e5fe8272e36",
+    "noFittedModelsOrValidationResultsExistAtSeal": true,
+    "unchangedPrerequisites": {
+        "logicalLabels": 36864,
+        "allRawSourceInputWinnerGeometryFundingBooksCacheFeatureAndNativeRefusalProofsVerified": true,
+        "trainingFamilies": 864,
+        "validationFamilies": 288,
+        "validationCases": 1152,
+        "validationCells": 18,
+        "familiesPerValidationCell": 16,
+        "physicalSeatsPerFamily": 2,
+        "futuresPerPhysicalSeat": 2,
+        "bothFixedFinal80ModelsSealedBeforeValidation": true,
+        "nativePredictionTolerance": 0.0001,
+        "nativeChoicesExactlyMatchGpu": true,
+        "deploymentMarginStrictlyGreaterThan": 0.03
+    },
+    "unchangedInternalGate": {
+        "minFamilies": 288,
+        "minChangedFamilies": 30,
+        "minPairedGain": 0.02,
+        "confidence": 0.95,
+        "comparisons": 1,
+        "wholeFamilyBootstrapSamples": 20000,
+        "bootstrapSeed": 817318,
+        "lowerBoundStrictlyPositive": true,
+        "ablation": "Descriptive only; cannot replace a failed primary"
+    },
+    "functionalControls": {
+        "syntheticCases": 1152,
+        "syntheticFamilies": 288,
+        "syntheticInputSha256": "6aec9033ed8ae00ea3db511fa49065241db1e363dec92d790437eee0bb343fb4",
+        "canonicalOutputSha256": "8894b0005638f78e16c0786cc3b9f7703573692fd5edea77391b108e3bc88f14",
+        "allMeansIntervalsSupportCountsGatesAndFamilyRowsExactlyMatchFrozenBunReport": true,
+        "exactBunPrngParity": true,
+        "positiveAndNegativeAndZeroIntervalControls": true,
+        "insufficientBehaviorSupportRejected": true,
+        "unequalCaseCountsUseEqualFamilyWeight": true,
+        "duplicateAndInvalidScoreAndBehaviorTypeRejected": true,
+        "partialStudyRejectedBeforeReadingLabelsOrCreatingReceipt": true,
+        "labelCutoffAndFinalCutoffAndPipelineFailureAndAuditFailureControls": true,
+        "nativeGames": 0,
+        "trainingSteps": 0,
+        "validationLabelsRead": false
+    },
+    "watcher": {
+        "host": "puffalo",
+        "launchedAtUtc": "2026-11-19T05:14:26.736216+00:00",
+        "onlyAfterCompleteOriginalFixedPipeline": true,
+        "canLaunchFitter": false,
+        "canRetryOrExtend": false,
+        "labelCutoffUtc": "2026-11-19T10:00:00Z",
+        "fitAndValidationCutoffUtc": "2026-11-19T11:00:00Z"
+    },
+    "newStrengthGainEstablished": false,
+    "freshQualificationAndIndependentConfirmationPending": true,
+    "costQualification": {
+        "pending": true,
+        "userLimit": "Overall average +10%, not a separate bound on every subgroup",
+        "requiresCompleteFightCpuAndWeightedCpuPerActualSearchDriverDecision": true,
+        "includesBothAiAdoption": true,
+        "slowerSubgroupsDescriptive": true,
+        "concurrentCollectionTimingsNotPolicyCostEvidence": true
+    },
+    "defaultChanged": false,
+    "automaticPromotionOrDeployment": false,
+    "olderFailedStudiesAndUnopenedBanksUnchanged": true
+}

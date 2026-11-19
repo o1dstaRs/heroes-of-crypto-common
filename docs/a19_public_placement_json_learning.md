@@ -116,3 +116,27 @@ cold/pooled/warm8-worker benchmark must match before Mac continuation. Families
 stay on their original hosts; parallel collection timings are not algorithm CPU
 qualification. The original10:00/11:00 UTC deadlines and all intelligence gates
 remain fixed. No partial fitting or automatic activation follows.
+
+## Independent final statistics verification
+
+A separate [statistics-audit seal](evidence/a19_public_placement_final_statistics_audit_20261119.json)
+was fixed before either final model or validation result existed. It leaves both
+the native producer and Float32 analysis sources unchanged. The independent
+Python calculation reconstructs every paired score from the sealed proposal
+groups and model choices, checks all eighteen validation cells and both seats /
+futures, then recomputes equal-family means, behavior support, the registered
+20,000-sample bootstrap interval and all four admission gates.
+
+Across 1,152 synthetic cases /288 synthetic families, its means, intervals,
+counts, family rows and gate decisions exactly match the frozen Bun report.
+Additional controls reject duplicate cases, invalid scores, insufficient behavior
+support and incomplete data; unequal family sizes retain equal family weight.
+These are arithmetic controls, with zero native games or training steps and no
+validation labels opened. They are not evidence of a stronger AI.
+
+The source and all nine files are byte-verified on HFT and Puffalo. A separate
+Puffalo watcher can run the audit only after the complete original fixed fit and
+native validation succeed. It preserves the original label /fit cutoffs and
+cannot launch training, choose the descriptive ablation, retry a failure or
+promote a policy. Fresh full-policy strength, independent confirmation and the
+overall-average +10% CPU gates, including both-AI adoption, remain pending.
