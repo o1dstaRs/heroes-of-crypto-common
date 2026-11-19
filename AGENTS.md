@@ -1,5 +1,24 @@
 # Agent guidance
 
+## Paired-label placement preparation — November 19, 2026
+
+Read `docs/a19_public_placement_pair_learning.md` before new sampling or fitting.
+The distinct prospective study uses current published engine revisions and a
+wholly fresh `native-public-placement-paired-data-20261119-v1` namespace. Reserve
+all six roles ×32,768 counters, including rejected/unused values, with the same
+raw/permuted draft offsets and terrain search expansion. Explicitly exclude all
+four preceding full six-role reservations, including the closed five-/six-point
+study, plus historical/peer ledgers. No old partial labels are fitted or bank resumed.
+
+Keep 864 training /288 validation families and all four seat/future cases. Training
+observes reference0 plus one fixed scheduled alternative; validation keeps all
+eight proposals. Complete funding is16,128 logical labels. The final80 models,
+primary2-point/positive95% interval/30changed-family gates, full native quality,
+fresh strength/confirmation and overall-average+10% CPU requirements remain.
+Source/input/execution seals, actual scheduler preflight and integrated process /
+ENOSPC stop rehearsal must pass before any fresh native label. No Mac collection,
+partial fitting, validation tuning, automatic retry or default activation follows.
+
 ## Closed JSON placement collection after storage failure — November 19, 2026
 
 The `b8d7f4ed` producer / `8cf5e842` analysis continuation is now **closed incomplete**.
