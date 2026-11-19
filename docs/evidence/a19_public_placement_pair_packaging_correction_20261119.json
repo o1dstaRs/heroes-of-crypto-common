@@ -1,0 +1,41 @@
+{
+    "schema": 1,
+    "atUtc": "2026-11-19T07:24:39.028669+00:00",
+    "failedInputSource": "72308b4de8d0206af6145f7c89df8f11d824b0a8c0768e907813062146bdf160",
+    "cause": "Missing imported draft-parity.ts during worker module loading before any task execution. Both original failures, markers, logs, source archives and source seal remain unchanged.",
+    "bothControllersAndChildrenStopped": true,
+    "freshDraftsScanned": 0,
+    "freshSetupCaptures": 0,
+    "freshCombatLabels": 0,
+    "knownCurrentEngineeringGamesPassed": 16,
+    "semanticFix": "Add exact existing serving-draft parity helper omitted from packaging; dependency build and six known-draft decision parity controls before fresh tasks.",
+    "unstartedInputTasksOnly": true,
+    "noInvalidNativeOutcomeRetried": true,
+    "sameUnopenedAllocation": true,
+    "policiesModelsValidationCoverageGatesHardwareAndOriginalCutoffsUnchanged": true,
+    "newOutputNamesPreserveFailedDirectories": true,
+    "newFiles": [
+        "draft-parity.ts",
+        "known-draft-controls.json",
+        "sample-inputs-v2.ts",
+        "sampling-preflight.ts",
+        "run_phase_v2.py",
+        "watch-stage-v2.py",
+        "packaging-correction-v2.json",
+        "input-source-seal.json"
+    ],
+    "sourceV2": "77a36c2f04c6e9cf2d2854c3fb5b3af326937538946de0e0f2d2a46dc95f7d34",
+    "completeReservedChannels": 2293095,
+    "localKnownDraftPreflight": {
+        "passed": true,
+        "knownDrafts": 6,
+        "freshDrafts": 0,
+        "combatGames": 0
+    },
+    "integratedGuardRehearsal": {
+        "passed": true,
+        "realMarkerlessControllerExitDetected": true,
+        "bothRealRemoteOwnedGroupsStoppedDespiteInjectedLocalEnospc": true,
+        "streamedReplicaExactWithoutLocalArchiveFile": true
+    }
+}

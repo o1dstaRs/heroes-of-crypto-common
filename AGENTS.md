@@ -19,6 +19,13 @@ Source/input/execution seals, actual scheduler preflight and integrated process 
 ENOSPC stop rehearsal must pass before any fresh native label. No Mac collection,
 partial fitting, validation tuning, automatic retry or default activation follows.
 
+Input source `72308b4d` stopped at worker import with zero scanned drafts,
+setup captures or combat games. Preserve that failed attempt. Read the separate
+packaging correction: `77a36c2f` adds the omitted existing parity helper and
+known-input preflight before only previously unexecuted input tasks. It is the
+SAME unopened allocation, not new independent data or an invalid native retry.
+All 2,293,095 reserved channels, funding, validation and cutoffs remain fixed.
+
 ## Closed JSON placement collection after storage failure — November 19, 2026
 
 The `b8d7f4ed` producer / `8cf5e842` analysis continuation is now **closed incomplete**.

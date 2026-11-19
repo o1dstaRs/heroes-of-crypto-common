@@ -51,3 +51,17 @@ are required before collection.
 Before sampling, preparation corrected a copied quality-check sentence from
 36,864 to the registered 16,128 labels. There were zero fresh captures, battles
 or opened validation outcomes; the funding, validation coverage and gates did not change.
+
+The first input source `72308b4d` failed while loading an omitted
+`draft-parity.ts` helper. Both raw failure records report zero scanned drafts,
+zero setup captures and zero combat games. All owned controllers and children
+were verified stopped; the integrated coordinator delivered both stop requests.
+The [separate packaging correction](evidence/a19_public_placement_pair_packaging_correction_20261119.json)
+keeps that failed source and its directories unchanged. Input source `77a36c2f`
+adds the exact existing helper, dependency resolution and six known draft parity
+controls, then starts only previously unexecuted input tasks in a new output
+directory. The same unopened allocation, all 2,293,095 reserved channels, model,
+full validation, funding, hosts, gates and original cutoffs remain unchanged.
+Sixteen current native/observed/cold games on HFT and Puffalo passed full outcome
+equality; each current known refusal was witnessed without state or RNG changes.
+These are functional controls, not measured AI strength or new independent data.
