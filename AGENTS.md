@@ -1,5 +1,26 @@
 # Agent guidance
 
+## Fresh weighted-movement paired study — November 19, 2026
+
+Read `docs/a19_public_placement_weighted_move_learning.md` before new sampling,
+fitting or seed allocation. This distinct preparation freezes published corrected
+common d4fa46e4/server d2d830d with current v13; all five predecessors stay closed
+and unfitted. Reserve ALL six roles ×32,768 counters and 2,293,206 expanded channels
+in `native-public-placement-weighted-move-pairs-20261119-v1`, including rejected,
+unused and unselected values, all raw/permuted draft offsets0..31 and terrain search
+channels. Exclude this full sixth reservation in other studies, not just selected
+roots. Input/label/fit cutoffs are Nov19 12Z /Nov20 04Z /05Z, without extension.
+
+Keep all 1,152 families/16,128 labels, the paired observation schedule, exact warm
+start/final80 and original +2-point/positive95%/30 changed-family gate. Both final
+exports precede validation; exact regenerated native CPU choices must match on
+both nodes before accepting effect statistics. Local process/protocol controls
+pass22; real-node/native controls and complete source seals remain pending.
+No fresh capture, label, model or gain exists yet. Full clean funding precedes
+labels; complete data precedes fitting. Fresh strength/held confirmation and the
+user's overall-average +10% complete-fight/weighted actual-decision CPU for both-AI
+adoption remain separate. No automatic activation or deployment.
+
 ## Backstab authoritative movement correction — November 19, 2026
 
 Read `docs/a19_backstab_movement_correction.md`. The Scavenger invalid move was

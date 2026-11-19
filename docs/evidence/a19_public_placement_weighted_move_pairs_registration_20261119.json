@@ -1,0 +1,256 @@
+{
+    "schema": 1,
+    "registration": {
+        "schema": 1,
+        "id": "native-public-placement-weighted-move-pairs-20261119-v1",
+        "registeredAtUtc": "2026-11-19T09:47:16.257160+00:00",
+        "stage": "Prospective complete-data placement learning with authoritative Backstab movement; no fresh captures, labels or fitting yet",
+        "familyPopulation": "Actual lockedV3/contextual/exclusive-delivery ranked draft, own doctrine3, three public live maps1/3/4, opponent doctrines1/2/3, both initial draft orders; native complete public Setup, valid original placement model, at least2 shooting bodies and fewer than2 offensive melee types, no applied delivery. Require all4 setup-only cases valid before accepting a family; no outcome selection.",
+        "cellOrder": [
+            [1, 1, 0],
+            [1, 1, 1],
+            [1, 2, 0],
+            [1, 2, 1],
+            [1, 3, 0],
+            [1, 3, 1],
+            [3, 1, 0],
+            [3, 1, 1],
+            [3, 2, 0],
+            [3, 2, 1],
+            [3, 3, 0],
+            [3, 3, 1],
+            [4, 1, 0],
+            [4, 1, 1],
+            [4, 2, 0],
+            [4, 2, 1],
+            [4, 3, 0],
+            [4, 3, 1]
+        ],
+        "familiesPerCell": 64,
+        "foldAssignment": "Before any outcomes: first48 eligible independent families per fixed cell training, next16 validation. Sampling checks all cells in rounds; stop each cell only at64 or exhaustion of its reserved fixed pool; fail incomplete without substitution.",
+        "funding": {
+            "families": 1152,
+            "trainingFamilies": 864,
+            "validationFamilies": 288,
+            "actualPhysicalSeatsPerFamily": 2,
+            "independentLiveRngRootsPerSeat": 2,
+            "logicalLabelGames": 16128,
+            "nativeCombat": "Full current published v13 A19 H64 R2 both sides throughout; actual funding, support splits, books and memory",
+            "caseTickLimit": 3000,
+            "singleTaskTimeoutMs": 180000,
+            "trainingLogicalGames": 6912,
+            "validationLogicalGames": 9216,
+            "trainingProposalsPerCase": 2,
+            "validationProposalsPerCase": 8
+        },
+        "sampler": "Existing canonical legal draft choices and unscored authoritative setup-capture only. All inspected drafts, rejected/unused roots, native setup captures and reasons retained. Zero combat decisions/score during allocation.",
+        "features": {
+            "schema": "native-public-placement-value-v1",
+            "count": 2772,
+            "prefixCount": 2138,
+            "publicAdditional": {
+                "neutralBitmap": 256,
+                "hypotheticalNeutralRayMask": 168,
+                "positiveOwnAuraRangeFootprintCoverage": 144,
+                "publicVariants": 8,
+                "actualOwnActiveLevels": 24,
+                "ownDistinctFactionCountsLevels": 8,
+                "ownActiveEffects": 9,
+                "publicEnemyPotentialFactionCountsLevelsEffects": 17
+            },
+            "publicScope": "Own bodies/candidate/reference and actually rolled/active own synergies; enemy potential computed from publicly complete creature identities, never its actual hidden levels or amount/deployment/doctrine. Hypothetical rays and aura-range bits are descriptors, not exact damage or benefit. No IDs/seed/label/future in tensors."
+        },
+        "proposalPolicy": "Keep the same eight public free proposals and native reference0. Training observes only proposal0 plus index1+((4*acceptedOrdinalInCell+2*(physicalTeam-1)+future)%7), fixed before any outcome. Validation observes ALL eight proposals. No unobserved score imputation or labels from previous collections.",
+        "fit": {
+            "primary": "public-context",
+            "descriptiveAblation": "unchanged first2138 feature columns only; not a selectable alternate finalist",
+            "architecture": [2772, 256, 64, 1],
+            "initialization": "Exact packed locked placement-v2 tensors; existing2138 first-layer columns copied bit-exact and extra634 columns zero. Old artifact unchanged. Ablation uses same warm-start tensors and recipe.",
+            "torchSeed": 917318,
+            "dtype": "float32",
+            "tf32": false,
+            "deterministicAlgorithms": true,
+            "optimizer": "AdamW",
+            "learningRate": 0.0003,
+            "weightDecay": 0.01,
+            "epochs": 80,
+            "checkpointSelection": "Final fixed epoch80 only; no early stopping, seed/hyperparameter sweep or validation-driven replacement",
+            "groupBatchSize": 64,
+            "loss": "MSE absolute score +0.5*MSE of all within-TWO-observed-proposal predicted differences versus matched observed differences, including the zero diagonal. The native architecture, final80 warm-start and inference margin remain fixed.",
+            "gradientClipNorm": 1,
+            "referenceIndex": 0,
+            "deploymentMarginStrictlyGreaterThan": 0.03,
+            "trainingShuffles": "Whole two-observed-proposal groups only; deterministic torch seeded permutation each epoch",
+            "validationUse": "Read validation outcomes only after BOTH fixed final80 exports sealed. Require ALL16128 logical labels/all raw proof checks before fitting. No refit, alternate finalist, partial fitting or validation-driven replacement.",
+            "requiredAdditionalAudit": "After sealing BOTH final80 exports and before accepting validation effects: regenerate public features from native context, independently require exact native CPU policy choices and numerical tolerance on BOTH nodes. The frozen recorded-row/Float32 parity check alone is insufficient. No audit can tune or select a replacement model."
+        },
+        "developmentAdmission": {
+            "pairedGainAgainstCurrentMinPp": 2,
+            "wholeFamily95LowerBoundStrictlyPositive": true,
+            "changedFamiliesMin": 30,
+            "bootstrapSamples": 20000,
+            "bootstrapSeed": 817318,
+            "matchedFreeControl": "This candidate is free geometry only; current native formation is its matched free reference. No paid superiority claimed.",
+            "ablationComparison": "Descriptive incremental contrast only; cannot substitute failed primary or open a different fresh bank.",
+            "requireCompleteAllLogicalLabelGames": true,
+            "requireAllSourceInputsOutcomesAndGeometryVerified": true,
+            "requireNativeBunFloat32ExportParityAndFinitePredictions": true
+        },
+        "freshStrengthAndCost": "Only if fixed primary passes development admission: register independent fresh full native-policy strength and conditional confirmation without replacing the artifact; separate overall-average +10% complete-fight CPU and weighted CPU per actual SearchDriver decision, including both-AI activation. No raw concurrent per-case CPU attribution; serial counterbalanced runs required. No timing shortcut, defaults/deploy/old gate edits.",
+        "cutoffsUtc": {
+            "inputSampling": "2026-11-19T12:00:00Z",
+            "labelCollection": "2026-11-20T04:00:00Z",
+            "trainingAndValidation": "2026-11-20T05:00:00Z"
+        },
+        "currentFreshGames": 0,
+        "validationOpened": false,
+        "oldHeldOutTeacherTestsOpened": false,
+        "automaticPromotionOrDeployment": false,
+        "predecessor": "ALL FIVE complete closed six-role banks are excluded; none are resumed, partially fitted or counted as fresh.",
+        "qualityContract": {
+            "id": "native-v13-audited-neutral-melee-json-labels-20261119-v1",
+            "nativePolicy": "Current published corrected engine: common d4fa46e4 / server d2d830d; full v13 H64/R2 both sides, real memory/funding/geometry. Backstab uses authoritative enemy threat. No post-search repair, model/profile/budget changes or forecast mixture.",
+            "rawWarnings": "Retain every original native quality warning and all original outcome fields, exactly reconstructible with an original-outcome hash. No native outcome is changed.",
+            "eligibility": "Zero unclassified native errors/warnings. Only actual native v0.8 melee attack_not_available may be classified neutral by the separately admitted source-frozen observer. Require each actual attempt to have all six full state/alias bodies, raw failed handler/engine results, matching actor IDs, exact before-engine/before-refresh and after-refresh/handler-entry/handler-exit/engine-exit equality, identical live unit references/prototypes, zero RNG draws/UUIDs/emitted events. Every observation must match a raw native warning; every matching attempt must pass. Other warnings or incomplete witnesses abort collection and remain rejected, unscored and unfitted.",
+            "pipeline": "The adapter reports residual qualityErrors under THIS new data contract and retains raw quality errors and proof in evidence. The canonical validator itself is unchanged and still rejects the original known raw warning. No reinterpretation or resumption of any older study.",
+            "independentVerification": "Before any fitting, verify all logical labels, raw/native journal winners, reconstructible original outcomes, source/cache/input/geometry/funding/quantity/books and every certificate independently. Complete all 16128 logical labels. Any failure stops without retry, seed substitution, case exclusion or partial fitting.",
+            "functionalAdmission": "Before fresh sampling, 16 current-source known native/observed/cold fights across both nodes and six certificate corruption controls per node. Before fresh labels, eight additional canonical cold/pooled/warm-cache controls, exact new-source native goldens and twelve foreign corruptions. Original outcomes are never assumed unchanged across engine revisions. The old Scavenger diagnosis/engineering remains separate and complete.",
+            "losslessNativeOptionalFields": "Canonical action/engine/handler projections retain an exact optionalUndefinedFields own-key list; every missing native undefined field can be reconstructed. Every full native state body and raw warning/outcome still retained. Independently require engineResult undefined keys [message], no handler undefined keys, and only known optional action fields path/hasLavaCell/hasWaterCell. Unknown unsupported data or incomplete proofs stop all hosts."
+        },
+        "namespaceReservation": {
+            "namespace": "native-public-placement-weighted-move-pairs-20261119-v1",
+            "roles": ["draft", "setup-a", "setup-b", "reverse-a", "reverse-b", "terrain"],
+            "countersPerRole": 32768,
+            "preimage": "First4 SHA256 bytes of namespace:role:counter, little endian",
+            "channels": "draft:raw and native permuted offsets0..31; setup/reverse:raw; terrain:raw and first8 SHA256 hex of sim-<root>. Reserve every scanned/rejected/unused preimage and derived channel, not only accepted families. All earlier banks remain excluded.",
+            "freshness": "Global historical/common/server/peer ledgers, plus all five preceding complete six-role reservations, including the closed paired study. Reserve every scanned/rejected/unused/unselected value and all exact draft/terrain expansions; audit before inputs and labels.",
+            "uniqueExpandedChannels": 2293206
+        },
+        "preparationControls": {
+            "engineeringFullGamesBudget": 24,
+            "freshIndependentData": false,
+            "knownInputsOnly": true,
+            "currentNativeVsObservedAndColdFullOutcomeMustMatch": true,
+            "sourceAndRuntimeAndQualityContractBound": true,
+            "originalPrecedingOutcomesNotAssumedUnchangedAcrossBalanceRevisions": true,
+            "zeroGameSchedulerAndTransportAndProcessGuardIntegrationRequired": true,
+            "localProcessProtocolTestsPassed": 22,
+            "additionalFastChildControl": "A direct owned Popen successful completion may precede the live PID probe; require its exclusive ready PID/argv/body and actual exit code. Missing/failed children and controller identity/lease remain strict. Real-node race/failure/stop/ENOSPC tests still pending; no native game started."
+        },
+        "runtime": {
+            "atUtc": "2026-11-19T09:47:16.257160+00:00",
+            "serverPublishedCommit": "d2d830d39c60bfb95d938c1db568f6e2d14c6bec",
+            "commonPinnedPublishedCommit": "d4fa46e4b6f1f4bf6dc00b9d202aaa5a90828a02",
+            "publishedSourcesOnly": true,
+            "runtimeIncludesAuthoritativeBackstabMovementFix": true,
+            "portableDependenciesFromVerifiedParent": "f64b4c0f84afdc1b624442494ad35cc74beac3a76d08713b6184a4269107ab76",
+            "oldNativeLabelsOrOldInputBankCopied": false,
+            "freshNativeGames": 0,
+            "unscoredFreshCaptures": 0,
+            "filesYetToBeSealed": true
+        },
+        "nativeWarningContract": "Same separately admitted lossless-JSON neutral-native-melee contract, prospectively adopted with every full state/alias/RNG/UUID/event witness on current source. All unknown or unsupported warnings stop without substitution.",
+        "hardwareRule": {
+            "macNativeLabels": 0,
+            "wholeFamilyAllocation": "Within each cell ordinal modulo8,0..4 to HFT,5..7 to Puffalo, same for both folds and all seats/futures. Fixed before labels; no reassignment afterward.",
+            "hft": {
+                "families": 720,
+                "trainingFamilies": 540,
+                "validationFamilies": 180,
+                "logicalGames": 10080,
+                "workers": 4,
+                "nice": 19
+            },
+            "puffalo": {
+                "families": 432,
+                "trainingFamilies": 324,
+                "validationFamilies": 108,
+                "logicalGames": 6048,
+                "workers": 8,
+                "nice": 19
+            },
+            "rationale": "Current shared workloads inspected; conservative pools, higher-storage Linux nodes collect, no Mac label/archive relay files. Cutoffs are outer funding limits, not completion estimates."
+        },
+        "guards": {
+            "prototypeSource": "0eecd1aef9e54a86bca4517d620c5e9e1268d740436d8a1887083dea57ecd87d",
+            "requireIntegratedActualProcessIdentityAndMissingMarkerAndEnospcRemoteStopControlsBeforeLaunch": true,
+            "remoteControllerLeaseSeconds": 180,
+            "metadataCoordinatorOnlyLocalNoRawArchiveDownloads": true,
+            "crossReplicaTransport": "Memory-stream source-to-target encrypted SSH through the local coordinator; exclusive partial file, hash/size verification and atomic publication; no credentials copied to nodes",
+            "minimumFreeGiB": {
+                "localPreparation": 2,
+                "hft": 10,
+                "puffalo": 5
+            },
+            "nativeInvalidOutcomeRetry": false
+        }
+    },
+    "seedAdmission": {
+        "qualityPassed": true,
+        "at": "2026-11-19T09:48:33.479392+00:00",
+        "namespace": "native-public-placement-weighted-move-pairs-20261119-v1",
+        "scannedCountersPerRole": 32768,
+        "roles": ["draft", "setup-a", "setup-b", "reverse-a", "reverse-b", "terrain"],
+        "allScannedReserved": true,
+        "roleRecipe": {
+            "draft": "raw offsets0..31 and native permuted offsets0..31; capture throws before any combat",
+            "setup-a": "one actual seat-A native setup/live-combat RNG root, first future",
+            "setup-b": "independent seat-A native setup/live-combat RNG root, second future",
+            "reverse-a": "one reverse-seat native setup/live-combat RNG root, first future",
+            "reverse-b": "independent reverse-seat native setup/live-combat RNG root, second future",
+            "terrain": "one actual public terrain/match root plus canonical SHA256 sim-id search root"
+        },
+        "uniqueReservedChannels": 2293206,
+        "eligiblePreimagesByRole": {
+            "draft": 7026,
+            "setup-a": 31709,
+            "setup-b": 31730,
+            "reverse-a": 31699,
+            "reverse-b": 31675,
+            "terrain": 30678
+        },
+        "allocatedRootsPerRole": 7020,
+        "unscoredDraftPoolFamilies": 7020,
+        "unscoredPoolPerCell": 390,
+        "acceptedTargetPerCell": 64,
+        "sourceLedgers": 416,
+        "freshBattleExecutions": 0,
+        "unusedRejectedAndUnselectedRemainReserved": true,
+        "allPreviousCapsuleReservationsExcluded": true,
+        "concurrentMetaExcluded": {
+            "baseSeed": 3181802824,
+            "gamesPerCohort": 4032,
+            "cohorts": 7
+        }
+    },
+    "initialFreshnessAudit": {
+        "qualityPassed": true,
+        "namespace": "native-public-placement-weighted-move-pairs-20261119-v1",
+        "auditedAllocatedRoots": 42120,
+        "auditedDerivedChannels": 491400,
+        "sourceLedgers": 416,
+        "intersections": 0,
+        "freshBattleExecutedByAudit": false
+    },
+    "oldFullSixRoleExclusions": {
+        "native-public-placement-value-data-20261118-v1": 2293199,
+        "native-public-placement-audited-data-20261119-v1": 2293215,
+        "native-public-placement-audited-json-data-20261119-v1": 2293218,
+        "native-low-budget-formation-ridge-20261119-v1": 2293130,
+        "native-public-placement-paired-data-20261119-v1": 2293095
+    },
+    "warmStartFileSha256": "fdd40de3edda54e13eb1a45a438bfaf82c848b2aad4bacb152bac9ae5988f065",
+    "warmStartReceipt": {
+        "passed": true,
+        "modelHash": "87bce1ebbbe2b2ce38cc6172afb18dc6420b50447f34e415f05bece8a7e18f6b",
+        "fixtures": 48,
+        "newLabelsRead": 0,
+        "newWeightsTrained": false
+    },
+    "fullSourceNotYetSealed": true,
+    "freshCaptures": 0,
+    "freshCombatGames": 0,
+    "modelsTrained": 0,
+    "defaultChanged": false,
+    "noOldLabelsOrOldInputBankCopied": true
+}
