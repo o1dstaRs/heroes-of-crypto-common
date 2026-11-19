@@ -104,3 +104,16 @@ partial labels cannot start either fitter. The complete-data index is written
 only after all 36,864 logical labels pass. Only then may the fixed 5090 fitter
 start, after checking for competing GPU work. Neither internal fitting nor a
 passing internal result automatically activates a model.
+
+## Closed before fresh combat labels
+
+The [engineering preflight failed](evidence/a19_public_placement_audited_preflight_failure_20261119.json)
+because the native engine's rejected result owns `message: undefined`. The new
+witness retained that value but could not pass strict canonical JSON encoding.
+Both Linux controls stopped; the global coordinator stopped the local job too.
+No fresh combat label, completed block, fit or model-selection validation exists.
+All input families and all six-role reservations remain retained and excluded.
+Do not resume this source/registration, reuse its bank as new data, fit partials
+or extend its deadlines. The failed preflight did not persist its raw result
+before its assertion; preserve that limitation rather than claiming recovery.
+The separate lossless-JSON functional admission does not turn this into a pass.

@@ -1,5 +1,27 @@
 # Agent guidance
 
+## Fresh lossless-JSON placement preparation — November 19, 2026
+
+Read `docs/a19_public_placement_json_learning.md`. The corrected recorder passed
+twelve fixed cross-host native/observed controls; this is functional evidence only.
+The separate study retains the same complete-data/model/gate/04:00/10:00/11:00 UTC
+deadline recipe and uses wholly fresh inputs, not either closed collection.
+Reserve all six roles ×32,768 counters in namespace
+`native-public-placement-audited-json-data-20261119-v1`: 2,293,218 unique expanded
+channels, including rejected and unused values. Explicitly exclude both preceding
+six-role reservations. No partial fitting, validation tuning, automatic retry,
+default change or promotion. Full label source/allocation still needs its own seal.
+
+## Audited collection stopped in engineering — November 19, 2026
+
+The `22a4a8bf` label source failed strict JSON encoding of an optional native
+`engineResult.message: undefined` in its fixed preflight. Read the closeout in
+`docs/a19_public_placement_audited_learning.md`. No fresh label or fit exists.
+All its six-role scanned/rejected/unused reservations remain excluded; do not
+resume that source, reuse its input bank as fresh data or reinterpret it as passed.
+The separately registered twelve-game lossless-JSON admission verifies the
+corrected recorder only; it is not strength, cost or a deployed AI improvement.
+
 ## Fresh audited placement collection preparation — November 19, 2026
 
 Read `docs/a19_public_placement_audited_learning.md` before new data work or seed allocation.

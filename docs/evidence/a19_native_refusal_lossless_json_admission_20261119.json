@@ -1,0 +1,118 @@
+{
+    "passed": true,
+    "atUtc": "2026-11-19T03:40:02.722Z",
+    "sourceSeal": "745404e40140c208c133decbb9c387359bd00afdb5634c9b86c84ff289c26d8c",
+    "sourceFiles": 6179,
+    "fullGames": 12,
+    "actualNeutralProofs": 6,
+    "allSixStateBodiesAndSourceAndCompleteNativeOutcomesVerified": true,
+    "originalRawWarningsStillCanonicallyInvalid": true,
+    "losslessOptionalUndefinedKeysVerified": true,
+    "allThreeHostsAndBothColdEpochsExactlyEqual": true,
+    "receipts": [
+        {
+            "passed": true,
+            "atUtc": "2026-11-19T03:34:40.347Z",
+            "host": "Stepans-Mac-Studio.local",
+            "kind": "local",
+            "fullGames": 4,
+            "rows": [
+                {
+                    "epoch": 0,
+                    "native": "93ec7a2f91d45ab21d684fe68780680370436d5062372b31d4d62264cd631b51",
+                    "audited": "078969c620d3f1bec17fd5f46045c20fe439e15d5d315cfc3e3d89efc0297dcb",
+                    "rejectedFaults": 6
+                },
+                {
+                    "epoch": 1,
+                    "native": "93ec7a2f91d45ab21d684fe68780680370436d5062372b31d4d62264cd631b51",
+                    "audited": "078969c620d3f1bec17fd5f46045c20fe439e15d5d315cfc3e3d89efc0297dcb",
+                    "rejectedFaults": 6
+                }
+            ],
+            "originalNativeWarningStillCanonicalInvalid": true,
+            "completeNativeOutcomeAndAllSixStatesUnchanged": true,
+            "explicitUndefinedKeysLosslesslyRetained": true,
+            "newIndependentFamilies": 0,
+            "fitOrStrengthOrCostClaim": false,
+            "defaultChanged": false
+        },
+        {
+            "passed": true,
+            "atUtc": "2026-11-19T03:36:03.106Z",
+            "host": "hft",
+            "kind": "hft",
+            "fullGames": 4,
+            "rows": [
+                {
+                    "epoch": 0,
+                    "native": "93ec7a2f91d45ab21d684fe68780680370436d5062372b31d4d62264cd631b51",
+                    "audited": "078969c620d3f1bec17fd5f46045c20fe439e15d5d315cfc3e3d89efc0297dcb",
+                    "rejectedFaults": 6
+                },
+                {
+                    "epoch": 1,
+                    "native": "93ec7a2f91d45ab21d684fe68780680370436d5062372b31d4d62264cd631b51",
+                    "audited": "078969c620d3f1bec17fd5f46045c20fe439e15d5d315cfc3e3d89efc0297dcb",
+                    "rejectedFaults": 6
+                }
+            ],
+            "originalNativeWarningStillCanonicalInvalid": true,
+            "completeNativeOutcomeAndAllSixStatesUnchanged": true,
+            "explicitUndefinedKeysLosslesslyRetained": true,
+            "newIndependentFamilies": 0,
+            "fitOrStrengthOrCostClaim": false,
+            "defaultChanged": false
+        },
+        {
+            "passed": true,
+            "atUtc": "2026-11-19T03:36:30.116Z",
+            "host": "DESKTOP-HO35CGD",
+            "kind": "puffalo",
+            "fullGames": 4,
+            "rows": [
+                {
+                    "epoch": 0,
+                    "native": "93ec7a2f91d45ab21d684fe68780680370436d5062372b31d4d62264cd631b51",
+                    "audited": "078969c620d3f1bec17fd5f46045c20fe439e15d5d315cfc3e3d89efc0297dcb",
+                    "rejectedFaults": 6
+                },
+                {
+                    "epoch": 1,
+                    "native": "93ec7a2f91d45ab21d684fe68780680370436d5062372b31d4d62264cd631b51",
+                    "audited": "078969c620d3f1bec17fd5f46045c20fe439e15d5d315cfc3e3d89efc0297dcb",
+                    "rejectedFaults": 6
+                }
+            ],
+            "originalNativeWarningStillCanonicalInvalid": true,
+            "completeNativeOutcomeAndAllSixStatesUnchanged": true,
+            "explicitUndefinedKeysLosslesslyRetained": true,
+            "newIndependentFamilies": 0,
+            "fitOrStrengthOrCostClaim": false,
+            "defaultChanged": false
+        }
+    ],
+    "newIndependentFamilies": 0,
+    "notStrengthOrCpuEvidence": true,
+    "defaultChanged": false,
+    "serverCodecCommit": "751c9f0f198ed3c745a234cfcd5dee347f35d391",
+    "archives": [
+        {
+            "kind": "hft",
+            "sha256": "9ae5f07799dd4d32bc5658abd45955f541250a13b3f86f0e35630f549eace572",
+            "regularMembersVerified": 18
+        },
+        {
+            "kind": "puffalo",
+            "sha256": "7229fe12430c3c2af8270de0b5a92f70ac979ee9a63c280c47ff14d1e8cb79ca",
+            "regularMembersVerified": 18
+        }
+    ],
+    "serverFinalGate": {
+        "unitTestsPassed": 1933,
+        "existingDatabaseSkips": 15,
+        "failed": 0,
+        "typecheck": "pass",
+        "lint": "zero errors, three existing warnings"
+    }
+}

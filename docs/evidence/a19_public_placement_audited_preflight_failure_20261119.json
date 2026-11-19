@@ -1,0 +1,22 @@
+{
+    "schema": 1,
+    "id": "a19-public-placement-audited-learning-20261119-closed-preflight-failure",
+    "atUtc": "2026-11-19T03:39:20.276015+00:00",
+    "sourceSeal": "22a4a8bff09ba28e07b03148181ab46ff09faf52271c5e4dee30506db8660a24",
+    "status": "closed-incomplete-before-fresh-labels",
+    "inputFamiliesCompleted": 1152,
+    "freshCombatLabels": 0,
+    "fittingStarted": false,
+    "modelSelectionValidationOpened": false,
+    "failure": "Known-native audit evidence contains an own optional engineResult.message=undefined. Strict canonical JSON rejected the witness during fixed engineering preflight on both Linux hosts. Global supervisor stopped all owned groups.",
+    "rawKnownControlLimit": "The failed old preflight did not persist its just-completed raw result before the canonical assertion. Retain this limitation and full original source/logs; do not claim a lost outcome was recovered. Corrected separately registered controls persist outputs before checking.",
+    "previousInputControls": 48,
+    "localAdditionalControlAcknowledgements": 4,
+    "inFlightLocalControlAtStop": "one; completion not independently attested",
+    "completeBlocks": 0,
+    "noRetryOrResumeOrPartialFit": true,
+    "allSixRoleReservationsRemainExcluded": true,
+    "allOriginalCutoffsUnchanged": true,
+    "defaultChanged": false,
+    "computeOrStrengthGainClaim": false
+}
