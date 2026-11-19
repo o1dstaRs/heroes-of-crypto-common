@@ -1,0 +1,992 @@
+{
+    "schema": 1,
+    "id": "a19-root-compound-choice-audit-20261119",
+    "status": "completed_read_only_diagnosis",
+    "registration": {
+        "schema": 1,
+        "id": "a19-root-compound-choice-audit-20261119",
+        "registeredAtUtc": "2026-11-19T01:56:38.000065+00:00",
+        "hypothesis": "Read-only audit of actual-root malformed melee incumbents: distinguish already-scored coherent attacks and native move-only prefixes from missing choices before proposing a new pre-search correction. No policy intervention, no additional enumeration/engine apply/score/rollout.",
+        "cases": 13,
+        "selection": "Every one of twelve changed native-trace cases from the closed final-root screen, independent of terminal score, plus the separate original uncached refusal input. Reused exposed diagnostics only.",
+        "fullExecutions": 30,
+        "hftExecutions": 26,
+        "localColdExecutions": 4,
+        "arms": ["native", "observed"],
+        "localColdCaseIndices": [0, 12],
+        "newSeeds": 0,
+        "immutableNativeReference": "Existing completed a19-root-melee-reused-admission-20261119 frozen server d5fa16b and private common9c10c836, exact single package identity. Parent portable manifest626aa51cc6144e940c1d23be0c673419531354758915f103d015fa297e64437e. No changes to any parent capsule/source.",
+        "observeScope": "Both physical teams, completed actual v0.8 root search only. Retain every native candidate/shortlist/existing score call for a geometrically inconsistent native incumbent. Invoke old geometry helper only AFTER unchanged search returns, discard its proposed repair, and prove covered state/aliases/identity/RNG/UUID unchanged.",
+        "gates": [
+            "Exact original complete native outcomes on the twelve closed-screen cases",
+            "Original warning and digest retained on known-refusal control",
+            "All native/observed complete outcomes identical within each case",
+            "Zero additional scoring requests or hypothetical policy edits",
+            "Read-only helper full covered state/alias/ref/prototype/RNG/UUID parity",
+            "All four fixed local cold complete outcomes and observations match HFT",
+            "Source files and all outputs independently hash verified"
+        ],
+        "qualityContract": "The known single native warning is preserved for this already-exposed diagnostic only. All other cases retain exact original zero-error outcomes. No warning is admitted as a training label and no older quality gate changes.",
+        "cutoffUtc": "2026-11-19T02:30:00Z",
+        "automaticRetryExtensionOrExclusion": false,
+        "interpretation": "Coverage and model-choice diagnosis only. No strength/compute qualification or winner-based policy selection. Any new pre-scoring policy needs separate source, registration and physical-distinctness evidence, fresh qualification/confirmation and overall-average full-fight/weighted actual-decision CPU<=+10%, including both actual drivers.",
+        "defaultChanged": false,
+        "automaticPromotionOrDeployment": false
+    },
+    "sourceRegistration": {
+        "schema": 1,
+        "atUtc": "2026-11-19T01:58:28.664575+00:00",
+        "parentPortableSourceSealSha256": "626aa51cc6144e940c1d23be0c673419531354758915f103d015fa297e64437e",
+        "files": [
+            {
+                "path": "probe.ts",
+                "bytes": 8405,
+                "sha256": "b6cdd3b19defe228d06d38eb9b5f8ce8cecd6bf4d652d9ab77ac136adecbf449"
+            },
+            {
+                "path": "controller.py",
+                "bytes": 3805,
+                "sha256": "7b2af2dc64ff7bc4c9b389eaa41b18dba80ea33d5314a818d00c1bd27e38d8e3"
+            },
+            {
+                "path": "verify.py",
+                "bytes": 4884,
+                "sha256": "9c41a83737f4769ccf2d4e9152e17e63fa36bb08dee35114d50b2e24c6def2c7"
+            },
+            {
+                "path": "registration.json",
+                "bytes": 2786,
+                "sha256": "b9b21a703b0e27fdb09d1f7e14a658c0dc1f51cc38c793a95e60aacfd699a213"
+            },
+            {
+                "path": "inputs.json",
+                "bytes": 151882,
+                "sha256": "5d24881b2958aa9e98d6cf91be5ebafdc5954595a287d5d6c31e1d8e703ea251"
+            }
+        ]
+    },
+    "results": {
+        "schema": 1,
+        "passed": true,
+        "atUtc": "2026-11-19T02:01:00.180490+00:00",
+        "id": "a19-root-compound-choice-audit-20261119",
+        "fullHftGames": 26,
+        "fullLocalColdGames": 4,
+        "allCompleteNativeObserverPairsExact": 13,
+        "frames": [
+            {
+                "caseId": "exposed-0108e69a07c43a893c88b5622e004068f9731ca101faf45b9702c81ab20164c3",
+                "family": "placement-data-m1-op1-o0-scan0037",
+                "sequence": 22,
+                "name": "Peasant",
+                "team": 2,
+                "candidateTeam": 2,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 9,
+                        "alignedScores": [0.8809967611611256],
+                        "walkScores": [],
+                        "incumbentScores": [0.8809967611611256]
+                    },
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [1],
+                        "walkScores": [],
+                        "incumbentScores": [1]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-125a278720665e0a5cd31df7719fe931733b3277cac13579e63437998a7fb68c",
+                "family": "placement-data-m1-op1-o1-scan0038",
+                "sequence": 32,
+                "name": "Peasant",
+                "team": 2,
+                "candidateTeam": 2,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [0],
+                        "walkScores": [],
+                        "incumbentScores": [0]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-267db04790268f9e1e0c37c690d4b0e81d66c848d9920b413c4c8926a3bc5ddf",
+                "family": "placement-data-m1-op3-o0-scan0050",
+                "sequence": 42,
+                "name": "Valkyrie",
+                "team": 1,
+                "candidateTeam": 1,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 1,
+                            "walkExactActions": 1
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 1,
+                        "walkExactActions": 1,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 13,
+                        "alignedScores": [0.999917785815684],
+                        "walkScores": [0.9996364811564131],
+                        "incumbentScores": [0.999917785815684]
+                    },
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [1],
+                        "walkScores": [],
+                        "incumbentScores": [1]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-407ef36643d045938ca08b124404eec64cd31c2e54513b31e06f9067eaab8c9a",
+                "family": "placement-data-m1-op1-o0-scan0037",
+                "sequence": 40,
+                "name": "Valkyrie",
+                "team": 2,
+                "candidateTeam": 2,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 13,
+                        "alignedScores": [0.9996316831232344],
+                        "walkScores": [],
+                        "incumbentScores": [0.9996316831232344]
+                    },
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [1],
+                        "walkScores": [],
+                        "incumbentScores": [1]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-6746f02fef030664425c5971fe9763620241ca22c47b1551a7bfe40ae1028336",
+                "family": "placement-data-m1-op1-o1-scan0020",
+                "sequence": 35,
+                "name": "Nomad",
+                "team": 2,
+                "candidateTeam": 2,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 1,
+                            "walkExactActions": 1
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 1,
+                        "walkExactActions": 1,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 9,
+                        "alignedScores": [0.99591422154177],
+                        "walkScores": [0.9955555890524398],
+                        "incumbentScores": [0.9958879141168653]
+                    },
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [1],
+                        "walkScores": [],
+                        "incumbentScores": [1]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-6746f02fef030664425c5971fe9763620241ca22c47b1551a7bfe40ae1028336",
+                "family": "placement-data-m1-op1-o1-scan0020",
+                "sequence": 43,
+                "name": "Nomad",
+                "team": 2,
+                "candidateTeam": 2,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 1,
+                            "walkExactActions": 1
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 1,
+                        "walkExactActions": 1,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 8,
+                        "alignedScores": [0.9999537530727324],
+                        "walkScores": [0.9999368805144205],
+                        "incumbentScores": [0.9999506046144038]
+                    },
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [1],
+                        "walkScores": [],
+                        "incumbentScores": [1]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-a1a450fd535082450578ba59a0b6c377667c361328da7d7dc566b4c5c6ea8984",
+                "family": "placement-data-m1-op1-o1-scan0038",
+                "sequence": 34,
+                "name": "Wolf Rider",
+                "team": 2,
+                "candidateTeam": 1,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 8,
+                        "alignedScores": [0.9423724046074352],
+                        "walkScores": [],
+                        "incumbentScores": [0.9266343506697459]
+                    },
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [1],
+                        "walkScores": [],
+                        "incumbentScores": [1]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-a1a450fd535082450578ba59a0b6c377667c361328da7d7dc566b4c5c6ea8984",
+                "family": "placement-data-m1-op1-o1-scan0038",
+                "sequence": 35,
+                "name": "Wandering Mage",
+                "team": 1,
+                "candidateTeam": 1,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": false,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 1,
+                            "walkExactActions": 1
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 1,
+                            "walkExactActions": 1
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 1,
+                        "walkExactActions": 1,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 11,
+                        "alignedScores": [0.036887862930333346],
+                        "walkScores": [0.07993020529266161],
+                        "incumbentScores": [0.036887862930333346]
+                    },
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 1,
+                        "walkExactActions": 1,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 8,
+                        "alignedScores": [0],
+                        "walkScores": [0],
+                        "incumbentScores": [0]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-bc936ab8001f465384edb12b1dee0cf52db8b38f5f845ba71ee1b642bf0e282a",
+                "family": "placement-data-m1-op3-o0-scan0023",
+                "sequence": 23,
+                "name": "Peasant",
+                "team": 2,
+                "candidateTeam": 2,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": false,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 1,
+                            "walkExactActions": 1
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 1,
+                            "walkExactActions": 1
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 1,
+                        "walkExactActions": 1,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [0],
+                        "walkScores": [0],
+                        "incumbentScores": [0]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-c17a08c0e019e52b0a4d853996cf1270bb7d232edcfbe028a8a8eea6e49dddf2",
+                "family": "placement-data-m3-op2-o0-scan0020",
+                "sequence": 45,
+                "name": "Battle Mage",
+                "team": 1,
+                "candidateTeam": 1,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 5,
+                        "alignedScores": [0],
+                        "walkScores": [],
+                        "incumbentScores": [0]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-cf24c64223914138392a8868423cc0541d1a196e4175b9d6904fcf273e6a6d99",
+                "family": "placement-data-m1-op1-o0-scan0055",
+                "sequence": 7,
+                "name": "Blacksmith",
+                "team": 2,
+                "candidateTeam": 2,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        },
+                        "shortlist": {
+                            "alignedIntent": 0,
+                            "alignedExactActions": 0,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 23,
+                        "alignedScores": [0.8275824411650741],
+                        "walkScores": [],
+                        "incumbentScores": [0.8275824411650741]
+                    },
+                    {
+                        "alignedIntent": 0,
+                        "alignedExactActions": 0,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [],
+                        "walkScores": [],
+                        "incumbentScores": [0]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-d775eff886fa2f7872c14949ac2b5527bc15569f24f82f4c5a3646acb1c907f5",
+                "family": "placement-data-m1-op3-o0-scan0023",
+                "sequence": 34,
+                "name": "Peasant",
+                "team": 1,
+                "candidateTeam": 1,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 1,
+                            "walkExactActions": 1
+                        },
+                        "shortlist": {
+                            "alignedIntent": 0,
+                            "alignedExactActions": 0,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 1,
+                        "walkExactActions": 1,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 11,
+                        "alignedScores": [0.9867838347553964],
+                        "walkScores": [0.9795875534307499],
+                        "incumbentScores": [0.9867838347553964]
+                    },
+                    {
+                        "alignedIntent": 0,
+                        "alignedExactActions": 0,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [],
+                        "walkScores": [],
+                        "incumbentScores": [1]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-eba329283dd7314a2e982e8296804322c2fdc476daa7ab2aa5935dc6362d7faa",
+                "family": "placement-data-m3-op1-o1-scan0033",
+                "sequence": 35,
+                "name": "Wandering Mage",
+                "team": 2,
+                "candidateTeam": 2,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": false,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 16,
+                        "alignedScores": [0.9815842940506248],
+                        "walkScores": [],
+                        "incumbentScores": [0.9815842940506248]
+                    },
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 8,
+                        "alignedScores": [1],
+                        "walkScores": [],
+                        "incumbentScores": [1]
+                    }
+                ]
+            },
+            {
+                "caseId": "exposed-ed9b572c5c72f9037a15d60d01e2c395f144c0666d3428a90a7d7ae97b302194",
+                "family": "placement-data-m1-op3-o0-scan0000",
+                "sequence": 35,
+                "name": "Blacksmith",
+                "team": 2,
+                "candidateTeam": 2,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        },
+                        "shortlist": {
+                            "alignedIntent": 0,
+                            "alignedExactActions": 0,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 14,
+                        "alignedScores": [0.010998766191953663],
+                        "walkScores": [],
+                        "incumbentScores": [0.010998766191953663]
+                    },
+                    {
+                        "alignedIntent": 0,
+                        "alignedExactActions": 0,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [],
+                        "walkScores": [],
+                        "incumbentScores": [0]
+                    }
+                ]
+            },
+            {
+                "caseId": "known-refusal-task316",
+                "family": "placement-data-m1-op1-o1-scan0041",
+                "sequence": 25,
+                "name": "Trent",
+                "team": 2,
+                "candidateTeam": 1,
+                "reason": "aligned-approach",
+                "selectedOriginalMalformedIncumbent": true,
+                "catalogs": [
+                    {
+                        "full": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        },
+                        "shortlist": {
+                            "alignedIntent": 1,
+                            "alignedExactActions": 1,
+                            "walkIntent": 0,
+                            "walkExactActions": 0
+                        }
+                    }
+                ],
+                "scoreCalls": [
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "leaf",
+                        "rolloutCount": 1,
+                        "turnHorizon": 64,
+                        "candidateCount": 8,
+                        "alignedScores": [0.9999280209504499],
+                        "walkScores": [],
+                        "incumbentScores": [0.9999607414015445]
+                    },
+                    {
+                        "alignedIntent": 1,
+                        "alignedExactActions": 1,
+                        "walkIntent": 0,
+                        "walkExactActions": 0,
+                        "horizonMode": "turns",
+                        "rolloutCount": 2,
+                        "turnHorizon": 64,
+                        "candidateCount": 6,
+                        "alignedScores": [1],
+                        "walkScores": [],
+                        "incumbentScores": [1]
+                    }
+                ]
+            }
+        ],
+        "pairs": [
+            {
+                "caseId": "exposed-0108e69a07c43a893c88b5622e004068f9731ca101faf45b9702c81ab20164c3",
+                "family": "placement-data-m1-op1-o0-scan0037",
+                "score": 1,
+                "digest": "e02734dfad5d6d2cf8e3aae2c1c606c519d5554e6e96f12a03ae25b98ab1239d",
+                "decisions": 54,
+                "frames": 1
+            },
+            {
+                "caseId": "exposed-125a278720665e0a5cd31df7719fe931733b3277cac13579e63437998a7fb68c",
+                "family": "placement-data-m1-op1-o1-scan0038",
+                "score": 0,
+                "digest": "0b9d9943d2ac422d52ce648fbf0c4e9a41b326bb037df4fbc8f412d9e4127f7f",
+                "decisions": 50,
+                "frames": 1
+            },
+            {
+                "caseId": "exposed-267db04790268f9e1e0c37c690d4b0e81d66c848d9920b413c4c8926a3bc5ddf",
+                "family": "placement-data-m1-op3-o0-scan0050",
+                "score": 1,
+                "digest": "c781babf873db2b18370d44af8823877f6f624209d6dd260fa5a53fbb29a0c3f",
+                "decisions": 43,
+                "frames": 1
+            },
+            {
+                "caseId": "exposed-407ef36643d045938ca08b124404eec64cd31c2e54513b31e06f9067eaab8c9a",
+                "family": "placement-data-m1-op1-o0-scan0037",
+                "score": 1,
+                "digest": "2e0bfe3a42d11edd5b2e429993cd7e37fa57c38d54733ec716af510b61d9f359",
+                "decisions": 41,
+                "frames": 1
+            },
+            {
+                "caseId": "exposed-6746f02fef030664425c5971fe9763620241ca22c47b1551a7bfe40ae1028336",
+                "family": "placement-data-m1-op1-o1-scan0020",
+                "score": 1,
+                "digest": "017c30488cc6fbb8becb35b72301c1e77e58b9a87ed4fe48d70a813255cfb0d5",
+                "decisions": 44,
+                "frames": 2
+            },
+            {
+                "caseId": "exposed-a1a450fd535082450578ba59a0b6c377667c361328da7d7dc566b4c5c6ea8984",
+                "family": "placement-data-m1-op1-o1-scan0038",
+                "score": 0,
+                "digest": "8c37046c24226f5761810a21461857eed10b0fdcf9ca267fa30d6aa40e674125",
+                "decisions": 44,
+                "frames": 2
+            },
+            {
+                "caseId": "exposed-bc936ab8001f465384edb12b1dee0cf52db8b38f5f845ba71ee1b642bf0e282a",
+                "family": "placement-data-m1-op3-o0-scan0023",
+                "score": 0.5,
+                "digest": "69374232eaa64e35651bdeb89451cc74d9d92af78c40aae0b60aaaa3edcc8983",
+                "decisions": 61,
+                "frames": 1
+            },
+            {
+                "caseId": "exposed-c17a08c0e019e52b0a4d853996cf1270bb7d232edcfbe028a8a8eea6e49dddf2",
+                "family": "placement-data-m3-op2-o0-scan0020",
+                "score": 0,
+                "digest": "041f58bbbadd9e538e312a154723de80e3a68e920aba76282535b4e39ca7a333",
+                "decisions": 60,
+                "frames": 1
+            },
+            {
+                "caseId": "exposed-cf24c64223914138392a8868423cc0541d1a196e4175b9d6904fcf273e6a6d99",
+                "family": "placement-data-m1-op1-o0-scan0055",
+                "score": 1,
+                "digest": "314bd557048d0b5dca8db3fbaa77b5e963274452421959870b00c59bde513dbb",
+                "decisions": 51,
+                "frames": 1
+            },
+            {
+                "caseId": "exposed-d775eff886fa2f7872c14949ac2b5527bc15569f24f82f4c5a3646acb1c907f5",
+                "family": "placement-data-m1-op3-o0-scan0023",
+                "score": 1,
+                "digest": "0027e907f6bb1ab508e7df7bc45cc7260bcc8dcf5ac537683275f203c666e41e",
+                "decisions": 40,
+                "frames": 1
+            },
+            {
+                "caseId": "exposed-eba329283dd7314a2e982e8296804322c2fdc476daa7ab2aa5935dc6362d7faa",
+                "family": "placement-data-m3-op1-o1-scan0033",
+                "score": 1,
+                "digest": "9d97c7a36c73cd8cc9976bd2348750e18176e55e4d94a70d717f27d558b1fdec",
+                "decisions": 51,
+                "frames": 1
+            },
+            {
+                "caseId": "exposed-ed9b572c5c72f9037a15d60d01e2c395f144c0666d3428a90a7d7ae97b302194",
+                "family": "placement-data-m1-op3-o0-scan0000",
+                "score": 0,
+                "digest": "3d2fa4ab07705d057b7ba4c105933530225aa9f7c4482e9b3b39d9fe8f11ebf2",
+                "decisions": 51,
+                "frames": 1
+            },
+            {
+                "caseId": "known-refusal-task316",
+                "family": "placement-data-m1-op1-o1-scan0041",
+                "score": 0,
+                "digest": "fb182d254b8244f4d3878e2e1061233c6ffe1b2d0f57f69a19c9130343e6b5d9",
+                "decisions": 26,
+                "frames": 1
+            }
+        ],
+        "newSeeds": 0,
+        "policyEdits": 0,
+        "extraScoringRequests": 0,
+        "notStrengthOrCostQualification": true,
+        "defaultChanged": false
+    },
+    "summary": {
+        "actualMalformedIncumbents": 15,
+        "selectedOriginalMalformedIncumbent": 12,
+        "exactCoherentAttackAlreadyInEveryInitialCatalog": 15,
+        "exactCoherentAttackAlreadyInFullScoring": 12,
+        "allTwelveFullScoresTieIncumbent": true,
+        "fullCoherentScores": {
+            "zero": 4,
+            "one": 8
+        },
+        "originalWalkPresentInInitialCatalog": 6,
+        "originalWalkReachesFullSearch": 2,
+        "selectedMalformedIncumbentCasesWithWalkInFullSearch": 0
+    },
+    "interpretation": "Adding the aligned attack to every catalog is not a demonstrated missing-choice fix: all fifteen already contain it. Twelve native full comparisons tie. Three aligned attacks are dropped at shortlisting, while native permissive incumbent scoring can already model a partial move. No new selection policy, broad coverage rate, general equivalence, strength or cost gain is established. Closed final-root and all-policy experiments remain closed.",
+    "archive": {
+        "schema": 1,
+        "sha256": "5ec21b34cba4ac5f2903cae2f42f8700fc5645aabe167b0ac7f8d26a0b8cf1ac",
+        "bytes": 407140,
+        "members": 25,
+        "allMembersVerifiedLocally": true,
+        "notStrengthOrCostQualification": true
+    },
+    "hftReturn": {
+        "sha256": "f70423b910c1a7bb9d285fb90482ae5a97a84267876315f72bbab8cd3dacb178",
+        "bytes": 325596,
+        "members": 89,
+        "allMembersVerifiedLocally": true
+    },
+    "defaultChanged": false,
+    "newSeeds": 0
+}

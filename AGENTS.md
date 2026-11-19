@@ -34,6 +34,12 @@ Preserve its full source versions, raw warnings and original uncached-outcome li
 `docs/evidence/a19_native_refusal_integrity_diagnosis_20261119.json`. The server's research runner
 now retains rejected outcomes outside valid cache before aborting; its quality gate is unchanged.
 
+The separate thirty-game read-only compound-choice audit also completed with exact observer/cold
+controls. All fifteen malformed native incumbents already have an exact aligned attack in the
+initial catalog; twelve reach full H64/R2 and tie the incumbent. Read
+`docs/evidence/a19_root_compound_choice_audit_20261119.json`. This does not qualify a new
+pre-scoring selector, broad missing-choice frequency, strength or CPU gain. Keep prior candidates closed.
+
 ## Frozen public-context placement learning — November 18, 2026
 
 Read `docs/a19_public_placement_value_learning.md` before new placement learning or seed allocation.

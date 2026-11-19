@@ -115,3 +115,19 @@ comparison. It does not admit them as labels. Its 1,925 server tests and local
 type/lint gates pass; GitHub's CI jobs did not start because of the account's
 payment/spending limit, so those checks cannot be reported green. No serving
 engine, protocol, default or consumer dependency is changed by these findings.
+
+The subsequent [read-only compound-choice audit](evidence/a19_root_compound_choice_audit_20261119.json)
+used every twelve changed-trace case plus the known refusal: 26 native/observer
+games and four fixed cross-host cold games. All thirteen complete native pairs,
+four cold outcomes/observations and covered state/alias/reference/RNG checks match.
+It adds no enumeration, scoring request, rollout or policy edit.
+
+All fifteen observed malformed native incumbents already have an **exact aligned
+attack** in the initial catalog. Twelve aligned attacks reach full H64/R2 scoring,
+and all twelve tie the native incumbent (four score zero, eight score one).
+Three aligned attacks disappear at shortlisting. The original move-only prefix
+appears in six catalogs and two full comparisons; permissive native incumbent
+execution can also evaluate a partially rejected plan as its executed movement.
+These are exposed diagnostic roots, not population coverage or causal regret
+estimates. No new pre-scoring policy or strength/compute gain is qualified by
+this audit; keep all earlier fixed candidates closed.
