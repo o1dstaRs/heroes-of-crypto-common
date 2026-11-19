@@ -1,5 +1,25 @@
 # Agent guidance
 
+## Closed placement collection and distinct final-root research — November 19, 2026
+
+The November 18 public-context placement collection is closed incomplete after a native melee
+refusal on Puffalo. Read its appended closeout in `docs/a19_public_placement_value_learning.md`.
+Preserve all 2,554 independently verified physical labels, the failed uncached game, four complete
+blocks, all inputs and six-role scanned/rejected/unused reservations. No fitter or model-selection
+validation ran. Do not resume that registration, fit partial labels, extend its cutoffs or rewrite gates.
+
+The separate inactive `a19-authoritative-root-melee-repair-v1` applies immutable geometry repair only
+to the final real result of unchanged A19 search, before native target-memory reconciliation. Read
+`docs/a19_authoritative_root_repair_research.md`. Preserve its fifteen completed diagnostic games,
+one pre-opening observer failure, full-outcome/cold controls and original-reference sentinel. It
+fixes one refused actual command without changing that winner; it does not qualify strength or cost.
+The old all-policy/atomic candidates stay closed. The distinct fixed reused screen contains all
+2,554 valid exposed inputs / 97 families, both arms and every loss: 5,108 main games. Retain its
+source, confidence/coverage/original-outcome/quality/cold gates and November 19 02:00 UTC cutoff.
+No retries, exclusions, extension or automatic promotion. Fresh broad strength, held confirmation
+and overall-average +10% full-fight / weighted actual-decision CPU, including both-AI use, remain
+required. Slower subgroups are descriptive. No serving import, default change or deployment follows.
+
 ## Frozen public-context placement learning — November 18, 2026
 
 Read `docs/a19_public_placement_value_learning.md` before new placement learning or seed allocation.

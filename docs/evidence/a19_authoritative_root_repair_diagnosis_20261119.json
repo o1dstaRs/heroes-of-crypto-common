@@ -1,0 +1,347 @@
+{
+    "schema": 1,
+    "id": "a19-authoritative-root-plan-diagnosis-20261118",
+    "recordedAtUtc": "2026-11-19T00:23:48.431661+00:00",
+    "status": "bounded-functional-diagnosis-complete-not-strength-qualified",
+    "source": {
+        "commonNativeCode": "9c10c8369452d56efcd8b8a4fb515b00ce141616",
+        "server": "d5fa16bea5bac966c935a3fc90513cdd7b1a5edf",
+        "closedLabelSourceSealSha256": "a328b058da5ddcdd2655e9719a1044e08bfc6d7db0f3ac4e46ea30ad04c522f0"
+    },
+    "diagnosis": {
+        "schema": 1,
+        "passed": true,
+        "atUtc": "2026-11-19T00:10:21.361046+00:00",
+        "registeredExecutionBudget": 16,
+        "executionStarts": 16,
+        "completedNativeGames": 15,
+        "preOpeningObserverSerializerFailure": 1,
+        "newSeeds": 0,
+        "nativeObservedFullOutcomeEqualities": [
+            ["task316-native", "task316-observed-v2"],
+            ["task316-native", "task316-native-cold-repeat"],
+            ["task316-root-only", "task316-root-only-cold-repeat"],
+            ["task316-all-policy", "task316-all-policy-cold-repeat"],
+            ["sentinel-native", "sentinel-observed"],
+            ["sentinel-native", "sentinel-root-only"],
+            ["original-sentinel-native", "original-sentinel-observed"],
+            ["original-sentinel-native", "original-sentinel-root-only"]
+        ],
+        "allColdOutcomesExact": true,
+        "failedLabelOriginalRefusalExact": true,
+        "originalReferenceSentinelReplaysExactAfterRemovingDeclaredResearchOnlyMetadata": true,
+        "currentV13SentinelNativeAndBothRepairsSameOutcome": true,
+        "rootOnlyAndClosedAllPolicyPhysicallyDistinctOnOriginalReferenceSentinel": true,
+        "actualMeaning": "Root-only fixes one refused actual command in failedlabelcase without changing winner; retains native oldsentinel loss while closedall-policy wins viahypothetical repairs. This is a behavior/correctness distinction, not strengthqualification.",
+        "summaries": [
+            {
+                "path": "original-sentinel-all-policy-result.json",
+                "sha256": "16c9920b7cbc909e66a6c8c4f85944dde628fa752a5a0b71c5ba560a6c72e22b",
+                "bytes": 459592,
+                "mode": "all-policy",
+                "taskIndex": -1,
+                "score": 1,
+                "digest": "279190a45ab1553769373a91117a443be2b22c63ae6c21f63555b7150b50bfa3",
+                "actualSearchDecisions": 46,
+                "qualityErrors": [],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 24
+            },
+            {
+                "path": "original-sentinel-native-result.json",
+                "sha256": "9c6a67cfc12a06fda2397c0864729dedcf613b4dba3f1bd108a1e1aa1940e833",
+                "bytes": 125511,
+                "mode": "native",
+                "taskIndex": -1,
+                "score": 0,
+                "digest": "31712d6b0e014645c7ce96f8d3849633ea12e1cf04023359c3968c372e1462ed",
+                "actualSearchDecisions": 41,
+                "qualityErrors": [],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 0
+            },
+            {
+                "path": "original-sentinel-observed-result.json",
+                "sha256": "20c8faa515c695f12d3b75c5f41352cd0fba1f567cd8a4ec59e8614b6d7ed998",
+                "bytes": 394226,
+                "mode": "observed",
+                "taskIndex": -1,
+                "score": 0,
+                "digest": "31712d6b0e014645c7ce96f8d3849633ea12e1cf04023359c3968c372e1462ed",
+                "actualSearchDecisions": 41,
+                "qualityErrors": [],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 0
+            },
+            {
+                "path": "original-sentinel-root-only-result.json",
+                "sha256": "26bcf583d04c2386ed218a3a157032b7d874e8d25d86827891668eaeb08da365",
+                "bytes": 394227,
+                "mode": "root-only",
+                "taskIndex": -1,
+                "score": 0,
+                "digest": "31712d6b0e014645c7ce96f8d3849633ea12e1cf04023359c3968c372e1462ed",
+                "actualSearchDecisions": 41,
+                "qualityErrors": [],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 0
+            },
+            {
+                "path": "sentinel-all-policy-result.json",
+                "sha256": "5fe7f86319d7eabb56002e626ae625c718715f38f28f7c8d1a7c06314765f489",
+                "bytes": 543313,
+                "mode": "all-policy",
+                "taskIndex": -1,
+                "score": 1,
+                "digest": "2c38c0f74acc5211e9ff967456356221726936ac3f8cb8e5a0e36466045c2b70",
+                "actualSearchDecisions": 52,
+                "qualityErrors": [],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 32
+            },
+            {
+                "path": "sentinel-native-result.json",
+                "sha256": "bb0a38c26dd80c42b4c29405a97fd35b4de52e8ae2bf5bd7c11aa9636e327bea",
+                "bytes": 140197,
+                "mode": "native",
+                "taskIndex": -1,
+                "score": 1,
+                "digest": "2c38c0f74acc5211e9ff967456356221726936ac3f8cb8e5a0e36466045c2b70",
+                "actualSearchDecisions": 52,
+                "qualityErrors": [],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 0
+            },
+            {
+                "path": "sentinel-observed-result.json",
+                "sha256": "27bc0ab1964bc16c21235c9aea6bc5948faaebb8411c65d514a1c872fc103111",
+                "bytes": 512877,
+                "mode": "observed",
+                "taskIndex": -1,
+                "score": 1,
+                "digest": "2c38c0f74acc5211e9ff967456356221726936ac3f8cb8e5a0e36466045c2b70",
+                "actualSearchDecisions": 52,
+                "qualityErrors": [],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 0
+            },
+            {
+                "path": "sentinel-root-only-result.json",
+                "sha256": "ff3dbbebf084f6bbf593dd17b2bd51fc2dd20a67040d4a89c84b5710c5707405",
+                "bytes": 512878,
+                "mode": "root-only",
+                "taskIndex": -1,
+                "score": 1,
+                "digest": "2c38c0f74acc5211e9ff967456356221726936ac3f8cb8e5a0e36466045c2b70",
+                "actualSearchDecisions": 52,
+                "qualityErrors": [],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 0
+            },
+            {
+                "path": "task316-all-policy-cold-repeat-result.json",
+                "sha256": "d60d05ef1a8aaef1ef5f774c96ba1cba92cc65845b5a786358dbe75244ee1a68",
+                "bytes": 316648,
+                "mode": "all-policy",
+                "taskIndex": 316,
+                "score": 0,
+                "digest": "6046d7700164397556c5a50c9a646a0261977e3c80ca565fd1a76c2c41cc327d",
+                "actualSearchDecisions": 25,
+                "qualityErrors": [],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 39
+            },
+            {
+                "path": "task316-all-policy-result.json",
+                "sha256": "0711d355928e74fe02a254f5439307c222156679f8b693aef65f8bf4ee566c1b",
+                "bytes": 316648,
+                "mode": "all-policy",
+                "taskIndex": 316,
+                "score": 0,
+                "digest": "6046d7700164397556c5a50c9a646a0261977e3c80ca565fd1a76c2c41cc327d",
+                "actualSearchDecisions": 25,
+                "qualityErrors": [],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 39
+            },
+            {
+                "path": "task316-native-cold-repeat-result.json",
+                "sha256": "de1703b9450a91f1ef95aa83942e78ee19364eaf8f70e62e8968f5bf4183a38d",
+                "bytes": 109692,
+                "mode": "native",
+                "taskIndex": 316,
+                "score": 0,
+                "digest": "fb182d254b8244f4d3878e2e1061233c6ffe1b2d0f57f69a19c9130343e6b5d9",
+                "actualSearchDecisions": 26,
+                "qualityErrors": [
+                    "[server-ai] game=sim-1657 strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+                ],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 0
+            },
+            {
+                "path": "task316-native-result.json",
+                "sha256": "ca0bb8e7e5af2fba6ce70d0e1675ece6b5262c36c2c4ff5ace9acbe999c19b0c",
+                "bytes": 109692,
+                "mode": "native",
+                "taskIndex": 316,
+                "score": 0,
+                "digest": "fb182d254b8244f4d3878e2e1061233c6ffe1b2d0f57f69a19c9130343e6b5d9",
+                "actualSearchDecisions": 26,
+                "qualityErrors": [
+                    "[server-ai] game=sim-1657 strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+                ],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 0
+            },
+            {
+                "path": "task316-observed-v2-result.json",
+                "sha256": "68abcc1fe43fcb3390609f5b8e863eb9e1efd24399c092d306289d961ea0f16b",
+                "bytes": 471179,
+                "mode": "observed",
+                "taskIndex": 316,
+                "score": 0,
+                "digest": "fb182d254b8244f4d3878e2e1061233c6ffe1b2d0f57f69a19c9130343e6b5d9",
+                "actualSearchDecisions": 26,
+                "qualityErrors": [
+                    "[server-ai] game=sim-1657 strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+                ],
+                "rootPlanRepairs": 0,
+                "hypotheticalPolicyRepairs": 0
+            },
+            {
+                "path": "task316-root-only-cold-repeat-result.json",
+                "sha256": "17ff1209a35265939ef75e2045dd6b9ca9553f18fcd8e3086a1f4f3bba2ca392",
+                "bytes": 278035,
+                "mode": "root-only",
+                "taskIndex": 316,
+                "score": 0,
+                "digest": "6046d7700164397556c5a50c9a646a0261977e3c80ca565fd1a76c2c41cc327d",
+                "actualSearchDecisions": 25,
+                "qualityErrors": [],
+                "rootPlanRepairs": 1,
+                "hypotheticalPolicyRepairs": 0
+            },
+            {
+                "path": "task316-root-only-result.json",
+                "sha256": "dffdb4a51c526258ec1608cf7f255a718fe7b6a3123ecb3bc45de83d732eb2a2",
+                "bytes": 278035,
+                "mode": "root-only",
+                "taskIndex": 316,
+                "score": 0,
+                "digest": "6046d7700164397556c5a50c9a646a0261977e3c80ca565fd1a76c2c41cc327d",
+                "actualSearchDecisions": 25,
+                "qualityErrors": [],
+                "rootPlanRepairs": 1,
+                "hypotheticalPolicyRepairs": 0
+            }
+        ],
+        "fitOrDefaultChanged": false,
+        "newStrengthOrCostQualified": false
+    },
+    "cause": {
+        "unit": "Trent",
+        "team": 2,
+        "base": {
+            "x": 13,
+            "y": 7
+        },
+        "explicitMoveDestination": {
+            "x": 9,
+            "y": 7
+        },
+        "rewrittenAttackFrom": {
+            "x": 11,
+            "y": 9
+        },
+        "staleAttackRouteStartsAt": {
+            "x": 13,
+            "y": 7
+        },
+        "searchKeptInconsistentIncumbent": true
+    },
+    "researchCheckpoint": {
+        "id": "a19-authoritative-root-melee-repair-v1",
+        "module": "src/simulation/a19_authoritative_root_repair_research.ts",
+        "moduleSha256": "51cbd91b073ecdebda2e3b934cf03e80ec08c8cd5739b9b6647b2464967d1d67",
+        "usesUnchangedGeometryHelper": true,
+        "postSearchActualRootOnly": true,
+        "hypotheticalPolicyEdits": false,
+        "servingImportsOrActivation": false
+    },
+    "archive": {
+        "schema": 1,
+        "passed": true,
+        "file": "a19-authoritative-root-plan-diagnosis-20261118-complete.tar.gz",
+        "sha256": "5c5b0f1875772df0123a463f0abe4e65ce7ac3deda8ed2545cf6976c7554653b",
+        "bytes": 440882,
+        "regularMembersVerified": 50,
+        "sourceBindings": {
+            "schema": 1,
+            "atUtc": "2026-11-19T00:17:37.493471+00:00",
+            "sourceLayers": [
+                {
+                    "name": "input-source-packet-v1.tar.gz",
+                    "sha256": "913fe1b7bff1ac63bea83313498aba9e614f4410b3280151c838d0b13eb2c5ff",
+                    "bytes": 67634075
+                },
+                {
+                    "name": "input-source-overlay-v2.tar.gz",
+                    "sha256": "5cb42bc280ea2953334b899e4e25de85875bf651f51bae57188fc48849d80001",
+                    "bytes": 780218
+                },
+                {
+                    "name": "label-source-overlay-v1.tar.gz",
+                    "sha256": "2fe555de604c692f0499b96e049c761adf25e305e4ddff6ea6acd05888adeae3",
+                    "bytes": 46337701
+                }
+            ],
+            "currentLabelSourceSealSha256": "a328b058da5ddcdd2655e9719a1044e08bfc6d7db0f3ac4e46ea30ad04c522f0",
+            "oldReferenceSourceArchive": {
+                "name": "a19-coherent-melee-approach-20261118/closed-complete-return.tar.gz",
+                "sha256": "e6f55e45de526ea3404c93d07343768bec3cd418dda6383659295f235370bb8d"
+            },
+            "reconstruction": "Use three current source layers for current profile; use original closed coherent archive frozen-server for original reference runtime. Symlink entries are not scientific source and are excluded; never mix the two common package instances."
+        }
+    },
+    "nextIndependentOfClosedStudies": {
+        "registration": {
+            "schema": 1,
+            "id": "a19-authoritative-root-melee-repair-reused-admission-20261119",
+            "registeredAtUtc": "2026-11-19T00:12:36.268662+00:00",
+            "hypothesis": "Repair only final actual selected v0.8 A19 root move/melee incoherence after unchanged search, before native target-memory reconciliation. No hypothetical policy changes. This is distinct from the closed late all-policy repair, not its fresh progression.",
+            "comparator": "Frozen current v13, common9c10c836/serverd5fa16be, all defaults, budgets, weights and native setup unchanged.",
+            "eligibility": "ALL2554 native-quality-verified cached physical inputs from seven closed partial placement-data blocks, unconditional on score. All have fixed complete actual geometry/funding and training fold. Native canonicalquality failure316 stays preserved as separate already-exposed functional diagnostic; no partial-label fitting or relaunch. This is reused exposed engineering data, not fresh qualification.",
+            "candidateScope": "Acting candidateTeam only, versionv0.8, completed search, real root context, active registered unit, live fight. Immutable helper geometry; off by default/no serving imports.",
+            "cases": 2554,
+            "arms": ["native", "root-only-entrant"],
+            "mainFullGames": 5108,
+            "extraEngineeringGames": "canonical8-input cold/persistent/cache transport controls; every changed candidate outcome repeated cold before a screen can pass; preserve all attempts. Maxadditional2554 changed repeats plus64 transport executions.",
+            "seedAllocation": "ZERO new battle seeds; all six roles of original native-public-placement-value-data-20261118-v1 remain reserved, including rejected/unused. Original data/validation/training/oldlate/atomic/held studies stay closed.",
+            "gates": {
+                "allNativeOriginalCompleteOutcomeParity": true,
+                "qualityErrorsZeroBoth": true,
+                "all2554CasesBothArmsComplete": true,
+                "candidateGainScorePointsAtLeast": 0.15,
+                "strictlyPositive95WholeFamilyBootstrapLowerBound": true,
+                "minChangedFamilies": 10,
+                "resamples": 30000,
+                "bootstrapSeed": 2026111901,
+                "repeatAllChangedCandidateOutcomesColdExactly": true
+            },
+            "cutoffUtc": "2026-11-19T02:00:00Z",
+            "automaticRetryExtensionOrCaseExclusion": false,
+            "interpretation": "A passed reused screen only supports prospectively registering independent broad native draft strength, held confirmation and serial overall-average full-fight / weighted actual decision CPU<=+10%, including both AIs. It cannot qualify or activate this candidate, train on incomplete labels or rescue an older candidate. Failed/inconclusive screen stops this fixed candidate.",
+            "defaultChanged": false,
+            "automaticPromotionOrDeployment": false
+        },
+        "cases": 2554,
+        "families": 97,
+        "newSeeds": 0,
+        "freshStrength": false,
+        "sourceAndTransportPreflightsRequired": true,
+        "automaticPromotion": false
+    },
+    "defaultChanged": false,
+    "newStrengthOrCostQualified": false
+}

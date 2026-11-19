@@ -1,0 +1,120 @@
+{
+    "schema": 1,
+    "id": "a19-public-placement-value-collection-closeout-20261119",
+    "recordedAtUtc": "2026-11-19T00:23:48.431661+00:00",
+    "status": "closed-incomplete",
+    "originalRegistration": "a19_public_placement_value_registration_20261118.json",
+    "originalRegistrationUnchanged": true,
+    "reason": "An authoritative native v0.8 melee command was refused on Puffalo at2026-11-18T23:25:24.956987Z. The global all-data gate failed. Stop only own HFT group and preserve all inputs, cached results and failures. No fitting incomplete data.",
+    "nativeFailure": {
+        "family": "placement-data-m1-op1-o1-scan0041",
+        "case": "placement-data-m1-op1-o1-scan0041-team1-future0",
+        "proposal": 5,
+        "uniqueTaskIndex": 316,
+        "warning": "[server-ai] game=sim-1657 strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available",
+        "failedOutcomeCachedOrTrained": false
+    },
+    "data": {
+        "registeredLogicalLabels": 36864,
+        "verifiedPhysicalLabels": 2554,
+        "completedLogicalBlocks": 4,
+        "completedLogicalLabels": 2048,
+        "completedPhysicalLabels": 1716,
+        "partialPhysicalLabels": 838,
+        "wholeBankComplete": false,
+        "trainingFamiliesInput": 864,
+        "validationFamiliesInput": 288,
+        "inputsFamilies": 1152,
+        "allValidatedCacheLabelsTrainingFold": true,
+        "fitExecutions": 0,
+        "validationModelSelection": false
+    },
+    "verifiedBlocks": [
+        {
+            "host": "hft",
+            "id": "placement-native-labels-m1-op1-o0-b0",
+            "completed": true,
+            "physicalLabels": 410,
+            "declaredUniqueTasks": 410,
+            "logicalLabels": 512,
+            "sourceSeal": "8bb566b18f4fe7209d9fe5b1e782983009d4c0ae0e846f9ddfc562b12b09be9c"
+        },
+        {
+            "host": "hft",
+            "id": "placement-native-labels-m1-op2-o1-b0",
+            "completed": true,
+            "physicalLabels": 424,
+            "declaredUniqueTasks": 424,
+            "logicalLabels": 512,
+            "sourceSeal": "cc0552e2194bd25e88a4cb476900cddbc36d0f0fa174fbd2cdad49746ba56b1e"
+        },
+        {
+            "host": "hft",
+            "id": "placement-native-labels-m1-op3-o0-b0",
+            "completed": true,
+            "physicalLabels": 438,
+            "declaredUniqueTasks": 438,
+            "logicalLabels": 512,
+            "sourceSeal": "7f9de920c7f18a60da1134cbac448b40e557d5169c7618213ff1fd30fe5e3230"
+        },
+        {
+            "host": "hft",
+            "id": "placement-native-labels-m3-op1-o1-b0",
+            "completed": true,
+            "physicalLabels": 444,
+            "declaredUniqueTasks": 444,
+            "logicalLabels": 512,
+            "sourceSeal": "97d96c05043a46a3283cd516836cc6d1f952896b256b95a60c872ecf5db0b863"
+        },
+        {
+            "host": "hft",
+            "id": "placement-native-labels-m3-op2-o0-b0",
+            "completed": false,
+            "physicalLabels": 128,
+            "declaredUniqueTasks": 464,
+            "logicalLabels": null,
+            "sourceSeal": "8f01687dcb12d6b23dbcd38601f2d48f946c1f76a9a1252a343da29d920b4325"
+        },
+        {
+            "host": "puffalo",
+            "id": "placement-native-labels-m1-op1-o1-b0",
+            "completed": false,
+            "physicalLabels": 326,
+            "declaredUniqueTasks": 428,
+            "logicalLabels": null,
+            "sourceSeal": "cd2650e26b54339aab099f630fc60ce1d888053a9b36643428dc0b896e849f97"
+        },
+        {
+            "host": "puffalo",
+            "id": "placement-native-labels-m1-op2-o0-b0",
+            "completed": false,
+            "physicalLabels": 384,
+            "declaredUniqueTasks": 426,
+            "logicalLabels": null,
+            "sourceSeal": "67f88600cd059da0f6a75840fd539a43a38cedc353e2dccd5123b2dfa79a08e3"
+        }
+    ],
+    "verification": {
+        "allSemanticInputsCachesRecordsNativeWinnersGeometryAmountsBooksFundingAndPurityVerified": true,
+        "receiptSha256": "ed61d4cab11d1275c59a3b7ca543eb89319ea4a41407edabb8b07b6778780c1f",
+        "allFourCompleteArchiveMembersIndependentlyHashed": true,
+        "firstVerifierMistake": "Partial canonical records contain execution.outcome; completed final records contain outcome. Preserve first failed verifier and corrected parser; no native result or quality rule changed."
+    },
+    "returns": {
+        "hft": {
+            "sha256": "d702813bfba650333d6c4f52db2d76abb9b549b89a8dd93fd5f999566128d93f",
+            "bytes": 78297482,
+            "completedBlocks": 4,
+            "externalStopAfterOtherHostFailure": true
+        },
+        "puffalo": {
+            "sha256": "4c3ed7803b0f22f693f4b6a690e9f8d69a76938192569a65c65db1c76c8012cf",
+            "bytes": 21158194,
+            "completedBlocks": 0,
+            "nativeFailureHost": true
+        }
+    },
+    "seedReservation": "Preserve all six roles x32768 scanned preimages, rejected/unused/unselected and derived channels from the original compact recipe; no fresh seeds allocated by diagnosis.",
+    "noAutomaticRetryExtensionFittingPromotionOrDeployment": true,
+    "defaultChanged": false
+}

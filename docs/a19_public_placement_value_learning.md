@@ -1,5 +1,20 @@
 # Public-context placement value learning
 
+The November 19 [collection closeout](evidence/a19_public_placement_value_collection_closeout_20261119.json)
+records this study as **closed incomplete**. Native A19 refused a melee proposal on Puffalo;
+the complete-data gate failed and only the owned HFT collection was stopped. Four complete
+training blocks contain 2,048 logical / 1,716 physical labels; three partial blocks add 838
+verified physical labels. Independent audit verified all 2,554 cached native outcomes, inputs,
+winners, placement geometry, amounts, books, funded levels and observer purity. Preserve the
+failed uncached game too. No fitter or model-selection validation ran, and no new default or
+weights were promoted. Never resume this registration, fit its partial data or extend its cutoffs.
+
+All original input families and six-role scanned/unused/rejected seed reservations remain
+excluded. The separate [final-root diagnosis](a19_authoritative_root_repair_research.md) reproduces
+the error and studies a different post-search correction; it does not reopen this collection,
+the old all-policy repair or any previous failed gate. The original registration below remains
+an immutable account of what was promised before labels.
+
 Registered November 18, 2026. This is a separate inactive research study. Current v13 and every
 locked model remain unchanged. The [registration](evidence/a19_public_placement_value_registration_20261118.json)
 binds the complete data, fitter, controls, source archives and seed reservation before fresh fight
