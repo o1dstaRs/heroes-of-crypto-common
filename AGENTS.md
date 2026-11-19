@@ -35,6 +35,17 @@ engineering games, foreign corruption controls, both-archive acknowledgment
 barrier, complete 16,128 labels and final80-before-validation requirements.
 Per-block canonical comparisons are quarantined; they do not select a model.
 
+The original `da73d271` label execution stopped in known-input engineering on
+an exporter final-record format assertion, before any fresh label. Preserve it
+and both stopped prefixes. The separate final-record correction is `794b281e`
+(6,246 files), with the SAME unopened input bank and all 16,128 funded labels.
+All 24 completed known engineering games / exact native-cold-pooled-cache parity
+and twelve foreign corruptions pass. Two interrupted unvalidated Puffalo attempts
+remain separate; only their same two logical slots were continued, with no valid
+completed or native-invalid result replayed. Freshness was re-audited across 403
+ledgers with zero intersections. Keep the original policies, complete-data gates,
+model/fit, fixed hardware, full validation and cutoffs. The failed source stays failed.
+
 ## Closed JSON placement collection after storage failure — November 19, 2026
 
 The `b8d7f4ed` producer / `8cf5e842` analysis continuation is now **closed incomplete**.

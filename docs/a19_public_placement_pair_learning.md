@@ -82,3 +82,27 @@ source/cache/input/feature/geometry/book/winner/refusal verification before star
 the next block. Both complete models still precede opening validation effect
 statistics. Canonical mandatory per-block comparisons are quarantined and never
 used to select, stop or tune the fixed fit. No new model or gain is qualified.
+
+The `da73d271` execution stopped during known-input engineering: an exporter
+assertion expected the runner intermediate `execution` record, but the runner
+finalizes records as `{key, input, outcome}`. HFT completed all four canonical
+games with exact cold / pooled / warm parity. The stop preserved Puffalo’s two
+completed cold games and two interrupted pooled attempts with no valid or rejected
+result. Neither node began a fresh study fight.
+
+The [separate final-record correction](evidence/a19_public_placement_pair_final_record_correction_20261119.json)
+keeps the failed source and both stopped prefixes unchanged on both nodes. It
+re-exports completed HFT outcomes without games and continues only the same two
+interrupted Puffalo logical slots under the original seal. No valid completed or
+native-invalid outcome was replayed. All 24 completed known engineering games
+now pass, including exact original native golden, cold / pooled / cache parity
+and twelve foreign corruption controls; the two unvalidated prefix attempts
+remain separately reported.
+
+The corrected producer is `794b281e`, covering 6,246 files, with the SAME unopened
+input bank and 16,128 logical labels. Actual scheduler checks passed again at
+four / eight nice 19 workers; a second freshness audit found zero intersections
+across 403 ledgers. The policies, native quality, funding, full validation, model,
+fit, gates and original cutoffs are unchanged. This is an operational correction
+before fresh labels, not a new independent bank, strength result or admission
+pass for the failed source.

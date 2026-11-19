@@ -1,0 +1,73 @@
+{
+    "schema": 1,
+    "id": "paired-native-final-record-correction-20261119-v2",
+    "atUtc": "2026-11-19T07:56:36.832356+00:00",
+    "failedOriginalSource": "da73d2712c89101a0496818ee9069f81898920f3a8fbcc2cad6503a2bab98a1d",
+    "cause": "Exporter expected intermediate record.execution, while canonical runner finalizes records as {key,input,outcome}. Original failed source/records and both stopped prefixes retained.",
+    "freshStudyLabelsBeforeCorrection": 0,
+    "correction": "Separate exporter/verifier enforce the actual canonical final record exactly; no change to native engine, adapter, model, quality, inputs, hardware, funded labels, gates or original cutoffs.",
+    "sourceV2": "794b281e44367a26385efbb589c583d940dc490b3a27295387b39a870bcf7175",
+    "sourceFiles": 6246,
+    "sourceFileManifestSha256": "122ee5b350eae5bc58e8786cf079b525db365ef6408131034031b99ae9a1ac00",
+    "actualSchedulerPreflight": {
+        "hft": {
+            "passed": true,
+            "source": "794b281e44367a26385efbb589c583d940dc490b3a27295387b39a870bcf7175",
+            "sourceFileSha256": "122ee5b350eae5bc58e8786cf079b525db365ef6408131034031b99ae9a1ac00",
+            "scheduler": {
+                "passed": true,
+                "host": "hft",
+                "blocks": 91,
+                "families": 720,
+                "logicalGames": 10080,
+                "workers": 4,
+                "newGames": 0,
+                "processesStarted": 0
+            }
+        },
+        "puffalo": {
+            "passed": true,
+            "source": "794b281e44367a26385efbb589c583d940dc490b3a27295387b39a870bcf7175",
+            "sourceFileSha256": "122ee5b350eae5bc58e8786cf079b525db365ef6408131034031b99ae9a1ac00",
+            "scheduler": {
+                "passed": true,
+                "host": "puffalo",
+                "blocks": 55,
+                "families": 432,
+                "logicalGames": 6048,
+                "workers": 8,
+                "newGames": 0,
+                "processesStarted": 0
+            }
+        }
+    },
+    "freshSeedAudit": {
+        "qualityPassed": true,
+        "namespace": "native-public-placement-paired-data-20261119-v1",
+        "auditedAllocatedRoots": 43632,
+        "auditedDerivedChannels": 509040,
+        "sourceLedgers": 403,
+        "intersections": 0,
+        "freshBattleExecutedByAudit": false
+    },
+    "engineering": {
+        "passed": true,
+        "knownEngineeringCompleteGames": 24,
+        "originalCurrentNativeObservedColdGames": 16,
+        "originalCanonicalCompletedGames": 6,
+        "continuedInterruptedPuffaloPooledSlots": 2,
+        "interruptedUnvalidatedPrefixAttemptsNotHidden": 2,
+        "validOrNativeInvalidCompletedOutcomeReplayed": false,
+        "bothOriginalColdPooledAndWarmOutcomesExactlyEqual": true,
+        "nativeGoldenReferenceExactlyEqual": true,
+        "foreignCorruptionsRejected": 12,
+        "freshNativeLabels": 0,
+        "policiesAndGatesUnchanged": true
+    },
+    "completeDatasetRequired": 16128,
+    "sameUnopenedOriginalBank": true,
+    "oldNativeInvalidOrCompletedOutcomeRetried": false,
+    "twoInterruptedUnvalidatedEngineeringAttemptsPreserved": true,
+    "validationEffectStatisticsOpened": false,
+    "automaticPromotionOrDeployment": false
+}
