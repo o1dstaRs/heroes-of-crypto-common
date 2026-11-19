@@ -1,0 +1,175 @@
+{
+    "schema": 1,
+    "id": "a19-public-placement-weighted-move-pairs-execution-20261119",
+    "recordedAtUtc": "2026-11-19T11:06:21.089538+00:00",
+    "status": "fresh-native-collection-in-progress-no-fit-or-strength-result",
+    "frozenRuntime": {
+        "atUtc": "2026-11-19T09:47:16.257160+00:00",
+        "serverPublishedCommit": "d2d830d39c60bfb95d938c1db568f6e2d14c6bec",
+        "commonPinnedPublishedCommit": "d4fa46e4b6f1f4bf6dc00b9d202aaa5a90828a02",
+        "publishedSourcesOnly": true,
+        "runtimeIncludesAuthoritativeBackstabMovementFix": true,
+        "portableDependenciesFromVerifiedParent": "f64b4c0f84afdc1b624442494ad35cc74beac3a76d08713b6184a4269107ab76",
+        "oldNativeLabelsOrOldInputBankCopied": false,
+        "freshNativeGames": 0,
+        "unscoredFreshCaptures": 0,
+        "filesYetToBeSealed": true
+    },
+    "sourceBindings": {
+        "input": {
+            "sha256": "e9ae97208424d939ced7f96bfa7bce171636c07b5239a4f82f8f26619d5ada41",
+            "files": 8315
+        },
+        "atomicInputAssembly": {
+            "sha256": "8a224d8e04d87a17f753ec0c598db4b8e317568e232c13cfc904171199b2d84a"
+        },
+        "labels": {
+            "sha256": "a02638064972ea0c3d4e916f3d1172ad801db069e4e611c6dc177e418a5447d8",
+            "fileSha256": "88d8a8c538a245186bbb760fc4b2360de729f957e713e6907a50beb95a6cf043",
+            "files": 8351,
+            "relativeDependencyLinks": 27,
+            "bothNodesEveryMemberVerified": true
+        },
+        "metadataCoordinator": {
+            "path": "collect-labels-initial.py",
+            "sha256": "5efce1e7ad6bfecf7837d8ac05237458cebbf32cd6fd978e9f049d2dbd7d5eb7",
+            "actualNativeProcessIdentityAndLeasesOwnedBySameCoordinator": true,
+            "flatAcksAndBarrierPublishedAtomically": true
+        },
+        "fixedFitAndNativeParity": {
+            "path": "fit-initial-study.py",
+            "sha256": "3e6b1170490f994ce9afcd5c94edb52c3c618c7471b7fe01ef8e4ed8821b245b",
+            "exactRegeneratedNativeChoicesRequiredOnBothNodesBeforeEffectStatistics": true
+        }
+    },
+    "completeUnscoredInputBank": {
+        "sha256": "2f896b31b89c1118e1da785f7add98e6c7a732404efb220aab3116860887d218",
+        "schema": 1,
+        "passed": true,
+        "atUtc": "2026-11-19T10:31:22.247897+00:00",
+        "independentFamilies": 1152,
+        "trainingFamilies": 864,
+        "validationFamilies": 288,
+        "logicalCases": 4608,
+        "fixedFutureLabelGames": 16128,
+        "nativeCombatLabels": 0,
+        "allInspectedDrafts": 4053,
+        "allUnscoredSetupCaptures": 4724,
+        "legalPhaseContextsVerified": 53067,
+        "fixedProposalsReplayed": 36864,
+        "sourceSealSha256": "e9ae97208424d939ced7f96bfa7bce171636c07b5239a4f82f8f26619d5ada41",
+        "boundInputFiles": [
+            {
+                "path": "all-cases.json",
+                "sha256": "273d5627269f8cdd5db770e8bfe90a0471aff774744928f67b8286e046a34114"
+            },
+            {
+                "path": "native-opening-audit.json",
+                "sha256": "3704bb9386cfe5e59c2ec5f7cbed2e8738eb45ebfdbacd24d82020fb45be1a1e"
+            },
+            {
+                "path": "all-family-inputs.json",
+                "sha256": "3a3dcc1831ce29930c16b809949f0c739fd31b6049f763ccea5717c8aa1b6b0e"
+            },
+            {
+                "path": "crosshost-engineering-receipts.json",
+                "sha256": "fb6812607d5755def4ae2ab93b0327ff9e0d15536e0dc831c28c870f9cb0a690"
+            },
+            {
+                "path": "all-input-scan-verification.json",
+                "sha256": "02de5efdd97e418a53d5552a7d8f9fd8c54c4d70bf56931500be9a5ee6abe306"
+            }
+        ],
+        "independentReconstructionBothNodesPassed": true,
+        "allSevenOutputFilesByteIdentical": true,
+        "noCaptureOrCombatReplayedForMetadataRepair": true
+    },
+    "freshness": {
+        "qualityPassed": true,
+        "namespace": "native-public-placement-weighted-move-pairs-20261119-v1",
+        "auditedAllocatedRoots": 42120,
+        "auditedDerivedChannels": 491400,
+        "sourceLedgers": 417,
+        "intersections": 0,
+        "freshBattleExecutedByAudit": false
+    },
+    "controls": {
+        "localProcessProtocolAndAtomicTestsPassed": 24,
+        "actualAtomicSuccessfulFailedAndLiveChildControlsPerNode": 3,
+        "actualNodeSchedulerPreflightPassed": true,
+        "knownNativeEngineeringAdmission": {
+            "passed": true,
+            "sourceSeal": "a02638064972ea0c3d4e916f3d1172ad801db069e4e611c6dc177e418a5447d8",
+            "knownEngineeringFullGames": 24,
+            "currentNativeObservedAndSeparateColdGames": 16,
+            "canonicalColdAndPooledGames": 8,
+            "warmCacheNewGames": 0,
+            "foreignCorruptionsRejected": 12,
+            "bothNativeReferencesMatchOriginalCurrentNativeGolden": true,
+            "bothFullReplicasVerified": true,
+            "freshNativeLabelsAtAdmission": 0,
+            "validationModelSelection": false,
+            "atEpoch": 1795086287.829173
+        }
+    },
+    "preservedOperationalFailures": {
+        "initialMetadataAssemblySource": "aebda8132d10ae563b6964b65ea83571cc44f5701b8f68ae3798e2bfa1a4caf7",
+        "failure": "Readiness path became visible before JSON publication completed; both owned metadata stages stopped. No fresh capture or combat replay.",
+        "correction": "New atomic readiness wrapper writes and fsyncs privately, then publishes through exclusive hard link. Original frozen sources and failed prefixes remain unchanged.",
+        "firstAtomicRehearsal": "Stopped before any child because of previously occupied exclusive log names; distinct v2 rehearsal with unique logs passed on both nodes.",
+        "oldFiveClosedBanksRemainClosedUnfittedAndExcluded": true
+    },
+    "nativeExecution": {
+        "logicalLabelsRequiredBeforeFit": 16128,
+        "independentFamilies": 1152,
+        "trainingFamilies": 864,
+        "validationFamilies": 288,
+        "cases": 4608,
+        "wholeFamilyBlocks": 146,
+        "nodeAllocation": {
+            "hft": {
+                "families": 720,
+                "trainingFamilies": 540,
+                "validationFamilies": 180,
+                "logicalGames": 10080,
+                "workers": 4,
+                "nice": 19,
+                "familiesPerBlock": 8,
+                "blocks": 91
+            },
+            "puffalo": {
+                "families": 432,
+                "trainingFamilies": 324,
+                "validationFamilies": 108,
+                "logicalGames": 6048,
+                "workers": 8,
+                "nice": 19,
+                "familiesPerBlock": 8,
+                "blocks": 55
+            }
+        },
+        "freshLabelsStartedAfterAll24KnownEngineeringGamesPassed": true,
+        "twoCompleteIndexedRawReplicasAndForeignNativeProofRequiredBeforeNextBlock": true,
+        "noInvalidNativeRetryOrPartialFit": true
+    },
+    "gatesUnchanged": {
+        "fixedFinalEpoch": 80,
+        "primaryGainMinPp": 2,
+        "wholeFamily95LowerBoundStrictlyPositive": true,
+        "changedFamiliesMin": 30,
+        "descriptiveAblationCannotReplacePrimary": true,
+        "bothFinal80ArtifactsSealedBeforeValidation": true,
+        "freshStrengthMatchedFreeFormationAndIndependentConfirmationStillRequired": true,
+        "computeLimit": "Overall mean complete-fight CPU and weighted CPU per actual SearchDriver decision <= +10%, including both-AI adoption; subgroup costs descriptive.",
+        "cutoffsUtc": {
+            "inputSampling": "2026-11-19T12:00:00Z",
+            "labelCollection": "2026-11-20T04:00:00Z",
+            "trainingAndValidation": "2026-11-20T05:00:00Z"
+        }
+    },
+    "fitStartedAtRecord": false,
+    "validationEffectStatisticsRead": false,
+    "strengthGainClaim": null,
+    "defaultModelOrProfileChanged": false,
+    "automaticPromotionOrDeployment": false
+}

@@ -34,8 +34,9 @@ re-audit before inputs and labels. Allocation is not a combat result.
 Collect on HFT/Puffalo with four/eight nice-19 workers and the same whole-family
 allocation. The Mac coordinates metadata; stream full archives between nodes
 without local raw relays. Native parity, packaging, real process ownership and
-stop delivery despite local ENOSPC must pass before sampling. Twenty-two local
-process/protocol tests pass; real-node controls and full source seals are pending.
+stop delivery despite local ENOSPC must pass before sampling. The original twenty-two local
+process/protocol controls passed; the later atomic-publication correction adds two
+controls. Real-node controls and sealed source checks are recorded below.
 The new fast-child guard handles a successful direct process completion before
 the startup probe without accepting missing/failed children or weakening the
 separate controller identity and lease checks.
@@ -44,4 +45,34 @@ New outer cutoffs are November 19 12:00 UTC for inputs, November 20 04:00 UTC fo
 labels and 05:00 UTC for fitting/validation. These are funding limits, not completion
 estimates or extensions of any old study. No partial fitting, outcome-based case
 exclusion, invalid-game retry, validation tuning or automatic deployment follows.
-Preparation currently has zero fresh captures, combat labels or trained models.
+The prospective registration preceded every fresh capture and combat label.
+
+Input reconstruction and native collection, November 19: both nodes completed
+identical 1,152-family / 4,608-case input banks, checking 4,053 scanned drafts,
+4,724 unscored setup captures and 53,067 legal phase contexts. The final freshness
+check found zero intersections across 417 ledgers. All rejected and unused scans
+remain reserved.
+
+The first metadata merger stopped when a readiness file became visible before
+its JSON write finished. A distinct atomic-publication wrapper fixed that race;
+the original source and failed prefixes remain preserved. Only metadata checks
+were repeated. No fresh capture or native combat was replayed. One subsequent
+control attempt stopped before starting a child because its exclusive log name
+already existed; the separately named three-control rehearsal passed on each node.
+
+The [execution evidence](evidence/a19_public_placement_weighted_move_pairs_execution_20261119.json)
+binds input source `e9ae9720`, atomic assembly `8a224d8e`, and native label source
+`a0263806` (8,351 files / 27 relative dependency links). Both nodes verified every
+source member and link. All 24 known native/cold/pooled games and twelve foreign
+corruption checks passed before opening fresh labels. Actual scheduler preflight
+and all 24 local process/protocol/atomic controls passed.
+
+Fresh collection is running in 146 fixed whole-family blocks. One metadata
+coordinator checks actual native-process identity and renews leases; its loss
+stops collection even without a failure marker. Flat acknowledgments and the
+engineering barrier are published atomically. Each next block waits for full
+indexed archives on both nodes and independent foreign source/cache/native/
+geometry/feature/winner verification. The fixed GPU fit can start only after all
+16,128 logical labels pass. Both-node regenerated native-choice parity precedes
+validation effects. There is no trained model, new strength result, activation or
+deployment at this execution checkpoint.

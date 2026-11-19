@@ -14,10 +14,15 @@ roots. Input/label/fit cutoffs are Nov19 12Z /Nov20 04Z /05Z, without extension.
 Keep all 1,152 families/16,128 labels, the paired observation schedule, exact warm
 start/final80 and original +2-point/positive95%/30 changed-family gate. Both final
 exports precede validation; exact regenerated native CPU choices must match on
-both nodes before accepting effect statistics. Local process/protocol controls
-pass22; real-node/native controls and complete source seals remain pending.
-No fresh capture, label, model or gain exists yet. Full clean funding precedes
-labels; complete data precedes fitting. Fresh strength/held confirmation and the
+both nodes before accepting effect statistics. All 24 local process/protocol/atomic controls, actual scheduler preflight,
+24 known native/cold/pooled games and twelve foreign corruption checks passed.
+Both nodes independently reconstructed identical 1,152-family / 4,608-case inputs
+and verified label source `a0263806` (8,351 files / 27 links). Read the execution
+checkpoint in that document: metadata publication failures remain preserved;
+no captures or native combats were replayed for those repairs. Fresh labels are
+now collecting in 146 fixed blocks, with two indexed raw replicas and foreign
+native verification before each acknowledgment. No model or gain exists yet.
+Complete data precedes fitting. Fresh strength/held confirmation and the
 user's overall-average +10% complete-fight/weighted actual-decision CPU for both-AI
 adoption remain separate. No automatic activation or deployment.
 
