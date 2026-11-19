@@ -1,0 +1,144 @@
+{
+    "schema": 1,
+    "registration": {
+        "schema": 1,
+        "id": "native-public-placement-float32-audit-continuation-20261119",
+        "registeredAtUtc": "2026-11-19T04:37:21.142517+00:00",
+        "producerSourceUnchanged": "b8d7f4ed2a53b2d81c9c9b13d99a69c7d83bd4f147001b2a9d3a71e214c2e665",
+        "originalInputSourceUnchanged": "168756bc6eb447c756352735b6e9e64b6dba5a741e6f86821dc0fd4b7e1e2980",
+        "sameRegistered36864LogicalLabelsAnd1152Families": true,
+        "correction": "Independent audit must check the registered actualfloat32 tensor bytes exactly. Original exactfloat64 regeneration had a false failure from384 one-ULP host differences among1064448coordinates. Preserve original doubles; bound regeneration by8*EPSILON*max(1,abs(a),abs(b)) in addition to exactfloat32 bytes. Native final prediction tolerance1e-4 and exact final policy choices remain mandatory.",
+        "admission": {
+            "passed": true,
+            "atUtc": "2026-11-19T04:31:27.348Z",
+            "groups": 48,
+            "coordinates": 1064448,
+            "differences": 384,
+            "maxAbsoluteDifference": 2.7755575615628914e-17,
+            "maxScaledEpsilon": 0.125,
+            "allNativeFloat32TensorBytesExactlyEqual": true,
+            "onlyInsignificantHostDoubleDifferences": true,
+            "rejectedCorruptions": 4,
+            "gameOutcomesNotAggregated": true,
+            "newGames": 0,
+            "defaultChanged": false
+        },
+        "noGameplaySourceOrCacheOrOutcomeRekeying": true,
+        "resumeOnlyCanonicalExactInputCacheAndUnfinishedRegisteredTasks": true,
+        "nativeInvalidOutcomesNeverRetriedOrExcluded": true,
+        "cancelledUnacknowledgedAttemptsRetainedButExactCompletedCountNotClaimed": true,
+        "noPartialFittingOrOutcomeBasedSelectionOrNewIndependentDataClaim": true,
+        "modelArchitectureWarmstartFinal80RecipeAndPrimaryGatesUnchanged": true,
+        "cutoffsUtc": {
+            "inputSampling": "2026-11-19T04:00:00Z",
+            "labelCollection": "2026-11-19T10:00:00Z",
+            "trainingAndValidation": "2026-11-19T11:00:00Z",
+            "noAutomaticRetryOrExtension": true
+        },
+        "workerConcurrency": {
+            "local": 8,
+            "hft": 6,
+            "puffalo": 12
+        },
+        "concurrencyRationale": "Only batch parallelism increases on M4, within12performance/16logical core host. Per-game H64/R2 work unchanged; games/families stay on their original hosts. Source-cache identity intentionally excludes workers. Require a separate old-case canonical cold/pooled/warm8worker parity check before local resumption.",
+        "additionalOldCaseBenchmarkGamesMax": 96,
+        "sourceOfTruthForPhysicalLabels": "Unique canonical input/cache keys across completed blocks, not only the final resume invocation executedTasks counter. Retain original delta counters separately.",
+        "defaultChanged": false
+    },
+    "analysisSource": "8cf5e84229d13dc341e2c24e9c3c20fc0b313c54e3afe6dcdc4953f25e456f36",
+    "analysisFiles": [
+        {
+            "path": "feature-contract.ts",
+            "sha256": "c2de7133c2996a3c251a2238a2ab589796770dfe3c0a8604037f326984679f75",
+            "bytes": 1150
+        },
+        {
+            "path": "audit-features.ts",
+            "sha256": "4344e87e2afd23c40f809af2027e767524418c98ae0475fd9034d244bbc3dffb",
+            "bytes": 2233
+        },
+        {
+            "path": "feature-contract-admission.json",
+            "sha256": "d0f3d9592438778ccc322d02a1bf0b22339b824d503425fc6ec4acc55f15d78c",
+            "bytes": 414
+        },
+        {
+            "path": "verify-cache-batch.ts",
+            "sha256": "31fa77e88692f816fc4bcf52b3471087149cacba479ec7fb8797bfb895e347ce",
+            "bytes": 2466
+        },
+        {
+            "path": "validate-fixed-models.ts",
+            "sha256": "7149358e2d4b07bf7448e4c1abaede64f46644b192e2823a171d533b94c22f10",
+            "bytes": 8288
+        },
+        {
+            "path": "fixed-gpu-supervisor.py",
+            "sha256": "ef6076d1f5ace6af697792a967719976ff15421e2fa922a31808de9e2dac71ee",
+            "bytes": 1832
+        },
+        {
+            "path": "collect-fit-pipeline.py",
+            "sha256": "b31c324fbaa6288df4f18671f5cb527fcba39f596fc6bc9624d5b9da07813f27",
+            "bytes": 12159
+        },
+        {
+            "path": "resume-controller.py",
+            "sha256": "0edd5c95a6c174080cdcefed15762e0ded7d19f69f9532811d930333bdea70f3",
+            "bytes": 11563
+        },
+        {
+            "path": "audit-continuation-registration.json",
+            "sha256": "4671a51bb59cac3c6515f4d9eda5bb4df3cdbba0b7cc4eea32b1a42fd090519b",
+            "bytes": 2589
+        },
+        {
+            "path": "prepare-resume.py",
+            "sha256": "536b10ab6709eb811812c96ac80ce6967ab75a0c0ea017bca9774f041d706872",
+            "bytes": 1718
+        },
+        {
+            "path": "full-native-prefix-reverification.log",
+            "sha256": "b48f252a1d822d51e9d6bb7004d12dff389e739834c3c0e44230c062ac5e2751",
+            "bytes": 280
+        }
+    ],
+    "featureContractAdmission": {
+        "passed": true,
+        "atUtc": "2026-11-19T04:31:27.348Z",
+        "groups": 48,
+        "coordinates": 1064448,
+        "differences": 384,
+        "maxAbsoluteDifference": 2.7755575615628914e-17,
+        "maxScaledEpsilon": 0.125,
+        "allNativeFloat32TensorBytesExactlyEqual": true,
+        "onlyInsignificantHostDoubleDifferences": true,
+        "rejectedCorruptions": 4,
+        "gameOutcomesNotAggregated": true,
+        "newGames": 0,
+        "defaultChanged": false
+    },
+    "completeOldPrefixReverified": {
+        "logicalLabels": 640,
+        "uniqueNativeInputs": 556,
+        "blocks": 3,
+        "nativeSourceCacheInputOutcomeWinnerGeometryQuantitiesBooksAndFloat32FeaturesAllVerified": true
+    },
+    "producerSourceRemainsUnchanged": "b8d7f4ed2a53b2d81c9c9b13d99a69c7d83bd4f147001b2a9d3a71e214c2e665",
+    "nativeGamesNotRekeyedOrRewritten": true,
+    "fitterAndFinalPolicyGatesUnchanged": true,
+    "newModelStillUntrained": true,
+    "defaultChanged": false,
+    "concurrencyParity": {
+        "passed": true,
+        "atUtc": "2026-11-19T04:55:29.976078+00:00",
+        "oldWorkers": 4,
+        "newWorkers": 8,
+        "logicalControlRows": 16,
+        "allCompleteNativeOutcomesExactlyEqual": true,
+        "allCasesAndRngAndBudgetsUnchanged": true,
+        "newIndependentData": false,
+        "timingsAreNotAIComputeQualification": true,
+        "defaultChanged": false
+    }
+}

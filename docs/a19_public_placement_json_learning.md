@@ -83,3 +83,36 @@ other prior source/input files remain exact. Explicitly fund at most126
 additional existing-game engineering controls before new labels; they never
 enter training or model selection. Automatic game retries, cutoff extensions,
 invalid-label substitution and partial fitting remain prohibited.
+
+## Float32 audit correction and exact-cache continuation
+
+The original independent cross-host checker stopped on a last-bit Float64
+regeneration difference. The [fixed tensor-contract audit](evidence/a19_public_placement_float32_audit_continuation_20261119.json)
+checked all1,064,448 coordinates in the affected HFT block:384 differed by at
+most2.7755575615628914e-17, while **every actual Float32 tensor byte matched**.
+All342 native outcomes, source/cache/input bindings and witnesses in that block
+pass. Keep the original false audit failure; do not alter its files or logs.
+
+Separate analysis source8cf5e842 implements the registered Float32 identity
+contract exactly and additionally bounds native-double regeneration by
+`8 * Number.EPSILON * max(1, abs(a), abs(b))`. Four corrupted inputs are rejected.
+The final native prediction tolerance1e-4 and exact policy choices are unchanged;
+native validation evaluates regenerated native features. The original producer
+sourceb8d7f4ed, input bank, cached outcomes, proposals and final80 trainer remain
+byte-identical. No phenotype or model recipe is changed.
+
+All640 completed logical labels /556 unique native inputs across the first
+three blocks passed the corrected independent audit. Canonical exact-input cache
+continuation retains every completed input and schedules unfinished tasks only.
+Preserve cancelled prefixes and acknowledge that an interrupted, unacknowledged
+attempt may have run; do not invent an exact attempted-game count. Native-invalid
+outcomes are never retried or excluded. The physical-label count is the number
+of unique valid canonical cache keys, with continuation execution deltas retained
+separately. All36,864 logical labels are still required before fitting.
+
+An external operational scheduler uses eight Mac, six HFT and twelve Puffalo
+workers with the same full per-game H64/R2 work. A separate existing-case
+cold/pooled/warm8-worker benchmark must match before Mac continuation. Families
+stay on their original hosts; parallel collection timings are not algorithm CPU
+qualification. The original10:00/11:00 UTC deadlines and all intelligence gates
+remain fixed. No partial fitting or automatic activation follows.

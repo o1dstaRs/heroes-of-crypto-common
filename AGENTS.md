@@ -23,6 +23,17 @@ policies/models/gates/deadlines; do not call it new independent data or a native
 label retry. Preserve the failed6169a81c attempt. No automatic invalid-game retry,
 input substitution, partial fitting or deadline extension follows.
 
+The independent Float64 equality check later produced a false audit failure:
+all1,064,448 affected coordinates have identical actual Float32 tensor bytes.
+Read the appended Float32 correction and evidence. Separate analysis source
+`8cf5e842` reverified640 completed logical labels, retaining the unchanged
+`b8d7f4ed` producer, inputs, cache keys/outcomes, fitter and policy gates. Resume
+only canonical unfinished tasks; never retry a native-invalid outcome or count
+old labels as new independent data. The operational Mac pool is8 after an exact
+old-case parity control, HFT6/Puff12; full per-game work and host assignments stay
+fixed. Final CPU-policy choices must still exactly match and numerical error stay
+within1e-4. Complete-data and original cutoff requirements remain mandatory.
+
 ## Audited collection stopped in engineering — November 19, 2026
 
 The `22a4a8bf` label source failed strict JSON encoding of an optional native
