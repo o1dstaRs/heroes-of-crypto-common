@@ -88,9 +88,7 @@ describe("first-contact research design", () => {
         expect(before).toBe(1);
         expect(decisions).toBeGreaterThan(0);
         expect(turns).toBeGreaterThan(0);
-        const { elapsedMs: _a, ...a } = original;
-        const { elapsedMs: _b, ...b } = observed;
-        expect(a).toEqual(b);
+        expect({ ...original, elapsedMs: 0 }).toEqual({ ...observed, elapsedMs: 0 });
     });
     test("the new candidate crosses all nine budget pairings and stays a distinct experiment", () => {
         expect(
@@ -137,9 +135,7 @@ describe("first-contact research design", () => {
         expect(Math.abs(changes[0].before.y - changes[0].after.y)).toBeLessThanOrEqual(2);
         expect(first.groundMeleeStacks).toBe(control.groundMeleeStacks);
         expect(first.groundMeleeStacks).toBeGreaterThanOrEqual(2);
-        const { elapsedMs: _first, ...a } = first;
-        const { elapsedMs: _second, ...b } = second;
-        expect(a).toEqual(b);
+        expect({ ...first, elapsedMs: 0 }).toEqual({ ...second, elapsedMs: 0 });
     });
     test("the congestion proposal is invariant to hidden enemy deployment changes", () => {
         const variants = (["current", "compact", "spread"] as const).map((formation) =>
@@ -249,7 +245,8 @@ describe("first-contact research design", () => {
     test("a changed real-engine case is reproducible and completes without rejected actions", () => {
         const job = {
             cohort: "ranked-draft" as const,
-            pair: 18,
+            // Current balance preserves an accepted swap here; pair 18 now keeps its incumbent.
+            pair: 25,
             map: 1 as const,
             side: "green" as const,
             formation: "current" as const,
@@ -263,9 +260,7 @@ describe("first-contact research design", () => {
         expect(a.actualSwap).toBe(true);
         expect(a.rejected + a.opponentRejected).toBe(0);
         expect(a.endReason).toBe("elimination");
-        const { elapsedMs: _a, ...first } = a;
-        const { elapsedMs: _b, ...second } = b;
-        expect(first).toEqual(second);
+        expect({ ...a, elapsedMs: 0 }).toEqual({ ...b, elapsedMs: 0 });
     });
     test("records real melee contact in a headless fight", () => {
         const result = playFirstContactJob({

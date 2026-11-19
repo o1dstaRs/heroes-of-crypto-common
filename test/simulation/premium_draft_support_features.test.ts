@@ -33,9 +33,10 @@ describe("research draft support descriptors", () => {
         const base = [c.PEASANT, c.ORC, c.HEALER, c.SATYR, c.ANGEL];
         const cannon = fields([...base, c.TSAR_CANNON]);
         const blackDragon = fields([...base, c.BLACK_DRAGON]);
-        const hydra = fields([...base, c.HYDRA]);
+        const abomination = fields([...base, c.ABOMINATION]);
         expect(cannon.healRecipientBodyHp).toBeCloseTo(blackDragon.healRecipientBodyHp);
-        expect(hydra.healRecipientBodyHp).toBeGreaterThan(cannon.healRecipientBodyHp);
+        // Use a recipient with more HP than the Angel already in the base roster. Hydra now ties it.
+        expect(abomination.healRecipientBodyHp).toBeGreaterThan(cannon.healRecipientBodyHp);
         const cannonHp = creatureInfo(c.TSAR_CANNON)!.hp / creatureInfo(c.TSAR_CANNON)!.exp;
         const sumHp = [...base, c.TSAR_CANNON].reduce((s, id) => s + creatureInfo(id)!.hp / creatureInfo(id)!.exp, 0);
         expect(cannon.resurrectableAllyHpPerExperience).toBeCloseTo((sumHp - cannonHp) / 6);

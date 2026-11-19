@@ -187,13 +187,14 @@ describe("Healer recovery estimates and research spell selection", () => {
                 f.add("Squire", "Life", 10, { x: 14, y: 7 }, f.enemyTeam);
                 f.start();
                 target.applyDamage(300, 0, new SceneLogMock());
+                const damagedHp = target.getHp();
                 const selected = f.choose(f.cast("Spiritual Armor", idle));
                 expect(selected.reason).toBe("support-value");
                 expect(selected.actions[0]).toMatchObject({ spellName: "Heal", targetId: target.getId() });
                 const heal = selected.proposals.find((p) => p.spellName === "Heal" && p.targetId === target.getId())!;
                 expect(heal.recoveredHp).toBe(100);
                 expect(f.engine.apply(selected.actions[0]).completed).toBe(true);
-                expect(target.getHp()).toBe(300);
+                expect(target.getHp() - damagedHp).toBe(100);
             });
         }
     }

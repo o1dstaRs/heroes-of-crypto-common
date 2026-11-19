@@ -27,7 +27,8 @@ describe("ranked AI uses scouting to draft", () => {
         for (const doctrine of [Doctrine.SEE_ALL, Doctrine.THREE_REVEALS]) {
             let checked = false;
             resolveRankedDraftPick(
-                291,
+                // Current balance keeps both ban- and map-sensitive opening choices on this seed.
+                555,
                 genome,
                 genome,
                 { left: setup, right: setup, leftDoctrine: doctrine },
