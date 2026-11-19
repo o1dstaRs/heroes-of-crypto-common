@@ -155,3 +155,9 @@ allows exactly two known-exposed-case diagnostic games, one per node. It must
 retain the SAME invalid warning and reproduce the full original raw outcome
 exactly while observing the actual native route/rejection calls. It cannot make
 a training label, change policy, rescue this failed study or establish strength.
+
+Before any diagnostic game executed, preparation v2 added unconditional raw
+outcome/telemetry preservation before validation. The original v1 remains
+unexecuted; [v2](evidence/a19_invalid_scavenger_move_diagnosis_registration_v2_20261119.json)
+keeps the TOTAL budget at two known diagnostic games and the same native runtime
+environment, exact-outcome requirement, invalid warning and 10:00 UTC deadline.

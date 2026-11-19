@@ -1,0 +1,44 @@
+{
+    "schema": 1,
+    "id": "read-only-invalid-scavenger-move-diagnosis-20261119-v2",
+    "registeredAtUtc": "2026-11-19T08:54:45.598914+00:00",
+    "scope": "Separate diagnostics of one already exposed invalid move. The collection stays CLOSED INCOMPLETE. No retry for data, reclassification, valid label or strength/cost inference.",
+    "fullDiagnosticGamesBudget": 2,
+    "hostAssignments": {
+        "hft": 1,
+        "puffalo": 1
+    },
+    "onlyExposedInput": {
+        "case": "paired-placement-m1-op1-o1-scan0102-team2-future1",
+        "proposal": 7,
+        "originalNativeOutcomeDigest": "ffd340fa5b38d62eaf86c6242bd3a63598e266252ae1e7614626f2cf371a865b",
+        "failedNativeCacheKey": "5cdd79b27f12645ecc1442cc24b0505a8fdbd44806856ec9f0fd2236262b69db"
+    },
+    "expectedWarningUnchanged": "move_unit invalid_move",
+    "nativeProducerUnchanged": "794b281e",
+    "operationalParentUnchanged": "1f30d785",
+    "scriptSha256": "906ba3001cf9e6a69c0a946f5a205ef5e8ff6e65d33ea46f928e93f76cf91e07",
+    "observer": "Wrap only the actual failing apply, route validation/known-path callback and native rejection. Return identical native values/references; restore original descriptors. Capture current unit steps/position/buffs, actual authoritative routes and rejection location. No extra policy search, game events or action edits.",
+    "acceptance": "Full original raw native outcome hash EXACT on each node, same invalid warning, one actual failing move trace. A failed observational parity control stays failed, no automatic replay.",
+    "trainingEligible": false,
+    "newIndependentData": false,
+    "oldCollectionRemainsClosed": true,
+    "noPolicyOrModelOrGatesChanged": true,
+    "deadlineUtc": "2026-11-19T10:00:00Z",
+    "automaticPromotionOrDeployment": false,
+    "supersedesUnexecutedPreparationV1": true,
+    "v1DiagnosticGamesExecuted": 0,
+    "fullDiagnosticGamesBudgetAcrossBothRevisions": 2,
+    "sourceCorrection": "Always preserve raw outcome, actual digest and full telemetry BEFORE checking observational parity. No input/policy/observation/gate/deadline change; v1 was never executed.",
+    "runtimeEnvironment": {
+        "NODE_ENV": "test",
+        "TZ": "UTC",
+        "HOC_ARANGODB_HOST": "",
+        "HOC_REDIS_HOST": "",
+        "HOC_REDIS_QUEUE": "false",
+        "HOC_REDIS_PUBSUB": "false",
+        "HOC_REDIS_SESSIONS": "false",
+        "HOC_REDIS_SHARED_STATE": "false",
+        "HOC_BOT_SEARCH": "1"
+    }
+}
