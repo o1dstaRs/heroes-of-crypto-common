@@ -455,7 +455,7 @@
         },
         "Satyr": {
             "name": "Satyr",
-            "hp": 16,
+            "hp": 15,
             "steps": 3.9,
             "initiative": 4,
             "armor": 12,
@@ -468,7 +468,7 @@
             "shot_distance": 0,
             "magic_resist": 5,
             "movement_type": "WALK",
-            "exp": 28.2,
+            "exp": 26.79,
             "size": 1,
             "level": 2,
             "spells": [

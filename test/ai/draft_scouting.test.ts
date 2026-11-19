@@ -24,11 +24,14 @@ const phaseActors = LIVE_PICK_PHASES.map((phase) => phase.actors);
 
 describe("ranked AI uses scouting to draft", () => {
     test("Spymaster's early map and both scouting doctrines' early bans change an opening build", () => {
-        for (const doctrine of [Doctrine.SEE_ALL, Doctrine.THREE_REVEALS]) {
+        // Keep each doctrine's fixture sensitive to its legal information on the current unit costs.
+        for (const [doctrine, seed] of [
+            [Doctrine.SEE_ALL, 1528],
+            [Doctrine.THREE_REVEALS, 388],
+        ] as const) {
             let checked = false;
             resolveRankedDraftPick(
-                // Current balance keeps both ban- and map-sensitive opening choices on this seed.
-                555,
+                seed,
                 genome,
                 genome,
                 { left: setup, right: setup, leftDoctrine: doctrine },
