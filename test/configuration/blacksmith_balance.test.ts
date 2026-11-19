@@ -15,9 +15,9 @@ import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 
 describe("Blacksmith balance", () => {
-    it("loads Blacksmith with 11 base armor", () => {
+    it("loads Blacksmith with 12 base armor", () => {
         const blacksmith = getCreatureConfig(PBTypes.TeamVals.LEFT, "Life", "Blacksmith", "blacksmith_512", 1);
 
-        expect(blacksmith.base_armor).toBe(11);
+        expect(blacksmith.base_armor).toBe(12);
     });
 });

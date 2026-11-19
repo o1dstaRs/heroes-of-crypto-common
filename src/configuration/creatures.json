@@ -6,7 +6,7 @@
             "hp": 9,
             "steps": 3.6,
             "initiative": 2.5,
-            "armor": 11,
+            "armor": 12,
             "attack_type": "MELEE",
             "attack": 9,
             "attack_damage_min": 2,
@@ -141,7 +141,7 @@
         },
         "Healer": {
             "name": "Healer",
-            "hp": 13,
+            "hp": 14,
             "steps": 3.2,
             "initiative": 4.1,
             "armor": 13,
@@ -455,7 +455,7 @@
         },
         "Satyr": {
             "name": "Satyr",
-            "hp": 15,
+            "hp": 16,
             "steps": 3.9,
             "initiative": 4,
             "armor": 12,
@@ -899,10 +899,10 @@
         },
         "Hydra": {
             "name": "Hydra",
-            "hp": 190,
+            "hp": 180,
             "steps": 6.1,
             "initiative": 6.2,
-            "armor": 33,
+            "armor": 32,
             "attack_type": "MELEE",
             "attack": 33,
             "attack_damage_min": 40,
@@ -920,7 +920,7 @@
         },
         "Abomination": {
             "name": "Abomination",
-            "hp": 500,
+            "hp": 525,
             "steps": 4.2,
             "initiative": 3.3,
             "armor": 47,
@@ -1016,7 +1016,7 @@
     "Might": {
         "Mermaid": {
             "name": "Mermaid",
-            "hp": 11,
+            "hp": 12,
             "steps": 4.5,
             "initiative": 5,
             "armor": 9,

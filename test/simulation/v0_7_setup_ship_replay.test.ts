@@ -174,7 +174,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // An in-memory old-armor control reproduces the previous digest; two new-armor runs agree with zero
 // rejected actions across all eight fights. The Battle Mage health change above remains included.
 // Previous digest: 38bdbe1d4e533c937285d6abd9abd3cc0ea66d89a6b0b8200c7d0ed6d96680e2.
-const EXPECTED_REPLAY_SHA256 = "a0402edc4096ef6abcb089494176996c3970d99934c70d6f1fb0719b2a8afacf";
+// Re-pinned 2026-11-19 for Mermaid/Satyr/Healer/Abomination HP buffs, Blacksmith armor +1,
+// and Hydra HP -10/armor -1. The in-memory old-stat control restores the previous digest;
+// two new-stat runs agree with zero rejected actions across all eight fights.
+// Previous digest: a0402edc4096ef6abcb089494176996c3970d99934c70d6f1fb0719b2a8afacf.
+const EXPECTED_REPLAY_SHA256 = "e9da2d3035da5538cf41c7f0a12ef60bfcbeb802bbd16e0b3d9d8a866abbeb5a";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

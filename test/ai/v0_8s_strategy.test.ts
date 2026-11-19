@@ -215,7 +215,10 @@ describe("v0.8 search measurement alias", () => {
         // Re-pinned 2026-11-05 for Abomination +2 armor, Healer +1 and Blacksmith +1. The old-armor
         // control restores aa5a6f53ac14d4bab234928e98069b330c0f2e2ebd1f8e4e11f5f81001050f4f;
         // two updated runs agree with zero rejected actions.
-        expect(digest("v0.7")).toBe("855a02781d7fda61e46203e9dde56b97535b8588bcbceb423c14a322182defeb");
+        // Re-pinned 2026-11-19 for the requested six-unit HP/armor balance pass. The old-stat control
+        // restores 855a02781d7fda61e46203e9dde56b97535b8588bcbceb423c14a322182defeb;
+        // two new-stat runs agree with zero rejected actions.
+        expect(digest("v0.7")).toBe("d4a8968f557e31206a64a70629e5b9df45442d579f1b7397561703e533dcd8fa");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -256,7 +259,10 @@ describe("v0.8 search measurement alias", () => {
         // ad13ab7449c986e8e53ceafae5af3305afce41113c39feceaafefc7f6ee29b53; two updated runs agree.
         // The same 2026-11-05 armor changes move this trace. The old-armor control restores
         // 6157cbf8d772939d93da0b55db9a5829ef846d979329c3d073c1a5acafcf734c; two updated runs agree.
-        expect(digest("v0.8")).toBe("917c16b76a800c614b0a6d82b5e53684d477aecedafd821962b30848fc4cf17c");
+        // The same 2026-11-19 balance pass moves this trace. The old-stat control restores
+        // 917c16b76a800c614b0a6d82b5e53684d477aecedafd821962b30848fc4cf17c;
+        // two new-stat runs agree with zero rejected actions.
+        expect(digest("v0.8")).toBe("6b3b3bd63c98e361c9b588367108cf3552d7ab985f9c66afc9de7a95c3e96c84");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

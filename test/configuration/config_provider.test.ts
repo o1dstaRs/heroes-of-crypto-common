@@ -134,8 +134,8 @@ describe("config_provider", () => {
     it("loads Hydra's durability", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Hydra", "hydra_512", 0, 500);
 
-        expect(creature.hp).toBe(190);
-        expect(creature.base_armor).toBe(33);
+        expect(creature.hp).toBe(180);
+        expect(creature.base_armor).toBe(32);
     });
 
     // Owner request 2026-10-22: damage floor 35 -> 40. The ceiling stays 60.
@@ -261,9 +261,8 @@ describe("config_provider", () => {
     it("loads the one-unit Abomination balance and stack-powered Flesh Shield metadata", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Abomination", "abomination_512", 0, 1000);
 
-        // The requested one-unit tank profile: a 1,000-XP stack is exactly one 500-HP creature
-        // (owner balance pass 2026-09-13: 550 -> 500).
-        expect(creature.max_hp).toBe(500);
+        // The requested one-unit tank profile remains one creature per 1,000 XP.
+        expect(creature.max_hp).toBe(525);
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(3.3);
         // Owner balance pass 2026-11-05: armor 45 -> 47.
