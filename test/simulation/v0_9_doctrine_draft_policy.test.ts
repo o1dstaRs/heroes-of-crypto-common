@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
+import { creatureInfo } from "../../src/ai/setup/creature_score";
 import { isRankedDraftStrengthPolicy } from "../../src/ai/setup/draft_strength_prior";
+import creatures from "../../src/configuration/creatures.json";
 import { Doctrine } from "../../src/doctrines/doctrine_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { creaturesByLevel } from "../../src/simulation/army";
 import type { IMatchConfig, IMatchResult } from "../../src/simulation/battle_engine";
 import {
     playRankedDraftGame,
@@ -20,6 +23,22 @@ import fixture from "./fixtures/doctrine_draft_v3_replay.json";
 
 if (!isRankedDraftStrengthPolicy(fixture.draft)) throw new Error("Unknown historical draft policy");
 const genome = rankedDraftStrengthCandidate(fixture.draft);
+
+// This immutable 2026-11-04 fixture predates Satyr's 5% XP discount. Keep the real draft and
+// stack-size calculations on that recorded cost, then restore every live catalog view.
+const withHistoricalSatyrCost = (replay: () => void) => () => {
+    const info = creatureInfo(PBTypes.CreatureVals.SATYR)!;
+    const catalog = creaturesByLevel(2).find((entry) => entry.creatureName === "Satyr")!;
+    const before = { source: creatures.Nature.Satyr.exp, info: info.exp, catalog: catalog.exp };
+    creatures.Nature.Satyr.exp = info.exp = catalog.exp = 28.2;
+    try {
+        replay();
+    } finally {
+        creatures.Nature.Satyr.exp = before.source;
+        info.exp = before.info;
+        catalog.exp = before.catalog;
+    }
+};
 
 // These tests compare recorded drafts and setups, without simulating or asserting battle outcomes.
 const skippedFight = (config: IMatchConfig): IMatchResult => ({
@@ -79,51 +98,56 @@ describe("reusable locked doctrine draft policy", () => {
         }
     });
 
-    test("reproduces historical setups, decisions and collision counts across doctrines and seats", () => {
-        expect(fixture.rows).toHaveLength(49);
-        for (const row of fixture.rows) {
-            const decisions: IDoctrineDraftResearchDecision[] = [];
-            const record = playRankedDraftGame(
-                genome,
-                genome,
-                {
-                    gamesPerOpponent: 8,
-                    baseSeed: row.seed,
-                    mapTypes: [row.map],
-                    fightProfile: "a19",
-                    maxLaps: 256,
-                    liveDraftRules: true,
-                    sideBoard: true,
-                    deterministicSearch: true,
-                    liveSynergyVariants: true,
-                    tacticalSplits: true,
-                    candidateSetupPolicySpec: fixture.setup,
-                    opponentSetupPolicySpec: fixture.setup,
-                    candidateDoctrinePolicy: row.candidateDoctrinePolicy as ScoutingDoctrine,
-                    opponentDoctrinePolicy: row.opponentDoctrinePolicy as ScoutingDoctrine,
-                },
-                row.game,
-                0,
-                {
-                    researchCandidateDraftChoices: createLockedDoctrineDraftResearchChoices({
-                        genome,
-                        doctrine: row.candidateDoctrinePolicy as ScoutingDoctrine,
-                        synergyVariants: synergyVariantsForSeed(`ranked-draft-${permuteRankedDraftSeed(row.seed + 1)}`),
-                        maskAdvanceInformation: row.condition === "masked",
-                        onDecision: (decision) => decisions.push(decision),
-                    }),
-                    matchRunner: skippedFight,
-                },
-            );
-            expect(record.setupFingerprint).toBe(row.setupFingerprint);
-            expect(record.collisions).toBe(row.collisions);
-            expect(fingerprintV09(decisions)).toBe(row.decisionsSha256);
-            expect(decisions.filter((decision) => decision.chosen !== decision.preferred).length).toBeLessThanOrEqual(
-                1,
-            );
-            if (row.candidateDoctrinePolicy === "see-none") expect(decisions).toEqual([]);
-        }
-    });
+    test(
+        "reproduces historical setups, decisions and collision counts across doctrines and seats",
+        withHistoricalSatyrCost(() => {
+            expect(fixture.rows).toHaveLength(49);
+            for (const row of fixture.rows) {
+                const decisions: IDoctrineDraftResearchDecision[] = [];
+                const record = playRankedDraftGame(
+                    genome,
+                    genome,
+                    {
+                        gamesPerOpponent: 8,
+                        baseSeed: row.seed,
+                        mapTypes: [row.map],
+                        fightProfile: "a19",
+                        maxLaps: 256,
+                        liveDraftRules: true,
+                        sideBoard: true,
+                        deterministicSearch: true,
+                        liveSynergyVariants: true,
+                        tacticalSplits: true,
+                        candidateSetupPolicySpec: fixture.setup,
+                        opponentSetupPolicySpec: fixture.setup,
+                        candidateDoctrinePolicy: row.candidateDoctrinePolicy as ScoutingDoctrine,
+                        opponentDoctrinePolicy: row.opponentDoctrinePolicy as ScoutingDoctrine,
+                    },
+                    row.game,
+                    0,
+                    {
+                        researchCandidateDraftChoices: createLockedDoctrineDraftResearchChoices({
+                            genome,
+                            doctrine: row.candidateDoctrinePolicy as ScoutingDoctrine,
+                            synergyVariants: synergyVariantsForSeed(
+                                `ranked-draft-${permuteRankedDraftSeed(row.seed + 1)}`,
+                            ),
+                            maskAdvanceInformation: row.condition === "masked",
+                            onDecision: (decision) => decisions.push(decision),
+                        }),
+                        matchRunner: skippedFight,
+                    },
+                );
+                expect(record.setupFingerprint).toBe(row.setupFingerprint);
+                expect(record.collisions).toBe(row.collisions);
+                expect(fingerprintV09(decisions)).toBe(row.decisionsSha256);
+                expect(
+                    decisions.filter((decision) => decision.chosen !== decision.preferred).length,
+                ).toBeLessThanOrEqual(1);
+                if (row.candidateDoctrinePolicy === "see-none") expect(decisions).toEqual([]);
+            }
+        }),
+    );
 
     test("a collided alternative consumes the override, and the next draft gets its own allowance", () => {
         const { doctrine, synergyVariants, previous, current } = fixture.collisionExample;

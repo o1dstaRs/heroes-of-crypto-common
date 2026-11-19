@@ -86,13 +86,20 @@ test("the serving adapter applies the confirmed choice without modifying inputs 
         };
         const incumbent = new Map(sample.input.bodies.map((b, i) => [b.id, { ...sample.baseline[i] }]));
         const before = JSON.stringify([...incumbent]);
-        // Confirmation fixtures use their recorded HP independently of later live balance changes.
+        // Confirmation fixtures keep their recorded HP and pre-discount Satyr cost. Later live
+        // balance changes must not turn the historical stack quantity into an unfunded input.
         const recordedHp = new Map(sample.input.bodies.map((b) => [b.creature, b.hp]));
         const readCreatureInfo = creatureScore.creatureInfo;
         const catalog = spyOn(creatureScore, "creatureInfo").mockImplementation((id) => {
             const info = readCreatureInfo(id);
             const hp = recordedHp.get(id);
-            return info && hp !== undefined ? { ...info, hp } : info;
+            return info
+                ? {
+                      ...info,
+                      ...(hp !== undefined ? { hp } : {}),
+                      ...(info.name === "Satyr" ? { exp: 28.2 } : {}),
+                  }
+                : info;
         });
         try {
             expect(buildPlacementInput(units, context)).toEqual(sample.input);

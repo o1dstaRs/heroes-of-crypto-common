@@ -206,7 +206,7 @@ describe("v0.7 fixed archetype definitions", () => {
             ["Squire", 132],
             ["Berserker", 109],
             ["Healer", 40],
-            ["Satyr", 36],
+            ["Satyr", 38], // 1,000 XP at the discounted 26.79 XP per creature.
             ["Crusader", 8],
             ["Hydra", 2],
         ]);
