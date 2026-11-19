@@ -1,0 +1,251 @@
+{
+    "schema": 1,
+    "id": "paired-public-placement-native-invalid-move-closeout-20261119",
+    "atUtc": "2026-11-19T08:50:16.498233+00:00",
+    "status": "closed-incomplete",
+    "nativeProducer": "794b281e",
+    "operationsSource": "1f30d785",
+    "stopAtUtc": "2026-11-19T08:28:59.594447+00:00",
+    "completeBlocks": 12,
+    "logicalLabelsVerified": 768,
+    "uniquePhysicalGamesVerified": 711,
+    "failure": {
+        "host": "hft",
+        "block": "training-b006",
+        "case": "paired-placement-m1-op1-o1-scan0102-team2-future1",
+        "selectedProposal": 7,
+        "actor": "enemy Scavenger",
+        "actorTeam": 1,
+        "move": {
+            "from": [8, 6],
+            "to": [4, 6]
+        },
+        "warning": "move_unit invalid_move",
+        "engineRandomDrawsObserved": 0,
+        "fullMoveStateWitnessAvailable": false,
+        "genericUnsupportedDiagnosticFlagsDoNotProveStateOrRandomMutation": true,
+        "originalInvalidOutcomeRawDigest": "ffd340fa5b38d62eaf86c6242bd3a63598e266252ae1e7614626f2cf371a865b"
+    },
+    "preservation": {
+        "passed": true,
+        "completeBlocks": 12,
+        "logicalLabels": 768,
+        "uniquePhysicalGames": 711,
+        "bothCompleteArchiveCopiesAndAllMembersVerified": true,
+        "bothInterruptedPrefixArchivesReplicatedAndAllMembersVerified": true,
+        "prefixesRemainUnvalidatedAndUnfitted": true,
+        "nativeInvalidMoveRemainsInvalid": true,
+        "proofs": {
+            "hft": {
+                "passed": true,
+                "host": "hft",
+                "prefixArchive": "stopped-native-prefix-hft.tar.gz",
+                "archiveSha256": "55149887e4d2ad629b444a1ab1552d7bef6123bab73dc8fe917dd60af8b59047",
+                "archiveBytes": 1876794,
+                "regularMembersVerified": 104,
+                "completeArchives": [
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b000.tar.gz",
+                        "sha256": "8c89a5c0b8c045ba1c73d1748125d683762e8cdf3054e833546d74cd3b910bff",
+                        "bytes": 4210635,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b001.tar.gz",
+                        "sha256": "5836f085e27bef6bfb85995eb90d8fce60a8b7fa3559074a2626114851020c52",
+                        "bytes": 4299888,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b002.tar.gz",
+                        "sha256": "ab54b75714261979d9cec75446c568c1c16a225cbb51939e8312203564669ed0",
+                        "bytes": 4301828,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b003.tar.gz",
+                        "sha256": "8579e69b311554113d001a601c036a4f0daba6907749018475e2ebe2929444bc",
+                        "bytes": 4164459,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b004.tar.gz",
+                        "sha256": "beaaba35a04fa64cb769514b6956f3f4fce3391e5df2e0932056988ac2073d20",
+                        "bytes": 4068465,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b005.tar.gz",
+                        "sha256": "4661e9bb48d20c5f8fff2d0fe638cd268f6d038d95958afd04fa77d94c1523f9",
+                        "bytes": 4317280,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b000.tar.gz",
+                        "sha256": "2a7eb8a768959b9b8634515a33737ef3c59e5843ae3637d335e629c08f3ee367",
+                        "bytes": 4017631,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b001.tar.gz",
+                        "sha256": "b7474a3eb6d9adc5906688fad5d593f48981bcc1613bde29417cbdab7656febe",
+                        "bytes": 4029541,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b002.tar.gz",
+                        "sha256": "d9d364956927f252d9bc429156e0ae3b2a09e0f5040cf3766b2d78bd8d44bfb6",
+                        "bytes": 4192033,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b003.tar.gz",
+                        "sha256": "91eb67928306582a9a8f4ba7dd031a7aaf8b9c98a10a110f3cb8912f35db62ed",
+                        "bytes": 4021127,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b004.tar.gz",
+                        "sha256": "efd017dc17bb0f0f0415b1a2eaaf4f36ef703c99d07028407ce2b8e41cc9246e",
+                        "bytes": 4233023,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b005.tar.gz",
+                        "sha256": "70120e87ef4d5c426e1670faf6ae95988aac418b98d0937dbb39cd9233279605",
+                        "bytes": 4371002,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    }
+                ],
+                "completeLogicalLabels": 768,
+                "trainingOrResumePermitted": false
+            },
+            "puffalo": {
+                "passed": true,
+                "host": "puffalo",
+                "prefixArchive": "stopped-native-prefix-puffalo.tar.gz",
+                "archiveSha256": "05646a4124a398781bd0632b528ef3c99856fa74d8c0239657c4c7a295cfee35",
+                "archiveBytes": 375343,
+                "regularMembersVerified": 32,
+                "completeArchives": [
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b000.tar.gz",
+                        "sha256": "8c89a5c0b8c045ba1c73d1748125d683762e8cdf3054e833546d74cd3b910bff",
+                        "bytes": 4210635,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b001.tar.gz",
+                        "sha256": "5836f085e27bef6bfb85995eb90d8fce60a8b7fa3559074a2626114851020c52",
+                        "bytes": 4299888,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b002.tar.gz",
+                        "sha256": "ab54b75714261979d9cec75446c568c1c16a225cbb51939e8312203564669ed0",
+                        "bytes": 4301828,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b003.tar.gz",
+                        "sha256": "8579e69b311554113d001a601c036a4f0daba6907749018475e2ebe2929444bc",
+                        "bytes": 4164459,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b004.tar.gz",
+                        "sha256": "beaaba35a04fa64cb769514b6956f3f4fce3391e5df2e0932056988ac2073d20",
+                        "bytes": 4068465,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-hft-training-b005.tar.gz",
+                        "sha256": "4661e9bb48d20c5f8fff2d0fe638cd268f6d038d95958afd04fa77d94c1523f9",
+                        "bytes": 4317280,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b000.tar.gz",
+                        "sha256": "2a7eb8a768959b9b8634515a33737ef3c59e5843ae3637d335e629c08f3ee367",
+                        "bytes": 4017631,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b001.tar.gz",
+                        "sha256": "b7474a3eb6d9adc5906688fad5d593f48981bcc1613bde29417cbdab7656febe",
+                        "bytes": 4029541,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b002.tar.gz",
+                        "sha256": "d9d364956927f252d9bc429156e0ae3b2a09e0f5040cf3766b2d78bd8d44bfb6",
+                        "bytes": 4192033,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b003.tar.gz",
+                        "sha256": "91eb67928306582a9a8f4ba7dd031a7aaf8b9c98a10a110f3cb8912f35db62ed",
+                        "bytes": 4021127,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b004.tar.gz",
+                        "sha256": "efd017dc17bb0f0f0415b1a2eaaf4f36ef703c99d07028407ce2b8e41cc9246e",
+                        "bytes": 4233023,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    },
+                    {
+                        "path": "label-archives/paired-native-labels-v2-puffalo-training-b005.tar.gz",
+                        "sha256": "70120e87ef4d5c426e1670faf6ae95988aac418b98d0937dbb39cd9233279605",
+                        "bytes": 4371002,
+                        "logicalGames": 64,
+                        "rawMemberIndexPassed": true
+                    }
+                ],
+                "completeLogicalLabels": 768,
+                "trainingOrResumePermitted": false
+            }
+        },
+        "noFitOrValidationSelectionOrResume": true,
+        "metadataObservationCorrection": "Compact JSON re-poll of already completed preservation handles; no job or game replay"
+    },
+    "nativeControllersAndChildrenVerifiedStoppedBothNodes": true,
+    "fitterStarted": false,
+    "validationEffectStatisticsOpened": false,
+    "closedNamespace": {
+        "namespace": "native-public-placement-paired-data-20261119-v1",
+        "roles": ["draft", "setup-a", "setup-b", "reverse-a", "reverse-b", "terrain"],
+        "countersPerRole": 32768,
+        "expandedReservedChannels": 2293095,
+        "allScannedRejectedUnusedUnselectedExcluded": true,
+        "draftRawAndPermutedOffsets0Through31": true,
+        "terrainRawAndSimSearchChannels": true
+    },
+    "noResumeOrExtensionOrPartialFitOrReclassification": true,
+    "defaultRemainsV13": true,
+    "newStrengthOrCostQualified": false,
+    "separateExposedCaseDiagnosisPermittedOnlyUnderItsOwnProspectiveRegistration": true
+}

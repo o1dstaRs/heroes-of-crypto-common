@@ -1,5 +1,26 @@
 # Agent guidance
 
+## Closed paired placement after invalid native move — November 19, 2026
+
+Read the closeout in `docs/a19_public_placement_pair_learning.md`. The paired
+study is CLOSED INCOMPLETE after a native enemy Scavenger move_unit/invalid_move
+at 08:28:59 UTC. Preserve 768 logical / 711 unique native fights in 12 complete blocks,
+both raw interrupted prefixes and rejected outcome; all are replicated and all
+member indexes verified on both nodes. Every native controller/child is stopped.
+There was no fit or validation-effect aggregation. No resume, extension, partial
+fit, case exclusion, data retry, reclassification, new gain or default activation.
+
+Exclude ALL 6 roles × 32,768 counters / 2,293,095 expanded channels in namespace
+`native-public-placement-paired-data-20261119-v1`, including rejected/unused scans,
+raw/permuted draft offsets 0..31 and terrain sim-search expansions. The FOUR older
+closed six-role reservations also remain excluded. This is a fifth closed bank.
+
+The separately registered two-game read-only Scavenger diagnosis uses only the
+exposed invalid case; it must exactly match the original full raw native outcome
+and keep its warning invalid. Its telemetry cannot fit/rescue this corpus or
+qualify strength. Unsupported observer flags did NOT establish movement state or
+RNG mutation; the move lacked the full witness and actual engine draws were zero.
+
 ## Paired-label placement preparation — November 19, 2026
 
 Read `docs/a19_public_placement_pair_learning.md` before new sampling or fitting.

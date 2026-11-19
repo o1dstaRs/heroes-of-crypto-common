@@ -126,3 +126,32 @@ This is the same unclosed study, with unchanged inputs, full 16,128-label fundin
 policies, native quality, models, fit, gates, hardware and original cutoffs. The
 failed scheduler stays failed. No partial fit, deadline extension, invalid-game
 retry, source default or measured strength gain follows from this correction.
+
+## Closed incomplete after native invalid move
+
+Collection stopped on November 19 at 08:28:59 UTC. The [closeout](evidence/a19_public_placement_pair_native_move_closeout_20261119.json)
+preserves 768 independently verified logical labels / 711 unique physical fights
+in twelve complete blocks, plus both interrupted raw prefixes and the rejected
+outcome. Every complete archive hash and member index was rechecked on both
+nodes; both raw prefix archives were copied and every member checked on each
+receiving node. All owned native controllers and children are verified stopped.
+No fitter, validation-effect aggregation, model result or new strength/cost gain exists.
+
+The failure is a native enemy Scavenger `move_unit / invalid_move`, from `(8,6)`
+toward `(4,6)`, in HFT training block b006 / proposal 7. The admitted contract
+covers only witnessed neutral melee refusals. Its generic unsupported-action
+flags do not prove state, reference or RNG mutation for this move: no complete
+move witness was captured; actual measured engine RNG draws were zero. The raw
+warning remains invalid and cannot be reclassified to fit this corpus.
+
+Do not resume this registration, fit partial labels, exclude the case, retry it
+for data, extend cutoffs or alter gates. Reserve ALL six roles × 32,768 counters
+and all 2,293,095 expanded channels in the paired namespace forever, including
+scanned/rejected/unused values; all four predecessor namespaces also stay excluded.
+Current default v13 is unchanged.
+
+A [separately registered read-only diagnosis](evidence/a19_invalid_scavenger_move_diagnosis_registration_20261119.json)
+allows exactly two known-exposed-case diagnostic games, one per node. It must
+retain the SAME invalid warning and reproduce the full original raw outcome
+exactly while observing the actual native route/rejection calls. It cannot make
+a training label, change policy, rescue this failed study or establish strength.
