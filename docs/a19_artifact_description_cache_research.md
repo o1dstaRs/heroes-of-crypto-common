@@ -33,12 +33,21 @@ The refinement moves all cache bookkeeping, getter guards and formula work behin
 the artifact-presence check in a small entry function. Five functional controls /
 28 assertions pass. Its separately registered 72-execution comparison on Puffalo
 uses stock /first cache /refinement, twice per scenario, with rotating palindromic
-arm order. Every original outcome must remain exact. Its original cutoff is
-November 19 06:30 UTC, without automatic retry, exclusion or extension.
+arm order. It completed at November 19 06:06 UTC: all 72 original outcomes remain
+exact, with 1,190 identical actual decisions per arm. Stock used 428.361116 CPU
+seconds, the first cache 434.226800 (**+1.369332%**) and the refinement 432.435217
+(**+0.951090%**). Independent verification checks every archive member, all six
+outputs per scenario, the twelve arm orders and all CPU / decision totals.
+
+The preliminary Mac saving did not reproduce on Puffalo. Both fixed candidates
+are closed inactive, with no current-engine qualification, deeper-search budget
+increase, strength claim or deployment. The original favorable result stays in
+the record; it cannot replace the larger comparison. Shared CPU load changed
+when the separate placement collection stopped during this run, another reason
+these reused timings are descriptive rather than final qualification.
 
 The [evidence record](evidence/a19_artifact_description_cache_research_20261119.json)
 binds sources, controls and the complete 53-file original archive, byte-verified on
-both nodes. Neither cache has a serving import. Current-engine qualification and
-a broad serial cost check remain required; deeper search would additionally need
-fresh strength and independent confirmation. The current default, ongoing placement
-data, fixed collection cutoffs and previous failed studies remain unchanged.
+both nodes. The complete 89-member follow-up archive is also byte-verified locally
+and on both nodes. Neither cache has a serving import. The current default,
+placement-data contracts, fixed cutoffs and previous failed studies are unchanged.
