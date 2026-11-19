@@ -59,3 +59,27 @@ Puffalo blocks. Allocation uses hardware capacity and prior host throughput,
 not outcomes; no reassignment after labels start is allowed. Every raw block
 must pass independent verification and have full byte-verified replicas on both
 nodes. Only the complete verified 36,864-label index permits the fixed 5090 fits.
+
+## Pre-label scheduler correction
+
+Execution source6169a81c stopped after HFT's successful native and transport
+controls: the scheduler read `nodeAllocation` from the model recipe instead of
+the execution registration. No registered fresh-family combat task started.
+Preserve that failed attempt and its controls; it is not a passed collection.
+
+The [prospective operational amendment](evidence/a19_public_placement_json_operational_amendment_20261119.json)
+fixes that lookup and adds a real `--inspect-plan` command, before any game or
+output directory is created. All three host selections pass with the exact
+registered family, block, worker and logical-game counts. This is a source-amended
+execution of the **same unopened input bank**, not a new independent data study
+or a retry of a fresh combat label. Inputs, family assignments, native policies,
+quality proofs, proposals, fitter, gates and all deadlines remain byte-identical.
+The original failed source is retained intact in its own capsule.
+
+New source `b8d7f4ed2a53b2d81c9c9b13d99a69c7d83bd4f147001b2a9d3a71e214c2e665`
+seals 6,177 files and27 relative links. Five files change only configuration
+selection, execution-root routing and source/registration bindings; all6,168
+other prior source/input files remain exact. Explicitly fund at most126
+additional existing-game engineering controls before new labels; they never
+enter training or model selection. Automatic game retries, cutoff extensions,
+invalid-label substitution and partial fitting remain prohibited.

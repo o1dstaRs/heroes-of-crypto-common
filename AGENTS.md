@@ -15,6 +15,14 @@ default change or promotion. Full label source/allocation is now sealed at
 allocation is 720Mac/288HFT/144Puff, four/six/twelve nice19 workers and 223 blocks.
 Only a complete independently verified 36,864-label index permits fitting.
 
+That source stopped on an operational registration lookup before any fresh
+combat task. Read the appended scheduler correction. The separately sealed
+`b8d7f4ed` execution fixes only orchestration, with a zero-game scheduler contract
+check before launch. It retains the SAME unopened registered input bank and all
+policies/models/gates/deadlines; do not call it new independent data or a native
+label retry. Preserve the failed6169a81c attempt. No automatic invalid-game retry,
+input substitution, partial fitting or deadline extension follows.
+
 ## Audited collection stopped in engineering — November 19, 2026
 
 The `22a4a8bf` label source failed strict JSON encoding of an optional native

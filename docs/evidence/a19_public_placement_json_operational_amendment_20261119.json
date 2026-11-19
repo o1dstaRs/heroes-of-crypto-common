@@ -1,0 +1,110 @@
+{
+    "schema": 1,
+    "registeredAtUtc": "2026-11-19T04:08:20.630731+00:00",
+    "parentExecutionSource": "6169a81cb9d75172c9f207731d4bc9a7df7765b19d1125c9537b58ed5c99c7dd",
+    "executionSource": "b8d7f4ed2a53b2d81c9c9b13d99a69c7d83bd4f147001b2a9d3a71e214c2e665",
+    "sourceFiles": 6177,
+    "relativeDependencyLinks": 27,
+    "operationalAmendment": {
+        "parentSourceSeal": "6169a81cb9d75172c9f207731d4bc9a7df7765b19d1125c9537b58ed5c99c7dd",
+        "parentAttempt": "closed before any registered fresh family combat; all sampler/input/model/gate/seed commitments remain fixed",
+        "reason": "Scheduler looked up nodeAllocation in data-and-fit-registration instead of label-execution-registration after successful HFT native/transport controls. Correct only operational configuration selection and validate it before any game.",
+        "freshLabelAttemptsBeforeAmendment": 0,
+        "nativePolicyAdapterQualityContractAndInputBytesUnchanged": true,
+        "freshLabelRetry": false,
+        "automaticGameRetry": false,
+        "sameRegisteredUnopenedInputBank": true,
+        "inputCutoffAlreadyMet": true,
+        "allCutoffsAndFundingAndFitterGatesUnchanged": true,
+        "additionalProspectivelyFundedKnownEngineeringControlsMax": 126,
+        "additionalEngineeringRecipe": "Same original exposed controls:24 local cold native,2 known refusal perhost,3canonical reference/pooled/warm benchmarks max96games; not labels or new independent data. Source-bound before execution.",
+        "failedOldSourceAndLogsRetained": true
+    },
+    "projectionProof": {
+        "schema": 1,
+        "passed": true,
+        "atUtc": "2026-11-19T04:10:44.325091+00:00",
+        "parentSource": "6169a81cb9d75172c9f207731d4bc9a7df7765b19d1125c9537b58ed5c99c7dd",
+        "unchangedSourceInputFiles": 6168,
+        "changedFiles": [
+            "label-controller.py",
+            "label-execution-registration.json",
+            "label-plans.json",
+            "research-transport.py",
+            "transport-plan.json"
+        ],
+        "onlyConfigurationReadRootNamespaceAndExecutionMetadataChange": true,
+        "nativeEngineCommonAdapterQualityProofFeaturesProposalsFitterAllBytesUnchanged": true,
+        "all4608CaseInputsAndAll1152FamilyAssignmentsByteIdentical": true,
+        "allFreshLabelPlansIdenticalExceptSourceBindings": true,
+        "freshLabelAttemptsInParent": 0,
+        "inputSamplingAndFamilyBankNeverRepeated": true,
+        "newIndependentStudyClaim": false,
+        "cutoffsUnchanged": true,
+        "defaultChanged": false
+    },
+    "schedulerContract": {
+        "passed": true,
+        "atUtc": "2026-11-19T04:08:21.452538+00:00",
+        "checked": [
+            {
+                "passed": true,
+                "hostKind": "local",
+                "registrationRead": "label-execution-registration.json",
+                "blocks": 180,
+                "families": 720,
+                "logicalGames": 23040,
+                "workers": 4,
+                "nice": 19,
+                "newGames": 0,
+                "processesStarted": 0
+            },
+            {
+                "passed": true,
+                "hostKind": "hft",
+                "registrationRead": "label-execution-registration.json",
+                "blocks": 24,
+                "families": 288,
+                "logicalGames": 9216,
+                "workers": 6,
+                "nice": 19,
+                "newGames": 0,
+                "processesStarted": 0
+            },
+            {
+                "passed": true,
+                "hostKind": "puffalo",
+                "registrationRead": "label-execution-registration.json",
+                "blocks": 19,
+                "families": 144,
+                "logicalGames": 4608,
+                "workers": 12,
+                "nice": 19,
+                "newGames": 0,
+                "processesStarted": 0
+            }
+        ],
+        "allFamiliesCasesBlocksAndWorkerCountsVerifiedBeforeAnySideEffect": true,
+        "modelRegistrationDeliberatelyHasNoNodeAllocation": true,
+        "newGames": 0,
+        "defaultChanged": false
+    },
+    "overlay": {
+        "sha256": "bb81b556bcfecd8bc8f3253ef11a8b19e080f1b72b33754962b01deeaf280c3f",
+        "bytes": 2021635,
+        "files": 10,
+        "completeSourceFiles": 6177,
+        "sourceSeal": "b8d7f4ed2a53b2d81c9c9b13d99a69c7d83bd4f147001b2a9d3a71e214c2e665",
+        "freshLabels": 0
+    },
+    "sameDataRegistration": "4dd8111b7b746c38b7e42fc538e81c680c4972891915628cc000f79bc77599bb",
+    "sameInputBank": "2954a6a8540631a3f93b62faca497afac96b077cc537963eee4eca939dfd5f23",
+    "cutoffsUtc": {
+        "inputSampling": "2026-11-19T04:00:00Z",
+        "labelCollection": "2026-11-19T10:00:00Z",
+        "trainingAndValidation": "2026-11-19T11:00:00Z",
+        "noAutomaticRetryOrExtension": true
+    },
+    "labelsNotStartedAtAmendment": true,
+    "defaultChanged": false
+}
