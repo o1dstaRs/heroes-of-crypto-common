@@ -20,6 +20,20 @@ No retries, exclusions, extension or automatic promotion. Fresh broad strength, 
 and overall-average +10% full-fight / weighted actual-decision CPU, including both-AI use, remain
 required. Slower subgroups are descriptive. No serving import, default change or deployment follows.
 
+That screen is now complete and **failed admission**: both arms have 1,121 wins / 36 draws /
+1,397 losses, zero score changes, twelve changed traces in nine families and thirteen returned
+root repairs with zero hypothetical edits. Read
+`docs/evidence/a19_authoritative_root_repair_results_20261119.json`. All 5,108 games, original
+native outcomes, runtime source/input/cache/winner bindings and twelve changed cold replays pass
+independent verification. The empirical [0,0] paired interval is not proof of general equivalence.
+Keep this fixed candidate inactive and closed without fresh/cost progression or subgroup rescue.
+
+The separate four-game native-refusal integrity fixture proves no rejected-handler state/RNG/UUID
+mutation in that one exposed case; it does not license other warnings or reopen partial-label fitting.
+Preserve its full source versions, raw warnings and original uncached-outcome limitation in
+`docs/evidence/a19_native_refusal_integrity_diagnosis_20261119.json`. The server's research runner
+now retains rejected outcomes outside valid cache before aborting; its quality gate is unchanged.
+
 ## Frozen public-context placement learning — November 18, 2026
 
 Read `docs/a19_public_placement_value_learning.md` before new placement learning or seed allocation.

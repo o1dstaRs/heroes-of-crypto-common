@@ -72,3 +72,46 @@ uses the three frozen placement-data layers; the old sentinel uses its original
 closed coherent archive, with one common package instance per run. Raw files
 remain outside Git in the ignored research capsules and research-host backups.
 Preserve all previous failed gates and reserved channels.
+
+The completed screen **failed admission**. All 5,108 main games finished, with
+every original native outcome reproduced, zero quality errors and all twelve
+changed candidate traces repeated exactly in cold processes. Both arms finished
+with 1,121 wins, 36 draws and 1,397 losses. No terminal score improved or worsened:
+the measured gain is zero. The empirical whole-family bootstrap interval is
+[0, 0] because every paired score is identical; this narrow exposed population
+does not establish general equivalence or safety.
+
+Only nine families changed a trace, below the registered ten-family floor.
+The +0.15-point minimum and strictly positive confidence gates also failed.
+Thirteen returned root plans were repaired across 59,381 entrant root calls,
+with zero hypothetical-policy repairs. Each arm made 120,100 actual SearchDriver
+decisions. Concurrent throughput and identical decision counts do not qualify
+representative CPU cost. Keep this fixed candidate inactive and closed: no fresh
+bank, cost progression, subgroup rescue, default change or deployment follows.
+
+The [complete compact closeout](evidence/a19_authoritative_root_repair_results_20261119.json)
+preserves all twelve changed cases, every failed gate, both return-archive hashes,
+full source bindings and the separately implemented 30,000-sample Python
+bootstrap. All archive members, actual runtime source files, inputs, cache keys,
+native winners, funded openings and changed cold outcomes passed independent
+verification. Both nodes finished before the unchanged 02:00 UTC cutoff.
+
+A separate four-game [native refusal diagnosis](evidence/a19_native_refusal_integrity_diagnosis_20261119.json)
+reproduces the failed uncached input's warning without changing policy. In that
+fixture the declined handler preserves all covered battle fields, serialized
+aliases, live unit identities/prototypes, UUID state and random stream. Exactly
+one normal authoritative-stat refresh happens before the handler; it catches up
+derived morale and auras after the preceding accepted move. The handler cannot
+find a route from the actual post-move anchor (9,7) to (11,9) and rejects before
+movement or attack effects. No engine corruption is established in this case.
+The original uncached full outcome was not retained; the four new complete cold
+outcomes agree, including its original warning. This does not license other
+warnings, fitting partial labels, resuming the closed collection or rewriting
+its zero-error gate.
+
+Server research commit `8a823170454529bcaf171d47b17f15eede17cfff` now
+preserves rejected adapter outcomes outside the valid cache before aborting a
+comparison. It does not admit them as labels. Its 1,925 server tests and local
+type/lint gates pass; GitHub's CI jobs did not start because of the account's
+payment/spending limit, so those checks cannot be reported green. No serving
+engine, protocol, default or consumer dependency is changed by these findings.

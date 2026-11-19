@@ -1,0 +1,581 @@
+{
+    "schema": 1,
+    "id": "a19-authoritative-root-melee-repair-reused-admission-20261119",
+    "status": "closed_failed_admission_no_strength_gain",
+    "registration": {
+        "schema": 1,
+        "id": "a19-authoritative-root-melee-repair-reused-admission-20261119",
+        "registeredAtUtc": "2026-11-19T00:12:36.268662+00:00",
+        "hypothesis": "Repair only final actual selected v0.8 A19 root move/melee incoherence after unchanged search, before native target-memory reconciliation. No hypothetical policy changes. This is distinct from the closed late all-policy repair, not its fresh progression.",
+        "comparator": "Frozen current v13, common9c10c836/serverd5fa16be, all defaults, budgets, weights and native setup unchanged.",
+        "eligibility": "ALL2554 native-quality-verified cached physical inputs from seven closed partial placement-data blocks, unconditional on score. All have fixed complete actual geometry/funding and training fold. Native canonicalquality failure316 stays preserved as separate already-exposed functional diagnostic; no partial-label fitting or relaunch. This is reused exposed engineering data, not fresh qualification.",
+        "candidateScope": "Acting candidateTeam only, versionv0.8, completed search, real root context, active registered unit, live fight. Immutable helper geometry; off by default/no serving imports.",
+        "cases": 2554,
+        "arms": ["native", "root-only-entrant"],
+        "mainFullGames": 5108,
+        "extraEngineeringGames": "canonical8-input cold/persistent/cache transport controls; every changed candidate outcome repeated cold before a screen can pass; preserve all attempts. Maxadditional2554 changed repeats plus64 transport executions.",
+        "seedAllocation": "ZERO new battle seeds; all six roles of original native-public-placement-value-data-20261118-v1 remain reserved, including rejected/unused. Original data/validation/training/oldlate/atomic/held studies stay closed.",
+        "gates": {
+            "allNativeOriginalCompleteOutcomeParity": true,
+            "qualityErrorsZeroBoth": true,
+            "all2554CasesBothArmsComplete": true,
+            "candidateGainScorePointsAtLeast": 0.15,
+            "strictlyPositive95WholeFamilyBootstrapLowerBound": true,
+            "minChangedFamilies": 10,
+            "resamples": 30000,
+            "bootstrapSeed": 2026111901,
+            "repeatAllChangedCandidateOutcomesColdExactly": true
+        },
+        "cutoffUtc": "2026-11-19T02:00:00Z",
+        "automaticRetryExtensionOrCaseExclusion": false,
+        "interpretation": "A passed reused screen only supports prospectively registering independent broad native draft strength, held confirmation and serial overall-average full-fight / weighted actual decision CPU<=+10%, including both AIs. It cannot qualify or activate this candidate, train on incomplete labels or rescue an older candidate. Failed/inconclusive screen stops this fixed candidate.",
+        "defaultChanged": false,
+        "automaticPromotionOrDeployment": false
+    },
+    "completedAtUtc": "2026-11-19T01:32:21.615803+00:00",
+    "independentVerifiedAtUtc": "2026-11-19T01:39:48.283417+00:00",
+    "source": {
+        "commonNativeCommit": "9c10c836",
+        "serverNativeCommit": "d5fa16b",
+        "researchHelperPublishedCommit": "f580f05ae0098e296b07cc76214b9b44f35a1e53",
+        "portableSourceSealSha256": "626aa51cc6144e940c1d23be0c673419531354758915f103d015fa297e64437e",
+        "productionClosurePackages": 92,
+        "actualRuntimeFilesPerHost": 5930,
+        "portableManifestFiles": 6199,
+        "runtimeKey": "a6417cf49cc63c2bcd359ea2d41282081f720d003f722b23d2d848390282b3f1",
+        "runtime": "Linux x64 Bun 1.4.4",
+        "overlayV2Sha256": "671981e23d182c55cbd6c04c44e250b500bb3fd8f81b5ce3146069ce674b816b",
+        "preMainManifestCorrection": "Original unused local V1 followed development dependencies; V2 records the unchanged exact 92-package production closure before node uploads and main execution. Both native node canonical source arrays match. Preserve original and erratum."
+    },
+    "evidencePopulation": {
+        "exposedTrainingFamilies": 97,
+        "matchedCases": 2554,
+        "fullMainGames": 5108,
+        "newSeeds": 0,
+        "allOriginalNativeOutcomesExact": true,
+        "qualityErrors": 0,
+        "allChangedCandidateColdReplaysExact": 12,
+        "originalClosedCollectionMayResumeOrFitPartialLabels": false
+    },
+    "arms": {
+        "native": {
+            "wins": 1121,
+            "draws": 36,
+            "losses": 1397,
+            "actualSearchDriverDecisions": 120100,
+            "actualRootCalls": 0,
+            "actualRootRepairs": 0,
+            "hypotheticalPolicyRepairs": 0
+        },
+        "root-only-entrant": {
+            "wins": 1121,
+            "draws": 36,
+            "losses": 1397,
+            "actualSearchDriverDecisions": 120100,
+            "actualRootCalls": 59381,
+            "actualRootRepairs": 13,
+            "hypotheticalPolicyRepairs": 0
+        }
+    },
+    "comparison": {
+        "id": "root-only-minus-native",
+        "baseline": "native",
+        "candidate": "root-only-entrant",
+        "mean": 0,
+        "interval": [0, 0],
+        "familyCount": 97,
+        "changedFamilies": 9,
+        "gained": 0,
+        "lost": 0,
+        "tied": 2554,
+        "gate": {
+            "enoughFamilies": true,
+            "enoughChangedFamilies": false,
+            "minimumGain": false,
+            "positiveAdjustedInterval": false
+        },
+        "passed": false,
+        "slices": [
+            {
+                "label": "draftOrder: 0",
+                "families": 52,
+                "pairs": 1360,
+                "delta": 0
+            },
+            {
+                "label": "draftOrder: 1",
+                "families": 45,
+                "pairs": 1194,
+                "delta": 0
+            },
+            {
+                "label": "fold: training",
+                "families": 97,
+                "pairs": 2554,
+                "delta": 0
+            },
+            {
+                "label": "future: 0",
+                "families": 97,
+                "pairs": 1277,
+                "delta": 0
+            },
+            {
+                "label": "future: 1",
+                "families": 97,
+                "pairs": 1277,
+                "delta": 0
+            },
+            {
+                "label": "map: 1",
+                "families": 76,
+                "pairs": 1982,
+                "delta": 0
+            },
+            {
+                "label": "map: 3",
+                "families": 21,
+                "pairs": 572,
+                "delta": 0
+            },
+            {
+                "label": "opponentDoctrine: 1",
+                "families": 45,
+                "pairs": 1180,
+                "delta": 0
+            },
+            {
+                "label": "opponentDoctrine: 2",
+                "families": 36,
+                "pairs": 936,
+                "delta": 0
+            },
+            {
+                "label": "opponentDoctrine: 3",
+                "families": 16,
+                "pairs": 438,
+                "delta": 0
+            },
+            {
+                "label": "physicalTeam: 1",
+                "families": 97,
+                "pairs": 1283,
+                "delta": 0
+            },
+            {
+                "label": "physicalTeam: 2",
+                "families": 95,
+                "pairs": 1271,
+                "delta": 0
+            },
+            {
+                "label": "purpose: reused-final-root-repair",
+                "families": 97,
+                "pairs": 2554,
+                "delta": 0
+            },
+            {
+                "label": "sourceBlock: placement-native-labels-m1-op1-o0-b0",
+                "families": 16,
+                "pairs": 410,
+                "delta": 0
+            },
+            {
+                "label": "sourceBlock: placement-native-labels-m1-op1-o1-b0",
+                "families": 13,
+                "pairs": 326,
+                "delta": 0
+            },
+            {
+                "label": "sourceBlock: placement-native-labels-m1-op2-o0-b0",
+                "families": 15,
+                "pairs": 384,
+                "delta": 0
+            },
+            {
+                "label": "sourceBlock: placement-native-labels-m1-op2-o1-b0",
+                "families": 16,
+                "pairs": 424,
+                "delta": 0
+            },
+            {
+                "label": "sourceBlock: placement-native-labels-m1-op3-o0-b0",
+                "families": 16,
+                "pairs": 438,
+                "delta": 0
+            },
+            {
+                "label": "sourceBlock: placement-native-labels-m3-op1-o1-b0",
+                "families": 16,
+                "pairs": 444,
+                "delta": 0
+            },
+            {
+                "label": "sourceBlock: placement-native-labels-m3-op2-o0-b0",
+                "families": 5,
+                "pairs": 128,
+                "delta": 0
+            }
+        ]
+    },
+    "changedCases": [
+        {
+            "caseId": "exposed-0108e69a07c43a893c88b5622e004068f9731ca101faf45b9702c81ab20164c3",
+            "family": "placement-data-m1-op1-o0-scan0037",
+            "tags": {
+                "fold": "training",
+                "map": "1",
+                "opponentDoctrine": "1",
+                "draftOrder": "0",
+                "physicalTeam": "2",
+                "future": "1",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m1-op1-o0-b0"
+            },
+            "nativeScore": 1,
+            "candidateScore": 1,
+            "nativeDigest": "e02734dfad5d6d2cf8e3aae2c1c606c519d5554e6e96f12a03ae25b98ab1239d",
+            "candidateDigest": "5e9f688092fca0ffab8e8a57e157c8b9b1cdc48982b4b924d224276a8863ed47",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-125a278720665e0a5cd31df7719fe931733b3277cac13579e63437998a7fb68c",
+            "family": "placement-data-m1-op1-o1-scan0038",
+            "tags": {
+                "fold": "training",
+                "map": "1",
+                "opponentDoctrine": "1",
+                "draftOrder": "1",
+                "physicalTeam": "2",
+                "future": "1",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m1-op1-o1-b0"
+            },
+            "nativeScore": 0,
+            "candidateScore": 0,
+            "nativeDigest": "0b9d9943d2ac422d52ce648fbf0c4e9a41b326bb037df4fbc8f412d9e4127f7f",
+            "candidateDigest": "c84656f42ba14a388db182ae02c590e717ed490b687da59b368b5b49b8a91b76",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-267db04790268f9e1e0c37c690d4b0e81d66c848d9920b413c4c8926a3bc5ddf",
+            "family": "placement-data-m1-op3-o0-scan0050",
+            "tags": {
+                "fold": "training",
+                "map": "1",
+                "opponentDoctrine": "3",
+                "draftOrder": "0",
+                "physicalTeam": "1",
+                "future": "0",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m1-op3-o0-b0"
+            },
+            "nativeScore": 1,
+            "candidateScore": 1,
+            "nativeDigest": "c781babf873db2b18370d44af8823877f6f624209d6dd260fa5a53fbb29a0c3f",
+            "candidateDigest": "fb8e37e19faba6dadbe2eeba6a4b7350f04c6b33a1c6b9718a773fbcd99827d0",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-407ef36643d045938ca08b124404eec64cd31c2e54513b31e06f9067eaab8c9a",
+            "family": "placement-data-m1-op1-o0-scan0037",
+            "tags": {
+                "fold": "training",
+                "map": "1",
+                "opponentDoctrine": "1",
+                "draftOrder": "0",
+                "physicalTeam": "2",
+                "future": "1",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m1-op1-o0-b0"
+            },
+            "nativeScore": 1,
+            "candidateScore": 1,
+            "nativeDigest": "2e0bfe3a42d11edd5b2e429993cd7e37fa57c38d54733ec716af510b61d9f359",
+            "candidateDigest": "593f3d437beee45fe123c6703002852064be39e2c05b5c584939e8e7ae62c147",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-6746f02fef030664425c5971fe9763620241ca22c47b1551a7bfe40ae1028336",
+            "family": "placement-data-m1-op1-o1-scan0020",
+            "tags": {
+                "fold": "training",
+                "map": "1",
+                "opponentDoctrine": "1",
+                "draftOrder": "1",
+                "physicalTeam": "2",
+                "future": "0",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m1-op1-o1-b0"
+            },
+            "nativeScore": 1,
+            "candidateScore": 1,
+            "nativeDigest": "017c30488cc6fbb8becb35b72301c1e77e58b9a87ed4fe48d70a813255cfb0d5",
+            "candidateDigest": "029d5ba552cece4e3232855259ff541b4cf94173964306b5fdf6c0e41f37c2bf",
+            "actualRootRepairs": 2,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-a1a450fd535082450578ba59a0b6c377667c361328da7d7dc566b4c5c6ea8984",
+            "family": "placement-data-m1-op1-o1-scan0038",
+            "tags": {
+                "fold": "training",
+                "map": "1",
+                "opponentDoctrine": "1",
+                "draftOrder": "1",
+                "physicalTeam": "1",
+                "future": "1",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m1-op1-o1-b0"
+            },
+            "nativeScore": 0,
+            "candidateScore": 0,
+            "nativeDigest": "8c37046c24226f5761810a21461857eed10b0fdcf9ca267fa30d6aa40e674125",
+            "candidateDigest": "ad7d242573effdeab4fba3d331ea71a21f524bb7f7b2489261b4323e4d6b6c53",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-bc936ab8001f465384edb12b1dee0cf52db8b38f5f845ba71ee1b642bf0e282a",
+            "family": "placement-data-m1-op3-o0-scan0023",
+            "tags": {
+                "fold": "training",
+                "map": "1",
+                "opponentDoctrine": "3",
+                "draftOrder": "0",
+                "physicalTeam": "2",
+                "future": "0",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m1-op3-o0-b0"
+            },
+            "nativeScore": 0.5,
+            "candidateScore": 0.5,
+            "nativeDigest": "69374232eaa64e35651bdeb89451cc74d9d92af78c40aae0b60aaaa3edcc8983",
+            "candidateDigest": "da26eb88badea96256c88db8c5b6057ab512ecb6993c58da46cd18592c1ba46e",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-c17a08c0e019e52b0a4d853996cf1270bb7d232edcfbe028a8a8eea6e49dddf2",
+            "family": "placement-data-m3-op2-o0-scan0020",
+            "tags": {
+                "fold": "training",
+                "map": "3",
+                "opponentDoctrine": "2",
+                "draftOrder": "0",
+                "physicalTeam": "1",
+                "future": "0",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m3-op2-o0-b0"
+            },
+            "nativeScore": 0,
+            "candidateScore": 0,
+            "nativeDigest": "041f58bbbadd9e538e312a154723de80e3a68e920aba76282535b4e39ca7a333",
+            "candidateDigest": "2efc88dfda39a24a43f243a3135e49f0c5dcebc2a9c7a71ce3bb231554c06249",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-cf24c64223914138392a8868423cc0541d1a196e4175b9d6904fcf273e6a6d99",
+            "family": "placement-data-m1-op1-o0-scan0055",
+            "tags": {
+                "fold": "training",
+                "map": "1",
+                "opponentDoctrine": "1",
+                "draftOrder": "0",
+                "physicalTeam": "2",
+                "future": "1",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m1-op1-o0-b0"
+            },
+            "nativeScore": 1,
+            "candidateScore": 1,
+            "nativeDigest": "314bd557048d0b5dca8db3fbaa77b5e963274452421959870b00c59bde513dbb",
+            "candidateDigest": "edb6dfbbe54037a5d1c35383a18477682f02339fb621999db706f9575862464e",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-d775eff886fa2f7872c14949ac2b5527bc15569f24f82f4c5a3646acb1c907f5",
+            "family": "placement-data-m1-op3-o0-scan0023",
+            "tags": {
+                "fold": "training",
+                "map": "1",
+                "opponentDoctrine": "3",
+                "draftOrder": "0",
+                "physicalTeam": "1",
+                "future": "0",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m1-op3-o0-b0"
+            },
+            "nativeScore": 1,
+            "candidateScore": 1,
+            "nativeDigest": "0027e907f6bb1ab508e7df7bc45cc7260bcc8dcf5ac537683275f203c666e41e",
+            "candidateDigest": "a8475e250ad89c29980cd05d530a935d9d4cce2e99caac7308b100781963a534",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-eba329283dd7314a2e982e8296804322c2fdc476daa7ab2aa5935dc6362d7faa",
+            "family": "placement-data-m3-op1-o1-scan0033",
+            "tags": {
+                "fold": "training",
+                "map": "3",
+                "opponentDoctrine": "1",
+                "draftOrder": "1",
+                "physicalTeam": "2",
+                "future": "1",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m3-op1-o1-b0"
+            },
+            "nativeScore": 1,
+            "candidateScore": 1,
+            "nativeDigest": "9d97c7a36c73cd8cc9976bd2348750e18176e55e4d94a70d717f27d558b1fdec",
+            "candidateDigest": "1a66fc33cb90806321117b1a65e05a305c3d05811633ef0d35dec676f20ea9fb",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        },
+        {
+            "caseId": "exposed-ed9b572c5c72f9037a15d60d01e2c395f144c0666d3428a90a7d7ae97b302194",
+            "family": "placement-data-m1-op3-o0-scan0000",
+            "tags": {
+                "fold": "training",
+                "map": "1",
+                "opponentDoctrine": "3",
+                "draftOrder": "0",
+                "physicalTeam": "2",
+                "future": "1",
+                "purpose": "reused-final-root-repair",
+                "sourceBlock": "placement-native-labels-m1-op3-o0-b0"
+            },
+            "nativeScore": 0,
+            "candidateScore": 0,
+            "nativeDigest": "3d2fa4ab07705d057b7ba4c105933530225aa9f7c4482e9b3b39d9fe8f11ebf2",
+            "candidateDigest": "3528aeb16d06f4c80d8f8b4fd335d220b591fd7df736d639d707ee1eed251ae2",
+            "actualRootRepairs": 1,
+            "changedCandidateColdExact": true
+        }
+    ],
+    "independentVerification": {
+        "allReturnedMemberHashes": true,
+        "actualRuntimeClosureAndSingleCommonIdentity": true,
+        "allInputCacheRecordAndNativeWinnerBindings": true,
+        "unchangedOriginalOutcomes": true,
+        "fundedOpeningsAndGeometry": true,
+        "changedColdOutcomes": true,
+        "independentPythonFamilyBootstrap": {
+            "schema": 1,
+            "passed": true,
+            "atUtc": "2026-11-19T01:39:48.283417+00:00",
+            "families": 97,
+            "cases": 2554,
+            "mainGames": 5108,
+            "candidateGainScorePoints": 0.0,
+            "intervalScorePoints": [0.0, 0.0],
+            "gained": 0,
+            "lost": 0,
+            "tied": 2554,
+            "changedFamilies": 9,
+            "gates": {
+                "enoughFamilies": true,
+                "enoughChangedFamilies": false,
+                "minimumGain": false,
+                "positiveAdjustedInterval": false
+            },
+            "allRegisteredReusedScreenGatesPassed": false,
+            "independentMulberry32FamilyBootstrapMatchesCanonical": true,
+            "resamples": 30000,
+            "bootstrapSeed": 2026111901,
+            "notFreshStrengthOrCostQualification": true,
+            "defaultChanged": false
+        }
+    },
+    "interpretation": "No extra wins or losses in this exposed population. The empirical zero interval reflects identical paired terminal scores and does not prove general equivalence or safety. Coverage, minimum gain and positive-confidence gates failed. Close this fixed candidate without fresh strength, cost progression, favorable-slice rescue or activation.",
+    "archives": [
+        {
+            "host": "hft",
+            "schema": 1,
+            "passed": true,
+            "atUtc": "2026-11-19T01:03:11.430726+00:00",
+            "hostKind": "hft",
+            "cases": 1366,
+            "mainGames": 2732,
+            "allNativeOriginalOutcomeAndChangedColdChecks": true,
+            "archiveSha256": "2687a03e7cf92ca19170a704013b5ea2dbe0636f87997bee81efa9a4fa173304",
+            "archiveBytes": 178844806,
+            "regularMembersVerified": 5633,
+            "defaultChanged": false,
+            "freshStrengthOrCostQualified": false
+        },
+        {
+            "host": "puffalo",
+            "schema": 1,
+            "passed": true,
+            "atUtc": "2026-11-19T01:32:21.615803+00:00",
+            "hostKind": "puffalo",
+            "cases": 1188,
+            "mainGames": 2376,
+            "allNativeOriginalOutcomeAndChangedColdChecks": true,
+            "archiveSha256": "9ab4fc80a5ecbc01aff812540424baebc5968c80f86661bbf07b6caf9bb08d6b",
+            "archiveBytes": 164928684,
+            "regularMembersVerified": 4931,
+            "defaultChanged": false,
+            "freshStrengthOrCostQualified": false
+        }
+    ],
+    "analysisFiles": [
+        {
+            "path": "global-independent-results.json",
+            "sha256": "91e924f6598558a815a808ca747245750c4e58d89a59e2809c79808a6912596b",
+            "bytes": 7807793
+        },
+        {
+            "path": "global-independent-verification.log",
+            "sha256": "1ad9d5125fe07daccf109a707303ea1fdba19b5d046144bc1491e41588b2a5b3",
+            "bytes": 411
+        },
+        {
+            "path": "independent-global-bootstrap-verification.json",
+            "sha256": "238d5ae2e3a42c4126dc591b9cb16c223671f05030a51725ddca3f2991c445fe",
+            "bytes": 677
+        },
+        {
+            "path": "source-only-verification.json",
+            "sha256": "ea98ecd18f3396903853cc65bfa6b91f161dfeae0c98ad143a34a460ace9dd95",
+            "bytes": 463
+        },
+        {
+            "path": "verify-global.ts",
+            "sha256": "edce8daa4fb9ae57a455700c8f7c756cb67427a342abad09c4422f963dbf70e9",
+            "bytes": 9596
+        },
+        {
+            "path": "stream-study-returns.py",
+            "sha256": "c7d59c96e77e68aaa421aa17d1bf9d7ed688f1069783e454143112d3e768c250",
+            "bytes": 1732
+        },
+        {
+            "path": "independent-bootstrap.py",
+            "sha256": "ce4e6b5c5ed9d9a0a43cb930b7d62bd15cc35f9dc12b2262abf7028bd72457f2",
+            "bytes": 2874
+        }
+    ],
+    "seedReservations": "All six roles and all scanned/rejected/unused channels of native-public-placement-value-data-20261118-v1 remain reserved; all earlier exclusions and unopened banks remain closed.",
+    "representativeComputeQualified": false,
+    "defaultChanged": false,
+    "servingImportsAdded": false,
+    "automaticPromotionOrDeployment": false,
+    "completePairRecords": "All 2,554 complete matched records and all 5,108 slim outcomes remain in the hash-bound global-independent-results.json and both complete return archives outside Git.",
+    "independentAnalysisArchive": {
+        "name": "closed-independent-analysis.tar.gz",
+        "sha256": "98e06d757ec157aafab8a721e1f3447b74baf15c8f50aceff807b25d54d7d5ea",
+        "bytes": 4593491,
+        "regularMembers": 35,
+        "allMembersVerifiedOnBothResearchNodes": true,
+        "description": "Contains original full analysis, verifiers, raw-source bindings and initial closeout bookkeeping, including the original unabridged comparison pairs. Final tracked fixture omits those generated pair arrays."
+    }
+}

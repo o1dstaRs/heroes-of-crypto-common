@@ -1,0 +1,97 @@
+{
+    "schema": 1,
+    "passed": true,
+    "atUtc": "2026-11-19T00:52:06.190611+00:00",
+    "id": "a19-native-refusal-integrity-diagnosis-20261119",
+    "fullNativeGames": 4,
+    "newSeeds": 0,
+    "completeNativeOutcomesIncludingWarningsEqualAcrossAllFourExecutions": true,
+    "refusedMeleeHandlerFullBattleFieldsAndAliasGraphUnchanged": true,
+    "liveUnitIdentityAndPrototypePreserved": true,
+    "refusedHandlerRandomDraws": 0,
+    "wholeRejectedEngineActionRandomDrawsV2": 0,
+    "uuidUnchanged": true,
+    "physicalDifferenceBeforeHandler": "Exactly one native authoritative-stat refresh; beforehandler equals afterhandler equals afterfailedengineapply. Morale/aura refresh after the preceding move is separate from an attack sideeffect.",
+    "knownHandlerCause": "No authoritative approach route from actualpostmoveanchor(9,7) toattackFrom(11,9); handlerrejectsbeforemovementorattack.",
+    "nativeWinnerPreserved": true,
+    "evidenceScope": "One exposed alreadyfailedinput only. Doesnotlicenseotherwarnings/partialdatafitting/waiveoldgates/restartclosedstudies orqualifystrength. Futureper-gameintegrity-classification requiresprospectiveregistrationandindependentfullproof.",
+    "sourceCorrection": "PreserveV1handler-only RNG measurement. V2also meterswholeactualrejectedenginecall includingnativeStatsRefresh, preservingsuccessfulUUIDadvances. Addedcoveragebeforethirdexecution; onlytwo originalremaininggames,no retries.",
+    "results": [
+        {
+            "path": "native-result.json",
+            "sha256": "f371e29d87a24749a62cdc2d008e8ff3ddedaa142743a5f043c6345d8ac02992",
+            "bytes": 105413,
+            "score": 0,
+            "digest": "fb182d254b8244f4d3878e2e1061233c6ffe1b2d0f57f69a19c9130343e6b5d9",
+            "qualityErrors": [
+                "[server-ai] game=sim-1657 strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+            ]
+        },
+        {
+            "path": "observed-result.json",
+            "sha256": "f9331b69288ae58b6b3f5b8d658c279ce1742df683dd70e7aef7b73c94bc687c",
+            "bytes": 579287,
+            "score": 0,
+            "digest": "fb182d254b8244f4d3878e2e1061233c6ffe1b2d0f57f69a19c9130343e6b5d9",
+            "qualityErrors": [
+                "[server-ai] game=sim-1657 strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+            ]
+        },
+        {
+            "path": "observed-cold-result.json",
+            "sha256": "344a20e20447c7fe76c200daf3bfb45bd0fd5d73359cc272fae142bcb2bc9426",
+            "bytes": 579333,
+            "score": 0,
+            "digest": "fb182d254b8244f4d3878e2e1061233c6ffe1b2d0f57f69a19c9130343e6b5d9",
+            "qualityErrors": [
+                "[server-ai] game=sim-1657 strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+            ]
+        },
+        {
+            "path": "native-cold-result.json",
+            "sha256": "a94581b9e2cde72068aea331e76a42e49c93a6ec0bbd058d0fe48aae75f1d2d9",
+            "bytes": 105418,
+            "score": 0,
+            "digest": "fb182d254b8244f4d3878e2e1061233c6ffe1b2d0f57f69a19c9130343e6b5d9",
+            "qualityErrors": [
+                "[server-ai] game=sim-1657 strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+            ]
+        }
+    ],
+    "oldGatesWeightsAndDefaultChanged": false,
+    "status": "completed_bounded_diagnosis_not_training_quality_admission",
+    "originalUncachedFullOutcomePreserved": false,
+    "uncachedOriginalWarningReproduced": true,
+    "nativeColdReplayDigest": "fb182d254b8244f4d3878e2e1061233c6ffe1b2d0f57f69a19c9130343e6b5d9",
+    "moraleClarification": "initialUnitProperties.morale was already 8 before the rejected engine call; derived unitProperties.morale refreshes from 5 to 8 before the melee handler. AbsorbPenaltiesAura leaves the derived aura list after the preceding accepted move. Aura removal is not established as the cause of morale increase.",
+    "sourceArchives": [
+        {
+            "name": "a19-native-refusal-integrity-diagnosis-20261119-complete.tar.gz",
+            "sha256": "47ab4a9aa7a1023123f2648e882dc2a8b2f14dfcaa051a345c84d2f77bf34a6a",
+            "bytes": 144392,
+            "regularMembers": 16
+        },
+        {
+            "name": "a19-native-refusal-integrity-diagnosis-20261119-source-supplement.tar.gz",
+            "sha256": "da722c0584e7e2f506890a91b8db11f85b4dff7d85baf8ef412cbe5e8b627992",
+            "bytes": 3420,
+            "regularMembers": 2
+        }
+    ],
+    "allFourExecutedSourceVersionsReconstructAndMatchHashes": true,
+    "allArchiveMembersVerifiedOnBothResearchNodes": true,
+    "pipelineRecorder": {
+        "publishedServerCommit": "8a823170454529bcaf171d47b17f15eede17cfff",
+        "effect": "Preserve each rejected native outcome plus input, hash, source/runtime declaration and validation error outside valid cache; comparison still aborts. No quality admission, retries or serving changes.",
+        "fullServerTestsPassed": 1925,
+        "existingDatabaseSkips": 15,
+        "typecheckPassed": true,
+        "lintErrors": 0,
+        "existingLintWarnings": 3,
+        "ciUrl": "https://github.com/o1dstaRs/heroes-of-crypto-server/actions/runs/44435357351",
+        "ciStatus": "Jobs did not start: GitHub account payment or spending-limit block. Local checks pass; CI is not green."
+    },
+    "defaultChanged": false,
+    "qualityContractChanged": false,
+    "closedStudyResumed": false
+}
