@@ -106,3 +106,23 @@ across 403 ledgers. The policies, native quality, funding, full validation, mode
 fit, gates and original cutoffs are unchanged. This is an operational correction
 before fresh labels, not a new independent bank, strength result or admission
 pass for the failed source.
+
+The first two fresh blocks completed 128 logical labels / 119 unique native
+fights with zero rejected native outcomes. The coordinator had wrapped its
+acknowledgment in `{record, ack}` while the scheduler expected a flat `passed`
+message. That operational `KeyError` stopped both schedulers after completed
+blocks; it was not an invalid native game or a model-selection result.
+
+The [source-bound operational overlay](evidence/a19_public_placement_pair_ack_handoff_20261119.json)
+is `1f30d785` (6,256 files including unchanged producer `794b281e`). It adds a
+strict shared acknowledgment contract, with sixteen local process/protocol/stop
+controls and seven real-payload protocol tests on each node. Original failed code,
+markers, messages and raw archives remain. Both completed blocks were independently
+reverified in full on the opposite node, with exact replicas and unchanged native
+source/cache keys; none of their 119 fights was replayed. A 128-label barrier
+passed before either scheduler proceeded to previously unexecuted tasks.
+
+This is the same unclosed study, with unchanged inputs, full 16,128-label funding,
+policies, native quality, models, fit, gates, hardware and original cutoffs. The
+failed scheduler stays failed. No partial fit, deadline extension, invalid-game
+retry, source default or measured strength gain follows from this correction.

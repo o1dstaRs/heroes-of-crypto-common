@@ -46,6 +46,17 @@ completed or native-invalid result replayed. Freshness was re-audited across 403
 ledgers with zero intersections. Keep the original policies, complete-data gates,
 model/fit, fixed hardware, full validation and cutoffs. The failed source stays failed.
 
+The first two native blocks produced 128 logical / 119 unique physical games,
+with zero native rejections. Both schedulers then stopped on an acknowledgment
+shape error. Read the source-bound operational correction `1f30d785`: strict
+shared flat acknowledgments, sixteen local controls and seven real-payload tests
+on each node. Native producer `794b281e`, every native source/cache key, inputs,
+policies, quality, funding, models, gates and original cutoffs stay unchanged.
+Both first blocks were fully reverified on the opposite node with two exact raw
+replicas, without replaying any completed fight. The 128-label barrier passed
+before continuing only unexecuted tasks. This study remains unclosed; do not fit
+partially, retry a native-invalid game or reinterpret the failed scheduler as passed.
+
 ## Closed JSON placement collection after storage failure — November 19, 2026
 
 The `b8d7f4ed` producer / `8cf5e842` analysis continuation is now **closed incomplete**.

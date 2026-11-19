@@ -1,0 +1,93 @@
+{
+    "schema": 1,
+    "id": "paired-native-acknowledgment-overlay-20261119-v3",
+    "atUtc": "2026-11-19T08:16:00.777228+00:00",
+    "nativeProducerUnchanged": "794b281e44367a26385efbb589c583d940dc490b3a27295387b39a870bcf7175",
+    "operationalSource": "1f30d78563e52c55d70836957143fa1fffa98a1fd79ab4f16fe2e2ac9578755c",
+    "sourceFiles": 6256,
+    "cause": "Coordinator wrote a {record,ack} envelope; scheduler expected a flat passed acknowledgment. Both first native blocks had completed when scheduler stopped at the acknowledgment.",
+    "correction": "Strict shared flat acknowledgment contract and exact source/archive/count/proof checks; recover complete archives and reverify them without executing their games; first-128 barrier before any unexecuted task.",
+    "sourceAndNativeKeysInputsModelsPoliciesQualityBudgetAndCutoffsUnchanged": true,
+    "localProtocolProcessAndStopControlsPassed": 16,
+    "realProtocolTestsPassedPerNode": 7,
+    "oldControllerPidsVerifiedStopped": true,
+    "actualSchedulerPreflight": {
+        "hft": {
+            "passed": true,
+            "nativeProducer": "794b281e44367a26385efbb589c583d940dc490b3a27295387b39a870bcf7175",
+            "operationsSource": "1f30d78563e52c55d70836957143fa1fffa98a1fd79ab4f16fe2e2ac9578755c",
+            "sourceFiles": 6256,
+            "actualProtocolTests": 7,
+            "scheduler": {
+                "passed": true,
+                "host": "hft",
+                "blocks": 91,
+                "families": 720,
+                "logicalGames": 10080,
+                "workers": 4,
+                "newGames": 0,
+                "processesStarted": 0,
+                "completeBlocksAvailableForRecovery": 1
+            },
+            "oldControllerVerifiedStopped": true,
+            "newNativeGames": 0
+        },
+        "puffalo": {
+            "passed": true,
+            "nativeProducer": "794b281e44367a26385efbb589c583d940dc490b3a27295387b39a870bcf7175",
+            "operationsSource": "1f30d78563e52c55d70836957143fa1fffa98a1fd79ab4f16fe2e2ac9578755c",
+            "sourceFiles": 6256,
+            "actualProtocolTests": 7,
+            "scheduler": {
+                "passed": true,
+                "host": "puffalo",
+                "blocks": 55,
+                "families": 432,
+                "logicalGames": 6048,
+                "workers": 8,
+                "newGames": 0,
+                "processesStarted": 0,
+                "completeBlocksAvailableForRecovery": 1
+            },
+            "oldControllerVerifiedStopped": true,
+            "newNativeGames": 0
+        }
+    },
+    "first128Barrier": {
+        "passed": true,
+        "sourceSeal": "794b281e44367a26385efbb589c583d940dc490b3a27295387b39a870bcf7175",
+        "logicalGames": 128,
+        "uniquePhysicalGames": 119,
+        "bothFullRawReplicasAndIndependentForeignProofsVerified": true,
+        "nativeGameReplay": false
+    },
+    "initialBlocks": [
+        {
+            "host": "hft",
+            "id": "paired-native-labels-v2-hft-training-b000",
+            "logicalGames": 64,
+            "uniqueGames": 61,
+            "archiveSha256": "8c89a5c0b8c045ba1c73d1748125d683762e8cdf3054e833546d74cd3b910bff",
+            "archiveBytes": 4210635,
+            "independentlyVerified": true,
+            "bothReplicasVerified": true
+        },
+        {
+            "host": "puffalo",
+            "id": "paired-native-labels-v2-puffalo-training-b000",
+            "logicalGames": 64,
+            "uniqueGames": 58,
+            "archiveSha256": "2a7eb8a768959b9b8634515a33737ef3c59e5843ae3637d335e629c08f3ee367",
+            "archiveBytes": 4017631,
+            "independentlyVerified": true,
+            "bothReplicasVerified": true
+        }
+    ],
+    "firstBlocksNativeOutcomesRejected": 0,
+    "sameUnclosedStudyContinuation": true,
+    "noCompletedOrInvalidNativeOutcomeReplayed": true,
+    "complete16128BeforeAnyFit": true,
+    "originalFinal80ModelsAndValidationGatesUnchanged": true,
+    "validationEffectStatisticsOpened": false,
+    "automaticPromotionOrDeployment": false
+}
