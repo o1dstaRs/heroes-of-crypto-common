@@ -112,6 +112,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE",
     "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
     "SEARCH_A19_MELEE_BARREL_DELIBERATION",
+    "SEARCH_A19_NEUTRAL_BARREL_DELIBERATION",
     "SEARCH_A19_NIGHTMARE_WALL_MOVEMENT",
     "SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES",
     "V08_AGGRESSIVE",
@@ -947,6 +948,167 @@ describe("search driver — gating, hygiene, determinism", () => {
             throw new Error("Neutral cleanup entered search");
         };
         expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+    });
+    const neutralBarrelFixture = (ranged = false) => {
+        if (!ranged) {
+            const { harness, unit, incumbent } = barrelDeliberationFixture(PBTypes.GridVals.BLOCK_CENTER);
+            const cell = harness.grid.getArtifactBarrels()[0].cell;
+            harness.grid.clearArtifactBarrels(unit.getTeam());
+            harness.grid.setScatteredMountains([cell]);
+            expect(harness.grid.getArtifactBarrels()).toHaveLength(0);
+            expect(harness.grid.getScatteredMountainsStanding()).toEqual([cell]);
+            process.env.SEARCH_A19_NEUTRAL_BARREL_DELIBERATION = "1";
+            return { harness, unit, incumbent };
+        }
+        // A real shooter: the native cleanup spends a shot on the nearest standing neutral barrel.
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "0.03",
+            SEARCH_ACTIVE_CHALLENGERS: "1",
+            SEARCH_INCLUDE_MOVES: "1",
+            SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: "1",
+            SEARCH_A19_MELEE_BARREL_DELIBERATION: "1",
+            SEARCH_A19_NEUTRAL_BARREL_DELIBERATION: "1",
+            SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE: "1",
+        });
+        const harness = buildBattle(
+            7,
+            "v0.8",
+            undefined,
+            [
+                { faction: "Life", creatureName: "Arbalester", level: 1, size: 1, amount: 20 },
+                { faction: "Life", creatureName: "Arbalester", level: 1, size: 1, amount: 18 },
+            ],
+            false,
+            PBTypes.GridVals.BLOCK_CENTER,
+        );
+        const unit = harness.activeUnit()!;
+        const cell = { x: 7, y: unit.getBaseCell().y };
+        harness.grid.setScatteredMountains([cell]);
+        expect(harness.grid.getScatteredMountainsStanding()).toEqual([cell]);
+        const context: IDecisionContext = {
+            grid: harness.grid,
+            unitsHolder: harness.unitsHolder,
+            matrix: harness.grid.getMatrix(),
+            fightProperties: harness.fightProperties,
+            pathHelper: harness.pathHelper,
+            attackHandler: harness.attackHandler,
+        };
+        const strike = enumerateCandidates(unit, context, [{ type: "wait_turn", unitId: unit.getId() }], {
+            includeMountainAttacks: true,
+        }).candidates.find((candidate) => candidate.kind === "mine");
+        expect(strike).toBeDefined();
+        expect(strike!.features.spendsRangeShot).toBe(1);
+        expect(strike!.actions.some((a) => a.type === "obstacle_attack" && a.attackFrom === undefined)).toBe(true);
+        return { harness, unit, incumbent: [...strike!.actions] };
+    };
+    for (const ranged of [false, true]) {
+        for (const preferred of ["move", "wait", "defend"] as const) {
+            it(`compares ${preferred} against a ${ranged ? "ranged" : "melee"} neutral cemetery barrel strike`, () => {
+                const { harness, unit, incumbent } = neutralBarrelFixture(ranged);
+                const before = snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties);
+                let offered: readonly IEnumeratedCandidate[] = [];
+                const driver = harness.makeDriver() as unknown as BarrelTestDriver;
+                driver.scoreCandidates = (_actor, candidates) => {
+                    offered = candidates;
+                    return candidates.map((candidate) => (candidate.kind === preferred ? 0.9 : 0.2));
+                };
+                const chosen = driver.chooseDecision(unit, "v0.8", incumbent);
+                expect(offered[0].actions).toBe(incumbent);
+                expect(offered.some((candidate) => candidate.kind === preferred)).toBe(true);
+                const action = { move: "move_unit", wait: "wait_turn", defend: "defend_turn" } as const;
+                expect(chosen.some((a) => a.type === action[preferred])).toBe(true);
+                expect(chosen.some((a) => a.type === "obstacle_attack")).toBe(false);
+                expect(snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties)).toEqual(before);
+            });
+        }
+    }
+    it("retains a neutral barrel strike that forecasts best or equal", () => {
+        const { harness, unit, incumbent } = neutralBarrelFixture();
+        const driver = harness.makeDriver() as unknown as BarrelTestDriver;
+        driver.scoreCandidates = (_actor, candidates) => candidates.map((c) => (c.kind === "incumbent" ? 0.9 : 0.2));
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+        driver.scoreCandidates = (_actor, candidates) => candidates.map(() => 0.5);
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+    });
+    it("never offers another neutral barrel as a challenger", () => {
+        const { harness, unit, incumbent } = neutralBarrelFixture();
+        const first = harness.grid.getScatteredMountainsStanding()[0];
+        const base = unit.getBaseCell();
+        const second = [-1, 0, 1]
+            .flatMap((dx) => [-1, 0, 1].map((dy) => ({ x: base.x + dx, y: base.y + dy })))
+            .find(
+                (cell) =>
+                    (cell.x !== first.x || cell.y !== first.y) &&
+                    (cell.x !== base.x || cell.y !== base.y) &&
+                    harness.grid.getOccupantUnitId(cell) === "",
+            );
+        expect(second).toBeDefined();
+        harness.grid.setScatteredMountains([first, second!]);
+        let offered: readonly IEnumeratedCandidate[] = [];
+        const driver = harness.makeDriver() as unknown as BarrelTestDriver;
+        driver.scoreCandidates = (_actor, candidates) => {
+            offered = candidates;
+            return candidates.map(() => 0.5);
+        };
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+        expect(offered.length).toBeGreaterThan(1);
+        expect(offered.slice(1).some((candidate) => candidate.kind === "mine")).toBe(false);
+    });
+    it("keeps deployment-barrel handling under the melee switch alone", () => {
+        for (const scenario of ["ranged-artifact", "melee-switch-off"] as const) {
+            const { harness, unit, incumbent } = barrelDeliberationFixture(PBTypes.GridVals.BLOCK_CENTER);
+            process.env.SEARCH_A19_NEUTRAL_BARREL_DELIBERATION = "1";
+            if (scenario === "ranged-artifact") unit.getAttackTypeSelection = () => PBTypes.AttackVals.RANGE;
+            else process.env.SEARCH_A19_MELEE_BARREL_DELIBERATION = "0";
+            const driver = harness.makeDriver() as unknown as BarrelTestDriver;
+            driver.search = () => {
+                throw new Error(`Deployment barrel entered search through the neutral switch: ${scenario}`);
+            };
+            expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+        }
+    });
+    it("leaves a classic mountain strike outside neutral barrel deliberation", () => {
+        const offeredKinds = (neutral: "0" | "1"): string[] => {
+            const { harness, unit, incumbent } = barrelDeliberationFixture(PBTypes.GridVals.BLOCK_CENTER);
+            harness.grid.clearArtifactBarrels(unit.getTeam());
+            expect(harness.grid.getScatteredMountainsStanding()).toHaveLength(0);
+            process.env.SEARCH_A19_NEUTRAL_BARREL_DELIBERATION = neutral;
+            let offered: readonly IEnumeratedCandidate[] = [];
+            const driver = harness.makeDriver() as unknown as BarrelTestDriver;
+            driver.scoreCandidates = (_actor, candidates) => {
+                offered = candidates;
+                return candidates.map(() => 0.5);
+            };
+            driver.chooseDecision(unit, "v0.8", incumbent);
+            return offered.map((candidate) => candidate.kind);
+        };
+        const withSwitch = offeredKinds("1");
+        expect(withSwitch).toEqual(offeredKinds("0"));
+        expect(withSwitch.includes("wait") || withSwitch.includes("defend")).toBe(false);
+    });
+    it("restores terrain, units and live randomness after actual neutral barrel forecasts", () => {
+        for (const ranged of [false, true]) {
+            const { harness, unit, incumbent } = neutralBarrelFixture(ranged);
+            process.env.SEARCH_HORIZON = "64";
+            process.env.SEARCH_ROLLOUTS = "2";
+            process.env.SEARCH_SHORTLIST = "6";
+            const driver = harness.makeDriver();
+            const before = snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties);
+            const source = getDeterministicRandomSource();
+            const chosen = driver.chooseDecision(unit, "v0.8", incumbent);
+            expect(chosen.length).toBeGreaterThan(0);
+            expect(driver.counters.decisions).toBe(1);
+            expect(driver.counters.rolloutTurnsTotal).toBeGreaterThan(0);
+            expect(snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties)).toEqual(before);
+            expect(getDeterministicRandomSource()).toBe(source);
+        }
+    });
+    it("validates the explicit neutral barrel deliberation switch", () => {
+        const { harness } = neutralBarrelFixture();
+        process.env.SEARCH_A19_NEUTRAL_BARREL_DELIBERATION = "sometimes";
+        expect(() => harness.makeDriver()).toThrow("SEARCH_A19_NEUTRAL_BARREL_DELIBERATION must be 0 or 1");
     });
     it("restores terrain, units and live randomness after actual barrel forecasts", () => {
         const { harness, unit, incumbent } = barrelDeliberationFixture();

@@ -1,0 +1,260 @@
+{
+ "schema": "hoc.research.registration.v1",
+ "id": "cemetery-neutral-barrel-deliberation-confirmation-a-20261119",
+ "candidate": "a19-neutral-barrel-deliberation-v1",
+ "registeredAtUtc": "2026-11-19T19:23:29.454712+00:00",
+ "servingDefaultChanged": false,
+ "question": "Does A19 get stronger on the Cemetery map when a native strike on a standing NEUTRAL barrel (melee or ranged) is compared with legal move/wait/defend/spell alternatives by the existing bounded search instead of being returned without comparison?",
+ "comparator": {
+  "profile": "A19 profile v13",
+  "revision": "a19-neural-r2-placement-v2-unit-support-v2-barrel-v1-nightmare-v1-terrain-v1-delivery-v1-sniper-v1",
+  "server": "28b6e90ba021e42ac62ce24becc88811f84385d6",
+  "common": "ce2b26fdda116eef67683c40a078228989e1037f"
+ },
+ "candidateDefinition": {
+  "armParameters": {
+   "cleanup": "native",
+   "deliberate": "neutral-all"
+  },
+  "rule": "At an actual A19 root of the named entrant whose native incumbent contains an obstacle strike on a standing scattered stone that is not a deployment barrel, the strike enters the same deliberation the adopted v9 switch gives melee deployment-barrel strikes: no cemetery fast return, wait and defend challengers admitted, no forced-productive tier, unchanged H64/R2/K6, value gate, scored/material arbitration and neural tie correction. The strike stays candidate zero.",
+  "unchanged": [
+   "native v0.8 cleanup at roots and inside every forecast",
+   "deployment-barrel handling (melee deliberation on, ranged fast return)",
+   "classic mountains",
+   "opponent seat",
+   "draft, setup, splits, placement, models and search budgets"
+  ],
+  "scope": "entrant seat only; the opponent runs the unmodified default stack",
+  "seamPatches": {
+   "research-common-search_driver.patch": "7622221a4124c52dbd3511500da7610e0d63e8a54f6daada4aed069e4a69b3ee",
+   "research-common-v0_8.patch": "fb42ac12c0107d67313af12b809518968bbb746db70e1f2b78769bf9909ad99c"
+  }
+ },
+ "source": {
+  "manifestSha256": "bb61fb601966126ca026e9121ac2269696987d2aed1f1acdd4d8a908c8711011",
+  "manifestFiles": 1438,
+  "thirdPartyVersions": {
+   "ajv": "8.20.0",
+   "arangojs": "10.6.0",
+   "bcryptjs": "3.0.3",
+   "denque": "2.1.0",
+   "google-auth-library": "11.3.4",
+   "google-protobuf": "4.0.3",
+   "ioredis": "6.0.0",
+   "jose": "6.2.17",
+   "jsonwebtoken": "9.0.3",
+   "node-mailjet": "6.0.11",
+   "protobufjs": "8.8.1",
+   "ua-parser-js": "2.0.10",
+   "uuid": "14.0.3"
+  },
+  "bun": "1.4.4",
+  "adapterSha256": "02e3511e87380c889434555b9be5f32181c8a758c8489e4d7806d2777bbc8bcd",
+  "runnerSha256": "72c7b66471f8b6f6532e8bd3c89931c6fc78fb2fee19f4230e25de615ac93a51",
+  "runnerNote": "run-shard2.ts preserves a rejected game in <out>.rejected.jsonl and finishes the shard; any rejection fails the quality gate"
+ },
+ "population": {
+  "map": "Cemetery (gridType 4, seeded 9-12 neutral barrels)",
+  "drafts": "actual V3/contextual/exclusive-delivery native drafts, all nine own x opponent doctrine pairings, balanced pick order, both physical seats, no eligibility filter (scan order)",
+  "bankFile": "confirmation-A-cases.json",
+  "bankSha256": "863829e466ceee6484b42332b5a91b157c1c460d36799b22d264005cd8d25103",
+  "families": 2700,
+  "cases": 5400,
+  "arms": 2,
+  "games": 10800,
+  "selection": "reserve families with scan index 120..419 in each of the nine doctrine cells; fixed before any game on them",
+  "unopenedRemainder": {
+   "file": "confirmation-B-reserve-cases.json",
+   "sha256": "ac383dede20937384ef56450042ad9741d5bda1e6349e34c2afc20db97aee8c5",
+   "families": 1386,
+   "use": "not part of this registration; stays reserved"
+  },
+  "seeds": {
+   "namespace": "barrel-strike-necessity-20261119-v1",
+   "scannedCountersPerRole": 24000,
+   "roles": [
+    "draft",
+    "setup",
+    "reverse",
+    "terrain"
+   ],
+   "uniqueReservedChannels": 1631768,
+   "sourceLedgers": 428,
+   "allScannedReserved": true,
+   "reservedFiles": [
+    "reserved-scanned-preimages.json",
+    "reserved-scanned-channels.json",
+    "seed-scans.json"
+   ]
+  }
+ },
+ "arms": [
+  {
+   "id": "current",
+   "parameters": {
+    "cleanup": "native",
+    "deliberate": "native"
+   }
+  },
+  {
+   "id": "neutral-all",
+   "parameters": {
+    "cleanup": "native",
+    "deliberate": "neutral-all"
+   }
+  }
+ ],
+ "armsSha256": "b9f02f474947e23df27687617469bd8a26e1c8bbe6cb95c84ec4134f65ccf0f9",
+ "primaryEndpoint": "mean paired match-score difference candidate minus current (win 1, draw 0.5, loss 0); the unit is one draft family (both seats); 20,000 whole-family bootstrap resamples, mulberry32 seed 2026111902, index floor(u32*n/2^32), percentile 2.5/97.5",
+ "bootstrap": {
+  "samples": 20000,
+  "seed": 2026111902
+ },
+ "gates": {
+  "quality": "all 10,800 results present, duplicate rows identical, independent input hashes and journal winners verified, zero quality errors, source manifest verified on every host before and after",
+  "minGainPoints": 0.5,
+  "lowerBound": "family-bootstrap 95% lower bound strictly above 0",
+  "minChangedFamilies": 1350,
+  "sliceFloorPoints": -1.0,
+  "sliceFloorSlices": [
+   "doctrine",
+   "opponentDoctrine",
+   "seat"
+  ],
+  "independentReconstruction": "analysis/final_analysis.py and analysis/final_analysis.ts must agree on every half-point total and on the sha256 of all bootstrap sums",
+  "inertness": "every off-map control pair (inert-bank.json, 80 Normal/Lava cases incl. all exposed Barrel Barricade cases) has identical digests under current and candidate, rerun under this manifest",
+  "nativeParity": "the capsule current arm reproduces the unpatched server digest on the 48 fixed development cases, rerun under this manifest",
+  "cost": "separate serial AB/BA study on 72 fixed development cases: complete adapter CPU and CPU per authoritative decision each within +10% overall",
+  "coldReplay": "after collection, shards 0 and 47 (about 225 games each) are recomputed in fresh processes on a different host; every digest, score and decision count must be identical"
+ },
+ "execution": {
+  "shards": 48,
+  "hosts": [
+   "hft (9800X3D, linux x64)",
+   "mac (M4 Max, darwin arm64)",
+   "puffalo (Xeon w7, linux x64)"
+  ],
+  "priority": "low (nice 5-12) beside unrelated workloads",
+  "cutoffUtc": "2026-11-20T00:30:00Z",
+  "rules": [
+   "no interim aggregate inspection of confirmation scores",
+   "no retry with another seed, no extension, no subset rescue",
+   "a shard may be recomputed on another host; duplicates must be identical and are counted once",
+   "a shard process that dies from a runtime crash (observed once before registration: a Bun abort in a control shard that did not recur on restart) is restarted and resumes after its last completed row, at most 8 times; crash logs are preserved; a completed or rejected game is never replayed with different inputs"
+  ]
+ },
+ "analysisSources": {
+  "analysis/final_analysis.py": "e7a48ae94fe7d39b2fe5c54557d5b0895acc94e7b64a62a8e64e377fd79a882e",
+  "analysis/final_analysis.ts": "6c539ca42139585d672796a8950acdc6635249bab4e83d7f7ac3f53f2d50a60e",
+  "analysis/verify_results.py": "5813584a520778d7cf98a64c76f956a29687b7459adbeade6c6b636e91d79edb",
+  "manifest.py": "a8f930237653130b8a7be4b9fca3a980740c0d236d1b5e7df4e323e7006bb5d7",
+  "allocate.py": "a160ac6505000b2e7b3bd641bcdaf86449407113d9be2aba270939740027a6fe",
+  "census.ts": "83701c42eec2462dda5e861aee40b3beb19765ab496a4cfa3e3e01a013febe5a",
+  "native-drafts.ts": "2457aa3ff272619c0966e0b5744f74749715a7794714f95dd9314046c2bc983a",
+  "draft-parity.ts": "9493f044a50c9b5074a78f3ceb2166cd34c4e833b483f73067a2b2449494f8d1"
+ },
+ "developmentHistoryAtRegistration": {
+  "exposedRecon": {
+   "bank": "72 exposed Cemetery families from the Sniper study",
+   "neutral-all style (all one-hit stones)": "+4.17 points, 95% -1.39 to +9.72",
+   "no-mine root+forecast": "-0.69 points, 95% -7.64 to +6.25"
+  },
+  "freshDevelopment": {
+   "bank": "development-cases.json",
+   "bankSha256": "e844a2c854d8b9d85ef7ec4649830f587ef0b4581320acdb50fd16d343ca1910",
+   "families": 1080,
+   "games": 2160,
+   "baselineScorePct": 51.458333333333336,
+   "candidateScorePct": 54.76851851851852,
+   "gainPoints": 3.310185185185185,
+   "bootstrap95": [
+    1.5740740740740742,
+    5.069444444444445
+   ],
+   "bootstrapSeed": 2026111901,
+   "improved": 242,
+   "worsened": 160,
+   "changedFamilies": 1046,
+   "slices": {
+    "doctrine": {
+     "1": {
+      "games": 720,
+      "gainPoints": 2.4305555555555554
+     },
+     "2": {
+      "games": 720,
+      "gainPoints": 5.138888888888889
+     },
+     "3": {
+      "games": 720,
+      "gainPoints": 2.361111111111111
+     }
+    },
+    "opponentDoctrine": {
+     "1": {
+      "games": 720,
+      "gainPoints": 4.375
+     },
+     "2": {
+      "games": 720,
+      "gainPoints": 2.5694444444444446
+     },
+     "3": {
+      "games": 720,
+      "gainPoints": 2.986111111111111
+     }
+    },
+    "seat": {
+     "1": {
+      "games": 1080,
+      "gainPoints": 3.3796296296296298
+     },
+     "2": {
+      "games": 1080,
+      "gainPoints": 3.240740740740741
+     }
+    },
+    "pickOrder": {
+     "0": {
+      "games": 1080,
+      "gainPoints": 3.0555555555555554
+     },
+     "1": {
+      "games": 1080,
+      "gainPoints": 3.564814814814815
+     }
+    },
+    "barrelArtifact": {
+     "both": {
+      "games": 12,
+      "gainPoints": -4.166666666666667
+     },
+     "none": {
+      "games": 1870,
+      "gainPoints": 3.5294117647058822
+     },
+     "opponent": {
+      "games": 152,
+      "gainPoints": 0.0
+     },
+     "own": {
+      "games": 126,
+      "gainPoints": 4.761904761904762
+     }
+    }
+   },
+   "cpuRatio": 1.064564542645249,
+   "decisionRatio": 1.0383527024862518
+  },
+  "otherDevelopmentArmsStillRunning": [
+   "neutral-melee",
+   "no-mine-root",
+   "no-mine-root-melee",
+   "useful-root",
+   "ownlane-root"
+  ],
+  "note": "Development selected this single candidate. Other arms are separate hypotheses; none shares this confirmation bank."
+ },
+ "promotion": "none automatic; a pass is evidence for an explicit user adoption decision",
+ "sha256": "8d4a618a9f3533b6a9a91e1784cfe197725996aa97c0a0284529a969badefc81"
+}

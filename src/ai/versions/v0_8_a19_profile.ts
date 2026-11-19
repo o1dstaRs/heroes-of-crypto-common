@@ -138,7 +138,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8078c75f34a4030ad5c767c" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "820db7a1f8eb9243a9d79e6ac68eff1df706c2d148a9d0606c28efaa709258ba" as const;
+    "feaf19b91f76615e590da9558832e6b7469e9c07df75d0f1d6140e8c9f02c724" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -175,7 +175,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "melee-barrel-rollback-environment" as const,
         source: "src/ai/versions/v0_8_a13_profile.ts" as const,
-        sha256: "49ac200e138d50f13a90d4b199b27d020abe523862d6464a25fed01c5a1d7264" as const,
+        sha256: "0de782b3da74931726cb8da41c0577546919a2e1f338cb97af99e0a00f26c9eb" as const,
     }),
     Object.freeze({
         role: "nightmare-wall-movement" as const,
@@ -195,8 +195,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Battle Mage retains distinct Meteorite impacts in both production enumeration paths.
-        sha256: "6d2cecce705f56e8bc753f73ccddc0b40a96d727c8d76e31cc99f0cb62a21ab6" as const,
+        // Adds the default-off neutral cemetery barrel deliberation switch; default behavior is unchanged.
+        sha256: "09f51dd48caee326017ae44597e738d7ee12994118ab343a0ba9cf88a53890e8" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
@@ -481,6 +481,8 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT: "0",
         // Only the explicit JSON research override may enable this unqualified candidate.
         SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
+        // Stronger on a registered Cemetery bank, but two registered gates failed: off until the user decides.
+        SEARCH_A19_NEUTRAL_BARREL_DELIBERATION: "0",
         SEARCH_A19_MATERIAL_ARBITRATION: "ties",
         SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1",
         SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: "1",

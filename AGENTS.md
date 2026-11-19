@@ -1,5 +1,47 @@
 # Agent guidance
 
+## Neutral cemetery barrel deliberation — November 19, 2026
+
+Read `docs/neutral_barrel_deliberation_research.md` before touching barrel strikes. The native v0.8
+cleanup turns every non-attacking turn into an obstacle strike while a one-hit stone stands, and A19
+returned that strike without comparison except for melee deployment-barrel strikes. On Cemetery this was
+3.27 neutral barrel strikes per seat-game, 12.6% of all root decisions.
+
+`a19-neutral-barrel-deliberation-v1` gives a strike on a standing **neutral** stone, melee or ranged,
+the same comparison the adopted v9 switch gives melee deployment-barrel strikes. The native cleanup,
+every forecast, deployment-barrel handling, classic mountains, models and budgets are unchanged, and
+boards without neutral stones cannot change. Fresh development on 1,080 Cemetery families gained +3.31
+score points (95% +1.57 to +5.07). The registered held-out confirmation on 2,700 fresh families / 10,800
+games gained **+3.58 points (95% +2.44 to +4.75)** under the most adverse reading of its six rejected
+games (every affected family scored as a double loss for the candidate); the Amendment 1 analysis gives
++3.62 (+2.46 to +4.79). Every strength and control gate passed. **Two registered gates FAILED:**
+quality, because one rejected game was outside the amended class (a mindless v0.1 Berserker closed by
+the non-policy timeout), and serial cost (complete CPU +10.14% against the +10% limit on 72 Cemetery
+cases; +3.93% per decision). Do not waive, re-run or relabel either gate: the candidate is measurably
+stronger on Cemetery but is not qualified for automatic progression.
+
+The switch `SEARCH_A19_NEUTRAL_BARREL_DELIBERATION` is in `SearchDriver` and pinned **off** in profile
+v13 (sealed environment `"0"`, a13 rollback unset). A 36-game integration replay through the real switch
+matches the research seam exactly. Adoption is an explicit user decision that weighs the two failed
+gates: one profile rule, a profile version bump, re-pinned fingerprints and the server revision string.
+Amendment 1 was filed blind during collection: a game rejected only for the known native refusal
+(`strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available`) has its family scored
+as the worst completion for the candidate; 5 families were imputed that way. Do not relax that rule,
+drop those families or reuse the consumed bank. A searchless exploration found no gain from removing the
+scripted strike from the plain native policy (−0.82 points, −2.52 to +0.86), so the gain comes from
+giving those turns back to A19's search.
+
+Preserve `docs/evidence/neutral_barrel_deliberation_registration_20261119.json`, the results fixture and
+the seed fixture. Exclude namespace `barrel-strike-necessity-20261119-v1`: roles `draft`, `setup`,
+`reverse`, `terrain`, counters 1..24,000 each, preimage = first four little-endian bytes of
+SHA-256(`<namespace>:<role>:<counter>`); draft reserves raw offsets 0..31 and their native permutation,
+setup and reverse their root, terrain its root and canonical search channel. Every scanned counter stays
+reserved, including rejected ones and the 1,386 never-played families (scan index 420..573). The arrays
+are in the client's ignored `game/core/tmp/barrel-strike-necessity-20261119` capsule. The consumed
+confirmation bank must not tune another candidate. Melee-only and root-removal variants scored the same
+within noise on development and were not confirmed; do not present them as separately qualified. Ranged
+strikes on deployment barrels and the searchless native policy were not studied and keep their behavior.
+
 ## Exact placement inference optimization — November 19, 2026
 
 Read `docs/a19_placement_inference_optimization.md`. Current v13 retains its

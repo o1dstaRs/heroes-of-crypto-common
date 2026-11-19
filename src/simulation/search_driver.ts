@@ -1437,6 +1437,7 @@ export class SearchDriver {
     private readonly a19MaterialLowEvidenceWinningSamples: number;
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
     private readonly a19MeleeBarrelDeliberation: boolean;
+    private readonly a19NeutralBarrelDeliberation: boolean;
     private readonly a19NightmareWallMovement: boolean;
     private readonly a19GravechainCoverage: boolean;
     private readonly a19WanderingMageSupport: boolean;
@@ -1740,6 +1741,16 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_MELEE_BARREL_DELIBERATION must be 0 or 1");
         }
         this.a19MeleeBarrelDeliberation = this.mode === "search" && meleeBarrelDeliberation === "1";
+        const neutralBarrelDeliberation = searchEnv("SEARCH_A19_NEUTRAL_BARREL_DELIBERATION");
+        if (
+            neutralBarrelDeliberation !== undefined &&
+            neutralBarrelDeliberation !== "" &&
+            neutralBarrelDeliberation !== "0" &&
+            neutralBarrelDeliberation !== "1"
+        ) {
+            throw new Error("SEARCH_A19_NEUTRAL_BARREL_DELIBERATION must be 0 or 1");
+        }
+        this.a19NeutralBarrelDeliberation = this.mode === "search" && neutralBarrelDeliberation === "1";
         const nightmareWallMovement = searchEnv("SEARCH_A19_NIGHTMARE_WALL_MOVEMENT");
         if (
             nightmareWallMovement !== undefined &&
@@ -2425,21 +2436,28 @@ export class SearchDriver {
         const isAggressiveV08 = this.aggressiveV08 && V08_AGGRESSIVE_VERSIONS.has(version);
         const obstacleStrike = incumbent.find((action) => action.type === "obstacle_attack");
         const obstacleCell =
-            this.a19MeleeBarrelDeliberation &&
-            obstacleStrike &&
-            unit.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE
+            (this.a19MeleeBarrelDeliberation || this.a19NeutralBarrelDeliberation) && obstacleStrike
                 ? getCellForPosition(this.deps.grid.getSettings(), obstacleStrike.targetPosition)
                 : undefined;
-        const deliberateBarrel =
-            isV08Search &&
+        const strikesArtifactBarrel =
             !!obstacleCell &&
             this.deps.grid
                 .getArtifactBarrels()
                 .some((barrel) => barrel.cell.x === obstacleCell.x && barrel.cell.y === obstacleCell.y);
         // Deployment barrels also activate scattered terrain. They must not inherit the cemetery fast return:
         // the native cleanup can replace a deliberate move/hold with a strike on either army's cover. Compare
-        // that strike with legal alternatives using the ordinary bounded search; preserve neutral-stone and
-        // ranged cleanup behavior.
+        // that strike with legal alternatives using the ordinary bounded search. The separate neutral switch
+        // gives the same comparison to melee and ranged strikes on standing neutral cemetery barrels; ranged
+        // strikes on deployment barrels and classic mountains keep their original handling.
+        const deliberateBarrel =
+            isV08Search &&
+            !!obstacleCell &&
+            (strikesArtifactBarrel
+                ? this.a19MeleeBarrelDeliberation && unit.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE
+                : this.a19NeutralBarrelDeliberation &&
+                  this.deps.grid
+                      .getScatteredMountainsStanding()
+                      .some((stone) => stone.x === obstacleCell.x && stone.y === obstacleCell.y));
         if (
             isV08Search &&
             this.deps.grid.hasScatteredMountains() &&

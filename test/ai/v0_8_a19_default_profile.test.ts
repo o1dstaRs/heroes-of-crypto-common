@@ -53,6 +53,7 @@ const ENV_KEYS = [
     "V08_VISIBLE_EDGE_SCREEN_PRESSURE",
     "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
     "SEARCH_A19_MELEE_BARREL_DELIBERATION",
+    "SEARCH_A19_NEUTRAL_BARREL_DELIBERATION",
     "SEARCH_A19_NIGHTMARE_WALL_MOVEMENT",
     "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
     "SEARCH_A19_ROLLOUT_ALLOCATION",
@@ -151,6 +152,8 @@ describe("v0.8+A19 production profile", () => {
                     "SEARCH_A19_CERTIFIED_TIGHT_BOUNDS",
                     "SEARCH_A19_MATERIAL_ARBITRATION",
                     "SEARCH_A19_ROLLOUT_ALLOCATION",
+                    // Measured but not adopted: the A19 environment pins it off instead of leaving it unset.
+                    "SEARCH_A19_NEUTRAL_BARREL_DELIBERATION",
                 ].includes(key)
             ) {
                 continue;

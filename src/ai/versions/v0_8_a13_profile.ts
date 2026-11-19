@@ -130,6 +130,7 @@ export function buildV08A13SearchEnvironment(
         SEARCH_A19_HEALER_OPENING_COHESION: undefined,
         SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: undefined,
         SEARCH_A19_MELEE_BARREL_DELIBERATION: undefined,
+        SEARCH_A19_NEUTRAL_BARREL_DELIBERATION: undefined,
         SEARCH_A19_NIGHTMARE_WALL_MOVEMENT: undefined,
         SEARCH_A19_GRAVECHAIN_COVERAGE: undefined,
         SEARCH_A19_LAST_FUSE_TRADES: undefined,
