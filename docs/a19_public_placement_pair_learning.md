@@ -65,3 +65,20 @@ full validation, funding, hosts, gates and original cutoffs remain unchanged.
 Sixteen current native/observed/cold games on HFT and Puffalo passed full outcome
 equality; each current known refusal was witnessed without state or RNG changes.
 These are functional controls, not measured AI strength or new independent data.
+
+Both nodes independently reconstructed identical complete input bytes: 1,152
+families, 4,608 cases, 864 training / 288 validation families and every original
+unscored scan. The final freshness audit covers 402 ledgers with zero allocated
+channel intersections. The [unopened execution seal](evidence/a19_public_placement_pair_execution_20261119.json)
+is `da73d271`, covering 6,225 source files. The real scheduler inspection passed
+with zero started games: 91 HFT blocks / 10,080 labels and 55 Puffalo blocks /
+6,048 labels, at four / eight nice 19 workers.
+
+Before fresh labels, the remaining eight known-input canonical games must pass
+cold / pooled full-outcome equality, zero-game cache replay, exact current native
+reference equality, independent foreign verification and twelve corruption controls.
+Each later block waits for a verified full archive on both nodes and independent
+source/cache/input/feature/geometry/book/winner/refusal verification before starting
+the next block. Both complete models still precede opening validation effect
+statistics. Canonical mandatory per-block comparisons are quarantined and never
+used to select, stop or tune the fixed fit. No new model or gain is qualified.

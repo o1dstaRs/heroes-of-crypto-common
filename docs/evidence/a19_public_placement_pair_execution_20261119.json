@@ -1,0 +1,127 @@
+{
+    "schema": 1,
+    "id": "paired-public-placement-native-execution-20261119-v1",
+    "atUtc": "2026-11-19T07:43:27.611768+00:00",
+    "stage": "Complete unopened native label source and actual scheduler preflight; zero fresh combat labels at this seal",
+    "sourceSealSha256": "da73d2712c89101a0496818ee9069f81898920f3a8fbcc2cad6503a2bab98a1d",
+    "sourceFileManifestSha256": "5f5daf567983c971c89e64d9d163a30841ef52bfd4101ddbc379ed6a898e3334",
+    "sourceFiles": 6225,
+    "dataRecipeSha256": "1520e6cacdc03406339436cf114f5a7cdb80726113d7a12054de52c527531794",
+    "inputBankMetadata": {
+        "passed": true,
+        "atUtc": "2026-11-19T07:38:07.628656+00:00",
+        "crossHostBoundInputBytesExactlyEqual": true,
+        "families": 1152,
+        "cases": 4608,
+        "trainingFamilies": 864,
+        "validationFamilies": 288,
+        "nativeCombatGames": 0,
+        "files": {
+            "complete-input-bank-index.json": [
+                "eb064999af16d82019394499996fad4eb2a1cea7f3af40afe3104cc9f9510faf",
+                1016
+            ],
+            "all-cases.json": ["91a66005128ee7e3078844d2f38cf4f267f59c26fa6716ca8d9da427c8a790e7", 20343780],
+            "all-family-inputs.json": ["277dd2ec4e89a3ae9b033462eea12ff176c072ce7439a37cff3554d6d5081b23", 503813],
+            "native-opening-audit.json": ["7f7c815fd3926a04174554b5ac444d419d2448be085adda6bb09ce18c22ad31b", 15035110],
+            "engineering-case.json": ["13315be54935ed73d09a89c55bad5f0c8a874e2ce0387c5f2ab94188523b9961", 3648],
+            "engineering-opening-audit.json": [
+                "a8e947df407e3d0624adc1c50c96a192c01c0fdb4f13354b022807f33d422236",
+                3059
+            ],
+            "known-engineering-native0-outcome.json": [
+                "818b5c2471233eddd1ba8d48c3aadd0af1d54e320a50b6fa3799fdb8d539a621",
+                118808
+            ]
+        },
+        "rawShardReplicasBothVerified": true,
+        "source": "77a36c2f04c6e9cf2d2854c3fb5b3af326937538946de0e0f2d2a46dc95f7d34"
+    },
+    "freshSeedAudit": {
+        "qualityPassed": true,
+        "namespace": "native-public-placement-paired-data-20261119-v1",
+        "auditedAllocatedRoots": 43632,
+        "auditedDerivedChannels": 509040,
+        "sourceLedgers": 402,
+        "intersections": 0,
+        "freshBattleExecutedByAudit": false
+    },
+    "allocation": {
+        "hft": {
+            "families": 720,
+            "trainingFamilies": 540,
+            "validationFamilies": 180,
+            "logicalGames": 10080,
+            "workers": 4,
+            "nice": 19,
+            "familiesPerBlock": 8,
+            "blocks": 91
+        },
+        "puffalo": {
+            "families": 432,
+            "trainingFamilies": 324,
+            "validationFamilies": 108,
+            "logicalGames": 6048,
+            "workers": 8,
+            "nice": 19,
+            "familiesPerBlock": 8,
+            "blocks": 55
+        }
+    },
+    "logicalGames": 16128,
+    "blocks": 146,
+    "guardControls": {
+        "unitAndActualOsProcessTestsPassed": 9,
+        "realMarkerlessControllerDeathAndLocalEnospcBothRemoteStopsPassed": true,
+        "streamedExactReplicaWithoutMacRawArchivePassed": true
+    },
+    "nodes": {
+        "hft": {
+            "passed": true,
+            "source": "da73d2712c89101a0496818ee9069f81898920f3a8fbcc2cad6503a2bab98a1d",
+            "sourceFileSha256": "5f5daf567983c971c89e64d9d163a30841ef52bfd4101ddbc379ed6a898e3334",
+            "scheduler": {
+                "passed": true,
+                "host": "hft",
+                "blocks": 91,
+                "families": 720,
+                "logicalGames": 10080,
+                "workers": 4,
+                "newGames": 0,
+                "processesStarted": 0
+            }
+        },
+        "puffalo": {
+            "passed": true,
+            "source": "da73d2712c89101a0496818ee9069f81898920f3a8fbcc2cad6503a2bab98a1d",
+            "sourceFileSha256": "5f5daf567983c971c89e64d9d163a30841ef52bfd4101ddbc379ed6a898e3334",
+            "scheduler": {
+                "passed": true,
+                "host": "puffalo",
+                "blocks": 55,
+                "families": 432,
+                "logicalGames": 6048,
+                "workers": 8,
+                "newGames": 0,
+                "processesStarted": 0
+            }
+        }
+    },
+    "engineering": {
+        "currentNativeObservedSeparateColdGamesPassed": 16,
+        "canonicalColdPooledForeignControlsBeforeFreshLabelsPlanned": 8,
+        "knownInputsOnly": true,
+        "totalFullGamesBudget": 24
+    },
+    "quarantinedCanonicalPerBlockComparisonsNotUsedForModelSelection": true,
+    "completeAll16128AndTwoRawReplicasBeforeFixedFinal80Fit": true,
+    "cutoffsUtc": {
+        "inputSampling": "2026-11-19T10:00:00Z",
+        "labelCollection": "2026-11-20T02:00:00Z",
+        "trainingAndValidation": "2026-11-20T03:00:00Z",
+        "noAutomaticRetryOrExtension": true
+    },
+    "freshNativeLabels": 0,
+    "validationModelSelectionOpened": false,
+    "automaticPromotionOrDeployment": false
+}

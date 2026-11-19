@@ -26,6 +26,15 @@ known-input preflight before only previously unexecuted input tasks. It is the
 SAME unopened allocation, not new independent data or an invalid native retry.
 All 2,293,095 reserved channels, funding, validation and cutoffs remain fixed.
 
+The complete unopened label source is now `da73d271` (6,225 files). Both nodes
+independently reconstructed identical 1,152-family / 4,608-case inputs; the final
+freshness audit found zero intersections across 402 ledgers. Actual scheduler
+inspection passed for 91 HFT / 55 Puffalo whole-family blocks at four / eight
+nice 19 workers. Keep the execution fixture, eight remaining known canonical
+engineering games, foreign corruption controls, both-archive acknowledgment
+barrier, complete 16,128 labels and final80-before-validation requirements.
+Per-block canonical comparisons are quarantined; they do not select a model.
+
 ## Closed JSON placement collection after storage failure — November 19, 2026
 
 The `b8d7f4ed` producer / `8cf5e842` analysis continuation is now **closed incomplete**.
