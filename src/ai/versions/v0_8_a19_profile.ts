@@ -12,6 +12,7 @@
 import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
 import { A19_TERRAIN_PLACEMENT_POLICY } from "../placement/terrain_reflection";
 import { A19_REVEALED_RANGED_POLICY, A19_SNIPER_DONOR_POLICY } from "../setup/a19_revealed_ranged_identity";
+import { A19_SHOOTERLESS_MOVEMENT_POLICY } from "../setup/a19_shooterless_setup_identity";
 import { A19_STRIKER_RUSH_POLICY } from "../setup/a19_striker_rush_identity";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
 import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
@@ -75,8 +76,13 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     weights and budgets are untouched. +28.80 score points against v14 on the registered sealed bank (95%
  *     +23.52 to +34.07); its quality and cost gates failed and stay recorded as failed
  *     (docs/striker_rush_adoption.md).
+ *   - shooterless Movement (profile v16) adopted on 2026-11-20 under the same standing instruction. A seat
+ *     without a ranged creature spends the Sniper point of its upgrade plan on Movement: Sniper does nothing for
+ *     such an army. Only seven-point plans hold that point. +8.06 score points for a seven-point seat against
+ *     v15 on the registered sealed bank (95% +3.89 to +12.04); all five registered gates passed
+ *     (docs/shooterless_movement_adoption.md). Search, weights and budgets are untouched.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v15" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v16" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -188,6 +194,19 @@ export const V08_A19_ARTIFACT_BENEFICIARY_POLICY = Object.freeze({
     adoptedAt: "2026-11-20",
     adoption: "standing-user-instruction",
     qualification: "changed-case-diagnostic",
+} as const);
+
+/**
+ * Shooterless Movement (profile v16). The rule lives in ai/setup/a19_shooterless_setup.ts and the server's setup
+ * decider, not in `SearchDriver`; this record keeps the decision and its registration with the profile. See
+ * docs/shooterless_movement_adoption.md.
+ */
+export const V08_A19_SHOOTERLESS_MOVEMENT_POLICY = Object.freeze({
+    policyId: A19_SHOOTERLESS_MOVEMENT_POLICY,
+    adoptedAt: "2026-11-20",
+    adoption: "standing-user-instruction",
+    registrationSha256: "28ca93f78b560d0a8e5217e88f28f4dd8ca2077176fabd899ce676c9ec701945",
+    qualification: "registered-confirmation-passed",
 } as const);
 
 /**
@@ -513,6 +532,7 @@ export const V08_A19_PROFILE = Object.freeze({
     neutralBarrelDeliberation: V08_A19_NEUTRAL_BARREL_DELIBERATION_POLICY,
     strikerRush: V08_A19_STRIKER_RUSH_POLICY,
     artifactBeneficiary: V08_A19_ARTIFACT_BENEFICIARY_POLICY,
+    shooterlessMovement: V08_A19_SHOOTERLESS_MOVEMENT_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

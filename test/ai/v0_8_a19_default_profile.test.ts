@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v15",
+            schema: "hoc.v0_8_a19_production_profile.v16",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -110,6 +110,14 @@ describe("v0.8+A19 production profile", () => {
                 qualification: "strength-confirmed-quality-and-cost-gates-failed",
             },
             artifactBeneficiary: { policyId: "artifact-fit-v8", qualification: "changed-case-diagnostic" },
+            // Profile v16: every registered gate of this one passed.
+            shooterlessMovement: {
+                policyId: "a19-shooterless-movement-v1",
+                adoptedAt: "2026-11-20",
+                adoption: "standing-user-instruction",
+                registrationSha256: "28ca93f78b560d0a8e5217e88f28f4dd8ca2077176fabd899ce676c9ec701945",
+                qualification: "registered-confirmation-passed",
+            },
         });
         expect(V08_A19_SEARCH).toMatchObject({
             gate: 0.03,

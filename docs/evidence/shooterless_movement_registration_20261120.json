@@ -1,0 +1,55 @@
+{
+ "id": "shooterless-movement-v1-confirmation-20261120",
+ "registeredAt": "2026-11-20T08:30:46.202800+00:00",
+ "question": "Does a seven-point army without a ranged creature score higher against the current default (A19 profile v15) when its Sniper point is spent on Movement instead?",
+ "candidate": {
+  "setupRule": "After the shipped upgrade selection, when the rush rule did not fire: if no drafted creature of the seat attacks at range, and the selected plan buys Sniper but neither Placement nor Movement, the Sniper levels are moved to Movement (to Placement once Movement is at 2). For the only budget where this happens, Armor 3 / Might 3 / Sniper 1 becomes Movement 1 / Armor 3 / Might 3. Nothing else changes: draft, formation, rush rule, A19 fight search, the opponent.",
+  "mechanism": "Sniper only modifies units whose attack type is ranged (units_holder.ts); for an army with none it does nothing. The anchor upgrade spend is composition-blind."
+ },
+ "control": "Profile v15 on both seats: striker draft head, rush rule, shipped setup.",
+ "opponent": "Profile v15 in both arms (striker draft head, rush rule; its Tier-2 beneficiary rule has no hook on the opponent seat of the draft generator, which changes under 3% of its artifact picks and is the same in both arms).",
+ "bank": {
+  "namespace": "rush-doctrine-20261120-v1",
+  "tasks": 540,
+  "families": "index 127..186, the reserve kept sealed by confirmation A; 180 per map (Normal, Lava, Block centre)",
+  "doctrine": "The candidate seat's doctrine is set to Battle Trance (seven upgrade points) on every task, because the rule acts on seven-point plans only; the opponent keeps the task's doctrine (5, 6 or 7 points, 180 each).",
+  "unit": "one task = one draft seed, opponent doctrine, map and pick order; one game per arm from the candidate seat; both arms play the identical drafted armies"
+ },
+ "primaryEndpoint": "Mean over the 540 tasks of candidate-arm score minus control-arm score for the candidate seat (win 1, draw 0.5, loss 0). 95% interval from 10,000 bootstrap resamples over tasks, seed 20261121.",
+ "gates": {
+  "G1": "Lower bound of the primary interval above zero.",
+  "G2": "No map with a negative point estimate.",
+  "G3": "Candidate-arm games with a quality error not more than control-arm games with one (the default's known incoherent melee proposal appears about once in 540 games in either arm).",
+  "G4": "A rerun of 30 candidate tasks on a second host reproduces the same digests.",
+  "G5": "Mean CPU per candidate game at most 1.25 times the control, same host and tree."
+ },
+ "notClaimed": "An effect for five- and six-point seats (their plans hold no Sniper, so the rule does nothing and the games are identical), for armies with a shooter, against opponents other than profile v15, or against people. Under the default's doctrine variety one seat in three has seven points.",
+ "development": {
+  "tasks": 198,
+  "estimate": "+7.8 points, 95% +2.0 to +13.9 (control 52.8%, candidate 60.6%; rule applied on 149 tasks), families 0..21 of the same namespace",
+  "alternativesRejected": "Placement 1 for the spare point +4.5 (-1.8 to +10.6); one Movement level before the last Might level -3.8; before the last Armor level -4.8; one Placement level first -11.4"
+ },
+ "execution": {
+  "runner": "life-run5.ts on the production server lifecycle; a seat carries a list of rules, first match wins (rush, then shooterless). Control spec v15.json, candidate spec v15-shooterless.json",
+  "tree": "shipped-parity/lab4 (server + engine at A19 profile v14 with inert research hooks; the v15 draft head and rush rule are applied by the draft generator and the runner, as in confirmation A)",
+  "treeManifestSha256": "bc730e9cfcb070fd997ac5f5b531fcf08b45b2fa68dbe3dd889a7e275ece389e",
+  "draftGenerator": "league-drafts.ts, seat strategies S:B1234:fast on both seats, over the frozen server policy functions with serving-parity assertions",
+  "host": "M4 Max, 8 processes"
+ },
+ "inputsSha256": {
+  "league-drafts.ts": "5b47451bef631ebfa923a3230f81111bbab1a4e48e3f86706208363381fe5beb",
+  "life-run5.ts": "b36942781793af4f74a3c8160e4fcfcc50fdaecc2d8ac334af4687892ba687e2",
+  "life-pool5.sh": "07c574dc5d8e6cad6cf8396b66d0a881252cd87b4ee566f6f7212b3be7cdb4ba",
+  "formation_lib.ts": "b6b64b8419d0b4bea3f2bf498f586e54ad3b44f0adc83f05b74a677371fe6f31",
+  "specs2/v15.json": "5c0fdb7eacb2d7afe90e027bcbcfb90eba85c227734e6b77f895263e6e1a01c1",
+  "specs2/v15-shooterless.json": "3bb2b90b539f2eccb154a0ee27d55f18e6269515d5c25d613ed754f575067f29",
+  "confirm_r2_analyze.py": "7e7d977909f604c651325d48bacf6eefd647c76b6fdc0465a0db55ef2fadad6a",
+  "tree_manifest.sh": "91e0dc01bd1a13e2a6aa75e022cabc56b79c8c5fbaeda6ab336ec8473e19203e",
+  "seeds/pool.json": "14d060c84af74cc74bf843ae2c9d402dd54e5d04889112ff17123223ba490dc9",
+  "seeds/split.json": "d010ad94ec688972bde669f26f658f937cb47290525aeb7589e7fba0f0746087",
+  "seeds/confirmation-reserve-tasks.json": "f5e779f40a1d70e3a0f8155fcda1d627d59890929470f070d6f7ba9506d8338b",
+  "seeds/confR2-tasks.json": "c5e567e33667896245a14b9b1cbf18ada2d38f21f58c680f61287ed67a26a106",
+  "bank/confR2-mirror.json": "536027384937ef4359dcda41dd589be34856739c839d9654329c05154360d5bd",
+  "../draft-parity.ts": "9493f044a50c9b5074a78f3ceb2166cd34c4e833b483f73067a2b2449494f8d1"
+ }
+}

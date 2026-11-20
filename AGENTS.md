@@ -1,6 +1,34 @@
 # Agent guidance
 
+## Shooterless Movement adoption — November 20, 2026
+
+Under the same standing instruction as the section below, `a19-shooterless-movement-v1` is active in
+the A19-backed v0.8 default: **the current default is profile v16**. Read
+`docs/shooterless_movement_adoption.md` before changing it.
+
+A seat without a ranged creature gets nothing from Sniper, yet the composition-blind anchor spend
+gave every seven-point seat Armor 3, Might 3 and Sniper 1. The rule spends those Sniper levels on
+Movement. It rewrites the stock plan only: a plan that already buys Placement or Movement (a funded
+delivery plan, a rush plan) is left as it is, and so is every army with a shooter.
+`src/ai/setup/a19_shooterless_setup.ts` holds the rule; the server's setup decider calls it. Armor 3
+and Might 3 still come first: one Movement or Placement level in place of the last Might or Armor
+level measured worse, so do not extend the rule to five- and six-point plans.
+
+Preserve the registered +8.06-point estimate (95% +3.89 to +12.04; 540 sealed tasks; all five gates
+passed) with its scope: a **seven-point seat against profile v15**, a melee mirror. One default seat
+in three has seven points, games the seat rushes are unchanged, armies with exactly one shooter were
+not measured, and it is not a win rate against people. The registered analysis script was amended
+once, before any result was seen, for a division by zero in a descriptive breakdown; both hashes are
+in the results file.
+
+Subsequent research compares with v16. The first rush namespace is now fully consumed: families 0-66
+development, 67-126 the striker rush confirmation, 127-186 this confirmation. A second sealed pool,
+namespace `matchup-draft-20261120-v1`, has had no development use.
+
 ## Striker rush and artifact beneficiary adoption — November 20, 2026
+
+Profile v15 is retained inside v16; where this section says "current default", read v15 as the
+default at that date.
 
 On November 19 the user gave a standing instruction for this research: “always lock in wins and
 continue”. Under it `a19-striker-rush-v1` and the Tier-2 beneficiary rule (`artifact-fit-v8`) are

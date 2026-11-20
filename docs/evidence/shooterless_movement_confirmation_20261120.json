@@ -1,0 +1,233 @@
+{
+ "id": "shooterless-movement-v1-confirmation-results-20261120",
+ "registrationSha256": "28ca93f78b560d0a8e5217e88f28f4dd8ca2077176fabd899ce676c9ec701945",
+ "evidenceHeads": {
+  "common": "bdb90084518e723ae3832b32eeb4b048262fa559",
+  "server": "f77ae29068f026c7d49c14b9af49018b622ce774",
+  "note": "Research tree at A19 profile v14 with the profile v15 draft head and rush rule applied by the draft generator and the runner, as in the striker rush confirmation. The adoption commit sits on a later head that also contains a Battle Mage stat change; these games were not replayed on it."
+ },
+ "primary": {
+  "tasks": 540,
+  "control": 53.43,
+  "candidate": 61.48,
+  "difference": 8.06,
+  "interval95": [
+   3.89,
+   12.04
+  ],
+  "better": 90,
+  "worse": 44
+ },
+ "ruleApplied": {
+  "tasks": 399,
+  "control": 50.63,
+  "candidate": 61.53,
+  "difference": 10.9,
+  "interval95": [
+   5.39,
+   16.29
+  ],
+  "better": 90,
+  "worse": 44
+ },
+ "ruleNotApplied": {
+  "tasks": 141,
+  "identicalDigests": 141,
+  "note": "Armies with a shooter: the candidate arm replays the control game exactly."
+ },
+ "maps": {
+  "Normal": {
+   "tasks": 180,
+   "control": 58.61,
+   "candidate": 62.22,
+   "difference": 3.61,
+   "interval95": [
+    -3.89,
+    10.83
+   ],
+   "better": 28,
+   "worse": 21
+  },
+  "Lava": {
+   "tasks": 180,
+   "control": 52.22,
+   "candidate": 63.06,
+   "difference": 10.83,
+   "interval95": [
+    4.17,
+    17.5
+   ],
+   "better": 32,
+   "worse": 11
+  },
+  "Block centre": {
+   "tasks": 180,
+   "control": 49.44,
+   "candidate": 59.17,
+   "difference": 9.72,
+   "interval95": [
+    3.06,
+    16.39
+   ],
+   "better": 30,
+   "worse": 12
+  }
+ },
+ "opponentDoctrine": {
+  "threeReveals": {
+   "tasks": 180,
+   "control": 43.06,
+   "candidate": 56.39,
+   "difference": 13.33,
+   "interval95": [
+    6.94,
+    20.0
+   ],
+   "better": 34,
+   "worse": 8
+  },
+  "seeAll": {
+   "tasks": 180,
+   "control": 64.72,
+   "candidate": 67.78,
+   "difference": 3.06,
+   "interval95": [
+    -3.61,
+    9.72
+   ],
+   "better": 23,
+   "worse": 17
+  },
+  "seeNone": {
+   "tasks": 180,
+   "control": 52.5,
+   "candidate": 60.28,
+   "difference": 7.78,
+   "interval95": [
+    0.0,
+    15.56
+   ],
+   "better": 33,
+   "worse": 19
+  }
+ },
+ "gamesPerArm": 540,
+ "lapsPerGame": {
+  "control": 6.92,
+  "candidate": 6.71
+ },
+ "searchedDecisionsPerGame": {
+  "control": 52.57,
+  "candidate": 48.97
+ },
+ "cpu": {
+  "secondsPerGame": {
+   "control": 6.381,
+   "candidate": 6.134
+  },
+  "ratioPerGame": 0.9613,
+  "note": "Offline deterministic work on one host; the arms ran one after the other under the same load."
+ },
+ "gates": {
+  "G1 strength, lower bound above zero": {
+   "passed": true,
+   "value": 3.89
+  },
+  "G2 no map with a negative point estimate": {
+   "passed": true,
+   "lowestMap": "Normal",
+   "value": 3.61
+  },
+  "G3 candidate games with a quality error not above the control arm": {
+   "passed": true,
+   "candidateGamesWithAnError": 1,
+   "controlGamesWithAnError": 1
+  },
+  "G4 thirty candidate tasks reproduce on a second host": {
+   "passed": true,
+   "identicalDigests": 30,
+   "replayed": 30
+  },
+  "G5 candidate CPU per game at most 1.25 times the control": {
+   "passed": true,
+   "value": 0.9613
+  }
+ },
+ "productionPort": {
+  "what": "75 tasks replayed twice: by the research runner with the rule on both seats, and by the production implementation with no research seam (the server applying the rule itself to both seats), built at the evidence heads.",
+  "identicalDigests": 75,
+  "replayed": 75,
+  "opponentsOnTheMovementPlan": 27
+ },
+ "development": {
+  "tasks": 198,
+  "estimate": {
+   "control": 52.8,
+   "candidate": 60.6,
+   "difference": 7.8,
+   "interval95": [
+    2.0,
+    13.9
+   ],
+   "ruleApplied": 149
+  },
+  "alternatives": {
+   "Placement 1 for the spare point": {
+    "difference": 4.5,
+    "interval95": [
+     -1.8,
+     10.6
+    ]
+   },
+   "one Movement level before the last Might level, all budgets": {
+    "difference": -3.8,
+    "interval95": [
+     -11.1,
+     3.3
+    ]
+   },
+   "one Movement level before the last Armor level, all budgets": {
+    "difference": -4.8,
+    "interval95": [
+     -11.6,
+     2.0
+    ]
+   },
+   "one Placement level first, all budgets": {
+    "difference": -11.4,
+    "interval95": [
+     -18.9,
+     -3.5
+    ]
+   },
+   "Armor 3 / Movement 2 / Might with the rest": {
+    "difference": -14.9,
+    "interval95": [
+     -21.7,
+     -7.8
+    ]
+   },
+   "Placement 2 with a forward line / Armor 3 / Might with the rest": {
+    "difference": -17.9,
+    "interval95": [
+     -25.5,
+     -10.4
+    ]
+   }
+  }
+ },
+ "scope": "Candidate seat on seven upgrade points (Battle Trance) against profile v15. Under the default's doctrine variety one seat in three has seven points; five- and six-point plans hold no Sniper and are untouched.",
+ "notMeasured": [
+  "play against people",
+  "armies with exactly one shooter",
+  "a seat without a ranged creature and fewer than four strikers that does not rush",
+  "live decision latency"
+ ],
+ "analysis": {
+  "script": "confirm_r2_analyze.py",
+  "registeredSha256": "7e7d977909f604c651325d48bacf6eefd647c76b6fdc0465a0db55ef2fadad6a",
+  "amendedSha256": "65802a4defdf9f24b75566720b36111a584723abe742e19ae26987302518694e",
+  "amendment": "The registered script divided by zero in a descriptive breakdown by the candidate seat's own doctrine, which is constant in this study. Before any result was seen the breakdown was changed to the opponent's doctrine. Endpoint, interval and gate code are unchanged.",
+  "bootstrap": "10,000 resamples over tasks, seed 20261121"
+ }
+}
