@@ -178,7 +178,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // and Hydra HP -10/armor -1. The in-memory old-stat control restores the previous digest;
 // two new-stat runs agree with zero rejected actions across all eight fights.
 // Previous digest: a0402edc4096ef6abcb089494176996c3970d99934c70d6f1fb0719b2a8afacf.
-const EXPECTED_REPLAY_SHA256 = "e9da2d3035da5538cf41c7f0a12ef60bfcbeb802bbd16e0b3d9d8a866abbeb5a";
+// Re-pinned 2026-11-19 for Battle Mage armor 9 -> 8 and max melee damage 5 -> 4. The old-stat
+// control restores the previous digest; two new-stat runs agree.
+// Previous digest: e9da2d3035da5538cf41c7f0a12ef60bfcbeb802bbd16e0b3d9d8a866abbeb5a.
+const EXPECTED_REPLAY_SHA256 = "b3a86ddadb52d118d1c3312e4b481db4c4daa3bc140c443f5192d5dc8c2c0600";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
