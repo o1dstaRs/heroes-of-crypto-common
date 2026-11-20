@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v14",
+            schema: "hoc.v0_8_a19_production_profile.v15",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -101,6 +101,15 @@ describe("v0.8+A19 production profile", () => {
                 id: "sniper-donor-preservation-v1",
                 checkpoint: "a19-preserve-sniper-20261118",
             },
+            // Profile v15: the draft and setup policy and the artifact rule are recorded with their evidence status.
+            strikerRush: {
+                policyId: "a19-striker-rush-v1",
+                adoptedAt: "2026-11-20",
+                adoption: "standing-user-instruction",
+                registrationSha256: "d2786fd4acf80d1a02d59cd2ad733e0d78a23a420b54f457bf13d944b24a50b0",
+                qualification: "strength-confirmed-quality-and-cost-gates-failed",
+            },
+            artifactBeneficiary: { policyId: "artifact-fit-v8", qualification: "changed-case-diagnostic" },
         });
         expect(V08_A19_SEARCH).toMatchObject({
             gate: 0.03,

@@ -1,0 +1,86 @@
+{
+ "id": "artifact-beneficiary-changed-cases-20261120",
+ "kind": "changed-case diagnostic; development evidence, not a registered confirmation and not an unconditional gain",
+ "question": "Where the win-rate table would take an artifact none of the five known creatures can use, is the best usable artifact on the same offer better?",
+ "design": "Every distinct roster of three lifecycle banks (726). For a roster with such an artifact in the live pool, one three-artifact offer on which the two rules disagree was sampled by hash. The pair of games differs only in that seat's Tier-2 artifact; both seats are the A19 profile v14 default, full production lifecycle.",
+ "rosters": 726,
+ "rostersWithAnUnusableArtifact": 239,
+ "offersEnumerated": 86996,
+ "offersWhereTheRulesDisagree": 9455,
+ "all": {
+  "pairs": 239,
+  "tableChoiceScore": 50.21,
+  "ruleChoiceScore": 57.74,
+  "difference": 7.53,
+  "interval95": [
+   0.84,
+   14.02
+  ],
+  "better": 43,
+  "worse": 26
+ },
+ "giantsMaul": {
+  "level4AreaAttacker": {
+   "pairs": 137,
+   "tableChoiceScore": 58.03,
+   "ruleChoiceScore": 64.23,
+   "difference": 6.2,
+   "interval95": [
+    -2.19,
+    14.6
+   ],
+   "better": 22,
+   "worse": 14
+  },
+  "noAreaAttackerInFinalArmy": {
+   "pairs": 64,
+   "tableChoiceScore": 32.03,
+   "ruleChoiceScore": 51.56,
+   "difference": 19.53,
+   "interval95": [
+    6.25,
+    32.81
+   ],
+   "better": 17,
+   "worse": 5
+  }
+ },
+ "farsightQuiver": {
+  "level4Shooter": {
+   "pairs": 8,
+   "tableChoiceScore": 87.5,
+   "ruleChoiceScore": 25.0,
+   "difference": -62.5,
+   "interval95": [
+    -87.5,
+    -25.0
+   ],
+   "better": 0,
+   "worse": 5
+  },
+  "noShooterInFinalArmy": {
+   "pairs": 30,
+   "tableChoiceScore": 43.33,
+   "ruleChoiceScore": 50.0,
+   "difference": 6.67,
+   "interval95": [
+    -10.0,
+    23.33
+   ],
+   "better": 4,
+   "worse": 2
+  }
+ },
+ "qualityErrors": 0,
+ "reading": {
+  "giantsMaul": "Judge it on the five known creatures. The replacement did no worse when a level-4 area attacker arrived and much better when none did.",
+  "farsightQuiver": "A level-4 shooter makes it strong (8 pairs, all in favour of keeping it), so the rule applies only to a seat that will not add a shooter, or to advice about the army as it stands."
+ },
+ "inputsSha256": {
+  "bank/art-v6.json": "07b0e5cd05f33769a6aa85614360438a4582b67d0f29e013a65e0fa0ff125284",
+  "bank/art-v8.json": "f954da015c9751aa53b66e5ba6450e466ac9936d1fa47bcc6274efa7f9923e9e",
+  "make-artifact-cases.ts": "7d894e7c29e6aafc85b90644ea8338c76146d0806cd046dd7be224e1199ed34b",
+  "analyze_art.py": "b81780154882ecbf35ec903044816e405e8ad190e76d02a91b6a1d0286b69cdd"
+ },
+ "host": "hft (Ryzen 7 9800X3D), lifecycle tree lab3, 5 processes"
+}

@@ -270,6 +270,32 @@ export const RANKED_SETUP_POLICY_ARTIFACT_FIT_V7: Readonly<IRankedAISetupPolicy>
         ),
 });
 
+/**
+ * v8 keeps every v6 choice and adds one rule to the Tier-2 pick: an offered artifact that no unit of the known
+ * roster can use never outranks one that does something. It extends v6, not the v7 Dual Strike candidate, and
+ * its drafting is v6's: the creature and bundle scorers below are handed 6.
+ */
+export const RANKED_SETUP_POLICY_ARTIFACT_FIT_V8: Readonly<IRankedAISetupPolicy> = Object.freeze({
+    ...RANKED_SETUP_POLICY_ARTIFACT_FIT_V6,
+    ...withArtifactFitSetupPolicy(SETUP_POLICY_V0_RESOLVED, 8),
+    version: "setup-v0+artifact-fit-v8",
+    pickCreature: (
+        level: number,
+        available: readonly number[],
+        ownIds: readonly number[],
+        enemyIds: readonly number[],
+        tier1?: number,
+        tier2?: number,
+    ): number => SETUP_POLICY_V0.pickCreature(level, available, ownIds, enemyIds, tier1, tier2, 6),
+    pickBundle: (bundles: readonly (readonly [number, number, number])[]): number =>
+        pickCoherentDraftBundle(
+            bundles,
+            scoreCreature,
+            (id, ownIds) => tier1ArtifactFitScoreV4(id, ownIds, TIER1_ARTIFACT_WINRATE[id] ?? 50),
+            { artifactFitVersion: 6 },
+        ),
+});
+
 type StrategyFactory = () => IAIStrategy;
 
 const checkedFactory =

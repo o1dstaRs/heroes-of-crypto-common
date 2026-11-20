@@ -12,6 +12,7 @@
 import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
 import { A19_TERRAIN_PLACEMENT_POLICY } from "../placement/terrain_reflection";
 import { A19_REVEALED_RANGED_POLICY, A19_SNIPER_DONOR_POLICY } from "../setup/a19_revealed_ranged_identity";
+import { A19_STRIKER_RUSH_POLICY } from "../setup/a19_striker_rush_identity";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
 import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
 import { A19_NIGHTMARE_WALL_MOVEMENT_POLICY } from "../nightmare_wall_movement";
@@ -68,8 +69,14 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     a scripted strike on a standing neutral barrel is searched against the other legal actions instead of
  *     being returned unsearched. +3.58 score points against v13 on the registered held-out Cemetery bank
  *     (95% +2.44 to +4.75); its quality and serial-cost gates failed and stay recorded as failed.
+ *   - striker rush and the Tier-2 beneficiary rule (profile v15) adopted on 2026-11-20 under the user's
+ *     standing instruction to lock in confirmed wins. The seat drafts melee strikers and, facing an army that is
+ *     not a melee army, buys Placement 2 / Movement 2 and starts its strikers on the edge of the zone. Search,
+ *     weights and budgets are untouched. +28.80 score points against v14 on the registered sealed bank (95%
+ *     +23.52 to +34.07); its quality and cost gates failed and stay recorded as failed
+ *     (docs/striker_rush_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v14" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v15" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -157,6 +164,30 @@ export const V08_A19_NEUTRAL_BARREL_DELIBERATION_POLICY = Object.freeze({
     adoption: "explicit-user-instruction",
     registrationSha256: "8d4a618a9f3533b6a9a91e1784cfe197725996aa97c0a0284529a969badefc81",
     qualification: "strength-confirmed-quality-and-cost-gates-failed",
+} as const);
+
+/**
+ * Striker rush (profile v15). The draft head and the setup rule live in ai/setup/a19_striker_rush.ts and the
+ * server's draft and setup deciders, not in `SearchDriver`; this record keeps the decision, its registration and
+ * the two failed gates with the profile. See docs/striker_rush_adoption.md.
+ */
+export const V08_A19_STRIKER_RUSH_POLICY = Object.freeze({
+    policyId: A19_STRIKER_RUSH_POLICY,
+    adoptedAt: "2026-11-20",
+    adoption: "standing-user-instruction",
+    registrationSha256: "d2786fd4acf80d1a02d59cd2ad733e0d78a23a420b54f457bf13d944b24a50b0",
+    qualification: "strength-confirmed-quality-and-cost-gates-failed",
+} as const);
+
+/**
+ * Tier-2 beneficiary rule (artifact-fit-v8), adopted with profile v15 on a changed-case diagnostic rather than
+ * a registered confirmation. See docs/artifact_beneficiary_rule.md.
+ */
+export const V08_A19_ARTIFACT_BENEFICIARY_POLICY = Object.freeze({
+    policyId: "artifact-fit-v8",
+    adoptedAt: "2026-11-20",
+    adoption: "standing-user-instruction",
+    qualification: "changed-case-diagnostic",
 } as const);
 
 /**
@@ -480,6 +511,8 @@ export const V08_A19_PROFILE = Object.freeze({
     battleMageTargets: BATTLE_MAGE_TARGET_POLICY,
     nightmareWallMovement: A19_NIGHTMARE_WALL_MOVEMENT_POLICY,
     neutralBarrelDeliberation: V08_A19_NEUTRAL_BARREL_DELIBERATION_POLICY,
+    strikerRush: V08_A19_STRIKER_RUSH_POLICY,
+    artifactBeneficiary: V08_A19_ARTIFACT_BENEFICIARY_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

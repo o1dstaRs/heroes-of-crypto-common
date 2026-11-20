@@ -36,6 +36,13 @@ describe("server A19 profile receipt", () => {
             else process.env.V08_A19_SEARCH_ENV_OVERRIDES = prior;
         }
     });
+    test("reads the server default once it moved to the Tier-2 beneficiary rule, and refuses an unknown prefix", () => {
+        const v8 = readA19AuditProfile({ ...sources, setup: sources.setup.replace("PREFIX_V6", "PREFIX_V8") });
+        expect(v8.setup).toBe("artifact-fit-v8:conditional-v1:sniper+t2a19");
+        expect(() =>
+            readA19AuditProfile({ ...sources, setup: sources.setup.replace("PREFIX_V6", "PREFIX_V7") }),
+        ).toThrow("Unrecognized server setup policy");
+    });
     test("refuses an unknown computed override rather than silently measuring a different baseline", () => {
         expect(() =>
             readA19AuditProfile({ ...sources, search: sources.search.replace('"ties"', "getMode()") }),

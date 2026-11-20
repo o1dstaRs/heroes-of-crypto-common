@@ -1,6 +1,47 @@
 # Agent guidance
 
+## Striker rush and artifact beneficiary adoption — November 20, 2026
+
+On November 19 the user gave a standing instruction for this research: “always lock in wins and
+continue”. Under it `a19-striker-rush-v1` and the Tier-2 beneficiary rule (`artifact-fit-v8`) are
+active in the A19-backed v0.8 default: **the current default is profile v15**. Read
+`docs/striker_rush_adoption.md`, `docs/striker_rush_research.md` and
+`docs/artifact_beneficiary_rule.md` before changing any of it.
+
+The policy is a draft head plus a setup rule and they are one policy. A default seat drafts melee
+strikers, fast ones first. With both complete rosters public, a seat with at least four strikers
+facing an army with at most three buys Placement 2 and Movement 2 and starts its real striker stacks
+on the edge of the zone nearest the enemy. Against a melee army it keeps its native setup, because the
+same plan loses there. The draft head without the setup rule is worth nothing (+0.0 on 198 development
+tasks) and the setup rule on the previous shooter-heavy drafts costs points, so never ship, switch
+off or measure one half as if it were the policy. `src/ai/setup/a19_striker_rush.ts` holds the rules;
+the server's deciders call them. The A19 search, weights, models and budgets are unchanged.
+
+Preserve the registered +28.80-point estimate against v14 (95% +23.52 to +34.07; 540 sealed tasks,
+positive on all three maps) together with its two **failed** gates, quality and cost: do not waive,
+re-run or relabel either. The quality failure is one declined melee proposal in 540 candidate games,
+made by the default opponent's script (the inactive coherent-approach repair addresses it); the cost
+failure is 1.2529 times the control's CPU per game against a 1.25 limit, about 39% more CPU per
+searched decision. Live latency under the decision deadline is not measured. The estimate is against
+the previous default, which fields shooters: it is not a win rate against people, and the new default
+against itself was only run as a quality check.
+
+The beneficiary rule keeps Giant's Maul for rosters with a physical area attacker among the five
+known creatures and Farsight Quiver for rosters with a shooter, counting the seat's stated level-4
+prospect for the quiver only. It rests on a 239-pair changed-case diagnostic, not on a registered
+confirmation. v8 extends the registered v6 line and changes only the Tier-2 pick, so
+`artifactFitVersionForSetupSpec` reports **6** for a v8 spec: every draft consumer, including the
+frozen contextual draft helpers whose source hashes are locked, stays on its v6 path. Never hand a
+draft 8, because "at least 7" selects the unadopted Dual Strike candidate.
+
+Subsequent research compares with v15. Already-running frozen studies keep their registered
+comparator. The research seeds are namespace `rush-doctrine-20261120-v1`: families 0-66 development,
+67-126 the consumed confirmation, 127-186 still sealed.
+
 ## Explicit neutral barrel deliberation adoption — November 19, 2026
+
+Profile v14 is retained inside v15; where this section says "current default", read v14 as the
+default at that date.
 
 The study report recommended adopting the candidate as profile v14 and listed both failed gates. The
 user answered “continue, do what is needed”. This activates `a19-neutral-barrel-deliberation-v1` in

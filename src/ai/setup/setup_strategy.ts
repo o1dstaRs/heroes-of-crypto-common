@@ -40,6 +40,12 @@ interface ISetupDecisionContextBase {
 export interface ITier2ArtifactDecisionContext extends ISetupDecisionContextBase {
     readonly decisionPhase: "tier2-artifact";
     readonly opponentRosterVisibility: "partial";
+    /**
+     * The creature this seat expects to add with the level-4 pick that follows the artifact, when its own draft
+     * policy can say: own intent, never opponent information. An empty list means "judge the army as it stands".
+     * Omitted when the caller cannot know, which leaves every artifact eligible on that count.
+     */
+    readonly ownProspectiveCreatureIds?: readonly number[];
 }
 
 /**
@@ -104,6 +110,9 @@ export const createTier2ArtifactDecisionContext = (
 ): Readonly<ITier2ArtifactDecisionContext> =>
     Object.freeze({
         ...freezePublicSetupFields(context),
+        ...(context.ownProspectiveCreatureIds
+            ? { ownProspectiveCreatureIds: Object.freeze([...new Set(context.ownProspectiveCreatureIds)]) }
+            : {}),
         decisionPhase: "tier2-artifact",
         opponentRosterVisibility: "partial",
     });

@@ -1,0 +1,55 @@
+{
+ "id": "striker-rush-v1-confirmation-A-20261120",
+ "registeredAt": "2026-11-20T05:51:46.931890+00:00",
+ "question": "Does the striker-rush strategy score higher than the current default (A19 profile v14) against the current default?",
+ "candidate": {
+  "draftHead": "After the shipped draft decision (V3, contextual, revealed-ranged delivery): if a fast striker (flies, or five printed steps) is on offer and the choice is not one, take the shipped policy's best fast striker; with none on offer, its best striker; with none, keep the choice. Opening bundle: the one with the most strikers (two per striker, plus one per fast striker), keeping the shipped choice on a tie. Tier-2 artifact: never one the five known creatures cannot use (Farsight Quiver without a shooter, Giant's Maul without a physical area attacker) while another offered artifact works.",
+  "setupRule": "With both complete rosters public: if at least 4 own drafted creatures are strikers and at most 3 enemy creatures are, buy Placement 2 and Movement 2 out of the shipped plan (Sniper down to 1, Empower, Might, Armor, last Sniper level; unspent points to Armor then Might) and start every real striker stack on the zone edge nearest the enemy, spread evenly over its rows in native row order. Otherwise the shipped setup, replayed exactly.",
+  "unchanged": "Doctrine choice, synergies, tactical splits, A19 fight search and every opponent decision."
+ },
+ "control": "Shipped default on both seats: native draft, shipped setup.",
+ "opponent": "Shipped default in both arms. It drafts against what it sees of the candidate, so the two arms can face different opposing rosters.",
+ "bank": {
+  "namespace": "rush-doctrine-20261120-v1",
+  "tasks": 540,
+  "families": "index 67..126 of the sealed reserve; 60 per doctrine pair, 180 per map (Normal, Lava, Block centre)",
+  "unit": "one task = one draft seed, doctrine pair, map and pick order; one game per arm from the candidate seat",
+  "reserveKeptSealed": "family index 127..186 (540 tasks)"
+ },
+ "primaryEndpoint": "Mean over the 540 tasks of candidate-arm score minus control-arm score for the candidate seat (win 1, draw 0.5, loss 0). 95% interval from 10,000 bootstrap resamples over tasks, seed 20261120.",
+ "gates": {
+  "G1": "Lower bound of the primary interval above zero.",
+  "G2": "No map with a negative point estimate.",
+  "G3": "No quality error in any candidate game; every game reaches an authoritative terminal state.",
+  "G4": "A rerun of 30 candidate tasks on a second host reproduces the same digests.",
+  "G5": "Mean CPU per candidate game at most 1.25 times the control, same host and tree."
+ },
+ "notClaimed": "Strength against human players, against opponents other than the shipped default, or of either component alone. Development estimates are not evidence here.",
+ "development": {
+  "tasks": 198,
+  "estimate": "+28.8 points, 95% +19.9 to +37.6 (candidate 79.0%, control 50.3%); rush4 setup without the enemy-striker condition, which the native opponent never triggers"
+ },
+ "execution": {
+  "runner": "life-run2.ts on the production server lifecycle; research seams replace only the candidate seat's upgrade selection and final formation layer",
+  "tree": "shipped-parity/lab4 (server + engine at A19 profile v14, research hooks inert)",
+  "treeManifestSha256": "bc730e9cfcb070fd997ac5f5b531fcf08b45b2fa68dbe3dd889a7e275ece389e",
+  "draftGenerator": "strat-drafts.ts over the frozen server policy functions with serving-parity assertions",
+  "host": "M4 Max, 6 processes"
+ },
+ "inputsSha256": {
+  "strat-drafts.ts": "603084003eccc43666ce3ee39f00e44994513b66c5ea1f42fb0808b9e94edfaf",
+  "life-run2.ts": "bc8ec8ae15767518bcacf9f1da074c564d6b749d154b36ad09b3191101ad0fb0",
+  "life-pool2.sh": "9852395da7d998f5869ddbb1adf94edd404d29382374283e0382d0bdd86730fc",
+  "formation_lib.ts": "e33923444a394bd59cde68d70a8589d20242cc5e63fe135c93c9236cd578d52e",
+  "specs2/rush.json": "e730631e6eba43b862c4347cafa626e9090c8cea0d21fd8698fde5eb2e34f172",
+  "specs2/stock.json": "7b8480c0cab5fba9eaff580ca624aff09d4bb2eeb3833714b06479ead1503bd8",
+  "confirm_analyze.py": "84f283801db162babaf34b3302f2eb723b939f275b986739b6e29e6a103650c5",
+  "seeds/pool.json": "14d060c84af74cc74bf843ae2c9d402dd54e5d04889112ff17123223ba490dc9",
+  "seeds/split.json": "d010ad94ec688972bde669f26f658f937cb47290525aeb7589e7fba0f0746087",
+  "seeds/confirmation-A-tasks.json": "e5d475412e2673e5398ce9c73bee3c75a13a1665bd39833b2f3d0c223e842683",
+  "seeds/seed-admission.json": "52e91915bd7d98f74bb67ac880faaf8157a1034d4c7dcb2758b1b512e43de461",
+  "bank/confA-native.json": "11967b665983adc7e0c88fbbff7c7e69b43883dae52d22acc77bbb9272f54be2",
+  "bank/confA-fast.json": "1b97a3b98f236937f22db5d815e376220a05981f67bf2a7dcae7aff941f11071",
+  "../draft-parity.ts": "9493f044a50c9b5074a78f3ceb2166cd34c4e833b483f73067a2b2449494f8d1"
+ }
+}

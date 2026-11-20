@@ -24,22 +24,33 @@ export const ARTIFACT_FIT_SETUP_PREFIX_V4 = "artifact-fit-v4:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V5 = "artifact-fit-v5:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V6 = "artifact-fit-v6:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V7 = "artifact-fit-v7:";
+export const ARTIFACT_FIT_SETUP_PREFIX_V8 = "artifact-fit-v8:";
+/** Versions a draft context can carry. v8 is a Tier-2 rule on the v6 line and drafts as v6. */
 export type ArtifactFitVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+/** Versions of the setup policy wrapper, including the Tier-2 beneficiary rule. */
+export type ArtifactFitSetupVersion = ArtifactFitVersion | 8;
 
+/**
+ * The fit version a DRAFT sees. v8 changes only the Tier-2 pick, so for drafting it is v6: creature and bundle
+ * scoring, coherence, and the frozen contextual draft helpers all keep their v6 paths byte for byte. It must
+ * never be reported as 7 or more to a draft, because "at least 7" selects the unadopted Dual Strike candidate.
+ */
 export const artifactFitVersionForSetupSpec = (spec: string): ArtifactFitVersion =>
-    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V7)
-        ? 7
-        : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V6)
-          ? 6
-          : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V5)
-            ? 5
-            : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V4)
-              ? 4
-              : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3)
-                ? 3
-                : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
-                  ? 2
-                  : 1;
+    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V8)
+        ? 6
+        : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V7)
+          ? 7
+          : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V6)
+            ? 6
+            : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V5)
+              ? 5
+              : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V4)
+                ? 4
+                : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3)
+                  ? 3
+                  : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
+                    ? 2
+                    : 1;
 
 const roster = (ids: readonly number[]): ICreatureInfo[] =>
     [...new Set(ids)].flatMap((id) => {
@@ -375,25 +386,72 @@ function tier2ArtifactFitScoreWithMagicPressure(
     }
 }
 
+/**
+ * Physical area abilities that Giant's Maul amplifies in the engine: the five whose cards it rewrites
+ * (Unit.GIANTS_MAUL_AOE_DESCRIPTION_ABILITIES) and Chakram, whose bounces go through the same area damage tail.
+ */
+export const GIANTS_MAUL_BENEFICIARY_ABILITIES: readonly string[] = Object.freeze([
+    "Lightning Spin",
+    "Area Throw",
+    "Through Shot",
+    "Skewer Strike",
+    "Large Caliber",
+    "Chakram",
+]);
+
+/**
+ * Whether this roster can use the Tier-2 artifact at all. This is the engine's own rule, not a strength estimate:
+ * Farsight Quiver is granted to native shooters only and changes nothing for one that already has Sniper; Giant's
+ * Maul only multiplies physical area damage. Every other artifact acts on any army. An empty roster gives no verdict.
+ *
+ * The artifact is chosen before the level-4 pick, and the two artifacts differ on whether that pick counts
+ * (docs/artifact_beneficiary_rule.md, 239 paired cases):
+ * - Farsight Quiver with one level-4 shooter is strong, so `prospectiveIds` are part of its roster. `undefined`
+ *   means the caller cannot say what comes next and the artifact stays eligible.
+ * - Giant's Maul is judged on the known creatures only. The artifact that replaces it did no worse even when an
+ *   area attacker arrived at level 4, and much better when none did.
+ */
+export function tier2ArtifactHasBeneficiary(
+    id: number,
+    ownIds: readonly number[],
+    prospectiveIds?: readonly number[],
+): boolean {
+    const own = roster(ownIds);
+    if (!own.length) return true;
+    switch (id) {
+        case Tier2Artifact.FARSIGHT_QUIVER:
+            return (
+                prospectiveIds === undefined ||
+                roster([...ownIds, ...prospectiveIds]).some((unit) => unit.ranged && !unit.abilities.includes("Sniper"))
+            );
+        case Tier2Artifact.GIANTS_MAUL:
+            return own.some((unit) => GIANTS_MAUL_BENEFICIARY_ABILITIES.some((name) => unit.abilities.includes(name)));
+        default:
+            return true;
+    }
+}
+
 /** Keep the base policy's ordering of established items; compare only the new items against that incumbent. */
 export function withArtifactFitSetupPolicy(
     base: Readonly<IResolvedSetupPolicy>,
-    version: ArtifactFitVersion = 1,
+    version: ArtifactFitSetupVersion = 1,
 ): IResolvedSetupPolicy {
     const prefix =
-        version === 7
-            ? ARTIFACT_FIT_SETUP_PREFIX_V7
-            : version === 6
-              ? ARTIFACT_FIT_SETUP_PREFIX_V6
-              : version === 5
-                ? ARTIFACT_FIT_SETUP_PREFIX_V5
-                : version === 4
-                  ? ARTIFACT_FIT_SETUP_PREFIX_V4
-                  : version === 1
-                    ? ARTIFACT_FIT_SETUP_PREFIX
-                    : version === 2
-                      ? ARTIFACT_FIT_SETUP_PREFIX_V2
-                      : ARTIFACT_FIT_SETUP_PREFIX_V3;
+        version === 8
+            ? ARTIFACT_FIT_SETUP_PREFIX_V8
+            : version === 7
+              ? ARTIFACT_FIT_SETUP_PREFIX_V7
+              : version === 6
+                ? ARTIFACT_FIT_SETUP_PREFIX_V6
+                : version === 5
+                  ? ARTIFACT_FIT_SETUP_PREFIX_V5
+                  : version === 4
+                    ? ARTIFACT_FIT_SETUP_PREFIX_V4
+                    : version === 1
+                      ? ARTIFACT_FIT_SETUP_PREFIX
+                      : version === 2
+                        ? ARTIFACT_FIT_SETUP_PREFIX_V2
+                        : ARTIFACT_FIT_SETUP_PREFIX_V3;
     if (base.spec.startsWith(prefix)) return base;
     return Object.freeze({
         ...base,
@@ -405,9 +463,17 @@ export function withArtifactFitSetupPolicy(
             ownIds: readonly number[],
             context?: Readonly<ITier2ArtifactDecisionContext>,
         ): number => {
-            const legal = offered.filter((id) => LIVE_TIER2_IDS.has(id));
-            if (!legal.length) return Tier2Artifact.NO_ARTIFACT;
+            const live = offered.filter((id) => LIVE_TIER2_IDS.has(id));
+            if (!live.length) return Tier2Artifact.NO_ARTIFACT;
             const own = roster(ownIds);
+            // v8: an artifact no unit of the known roster can use never outranks one that does something. The
+            // win-rate tables are army-wide averages and cannot see that. With nothing usable on offer the
+            // choice is immaterial and stays the older one.
+            const usable =
+                version >= 8
+                    ? live.filter((id) => tier2ArtifactHasBeneficiary(id, ownIds, context?.ownProspectiveCreatureIds))
+                    : live;
+            const legal = usable.length ? usable : live;
             if (!own.length || !legal.some((id) => FIT_TIER2_IDS.has(id)))
                 return base.pickArtifactT2(legal, ownIds, context);
             const established = legal.filter((id) => !FIT_TIER2_IDS.has(id));

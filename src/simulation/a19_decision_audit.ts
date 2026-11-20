@@ -1,7 +1,7 @@
 /* Offline decision diagnostics. No production policy imports this module. */
 import { createHash } from "node:crypto";
 import ts from "typescript";
-import { ARTIFACT_FIT_SETUP_PREFIX_V6 } from "../ai/setup/artifact_fit";
+import { ARTIFACT_FIT_SETUP_PREFIX_V6, ARTIFACT_FIT_SETUP_PREFIX_V8 } from "../ai/setup/artifact_fit";
 import { buildV08A19SearchEnvironment } from "../ai/versions/v0_8_a19_profile";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
 import { hashSimulationParts } from "./army";
@@ -76,18 +76,23 @@ export function readA19AuditProfile(sources: { search: string; draft: string; se
     }
     if (bases !== 1) throw new Error("Expected one server A19 base environment");
     const setup = initializer(sources.setup, "V08_RANKED_SETUP_POLICY_SPEC");
+    // The fit prefixes the server default has used: v6, and v8 once the Tier-2 beneficiary rule was adopted.
+    const setupPrefixes: Readonly<Record<string, string>> = {
+        ARTIFACT_FIT_SETUP_PREFIX_V6,
+        ARTIFACT_FIT_SETUP_PREFIX_V8,
+    };
     if (
         !ts.isTemplateExpression(setup) ||
         setup.head.text !== "" ||
         setup.templateSpans.length !== 1 ||
-        setup.templateSpans[0].expression.getText() !== "ARTIFACT_FIT_SETUP_PREFIX_V6"
+        !Object.hasOwn(setupPrefixes, setup.templateSpans[0].expression.getText())
     )
         throw new Error("Unrecognized server setup policy; update the source parser deliberately");
     const base = withScopedAIEnvironment({ V08_A19_SEARCH_ENV_OVERRIDES: undefined }, buildV08A19SearchEnvironment);
     return {
         revision: literal(sources.search, "BOT_SEARCH_PRODUCTION_REVISION"),
         draft: literal(sources.draft, "DEFAULT_RANKED_DRAFT_POLICY_SPEC"),
-        setup: ARTIFACT_FIT_SETUP_PREFIX_V6 + setup.templateSpans[0].literal.text,
+        setup: setupPrefixes[setup.templateSpans[0].expression.getText()] + setup.templateSpans[0].literal.text,
         environment: { ...base, ...overrides },
         overrides,
         sourceSha256: Object.fromEntries(

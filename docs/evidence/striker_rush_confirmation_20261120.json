@@ -1,0 +1,216 @@
+{
+ "id": "striker-rush-v1-confirmation-A-results-20261120",
+ "registrationSha256": "d2786fd4acf80d1a02d59cd2ad733e0d78a23a420b54f457bf13d944b24a50b0",
+ "evidenceHeads": {
+  "common": "bdb90084518e723ae3832b32eeb4b048262fa559",
+  "server": "f77ae29068f026c7d49c14b9af49018b622ce774",
+  "note": "A19 profile v14. The adoption commit sits on a later head that also contains a Battle Mage stat change; these games were not replayed on it."
+ },
+ "primary": {
+  "tasks": 540,
+  "control": 50.74,
+  "candidate": 79.54,
+  "difference": 28.8,
+  "interval95": [
+   23.52,
+   34.07
+  ],
+  "better": 216,
+  "worse": 59
+ },
+ "maps": {
+  "Normal": {
+   "tasks": 180,
+   "control": 49.72,
+   "candidate": 81.67,
+   "difference": 31.94,
+   "interval95": [
+    22.78,
+    41.11
+   ],
+   "better": 76,
+   "worse": 18
+  },
+  "Lava": {
+   "tasks": 180,
+   "control": 51.39,
+   "candidate": 80.83,
+   "difference": 29.44,
+   "interval95": [
+    20.28,
+    38.61
+   ],
+   "better": 71,
+   "worse": 19
+  },
+  "Block centre": {
+   "tasks": 180,
+   "control": 51.11,
+   "candidate": 76.11,
+   "difference": 25.0,
+   "interval95": [
+    15.56,
+    34.17
+   ],
+   "better": 69,
+   "worse": 22
+  }
+ },
+ "ownDoctrine": {
+  "threeReveals": {
+   "tasks": 180,
+   "control": 55.28,
+   "candidate": 80.28,
+   "difference": 25.0,
+   "interval95": [
+    15.56,
+    34.17
+   ],
+   "better": 67,
+   "worse": 20
+  },
+  "seeAll": {
+   "tasks": 180,
+   "control": 42.22,
+   "candidate": 71.94,
+   "difference": 29.72,
+   "interval95": [
+    20.28,
+    39.44
+   ],
+   "better": 75,
+   "worse": 22
+  },
+  "seeNone": {
+   "tasks": 180,
+   "control": 54.72,
+   "candidate": 86.39,
+   "difference": 31.67,
+   "interval95": [
+    22.78,
+    40.56
+   ],
+   "better": 74,
+   "worse": 17
+  }
+ },
+ "setupRuleActiveInCandidateGames": 540,
+ "forwardFormationAppliedInCandidateGames": 540,
+ "gamesPerArm": 540,
+ "lapsPerGame": {
+  "control": 6.79,
+  "candidate": 5.75
+ },
+ "searchedDecisionsPerGame": {
+  "control": 53.76,
+  "candidate": 48.55
+ },
+ "cpu": {
+  "secondsPerGame": {
+   "control": 5.417,
+   "candidate": 6.787
+  },
+  "ratioPerGame": 1.2529,
+  "millisecondsPerSearchedDecision": {
+   "control": 100.8,
+   "candidate": 139.8
+  },
+  "ratioPerSearchedDecision": 1.387,
+  "note": "Offline deterministic work on one host; the arms ran one after the other under different background load. Both seats' decisions are counted in both arms."
+ },
+ "gates": {
+  "G1 strength, lower bound above zero": {
+   "passed": true,
+   "value": 23.52
+  },
+  "G2 no map with a negative point estimate": {
+   "passed": true
+  },
+  "G3 no quality error in a candidate game": {
+   "passed": false,
+   "candidateGamesWithAnError": 1,
+   "controlGamesWithAnError": 1,
+   "diagnosis": "One declined melee proposal in each arm. In the candidate game it was made by the default opponent's one-model caster split: a move to one cell followed by a strike whose approach starts at the old cell. The engine refuses the strike and the turn ends after the move. This is the known construction bug of docs/coherent_melee_approach_research.md, whose repair is inactive. Recorded as failed, not waived."
+  },
+  "G4 second-host rerun of 30 candidate tasks reproduces the digests": {
+   "passed": true,
+   "identical": 30,
+   "rerun": 30,
+   "host": "Ryzen 7 9800X3D, separate tree copy"
+  },
+  "G5 candidate CPU per game at most 1.25 times the control": {
+   "passed": false,
+   "ratio": 1.2529,
+   "limit": 1.25,
+   "reading": "Games are shorter (fewer laps and fewer searched decisions) but each searched decision costs about 39% more CPU, most on the open map: melee contact gives the search more attack candidates. Recorded as failed, not waived."
+  }
+ },
+ "productionPort": {
+  "what": "The same 30 candidate tasks replayed through the production implementation (no research seam) built at the evidence heads.",
+  "identicalDigests": 30,
+  "replayed": 30
+ },
+ "development": {
+  "ruleDiscovery": {
+   "pairedGames": 371,
+   "source": "rosters of 57 real human-versus-AI games and a 212-case bot bank; rush setup against stock setup for the same seat",
+   "ownStrikersAtLeast4AndEnemyStrikersAtMost3": {
+    "games": 51,
+    "difference": 32.4,
+    "interval95": [
+     19.6,
+     46.1
+    ],
+    "better": 17,
+    "worse": 1
+   },
+   "ownShootersAtMost1AndEnemyStrikersAtLeast4": {
+    "games": 66,
+    "difference": -18.9,
+    "interval95": [
+     -29.9,
+     -8.2
+    ]
+   },
+   "ownShootersAtLeast2": {
+    "games": 252,
+    "difference": -13.3,
+    "interval95": [
+     -20.3,
+     -6.3
+    ]
+   }
+  },
+  "wholeStrategy": {
+   "pairedTasks": 198,
+   "control": 50.3,
+   "candidate": 79.0,
+   "difference": 28.8,
+   "interval95": [
+    19.9,
+    37.6
+   ]
+  },
+  "draftHeadWithStockSetup": {
+   "pairedTasks": 198,
+   "control": 50.3,
+   "candidate": 50.3,
+   "difference": 0.0,
+   "interval95": [
+    -9.6,
+    10.1
+   ],
+   "reading": "The draft head alone is worth nothing; the gain needs the setup rule."
+  }
+ },
+ "notMeasured": [
+  "play against people",
+  "the new default against itself as a strength question",
+  "live decision latency under the 1000 ms deadline"
+ ],
+ "analysis": {
+  "script": "confirm_analyze.py",
+  "sha256": "84f283801db162babaf34b3302f2eb723b939f275b986739b6e29e6a103650c5",
+  "bootstrap": "10,000 resamples over tasks, seed 20261120"
+ }
+}
