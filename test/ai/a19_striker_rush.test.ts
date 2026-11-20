@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test";
 
 import {
+    A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS,
+    A19_STRIKER_RUSH_MIXED_POLICY,
     A19_STRIKER_RUSH_POLICY,
+    a19ShooterCount,
     a19StrikerCount,
     a19StrikerRushAugments,
     a19StrikerRushBundle,
@@ -21,6 +24,7 @@ const brawlers = [C.SQUIRE, C.BERSERKER, C.HYENA, C.NOMAD, C.CRUSADER, C.CHAMPIO
 
 test("the policy has a stable identity", () => {
     expect(A19_STRIKER_RUSH_POLICY).toBe("a19-striker-rush-v1");
+    expect(A19_STRIKER_RUSH_MIXED_POLICY).toBe("a19-striker-rush-mixed-v1");
 });
 
 test("fast strikers fly or have five printed steps; shooters and casters are never strikers", () => {
@@ -62,6 +66,7 @@ test("the setup is used by a melee army against an army that is not one", () => 
     expect(isA19StrikerRushSetup(rushers, shooters)).toBe(true);
     // The same setup loses to a melee army: keep the native plan there.
     expect(isA19StrikerRushSetup(rushers, brawlers)).toBe(false);
+    // Four strikers and two casters, no shooter: still a melee army for this purpose.
     expect(isA19StrikerRushSetup(brawlers, rushers)).toBe(false);
     // Three strikers are not a melee army.
     expect(isA19StrikerRushSetup(shooters, rushers)).toBe(false);
@@ -69,6 +74,26 @@ test("the setup is used by a melee army against an army that is not one", () => 
     // Partial rosters give no decision.
     expect(isA19StrikerRushSetup(rushers, shooters.slice(0, 5))).toBe(false);
     expect(isA19StrikerRushSetup(rushers.slice(0, 5), shooters)).toBe(false);
+});
+
+test("a mixed army is rushed: exactly four strikers and enough shooters", () => {
+    const fourAndTwoShooters = [C.SQUIRE, C.BERSERKER, C.HYENA, C.NOMAD, C.ZENA, C.GARGANTUAN];
+    const fourAndOneShooter = [C.SQUIRE, C.BERSERKER, C.HYENA, C.NOMAD, C.ZENA, C.WANDERING_MAGE];
+    const fourAndCasters = [C.SQUIRE, C.BERSERKER, C.HYENA, C.NOMAD, C.HEALER, C.WANDERING_MAGE];
+    const fiveAndOneShooter = [C.SQUIRE, C.BERSERKER, C.HYENA, C.NOMAD, C.CRUSADER, C.GARGANTUAN];
+    expect(a19ShooterCount(fourAndTwoShooters)).toBe(2);
+    expect(a19ShooterCount(fourAndCasters)).toBe(0);
+    expect(a19ShooterCount([...fourAndOneShooter, C.ZENA])).toBe(1);
+    expect(isA19StrikerRushSetup(brawlers, fourAndTwoShooters)).toBe(true);
+    expect(isA19StrikerRushSetup(brawlers, fourAndOneShooter)).toBe(A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS <= 1);
+    // Without a shooter, and from five strikers up, the army facing it keeps its native setup.
+    expect(isA19StrikerRushSetup(brawlers, fourAndCasters)).toBe(false);
+    expect(isA19StrikerRushSetup(brawlers, fiveAndOneShooter)).toBe(false);
+    // The rule before profile v18 stops at three enemy strikers.
+    expect(isA19StrikerRushSetup(brawlers, fourAndTwoShooters, false)).toBe(false);
+    expect(isA19StrikerRushSetup(rushers, shooters, false)).toBe(true);
+    // The rushing side still needs four strikers of its own.
+    expect(isA19StrikerRushSetup(shooters, fourAndTwoShooters)).toBe(false);
 });
 
 test("the funded plan is Placement 2 and Movement 2, paid for from the native plan", () => {

@@ -1,5 +1,9 @@
 # Striker rush default adoption
 
+> Since profile v18 the rush also covers an army with exactly four strikers and at least two shooters.
+> Where this document says "at most three", read it as the rule of profile v15. See
+> `docs/striker_rush_mixed_adoption.md`.
+
 On November 20, 2026, the registered confirmation of `a19-striker-rush-v1` closed with a confirmed
 strength gain and two failed gates. On November 19 the user had given a standing instruction for
 this research: "always lock in wins and continue". Under it the A19-backed v0.8 production profile

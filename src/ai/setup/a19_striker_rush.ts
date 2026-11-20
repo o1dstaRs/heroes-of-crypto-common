@@ -22,11 +22,19 @@ import type { XY } from "../../utils/math";
  * strikers that reach the firing line on their first move switch the opposing shooters off. Read
  * docs/striker_rush_research.md before changing any number here: the same setup loses against a melee army.
  */
-export { A19_STRIKER_RUSH_POLICY } from "./a19_striker_rush_identity";
+export { A19_STRIKER_RUSH_MIXED_POLICY, A19_STRIKER_RUSH_POLICY } from "./a19_striker_rush_identity";
 /** Own drafted creatures that must be strikers before the rush setup is used. */
 export const A19_STRIKER_RUSH_MIN_OWN_STRIKERS = 4;
-/** The rush is a counter to shooters and casters. Against this many enemy strikers the army keeps its native setup. */
+/** The rush is a counter to shooters and casters: an army with at most this many strikers is always rushed. */
 export const A19_STRIKER_RUSH_MAX_ENEMY_STRIKERS = 3;
+/**
+ * A mixed army is rushed too: exactly this many strikers and at least `A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS` creatures
+ * with a ranged attack. Its shooters shoot freely at a melee army that stays on its stock setup. With four strikers and
+ * no shooter the army keeps its native setup against it, as it does against five or six strikers: that case was not
+ * measured, and a rush loses to a melee army. See docs/striker_rush_mixed_adoption.md.
+ */
+export const A19_STRIKER_RUSH_MIXED_ENEMY_STRIKERS = 4;
+export const A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS = 2;
 /** Printed steps from which a ground striker counts as fast. Flyers always do. */
 export const A19_STRIKER_RUSH_FAST_STEPS = 5;
 export const A19_STRIKER_RUSH_PLACEMENT = 2;
@@ -52,6 +60,9 @@ export function isA19FastStriker(creatureId: number): boolean {
 const distinct = (ids: readonly number[]): number[] => [...new Set(ids)];
 export const a19StrikerCount = (creatureIds: readonly number[]): number =>
     distinct(creatureIds).filter(isA19Striker).length;
+/** Drafted creatures with a ranged attack: the units a body next to them switches off. */
+export const a19ShooterCount = (creatureIds: readonly number[]): number =>
+    distinct(creatureIds).filter((id) => creatureInfo(id)?.ranged).length;
 
 /**
  * The creatures the draft head would rather take than `current`: fast strikers on offer, else any striker on
@@ -79,13 +90,27 @@ export function a19StrikerRushBundle(bundles: readonly (readonly [number, number
     return best;
 }
 
-/** Complete public rosters only: the decision reads the whole opposing army, never its hidden setup. */
-export function isA19StrikerRushSetup(ownIds: readonly number[], publicOpponentIds: readonly number[]): boolean {
+/**
+ * Complete public rosters only: the decision reads the whole opposing army, never its hidden setup.
+ * `rushMixedArmies` false gives the rule before profile v18: at most three enemy strikers, nothing else.
+ */
+export function isA19StrikerRushSetup(
+    ownIds: readonly number[],
+    publicOpponentIds: readonly number[],
+    rushMixedArmies = true,
+): boolean {
+    if (
+        distinct(ownIds).length !== 6 ||
+        distinct(publicOpponentIds).length !== 6 ||
+        a19StrikerCount(ownIds) < A19_STRIKER_RUSH_MIN_OWN_STRIKERS
+    )
+        return false;
+    const enemyStrikers = a19StrikerCount(publicOpponentIds);
     return (
-        distinct(ownIds).length === 6 &&
-        distinct(publicOpponentIds).length === 6 &&
-        a19StrikerCount(ownIds) >= A19_STRIKER_RUSH_MIN_OWN_STRIKERS &&
-        a19StrikerCount(publicOpponentIds) <= A19_STRIKER_RUSH_MAX_ENEMY_STRIKERS
+        enemyStrikers <= A19_STRIKER_RUSH_MAX_ENEMY_STRIKERS ||
+        (rushMixedArmies &&
+            enemyStrikers === A19_STRIKER_RUSH_MIXED_ENEMY_STRIKERS &&
+            a19ShooterCount(publicOpponentIds) >= A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS)
     );
 }
 

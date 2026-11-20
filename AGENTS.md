@@ -1,6 +1,37 @@
 # Agent guidance
 
+## Striker rush against mixed armies — November 20, 2026
+
+Under the same standing instruction as the sections below, `a19-striker-rush-mixed-v1` is active in
+the A19-backed v0.8 default: **the current default is profile v18**. Read
+`docs/striker_rush_mixed_adoption.md` before changing the rush condition.
+
+The striker rush used to stop at three enemy strikers. It now also covers an army with **exactly four
+strikers and at least two shooters**: a seat that drafted for a melee fight was keeping its stock
+setup while two shooters fired at it, and scored 53% and 63% against such armies. The condition is
+`isA19StrikerRushSetup` in `src/ai/setup/a19_striker_rush.ts`; plan, formation and draft are
+unchanged, and the draft's matchup probability keeps its four-striker boundary.
+
+Do not widen it. "Any army with four strikers" was registered first and **failed its mirror guard**:
+against the default's own four-striker armies it lost 7 and won 1 of 12 changed tasks. One shooter
+measured +3.7 (95% −6.5 to +14.4). Four strikers with no shooter, the shape of the army the rush was
+learned from, hardly occurs in the mixed banks and lost all three mirror tasks. Even the adopted
+shape lost 4 and won 1 of 10 changed mirror tasks; such armies are about 1% of
+default-against-default games.
+
+Preserve the registered +9.20-point estimate against mixed armies (95% +6.81 to +11.68; 576 sealed
+tasks; +23.2 and +13.2 on the tasks where the setup changes) together with its **failed** quality
+gate: four candidate games against one with a declined scripted melee proposal, the known incoherent
+approach of `docs/coherent_melee_approach_research.md`. Do not waive, re-run or relabel it. The
+estimate is against mixed armies drafted by the AI, not a win rate against people.
+
+Subsequent research compares with v18. Both research seed pools are now fully consumed: a new study
+needs a new namespace.
+
 ## Striker matchup draft adoption — November 20, 2026
+
+Profile v17 is retained inside v18; where this section says "current default", read v17 as the
+default at that date.
 
 Under the same standing instruction as the sections below, `a19-striker-matchup-v1` is active in the
 A19-backed v0.8 default: **the current default is profile v17**. Read
@@ -28,8 +59,8 @@ shooter-fielding v14 the candidate measured +3.52 (95% −0.83 to +7.96): not wo
 established. Fitted Tier-1 values in the bundle choice and matchup values at level 3-4 only were
 tried on development tasks and were worse.
 
-Subsequent research compares with v17. Namespace `matchup-draft-20261120-v1`: families 0-59 are this
-confirmation; 60-119 and 120-183 are still sealed and have had no development use.
+Namespace `matchup-draft-20261120-v1`: families 0-59 are this confirmation; 60-119 and 120-183 were
+consumed by the two striker rush confirmations of profile v18.
 
 ## Shooterless Movement adoption — November 20, 2026
 

@@ -1,0 +1,73 @@
+{
+ "id": "striker-rush-mixed-v1-confirmation-D-20261120",
+ "registeredAt": "2026-11-20T13:52:40.608586+00:00",
+ "question": "Does the default (A19 profile v17) score higher against mixed armies when it also rushes an army with exactly four strikers and at least two shooters?",
+ "history": {
+  "previousRegistration": "striker-rush-threshold-4-confirmation-C-20261120 (sha256 03001b44fed131dbde4562a3602bfaa33fdbac8a121f17de0f967ae975fa52a0)",
+  "outcome": "The registered rule of confirmation C, rush at most four enemy strikers whatever else the army holds, passed on strength against mixed armies (+13.24 points, 95% +10.56 to +15.97) and FAILED its mirror guard: against profile v17 armies with exactly four strikers it lost 7 and won 1 of 12 changed tasks (-1.11 points over all 540 mirror tasks, margin -1). It is not adopted.",
+  "whyThisRule": "A decision rule written before any result of that bank said to adopt only the measured part, four enemy strikers and at least k shooters, with k = 1 if the one-shooter tasks had n >= 40 and a non-negative estimate. They had n 108 and +3.7 (95% -6.5 to +14.4), with -20 on the five mirror tasks of that kind. k = 2 is registered here instead: the narrower scope, because the one-shooter estimate is not distinguishable from zero. On the bank of confirmation C the two-shooter tasks measured +24.5 (95% +19.7 to +29.4, n 567); that is a post-hoc subset and is why this rule gets a bank of its own."
+ },
+ "candidate": {
+  "setupRule": "Striker rush when the seat has at least four strikers and the enemy has at most three strikers (as today), OR the enemy has exactly four strikers and at least two creatures with a ranged attack. Plan, formation and draft are unchanged; the draft's matchup probability keeps its four-striker boundary."
+ },
+ "control": "Profile v17: matchup striker draft, striker rush at most three enemy strikers, shooterless Movement.",
+ "populations": {
+  "mixB12": "Opponent drafts strikers in the bundle and at levels 1-2 (fast first) and the shipped native pick at levels 3-4, on the shipped native setup.",
+  "mixB34": "Opponent drafts strikers in the bundle and at levels 3-4 and the shipped native pick at levels 1-2, on the shipped native setup.",
+  "mirror": "Opponent is profile v17 (guard)."
+ },
+ "bank": {
+  "namespace": "matchup-draft-20261120-v1",
+  "tasks": 576,
+  "families": "index 120..183 of the pool, the last sealed reserve, no development use; 64 per doctrine pair, 192 per map",
+  "playedTasks": "Only tasks where the candidate rule changes the setup (candidate seat at least four strikers, enemy exactly four strikers and at least two shooters): 293 (mixB12), 288 (mixB34) and 6 (mirror) of 576. On every other task the two arms are the same game and count as a zero difference.",
+  "unit": "one task = one draft seed, doctrine pair, map and pick order; one game per arm from the candidate seat; both arms play the identical drafted armies"
+ },
+ "primaryEndpoint": "Mean over the 576 tasks of the task's mean difference over mixB12 and mixB34 (candidate-seat score, candidate arm minus control arm; zero where the rule does not change the setup). 95% interval from 10,000 bootstrap resamples over tasks, seed 20261123.",
+ "gates": {
+  "G1": "Lower bound of the primary interval above zero.",
+  "G2": "Neither mixed population and no map with a negative point estimate.",
+  "G3": "Mirror guard: the difference over all 576 mirror tasks is at least -1 point. The rule changes six mirror tasks, so this gate can only fail if nearly all of them flip from a win to a loss; the changed tasks are reported on their own.",
+  "G4": "Candidate-arm games with a quality error not more than control-arm games with one.",
+  "G5": "A rerun of 30 changed tasks of the mixB12 candidate arm on a second host reproduces the same digests.",
+  "G6": "Mean CPU per changed game of the candidate arm at most 1.25 times the control arm (mixed populations), same host and tree."
+ },
+ "notClaimed": "Strength against people; armies with four strikers and fewer than two shooters (unchanged: native setup); any change against profile v14 armies or in ordinary striker mirrors, where the rule almost never fires.",
+ "development": {
+  "tasks": 198,
+  "estimate": "On the 218 development games with exactly four enemy strikers and two shooters: +18.8 points (95% +11.0 to +26.6). The development variant 'also when the enemy has at least two shooters whatever its strikers' measured +13.6 (mixB12) and +7.1 (mixB34) over all tasks."
+ },
+ "execution": {
+  "runner": "life-run5.ts on the production server lifecycle; control specs v17-r3.json (mixed) and v16-both.json (mirror), candidate specs v18-mixed.json (mixed) and v18-mixed-vs-v17.json (mirror)",
+  "tree": "shipped-parity/lab4",
+  "treeManifestSha256": "bc730e9cfcb070fd997ac5f5b531fcf08b45b2fa68dbe3dd889a7e275ece389e",
+  "draftGenerator": "league-drafts.ts; candidate seat S:B1234:val with explore/table-a.json (RUSH_PRIOR=0.5), opponents S:B12:fast, S:B34:fast and S:B1234:val",
+  "analysis": "confirm_c_analyze.py --prefix cfD --bank bank/cfD (the script of confirmation C, unchanged)",
+  "host": "M4 Max, 8 processes"
+ },
+ "inputsSha256": {
+  "league-drafts.ts": "5b47451bef631ebfa923a3230f81111bbab1a4e48e3f86706208363381fe5beb",
+  "life-run5.ts": "b36942781793af4f74a3c8160e4fcfcc50fdaecc2d8ac334af4687892ba687e2",
+  "life-pool5.sh": "07c574dc5d8e6cad6cf8396b66d0a881252cd87b4ee566f6f7212b3be7cdb4ba",
+  "formation_lib.ts": "b6b64b8419d0b4bea3f2bf498f586e54ad3b44f0adc83f05b74a677371fe6f31",
+  "specs2/v17-r3.json": "6d59567c401bfd39c2535c6949e1f52168522eafcaab4a52d4396b1b583b0129",
+  "specs2/v18-mixed.json": "7c961f3c54767b2d3374276c1f228283c44821cbbafc75a6e84d01a653ce088c",
+  "specs2/v16-both.json": "e4f0bd4214a7b770d1e3a5824ee948dcd0d9683d6c2cb1d26ec0fff269a84f77",
+  "specs2/v18-mixed-vs-v17.json": "eb5284268221f8cf52ad1b01ec4d95bda8cf458e8c01c6043b6b6c5d76551858",
+  "confirm_c_analyze.py": "32af8848571212cfe28e9208c780efcc4f48241715c78daa6391fd846a4f3760",
+  "g4_check.py": "92fb372e332d094a96a6157c97dd967416e09ff9201c14dcab038e6bfbcfb0c2",
+  "tree_manifest.sh": "91e0dc01bd1a13e2a6aa75e022cabc56b79c8c5fbaeda6ab336ec8473e19203e",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "seeds2/pool.json": "1dda6c1fefb6c6b49a4d27bf127ca1121df5d1201b07a2855e1380733f4e9cfb",
+  "seeds2/split.json": "d0bb5ae81269fa494fb0ddb98221d8edc72bb894099639362ba40d93819b24ee",
+  "seeds2/reserve-tasks.json": "16c727ca593e5f2a9f37fb9f04c79e832060d53f6d8503f70a8900a138769f96",
+  "bank/cfD-v17_vs_mixB12.json": "2c621856cfd8c377eb13e1a2a6a0b966145b7aa714912c595d6796d3853a6bbf",
+  "bank/cfD-v17_vs_mixB34.json": "48805b792749126c7fde93196b141a2a1d7eb56b4f4ae25eaef94cd9f7e45fc9",
+  "bank/cfD-v17_vs_v17.json": "d3925fc091c6e7d34620612349ba4bfb0853b97d0e56ed70e68450919b69b940",
+  "bank/cfD-v17_vs_mixB12-fire.json": "cfab7316be638372a70f29772ecf739764cac81ae51dc37a82a3778ed9bc845c",
+  "bank/cfD-v17_vs_mixB34-fire.json": "6be1b3d8266071ccee938f01314331f890c3e00038ec7fd59bb9ff4ddfe10a37",
+  "bank/cfD-v17_vs_v17-fire.json": "3d0f907340e8851eac5775a3a459371c2a69dea6a0775c31b398157ae498e930",
+  "bank/cfD-g5.json": "894d0cc621f6a59a7552f6d99e68f98eb7af5987ebb09156f1dc9080b05a9fd9",
+  "../draft-parity.ts": "9493f044a50c9b5074a78f3ceb2166cd34c4e833b483f73067a2b2449494f8d1"
+ }
+}

@@ -32,7 +32,11 @@ export const A19_STRIKER_MATCHUP_MELEE_PRIOR = 0.5;
 /** Share of strikers among the picks of a melee drafter and of any other drafter. */
 export const A19_STRIKER_MATCHUP_MELEE_STRIKER_RATE = 0.9;
 export const A19_STRIKER_MATCHUP_OTHER_STRIKER_RATE = 0.25;
-/** From this many enemy strikers the rush is off (A19_STRIKER_RUSH_MAX_ENEMY_STRIKERS + 1). */
+/**
+ * The draft's boundary between the two games. Since profile v18 a four-striker army with two shooters is rushed
+ * as well; moving this boundary to five with it was tried on development tasks and was not better, so it stays
+ * at four.
+ */
 const MELEE_ARMY_STRIKERS = 4;
 const ARMY_SIZE = 6;
 

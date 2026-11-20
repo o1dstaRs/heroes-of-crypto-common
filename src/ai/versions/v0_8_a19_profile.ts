@@ -14,7 +14,7 @@ import { A19_TERRAIN_PLACEMENT_POLICY } from "../placement/terrain_reflection";
 import { A19_REVEALED_RANGED_POLICY, A19_SNIPER_DONOR_POLICY } from "../setup/a19_revealed_ranged_identity";
 import { A19_SHOOTERLESS_MOVEMENT_POLICY } from "../setup/a19_shooterless_setup_identity";
 import { A19_STRIKER_MATCHUP_POLICY } from "../setup/a19_striker_matchup_identity";
-import { A19_STRIKER_RUSH_POLICY } from "../setup/a19_striker_rush_identity";
+import { A19_STRIKER_RUSH_MIXED_POLICY, A19_STRIKER_RUSH_POLICY } from "../setup/a19_striker_rush_identity";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
 import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
 import { A19_NIGHTMARE_WALL_MOVEMENT_POLICY } from "../nightmare_wall_movement";
@@ -89,8 +89,15 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     against v16 on the registered sealed bank (95% +22.96 to +33.06) and +3.52 against v14 (95% -0.83 to
  *     +7.96); all six registered gates passed (docs/striker_matchup_adoption.md). Search, weights and budgets
  *     are untouched.
+ *   - striker rush against mixed armies (profile v18) adopted on 2026-11-20 under the same standing
+ *     instruction. The rush also covers an army with exactly four strikers and at least two shooters; it used
+ *     to stop at three enemy strikers, and such an army's shooters shot freely. +9.20 score points against
+ *     mixed armies on the registered sealed bank (95% +6.81 to +11.68), +23.2 and +13.2 on the tasks where the
+ *     setup changes. Its quality gate failed (four candidate games against one with a declined scripted melee
+ *     proposal) and stays recorded as failed; a wider rule, any army with four strikers, failed its mirror
+ *     guard and was not adopted (docs/striker_rush_mixed_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v17" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v18" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -228,6 +235,19 @@ export const V08_A19_STRIKER_MATCHUP_POLICY = Object.freeze({
     adoption: "standing-user-instruction",
     registrationSha256: "764d9b96b46a323f2ffc3542bf1d39107babbbc43268f33a69b70e3b256db593",
     qualification: "registered-confirmation-passed",
+} as const);
+
+/**
+ * Striker rush against mixed armies (profile v18). The condition lives in ai/setup/a19_striker_rush.ts; this
+ * record keeps the decision, its registration and the failed quality gate with the profile. See
+ * docs/striker_rush_mixed_adoption.md.
+ */
+export const V08_A19_STRIKER_RUSH_MIXED_POLICY = Object.freeze({
+    policyId: A19_STRIKER_RUSH_MIXED_POLICY,
+    adoptedAt: "2026-11-20",
+    adoption: "standing-user-instruction",
+    registrationSha256: "ad387b7c4c3e815a1432b3f853b0895dfcd2b0a567e3a9a9c1ad9d9e579d715a",
+    qualification: "strength-confirmed-quality-gate-failed",
 } as const);
 
 /**
@@ -555,6 +575,7 @@ export const V08_A19_PROFILE = Object.freeze({
     artifactBeneficiary: V08_A19_ARTIFACT_BENEFICIARY_POLICY,
     shooterlessMovement: V08_A19_SHOOTERLESS_MOVEMENT_POLICY,
     strikerMatchup: V08_A19_STRIKER_MATCHUP_POLICY,
+    strikerRushMixed: V08_A19_STRIKER_RUSH_MIXED_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

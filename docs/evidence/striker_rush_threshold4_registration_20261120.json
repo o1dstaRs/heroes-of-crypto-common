@@ -1,0 +1,69 @@
+{
+ "id": "striker-rush-threshold-4-confirmation-C-20261120",
+ "registeredAt": "2026-11-20T13:26:12.834026+00:00",
+ "question": "Does the default (A19 profile v17) score higher against mixed armies when it also rushes an army with exactly four strikers, without losing against itself?",
+ "candidate": {
+  "setupRule": "The striker rush condition changes from 'at least four own strikers and at most THREE enemy strikers' to 'at least four own strikers and at most FOUR enemy strikers'. The plan (Placement 2, Movement 2, paid from the stock plan), the forward formation and everything else are unchanged, including the draft: its matchup probability keeps the four-striker boundary.",
+  "why": "The threshold of three was set from games in which the opposing army had at most three strikers (the previous default) or five to six (striker mirrors). Armies with exactly four strikers and one or two shooters were not sampled. They are the most common army in recorded games by people (20 of 64 armies have exactly four strikers)."
+ },
+ "control": "Profile v17: matchup striker draft, striker rush at most three enemy strikers, shooterless Movement.",
+ "populations": {
+  "mixB12": "Opponent drafts strikers in the bundle and at levels 1-2 (fast first) and the shipped native pick at levels 3-4, on the shipped native setup.",
+  "mixB34": "Opponent drafts strikers in the bundle and at levels 3-4 and the shipped native pick at levels 1-2, on the shipped native setup.",
+  "mirror": "Opponent is profile v17 (guard): striker rush at most three, shooterless Movement."
+ },
+ "bank": {
+  "namespace": "matchup-draft-20261120-v1",
+  "tasks": 540,
+  "families": "index 60..119 of the pool, no development use; 60 per doctrine pair, 180 per map",
+  "playedTasks": "Only tasks where the candidate seat has at least four strikers and the enemy exactly four: on every other task the candidate rule selects the same setup as the control and the two arms are the same game (in the shooterless confirmation 141 of 141 such tasks replayed with identical digests). Those count as a zero difference. Rule changes the setup on 326 (mixB12), 350 (mixB34) and 12 (mirror) of 540 tasks.",
+  "unit": "one task = one draft seed, doctrine pair, map and pick order; one game per arm from the candidate seat; both arms play the identical drafted armies"
+ },
+ "primaryEndpoint": "Mean over the 540 tasks of the task's mean difference over mixB12 and mixB34 (candidate-seat score, candidate arm minus control arm; zero where the rule does not change the setup). 95% interval from 10,000 bootstrap resamples over tasks, seed 20261123.",
+ "gates": {
+  "G1": "Lower bound of the primary interval above zero.",
+  "G2": "Neither mixed population and no map with a negative point estimate.",
+  "G3": "Mirror guard: the difference over all 540 mirror tasks is at least -1 point.",
+  "G4": "Candidate-arm games with a quality error not more than control-arm games with one.",
+  "G5": "A rerun of 30 changed tasks of the mixB12 candidate arm on a second host reproduces the same digests.",
+  "G6": "Mean CPU per changed game of the candidate arm at most 1.25 times the control arm (mixed populations), same host and tree."
+ },
+ "notClaimed": "Strength against people; armies with exactly four strikers and no shooter (casters only), which these populations hardly contain; a change against the previous default (profile v14 armies never have four strikers in the development bank, so the rule selects the same setup there).",
+ "development": {
+  "tasks": 198,
+  "estimate": "+11.4 points over the two mixed populations, 95% +6.6 to +16.2 (mixB12 +15.7, mixB34 +7.1); on the 252 games where the setup changes +17.9 (95% +11.1 to +25.0); mirror +0.5 (4 changed games of 198)",
+  "variantsRun": "Rush also when the enemy has at least two shooters whatever its strikers (+13.6 / +7.1); the at-most-four rule together with a five-striker boundary in the draft's matchup probability (+13.6 / +3.0). The simplest rule was registered. Baselines: profile v17 scores 53.0% against mixB12 and 63.4% against mixB34."
+ },
+ "execution": {
+  "runner": "life-run5.ts on the production server lifecycle; control specs v17-r3.json (mixed) and v16-both.json (mirror), candidate specs v17-r4.json (mixed) and v17-r4-vs-v17.json (mirror)",
+  "tree": "shipped-parity/lab4 (server + engine at A19 profile v14 with inert research hooks; draft heads and setup rules applied by the draft generator and the runner, as in the earlier confirmations of this series)",
+  "treeManifestSha256": "bc730e9cfcb070fd997ac5f5b531fcf08b45b2fa68dbe3dd889a7e275ece389e",
+  "draftGenerator": "league-drafts.ts; candidate seat S:B1234:val with explore/table-a.json (RUSH_PRIOR=0.5), opponents S:B12:fast, S:B34:fast and S:B1234:val",
+  "host": "M4 Max, 8 processes"
+ },
+ "inputsSha256": {
+  "league-drafts.ts": "5b47451bef631ebfa923a3230f81111bbab1a4e48e3f86706208363381fe5beb",
+  "life-run5.ts": "b36942781793af4f74a3c8160e4fcfcc50fdaecc2d8ac334af4687892ba687e2",
+  "life-pool5.sh": "07c574dc5d8e6cad6cf8396b66d0a881252cd87b4ee566f6f7212b3be7cdb4ba",
+  "formation_lib.ts": "b6b64b8419d0b4bea3f2bf498f586e54ad3b44f0adc83f05b74a677371fe6f31",
+  "specs2/v17-r3.json": "6d59567c401bfd39c2535c6949e1f52168522eafcaab4a52d4396b1b583b0129",
+  "specs2/v17-r4.json": "82b053267819ee6158f88c3a674c1076209aa448c62df608daa750476f12a630",
+  "specs2/v16-both.json": "e4f0bd4214a7b770d1e3a5824ee948dcd0d9683d6c2cb1d26ec0fff269a84f77",
+  "specs2/v17-r4-vs-v17.json": "7ef1efdc8dd1ad3d0ab733291c57b2dbfe66d61fe43eb770f819a3b54222e972",
+  "confirm_c_analyze.py": "32af8848571212cfe28e9208c780efcc4f48241715c78daa6391fd846a4f3760",
+  "g4_check.py": "92fb372e332d094a96a6157c97dd967416e09ff9201c14dcab038e6bfbcfb0c2",
+  "tree_manifest.sh": "91e0dc01bd1a13e2a6aa75e022cabc56b79c8c5fbaeda6ab336ec8473e19203e",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "seeds2/pool.json": "1dda6c1fefb6c6b49a4d27bf127ca1121df5d1201b07a2855e1380733f4e9cfb",
+  "seeds2/split.json": "d0bb5ae81269fa494fb0ddb98221d8edc72bb894099639362ba40d93819b24ee",
+  "seeds2/confirmation-C-tasks.json": "a672c23563a79b4c4fa63965f0fc387cd9045c5436915ae81657a0bf694f4b72",
+  "bank/cfC-v17_vs_mixB12.json": "6ecdb1f3b1ef9ba28c0b45986cadc9fd88777a1fda4969a74272167390ca5bb9",
+  "bank/cfC-v17_vs_mixB34.json": "83e8fd7e7ae9a14ce0d06254cb68464191a14d9c1507432aa9b377166b2d9eab",
+  "bank/cfC-v17_vs_v17.json": "562c4f46a3f8e1f0b6325180fb7b8254cbaea55e5fe130da99100580d581fa29",
+  "bank/cfC-v17_vs_mixB12-fire.json": "91ea841b4a6b416401d1ab33925dd1b8a019a2b87c77db8c5df2ffce16a1e6f4",
+  "bank/cfC-v17_vs_mixB34-fire.json": "76367a99e7d3653f30748b25dd3be7550481e890bd23816700545398cb1cb2fd",
+  "bank/cfC-v17_vs_v17-fire.json": "f7ee3d70bd514263991745254254ffcf05a9b1fe7ea3bb4226de7f87a1403201",
+  "bank/cfC-g5.json": "853d2501bd8fe2949bb98de96471d60d1ec7a19f12534e71f5dc91d737c4b128",
+  "../draft-parity.ts": "9493f044a50c9b5074a78f3ceb2166cd34c4e833b483f73067a2b2449494f8d1"
+ }
+}

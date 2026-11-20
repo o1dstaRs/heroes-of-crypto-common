@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v17",
+            schema: "hoc.v0_8_a19_production_profile.v18",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -125,6 +125,14 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "standing-user-instruction",
                 registrationSha256: "764d9b96b46a323f2ffc3542bf1d39107babbbc43268f33a69b70e3b256db593",
                 qualification: "registered-confirmation-passed",
+            },
+            // Profile v18: confirmed on strength; its quality gate failed and stays recorded as failed.
+            strikerRushMixed: {
+                policyId: "a19-striker-rush-mixed-v1",
+                adoptedAt: "2026-11-20",
+                adoption: "standing-user-instruction",
+                registrationSha256: "ad387b7c4c3e815a1432b3f853b0895dfcd2b0a567e3a9a9c1ad9d9e579d715a",
+                qualification: "strength-confirmed-quality-gate-failed",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({

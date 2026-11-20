@@ -1,0 +1,472 @@
+{
+ "id": "striker-rush-mixed-v1-confirmation-D-results-20261120",
+ "registrationSha256": "ad387b7c4c3e815a1432b3f853b0895dfcd2b0a567e3a9a9c1ad9d9e579d715a",
+ "evidenceHeads": {
+  "common": "bdb90084518e723ae3832b32eeb4b048262fa559",
+  "server": "f77ae29068f026c7d49c14b9af49018b622ce774",
+  "note": "Research tree at A19 profile v14 with the later draft heads and setup rules applied by the draft generator and the runner, as in the earlier confirmations of this series. The adoption commit sits on a later head that also contains a Battle Mage stat change; these games were not replayed on it."
+ },
+ "adoptedRule": "Striker rush when the seat has at least four strikers and the enemy has at most three strikers, or exactly four strikers and at least two creatures with a ranged attack.",
+ "primary": {
+  "tasks": 576,
+  "difference": 9.2,
+  "interval95": [
+   6.81,
+   11.68
+  ],
+  "better": 131,
+  "worse": 41
+ },
+ "maps": {
+  "Normal": {
+   "tasks": 192,
+   "difference": 11.2,
+   "interval95": [
+    7.29,
+    15.36
+   ],
+   "better": 46,
+   "worse": 9
+  },
+  "Lava": {
+   "tasks": 192,
+   "difference": 7.29,
+   "interval95": [
+    3.12,
+    11.59
+   ],
+   "better": 41,
+   "worse": 17
+  },
+  "Block centre": {
+   "tasks": 192,
+   "difference": 9.11,
+   "interval95": [
+    4.82,
+    13.54
+   ],
+   "better": 44,
+   "worse": 15
+  }
+ },
+ "populations": {
+  "mixB12": {
+   "tasks": 576,
+   "tasksWhereTheRuleChangesTheSetup": 293,
+   "allTasks": {
+    "tasks": 576,
+    "difference": 11.81,
+    "interval95": [
+     8.16,
+     15.45
+    ],
+    "better": 95,
+    "worse": 28
+   },
+   "changedTasks": {
+    "tasks": 293,
+    "difference": 23.21,
+    "interval95": [
+     16.55,
+     30.03
+    ],
+    "better": 95,
+    "worse": 28
+   },
+   "scoreOnChangedTasks": {
+    "control": 38.57,
+    "candidate": 61.77
+   },
+   "qualityErrors": {
+    "control": 0,
+    "candidate": 1
+   },
+   "lapsPerChangedGame": {
+    "control": 6.12,
+    "candidate": 5.55
+   }
+  },
+  "mixB34": {
+   "tasks": 576,
+   "tasksWhereTheRuleChangesTheSetup": 288,
+   "allTasks": {
+    "tasks": 576,
+    "difference": 6.6,
+    "interval95": [
+     3.39,
+     9.9
+    ],
+    "better": 67,
+    "worse": 30
+   },
+   "changedTasks": {
+    "tasks": 288,
+    "difference": 13.19,
+    "interval95": [
+     6.77,
+     19.79
+    ],
+    "better": 67,
+    "worse": 30
+   },
+   "scoreOnChangedTasks": {
+    "control": 62.15,
+    "candidate": 75.35
+   },
+   "qualityErrors": {
+    "control": 1,
+    "candidate": 3
+   },
+   "lapsPerChangedGame": {
+    "control": 6.8,
+    "candidate": 6.05
+   }
+  },
+  "mirror": {
+   "tasks": 576,
+   "tasksWhereTheRuleChangesTheSetup": 6,
+   "allTasks": {
+    "tasks": 576,
+    "difference": -0.17,
+    "interval95": [
+     -0.87,
+     0.35
+    ],
+    "better": 1,
+    "worse": 2
+   },
+   "changedTasks": {
+    "tasks": 6,
+    "difference": -16.67,
+    "interval95": [
+     -66.67,
+     33.33
+    ],
+    "better": 1,
+    "worse": 2
+   },
+   "scoreOnChangedTasks": {
+    "control": 50.0,
+    "candidate": 33.33
+   },
+   "qualityErrors": {
+    "control": 0,
+    "candidate": 0
+   },
+   "lapsPerChangedGame": {
+    "control": 5.83,
+    "candidate": 6.33
+   }
+  }
+ },
+ "cpuSecondsPerChangedGame": {
+  "control": 7.702,
+  "candidate": 8.284
+ },
+ "qualityErrors": {
+  "control": 1,
+  "candidate": 4
+ },
+ "gates": {
+  "G1 strength against mixed armies, lower bound above zero": {
+   "passed": true,
+   "value": 6.81
+  },
+  "G2 neither mixed population and no map with a negative point estimate": {
+   "passed": true,
+   "lowestMap": "Lava",
+   "value": 7.29
+  },
+  "G3 mirror guard, difference over all mirror tasks at least -1": {
+   "passed": true,
+   "value": -0.17,
+   "changedTasks": 6,
+   "better": 1,
+   "worse": 2
+  },
+  "G4 candidate games with a quality error not above the control arm": {
+   "passed": false,
+   "candidateGamesWithAnError": 4,
+   "controlGamesWithAnError": 1,
+   "note": "All five are the same message, a declined scripted melee proposal (attack_not_available): the incoherent move-then-strike proposal of docs/coherent_melee_approach_research.md, whose repair is inactive. All four candidate games were won by the candidate seat. In the predecessor confirmation the same arms had 0 candidate and 1 control game with it (676 changed games each). The gate failed and stays recorded as failed."
+  },
+  "G5 thirty changed tasks reproduce on a second host": {
+   "passed": true,
+   "identicalDigests": 30,
+   "replayed": 30
+  },
+  "G6 candidate CPU per changed game at most 1.25 times the control": {
+   "passed": true,
+   "value": 1.0756
+  }
+ },
+ "productionPort": {
+  "what": "60 changed tasks (30 mixB12, 24 mixB34, 6 mirror) replayed twice: by the research runner with the rule on both seats, and by the production implementation with no research seam, built at the evidence heads.",
+  "identicalDigests": 60,
+  "replayed": 60
+ },
+ "predecessor": {
+  "id": "striker-rush-threshold-4-confirmation-C-20261120",
+  "registrationSha256": "03001b44fed131dbde4562a3602bfaa33fdbac8a121f17de0f967ae975fa52a0",
+  "rule": "Rush at most four enemy strikers, whatever else the army holds. NOT adopted.",
+  "primary": {
+   "tasks": 540,
+   "difference": 13.24,
+   "interval95": [
+    10.56,
+    15.97
+   ],
+   "better": 158,
+   "worse": 40
+  },
+  "maps": {
+   "Normal": {
+    "tasks": 180,
+    "difference": 16.94,
+    "interval95": [
+     12.36,
+     21.53
+    ],
+    "better": 63,
+    "worse": 9
+   },
+   "Lava": {
+    "tasks": 180,
+    "difference": 8.75,
+    "interval95": [
+     4.17,
+     13.47
+    ],
+    "better": 42,
+    "worse": 17
+   },
+   "Block centre": {
+    "tasks": 180,
+    "difference": 14.03,
+    "interval95": [
+     9.03,
+     19.17
+    ],
+    "better": 53,
+    "worse": 14
+   }
+  },
+  "populations": {
+   "mixB12": {
+    "tasks": 540,
+    "tasksWhereTheRuleChangesTheSetup": 326,
+    "allTasks": {
+     "tasks": 540,
+     "difference": 17.69,
+     "interval95": [
+      13.7,
+      21.57
+     ],
+     "better": 118,
+     "worse": 22
+    },
+    "changedTasks": {
+     "tasks": 326,
+     "difference": 29.29,
+     "interval95": [
+      23.01,
+      35.58
+     ],
+     "better": 118,
+     "worse": 22
+    },
+    "scoreOnChangedTasks": {
+     "control": 38.8,
+     "candidate": 68.1
+    },
+    "qualityErrors": {
+     "control": 0,
+     "candidate": 0
+    },
+    "lapsPerChangedGame": {
+     "control": 6.15,
+     "candidate": 5.6
+    }
+   },
+   "mixB34": {
+    "tasks": 540,
+    "tasksWhereTheRuleChangesTheSetup": 350,
+    "allTasks": {
+     "tasks": 540,
+     "difference": 8.8,
+     "interval95": [
+      4.81,
+      12.78
+     ],
+     "better": 91,
+     "worse": 41
+    },
+    "changedTasks": {
+     "tasks": 350,
+     "difference": 13.57,
+     "interval95": [
+      7.71,
+      19.57
+     ],
+     "better": 91,
+     "worse": 41
+    },
+    "scoreOnChangedTasks": {
+     "control": 60.14,
+     "candidate": 73.71
+    },
+    "qualityErrors": {
+     "control": 1,
+     "candidate": 0
+    },
+    "lapsPerChangedGame": {
+     "control": 6.85,
+     "candidate": 6.22
+    }
+   },
+   "mirror": {
+    "tasks": 540,
+    "tasksWhereTheRuleChangesTheSetup": 12,
+    "allTasks": {
+     "tasks": 540,
+     "difference": -1.11,
+     "interval95": [
+      -2.22,
+      -0.19
+     ],
+     "better": 1,
+     "worse": 7
+    },
+    "changedTasks": {
+     "tasks": 12,
+     "difference": -50.0,
+     "interval95": [
+      -83.33,
+      -8.33
+     ],
+     "better": 1,
+     "worse": 7
+    },
+    "scoreOnChangedTasks": {
+     "control": 66.67,
+     "candidate": 16.67
+    },
+    "qualityErrors": {
+     "control": 0,
+     "candidate": 0
+    },
+    "lapsPerChangedGame": {
+     "control": 7.08,
+     "candidate": 5.83
+    }
+   }
+  },
+  "cpuSecondsPerChangedGame": {
+   "control": 7.857,
+   "candidate": 8.417
+  },
+  "qualityErrors": {
+   "control": 1,
+   "candidate": 0
+  },
+  "gates": {
+   "G1": true,
+   "G2": true,
+   "G3 mirror guard": false,
+   "G4": true,
+   "G5": true,
+   "G6": true
+  },
+  "mirrorGuard": "The rule changed 12 of 540 mirror tasks and lost on them: 66.7% to 16.7%, better 1, worse 7; -1.11 over all mirror tasks against a -1 margin.",
+  "changedTasksByEnemyShooters": {
+   "mixed, two or more shooters": {
+    "tasks": 567,
+    "difference": 24.5,
+    "interval95": [
+     19.7,
+     29.4
+    ]
+   },
+   "mixed, one shooter": {
+    "tasks": 108,
+    "difference": 3.7,
+    "interval95": [
+     -6.5,
+     14.4
+    ]
+   },
+   "mirror, none / one / two shooters": [
+    {
+     "tasks": 3,
+     "difference": -100.0
+    },
+    {
+     "tasks": 5,
+     "difference": -20.0
+    },
+    {
+     "tasks": 4,
+     "difference": -50.0
+    }
+   ]
+  },
+  "decisionRule": "Written before any result of that bank: adopt only four enemy strikers with at least k shooters, k = 1 if the one-shooter tasks had n >= 40 and a non-negative estimate, else 2. It pointed at k = 1; k = 2, the narrower scope, was registered instead because the one-shooter estimate is not distinguishable from zero and went the other way on the five mirror tasks of that kind."
+ },
+ "knownCost": "Against the default's own armies that happen to have exactly four strikers and two shooters the rule lost more than it won: over both banks 10 changed mirror tasks, better 1, worse 4. Such armies are about 1% of default-against-default games.",
+ "development": {
+  "tasks": 198,
+  "baseline": {
+   "againstMixB12": 53.0,
+   "againstMixB34": 63.4
+  },
+  "atMostFourStrikers": {
+   "mixB12": {
+    "difference": 15.7,
+    "interval95": [
+     9.1,
+     22.2
+    ]
+   },
+   "mixB34": {
+    "difference": 7.1,
+    "interval95": [
+     0.5,
+     13.6
+    ]
+   }
+  },
+  "fourStrikersTwoShooters": {
+   "games": 218,
+   "difference": 18.8,
+   "interval95": [
+    11.0,
+    26.6
+   ]
+  },
+  "draftBoundaryAtFiveOnTop": {
+   "mixB12": -2.0,
+   "mixB34": -4.0,
+   "note": "relative to the at-most-four rule; not better, the draft keeps its four-striker boundary"
+  },
+  "recordedHumanArmies": {
+   "games": 64,
+   "exactlyFourStrikers": 20,
+   "ofWhichTwoShooters": 8,
+   "oneShooter": 5,
+   "noShooter": 7,
+   "coveredByTheRuleBefore": 29,
+   "coveredNow": 37
+  }
+ },
+ "notMeasured": [
+  "play against people",
+  "armies with four strikers and fewer than two shooters (unchanged: native setup)",
+  "live decision latency"
+ ],
+ "analysis": {
+  "script": "confirm_c_analyze.py --prefix cfD --bank bank/cfD",
+  "sha256": "32af8848571212cfe28e9208c780efcc4f48241715c78daa6391fd846a4f3760",
+  "bootstrap": "10,000 resamples over tasks, seed 20261123",
+  "amendments": "none"
+ }
+}
