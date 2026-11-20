@@ -1,9 +1,22 @@
 # Agent guidance
 
+## Striker rush from one shooter — November 20, 2026
+
+Under the same standing instruction as the sections below, `a19-striker-rush-one-shooter-v1` is
+active: **the current default is profile v19**. Read `docs/striker_rush_one_shooter_adoption.md`. An
+army with exactly four strikers is rushed from one shooter (v18: two). Casters without a ranged
+attack do not count: four strikers with casters only measured −12.8 for the rusher and keep the
+native setup. `A19_STRIKER_RUSH_MIXED_V18_MIN_SHOOTERS` keeps the v18 value for the server's
+rollback switch. Preserve the registered +4.64-point estimate (95% +0.91 to +8.40; 927 changed games
+on a fresh sealed bank); its quality gate (G4: two candidate games against one with a declined
+scripted melee proposal) failed and stays recorded as failed: do not waive, re-run or relabel it.
+Its bank (namespace `rush-shooter-20261120-v1`) is now consumed.
+
 ## Striker rush against mixed armies — November 20, 2026
 
-Under the same standing instruction as the sections below, `a19-striker-rush-mixed-v1` is active in
-the A19-backed v0.8 default: **the current default is profile v18**. Read
+Profile v18 is retained inside v19; where this section says "current default", read v18 as the
+default at that date. Under the same standing instruction as the sections below,
+`a19-striker-rush-mixed-v1` is active in the A19-backed v0.8 default: **the current default is profile v18**. Read
 `docs/striker_rush_mixed_adoption.md` before changing the rush condition.
 
 The striker rush used to stop at three enemy strikers. It now also covers an army with **exactly four
@@ -12,7 +25,8 @@ setup while two shooters fired at it, and scored 53% and 63% against such armies
 `isA19StrikerRushSetup` in `src/ai/setup/a19_striker_rush.ts`; plan, formation and draft are
 unchanged, and the draft's matchup probability keeps its four-striker boundary.
 
-Do not widen it. "Any army with four strikers" was registered first and **failed its mirror guard**:
+Do not widen it beyond what profile v19 confirmed (one shooter, casters not counted). "Any army with
+four strikers" was registered first and **failed its mirror guard**:
 against the default's own four-striker armies it lost 7 and won 1 of 12 changed tasks. One shooter
 measured +3.7 (95% −6.5 to +14.4). Four strikers with no shooter, the shape of the army the rush was
 learned from, hardly occurs in the mixed banks and lost all three mirror tasks. Even the adopted

@@ -1,0 +1,188 @@
+{
+ "id": "striker-rush-one-shooter-confirmation-E-results-20261120",
+ "registrationSha256": "8654e5a54721df0c4ccd74ecc6bbfd31c404203b36bd295c82669febaa241b62",
+ "evidenceHeads": {
+  "common": "bdb90084518e723ae3832b32eeb4b048262fa559",
+  "server": "f77ae29068f026c7d49c14b9af49018b622ce774",
+  "note": "Research tree at A19 profile v14 with the later draft heads and setup rules applied by the draft generator and the runner, as in the earlier confirmations of this series."
+ },
+ "rule": "Striker rush when the seat has at least four strikers and the enemy has at most three strikers, or exactly four strikers and at least one creature with a ranged attack (profile v18: two). Casters without a ranged attack do not count.",
+ "primary": {
+  "tasks": 824,
+  "games": 927,
+  "difference": 4.64,
+  "interval95": [
+   0.91,
+   8.4
+  ],
+  "better": 187,
+  "worse": 144
+ },
+ "maps": {
+  "Normal": {
+   "tasks": 264,
+   "games": 299,
+   "difference": 6.69,
+   "interval95": [
+    0.5,
+    13.04
+   ],
+   "better": 58,
+   "worse": 39
+  },
+  "Lava": {
+   "tasks": 264,
+   "games": 293,
+   "difference": 6.83,
+   "interval95": [
+    0.17,
+    13.53
+   ],
+   "better": 66,
+   "worse": 45
+  },
+  "Block centre": {
+   "tasks": 296,
+   "games": 335,
+   "difference": 0.9,
+   "interval95": [
+    -5.57,
+    7.29
+   ],
+   "better": 63,
+   "worse": 60
+  }
+ },
+ "populations": {
+  "owner": {
+   "tasks": 2691,
+   "changedTasks": 453,
+   "changed": {
+    "tasks": 453,
+    "games": 453,
+    "difference": 3.2,
+    "interval95": [
+     -1.99,
+     8.28
+    ],
+    "better": 81,
+    "worse": 67
+   },
+   "scoreOnChanged": {
+    "control": 71.52,
+    "candidate": 74.72
+   },
+   "differenceOverAllTasks": 0.539
+  },
+  "mixB12": {
+   "tasks": 2691,
+   "changedTasks": 199,
+   "changed": {
+    "tasks": 199,
+    "games": 199,
+    "difference": 15.33,
+    "interval95": [
+     6.78,
+     23.87
+    ],
+    "better": 55,
+    "worse": 25
+   },
+   "scoreOnChanged": {
+    "control": 48.74,
+    "candidate": 64.07
+   },
+   "differenceOverAllTasks": 1.133
+  },
+  "mixB34": {
+   "tasks": 2691,
+   "changedTasks": 275,
+   "changed": {
+    "tasks": 275,
+    "games": 275,
+    "difference": -0.73,
+    "interval95": [
+     -7.82,
+     6.36
+    ],
+    "better": 51,
+    "worse": 52
+   },
+   "scoreOnChanged": {
+    "control": 60.36,
+    "candidate": 59.64
+   },
+   "differenceOverAllTasks": -0.074
+  },
+  "mirror": {
+   "tasks": 2691,
+   "changedTasks": 21,
+   "changed": {
+    "tasks": 21,
+    "games": 21,
+    "difference": 0.0,
+    "interval95": [
+     -23.81,
+     23.81
+    ],
+    "better": 3,
+    "worse": 3
+   },
+   "scoreOnChanged": {
+    "control": 42.86,
+    "candidate": 42.86
+   },
+   "differenceOverAllTasks": 0.0
+  }
+ },
+ "qualityErrors": {
+  "control": 1,
+  "candidate": 2
+ },
+ "cpuSecondsPerChangedGame": {
+  "control": 9.023,
+  "candidate": 9.002
+ },
+ "gates": {
+  "G1 strength on the changed tasks: lower bound above zero": true,
+  "G2 no map with a negative estimate, no population below -5": true,
+  "G3 mirror guard: difference over all mirror tasks at least -1": true,
+  "G4 candidate games with a quality error not above the control arm": false,
+  "G6 candidate CPU per changed game at most 1.25x control": true,
+  "G5 thirty changed owner tasks reproduce on a second host": true
+ },
+ "productionPort": {
+  "what": "Changed tasks replayed twice: by the research runner with the rule on both seats and by the production implementation with no research seam, built at the evidence heads.",
+  "identicalDigests": 108,
+  "replayed": 108
+ },
+ "development": {
+  "note": "Post hoc on the development cells and on the consumed bank of confirmation C, hence a bank of its own.",
+  "fourStrikersNoShooter": {
+   "games": 98,
+   "difference": -12.8
+  },
+  "fourStrikersOneShooter": {
+   "games": 61,
+   "difference": 16.4
+  },
+  "fourStrikersTwoShooters": {
+   "games": 223,
+   "difference": 18.4
+  },
+  "confirmationCOneShooter": {
+   "games": 108,
+   "difference": 3.7
+  }
+ },
+ "notMeasured": [
+  "play against people",
+  "live decision latency"
+ ],
+ "analysis": {
+  "script": "confirm_e_analyze.py",
+  "sha256": "01263e28bf5f5ca8e7bb95f50264c767496c7ec6f0966c42449d8a0951b20750",
+  "bootstrap": "10,000 resamples over draft tasks, seed 20261124",
+  "amendments": "none"
+ }
+}

@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v18",
+            schema: "hoc.v0_8_a19_production_profile.v19",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -132,6 +132,14 @@ describe("v0.8+A19 production profile", () => {
                 adoptedAt: "2026-11-20",
                 adoption: "standing-user-instruction",
                 registrationSha256: "ad387b7c4c3e815a1432b3f853b0895dfcd2b0a567e3a9a9c1ad9d9e579d715a",
+                qualification: "strength-confirmed-quality-gate-failed",
+            },
+            // Profile v19: the mixed-army rush from one shooter.
+            strikerRushOneShooter: {
+                policyId: "a19-striker-rush-one-shooter-v1",
+                adoptedAt: "2026-11-20",
+                adoption: "standing-user-instruction",
+                registrationSha256: "8654e5a54721df0c4ccd74ecc6bbfd31c404203b36bd295c82669febaa241b62",
                 qualification: "strength-confirmed-quality-gate-failed",
             },
         });

@@ -3,6 +3,8 @@ import { expect, test } from "bun:test";
 import {
     A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS,
     A19_STRIKER_RUSH_MIXED_POLICY,
+    A19_STRIKER_RUSH_MIXED_V18_MIN_SHOOTERS,
+    A19_STRIKER_RUSH_ONE_SHOOTER_POLICY,
     A19_STRIKER_RUSH_POLICY,
     a19ShooterCount,
     a19StrikerCount,
@@ -25,6 +27,7 @@ const brawlers = [C.SQUIRE, C.BERSERKER, C.HYENA, C.NOMAD, C.CRUSADER, C.CHAMPIO
 test("the policy has a stable identity", () => {
     expect(A19_STRIKER_RUSH_POLICY).toBe("a19-striker-rush-v1");
     expect(A19_STRIKER_RUSH_MIXED_POLICY).toBe("a19-striker-rush-mixed-v1");
+    expect(A19_STRIKER_RUSH_ONE_SHOOTER_POLICY).toBe("a19-striker-rush-one-shooter-v1");
 });
 
 test("fast strikers fly or have five printed steps; shooters and casters are never strikers", () => {
@@ -85,7 +88,17 @@ test("a mixed army is rushed: exactly four strikers and enough shooters", () => 
     expect(a19ShooterCount(fourAndCasters)).toBe(0);
     expect(a19ShooterCount([...fourAndOneShooter, C.ZENA])).toBe(1);
     expect(isA19StrikerRushSetup(brawlers, fourAndTwoShooters)).toBe(true);
-    expect(isA19StrikerRushSetup(brawlers, fourAndOneShooter)).toBe(A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS <= 1);
+    // Profile v19 rushes from one shooter; the v18 threshold of two is kept for the rollback.
+    expect(A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS).toBe(1);
+    expect(isA19StrikerRushSetup(brawlers, fourAndOneShooter)).toBe(true);
+    expect(isA19StrikerRushSetup(brawlers, fourAndOneShooter, true, A19_STRIKER_RUSH_MIXED_V18_MIN_SHOOTERS)).toBe(
+        false,
+    );
+    expect(isA19StrikerRushSetup(brawlers, fourAndTwoShooters, true, A19_STRIKER_RUSH_MIXED_V18_MIN_SHOOTERS)).toBe(
+        true,
+    );
+    // A threshold below one never turns the casters-only army into a target.
+    expect(isA19StrikerRushSetup(brawlers, fourAndCasters, true, 0)).toBe(false);
     // Without a shooter, and from five strikers up, the army facing it keeps its native setup.
     expect(isA19StrikerRushSetup(brawlers, fourAndCasters)).toBe(false);
     expect(isA19StrikerRushSetup(brawlers, fiveAndOneShooter)).toBe(false);

@@ -14,7 +14,11 @@ import { A19_TERRAIN_PLACEMENT_POLICY } from "../placement/terrain_reflection";
 import { A19_REVEALED_RANGED_POLICY, A19_SNIPER_DONOR_POLICY } from "../setup/a19_revealed_ranged_identity";
 import { A19_SHOOTERLESS_MOVEMENT_POLICY } from "../setup/a19_shooterless_setup_identity";
 import { A19_STRIKER_MATCHUP_POLICY } from "../setup/a19_striker_matchup_identity";
-import { A19_STRIKER_RUSH_MIXED_POLICY, A19_STRIKER_RUSH_POLICY } from "../setup/a19_striker_rush_identity";
+import {
+    A19_STRIKER_RUSH_MIXED_POLICY,
+    A19_STRIKER_RUSH_ONE_SHOOTER_POLICY,
+    A19_STRIKER_RUSH_POLICY,
+} from "../setup/a19_striker_rush_identity";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
 import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
 import { A19_NIGHTMARE_WALL_MOVEMENT_POLICY } from "../nightmare_wall_movement";
@@ -96,8 +100,13 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     setup changes. Its quality gate failed (four candidate games against one with a declined scripted melee
  *     proposal) and stays recorded as failed; a wider rule, any army with four strikers, failed its mirror
  *     guard and was not adopted (docs/striker_rush_mixed_adoption.md).
+ *   - striker rush from one shooter (profile v19) adopted on 2026-11-20 under the same standing instruction.
+ *     An army with exactly four strikers is rushed from one shooter instead of two; casters do not count.
+ *     +4.64 score points on the registered sealed bank where the setup changes (95% +0.91 to +8.40); its
+ *     quality gate failed (two candidate games against one with a declined scripted melee proposal) and stays
+ *     recorded as failed (docs/striker_rush_one_shooter_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v18" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v19" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -247,6 +256,18 @@ export const V08_A19_STRIKER_RUSH_MIXED_POLICY = Object.freeze({
     adoptedAt: "2026-11-20",
     adoption: "standing-user-instruction",
     registrationSha256: "ad387b7c4c3e815a1432b3f853b0895dfcd2b0a567e3a9a9c1ad9d9e579d715a",
+    qualification: "strength-confirmed-quality-gate-failed",
+} as const);
+
+/**
+ * Striker rush from one shooter (profile v19). The threshold lives in ai/setup/a19_striker_rush.ts; this record keeps
+ * the decision and its registration with the profile. See docs/striker_rush_one_shooter_adoption.md.
+ */
+export const V08_A19_STRIKER_RUSH_ONE_SHOOTER_POLICY = Object.freeze({
+    policyId: A19_STRIKER_RUSH_ONE_SHOOTER_POLICY,
+    adoptedAt: "2026-11-20",
+    adoption: "standing-user-instruction",
+    registrationSha256: "8654e5a54721df0c4ccd74ecc6bbfd31c404203b36bd295c82669febaa241b62",
     qualification: "strength-confirmed-quality-gate-failed",
 } as const);
 
@@ -576,6 +597,7 @@ export const V08_A19_PROFILE = Object.freeze({
     shooterlessMovement: V08_A19_SHOOTERLESS_MOVEMENT_POLICY,
     strikerMatchup: V08_A19_STRIKER_MATCHUP_POLICY,
     strikerRushMixed: V08_A19_STRIKER_RUSH_MIXED_POLICY,
+    strikerRushOneShooter: V08_A19_STRIKER_RUSH_ONE_SHOOTER_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

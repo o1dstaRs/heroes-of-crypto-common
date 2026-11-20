@@ -16,3 +16,5 @@
 export const A19_STRIKER_RUSH_POLICY = "a19-striker-rush-v1" as const;
 /** The extension of the rush to mixed armies, four strikers with shooters (profile v18). Same file holds the rule. */
 export const A19_STRIKER_RUSH_MIXED_POLICY = "a19-striker-rush-mixed-v1" as const;
+/** The mixed-army rush from one shooter instead of two (profile v19). Same file holds the rule. */
+export const A19_STRIKER_RUSH_ONE_SHOOTER_POLICY = "a19-striker-rush-one-shooter-v1" as const;

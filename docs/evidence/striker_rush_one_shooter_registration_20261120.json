@@ -1,0 +1,69 @@
+{
+ "id": "striker-rush-one-shooter-confirmation-E-20261120",
+ "registeredAt": "2026-11-20T17:15:37.831530+00:00",
+ "question": "Does the default (A19 profile v18) score higher when it also rushes an army with exactly four strikers and exactly one shooter, without losing against itself?",
+ "candidate": {
+  "setupRule": "Striker rush when the seat has at least four strikers and the enemy has at most three strikers, or exactly four strikers and at least ONE creature with a ranged attack (profile v18: at least two). Casters without a ranged attack do not count. Plan, formation and draft are unchanged."
+ },
+ "control": "Profile v18: rush at most three enemy strikers, or exactly four with at least two shooters; shooterless Movement; matchup draft.",
+ "why": "On development tasks, against an army with exactly four strikers: no shooter -12.8 for rushing (n 98), one shooter +16.4 (n 61: +23.1 against owner-shaped armies n 26, +30.8 and 0.0 against the two mixed populations), two shooters +18.4 (n 223). On the bank of confirmation C (consumed) the one-shooter tasks measured +3.7 (n 108). Post hoc on both, hence this bank.",
+ "populations": {
+  "owner": "Opponent drafts strikers from the bundle and at levels 2-3 (fast first) and casters at levels 1 and 4, stock setup: the shape of the owner's recorded armies.",
+  "mixB12": "Opponent drafts strikers from the bundle and levels 1-2 and the shipped native pick at levels 3-4, stock setup.",
+  "mixB34": "Opponent drafts strikers from the bundle and levels 3-4 and the shipped native pick at levels 1-2, stock setup.",
+  "mirror": "Opponent is profile v18 (guard)."
+ },
+ "bank": {
+  "namespace": "rush-shooter-20261120-v1",
+  "tasks": 2691,
+  "families": "all 299 families; allocated for this study, no development use; audited against 446 ledgers and both earlier pools",
+  "playedTasks": "Only tasks where the rule changes the setup: 453 (owner), 199 (mixB12), 275 (mixB34), 21 (mirror). On every other task the two arms are the same game.",
+  "unit": "one task = one draft seed, doctrine pair, map and pick order; one game per arm from the candidate seat; both arms play identical drafted armies"
+ },
+ "primaryEndpoint": "Mean over all changed tasks of owner, mixB12 and mixB34 of candidate-arm score minus control-arm score for the candidate seat. 95% interval from 10,000 bootstrap resamples over draft tasks (all changed rows of one task move together), seed 20261124.",
+ "gates": {
+  "G1": "Lower bound of the primary interval above zero.",
+  "G2": "No map with a negative point estimate of the primary endpoint, and no opponent population (owner, mixB12, mixB34) with a changed-task estimate below -5 points.",
+  "G3": "Mirror guard: the difference over all 2,691 mirror tasks is at least -1 point.",
+  "G4": "Candidate-arm games with a quality error not more than control-arm games with one (all populations).",
+  "G5": "A rerun of 30 changed owner tasks on a second host reproduces the candidate digests.",
+  "G6": "Mean CPU per changed game of the candidate arm at most 1.25 times the control arm (owner, mixB12, mixB34), same host and tree."
+ },
+ "notClaimed": "Strength against people; any effect on armies with a different shape; an effect over all games (the rule changes 10-17% of the games against these opponents and about 1% of mirrors).",
+ "execution": {
+  "runner": "life-run5.ts; control spec v18.json (owner, mixB12, mixB34) and v18-both.json (mirror); candidate spec v19.json and v19-vs-v18.json",
+  "tree": "shipped-parity/lab4",
+  "treeManifestSha256": "bc730e9cfcb070fd997ac5f5b531fcf08b45b2fa68dbe3dd889a7e275ece389e",
+  "draftGenerator": "league-drafts2.ts (reproduces the registered league-drafts.ts 198/198 on the mirror and both mixed opponents); candidate seat S:B1234:val with explore/table-a.json (RUSH_PRIOR=0.5); opponents S:B23:fast:K14, S:B12:fast, S:B34:fast, S:B1234:val",
+  "analysis": "confirm_e_analyze.py (dry-run on development rows before registration)",
+  "host": "M4 Max, 8 processes"
+ },
+ "inputsSha256": {
+  "league-drafts2.ts": "2a0190eee7d930cf83008532702f20f26770f5242573a3e1690f42548d758bf2",
+  "life-run5.ts": "b36942781793af4f74a3c8160e4fcfcc50fdaecc2d8ac334af4687892ba687e2",
+  "life-pool5.sh": "07c574dc5d8e6cad6cf8396b66d0a881252cd87b4ee566f6f7212b3be7cdb4ba",
+  "formation_lib.ts": "b6b64b8419d0b4bea3f2bf498f586e54ad3b44f0adc83f05b74a677371fe6f31",
+  "specs2/v18.json": "6501c0e68f97949683eba9ad837851a08289bba210843ab5c566fb713770ebe0",
+  "specs2/v18-both.json": "ed2b23bcf6c5a73cd3b85775b6aae8cb37afc5f4b72f6dca3bb67537e31565a1",
+  "specs2/v19.json": "19d1417bcd10d03181055c51a3b382adbe436c2413caef193115bab504bf76bf",
+  "specs2/v19-vs-v18.json": "bb02fbd433c6724c0ef25e4be54271574f23336b2b5992d77c1e9607a311e2b7",
+  "confirm_e_analyze.py": "01263e28bf5f5ca8e7bb95f50264c767496c7ec6f0966c42449d8a0951b20750",
+  "g4_check.py": "92fb372e332d094a96a6157c97dd967416e09ff9201c14dcab038e6bfbcfb0c2",
+  "tree_manifest.sh": "91e0dc01bd1a13e2a6aa75e022cabc56b79c8c5fbaeda6ab336ec8473e19203e",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "allocate_v19.py": "32d0f43f1118a70e5e907a52f5554f7997a688caad87f678df88927c6a3822b7",
+  "seeds3/pool.json": "143f848957d986a01b18412dcd974c9f44f23fc2c94f40fd0eca4cbfebd937ab",
+  "seeds3/split.json": "e0b7cfe437e1caa5d61a056c29a5ec185f3bee459297ca99be8098825482498e",
+  "seeds3/seed-admission.json": "d61b61028abbcb397233c84a205e2ff744b6ae6924aab411841a7354ec1df92c",
+  "bank/cfE-v18_vs_owner.json": "3fef86231acee15ca48b032cc5b74e5c08a0782e841f731ce44a05d3aac45853",
+  "bank/cfE-v18_vs_mixB12.json": "85e9bcd7af139c7717fb544332fcfdfb4aee0c9a46ff1016e318059a9144b6f3",
+  "bank/cfE-v18_vs_mixB34.json": "2a0662fe146c02590e39e29c62c12532a8f18ac38b19582eec9653733112d6a7",
+  "bank/cfE-v18_vs_mirror.json": "85e3c74104dfe6df483f7e0e9ed8b0e1e23b96e9aedf9ac563f26917cea62064",
+  "bank/cfE-v18_vs_owner-fire.json": "895b748f8223abcde7d31d940e6074502eaf887eb9303a3b97457b93558c0197",
+  "bank/cfE-v18_vs_mixB12-fire.json": "e2435d930c045fc216e48c13a508a22b7885d6da10411338cd7fc61827d03a61",
+  "bank/cfE-v18_vs_mixB34-fire.json": "ba7467e31a5a9d2a75ff723c0c7e2d5236c6c85401fc09d66a5739e5a1a6c88b",
+  "bank/cfE-v18_vs_mirror-fire.json": "300760fa0c0e2f2400b84db6af8a21d834b959667cc9205ca0601943233081fc",
+  "bank/cfE-g5.json": "d19d9d4ec47c3a9fdef5ba9d398697c23f178bd8a6cfce50e8f9719c87fad635",
+  "../draft-parity.ts": "9493f044a50c9b5074a78f3ceb2166cd34c4e833b483f73067a2b2449494f8d1"
+ }
+}

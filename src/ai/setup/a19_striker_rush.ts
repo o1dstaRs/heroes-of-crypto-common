@@ -22,7 +22,11 @@ import type { XY } from "../../utils/math";
  * strikers that reach the firing line on their first move switch the opposing shooters off. Read
  * docs/striker_rush_research.md before changing any number here: the same setup loses against a melee army.
  */
-export { A19_STRIKER_RUSH_MIXED_POLICY, A19_STRIKER_RUSH_POLICY } from "./a19_striker_rush_identity";
+export {
+    A19_STRIKER_RUSH_MIXED_POLICY,
+    A19_STRIKER_RUSH_ONE_SHOOTER_POLICY,
+    A19_STRIKER_RUSH_POLICY,
+} from "./a19_striker_rush_identity";
 /** Own drafted creatures that must be strikers before the rush setup is used. */
 export const A19_STRIKER_RUSH_MIN_OWN_STRIKERS = 4;
 /** The rush is a counter to shooters and casters: an army with at most this many strikers is always rushed. */
@@ -30,11 +34,14 @@ export const A19_STRIKER_RUSH_MAX_ENEMY_STRIKERS = 3;
 /**
  * A mixed army is rushed too: exactly this many strikers and at least `A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS` creatures
  * with a ranged attack. Its shooters shoot freely at a melee army that stays on its stock setup. With four strikers and
- * no shooter the army keeps its native setup against it, as it does against five or six strikers: that case was not
- * measured, and a rush loses to a melee army. See docs/striker_rush_mixed_adoption.md.
+ * no shooter the army keeps its native setup against it, as it does against five or six strikers: rushing four
+ * strikers with casters only measured -12.8 on development tasks. Profile v18 required two shooters; profile v19
+ * one. See docs/striker_rush_mixed_adoption.md and docs/striker_rush_one_shooter_adoption.md.
  */
 export const A19_STRIKER_RUSH_MIXED_ENEMY_STRIKERS = 4;
-export const A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS = 2;
+export const A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS = 1;
+/** The profile v18 threshold, kept for the rollback switch. */
+export const A19_STRIKER_RUSH_MIXED_V18_MIN_SHOOTERS = 2;
 /** Printed steps from which a ground striker counts as fast. Flyers always do. */
 export const A19_STRIKER_RUSH_FAST_STEPS = 5;
 export const A19_STRIKER_RUSH_PLACEMENT = 2;
@@ -93,11 +100,13 @@ export function a19StrikerRushBundle(bundles: readonly (readonly [number, number
 /**
  * Complete public rosters only: the decision reads the whole opposing army, never its hidden setup.
  * `rushMixedArmies` false gives the rule before profile v18: at most three enemy strikers, nothing else.
+ * `mixedMinShooters` is the shooter count from which a four-striker army is rushed (profile v18: 2, v19: 1).
  */
 export function isA19StrikerRushSetup(
     ownIds: readonly number[],
     publicOpponentIds: readonly number[],
     rushMixedArmies = true,
+    mixedMinShooters: number = A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS,
 ): boolean {
     if (
         distinct(ownIds).length !== 6 ||
@@ -110,7 +119,7 @@ export function isA19StrikerRushSetup(
         enemyStrikers <= A19_STRIKER_RUSH_MAX_ENEMY_STRIKERS ||
         (rushMixedArmies &&
             enemyStrikers === A19_STRIKER_RUSH_MIXED_ENEMY_STRIKERS &&
-            a19ShooterCount(publicOpponentIds) >= A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS)
+            a19ShooterCount(publicOpponentIds) >= Math.max(1, mixedMinShooters))
     );
 }
 
