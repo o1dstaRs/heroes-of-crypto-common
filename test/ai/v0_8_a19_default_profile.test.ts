@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v13",
+            schema: "hoc.v0_8_a19_production_profile.v14",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -152,8 +152,6 @@ describe("v0.8+A19 production profile", () => {
                     "SEARCH_A19_CERTIFIED_TIGHT_BOUNDS",
                     "SEARCH_A19_MATERIAL_ARBITRATION",
                     "SEARCH_A19_ROLLOUT_ALLOCATION",
-                    // Measured but not adopted: the A19 environment pins it off instead of leaving it unset.
-                    "SEARCH_A19_NEUTRAL_BARREL_DELIBERATION",
                 ].includes(key)
             ) {
                 continue;
@@ -203,6 +201,44 @@ describe("v0.8+A19 production profile", () => {
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_MELEE_BARREL_DELIBERATION: "invalid" });
         expect(() => createV08A19SearchDriver({} as ILookaheadDeps, match)).toThrow(
             "SEARCH_A19_MELEE_BARREL_DELIBERATION must be 0 or 1",
+        );
+    });
+
+    it("seals the user-adopted neutral barrel comparison for live and offline A19, with a strict rollback", () => {
+        process.env.SEARCH_A19_NEUTRAL_BARREL_DELIBERATION = "0";
+        expect(buildV08A19SearchEnvironment().SEARCH_A19_NEUTRAL_BARREL_DELIBERATION).toBe("1");
+        expect(buildV08A13SearchEnvironment("v0.8").SEARCH_A19_NEUTRAL_BARREL_DELIBERATION).toBeUndefined();
+        // Adopted on confirmed strength; the two failed registered gates stay part of the profile record.
+        expect(V08_A19_PROFILE.neutralBarrelDeliberation).toEqual({
+            policyId: "a19-neutral-barrel-deliberation-v1",
+            adoptedAt: "2026-11-19",
+            adoption: "explicit-user-instruction",
+            registrationSha256: "8d4a618a9f3533b6a9a91e1784cfe197725996aa97c0a0284529a969badefc81",
+            qualification: "strength-confirmed-quality-and-cost-gates-failed",
+        });
+        for (const offlineDeterministicWork of [false, true]) {
+            const match = { greenVersion: "v0.8", redVersion: "v0.8", offlineDeterministicWork };
+            expect(createV08A19SearchDriver({} as ILookaheadDeps, match)).toMatchObject({
+                a19NeutralBarrelDeliberation: true,
+                a19MeleeBarrelDeliberation: true,
+                horizon: 64,
+                rollouts: 2,
+                shortlist: 6,
+            });
+        }
+        const match = { greenVersion: "v0.8", redVersion: "v0.8" };
+        process.env.SEARCH_A19_NEUTRAL_BARREL_DELIBERATION = "1";
+        expect(createV08A13SearchDriver({} as ILookaheadDeps, match)).toMatchObject({
+            a19NeutralBarrelDeliberation: false,
+        });
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_NEUTRAL_BARREL_DELIBERATION: "0" });
+        expect(createV08A19SearchDriver({} as ILookaheadDeps, match)).toMatchObject({
+            a19NeutralBarrelDeliberation: false,
+            a19MeleeBarrelDeliberation: true,
+        });
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_NEUTRAL_BARREL_DELIBERATION: "yes" });
+        expect(() => createV08A19SearchDriver({} as ILookaheadDeps, match)).toThrow(
+            "SEARCH_A19_NEUTRAL_BARREL_DELIBERATION must be 0 or 1",
         );
     });
 

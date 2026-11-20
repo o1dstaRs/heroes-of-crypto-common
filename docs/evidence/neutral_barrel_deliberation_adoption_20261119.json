@@ -1,0 +1,293 @@
+{
+ "schema": "hoc.neutral_barrel_deliberation.adoption.v1",
+ "candidate": "a19-neutral-barrel-deliberation-v1",
+ "adoptedOn": "2026-11-19",
+ "decision": {
+  "kind": "explicit-user-instruction",
+  "context": "The study report recommended adopting the candidate as profile v14 and listed both failed registered gates.",
+  "userReply": "continue, do what is needed",
+  "qualification": "strength-confirmed-quality-and-cost-gates-failed",
+  "failedRegisteredGates": [
+   "quality",
+   "cost"
+  ],
+  "failedGatesWaivedRerunOrRelabeled": false
+ },
+ "profile": {
+  "schemaBefore": "hoc.v0_8_a19_production_profile.v13",
+  "schemaAfter": "hoc.v0_8_a19_production_profile.v14",
+  "rule": {
+   "SEARCH_A19_NEUTRAL_BARREL_DELIBERATION": "1"
+  },
+  "rollbackOverride": {
+   "V08_A19_SEARCH_ENV_OVERRIDES": "{\"SEARCH_A19_NEUTRAL_BARREL_DELIBERATION\":\"0\"}"
+  },
+  "behaviorEnvironmentSha256Before": "feaf19b91f76615e590da9558832e6b7469e9c07df75d0f1d6140e8c9f02c724",
+  "behaviorEnvironmentSha256After": "397a2fc8dc8d3145ab4cbc5300818d9eb3a89edeb2aacb57739a0a38d0c5c004",
+  "profileSourceSha256": "a6bbdba4877521b7ef9e91dd00d2010f208e1fb4c091d680964abc10df9bdf70",
+  "searchDriverSourceSha256": "09f51dd48caee326017ae44597e738d7ee12994118ab343a0ba9cf88a53890e8",
+  "searchDriverChangedByAdoption": false,
+  "serverRevision": "a19-neural-r2-placement-v2-unit-support-v2-barrel-v1-nightmare-v1-terrain-v1-delivery-v1-sniper-v1-neutral-barrel-v1"
+ },
+ "preservedEvidence": {
+  "registrationSha256": "8d4a618a9f3533b6a9a91e1784cfe197725996aa97c0a0284529a969badefc81",
+  "registrationFixtureSha256": "7ddba01c4b3e041c51c716027daff7c41371531f657fa37c473178e7808dcb56",
+  "resultsFixtureSha256": "6a1d24d69a932384ff808c1838687e5f547b13436f54edbd62a488b6e21c97e8",
+  "seedReservationFixtureSha256": "4363f7a24845f11bed38cc474fc02f46aec9aa78b7a5bd5d6a8ce9e52d66178f",
+  "registeredPromotionRule": "none automatic; a pass is evidence for an explicit user adoption decision",
+  "registeredGates": {
+   "quality": false,
+   "minGain": true,
+   "lowerBound": true,
+   "minChangedFamilies": true,
+   "sliceFloor": true,
+   "independentReconstruction": true,
+   "inertness": true,
+   "nativeParity": true,
+   "coldReplay": true,
+   "cost": false
+  },
+  "allRegisteredGatesPassed": false,
+  "heldOutConfirmation": {
+   "families": 2700,
+   "games": 10800,
+   "comparator": "profile v13 default; only the entrant seat runs the candidate",
+   "gainPoints": 3.5833333333333335,
+   "interval95": [
+    2.435185185185185,
+    4.75
+   ],
+   "reading": "every family with a rejected game scored as a double loss for the candidate"
+  },
+  "freshDevelopment": {
+   "families": 1080,
+   "games": 4320,
+   "gainPoints": 3.310185185185185,
+   "interval95": [
+    1.5740740740740742,
+    5.069444444444445
+   ]
+  },
+  "serialCost": {
+   "completeCpuRatio": 1.10141484733286,
+   "registeredLimit": 1.1,
+   "cpuPerDecisionRatio": 1.0393164517117774,
+   "gatePassed": false
+  },
+  "neverPlayedReserveFamilies": 1386
+ },
+ "adoptionReplay": {
+  "purpose": "integration check on consumed development and control cases; not a strength sample",
+  "host": "Ryzen 7 9800X3D research host, shared",
+  "runtime": "bun 1.4.4",
+  "startedUtc": "2026-11-20T02:20:08Z",
+  "finishedUtc": "2026-11-20T02:39:39Z",
+  "sets": {
+   "new": "previous default: engine 63c8e6b5, profile v13, switch pinned off, stock ranked adapter",
+   "adopted": "profile v14 source through the server driver factory and the stock ranked adapter",
+   "seam": "the research seam of the study on both seats over the frozen study engine",
+   "rollback": "profile v14 source with the rollback override set in the server bot search environment"
+  },
+  "engineLoadedPerTree": {
+   "new": {
+    "schema": "hoc.v0_8_a19_production_profile.v13",
+    "fingerprint": "feaf19b91f76615e590da9558832e6b7469e9c07df75d0f1d6140e8c9f02c724",
+    "sealedNeutral": "0",
+    "driverNeutral": false,
+    "driverMelee": true,
+    "profileSourceSha256": "6d9b31a85d52cf1a69d605922f99a23ba2055ac5d9b8c8578cea69c2675ae775",
+    "searchDriverSourceSha256": "09f51dd48caee326017ae44597e738d7ee12994118ab343a0ba9cf88a53890e8",
+    "serverBotSearchSourceSha256": "e985b655aab3ee07e1b88ab81a4da14ae6abc229c40a46e4530fc58a016c8604"
+   },
+   "adopted": {
+    "schema": "hoc.v0_8_a19_production_profile.v14",
+    "fingerprint": "397a2fc8dc8d3145ab4cbc5300818d9eb3a89edeb2aacb57739a0a38d0c5c004",
+    "sealedNeutral": "1",
+    "driverNeutral": true,
+    "driverMelee": true,
+    "profileSourceSha256": "a6bbdba4877521b7ef9e91dd00d2010f208e1fb4c091d680964abc10df9bdf70",
+    "searchDriverSourceSha256": "09f51dd48caee326017ae44597e738d7ee12994118ab343a0ba9cf88a53890e8",
+    "serverBotSearchSourceSha256": "e985b655aab3ee07e1b88ab81a4da14ae6abc229c40a46e4530fc58a016c8604"
+   },
+   "rollback": {
+    "schema": "hoc.v0_8_a19_production_profile.v14",
+    "fingerprint": "397a2fc8dc8d3145ab4cbc5300818d9eb3a89edeb2aacb57739a0a38d0c5c004",
+    "sealedNeutral": "1",
+    "driverNeutral": false,
+    "driverMelee": true,
+    "profileSourceSha256": "a6bbdba4877521b7ef9e91dd00d2010f208e1fb4c091d680964abc10df9bdf70",
+    "searchDriverSourceSha256": "09f51dd48caee326017ae44597e738d7ee12994118ab343a0ba9cf88a53890e8",
+    "serverBotSearchSourceSha256": "d5031967154cb1fe419158fe1d27037aca9ea8482cf39d9fe6651d0633ab5fbc"
+   }
+  },
+  "exitCodes": {
+   "adopted": 0,
+   "seam": 0,
+   "rollback": 0
+  },
+  "independentRecount": {
+   "implementation": "adoption-parity/compare.ts (Bun)",
+   "agreesOnEveryCount": true
+  },
+  "schema": "hoc.neutral_barrel_deliberation.adoption_replay.v1",
+  "bankSha256": "ed925c1eaad78d5c33e6f5346a2a43725a74352375a591d4470e16fb45e86fd4",
+  "cases": 212,
+  "boards": {
+   "Cemetery": 132,
+   "Lava": 40,
+   "Normal": 40
+  },
+  "casesWithBarrelBarricade": 125,
+  "played": {
+   "new": 212,
+   "adopted": 212,
+   "seam": 212,
+   "rollback": 212
+  },
+  "missing": {
+   "new": [],
+   "adopted": [],
+   "seam": [],
+   "rollback": []
+  },
+  "unexpected": {
+   "new": [],
+   "adopted": [],
+   "seam": [],
+   "rollback": []
+  },
+  "gamesWithQualityErrors": {
+   "new": [],
+   "adopted": [],
+   "seam": [],
+   "rollback": []
+  },
+  "adoptedVersusMeasuredCandidate": {
+   "identical": {
+    "Cemetery": 132,
+    "Lava": 40,
+    "Normal": 40
+   },
+   "different": {},
+   "identicalTotal": 212,
+   "differentTotal": 0,
+   "authoritativeDecisionsInIdenticalGames": 11692
+  },
+  "adoptedVersusMeasuredCandidateMismatches": {},
+  "rollbackVersusPreviousDefault": {
+   "identical": {
+    "Cemetery": 132,
+    "Lava": 40,
+    "Normal": 40
+   },
+   "different": {},
+   "identicalTotal": 212,
+   "differentTotal": 0,
+   "authoritativeDecisionsInIdenticalGames": 11387
+  },
+  "rollbackVersusPreviousDefaultMismatches": {},
+  "adoptedVersusPreviousDefault": {
+   "identical": {
+    "Lava": 40,
+    "Normal": 40
+   },
+   "different": {
+    "Cemetery": 132
+   },
+   "identicalTotal": 80,
+   "differentTotal": 132,
+   "authoritativeDecisionsInIdenticalGames": 4224
+  },
+  "cemeteryScoreTransitionsPreviousToAdopted": {
+   "0->0": 49,
+   "0->1": 14,
+   "0.5->0": 3,
+   "1->0": 22,
+   "1->1": 44
+  },
+  "comparedStrikeRootsInMeasuredCandidate": 1374,
+  "authoritativeDecisions": {
+   "new": 11387,
+   "adopted": 11692,
+   "seam": 11692,
+   "rollback": 11387
+  },
+  "passed": true
+ },
+ "derivedPerSeatCost": {
+  "schema": "hoc.neutral_barrel_deliberation.per_seat_cost.v1",
+  "registered": false,
+  "method": "searched roots = roots minus neutral-strike incumbents that returned without a search; exact counts from the stored diagnostics of completed games; CPU attribution assumes one cost per searched root in an arm",
+  "confirmationBank": {
+   "games": {
+    "current": 5396,
+    "candidate": 5398
+   },
+   "searchedRoots": {
+    "current": {
+     "changedSeat": 123087,
+     "opponent": 122814
+    },
+    "candidate": {
+     "changedSeat": 148825,
+     "opponent": 121633
+    }
+   },
+   "searchedRootsPerGame": {
+    "current": {
+     "changedSeat": 22.81078576723499,
+     "opponent": 22.760192735359524
+    },
+    "candidate": {
+     "changedSeat": 27.570396443127084,
+     "opponent": 22.53297517599111
+    }
+   },
+   "changedSeatSearchedRatio": 1.208656147335736,
+   "opponentSearchedRatio": 0.990016887729803,
+   "bothSeatsSearchedRatio": 1.099457884501331,
+   "decisionsRatio": 1.0304200183277579
+  },
+  "serialCostStudy": {
+   "games": {
+    "current": 144,
+    "candidate": 144
+   },
+   "searchedRoots": {
+    "current": {
+     "changedSeat": 3232,
+     "opponent": 3342
+    },
+    "candidate": {
+     "changedSeat": 4008,
+     "opponent": 3432
+    }
+   },
+   "searchedRootsPerGame": {
+    "current": {
+     "changedSeat": 22.444444444444443,
+     "opponent": 23.208333333333332
+    },
+    "candidate": {
+     "changedSeat": 27.833333333333332,
+     "opponent": 23.833333333333332
+    }
+   },
+   "changedSeatSearchedRatio": 1.24009900990099,
+   "opponentSearchedRatio": 1.0269299820466786,
+   "bothSeatsSearchedRatio": 1.1317310617584424,
+   "decisionsRatio": 1.059749266471059,
+   "completeCpuRatio": 1.10141484733286,
+   "cpuMsPerSearchedRootCurrent": 146.30921478551872,
+   "cpuMsPerAddedSearchedRoot": 112.63802540415705,
+   "estimatedChangedSeatCpuRatio": 1.1848433020188516
+  },
+  "estimatedChangedSeatCpuRatioOnConfirmationBank": 1.1606366110213202
+ },
+ "notEstablished": [
+  "a global ranked win rate: the estimate is conditional on Cemetery, one of three ranked maps",
+  "strength when both seats run profile v14",
+  "production wall-clock latency",
+  "a pass of the registered quality or serial-cost gate"
+ ]
+}

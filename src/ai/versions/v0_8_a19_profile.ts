@@ -64,8 +64,12 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     strength uncertainty; this does not establish the earlier 48% non-inferiority floor or live latency.
  *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
  *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
+ *   - neutral cemetery barrel deliberation (profile v14) adopted by explicit user instruction on 2026-11-19:
+ *     a scripted strike on a standing neutral barrel is searched against the other legal actions instead of
+ *     being returned unsearched. +3.58 score points against v13 on the registered held-out Cemetery bank
+ *     (95% +2.44 to +4.75); its quality and serial-cost gates failed and stay recorded as failed.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v13" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v14" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -98,6 +102,9 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: "1",
     // Fresh 12,096-game confirmation: compare melee clears with legal movement and holds, never force them.
     SEARCH_A19_MELEE_BARREL_DELIBERATION: "1",
+    // Explicit user adoption: neutral barrel strikes, melee or ranged, get the same comparison. The held-out
+    // gain is confirmed; the failed quality and cost gates stay recorded separately.
+    SEARCH_A19_NEUTRAL_BARREL_DELIBERATION: "1",
     // Explicit user adoption; preserve the positive estimate and failed qualification separately.
     SEARCH_A19_NIGHTMARE_WALL_MOVEMENT: "1",
     // Keep one broader single-target Gravechain attack for the horizon to price its movement denial.
@@ -138,7 +145,19 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8078c75f34a4030ad5c767c" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "feaf19b91f76615e590da9558832e6b7469e9c07df75d0f1d6140e8c9f02c724" as const;
+    "397a2fc8dc8d3145ab4cbc5300818d9eb3a89edeb2aacb57739a0a38d0c5c004" as const;
+
+/**
+ * User-adopted neutral cemetery barrel deliberation. The switch lives in `SearchDriver`; this record keeps the
+ * decision and the failed gates with the profile. See docs/neutral_barrel_deliberation_adoption.md.
+ */
+export const V08_A19_NEUTRAL_BARREL_DELIBERATION_POLICY = Object.freeze({
+    policyId: "a19-neutral-barrel-deliberation-v1",
+    adoptedAt: "2026-11-19",
+    adoption: "explicit-user-instruction",
+    registrationSha256: "8d4a618a9f3533b6a9a91e1784cfe197725996aa97c0a0284529a969badefc81",
+    qualification: "strength-confirmed-quality-and-cost-gates-failed",
+} as const);
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -195,7 +214,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Adds the default-off neutral cemetery barrel deliberation switch; default behavior is unchanged.
+        // Carries the neutral cemetery barrel deliberation switch that profile v14 turns on.
         sha256: "09f51dd48caee326017ae44597e738d7ee12994118ab343a0ba9cf88a53890e8" as const,
     }),
     Object.freeze({
@@ -460,6 +479,7 @@ export const V08_A19_PROFILE = Object.freeze({
     unitSupport: A19_UNIT_SUPPORT_POLICY,
     battleMageTargets: BATTLE_MAGE_TARGET_POLICY,
     nightmareWallMovement: A19_NIGHTMARE_WALL_MOVEMENT_POLICY,
+    neutralBarrelDeliberation: V08_A19_NEUTRAL_BARREL_DELIBERATION_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 
@@ -481,8 +501,6 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT: "0",
         // Only the explicit JSON research override may enable this unqualified candidate.
         SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
-        // Stronger on a registered Cemetery bank, but two registered gates failed: off until the user decides.
-        SEARCH_A19_NEUTRAL_BARREL_DELIBERATION: "0",
         SEARCH_A19_MATERIAL_ARBITRATION: "ties",
         SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1",
         SEARCH_A19_CERTIFIED_TIGHT_BOUNDS: "1",

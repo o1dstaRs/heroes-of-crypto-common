@@ -1,6 +1,33 @@
 # Agent guidance
 
-## Neutral cemetery barrel deliberation — November 19, 2026
+## Explicit neutral barrel deliberation adoption — November 19, 2026
+
+The study report recommended adopting the candidate as profile v14 and listed both failed gates. The
+user answered “continue, do what is needed”. This activates `a19-neutral-barrel-deliberation-v1` in
+the A19-backed v0.8 default: **the current default is profile v14**. It supersedes the non-activation
+notes in the study section below for this candidate only. Read
+`docs/neutral_barrel_deliberation_adoption.md`.
+
+`SEARCH_A19_NEUTRAL_BARREL_DELIBERATION=1` is a sealed profile rule; the switch itself lives in
+`SearchDriver`. At an A19 root whose native incumbent strikes a standing neutral stone, melee or ranged,
+the strike is searched against the other legal actions instead of being returned. It stays candidate
+zero and survives ties and deadline fallbacks. The native cleanup, every forecast, deployment-barrel
+handling, classic mountains, draft, setup, models and budgets are unchanged, and boards without neutral
+stones cannot change. The a13 rollback leaves the switch unset; an explicit A19 research override may
+set it to 0. Tiers without A19 search keep the scripted strike.
+
+This is explicit user adoption of a confirmed strength result whose quality and serial-cost gates
+failed, not a complete qualification. Preserve the +3.58-point held-out estimate against v13 (95%
++2.44 to +4.75), both failed gates and all fixtures unchanged; do not waive, re-run or relabel either
+gate. The estimate changes one seat on Cemetery only. It is not a global win rate, and production
+latency is not certified. The +10.14% is complete CPU of a two-seat game with one seat changed; that
+seat itself searches about 21% more decisions per Cemetery game (22.8 to 27.6), an estimated one sixth
+more search CPU. All 212 replayed games of profile v14 match the measured candidate exactly, and all
+212 match v13 with the rollback override. Subsequent research compares with v14. Already-running
+frozen studies keep their registered v13 comparator and need separate confirmation against v14 before
+claiming a new default gain.
+
+## Neutral cemetery barrel deliberation study — November 19, 2026
 
 Read `docs/neutral_barrel_deliberation_research.md` before touching barrel strikes. The native v0.8
 cleanup turns every non-attacking turn into an obstacle strike while a one-hit stone stands, and A19
@@ -20,16 +47,15 @@ the non-policy timeout), and serial cost (complete CPU +10.14% against the +10% 
 cases; +3.93% per decision). Do not waive, re-run or relabel either gate: the candidate is measurably
 stronger on Cemetery but is not qualified for automatic progression.
 
-The switch `SEARCH_A19_NEUTRAL_BARREL_DELIBERATION` is in `SearchDriver` and pinned **off** in profile
-v13 (sealed environment `"0"`, a13 rollback unset). A 36-game integration replay through the real switch
-matches the research seam exactly. Adoption is an explicit user decision that weighs the two failed
-gates: one profile rule, a profile version bump, re-pinned fingerprints and the server revision string.
-Amendment 1 was filed blind during collection: a game rejected only for the known native refusal
-(`strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available`) has its family scored
-as the worst completion for the candidate; 5 families were imputed that way. Do not relax that rule,
-drop those families or reuse the consumed bank. A searchless exploration found no gain from removing the
-scripted strike from the plain native policy (−0.82 points, −2.52 to +0.86), so the gain comes from
-giving those turns back to A19's search.
+The switch `SEARCH_A19_NEUTRAL_BARREL_DELIBERATION` is in `SearchDriver`. When the study closed it was
+pinned **off** in profile v13 (sealed environment `"0"`, a13 rollback unset); the adoption above turned
+it on as profile v14. A 36-game integration replay through the real switch matches the research seam
+exactly. Amendment 1 was filed blind during collection: a game rejected only for the known native
+refusal (`strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available`) has its
+family scored as the worst completion for the candidate; 5 families were imputed that way. Do not relax
+that rule, drop those families or reuse the consumed bank. A searchless exploration found no gain from
+removing the scripted strike from the plain native policy (−0.82 points, −2.52 to +0.86), so the gain
+comes from giving those turns back to A19's search.
 
 Preserve `docs/evidence/neutral_barrel_deliberation_registration_20261119.json`, the results fixture and
 the seed fixture. Exclude namespace `barrel-strike-necessity-20261119-v1`: roles `draft`, `setup`,
@@ -333,15 +359,15 @@ retry, cutoff extension, serving promotion or deployment is authorized by this r
 
 ## Explicit Sniper donor protection adoption — November 18, 2026
 
-The user requested “lock it in and continue” after reviewing the confirmed Sniper guard. Current
-default A19-backed v0.8/Premium is profile v13. Read `docs/sniper_donor_adoption.md`; preserve
+The user requested “lock it in and continue” after reviewing the confirmed Sniper guard. This
+established profile v13, retained in current v14. Read `docs/sniper_donor_adoption.md`; preserve
 checkpoint `a19-preserve-sniper-20261118`, its exact eligibility and unchanged evidence fixture.
 Reject Sniper-reducing delivery plans before preview only in the qualified public complete-setup
 population. Keep the exclusive draft allowance, legal visibility, standard own quantities, existing
 geometry and A19 combat. Retain already funded v12 plans through restart and preserve Premium undo.
-New default comparisons use v13; frozen studies keep their original controls. The +8.10-point
-held-out gain is conditional, not an unconditional ranked or human win rate. No model retraining
-or deployment is implied. Further broadening requires separate qualification.
+New default comparisons use the current default; frozen studies keep their original controls. The
++8.10-point held-out gain is conditional, not an unconditional ranked or human win rate. No model
+retraining or deployment is implied. Further broadening requires separate qualification.
 
 ## Explicit revealed-ranged delivery adoption — November 18, 2026 UTC
 

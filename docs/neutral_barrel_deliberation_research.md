@@ -6,11 +6,17 @@ correction](melee_barrel_deliberation.md) covers one case: a melee strike on a *
 barrel. Its eight forecast and predictor follow-ups are closed or incomplete and stay unchanged.
 This study covers the cases that correction left alone.
 
-**Status, November 19, 2026.** Comparing neutral barrel strikes instead of returning them is stronger
-on Cemetery by **+3.58 match-score points (95% +2.44 to +4.75)** on a registered held-out bank of
-2,700 fresh families, under the most adverse reading of six rejected games. The switch exists and is
-**off**. Two registered gates failed: quality, on one rejected game, and serial cost, by 0.14
-points. Adoption therefore needs an explicit user decision.
+**Subsequent user decision.** On November 19, 2026, after this study closed, the user adopted the
+candidate into the A19 default as profile v14. See [the adoption
+record](neutral_barrel_deliberation_adoption.md). The results, the two failed gates and the fixtures
+below are the record of the study and are unchanged. Where the text says the switch is off, it
+describes the code when the study closed.
+
+**Study result, November 19, 2026.** Comparing neutral barrel strikes instead of returning them is
+stronger on Cemetery by **+3.58 match-score points (95% +2.44 to +4.75)** on a registered held-out
+bank of 2,700 fresh families, under the most adverse reading of six rejected games. Two registered
+gates failed: quality, on one rejected game, and serial cost, by 0.14 points. The study therefore
+left the switch **off** and put adoption to the user as an explicit decision.
 
 ## Where the remaining strikes come from
 
@@ -185,8 +191,9 @@ double loss for the candidate.
 Evidence is in the [registration](evidence/neutral_barrel_deliberation_registration_20261119.json)
 and [results](evidence/neutral_barrel_deliberation_results_20261119.json) fixtures.
 
-## Implementation status
+## Implementation when the study closed
 
+This section describes commit `63c8e6b5`, before the adoption.
 `SEARCH_A19_NEUTRAL_BARREL_DELIBERATION` implements the candidate in `SearchDriver`. It is **off**
 in A19 profile v13: the sealed environment pins it to `"0"` and the a13 rollback environment leaves
 it unset, so no shell variable can enable it. Twelve driver tests cover melee and ranged neutral
