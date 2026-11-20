@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v16",
+            schema: "hoc.v0_8_a19_production_profile.v17",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -116,6 +116,14 @@ describe("v0.8+A19 production profile", () => {
                 adoptedAt: "2026-11-20",
                 adoption: "standing-user-instruction",
                 registrationSha256: "28ca93f78b560d0a8e5217e88f28f4dd8ca2077176fabd899ce676c9ec701945",
+                qualification: "registered-confirmation-passed",
+            },
+            // Profile v17: the striker a seat drafts depends on the opposing creatures it can see.
+            strikerMatchup: {
+                policyId: "a19-striker-matchup-v1",
+                adoptedAt: "2026-11-20",
+                adoption: "standing-user-instruction",
+                registrationSha256: "764d9b96b46a323f2ffc3542bf1d39107babbbc43268f33a69b70e3b256db593",
                 qualification: "registered-confirmation-passed",
             },
         });

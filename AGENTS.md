@@ -1,6 +1,40 @@
 # Agent guidance
 
+## Striker matchup draft adoption — November 20, 2026
+
+Under the same standing instruction as the sections below, `a19-striker-matchup-v1` is active in the
+A19-backed v0.8 default: **the current default is profile v17**. Read
+`docs/striker_matchup_adoption.md` before changing it.
+
+Profile v15 took fast strikers first, which is right for a rush and wrong for a brawl. Every striker
+now has two measured values, one for a rush against an army that is not melee and one for a fight
+against a melee army, and the seat takes the striker on offer worth most for the probability that
+the opponent ends with four or more strikers. That probability is computed from the opposing
+creatures the seat may legally see at the pick, through the server's own visibility projection; never
+hand it anything else. The head runs on the striker rush head's choice, never takes a non-striker,
+never runs without the striker rush head, and spends none of the earlier layers' one-use budgets.
+`src/ai/setup/a19_striker_matchup.ts` holds the table and the choice; the server's draft decider
+calls it.
+
+The table is fitted on exploration drafts with uniformly random striker picks (1,925 rush games,
+1,260 mirror games). Do not edit a value by hand or re-fit it on games drafted by the policy itself:
+a new table is a new candidate and needs its own confirmation. The values describe AI-played games
+and are not a balance statement.
+
+Preserve the registered +28.06-point estimate against v16 (95% +22.96 to +33.06; 540 sealed tasks,
+all three maps positive, all six gates passed) with its meaning: it is against a default that does
+not adapt, two matchup seats meet at 50%, and it is not a win rate against people. Against the
+shooter-fielding v14 the candidate measured +3.52 (95% −0.83 to +7.96): not worse, gain not
+established. Fitted Tier-1 values in the bundle choice and matchup values at level 3-4 only were
+tried on development tasks and were worse.
+
+Subsequent research compares with v17. Namespace `matchup-draft-20261120-v1`: families 0-59 are this
+confirmation; 60-119 and 120-183 are still sealed and have had no development use.
+
 ## Shooterless Movement adoption — November 20, 2026
+
+Profile v16 is retained inside v17; where this section says "current default", read v16 as the
+default at that date.
 
 Under the same standing instruction as the section below, `a19-shooterless-movement-v1` is active in
 the A19-backed v0.8 default: **the current default is profile v16**. Read

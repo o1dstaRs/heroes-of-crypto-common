@@ -1,0 +1,427 @@
+{
+ "id": "striker-matchup-v1-confirmation-B-results-20261120",
+ "registrationSha256": "764d9b96b46a323f2ffc3542bf1d39107babbbc43268f33a69b70e3b256db593",
+ "evidenceHeads": {
+  "common": "bdb90084518e723ae3832b32eeb4b048262fa559",
+  "server": "f77ae29068f026c7d49c14b9af49018b622ce774",
+  "note": "Research tree at A19 profile v14 with the profile v15/v16 draft head and setup rules applied by the draft generator and the runner, as in the two earlier confirmations of this series. The adoption commit sits on a later head that also contains a Battle Mage stat change; these games were not replayed on it."
+ },
+ "primary": {
+  "what": "candidate draft minus profile v16, both against profile v16",
+  "all": {
+   "tasks": 540,
+   "control": 52.22,
+   "candidate": 80.28,
+   "difference": 28.06,
+   "interval95": [
+    22.96,
+    33.06
+   ],
+   "better": 195,
+   "worse": 43
+  },
+  "maps": {
+   "Normal": {
+    "tasks": 180,
+    "control": 53.33,
+    "candidate": 76.67,
+    "difference": 23.33,
+    "interval95": [
+     13.89,
+     32.78
+    ],
+    "better": 64,
+    "worse": 23
+   },
+   "Lava": {
+    "tasks": 180,
+    "control": 51.11,
+    "candidate": 82.78,
+    "difference": 31.67,
+    "interval95": [
+     23.33,
+     39.72
+    ],
+    "better": 67,
+    "worse": 10
+   },
+   "Block centre": {
+    "tasks": 180,
+    "control": 52.22,
+    "candidate": 81.39,
+    "difference": 29.17,
+    "interval95": [
+     20.83,
+     37.22
+    ],
+    "better": 64,
+    "worse": 10
+   }
+  },
+  "ownDoctrine": {
+   "threeReveals": {
+    "tasks": 180,
+    "control": 53.89,
+    "candidate": 83.33,
+    "difference": 29.44,
+    "interval95": [
+     21.11,
+     37.78
+    ],
+    "better": 64,
+    "worse": 11
+   },
+   "seeAll": {
+    "tasks": 180,
+    "control": 43.61,
+    "candidate": 73.89,
+    "difference": 30.28,
+    "interval95": [
+     20.83,
+     39.17
+    ],
+    "better": 74,
+    "worse": 18
+   },
+   "seeNone": {
+    "tasks": 180,
+    "control": 59.17,
+    "candidate": 83.61,
+    "difference": 24.44,
+    "interval95": [
+     16.11,
+     32.78
+    ],
+    "better": 57,
+    "worse": 14
+   }
+  },
+  "opponentDoctrine": {
+   "threeReveals": {
+    "tasks": 180,
+    "control": 50.0,
+    "candidate": 77.78,
+    "difference": 27.78,
+    "interval95": [
+     19.17,
+     36.39
+    ],
+    "better": 65,
+    "worse": 14
+   },
+   "seeAll": {
+    "tasks": 180,
+    "control": 62.22,
+    "candidate": 89.17,
+    "difference": 26.94,
+    "interval95": [
+     19.17,
+     34.72
+    ],
+    "better": 59,
+    "worse": 11
+   },
+   "seeNone": {
+    "tasks": 180,
+    "control": 44.44,
+    "candidate": 73.89,
+    "difference": 29.44,
+    "interval95": [
+     20.28,
+     38.33
+    ],
+    "better": 71,
+    "worse": 18
+   }
+  },
+  "qualityErrors": {
+   "control": 2,
+   "candidate": 2
+  },
+  "cpuSecondsPerGame": {
+   "control": 6.166,
+   "candidate": 6.623
+  },
+  "searchedDecisionsPerGame": {
+   "control": 49.63,
+   "candidate": 51.71
+  },
+  "lapsPerGame": {
+   "control": 6.79,
+   "candidate": 6.09
+  },
+  "gamesWithTheRushSetup": {
+   "candidate": 0,
+   "control": 0
+  }
+ },
+ "guard": {
+  "what": "candidate draft minus profile v16, both against profile v14",
+  "all": {
+   "tasks": 540,
+   "control": 77.96,
+   "candidate": 81.48,
+   "difference": 3.52,
+   "interval95": [
+    -0.83,
+    7.96
+   ],
+   "better": 84,
+   "worse": 66
+  },
+  "maps": {
+   "Normal": {
+    "tasks": 180,
+    "control": 84.72,
+    "candidate": 82.5,
+    "difference": -2.22,
+    "interval95": [
+     -9.17,
+     4.72
+    ],
+    "better": 20,
+    "worse": 24
+   },
+   "Lava": {
+    "tasks": 180,
+    "control": 76.11,
+    "candidate": 85.0,
+    "difference": 8.89,
+    "interval95": [
+     1.67,
+     16.11
+    ],
+    "better": 30,
+    "worse": 14
+   },
+   "Block centre": {
+    "tasks": 180,
+    "control": 73.06,
+    "candidate": 76.94,
+    "difference": 3.89,
+    "interval95": [
+     -4.72,
+     12.5
+    ],
+    "better": 34,
+    "worse": 28
+   }
+  },
+  "ownDoctrine": {
+   "threeReveals": {
+    "tasks": 180,
+    "control": 73.89,
+    "candidate": 82.5,
+    "difference": 8.61,
+    "interval95": [
+     0.56,
+     16.67
+    ],
+    "better": 35,
+    "worse": 20
+   },
+   "seeAll": {
+    "tasks": 180,
+    "control": 73.61,
+    "candidate": 76.11,
+    "difference": 2.5,
+    "interval95": [
+     -5.83,
+     10.83
+    ],
+    "better": 31,
+    "worse": 27
+   },
+   "seeNone": {
+    "tasks": 180,
+    "control": 86.39,
+    "candidate": 85.83,
+    "difference": -0.56,
+    "interval95": [
+     -7.22,
+     5.83
+    ],
+    "better": 18,
+    "worse": 19
+   }
+  },
+  "opponentDoctrine": {
+   "threeReveals": {
+    "tasks": 180,
+    "control": 80.56,
+    "candidate": 83.06,
+    "difference": 2.5,
+    "interval95": [
+     -5.0,
+     10.0
+    ],
+    "better": 27,
+    "worse": 23
+   },
+   "seeAll": {
+    "tasks": 180,
+    "control": 82.22,
+    "candidate": 87.22,
+    "difference": 5.0,
+    "interval95": [
+     -1.67,
+     11.67
+    ],
+    "better": 24,
+    "worse": 15
+   },
+   "seeNone": {
+    "tasks": 180,
+    "control": 71.11,
+    "candidate": 74.17,
+    "difference": 3.06,
+    "interval95": [
+     -5.56,
+     11.94
+    ],
+    "better": 33,
+    "worse": 28
+   }
+  },
+  "qualityErrors": {
+   "control": 2,
+   "candidate": 0
+  },
+  "cpuSecondsPerGame": {
+   "control": 7.56,
+   "candidate": 7.472
+  },
+  "searchedDecisionsPerGame": {
+   "control": 49.17,
+   "candidate": 49.16
+  },
+  "lapsPerGame": {
+   "control": 5.84,
+   "candidate": 5.26
+  },
+  "gamesWithTheRushSetup": {
+   "candidate": 539,
+   "control": 538
+  }
+ },
+ "gamesPerCell": 540,
+ "gates": {
+  "G1 strength against the current default, lower bound above zero": {
+   "passed": true,
+   "value": 22.96
+  },
+  "G2 no map with a negative point estimate against the current default": {
+   "passed": true,
+   "lowestMap": "Normal",
+   "value": 23.33
+  },
+  "G3 not worse against the previous default, lower bound above -5": {
+   "passed": true,
+   "value": -0.83
+  },
+  "G4 candidate games with a quality error not above the control cells": {
+   "passed": true,
+   "candidateGamesWithAnError": 2,
+   "controlGamesWithAnError": 4
+  },
+  "G5 thirty tasks of the primary candidate cell reproduce on a second host": {
+   "passed": true,
+   "identicalDigests": 30,
+   "replayed": 30
+  },
+  "G6 candidate CPU per game at most 1.25 times the control, against the current default": {
+   "passed": true,
+   "value": 1.0742
+  }
+ },
+ "productionPort": {
+  "draftDecisions": {
+   "what": "Every decision the research draft head made while drafting the two candidate cells, replayed through the production functions a19StrikerMatchupCreature and a19StrikerMatchupBundle.",
+   "replayed": 5693,
+   "identicalChoices": 5693,
+   "identicalProbabilities": 5693,
+   "differFromTheFastFirstHead": 3403
+  },
+  "developmentDraftDecisions": {
+   "replayed": 2097,
+   "identicalChoices": 2097
+  },
+  "games": {
+   "what": "The 30 second-host tasks of the primary candidate cell replayed by the production server implementation (no research seam; the server applies the profile v16 setup rules itself), built at the evidence heads.",
+   "identicalDigests": 30,
+   "replayed": 30
+  }
+ },
+ "table": {
+  "file": "docs/evidence/striker_matchup_table_20261120.json",
+  "sha256": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "strikers": 34,
+  "fit": {
+   "rushGames": 1925,
+   "meleeGames": 1260,
+   "ridge": {
+    "rush": 16,
+    "melee": 16
+   },
+   "meanStandardErrorLogit": {
+    "rush": 0.14,
+    "melee": 0.121
+   },
+   "crossValidatedLogLoss": {
+    "rush": {
+     "model": 0.5867,
+     "interceptOnly": 0.6651
+    },
+    "melee": {
+     "model": 0.6084,
+     "coin": 0.6931
+    }
+   },
+   "randomStrikerArmiesScore": {
+    "rush": 61.8,
+    "melee": 51.0
+   }
+  }
+ },
+ "development": {
+  "tasks": 198,
+  "registeredVariant": {
+   "againstTheCurrentDefault": {
+    "difference": 28.3,
+    "interval95": [
+     19.7,
+     36.6
+    ]
+   },
+   "againstThePreviousDefault": {
+    "difference": 3.8,
+    "interval95": [
+     -3.0,
+     10.6
+    ]
+   }
+  },
+  "otherVariants": {
+   "with fitted Tier-1 values in the bundle choice": {
+    "againstTheCurrentDefault": 27.8,
+    "againstThePreviousDefault": 1.8
+   },
+   "matchup values at level 3 and 4 picks only": {
+    "againstTheCurrentDefault": 24.5,
+    "againstThePreviousDefault": -0.3
+   }
+  },
+  "earlierAttempt": "A flyers-first striker draft scored 83.3% against the previous default (+4.1 over profile v15) and 39.9% against profile v15: one fixed ranking cannot serve both matchups."
+ },
+ "notMeasured": [
+  "play against people",
+  "the candidate against itself (50% by symmetry)",
+  "live decision latency under the 1000 ms deadline (the draft does not change the search)"
+ ],
+ "analysis": {
+  "script": "confirm_b_analyze.py",
+  "sha256": "4ff6ae252c3f844a709f70354173c38acdbdd76dfa91257d834bfb259ecee716",
+  "bootstrap": "10,000 resamples over tasks, seed 20261122",
+  "amendments": "none"
+ }
+}

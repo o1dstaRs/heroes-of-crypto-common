@@ -1,0 +1,347 @@
+{
+ "id": "striker-matchup-v1-table-20261120",
+ "sourceSha256": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+ "units": "match-score points relative to the average striker of the level: rush = 16 x logit (against the profile v14 army, rush setup), melee = 25 x logit (against a striker army, stock setup); se in logit units",
+ "creatures": {
+  "Scavenger": {
+   "id": 2,
+   "level": 1,
+   "rush": 1.0,
+   "melee": 3.9,
+   "rushLogit": 0.0605,
+   "meleeLogit": 0.1567,
+   "rushSe": 0.137,
+   "meleeSe": 0.118
+  },
+  "Troglodyte": {
+   "id": 3,
+   "level": 1,
+   "rush": -4.4,
+   "melee": 4.2,
+   "rushLogit": -0.2746,
+   "meleeLogit": 0.1691,
+   "rushSe": 0.134,
+   "meleeSe": 0.114
+  },
+  "Berserker": {
+   "id": 12,
+   "level": 1,
+   "rush": -0.4,
+   "melee": -2.1,
+   "rushLogit": -0.0269,
+   "meleeLogit": -0.083,
+   "rushSe": 0.134,
+   "meleeSe": 0.111
+  },
+  "Wolf Rider": {
+   "id": 13,
+   "level": 1,
+   "rush": 2.7,
+   "melee": -4.9,
+   "rushLogit": 0.1688,
+   "meleeLogit": -0.1961,
+   "rushSe": 0.136,
+   "meleeSe": 0.113
+  },
+  "Wolf": {
+   "id": 21,
+   "level": 1,
+   "rush": -4.7,
+   "melee": -0.8,
+   "rushLogit": -0.2932,
+   "meleeLogit": -0.0312,
+   "rushSe": 0.128,
+   "meleeSe": 0.111
+  },
+  "Fairy": {
+   "id": 22,
+   "level": 1,
+   "rush": 6.8,
+   "melee": 4.2,
+   "rushLogit": 0.4238,
+   "meleeLogit": 0.167,
+   "rushSe": 0.138,
+   "meleeSe": 0.113
+  },
+  "Leprechaun": {
+   "id": 23,
+   "level": 1,
+   "rush": 0.9,
+   "melee": 5.4,
+   "rushLogit": 0.056,
+   "meleeLogit": 0.2158,
+   "rushSe": 0.134,
+   "meleeSe": 0.112
+  },
+  "Peasant": {
+   "id": 31,
+   "level": 1,
+   "rush": 3.1,
+   "melee": 1.6,
+   "rushLogit": 0.1907,
+   "meleeLogit": 0.0652,
+   "rushSe": 0.139,
+   "meleeSe": 0.11
+  },
+  "Squire": {
+   "id": 32,
+   "level": 1,
+   "rush": -1.4,
+   "melee": 1.9,
+   "rushLogit": -0.0884,
+   "meleeLogit": 0.0769,
+   "rushSe": 0.129,
+   "meleeSe": 0.115
+  },
+  "Mermaid": {
+   "id": 46,
+   "level": 1,
+   "rush": -2.4,
+   "melee": -5.4,
+   "rushLogit": -0.1492,
+   "meleeLogit": -0.2175,
+   "rushSe": 0.133,
+   "meleeSe": 0.116
+  },
+  "Troll": {
+   "id": 4,
+   "level": 2,
+   "rush": 0.5,
+   "melee": -3.5,
+   "rushLogit": 0.0313,
+   "meleeLogit": -0.1411,
+   "rushSe": 0.134,
+   "meleeSe": 0.112
+  },
+  "Harpy": {
+   "id": 14,
+   "level": 2,
+   "rush": 4.3,
+   "melee": -3.6,
+   "rushLogit": 0.2717,
+   "meleeLogit": -0.1455,
+   "rushSe": 0.134,
+   "meleeSe": 0.111
+  },
+  "Nomad": {
+   "id": 15,
+   "level": 2,
+   "rush": 1.9,
+   "melee": 2.3,
+   "rushLogit": 0.1179,
+   "meleeLogit": 0.0906,
+   "rushSe": 0.131,
+   "meleeSe": 0.111
+  },
+  "Hyena": {
+   "id": 16,
+   "level": 2,
+   "rush": -1.4,
+   "melee": 0.5,
+   "rushLogit": -0.0879,
+   "meleeLogit": 0.0207,
+   "rushSe": 0.128,
+   "meleeSe": 0.108
+  },
+  "White Tiger": {
+   "id": 25,
+   "level": 2,
+   "rush": -2.6,
+   "melee": -0.2,
+   "rushLogit": -0.1634,
+   "meleeLogit": -0.0096,
+   "rushSe": 0.129,
+   "meleeSe": 0.112
+  },
+  "Pikeman": {
+   "id": 35,
+   "level": 2,
+   "rush": 0.5,
+   "melee": 5.7,
+   "rushLogit": 0.0293,
+   "meleeLogit": 0.2272,
+   "rushSe": 0.133,
+   "meleeSe": 0.111
+  },
+  "Wyvern": {
+   "id": 51,
+   "level": 2,
+   "rush": 7.5,
+   "melee": 0.5,
+   "rushLogit": 0.4669,
+   "meleeLogit": 0.0195,
+   "rushSe": 0.137,
+   "meleeSe": 0.113
+  },
+  "Trent": {
+   "id": 52,
+   "level": 2,
+   "rush": -2.9,
+   "melee": 2.9,
+   "rushLogit": -0.1783,
+   "meleeLogit": 0.1142,
+   "rushSe": 0.132,
+   "meleeSe": 0.114
+  },
+  "Manticore": {
+   "id": 53,
+   "level": 2,
+   "rush": 1.2,
+   "melee": -6.9,
+   "rushLogit": 0.076,
+   "meleeLogit": -0.2765,
+   "rushSe": 0.131,
+   "meleeSe": 0.111
+  },
+  "Goblin Knight": {
+   "id": 7,
+   "level": 3,
+   "rush": -2.4,
+   "melee": 3.3,
+   "rushLogit": -0.1525,
+   "meleeLogit": 0.1303,
+   "rushSe": 0.149,
+   "meleeSe": 0.135
+  },
+  "Efreet": {
+   "id": 8,
+   "level": 3,
+   "rush": -0.8,
+   "melee": -6.3,
+   "rushLogit": -0.0501,
+   "meleeLogit": -0.2535,
+   "rushSe": 0.146,
+   "meleeSe": 0.129
+  },
+  "Mantis": {
+   "id": 27,
+   "level": 3,
+   "rush": 2.1,
+   "melee": -3.8,
+   "rushLogit": 0.1335,
+   "meleeLogit": -0.154,
+   "rushSe": 0.146,
+   "meleeSe": 0.132
+  },
+  "Unicorn": {
+   "id": 28,
+   "level": 3,
+   "rush": -6.8,
+   "melee": 0.9,
+   "rushLogit": -0.4239,
+   "meleeLogit": 0.0368,
+   "rushSe": 0.146,
+   "meleeSe": 0.134
+  },
+  "Pegasus": {
+   "id": 30,
+   "level": 3,
+   "rush": 0.6,
+   "melee": 4.2,
+   "rushLogit": 0.0386,
+   "meleeLogit": 0.1666,
+   "rushSe": 0.146,
+   "meleeSe": 0.131
+  },
+  "Griffin": {
+   "id": 37,
+   "level": 3,
+   "rush": 6.8,
+   "melee": -11.1,
+   "rushLogit": 0.4238,
+   "meleeLogit": -0.4432,
+   "rushSe": 0.152,
+   "meleeSe": 0.133
+  },
+  "Crusader": {
+   "id": 38,
+   "level": 3,
+   "rush": 0.5,
+   "melee": 12.9,
+   "rushLogit": 0.0307,
+   "meleeLogit": 0.5169,
+   "rushSe": 0.145,
+   "meleeSe": 0.134
+  },
+  "Black Dragon": {
+   "id": 9,
+   "level": 4,
+   "rush": -6.4,
+   "melee": -4.0,
+   "rushLogit": -0.3974,
+   "meleeLogit": -0.1583,
+   "rushSe": 0.147,
+   "meleeSe": 0.132
+  },
+  "Hydra": {
+   "id": 10,
+   "level": 4,
+   "rush": 3.0,
+   "melee": 14.2,
+   "rushLogit": 0.1862,
+   "meleeLogit": 0.5699,
+   "rushSe": 0.154,
+   "meleeSe": 0.137
+  },
+  "Thunderbird": {
+   "id": 19,
+   "level": 4,
+   "rush": 4.5,
+   "melee": -6.1,
+   "rushLogit": 0.2795,
+   "meleeLogit": -0.2434,
+   "rushSe": 0.15,
+   "meleeSe": 0.132
+  },
+  "Angel": {
+   "id": 40,
+   "level": 4,
+   "rush": 9.3,
+   "melee": -8.1,
+   "rushLogit": 0.5824,
+   "meleeLogit": -0.3228,
+   "rushSe": 0.154,
+   "meleeSe": 0.133
+  },
+  "Abomination": {
+   "id": 41,
+   "level": 4,
+   "rush": -11.5,
+   "melee": -6.9,
+   "rushLogit": -0.7191,
+   "meleeLogit": -0.276,
+   "rushSe": 0.142,
+   "meleeSe": 0.13
+  },
+  "Champion": {
+   "id": 42,
+   "level": 4,
+   "rush": 7.0,
+   "melee": -1.4,
+   "rushLogit": 0.4361,
+   "meleeLogit": -0.0556,
+   "rushSe": 0.156,
+   "meleeSe": 0.135
+  },
+  "Frenzied Boar": {
+   "id": 43,
+   "level": 4,
+   "rush": -3.4,
+   "melee": -0.7,
+   "rushLogit": -0.2142,
+   "meleeLogit": -0.03,
+   "rushSe": 0.144,
+   "meleeSe": 0.132
+  },
+  "Arachna Queen": {
+   "id": 44,
+   "level": 4,
+   "rush": -2.5,
+   "melee": 12.9,
+   "rushLogit": -0.1536,
+   "meleeLogit": 0.5163,
+   "rushSe": 0.15,
+   "meleeSe": 0.136
+  }
+ }
+}

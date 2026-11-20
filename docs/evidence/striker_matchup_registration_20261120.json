@@ -1,0 +1,88 @@
+{
+ "id": "striker-matchup-v1-confirmation-B-20261120",
+ "registeredAt": "2026-11-20T09:37:36.434502+00:00",
+ "question": "Does a striker draft that values each striker for the matchup it will face score higher than the current default (A19 profile v16) against the current default, without giving back the default's gain against the previous shooter-fielding default (profile v14)?",
+ "candidate": {
+  "draftHead": "After the profile v16 draft decision (V3, contextual, revealed-ranged delivery, striker rush head): among the strikers on offer the seat takes the one with the highest matchup value, keeping the striker rush head's choice unless another striker is strictly better (by more than 1e-9; strikers compared in ascending id order). With no striker on offer the earlier choice stands. Opening bundle: most strikers first, then the summed matchup value of its striker creatures, keeping the striker rush head's bundle on a tie. The Tier-1 and Tier-2 artifact choices are unchanged.",
+  "matchupValue": "value = q * melee + (1 - q) * rush, with the two per-creature values of explore/table-a.json (match-score points; a creature without an entry counts 0 for both).",
+  "meleeProbability": "q is the probability that the opponent's finished army has at least four strikers, from the opposing creatures the seat may legally see at that pick (the server's own visibility projection). Two kinds of drafter with prior 0.5 each: one takes a striker with probability 0.9 per pick, the other with 0.25. The kinds are updated on the strikers among the seen creatures and the unseen picks follow the updated mixture (binomial over 6 minus seen).",
+  "table": {
+   "file": "explore/table-a.json",
+   "sha256": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+   "strikers": 34,
+   "fit": "Ridge-penalised logistic regression on exploration drafts with uniformly random striker picks, families 32-66 of namespace rush-doctrine-20261120-v1 (development only): 1,925 rush games against the profile v14 army and 1,260 striker-mirror games. Points = 16 x logit (rush), 25 x logit (melee), rounded to one decimal."
+  },
+  "setup": "Profile v16 exactly: striker rush rule, then the shooterless Movement rule. Unchanged.",
+  "unchanged": "Doctrine choice, artifacts, synergies, tactical splits, upgrade selection, formation, A19 fight search and every opponent decision."
+ },
+ "control": "Profile v16: the striker rush draft head (fast strikers first, ranked by the shipped draft model) with the profile v16 setup.",
+ "opponents": {
+  "v16": "Profile v16 draft head and setup. The draft generator has no hook for the Tier-2 beneficiary rule on the opponent seat, which changes under 3% of its artifact picks and is the same in both arms.",
+  "v14": "The previous default: native draft, shipped setup. It drafts against what it sees of the candidate, so the two arms can face different opposing rosters."
+ },
+ "bank": {
+  "namespace": "matchup-draft-20261120-v1",
+  "tasks": 540,
+  "families": "index 0..59 of a pool allocated for this study with no development use (184 families; 60..119 and 120..183 stay sealed); 60 per doctrine pair, 180 per map (Normal, Lava, Block centre)",
+  "unit": "one task = one draft seed, doctrine pair, map and pick order; one game per cell from the candidate seat"
+ },
+ "cells": {
+  "cfB-cand_vs_v16": "candidate draft against profile v16",
+  "cfB-v16_vs_v16": "profile v16 against itself",
+  "cfB-cand_vs_v14": "candidate draft against profile v14",
+  "cfB-v16_vs_v14": "profile v16 against profile v14"
+ },
+ "primaryEndpoint": "Mean over the 540 tasks of score(cfB-cand_vs_v16) minus score(cfB-v16_vs_v16) for the candidate seat (win 1, draw 0.5, loss 0). 95% interval from 10,000 bootstrap resamples over tasks, seed 20261122.",
+ "guardEndpoint": "Mean over the 540 tasks of score(cfB-cand_vs_v14) minus score(cfB-v16_vs_v14), same interval.",
+ "gates": {
+  "G1": "Lower bound of the primary interval above zero.",
+  "G2": "No map with a negative point estimate of the primary endpoint.",
+  "G3": "Lower bound of the guard interval above -5 points: against the previous default the candidate is not worse than profile v16 by more than that margin.",
+  "G4": "Candidate-cell games with a quality error not more than control-cell games with one (both pairs together).",
+  "G5": "A rerun of 30 tasks of cfB-cand_vs_v16 on a second host reproduces the same digests.",
+  "G6": "Mean CPU per game of cfB-cand_vs_v16 at most 1.25 times cfB-v16_vs_v16, same host and tree."
+ },
+ "notClaimed": "Strength against people; strength of the candidate against itself (50% by symmetry); any change to the fight. The matchup values describe AI-played games on three maps and are not a balance statement.",
+ "development": {
+  "tasks": 198,
+  "families": "0..21 of namespace rush-doctrine-20261120-v1; none of them entered the fit",
+  "estimate": {
+   "againstTheCurrentDefault": "+28.3 points, 95% +19.7 to +36.6 (80.8% against 52.5%; opponent on the profile v15 setup)",
+   "againstThePreviousDefault": "+3.8 points, 95% -3.0 to +10.6 (82.8% against 79.0%)"
+  },
+  "selection": "Three variants were run once each on these tasks and the one with the highest sum of the two estimates was registered: all picks without artifact values (+28.3 / +3.8), with fitted Tier-1 values in the bundle choice (+27.8 / +1.8), and level 3-4 picks only (+24.5 / -0.3). The development estimate of the chosen variant is therefore optimistic."
+ },
+ "execution": {
+  "runner": "life-run5.ts on the production server lifecycle; a seat carries a list of rules, first match wins. Specs v16-both.json (rush, then shooterless, on both seats) and v16-vs-v14.json (the same on the candidate seat only)",
+  "tree": "shipped-parity/lab4 (server + engine at A19 profile v14 with inert research hooks; the v15/v16 draft head and setup rules are applied by the draft generator and the runner, as in the two earlier confirmations)",
+  "treeManifestSha256": "bc730e9cfcb070fd997ac5f5b531fcf08b45b2fa68dbe3dd889a7e275ece389e",
+  "draftGenerator": "league-drafts.ts over the frozen server policy functions with serving-parity assertions; candidate seat strategy S:B1234:val (RUSH_PRIOR=0.5, RUSH_VAL_SLOTS=B1234, RUSH_T1=policy, RUSH_T2=policy), control and v16 opponent S:B1234:fast, v14 opponent native",
+  "host": "M4 Max, 8 processes"
+ },
+ "inputsSha256": {
+  "league-drafts.ts": "5b47451bef631ebfa923a3230f81111bbab1a4e48e3f86706208363381fe5beb",
+  "life-run5.ts": "b36942781793af4f74a3c8160e4fcfcc50fdaecc2d8ac334af4687892ba687e2",
+  "life-pool5.sh": "07c574dc5d8e6cad6cf8396b66d0a881252cd87b4ee566f6f7212b3be7cdb4ba",
+  "formation_lib.ts": "b6b64b8419d0b4bea3f2bf498f586e54ad3b44f0adc83f05b74a677371fe6f31",
+  "specs2/v16-both.json": "e4f0bd4214a7b770d1e3a5824ee948dcd0d9683d6c2cb1d26ec0fff269a84f77",
+  "specs2/v16-vs-v14.json": "d230cac55f035e42edbb19d5dd73de5132b23f5ea330a1003431790960fdbdf5",
+  "confirm_b_analyze.py": "4ff6ae252c3f844a709f70354173c38acdbdd76dfa91257d834bfb259ecee716",
+  "g4_check.py": "92fb372e332d094a96a6157c97dd967416e09ff9201c14dcab038e6bfbcfb0c2",
+  "tree_manifest.sh": "91e0dc01bd1a13e2a6aa75e022cabc56b79c8c5fbaeda6ab336ec8473e19203e",
+  "fit_units.py": "976924c4f3f71e4706cbf2590f8bbdb1a83c6bea927e34bf05fc24ce73ebe89e",
+  "make_table.py": "0d645550f40700a22f0b8df0abe8c803314ce013ebe2a4f58518e6bf22463d84",
+  "explore/unit-values-a.json": "9d24a42e941b6357c9cc69af5a5c8707574a6c4a78e7226fbfa9434312b7144d",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "seeds2/pool.json": "1dda6c1fefb6c6b49a4d27bf127ca1121df5d1201b07a2855e1380733f4e9cfb",
+  "seeds2/split.json": "d0bb5ae81269fa494fb0ddb98221d8edc72bb894099639362ba40d93819b24ee",
+  "seeds2/confirmation-B-tasks.json": "ec7fdd671b302d156d1686340a870797bb325729db474d3cfb5fb07b9f61692a",
+  "seeds2/seed-admission.json": "a3c30377bb6832f22f613522ca524906f571c3f9923250efbf8b349d09cec789",
+  "bank/cfB-cand_vs_v16.json": "d05dcd403b59c72610fda2aa485b5b6c5ed1ce4e2c0744757c8c490e0b7f9074",
+  "bank/cfB-v16_vs_v16.json": "a1f9139398138cebcab90be52ba11c78b77883eb8c0ae5d3bec211d6cb50cb49",
+  "bank/cfB-cand_vs_v14.json": "aab38775964eda1451647d73df0ca0250e5948389976b90df676d961628c0a53",
+  "bank/cfB-v16_vs_v14.json": "dd69b67b987dcd71782c64a8a50db063c9ab335e7c639dc29ddc97a619578b20",
+  "bank/cfB-decisions-vs_v16.json": "dcf25de5842ffeb9ab8520f0fa04d5ed0a26eb0bcbe6c0289d3041ea97bd31f7",
+  "bank/cfB-decisions-vs_v14.json": "b2d5420c8b9d4c776cfc9a4f16fe683cb766b22f9db7fb1e346b50f1f3e38d09",
+  "../draft-parity.ts": "9493f044a50c9b5074a78f3ceb2166cd34c4e833b483f73067a2b2449494f8d1"
+ }
+}

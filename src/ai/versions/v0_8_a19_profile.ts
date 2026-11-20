@@ -13,6 +13,7 @@ import { A19_LEARNED_FINAL_PLACEMENT_POLICY } from "../placement/policy";
 import { A19_TERRAIN_PLACEMENT_POLICY } from "../placement/terrain_reflection";
 import { A19_REVEALED_RANGED_POLICY, A19_SNIPER_DONOR_POLICY } from "../setup/a19_revealed_ranged_identity";
 import { A19_SHOOTERLESS_MOVEMENT_POLICY } from "../setup/a19_shooterless_setup_identity";
+import { A19_STRIKER_MATCHUP_POLICY } from "../setup/a19_striker_matchup_identity";
 import { A19_STRIKER_RUSH_POLICY } from "../setup/a19_striker_rush_identity";
 import { A19_WANDERING_MAGE_SUPPORT_POLICY } from "../wandering_mage_support";
 import { A19_UNIT_SUPPORT_POLICY } from "../support_setup";
@@ -81,8 +82,15 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     such an army. Only seven-point plans hold that point. +8.06 score points for a seven-point seat against
  *     v15 on the registered sealed bank (95% +3.89 to +12.04); all five registered gates passed
  *     (docs/shooterless_movement_adoption.md). Search, weights and budgets are untouched.
+ *   - striker matchup draft (profile v17) adopted on 2026-11-20 under the same standing instruction. Among
+ *     the strikers on offer the seat takes the one worth most against the army it can see: every striker has
+ *     a measured value for a rush and another for a melee fight, weighed by the probability that the opponent
+ *     ends with four or more strikers. Only legally visible opposing creatures are read. +28.06 score points
+ *     against v16 on the registered sealed bank (95% +22.96 to +33.06) and +3.52 against v14 (95% -0.83 to
+ *     +7.96); all six registered gates passed (docs/striker_matchup_adoption.md). Search, weights and budgets
+ *     are untouched.
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v16" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v17" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -206,6 +214,19 @@ export const V08_A19_SHOOTERLESS_MOVEMENT_POLICY = Object.freeze({
     adoptedAt: "2026-11-20",
     adoption: "standing-user-instruction",
     registrationSha256: "28ca93f78b560d0a8e5217e88f28f4dd8ca2077176fabd899ce676c9ec701945",
+    qualification: "registered-confirmation-passed",
+} as const);
+
+/**
+ * Striker matchup draft (profile v17). The values and the choice live in ai/setup/a19_striker_matchup.ts and the
+ * server's draft decider, not in `SearchDriver`; this record keeps the decision and its registration with the
+ * profile. See docs/striker_matchup_adoption.md.
+ */
+export const V08_A19_STRIKER_MATCHUP_POLICY = Object.freeze({
+    policyId: A19_STRIKER_MATCHUP_POLICY,
+    adoptedAt: "2026-11-20",
+    adoption: "standing-user-instruction",
+    registrationSha256: "764d9b96b46a323f2ffc3542bf1d39107babbbc43268f33a69b70e3b256db593",
     qualification: "registered-confirmation-passed",
 } as const);
 
@@ -533,6 +554,7 @@ export const V08_A19_PROFILE = Object.freeze({
     strikerRush: V08_A19_STRIKER_RUSH_POLICY,
     artifactBeneficiary: V08_A19_ARTIFACT_BENEFICIARY_POLICY,
     shooterlessMovement: V08_A19_SHOOTERLESS_MOVEMENT_POLICY,
+    strikerMatchup: V08_A19_STRIKER_MATCHUP_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 
