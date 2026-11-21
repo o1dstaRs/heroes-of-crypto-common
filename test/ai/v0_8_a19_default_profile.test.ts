@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v19",
+            schema: "hoc.v0_8_a19_production_profile.v20",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -140,6 +140,14 @@ describe("v0.8+A19 production profile", () => {
                 adoptedAt: "2026-11-20",
                 adoption: "standing-user-instruction",
                 registrationSha256: "8654e5a54721df0c4ccd74ecc6bbfd31c404203b36bd295c82669febaa241b62",
+                qualification: "strength-confirmed-quality-gate-failed",
+            },
+            // Profile v20: the Tier-2 pick for a striker army.
+            tier2Striker: {
+                policyId: "a19-tier2-striker-v1",
+                adoptedAt: "2026-11-21",
+                adoption: "standing-user-instruction",
+                registrationSha256: "3e1c94aead03725988f8fc298aeb0e960eb873c1fbb04abc57c31f204112a3b4",
                 qualification: "strength-confirmed-quality-gate-failed",
             },
         });

@@ -14,6 +14,7 @@ import { A19_TERRAIN_PLACEMENT_POLICY } from "../placement/terrain_reflection";
 import { A19_REVEALED_RANGED_POLICY, A19_SNIPER_DONOR_POLICY } from "../setup/a19_revealed_ranged_identity";
 import { A19_SHOOTERLESS_MOVEMENT_POLICY } from "../setup/a19_shooterless_setup_identity";
 import { A19_STRIKER_MATCHUP_POLICY } from "../setup/a19_striker_matchup_identity";
+import { A19_TIER2_STRIKER_POLICY } from "../setup/a19_tier2_striker_identity";
 import {
     A19_STRIKER_RUSH_MIXED_POLICY,
     A19_STRIKER_RUSH_ONE_SHOOTER_POLICY,
@@ -105,8 +106,15 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     +4.64 score points on the registered sealed bank where the setup changes (95% +0.91 to +8.40); its
  *     quality gate failed (two candidate games against one with a declined scripted melee proposal) and stays
  *     recorded as failed (docs/striker_rush_one_shooter_adoption.md).
+ *   - Tier-2 pick for a striker army (profile v20) adopted on 2026-11-21 under the same standing instruction.
+ *     An army with fewer than two ranged stacks takes Crown of Command when it is offered and the opponent's
+ *     melee probability is below 0.8; otherwise an established artifact outranks the five that artifact-fit-v8
+ *     scores with a forecast. +7.06 score points on the 1,693 registered sealed tasks where the
+ *     artifact changes (95% +4.39 to +9.76); mirror over all its tasks +0.42. Its quality gate failed (two
+ *     candidate games against one with a declined scripted melee proposal) and stays recorded as failed
+ *     (docs/tier2_striker_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v19" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v20" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -268,6 +276,19 @@ export const V08_A19_STRIKER_RUSH_ONE_SHOOTER_POLICY = Object.freeze({
     adoptedAt: "2026-11-20",
     adoption: "standing-user-instruction",
     registrationSha256: "8654e5a54721df0c4ccd74ecc6bbfd31c404203b36bd295c82669febaa241b62",
+    qualification: "strength-confirmed-quality-gate-failed",
+} as const);
+
+/**
+ * Tier-2 pick for a striker army (profile v20). The rule lives in ai/setup/a19_tier2_striker.ts and the server's
+ * A19 setup policy; this record keeps the decision and its registration with the profile. See
+ * docs/tier2_striker_adoption.md.
+ */
+export const V08_A19_TIER2_STRIKER_POLICY = Object.freeze({
+    policyId: A19_TIER2_STRIKER_POLICY,
+    adoptedAt: "2026-11-21",
+    adoption: "standing-user-instruction",
+    registrationSha256: "3e1c94aead03725988f8fc298aeb0e960eb873c1fbb04abc57c31f204112a3b4",
     qualification: "strength-confirmed-quality-gate-failed",
 } as const);
 
@@ -598,6 +619,7 @@ export const V08_A19_PROFILE = Object.freeze({
     strikerMatchup: V08_A19_STRIKER_MATCHUP_POLICY,
     strikerRushMixed: V08_A19_STRIKER_RUSH_MIXED_POLICY,
     strikerRushOneShooter: V08_A19_STRIKER_RUSH_ONE_SHOOTER_POLICY,
+    tier2Striker: V08_A19_TIER2_STRIKER_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

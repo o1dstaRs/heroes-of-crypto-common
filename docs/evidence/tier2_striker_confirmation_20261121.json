@@ -1,0 +1,331 @@
+{
+ "id": "tier2-striker-confirmation-H-results-20261121",
+ "registrationSha256": "3e1c94aead03725988f8fc298aeb0e960eb873c1fbb04abc57c31f204112a3b4",
+ "evidenceHeads": {
+  "common": "bdb90084518e723ae3832b32eeb4b048262fa559",
+  "server": "f77ae29068f026c7d49c14b9af49018b622ce774",
+  "note": "Research tree at A19 profile v14 with the later draft heads and setup rules applied by the draft generator and the runner, as in the earlier confirmations of this series (tree manifest bc730e9c...; the second host ran its lab3 tree, manifest b547d05f..., checked by G5)."
+ },
+ "rule": "For an army with fewer than two ranged stacks among its known creatures: Crown of Command when offered and the opponent's melee probability (a19OpponentMeleeProbability over the legally visible opposing creatures) is below 0.8; otherwise, when artifact-fit-v8 picks one of Archmage's Ring, Aegis of the Arcane, Quiver of Echoes, Gravechain or Last Fuse and an established usable artifact is on offer, the shipped policy's choice among the established ones.",
+ "primary": {
+  "n": 1693,
+  "tasks": 411,
+  "difference": 7.0585,
+  "low": 4.3911,
+  "high": 9.7561,
+  "better": 282,
+  "worse": 158
+ },
+ "maps": {
+  "Normal": {
+   "n": 551,
+   "tasks": 133,
+   "difference": 4.6279,
+   "low": 0.4562,
+   "high": 8.7963,
+   "better": 77,
+   "worse": 52
+  },
+  "Lava": {
+   "n": 601,
+   "tasks": 141,
+   "difference": 12.2296,
+   "low": 7.3171,
+   "high": 17.1053,
+   "better": 125,
+   "worse": 49
+  },
+  "Block centre": {
+   "n": 541,
+   "tasks": 137,
+   "difference": 3.7893,
+   "low": -0.8349,
+   "high": 8.5952,
+   "better": 80,
+   "worse": 57
+  }
+ },
+ "doctrines": {
+  "Scout": {
+   "n": 661,
+   "tasks": 157,
+   "difference": 8.3964,
+   "low": 3.9706,
+   "high": 12.7871,
+   "better": 114,
+   "worse": 56
+  },
+  "Spymaster": {
+   "n": 515,
+   "tasks": 136,
+   "difference": 6.9903,
+   "low": 2.2505,
+   "high": 11.9626,
+   "better": 94,
+   "worse": 57
+  },
+  "Battle Trance": {
+   "n": 517,
+   "tasks": 118,
+   "difference": 5.4159,
+   "low": 0.7782,
+   "high": 10.274,
+   "better": 74,
+   "worse": 45
+  }
+ },
+ "populations": {
+  "owner": {
+   "tasks": 1080,
+   "changedTasks": 340,
+   "played": 340,
+   "missing": 0,
+   "allTasksDifference": 0.0925925925925926,
+   "changed": {
+    "n": 340,
+    "tasks": 340,
+    "difference": 0.2941,
+    "low": -5.1471,
+    "high": 5.7353,
+    "better": 48,
+    "worse": 46
+   },
+   "scoreOnChanged": {
+    "control": 73.9706,
+    "candidate": 74.2647
+   }
+  },
+  "mixB12": {
+   "tasks": 1080,
+   "changedTasks": 337,
+   "played": 337,
+   "missing": 0,
+   "allTasksDifference": 2.8703703703703702,
+   "changed": {
+    "n": 337,
+    "tasks": 337,
+    "difference": 9.1988,
+    "low": 4.0059,
+    "high": 14.5401,
+    "better": 59,
+    "worse": 27
+   },
+   "scoreOnChanged": {
+    "control": 65.5786,
+    "candidate": 74.7774
+   }
+  },
+  "mixB34": {
+   "tasks": 1080,
+   "changedTasks": 370,
+   "played": 370,
+   "missing": 0,
+   "allTasksDifference": 4.305555555555555,
+   "changed": {
+    "n": 370,
+    "tasks": 370,
+    "difference": 12.5676,
+    "low": 7.7027,
+    "high": 17.4324,
+    "better": 72,
+    "worse": 25
+   },
+   "scoreOnChanged": {
+    "control": 70.9459,
+    "candidate": 83.5135
+   }
+  },
+  "native": {
+   "tasks": 1080,
+   "changedTasks": 374,
+   "played": 374,
+   "missing": 0,
+   "allTasksDifference": 3.3796296296296298,
+   "changed": {
+    "n": 374,
+    "tasks": 374,
+    "difference": 9.7594,
+    "low": 5.8824,
+    "high": 13.7701,
+    "better": 49,
+    "worse": 12
+   },
+   "scoreOnChanged": {
+    "control": 76.0695,
+    "candidate": 85.8289
+   }
+  },
+  "mirror": {
+   "tasks": 1080,
+   "changedTasks": 272,
+   "played": 272,
+   "missing": 0,
+   "allTasksDifference": 0.4166666666666667,
+   "changed": {
+    "n": 272,
+    "tasks": 272,
+    "difference": 1.6544,
+    "low": -5.3309,
+    "high": 8.6397,
+    "better": 54,
+    "worse": 48
+   },
+   "scoreOnChanged": {
+    "control": 49.0809,
+    "candidate": 50.7353
+   }
+  }
+ },
+ "qualityErrors": {
+  "control": 1,
+  "candidate": 2
+ },
+ "qualityErrorGames": [
+  {
+   "arm": "control",
+   "population": "mixB34",
+   "task": "rt2-m1-d23-f0013"
+  },
+  {
+   "arm": "candidate",
+   "population": "mixB12",
+   "task": "rt2-m4-d13-f0055"
+  },
+  {
+   "arm": "candidate",
+   "population": "owner",
+   "task": "rt2-m4-d21-f0086"
+  }
+ ],
+ "qualityErrorMessage": "strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available",
+ "cpuSecondsPerChangedGame": {
+  "control": 14.4556,
+  "candidate": 14.0392
+ },
+ "swaps": [
+  [
+   "2",
+   "5",
+   139
+  ],
+  [
+   "17",
+   "5",
+   135
+  ],
+  [
+   "17",
+   "12",
+   131
+  ],
+  [
+   "17",
+   "7",
+   104
+  ],
+  [
+   "4",
+   "5",
+   103
+  ],
+  [
+   "14",
+   "5",
+   99
+  ],
+  [
+   "1",
+   "5",
+   90
+  ],
+  [
+   "17",
+   "9",
+   79
+  ],
+  [
+   "14",
+   "9",
+   77
+  ],
+  [
+   "14",
+   "12",
+   70
+  ],
+  [
+   "14",
+   "7",
+   66
+  ],
+  [
+   "16",
+   "7",
+   65
+  ],
+  [
+   "12",
+   "5",
+   61
+  ],
+  [
+   "16",
+   "9",
+   59
+  ],
+  [
+   "17",
+   "6",
+   49
+  ]
+ ],
+ "gates": {
+  "G1 strength on the changed tasks: lower bound above zero": true,
+  "G2 no map below -2, no population below -5": true,
+  "G3 mirror guard: difference over all mirror tasks at least -2": true,
+  "G4 candidate games with a quality error not above the control arm": false,
+  "G6 candidate CPU per changed game at most 1.25x control": true,
+  "G5 thirty changed owner tasks reproduce on a second host": true
+ },
+ "productionPort": {
+  "what": "Every recorded Tier-2 decision of the bank (1,693 changed and 600 sampled unchanged, from the drafts of both arms) replayed through the production rule a19Tier2StrikerDecision with the shipped melee table for the established pick.",
+  "identicalDecisions": 2293,
+  "replayed": 2293,
+  "fixture": "test/ai/fixtures/a19_tier2_striker_decisions.json"
+ },
+ "development": {
+  "design": "Every usable offered artifact played on each of 198 development tasks in five populations (2,650 games); the rule and its 0.8 threshold were chosen after seeing these data.",
+  "intoCrown": {
+   "owner": 16.0,
+   "mixB12": 8.2,
+   "mixB34": 30.0,
+   "native": 16.3,
+   "mirror": -18.0
+  },
+  "outOfForecast": {
+   "owner": 0.0,
+   "mixB12": 13.3,
+   "mixB34": 13.5,
+   "native": 0.0,
+   "mirror": 18.6
+  },
+  "devEstimateAllTasks": {
+   "difference": 3.23,
+   "low": 1.6,
+   "high": 5.1
+  }
+ },
+ "deviations": [
+  "mixB34 (both arms) ran on the Mac lab4 tree instead of Puffalo lab3 because Puffalo was saturated by other users; both arms of every population ran on one host and tree."
+ ],
+ "notMeasured": [
+  "play against people",
+  "live decision latency"
+ ],
+ "analysis": {
+  "script": "confirm_h_analyze.py",
+  "sha256": "e8fe2d48ea914330fe12f1dddeba84ee331150737c0cfc476e5c801564834eb9",
+  "bootstrap": "10,000 resamples over draft tasks, seed 20261127",
+  "amendments": "none"
+ }
+}

@@ -1,9 +1,26 @@
 # Agent guidance
 
+## Tier-2 pick for a striker army — November 21, 2026
+
+Under the same standing instruction as the sections below, `a19-tier2-striker-v1` is active: **the
+current default is profile v20**. Read `docs/tier2_striker_adoption.md`. An army with fewer than two
+ranged stacks takes Crown of Command when it is offered and the opponent's melee probability
+(`a19OpponentMeleeProbability`, legally visible creatures only) is below 0.8; otherwise an established
+Tier-2 artifact outranks the five that artifact-fit-v8 scores with a forecast. Such armies used to read
+the v0.7 melee table, where Crown is the lowest entry. The rule is in `src/ai/setup/a19_tier2_striker.ts`;
+the server applies it in its A19 setup policy and Premium advice follows it. Preserve the registered
++7.06-point estimate (95% +4.39 to +9.76; 1,693 changed games on a fresh sealed bank) with its scope:
+games where the artifact changes, not a win rate against people. Its quality gate (G4: two candidate
+games against one with a declined scripted melee proposal) failed and stays recorded as failed: do not
+waive, re-run or relabel it. Crown loses the melee mirror (−18 on development swaps): do not drop the
+melee-probability condition. Its bank (namespace `tier2-striker-20261121-v1`, first 120 of 306
+families) is consumed; the remaining 186 families are unused.
+
 ## Striker rush from one shooter — November 20, 2026
 
-Under the same standing instruction as the sections below, `a19-striker-rush-one-shooter-v1` is
-active: **the current default is profile v19**. Read `docs/striker_rush_one_shooter_adoption.md`. An
+Profile v19 is retained inside v20. Under the same standing instruction as the sections below,
+`a19-striker-rush-one-shooter-v1` is active: **the current default is profile v19**. Read
+`docs/striker_rush_one_shooter_adoption.md`. An
 army with exactly four strikers is rushed from one shooter (v18: two). Casters without a ranged
 attack do not count: four strikers with casters only measured −12.8 for the rusher and keep the
 native setup. `A19_STRIKER_RUSH_MIXED_V18_MIN_SHOOTERS` keeps the v18 value for the server's
