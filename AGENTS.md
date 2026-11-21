@@ -1,5 +1,14 @@
 # Agent guidance
 
+## Pre-fight goals — owner, November 21, 2026
+
+Before changing anything a default AI seat does before the fight, read the server's
+[AI pre-fight goals and scorecard](../../../heroes-of-crypto-server/docs/ai_prefight_scorecard.md). That covers the
+doctrine, draft, bans, Tier-1/Tier-2 artifacts, upgrades and placement or splits. The owner wants each doctrine
+drawn a third of the time and its information used. Synergies should be planned, and counters and map-suited units
+picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
+names the goals it advances and reports the scorecard metric before and after.
+
 ## Rejection fixes — November 21, 2026
 
 At the owner's request (“Need to fix all rejection causes”), `a19-rejection-fixes-v1` is active: **the current
