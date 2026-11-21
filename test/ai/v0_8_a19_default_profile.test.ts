@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v20",
+            schema: "hoc.v0_8_a19_production_profile.v21",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -149,6 +149,14 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "standing-user-instruction",
                 registrationSha256: "3e1c94aead03725988f8fc298aeb0e960eb873c1fbb04abc57c31f204112a3b4",
                 qualification: "strength-confirmed-quality-gate-failed",
+            },
+            // Profile v21: the owner-requested keep-attack fix.
+            keepAttack: {
+                policyId: "a19-keep-attack-v1",
+                adoptedAt: "2026-11-21",
+                adoption: "owner-request",
+                registrationSha256: "01cec0b5e01e328838864415a1884e7ddf35abbe879ff74ed42c3ffca15e0999",
+                qualification: "non-inferiority-confirmed",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({
@@ -456,6 +464,7 @@ describe("v0.8+A19 production profile", () => {
             "revealed-ranged-identity",
             "revealed-ranged-draft",
             "revealed-ranged-setup",
+            "keep-attack",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));

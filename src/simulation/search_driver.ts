@@ -177,6 +177,7 @@ import {
     VALUE_FEATURE_NAMES,
     VALUE_FEATURE_NAMES_V2,
 } from "./value_features";
+import { applyA19KeepAttack } from "../ai/keep_attack";
 import { assertNoLegacySeatEnv, seatEnvName } from "../ai/seat_env";
 
 /**
@@ -1434,6 +1435,9 @@ export class SearchDriver {
     private readonly exactTerminalResults: boolean;
     private readonly a19ScoredArbitration: boolean;
     private readonly a19MaterialArbitration: A19MaterialArbitrationMode | undefined;
+    /** a19-keep-attack-v1 (`src/ai/keep_attack.ts`): melee units keep attacking instead of only walking up. */
+    private readonly a19KeepMeleeAttack: boolean;
+    private readonly a19KeepContactAttack: boolean;
     private readonly a19MaterialLowEvidenceWinningSamples: number;
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
     private readonly a19MeleeBarrelDeliberation: boolean;
@@ -1945,6 +1949,14 @@ export class SearchDriver {
             }
             this.decisionDeadlineMs = decisionDeadlineMs;
         }
+        const keepRule = (name: string): boolean => {
+            const raw = searchEnv(name);
+            if (raw !== undefined && raw !== "" && raw !== "0" && raw !== "1")
+                throw new Error(`${name} must be 0 or 1`);
+            return this.mode === "search" && raw === "1";
+        };
+        this.a19KeepMeleeAttack = keepRule("SEARCH_A19_KEEP_MELEE_ATTACK");
+        this.a19KeepContactAttack = keepRule("SEARCH_A19_KEEP_CONTACT_ATTACK");
         const rawWaitDeadlinePolicy =
             this.mode === "search" ? searchEnv("SEARCH_WAIT_DEADLINE_POLICY")?.trim() || "profile" : "profile";
         if (rawWaitDeadlinePolicy !== "profile" && rawWaitDeadlinePolicy !== "operation_bounded") {
@@ -4115,6 +4127,12 @@ export class SearchDriver {
                     ),
                 version,
             );
+            if (this.a19KeepMeleeAttack || this.a19KeepContactAttack) {
+                applyA19KeepAttack(unit, scoredCandidates, means, this.deps.unitsHolder, {
+                    keepMeleeAttack: this.a19KeepMeleeAttack,
+                    keepContactAttack: this.a19KeepContactAttack,
+                });
+            }
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
             const legalProductiveIndices = scoredCandidates
                 .map((candidate, index) => ({ candidate, index }))

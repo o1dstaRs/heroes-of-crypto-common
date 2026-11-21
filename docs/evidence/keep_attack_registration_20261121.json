@@ -1,0 +1,73 @@
+{
+ "id": "keep-attack-confirmation-L-20261121",
+ "registeredAt": "2026-11-21T19:09:41.518831+00:00",
+ "question": "Does the keep-attack fix remove the AI behaviour the owner reported (a melee unit moves next to an enemy and ends its turn without attacking) without costing the default (A19 profile v20) more than 2 points?",
+ "origin": "Owner, 2026-11-21: \"units dont attack from time to time, just move close\" (test game 8e073b88: the search replaced the Hydra's move+attack with a plain move) and, after confirmation J of rule 1 alone failed its strength gate (+0.33, 95% -1.19..+1.94): \"i need fix on that\". This is a behaviour fix the owner asked for; its gate is non-inferiority, and strength is reported, not required.",
+ "candidate": {
+  "searchEnvOverrides": {
+   "SEARCH_A19_KEEP_MELEE_ATTACK": "1",
+   "SEARCH_A19_KEEP_CONTACT_ATTACK": "1"
+  },
+  "rule": "a19-keep-attack-v1 (common src/ai/keep_attack.ts, applied in search_driver.ts right after the primary means): for a non-ranged unit, (1) when the native choice is a melee attack, every challenger that does not attack (melee, ranged, area-throw, obstacle attack or cast) is lowered by 1 before selection; (2) when any scored candidate attacks, every challenger that moves the unit next to (or diagonal to) an enemy without attacking is lowered by 1. Illegal candidates stay illegal; the native choice itself is not lowered.",
+  "implementation": "production tree prod17 = server main 700527a + production common fa886ab5 + the rule (both switches, off by default) + research-only seams in ranked_adapter.ts (HOC_RESEARCH_ENTRANT_SEARCH entrant driver, HOC_RESEARCH_CONTACT_LOG decision log); entrant seat only; deterministic work mode",
+  "parity": "prod17 rules off == the production control (prod16-ctl) 6/6; two-driver \"{}\" == single driver 6/6"
+ },
+ "control": "HOC_RESEARCH_ENTRANT_SEARCH=\"{}\" on prod17: the matched two-driver stock control.",
+ "why": "Development, 144 v20 mirror tasks (first 144 of the 600 dev tasks) on prod17: entrant plain moves into contact without attacking, control 149 of 3,858 melee decisions (148 chosen by the search), rule 1 only 36, rules 1+2: 2. Scores: rule 1 +5.21, rules 1+2 +5.56 (both crossing zero on 144 tasks); quality errors 0 vs 0. Earlier diagnosis (3 x 48 games): 121 search-chosen contact moves, 118 with an attack available, only 61 replacing a native attack.",
+ "populations": {
+  "mirror": "both seats draft as the v20 default (primary)",
+  "owner": "the opponent drafts strikers from the bundle and at levels 2-3 and casters at levels 1 and 4 (guard)"
+ },
+ "bank": {
+  "namespace": "keep-attack-20261121-v1",
+  "tasks": 1674,
+  "families": "families 0000-0185 of a 208-family pool (seeds9), audited at allocation against 850 ledgers (every earlier namespace including deep-fit-20261121-v1, every league and bank file of this study, the Premium collection seeds) before any bank file was written: 0 intersections"
+ },
+ "primaryEndpoint": "Mean over all 1,674 mirror tasks of candidate-arm minus control-arm score for the entrant. 95% interval from 10,000 bootstrap resamples over pool families, seed 20261131, percentile 2.5 / 97.5.",
+ "gates": {
+  "N1": "Non-inferiority: the lower bound of the primary interval is at least -2 points.",
+  "N2": "No map of the mirror with an estimate below -2 points.",
+  "N3": "Owner guard: the difference over all owner tasks is at least -2 points.",
+  "N4": "Candidate-arm games with a quality error not more than control-arm games with one (both populations).",
+  "N5": "Behaviour: entrant plain moves into contact without attacking in the candidate arm at most 10% of the control arm, both populations together (contact logs).",
+  "N6": "A rerun of the 30 mirror tasks of bank/cfL-g5.json (candidate arm) on the second host reproduces the digests."
+ },
+ "reportedNotGated": "Superiority (primary lower bound above zero), CPU per game.",
+ "adoptionRule": "If N1-N5 pass, the fix is adopted into the default as the owner-requested behaviour fix (profile v21, a19-keep-attack-v1), with the result reported as measured; if the primary lower bound is also above zero it is reported as a strength gain. A failed gate stays failed. Deploying still needs the owner's go-ahead.",
+ "notClaimed": "Strength against people; any behaviour other than the plain move into contact.",
+ "execution": {
+  "runner": "life-run8.ts via life-pool8.sh (12 processes)",
+  "specs": "v19-both.json (mirror), v19.json (owner); same spec both arms",
+  "hosts": "Mac prod17: mirror control, mirror candidate, owner control, owner candidate; x3d prod17: N6 (8 processes, nice 19)",
+  "treeManifestSha256": {
+   "prod17 (Mac and x3d)": "9c975442de509206e4023783c8ca4cb6bd73f612be4c46763d11b195de911249"
+  },
+  "analysis": "confirm_l_analyze.py (dry-run on the development rows before registration)"
+ },
+ "inputsSha256": {
+  "life-run8.ts": "0af7e49b87714586466e7fc9ac76f7e3e0a68b51900b6dd8dcada8cb3c1cb87c",
+  "life-pool8.sh": "dd781069e537c889fd73cf0be47442d71e0d06efe5c7c321e7084f0512506741",
+  "specs2/v19.json": "19d1417bcd10d03181055c51a3b382adbe436c2413caef193115bab504bf76bf",
+  "specs2/v19-both.json": "31edf970176f56c691231821eeb64f2ce9e0bd655a852e91e63983f86fe9125c",
+  "confirm_l_analyze.py": "519b3acb8ec7a139aa6617e8187558c3ab5bd7a78a3d89c762e36fc8fb556bad",
+  "g4_check.py": "92fb372e332d094a96a6157c97dd967416e09ff9201c14dcab038e6bfbcfb0c2",
+  "tree_manifest.sh": "91e0dc01bd1a13e2a6aa75e022cabc56b79c8c5fbaeda6ab336ec8473e19203e",
+  "league-drafts4.ts": "73880bc10a12622bf3bf7534f4e6fc0306d329217c727fab2893e222d0e5fb2c",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "allocate_v25.py": "98e46d66b06929252a413ecf85b0d0991b7d36dca7e9e2b20f2f701bd35ef9f7",
+  "seeds9/pool.json": "a115434fd1a01ca0e8da3227728357ee430d2074e5aa2fb559c1133a8e75c69b",
+  "seeds9/seed-admission.json": "9b8d6eccf002346342a82ef637130a301d78291b0a4141643ac2f2e3be40ca1e",
+  "seeds9/allocation-audit.txt": "14b54b0bfc98d8693f5f222dda766136116c17b05db23951a4f0e7eb7061f013",
+  "bank/cfL-tasks.json": "c6d8ab96fc258a845676ce2854a3b3f586acd192c065ddad7a533161c1dd3c96",
+  "bank/cfL-mirror.json": "6497e063c1742d75bef2be8041ddb0351b055409d9b4b161ee88e340b118e819",
+  "bank/cfL-owner.json": "471f7b1f05bd559b291647bea603e398c230815f9f3f7d25c5af58c6d0f12ae6",
+  "bank/cfL-g5.json": "ba533393543a9fb225a00f7e0686d799347df3072723b1d2fd57fae5ebe0fc0d",
+  "league/dev144-mirror.json": "7fc97f4bd849c6eeed4783ce54e479a9acad6efc7beb4e2cd3af00c5c343132f",
+  "registration-J.json": "a2a225a8fcd1764c90ddd4efe0a75e4036aff9cb9fa5cc0e6ccd39e500e3eb68",
+  "registration-K.json": "cf8653ce3dc1308908d2c60fc4a76c1a2423e5e4062d45fca05d15b95e85b9cf",
+  "../shipped-parity/prod17/node_modules/@heroesofcrypto/common/src/ai/keep_attack.ts": "80776fbdc70362a28e538aa687b080f71014bc4c94b664633f9bea89cff052cd",
+  "../shipped-parity/prod17/node_modules/@heroesofcrypto/common/src/simulation/search_driver.ts": "3a455a102a12d7196d0bebc8ce5aecf881828343602d71da9a25942062b6f079",
+  "../shipped-parity/prod17/src/api/game/v1/bot_search.ts": "3daa6d7502b3fd61cada473bcc9ef1b8f33c2f5adebd40fac72b3562b5e150dd",
+  "../shipped-parity/prod17/src/simulation/ai_iteration/ranked_adapter.ts": "05c4bde9fa2e20c08cb894a9237ce8ed5d2279f5ece3bda922112228161d4093"
+ }
+}

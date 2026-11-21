@@ -113,8 +113,12 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     artifact changes (95% +4.39 to +9.76); mirror over all its tasks +0.42. Its quality gate failed (two
  *     candidate games against one with a declined scripted melee proposal) and stays recorded as failed
  *     (docs/tier2_striker_adoption.md).
+ *   - Keep-attack fix (profile v21) adopted on 2026-11-21 at the owner's request: a melee unit no longer walks up to an
+ *     enemy and ends its turn without attacking when an attack was available. Plain moves into contact fell from
+ *     3,499 to 84 on the registered sealed bank; mirror +1.34 score points (95% -0.39 to +3.05), owner guard +2.15;
+ *     registered as a non-inferiority check, so no strength gain is claimed (docs/keep_attack_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v20" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v21" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -162,6 +166,10 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     SEARCH_A19_NEURAL_TIES: "1",
     SEARCH_A19_WANDERING_MAGE_SUPPORT: "1",
     SEARCH_A19_SATYR_CONTACT_SUPPORT: "1",
+    // Owner-requested fix (profile v21, ai/keep_attack.ts): a melee unit's native attack is only replaced by another
+    // attack, and while an attack is scored no plain move ends next to an enemy. Confirmed not to cost strength.
+    SEARCH_A19_KEEP_MELEE_ATTACK: "1",
+    SEARCH_A19_KEEP_CONTACT_ATTACK: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -190,7 +198,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8078c75f34a4030ad5c767c" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "397a2fc8dc8d3145ab4cbc5300818d9eb3a89edeb2aacb57739a0a38d0c5c004" as const;
+    "429c490e0b611975db37f33c7111c7553b2f8d72c108e03f56f70df01636fb2e" as const;
 
 /**
  * User-adopted neutral cemetery barrel deliberation. The switch lives in `SearchDriver`; this record keeps the
@@ -293,6 +301,18 @@ export const V08_A19_TIER2_STRIKER_POLICY = Object.freeze({
 } as const);
 
 /**
+ * Keep-attack fix (profile v21). The rule lives in ai/keep_attack.ts and the search driver; this record keeps the
+ * decision and its registration with the profile. See docs/keep_attack_adoption.md.
+ */
+export const V08_A19_KEEP_ATTACK_POLICY = Object.freeze({
+    policyId: "a19-keep-attack-v1" as const,
+    adoptedAt: "2026-11-21",
+    adoption: "owner-request",
+    registrationSha256: "01cec0b5e01e328838864415a1884e7ddf35abbe879ff74ed42c3ffca15e0999",
+    qualification: "non-inferiority-confirmed",
+} as const);
+
+/**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
  * -> generic ranked placement -> plain v0.8. Each layer delegates on a miss; every layer needs only the public
  * roster and the map.
@@ -347,8 +367,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Carries the neutral cemetery barrel deliberation switch that profile v14 turns on.
-        sha256: "09f51dd48caee326017ae44597e738d7ee12994118ab343a0ba9cf88a53890e8" as const,
+        // Carries the neutral cemetery barrel deliberation switch that profile v14 turns on and the keep-attack
+        // switches of profile v21.
+        sha256: "65938b2be4c318a961df61973f2cfd83f127c56804922c8645cc829c055a7564" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
@@ -587,6 +608,11 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/setup/a19_revealed_ranged_setup.ts" as const,
         sha256: "d4edea27356e342756850dc9e65466df68a916e20f907d7ead263ebb3a2b32df" as const,
     }),
+    Object.freeze({
+        role: "keep-attack" as const,
+        source: "src/ai/keep_attack.ts" as const,
+        sha256: "0085acaca83845a838b56270a95db8996e0626bad06818ad4000acb0b2754dc9" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -620,6 +646,7 @@ export const V08_A19_PROFILE = Object.freeze({
     strikerRushMixed: V08_A19_STRIKER_RUSH_MIXED_POLICY,
     strikerRushOneShooter: V08_A19_STRIKER_RUSH_ONE_SHOOTER_POLICY,
     tier2Striker: V08_A19_TIER2_STRIKER_POLICY,
+    keepAttack: V08_A19_KEEP_ATTACK_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

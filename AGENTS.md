@@ -1,9 +1,26 @@
 # Agent guidance
 
+## Keep-attack fix — November 21, 2026
+
+At the owner's request, `a19-keep-attack-v1` is active: **the current default is profile v21**. Read
+`docs/keep_attack_adoption.md`. The owner reported that units sometimes move up to an enemy and do not
+attack. A melee unit's search no longer lets a non-attacking challenger replace a native melee attack
+(`SEARCH_A19_KEEP_MELEE_ATTACK`). While any scored candidate attacks, it also does not let a plain move
+that ends next to an enemy win (`SEARCH_A19_KEEP_CONTACT_ATTACK`). The rule is `applyA19KeepAttack` in
+`src/ai/keep_attack.ts`, applied in the search driver right after the primary means. Ranged units are
+unchanged. The confirmation was registered as non-inferiority on a fresh sealed bank and passed all six
+gates. Mirror +1.34 points (95% −0.39 to +3.05; 1,674 tasks); owner-shaped guard +2.15 (+0.69 to
++3.58); plain moves into contact 3,499 → 84. Do not report the mirror as a strength gain: its interval
+crosses zero. Confirmation J tested rule 1 alone (+0.33, 95% −1.19 to +1.94). It failed its strength
+gate and stays recorded as failed. All ten quality-error games of the confirmation were the declined
+scripted melee proposal, which is a separate cause. Its bank (namespace `keep-attack-20261121-v1`,
+families 0000–0185) is consumed.
+
 ## Tier-2 pick for a striker army — November 21, 2026
 
-Under the same standing instruction as the sections below, `a19-tier2-striker-v1` is active: **the
-current default is profile v20**. Read `docs/tier2_striker_adoption.md`. An army with fewer than two
+Profile v20 is retained inside v21. Under the same standing instruction as the sections below,
+`a19-tier2-striker-v1` is active: **the current default is profile v20**. Read
+`docs/tier2_striker_adoption.md`. An army with fewer than two
 ranged stacks takes Crown of Command when it is offered and the opponent's melee probability
 (`a19OpponentMeleeProbability`, legally visible creatures only) is below 0.8; otherwise an established
 Tier-2 artifact outranks the five that artifact-fit-v8 scores with a forecast. Such armies used to read

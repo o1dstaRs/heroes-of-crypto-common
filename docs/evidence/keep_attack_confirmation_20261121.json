@@ -1,0 +1,307 @@
+{
+  "id": "keep-attack-confirmation-L-20261121",
+  "registrationSha256": "01cec0b5e01e328838864415a1884e7ddf35abbe879ff74ed42c3ffca15e0999",
+  "evidenceHeads": {
+    "server": "700527a",
+    "common": "fa886ab5c15a2de2d093dd55a765075bb442f695",
+    "productionTreeManifestSha256": "9c975442de509206e4023783c8ca4cb6bd73f612be4c46763d11b195de911249",
+    "keep_attack.ts": "80776fbdc70362a28e538aa687b080f71014bc4c94b664633f9bea89cff052cd"
+  },
+  "rule": "a19-keep-attack-v1: SEARCH_A19_KEEP_MELEE_ATTACK=1 and SEARCH_A19_KEEP_CONTACT_ATTACK=1 on the entrant seat",
+  "primary": {
+    "n": 1674,
+    "families": 186,
+    "difference": 1.3440860215053763,
+    "low": -0.38829151732377537,
+    "high": 3.046594982078853,
+    "better": 148,
+    "worse": 125
+  },
+  "populations": {
+    "mirror": {
+      "tasks": 1674,
+      "played": 1674,
+      "missing": 0,
+      "all": {
+        "n": 1674,
+        "families": 186,
+        "difference": 1.3440860215053763,
+        "low": -0.38829151732377537,
+        "high": 3.046594982078853,
+        "better": 148,
+        "worse": 125
+      },
+      "maps": {
+        "Normal": {
+          "n": 558,
+          "families": 186,
+          "difference": 1.702508960573477,
+          "low": -1.4336917562724014,
+          "high": 4.749103942652329,
+          "better": 48,
+          "worse": 39
+        },
+        "Lava": {
+          "n": 558,
+          "families": 186,
+          "difference": 3.584229390681003,
+          "low": 0.17921146953405018,
+          "high": 6.899641577060931,
+          "better": 53,
+          "worse": 32
+        },
+        "Block centre": {
+          "n": 558,
+          "families": 186,
+          "difference": -1.2544802867383513,
+          "low": -4.480286738351254,
+          "high": 2.0609318996415773,
+          "better": 47,
+          "worse": 54
+        }
+      },
+      "doctrines": {
+        "Scout": {
+          "n": 558,
+          "families": 186,
+          "difference": 1.702508960573477,
+          "low": -1.6129032258064515,
+          "high": 4.838709677419355,
+          "better": 50,
+          "worse": 39
+        },
+        "Spymaster": {
+          "n": 558,
+          "families": 186,
+          "difference": 1.3440860215053763,
+          "low": -1.881720430107527,
+          "high": 4.659498207885305,
+          "better": 50,
+          "worse": 44
+        },
+        "Battle Trance": {
+          "n": 558,
+          "families": 186,
+          "difference": 0.985663082437276,
+          "low": -2.0609318996415773,
+          "high": 4.032258064516129,
+          "better": 48,
+          "worse": 42
+        }
+      },
+      "score": {
+        "control": 50.98566308243727,
+        "candidate": 52.32974910394266
+      }
+    },
+    "owner": {
+      "tasks": 1674,
+      "played": 1674,
+      "missing": 0,
+      "all": {
+        "n": 1674,
+        "families": 186,
+        "difference": 2.1505376344086025,
+        "low": 0.6869772998805257,
+        "high": 3.584229390681003,
+        "better": 113,
+        "worse": 74
+      },
+      "maps": {
+        "Normal": {
+          "n": 558,
+          "families": 186,
+          "difference": 1.3440860215053763,
+          "low": -0.7168458781362007,
+          "high": 3.494623655913978,
+          "better": 23,
+          "worse": 15
+        },
+        "Lava": {
+          "n": 558,
+          "families": 186,
+          "difference": 2.5985663082437274,
+          "low": 0.0,
+          "high": 5.10752688172043,
+          "better": 41,
+          "worse": 24
+        },
+        "Block centre": {
+          "n": 558,
+          "families": 186,
+          "difference": 2.5089605734767026,
+          "low": -0.5376344086021506,
+          "high": 5.555555555555555,
+          "better": 49,
+          "worse": 35
+        }
+      },
+      "doctrines": {
+        "Scout": {
+          "n": 558,
+          "families": 186,
+          "difference": 0.985663082437276,
+          "low": -1.6129032258064515,
+          "high": 3.584229390681003,
+          "better": 32,
+          "worse": 25
+        },
+        "Spymaster": {
+          "n": 558,
+          "families": 186,
+          "difference": 4.211469534050179,
+          "low": 1.5232974910394266,
+          "high": 6.899641577060931,
+          "better": 47,
+          "worse": 21
+        },
+        "Battle Trance": {
+          "n": 558,
+          "families": 186,
+          "difference": 1.2544802867383513,
+          "low": -1.0752688172043012,
+          "high": 3.584229390681003,
+          "better": 34,
+          "worse": 28
+        }
+      },
+      "score": {
+        "control": 74.2831541218638,
+        "candidate": 76.43369175627241
+      }
+    }
+  },
+  "behaviour": {
+    "plainContactMoves": {
+      "mirror-control": {
+        "meleeDecisions": 45781,
+        "plainContactMoves": 1831
+      },
+      "mirror-candidate": {
+        "meleeDecisions": 45044,
+        "plainContactMoves": 35
+      },
+      "owner-control": {
+        "meleeDecisions": 48248,
+        "plainContactMoves": 1668
+      },
+      "owner-candidate": {
+        "meleeDecisions": 47156,
+        "plainContactMoves": 49
+      }
+    }
+  },
+  "qualityErrorGames": {
+    "control": 5,
+    "candidate": 5
+  },
+  "qualityErrors": {
+    "mirror-control": [
+      {
+        "task": "rka-m4-d12-f0062-seat1",
+        "message": "[server-ai] strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+      }
+    ],
+    "mirror-candidate": [
+      {
+        "task": "rka-m4-d21-f0041-seat2",
+        "message": "[server-ai] strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+      },
+      {
+        "task": "rka-m1-d21-f0105-seat2",
+        "message": "[server-ai] strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+      },
+      {
+        "task": "rka-m1-d32-f0157-seat2",
+        "message": "[server-ai] strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+      }
+    ],
+    "owner-control": [
+      {
+        "task": "rka-m4-d32-f0054-seat1",
+        "message": "[server-ai] strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+      },
+      {
+        "task": "rka-m1-d13-f0179-seat1",
+        "message": "[server-ai] strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+      },
+      {
+        "task": "rka-m4-d21-f0119-seat2",
+        "message": "[server-ai] strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+      },
+      {
+        "task": "rka-m3-d33-f0100-seat2",
+        "message": "[server-ai] strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+      }
+    ],
+    "owner-candidate": [
+      {
+        "task": "rka-m4-d23-f0009-seat2",
+        "message": "[server-ai] strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+      },
+      {
+        "task": "rka-m1-d13-f0179-seat1",
+        "message": "[server-ai] strategy v0.8 proposal declined: type=melee_attack reason=attack_not_available"
+      }
+    ]
+  },
+  "cpuSecondsPerGame": {
+    "mirror": {
+      "control": 8.249026342891279,
+      "candidate": 8.175757966547192
+    },
+    "owner": {
+      "control": 8.146547025686978,
+      "candidate": 8.023342939068101
+    }
+  },
+  "gates": {
+    "N1 mirror non-inferiority: 95% lower bound at least -2 points": true,
+    "N2 no map of the mirror below -2": true,
+    "N3 owner guard: difference over all owner tasks at least -2": true,
+    "N4 candidate games with a quality error not above the control arm": true,
+    "N5 behaviour: candidate plain contact moves at most 10% of the control arm (both populations)": true,
+    "N6 thirty candidate mirror tasks reproduce on the second host (x3d)": true
+  },
+  "n6": "N6 (x3d rerun of 30 mirror candidate tasks): reruns 30, with a confirmation row 30; identical digest 30, identical opening 30, identical score 30",
+  "strengthReported": {
+    "superiorityLowerBoundAboveZero": false
+  },
+  "development": {
+    "tasks": 144,
+    "plainContactMoves": {
+      "off": 149,
+      "rule1": 36,
+      "rules1and2": 2
+    },
+    "scoreDifference": {
+      "rule1": 5.21,
+      "rules1and2": 5.56
+    },
+    "note": "first 144 of the 600 v20 mirror development tasks; intervals cross zero"
+  },
+  "precedingConfirmationJ": {
+    "id": "keep-melee-attack-20261121-v1",
+    "registrationSha256": "a2a225a8fcd1764c90ddd4efe0a75e4036aff9cb9fa5cc0e6ccd39e500e3eb68",
+    "rule": "rule 1 alone",
+    "mirror": "+0.33 (95% -1.19 to +1.94)",
+    "G1": "failed (stays failed)"
+  },
+  "deviations": [
+    "A unit-test file for the production port was briefly written into the registered prod17 tree during the run and moved out before any analysis; the tree manifest re-measured unchanged (9c975442...)."
+  ],
+  "analysis": "confirm_l_analyze.py as registered (sha256 519b3acb...), N6 by g4_check.py",
+  "notClaimed": "Strength against people; superiority in the mirror (lower bound -0.39).",
+  "productionPort": {
+    "note": "The production files are the registered prod17 files formatted by bun fmt (one line wrap in each); behaviour identical.",
+    "src/ai/keep_attack.ts": {
+      "registered": "80776fbdc70362a28e538aa687b080f71014bc4c94b664633f9bea89cff052cd",
+      "production": "0085acaca83845a838b56270a95db8996e0626bad06818ad4000acb0b2754dc9"
+    },
+    "src/simulation/search_driver.ts": {
+      "registered": "3a455a102a12d7196d0bebc8ce5aecf881828343602d71da9a25942062b6f079",
+      "production": "65938b2be4c318a961df61973f2cfd83f127c56804922c8645cc829c055a7564"
+    },
+    "behaviorEnvironmentSha256": "429c490e0b611975db37f33c7111c7553b2f8d72c108e03f56f70df01636fb2e"
+  }
+}
