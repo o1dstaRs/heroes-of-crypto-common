@@ -1,8 +1,22 @@
 # Agent guidance
 
+## Rejection fixes — November 21, 2026
+
+At the owner's request (“Need to fix all rejection causes”), `a19-rejection-fixes-v1` is active: **the current
+default is profile v22**. Read `docs/rejection_fixes_adoption.md`. Two causes are fixed in common.
+`a19CoherentMeleeApproach` (`src/ai/coherent_melee_approach.ts`) is the last step of `StrategyV0_8.decideTurn`, so
+a native decision no longer moves and then strikes from the old cell. `StrategyV0_1.isLegalMoveRoute` accepts only
+destinations in the engine-equivalent, zone-of-control-aware known paths, which a mindless Berserker or Frenzied
+Boar needs. Both are on unless `A19_COHERENT_MELEE_APPROACH_<LEFT|RIGHT>` or `A19_ENGINE_REACHABLE_ROUTES_<LEFT|RIGHT>`
+is `"0"`. The third cause, a turn-engine wedge, is fixed in the server. The registered non-inferiority confirmation
+passed all six gates. Mirror +0.06 points (95% −0.94 to +1.07); owner-shaped guard
++0.10; entrant refusals 5 → 0. Its bank (namespace `rejection-fixes-20261121-v1`,
+171 families) is consumed.
+
 ## Keep-attack fix — November 21, 2026
 
-At the owner's request, `a19-keep-attack-v1` is active: **the current default is profile v21**. Read
+Profile v21 is retained inside v22. At the owner's request, `a19-keep-attack-v1` is active: **the current default
+is profile v21**. Read
 `docs/keep_attack_adoption.md`. The owner reported that units sometimes move up to an enemy and do not
 attack. A melee unit's search no longer lets a non-attacking challenger replace a native melee attack
 (`SEARCH_A19_KEEP_MELEE_ATTACK`). While any scored candidate attacks, it also does not let a plain move

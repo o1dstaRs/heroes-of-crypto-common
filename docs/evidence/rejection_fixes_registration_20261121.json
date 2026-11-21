@@ -1,0 +1,84 @@
+{
+ "id": "rejection-fixes-confirmation-N-20261121",
+ "registeredAt": "2026-11-21T21:42:30.831013+00:00",
+ "question": "Do the two AI rejection fixes remove the refused AI actions the owner asked to have fixed, without costing the default (A19 profile v21) more than 2 points?",
+ "origin": "Owner, 2026-11-21: \"Need to fix all rejection causes\". 23 rejection games from the day's confirmation arms, all reproduced on production code and root-caused: (1) a declined native melee strike (attack_not_available, 16 games): the v0.8 decision is [move to X, melee_attack whose path starts at the old cell], because a policy layer (v0.4 rapidChargeReposition, inherited aura positioning) rewrites the strike without the move; the engine refuses the strike and the unit stands next to the enemy; (2) a mindless Berserker (exact v0.1) losing its turn to two invalid_move refusals: its findTarget route goes through an enemy zone of control the engine's known paths stop at; (3) a turn-engine wedge after consecutive Stun/Freeze-type skips, fixed in the server (dbb41ce, both arms here). This is a behaviour fix the owner asked for: the gate is non-inferiority, strength is reported.",
+ "candidate": {
+  "fixes": {
+   "a19-coherent-melee-approach-v1": "common src/ai/coherent_melee_approach.ts, applied as the last step of StrategyV0_8.decideTurn (live, rollouts, simulations): a move followed by a strike whose path starts at the old cell is replaced by one coherent approach and strike (or the strike alone when it is already stationary, or the original move when no coherent approach is reachable); seat switch A19_COHERENT_MELEE_APPROACH_<LEFT|RIGHT>, on unless \"0\"",
+   "a19-engine-reachable-routes-v1": "common src/ai/versions/v0_1.ts isLegalMoveRoute (inherited by v0.2-v0.8): a move route is legal only when its destination is in the engine-equivalent step-limited, zone-of-control-aware known paths (the server's currentActiveKnownPaths arguments), computed once per decision context inside a private random stream; seat switch A19_ENGINE_REACHABLE_ROUTES_<LEFT|RIGHT>, on unless \"0\""
+  },
+  "seam": "HOC_RESEARCH_FIX_SEATS=entrant (prod21 research ranked_adapter.ts): both switches on for the entrant team, off for the opponent, for the whole game; HOC_RESEARCH_ENTRANT_SEARCH=\"{}\" (the matched two-driver search); deterministic work mode",
+  "implementation": "prod21 = server dbb41ce (profile v21 + the advance-cap fix) + production common 1715a218 (profile v21) + the two fixes + research seams (entrant search, decline trace with seat, wedge trace, fix seats)",
+  "parity": "prod21 with HOC_RESEARCH_FIX_SEATS=none == the pristine v21 tree (prod21ctl: server dbb41ce + common 1715a218, no seams) on league/parity-6.json: 6/6 identical digest, opening and score; both fixes on both seats change 4 of the 6 games"
+ },
+ "control": "HOC_RESEARCH_FIX_SEATS=none, HOC_RESEARCH_ENTRANT_SEARCH=\"{}\" on prod21: production v21 on both seats.",
+ "why": "Replays on prod21 (v21) of the 21 recorded rejection games: fixes off 3 games / 6 refused actions, fixes on both seats 0 / 0 (on prod20 = v20 + fixes: 18 + 3 games reproduced, 0 refusals with the fixes). Unit tests: the repair 25/25 (production module), the route check 3/3, the advance cap 1/1 (fails on the old cap). Development, 600 v20 mirror tasks on prod20 (league/budget-dev-mirror.json): entrant-only fixes +1.33 points (95% -0.43 to +3.35; better 16, worse 8; Normal +1.00, Lava +2.25, Block centre +0.75), 123 of 600 games differ; both seats fixed against none +0.08 with 217 of 600 games different (the rollouts play the repaired decisions too). Refused actions in those 1,800 development games: 0 in every arm (the base rate is about one game in 700).",
+ "populations": {
+  "mirror": "both seats draft as the v21 default (primary)",
+  "owner": "the opponent drafts strikers from the bundle and at levels 2-3 and casters at levels 1 and 4 (guard)"
+ },
+ "bank": {
+  "namespace": "rejection-fixes-20261121-v1",
+  "tasks": 1539,
+  "families": "all 171 families (0000-0170) of the pool (seeds11; the scan funded 171, fewer than the 186 of L and M, so the bank is registered at 1,539 tasks), audited at allocation against 869 ledgers (every earlier namespace including deep-fit-4s-20261121-v1, every league and bank file of this study, the Premium collection seeds) before any bank file was written: 0 intersections"
+ },
+ "primaryEndpoint": "Mean over all 1,539 mirror tasks of candidate-arm minus control-arm score for the entrant. 95% interval from 10,000 bootstrap resamples over pool families, seed 20261133, percentile 2.5 / 97.5.",
+ "gates": {
+  "N1": "Non-inferiority: the lower bound of the primary interval is at least -2 points.",
+  "N2": "No map of the mirror with an estimate below -2 points.",
+  "N3": "Owner guard: the difference over all owner tasks is at least -2 points.",
+  "N4": "Refusals: entrant-seat actions the session did not complete (decline traces, both populations together) in the candidate arm at most 10% of the control arm; when the control arm has fewer than 5, the candidate arm has 0.",
+  "N5": "No turn-engine wedge (\"turn engine wedged\" quality error) in any game of either arm.",
+  "N6": "A rerun of the 30 mirror tasks of bank/cfN-g5.json (candidate arm) on the second host reproduces the digests."
+ },
+ "reportedNotGated": "Superiority (primary lower bound above zero), quality-error games, CPU per game, games that differ.",
+ "adoptionRule": "If N1-N6 pass, both fixes are adopted into the default as the owner-requested rejection fixes (profile v22, switches on), with the result reported as measured; a superiority claim needs the primary lower bound above zero. A failed gate stays failed. Deploying still needs the owner's go-ahead.",
+ "notClaimed": "Strength against people; refusals of the opponent seat (unfixed by design in both arms).",
+ "execution": {
+  "runner": "life-run8.ts via life-pool8.sh",
+  "specs": "v19-both.json (mirror), v19.json (owner); same spec both arms",
+  "hosts": "Mac prod21 (12 processes): mirror control, mirror candidate (cfN-mac.sh); x3d prod21 (8 processes, nice 19, after confirmation M's x3d arms): owner control, owner candidate, N6 (cfN-hft.sh). Both arms of each population on one host and tree.",
+  "treeManifestSha256": {
+   "prod21 (Mac and x3d)": "d2070294b171583560c7e8a02681f293ea2728295238bf9fd471b75ad9072bd8"
+  },
+  "analysis": "confirm_n_analyze.py (dry-run on the development rows before registration)"
+ },
+ "inputsSha256": {
+  "life-run8.ts": "0af7e49b87714586466e7fc9ac76f7e3e0a68b51900b6dd8dcada8cb3c1cb87c",
+  "life-pool8.sh": "dd781069e537c889fd73cf0be47442d71e0d06efe5c7c321e7084f0512506741",
+  "specs2/v19.json": "19d1417bcd10d03181055c51a3b382adbe436c2413caef193115bab504bf76bf",
+  "specs2/v19-both.json": "31edf970176f56c691231821eeb64f2ce9e0bd655a852e91e63983f86fe9125c",
+  "confirm_n_analyze.py": "2ff7a77970b01792ebe287e75df35e0637ee915d43d502d4d683f2ae415aa96c",
+  "g4_check.py": "92fb372e332d094a96a6157c97dd967416e09ff9201c14dcab038e6bfbcfb0c2",
+  "tree_manifest.sh": "91e0dc01bd1a13e2a6aa75e022cabc56b79c8c5fbaeda6ab336ec8473e19203e",
+  "league-drafts4.ts": "73880bc10a12622bf3bf7534f4e6fc0306d329217c727fab2893e222d0e5fb2c",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "allocate_v27.py": "774dfc02fa9759346910412db83b90ad1cbb6336ce168dbab2de467a0fd914dd",
+  "seeds11/pool.json": "98bf338a5dba7616a10196989003e10599fbc4ca31a522f3ff4dc19f875d32b9",
+  "seeds11/seed-admission.json": "51336dff04b67f28a7936c46b28953e5f3e466926cfda9fca5ea11d82025fc3c",
+  "seeds11/allocation-audit.txt": "7bdfc9bbdb876d2c3cd3b1a52bd0341a4ad38216cceabe82f106cf7fbddfcda7",
+  "bank/cfN-tasks.json": "579941e90b29a4a47f50925db1aa2bb54122908f6232948e2d0745f9aa359f35",
+  "bank/cfN-mirror.json": "1004c041eed7b52b93e09a0953c710f14e0808b6e2782b0e88433d3c3b5bb72d",
+  "bank/cfN-owner.json": "acad516c6716654841a2c6aa96bfb233379558f760cfd89c03970d7b5f1e988f",
+  "bank/cfN-g5.json": "8f3fe7ea9199f5a5830edd373619e67594f21ca1f2c037f4778d7e1a7f2653ce",
+  "registration-L.json": "01cec0b5e01e328838864415a1884e7ddf35abbe879ff74ed42c3ffca15e0999",
+  "registration-M.json": "aa99e261a3d7ee4f33fbe95d3cc349aa0651e01a1c1539b8e59f4a7084122616",
+  "league/budget-dev-mirror.json": "383c8c074dfb00f3928c246a193334ee50800b428c26070dee0ae955dc0edc5f",
+  "league/rej-ctl-mirror.json": "ca500fa5d5f589787ef3ca17427b195c86a25822a60061a1f08a05fdb00fa36a",
+  "league/rej-ctl-owner.json": "54815a90edf1a0deaac36f7057d05fd3213b1d14f0896c0aa514c7e9de7994e0",
+  "league/rej-cand-mirror.json": "c4455e9dcd4381a7a7b4a20ea6a2f712135a5491189507f7cb3ff3215d971f3d",
+  "cfN-mac.sh": "66ada588f2c5336d0e23d1cb42f3531a54f560eda46d1abc9d30df33c91aca17",
+  "cfN-hft.sh": "3ccf0177498b0c8696b83476f310bf9b4898881e74a3f632538fd37812f44cb3",
+  "../shipped-parity/prod21/node_modules/@heroesofcrypto/common/src/ai/coherent_melee_approach.ts": "0114c26e290f360112bf7b76a615e994342e3cd29f2ff7544add322b736c04b2",
+  "../shipped-parity/prod21/node_modules/@heroesofcrypto/common/src/ai/versions/v0_1.ts": "c9a2210fde6d89e4cce294f4293c1a0085fe2e476b5d5ae4f051120a55274f8c",
+  "../shipped-parity/prod21/node_modules/@heroesofcrypto/common/src/ai/versions/v0_8.ts": "fc09937d9593b25916a312961aa0c3022be33766dcca2532dba23ecbec2e48de",
+  "../shipped-parity/prod21/node_modules/@heroesofcrypto/common/src/ai/keep_attack.ts": "0085acaca83845a838b56270a95db8996e0626bad06818ad4000acb0b2754dc9",
+  "../shipped-parity/prod21/node_modules/@heroesofcrypto/common/src/simulation/search_driver.ts": "65938b2be4c318a961df61973f2cfd83f127c56804922c8645cc829c055a7564",
+  "../shipped-parity/prod21/node_modules/@heroesofcrypto/common/src/ai/versions/v0_8_a19_profile.ts": "16850bf276c22cba58d72fdb78ecccd61ca1e243b87574102db3d9fa9bb6d46d",
+  "../shipped-parity/prod21/src/api/game/v1/bot_search.ts": "1a78193d6f0f558a34cbd1d5afec2bbb0c72b7c477b7998703fd1bc2e9417965",
+  "../shipped-parity/prod21/src/api/game/v1/play_session.ts": "dbdbdea1a09f6bdb5afa051600a0ea13a57db384501c78449a39317e2c650978",
+  "../shipped-parity/prod21/src/api/game/v1/turn_advance.ts": "b63856bd37202bcdd91ce8bdf6bc5991970dce388375323e095d0b2bfe099252",
+  "../shipped-parity/prod21/src/simulation/ai_iteration/ranked_adapter.ts": "0e14f8ef7b6e52756682f308d073aa7adfae8d4fffcaf920dadc5f55ce399f4c"
+ }
+}

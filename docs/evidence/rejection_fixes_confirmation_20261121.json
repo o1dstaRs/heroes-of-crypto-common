@@ -1,0 +1,251 @@
+{
+  "id": "rejection-fixes-confirmation-N-20261121",
+  "registrationSha256": "0613b1987e120e72cb874aae41fb01b781c3acbb46382d3fed41d960620bbea0",
+  "deviation": [
+    {
+      "file": "deviation-N.md",
+      "sha256": "4c9f4ca177bf3457714b0c42a09a5f32c35c10254bd639486afda8c96a260a84",
+      "summary": "owner arms on the Mac instead of x3d (same prod21 manifest), recorded before any owner row"
+    },
+    {
+      "file": "deviation-N-2.md",
+      "sha256": "87ccc47ede5d568a8d1fcc6ace5d0663d82a20f50d8dd23d9ae5296570d6c052",
+      "summary": "N6 started on x3d alongside confirmation M (2 processes, nice 19) instead of after it, recorded before any N6 row"
+    }
+  ],
+  "evidenceHeads": {
+    "server": "dbb41ce",
+    "common": "1715a218dc48f15e97c67494c11e682c8f24aa46",
+    "productionTreeManifestSha256": "d2070294b171583560c7e8a02681f293ea2728295238bf9fd471b75ad9072bd8"
+  },
+  "primary": {
+    "n": 1539,
+    "families": 171,
+    "difference": 0.0649772579597141,
+    "low": -0.9421702404158544,
+    "high": 1.0721247563352825,
+    "better": 34,
+    "worse": 31
+  },
+  "populations": {
+    "mirror": {
+      "tasks": 1539,
+      "played": 1539,
+      "missing": 0,
+      "all": {
+        "n": 1539,
+        "families": 171,
+        "difference": 0.0649772579597141,
+        "low": -0.9421702404158544,
+        "high": 1.0721247563352825,
+        "better": 34,
+        "worse": 31
+      },
+      "maps": {
+        "Normal": {
+          "n": 513,
+          "families": 171,
+          "difference": -1.364522417153996,
+          "low": -3.7037037037037033,
+          "high": 0.7797270955165692,
+          "better": 14,
+          "worse": 21
+        },
+        "Lava": {
+          "n": 513,
+          "families": 171,
+          "difference": 1.8518518518518516,
+          "low": 0.1949317738791423,
+          "high": 3.6062378167641325,
+          "better": 16,
+          "worse": 6
+        },
+        "Block centre": {
+          "n": 513,
+          "families": 171,
+          "difference": -0.29239766081871343,
+          "low": -1.267056530214425,
+          "high": 0.5847953216374269,
+          "better": 4,
+          "worse": 4
+        }
+      },
+      "doctrines": {
+        "Scout": {
+          "n": 513,
+          "families": 171,
+          "difference": -0.1949317738791423,
+          "low": -2.046783625730994,
+          "high": 1.6569200779727096,
+          "better": 13,
+          "worse": 13
+        },
+        "Spymaster": {
+          "n": 513,
+          "families": 171,
+          "difference": 0.09746588693957114,
+          "low": -1.5594541910331383,
+          "high": 1.8518518518518516,
+          "better": 10,
+          "worse": 9
+        },
+        "Battle Trance": {
+          "n": 513,
+          "families": 171,
+          "difference": 0.29239766081871343,
+          "low": -1.364522417153996,
+          "high": 1.949317738791423,
+          "better": 11,
+          "worse": 9
+        }
+      },
+      "score": {
+        "control": 53.086419753086425,
+        "candidate": 53.15139701104613
+      },
+      "tasksWithADifferentGame": 303
+    },
+    "owner": {
+      "tasks": 1539,
+      "played": 1539,
+      "missing": 0,
+      "all": {
+        "n": 1539,
+        "families": 171,
+        "difference": 0.09746588693957114,
+        "low": -0.649772579597141,
+        "high": 0.8122157244964262,
+        "better": 16,
+        "worse": 15
+      },
+      "maps": {
+        "Normal": {
+          "n": 513,
+          "families": 171,
+          "difference": 0.682261208576998,
+          "low": -0.8771929824561403,
+          "high": 2.241715399610136,
+          "better": 10,
+          "worse": 7
+        },
+        "Lava": {
+          "n": 513,
+          "families": 171,
+          "difference": -0.5847953216374269,
+          "low": -1.7543859649122806,
+          "high": 0.5847953216374269,
+          "better": 3,
+          "worse": 6
+        },
+        "Block centre": {
+          "n": 513,
+          "families": 171,
+          "difference": 0.1949317738791423,
+          "low": -0.5847953216374269,
+          "high": 0.9746588693957114,
+          "better": 3,
+          "worse": 2
+        }
+      },
+      "doctrines": {
+        "Scout": {
+          "n": 513,
+          "families": 171,
+          "difference": 0.1949317738791423,
+          "low": -0.3898635477582846,
+          "high": 0.9746588693957114,
+          "better": 2,
+          "worse": 1
+        },
+        "Spymaster": {
+          "n": 513,
+          "families": 171,
+          "difference": -0.7797270955165692,
+          "low": -2.53411306042885,
+          "high": 0.7797270955165692,
+          "better": 7,
+          "worse": 11
+        },
+        "Battle Trance": {
+          "n": 513,
+          "families": 171,
+          "difference": 0.8771929824561403,
+          "low": -0.1949317738791423,
+          "high": 2.046783625730994,
+          "better": 7,
+          "worse": 3
+        }
+      },
+      "score": {
+        "control": 75.43859649122807,
+        "candidate": 75.53606237816764
+      },
+      "tasksWithADifferentGame": 273
+    }
+  },
+  "refusals": {
+    "mirror-control": {
+      "entrant": 3,
+      "opponent": 0
+    },
+    "mirror-candidate": {
+      "entrant": 0,
+      "opponent": 1
+    },
+    "owner-control": {
+      "entrant": 2,
+      "opponent": 1
+    },
+    "owner-candidate": {
+      "entrant": 0,
+      "opponent": 1
+    }
+  },
+  "entrantRefusalKinds": {
+    "control: melee_attack attack_not_available": 5
+  },
+  "qualityErrorGames": {
+    "control": 6,
+    "candidate": 2
+  },
+  "turnEngineWedges": 0,
+  "cpuSecondsPerGame": {
+    "mirror": {
+      "control": 7.851788968161143,
+      "candidate": 7.994044968810916
+    },
+    "owner": {
+      "control": 7.803726304093567,
+      "candidate": 7.476076055880442
+    }
+  },
+  "gates": {
+    "N1 mirror non-inferiority: 95% lower bound at least -2 points": true,
+    "N2 no map of the mirror below -2": true,
+    "N3 owner guard: difference over all owner tasks at least -2": true,
+    "N4 entrant refusals: candidate at most 10% of control (both populations), and zero when control has fewer than 5": true,
+    "N5 no turn-engine wedge in any game of either arm": true,
+    "N6 thirty candidate mirror tasks reproduce on the second host (x3d)": true
+  },
+  "n6": "N6 (x3d rerun of 30 mirror candidate tasks): reruns 30, with a confirmation row 30; identical digest 30, identical opening 30, identical score 30",
+  "strengthReported": {
+    "superiorityLowerBoundAboveZero": false
+  },
+  "productionPort": {
+    "src/ai/coherent_melee_approach.ts": {
+      "registered": "0114c26e290f360112bf7b76a615e994342e3cd29f2ff7544add322b736c04b2",
+      "production": "35fe4148388f7ec0aad4b95d67b000e5d2139a77cb4e150e9eec6fd7742b946b"
+    },
+    "src/ai/versions/v0_1.ts": {
+      "registered": "c9a2210fde6d89e4cce294f4293c1a0085fe2e476b5d5ae4f051120a55274f8c",
+      "production": "0fd06f0f134a237454b6b659ee486da74cd79b870e72f9cb92f11eb90168988f"
+    },
+    "src/ai/versions/v0_8.ts": {
+      "registered": "fc09937d9593b25916a312961aa0c3022be33766dcca2532dba23ecbec2e48de",
+      "production": "07b86b77f43fce6e2ff7c766d73c4cc7afd56ccb138d9b3d05acf6dcac975163"
+    },
+    "note": "The production files are the registered prod21 files formatted by bun fmt; the coherent module also gains the standard license header. Behaviour identical."
+  },
+  "analysis": "confirm_n_analyze.py as registered, N6 by g4_check.py",
+  "notClaimed": "Strength against people; refusals of the opponent seat, unfixed by design in both arms."
+}

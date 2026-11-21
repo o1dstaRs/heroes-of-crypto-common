@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { a19CoherentMeleeApproach, a19CoherentMeleeApproachEnabled } from "../coherent_melee_approach";
 import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { TeamType } from "../../generated/protobuf/v1/types_gen";
@@ -735,7 +736,10 @@ export class StrategyV0_8 extends StrategyV0_7 {
             this.canHourglass(unit, context),
         );
         const wardDecision = repairV08BacklineWardDecision(unit, context, protectedDecision);
-        return prioritizeV08CemeteryObstacleAttack(unit, context, wardDecision);
+        const final = prioritizeV08CemeteryObstacleAttack(unit, context, wardDecision);
+        return a19CoherentMeleeApproachEnabled(unit.getTeam())
+            ? a19CoherentMeleeApproach(unit, context, final).actions
+            : final;
     }
 }
 

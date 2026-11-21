@@ -32,8 +32,25 @@ import { decisionFireWalls } from "../decision_fight_state";
 import { isMindlessAiUnit } from "../unit_ai_overrides";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "../melee_attack_type";
+import { assertNoLegacySeatEnv, seatEnvName } from "../seat_env";
+import {
+    captureDeterministicRandomState,
+    restoreDeterministicRandomState,
+    setDeterministicRandomSource,
+} from "../../utils/lib";
 
 export const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
+
+/** Per-seat switch (seat_env): on unless `A19_ENGINE_REACHABLE_ROUTES_<LEFT|RIGHT>=0`. */
+export const A19_ENGINE_REACHABLE_ROUTES_ENV = "A19_ENGINE_REACHABLE_ROUTES";
+
+/** One engine-reachability search per decision context and unit (a context is one decision's frozen board). */
+const engineReachableCells = new WeakMap<IDecisionContext, Map<string, ReadonlySet<number>>>();
+
+function engineReachableRoutesEnabled(team: number): boolean {
+    assertNoLegacySeatEnv(A19_ENGINE_REACHABLE_ROUTES_ENV);
+    return process.env[seatEnvName(A19_ENGINE_REACHABLE_ROUTES_ENV, team)] !== "0";
+}
 
 export const otherTeam = (team: number): number =>
     team === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
@@ -543,7 +560,57 @@ export class StrategyV0_1 implements IAIStrategy {
             }
             previous = cell;
         }
-        return true;
+        return !engineReachableRoutesEnabled(unit.getTeam()) || this.engineReachesCell(unit, context, targetCell);
+    }
+    /**
+     * The engine accepts a move only to a cell in its own step-limited known paths, which stop at an enemy's zone
+     * of control. findTarget can plan an approach from a wider search, so a mindless Berserker kept proposing a
+     * route through an enemy's zone and lost its turn to two refusals. Ask the question the engine will ask, on a
+     * fresh path search inside a private random stream, so the check never shifts a later draw.
+     */
+    protected engineReachesCell(unit: Unit, context: IDecisionContext, cell: XY): boolean {
+        let byUnit = engineReachableCells.get(context);
+        if (!byUnit) {
+            byUnit = new Map();
+            engineReachableCells.set(context, byUnit);
+        }
+        let reachable = byUnit.get(unit.getId());
+        if (!reachable) {
+            reachable = this.engineReachableCellKeys(unit, context);
+            byUnit.set(unit.getId(), reachable);
+        }
+        return reachable.has(cellKey(cell));
+    }
+    private engineReachableCellKeys(unit: Unit, context: IDecisionContext): ReadonlySet<number> {
+        const saved = captureDeterministicRandomState();
+        let state = 0x9e3779b9;
+        setDeterministicRandomSource(() => {
+            state = (state + 0x6d2b79f5) >>> 0;
+            let t = state;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        });
+        try {
+            return new Set(
+                context.pathHelper
+                    .getMovePath(
+                        unit.getBaseCell(),
+                        context.matrix,
+                        unit.getSteps(),
+                        context.grid.getAggrMatrixByTeam(otherTeam(unit.getTeam())),
+                        unit.canFly(),
+                        unit.isSmallSize(),
+                        unit.canTraverseLava(),
+                        unit.hasAbilityActive("In Its Own World"),
+                        unit.getFootprintWidth(),
+                        unit.getFootprintHeight(),
+                    )
+                    .knownPaths.keys(),
+            );
+        } finally {
+            restoreDeterministicRandomState(saved);
+        }
     }
     /**
      * The cells `unit` would occupy standing on `cell` — the ONE footprint every strategy from v0.1 to v0.9

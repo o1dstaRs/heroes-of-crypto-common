@@ -117,8 +117,12 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     enemy and ends its turn without attacking when an attack was available. Plain moves into contact fell from
  *     3,499 to 84 on the registered sealed bank; mirror +1.34 score points (95% -0.39 to +3.05), owner guard +2.15;
  *     registered as a non-inferiority check, so no strength gain is claimed (docs/keep_attack_adoption.md).
+ *   - Rejection fixes (profile v22) adopted on 2026-11-21 at the owner's request: the native decision no longer
+ *     moves and then proposes a strike from the old cell (ai/coherent_melee_approach.ts), and a move route must end
+ *     where the engine's zone-of-control-aware paths reach (StrategyV0_1.isLegalMoveRoute); registered as a
+ *     non-inferiority check (docs/rejection_fixes_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v21" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v22" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -313,6 +317,21 @@ export const V08_A19_KEEP_ATTACK_POLICY = Object.freeze({
 } as const);
 
 /**
+ * Rejection fixes (profile v22). a19-coherent-melee-approach-v1 is the last step of StrategyV0_8.decideTurn and
+ * a19-engine-reachable-routes-v1 lives in StrategyV0_1.isLegalMoveRoute; both are on unless a seat's switch
+ * (A19_COHERENT_MELEE_APPROACH_<LEFT|RIGHT>, A19_ENGINE_REACHABLE_ROUTES_<LEFT|RIGHT>) is "0". This record keeps the
+ * decision and its registration with the profile. See docs/rejection_fixes_adoption.md.
+ */
+export const V08_A19_REJECTION_FIXES_POLICY = Object.freeze({
+    policyId: "a19-rejection-fixes-v1" as const,
+    components: Object.freeze(["a19-coherent-melee-approach-v1", "a19-engine-reachable-routes-v1"] as const),
+    adoptedAt: "2026-11-21",
+    adoption: "owner-request",
+    registrationSha256: "0613b1987e120e72cb874aae41fb01b781c3acbb46382d3fed41d960620bbea0",
+    qualification: "non-inferiority-confirmed",
+} as const);
+
+/**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
  * -> generic ranked placement -> plain v0.8. Each layer delegates on a miss; every layer needs only the public
  * roster and the map.
@@ -362,7 +381,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "native-v08-combat" as const,
         source: "src/ai/versions/v0_8.ts" as const,
-        sha256: "516b07f452d1fdd6b43e5ff1d1c6c498d19f7d7038da957d8158b3963c0f8904" as const,
+        // Ends with the coherent melee approach of profile v22.
+        sha256: "07b86b77f43fce6e2ff7c766d73c4cc7afd56ccb138d9b3d05acf6dcac975163" as const,
     }),
     Object.freeze({
         role: "search-driver" as const,
@@ -613,6 +633,16 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/keep_attack.ts" as const,
         sha256: "0085acaca83845a838b56270a95db8996e0626bad06818ad4000acb0b2754dc9" as const,
     }),
+    Object.freeze({
+        role: "coherent-melee-approach" as const,
+        source: "src/ai/coherent_melee_approach.ts" as const,
+        sha256: "35fe4148388f7ec0aad4b95d67b000e5d2139a77cb4e150e9eec6fd7742b946b" as const,
+    }),
+    Object.freeze({
+        role: "engine-reachable-routes" as const,
+        source: "src/ai/versions/v0_1.ts" as const,
+        sha256: "0fd06f0f134a237454b6b659ee486da74cd79b870e72f9cb92f11eb90168988f" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -647,6 +677,7 @@ export const V08_A19_PROFILE = Object.freeze({
     strikerRushOneShooter: V08_A19_STRIKER_RUSH_ONE_SHOOTER_POLICY,
     tier2Striker: V08_A19_TIER2_STRIKER_POLICY,
     keepAttack: V08_A19_KEEP_ATTACK_POLICY,
+    rejectionFixes: V08_A19_REJECTION_FIXES_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 
