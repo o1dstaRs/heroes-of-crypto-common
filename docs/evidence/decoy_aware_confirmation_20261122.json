@@ -1,0 +1,86 @@
+{
+  "id": "decoy-aware-confirmation-Y-20261122",
+  "registrationSha256": "9e2d00ea2bfdd5b610d2f2cf54f661b58c2aa541c929d42bc6850e3f62f1f146",
+  "analysis": {
+    "script": "confirm_y_analyze.py",
+    "sha256": "bdd72990d9e8a03ff2c4d6ec725f5c728e230ce7055e205c4fbce12ee0ae6135",
+    "dryRun": "validated on development rows before registration (no bank row existed)"
+  },
+  "primary": {
+    "n": 600,
+    "difference": 6.333333333333333,
+    "low": 2.5876460767946576,
+    "high": 10.049423393739703
+  },
+  "populations": {
+    "checker": {
+      "all": {
+        "n": 600,
+        "difference": 6.333333333333333,
+        "low": 2.5876460767946576,
+        "high": 10.049423393739703
+      },
+      "control": 59.5,
+      "candidate": 65.83333333333333,
+      "changedGames": 531
+    },
+    "ring": {
+      "all": {
+        "n": 300,
+        "difference": 8.333333333333334,
+        "low": 3.0,
+        "high": 13.770491803278688
+      },
+      "control": 58.0,
+      "candidate": 66.33333333333333,
+      "changedGames": 268
+    },
+    "mirror": {
+      "all": {
+        "n": 400,
+        "difference": 1.625,
+        "low": -1.1278195488721805,
+        "high": 4.433497536945813
+      },
+      "control": 54.875,
+      "candidate": 56.5,
+      "changedGames": 108
+    },
+    "owner": {
+      "all": {
+        "n": 400,
+        "difference": 0.75,
+        "low": -0.9925558312655087,
+        "high": 2.542372881355932
+      },
+      "control": 78.75,
+      "candidate": 79.5,
+      "changedGames": 79
+    }
+  },
+  "qualityErrorGames": {
+    "control": 0,
+    "candidate": 0
+  },
+  "g5": {
+    "tasks": 30,
+    "identical": 30
+  },
+  "gates": {
+    "Y1 strength: lower bound of the checkerboard-fort 95% interval above 0": true,
+    "Y2 ring-fort guard: difference at least -2 points": true,
+    "Y3 mirror guard: difference at least -2 points": true,
+    "Y4 owner guard: difference at least -2 points": true,
+    "Y5 quality: candidate games with a quality error at most control + 2": true,
+    "Y6 second host: the 30 G5 candidate tasks reproduce the digests on x3d": true
+  },
+  "productionPort": {
+    "note": "The research change (prod21c6, A19_RESEARCH_DECOY_AWARE_<seat>=1 on the entrant seat, the root redirect as a wrapper of the server's searchBotDecisionWithStatus) is ported as the seat switch A19_DECOY_AWARE_<seat> (on unless \"0\"): the candidates.ts filter and decoyAwareIncumbent at the start of the server's bot search. The confirmation ran on the v22 base; with v23-v24 the combination was not measured as a whole.",
+    "productionSources": {
+      "src/ai/decoy_aware.ts": "2e75080ab2751be7b64bf0cf77a2a7129c88cbe539ff91980a5f5b0abd50ac43",
+      "src/ai/decoy_aware_redirect.ts": "4065952f69c77117db4b81a1790f2453df42894e146978359558907f1b56f98b",
+      "src/ai/candidates.ts": "241126f336686a85afdd4dc15e4d7f0af8d705d4a88956bf4e675351f007081c"
+    }
+  },
+  "notClaimed": "Strength against people beyond the measured owner-style populations."
+}

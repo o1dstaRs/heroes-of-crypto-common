@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { a19DecoyAwareEnabled, strikesOneModelDecoy, strikesRealStack } from "./decoy_aware";
 import { a19WildRegenGiftEnabled, isWorthwhileWildRegenerationGift } from "./wild_regeneration_gift";
 import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
@@ -1213,6 +1214,18 @@ class CandidateGenerator {
         this.addAreaThrows();
         this.addSpells();
         this.addMoves();
+        // a19-decoy-aware-v1: no challenger spends a melee strike on a one-model decoy while another candidate strikes a
+        // real stack. Candidate 0, the native decision, always stays.
+        if (
+            a19DecoyAwareEnabled(this.unit.getTeam()) &&
+            this.candidates.some((candidate) => strikesRealStack(this.context, candidate.actions))
+        ) {
+            const kept = this.candidates.filter(
+                (candidate, index) => index === 0 || !strikesOneModelDecoy(this.context, candidate.actions),
+            );
+            this.candidates.length = 0;
+            this.candidates.push(...kept);
+        }
         return { candidates: this.candidates, truncated: this.truncated };
     }
     // ---- shared feature plumbing ---------------------------------------------------------------

@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v24",
+            schema: "hoc.v0_8_a19_production_profile.v25",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -182,6 +182,14 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "owner-explicit-decision",
                 registrationSha256: "15861f7f825265f6b376b134bc1ea71f7944d364ab7fc65a2e49bd116823f712",
                 qualification: "behaviour-confirmed-owner-guard-failed",
+            },
+            // Profile v25: decoy-aware targeting, confirmed against the owner's checkerboard decoy fort.
+            decoyAware: {
+                policyId: "a19-decoy-aware-v1",
+                adoptedAt: "2026-11-22",
+                adoption: "standing-user-instruction",
+                registrationSha256: "9e2d00ea2bfdd5b610d2f2cf54f661b58c2aa541c929d42bc6850e3f62f1f146",
+                qualification: "strength-confirmed",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({
@@ -494,6 +502,8 @@ describe("v0.8+A19 production profile", () => {
             "engine-reachable-routes",
             "deep-fit",
             "wild-regen-gift",
+            "decoy-aware",
+            "decoy-aware-redirect",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));

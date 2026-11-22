@@ -9,6 +9,15 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Decoy-aware targeting — November 22, 2026
+
+Under the standing instruction `a19-decoy-aware-v1` is active: **the current default is profile v25**. Read
+`docs/decoy_aware_adoption.md`. A melee unit never spends its strike on a one-model decoy while it can strike a real
+stack (`src/ai/decoy_aware.ts`; switch `A19_DECOY_AWARE_<LEFT|RIGHT>`, on unless `0`). Confirmation Y against the owner's
+checkerboard decoy-fort layout +6.33 points (95% +2.59 to +10.05); ring fort, mirror and owner guards passed.
+
+Profile v24 is retained inside v25.
+
 ## Wild Regeneration gift — November 22, 2026
 
 By the owner's explicit decision `a19-wild-regen-gift-v1` is active: **the current default is profile v24**. Read

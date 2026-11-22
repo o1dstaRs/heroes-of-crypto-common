@@ -61,7 +61,7 @@ describe("tournament entrant-A research strategy profile", () => {
         expect(summary.entrantAResearchProfile).toEqual(records[0].entrantAResearchProfile);
         expect(records[0].entrantAResearchProfile).toMatchObject({
             selector: TOURNAMENT_RESEARCH_A19,
-            schema: "hoc.v0_8_a19_production_profile.v24",
+            schema: "hoc.v0_8_a19_production_profile.v25",
             candidateId: "a19",
             searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
         });
@@ -125,6 +125,8 @@ describe("tournament entrant-A research strategy profile", () => {
             "engine-reachable-routes",
             "deep-fit",
             "wild-regen-gift",
+            "decoy-aware",
+            "decoy-aware-redirect",
         ]);
 
         // Game 0: entrant A owns GREEN and receives the scoped compact placement; B remains native v0.8.

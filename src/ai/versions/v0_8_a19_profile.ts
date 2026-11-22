@@ -130,8 +130,12 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     failed the owner-shaped guard (-2.34; registered gate W3, recorded as failed): the Troll's one-way gift goes only
  *     to an ally whose creatures have more max HP than the caster's (ai/wild_regeneration_gift.ts). Strength on fresh
  *     tasks +0.05 (95% -1.97 to +2.09); gifts to weaker creatures 526 -> 0 (docs/wild_regen_gift_adoption.md).
+ *   - Decoy-aware targeting (profile v25) adopted on 2026-11-22 under the standing instruction: a melee unit never spends
+ *     its strike on a one-model decoy while it can strike a real stack (ai/decoy_aware.ts). Against the owner's
+ *     checkerboard decoy-fort layout +6.33 points (95% +2.59 to +10.05); every guard passed
+ *     (docs/decoy_aware_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v24" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v25" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -368,6 +372,18 @@ export const V08_A19_WILD_REGEN_GIFT_POLICY = Object.freeze({
 } as const);
 
 /**
+ * Decoy-aware targeting (profile v25): ai/decoy_aware.ts, used by the candidate generator and the server's root
+ * redirect. See docs/decoy_aware_adoption.md.
+ */
+export const V08_A19_DECOY_AWARE_POLICY = Object.freeze({
+    policyId: "a19-decoy-aware-v1" as const,
+    adoptedAt: "2026-11-22",
+    adoption: "standing-user-instruction",
+    registrationSha256: "9e2d00ea2bfdd5b610d2f2cf54f661b58c2aa541c929d42bc6850e3f62f1f146",
+    qualification: "strength-confirmed",
+} as const);
+
+/**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
  * -> generic ranked placement -> plain v0.8. Each layer delegates on a miss; every layer needs only the public
  * roster and the map.
@@ -466,7 +482,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
         // Candidate rays share the player cursor's selectable-edge gate; Through Shot retains free aim.
-        sha256: "8f2c395b9a325ba69c2aded3141007baff0ef02da7781b894227e2dc74db4565" as const,
+        sha256: "241126f336686a85afdd4dc15e4d7f0af8d705d4a88956bf4e675351f007081c" as const,
     }),
     Object.freeze({
         role: "ranged-target-selection" as const,
@@ -689,6 +705,16 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/wild_regeneration_gift.ts" as const,
         sha256: "1947b0ecbdc25c3a7f5284f58910193f7e37cf5a376188aaaddc75d1c53fcb20" as const,
     }),
+    Object.freeze({
+        role: "decoy-aware" as const,
+        source: "src/ai/decoy_aware.ts" as const,
+        sha256: "2e75080ab2751be7b64bf0cf77a2a7129c88cbe539ff91980a5f5b0abd50ac43" as const,
+    }),
+    Object.freeze({
+        role: "decoy-aware-redirect" as const,
+        source: "src/ai/decoy_aware_redirect.ts" as const,
+        sha256: "4065952f69c77117db4b81a1790f2453df42894e146978359558907f1b56f98b" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -726,6 +752,7 @@ export const V08_A19_PROFILE = Object.freeze({
     rejectionFixes: V08_A19_REJECTION_FIXES_POLICY,
     deepFit: V08_A19_DEEP_FIT_POLICY,
     wildRegenGift: V08_A19_WILD_REGEN_GIFT_POLICY,
+    decoyAware: V08_A19_DECOY_AWARE_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

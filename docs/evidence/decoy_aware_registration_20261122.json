@@ -1,0 +1,66 @@
+{
+ "id": "decoy-aware-confirmation-Y-20261122",
+ "registeredAt": "2026-11-22T20:40:59.696305+00:00",
+ "question": "Does decoy-aware targeting (a melee unit never spends its strike on a one-model decoy while it can strike a real stack) improve the default against the owner's checkerboard decoy fort, without costing more than 2 points against a ring decoy fort, the AI mirror or owner-shaped armies?",
+ "origin": "Owner game 9a1003ec (2026-11-22, 'won with this cool strat'): a checkerboard wall of one-creature Fairy splits in front of a corner fort beat ai:v0.8:brutal; the owner asked to think about it measurably and to lock in wins. Development (300 tasks each, prod21c6): against the checkerboard fort +8.17 (95% +3.00 to +13.17), avoidable decoy strikes 8.8% -> 0.4% of AI melee strikes; ring fort +0.83 (-4.17 to +5.83); mirror +1.50 (-1.83 to +4.83).",
+ "candidate": {
+  "rule": "HOC_RESEARCH_DECOY_AWARE=entrant (prod21c6): common src/ai/decoy_research.ts; candidates.ts drops challengers that melee-strike a one-model decoy (a one-creature stack whose creature has a bigger living stack in its army) while another candidate strikes a real stack (candidate 0 stays); the adapter redirects a native decision that strikes a decoy to the best real-stack strike (most cumulative HP).",
+  "seams": "HOC_RESEARCH_FIX_SEATS=both; HOC_RESEARCH_ENTRANT_SEARCH=\"{}\"; deterministic work mode; runner life-run14.ts / life-pool14.sh",
+  "implementation": "prod21c6 = prod21 (server dbb41ce + common 1715a218 + the v22 rejection fixes) + research seams, all inert without their switches; tree manifest 193209e7fa7ea8a7a02016ea48ce6440da7baa50283345ae1d9709a1b062fb13 (Mac = x3d).",
+  "control": "the same tree and specs without HOC_RESEARCH_DECOY_AWARE"
+ },
+ "bank": {
+  "namespace": "decoy-aware-b-20261122-v1 (seeds16, allocate_v32.py: 2,016 tasks, audited against 984 ledgers, 0 intersections; seed-admission sha256 c1637a3964db676dfc7cda22fb46f6b8643e279dba55f46281299807e3296e85). The earlier decoy-aware-20261122-v1 scan (seeds15) was reserved and left unfunded (881 eligible draft roots < 900).",
+  "drafts": "h-drafts recipe (league-drafts4.ts, RUSH_VALUES=explore/table-a.json RUSH_PRIOR=0.5 RUSH_VAL_SLOTS=B1234 RUSH_T1=policy RUSH_T2=h1): entrant S:B1234:val vs native (both forts), S:B1234:val (mirror), S:B23:fast:K14 (owner)",
+  "selection": "round-robin across all 224 pool families: checker 600, ring 300 (subset of the checker tasks), mirror 400, owner 400",
+  "files": {
+   "bank/cfY-checker.json": {
+    "tasks": 600,
+    "sha256": "fa2b005d727d8917414627ee9ce99c434c7e8bce8beee7099b8742db366ad27d"
+   },
+   "bank/cfY-ring.json": {
+    "tasks": 300,
+    "sha256": "37e6d69fead0cee4b88332608c70f7ce51c36591a91e44dcb5289f8ef0317ebb"
+   },
+   "bank/cfY-mirror.json": {
+    "tasks": 400,
+    "sha256": "b5bebfb48255653ead1fd5ec4d74f42fcc8a4d6604f3aea0e9661cef48b00da6"
+   },
+   "bank/cfY-owner.json": {
+    "tasks": 400,
+    "sha256": "145592dde7ec66f066726e4bb125be65fb2b942940f81bb2cdcc174c4cd1c84a"
+   }
+  },
+  "allDrafts": {
+   "bank/cfY-native-all.json": "36bdc4c67e0b2730cb90f58b7bfc512222666fff90c9d9420ce72e7fa37cb8a3",
+   "bank/cfY-mirror-all.json": "4e2a7c8099a2492c51bc10fa693bbcd0029efce8f7da8831004554d3a33978bc",
+   "bank/cfY-owner-all.json": "590842d93a45a0a5ad9e66c095298e47c80bee013d3173c7548f314a82e9a791",
+   "bank/cfY-tasks.json": "47cef54447c0237677a430fbc64d252c161054b0433e650621c31b92cf6c2c60"
+  },
+  "g5": {
+   "bank/cfY-g5-checker.json": "1fc2e91e1fe67258c14f1fe677aaa17d296b2e8e2bc1f063604331ddc06d4944",
+   "bank/cfY-g5-mirror.json": "a53bc2792d5f91e4b396f27946f10a836bb5d9a491532f11fa19f3834c909777"
+  }
+ },
+ "specs": {
+  "checker": "specs2/bat-decoychecker.json (sha256 86ea75eebfc6b410e56d625c78a297d42eaf75479c76556120379e76d5a2d3bc)",
+  "ring": "specs2/bat-decoyfort-nohold.json (sha256 6db7a0dab8a3b37abed92b0610f17776b4a2593d266f6246466eebac06d7edd4)",
+  "mirror": "specs2/aug-ctl.json",
+  "owner": "specs2/aug-ctl.json"
+ },
+ "primary": "paired difference candidate - control over all checker tasks, score points; 95% interval by bootstrap over pool families (fNNNN), 20,000 resamples, seed 20261122",
+ "gates": {
+  "Y1": "Strength: the lower bound of the checkerboard-fort 95% interval is above 0.",
+  "Y2": "Ring-fort guard: the difference is at least -2 points.",
+  "Y3": "Mirror guard: the difference is at least -2 points.",
+  "Y4": "Owner guard: the difference is at least -2 points.",
+  "Y5": "Quality: candidate games with a quality error at most the control's + 2.",
+  "Y6": "Second host: the 30 candidate tasks of bank/cfY-g5-checker.json and bank/cfY-g5-mirror.json rerun on x3d reproduce the digests."
+ },
+ "analysis": {
+  "script": "confirm_y_analyze.py",
+  "sha256": "bdd72990d9e8a03ff2c4d6ec725f5c728e230ce7055e205c4fbce12ee0ae6135",
+  "dryRun": "validated on development rows before registration (no bank row existed)"
+ },
+ "adoption": "If Y1-Y6 pass, the rule is adopted into the default under the standing instruction and deployed to all servers (owner, 2026-11-22: 'always lock in wins please'); a failed gate stays recorded as failed."
+}
