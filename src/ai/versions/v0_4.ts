@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { a19WildRegenGiftEnabled, isWorthwhileWildRegenerationGift } from "../wild_regeneration_gift";
 import type { GameAction } from "../../engine/actions";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
@@ -1018,9 +1019,18 @@ export class StrategyV0_4 extends StrategyV0_3 {
                 target.canBeHealed(),
                 undefined,
             );
+        // a19-wild-regen-gift-v1 (v0.8 aliases only; frozen v0.4-v0.7 keep their rule): gift only to an ally it is worth
+        // more to, the most HP per creature first (the card refills one creature per turn).
+        const giftRule =
+            (this.version === "v0.8" || this.version === "v0.8s") && a19WildRegenGiftEnabled(unit.getTeam());
         const target = allies
             .filter((a) => a.getLevel() <= maxGift && !a.hasBuffActive("Wild Regeneration"))
-            .sort((p, q) => q.getMaxHp() * q.getAmountAlive() - p.getMaxHp() * p.getAmountAlive())
+            .filter((a) => !giftRule || isWorthwhileWildRegenerationGift(unit, a))
+            .sort((p, q) =>
+                giftRule
+                    ? q.getMaxHp() - p.getMaxHp() || q.getCumulativeHp() - p.getCumulativeHp()
+                    : q.getMaxHp() * q.getAmountAlive() - p.getMaxHp() * p.getAmountAlive(),
+            )
             .find((a) => canCast(a));
         if (!target) {
             return undefined;

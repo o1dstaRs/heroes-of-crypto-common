@@ -9,6 +9,16 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Wild Regeneration gift — November 22, 2026
+
+By the owner's explicit decision `a19-wild-regen-gift-v1` is active: **the current default is profile v24**. Read
+`docs/wild_regen_gift_adoption.md`. The Troll's one-way Wild Regeneration gift goes only to an ally whose creatures have
+more max HP than the caster's (`src/ai/wild_regeneration_gift.ts`, used by `candidates.ts` and the v0.8 native gift;
+switch `A19_WILD_REGEN_GIFT_<LEFT|RIGHT>`, on unless `0`). Confirmation W measured +0.05 points (95% −1.97 to +2.09) and
+removed every gift to a weaker creature (526 → 0). Its owner guard (W3, −2.34) failed and stays recorded as failed: do not
+waive, re-run or relabel it. No strength gain is claimed.
+
+Profile v23 is retained inside v24.
 ## Deep search when it fits — November 22, 2026
 
 Under the standing instruction and at the owner-approved think budget of about 4 s, `a19-deep-fit-v1` is active:

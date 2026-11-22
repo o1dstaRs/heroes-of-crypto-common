@@ -1,0 +1,80 @@
+{
+ "id": "wild-regen-confirmation-W-20261122",
+ "registeredAt": "2026-11-22T06:52:18.113329+00:00",
+ "question": "Does the Wild Regeneration gift fix stop the AI from gifting the Troll's regeneration to creatures with no more HP per creature than the Troll, without costing the default (A19 profile v22 combat) more than 2 points in games where it fields a Troll?",
+ "origin": "Owner, 2026-11-22, test game 1a785955: \"for some reason also troll gave his spell to fairy instead of grifiin for rejuvination\". Wild Regeneration is a one-way gift (Holy Cross keeps a copy) of 'refill the top creature to max HP at the start of its turn', target level <= 3, so it is worth about one creature's max HP per turn; gifting it to a creature weaker than the Troll loses value. The production router does not route it; the casts come from the A19 search's per-ally spell candidates (rollout noise among many near-equal options) and the v0.4 native gift sorts by stack total HP. Development (838 paired tasks with an entrant Troll, counter-exploration salts 1-3, prod21c2): +1.85 points (95% -0.23 to +3.92), entrant gifts to weaker creatures 335 -> 0. This is a behaviour fix the owner reported: the gate is non-inferiority, strength is reported.",
+ "candidate": {
+  "fix": "A19_RESEARCH_WILD_REGEN_<LEFT|RIGHT>=1 (prod21c2): candidates.ts offers the Wild Regeneration gift (ANY_ALLY) only to a living ally without Wild Regeneration whose creatures have more max HP than the caster's (any ally when the caster holds Holy Cross); v0.4 trollWildRegen applies the same filter and sorts by per-creature max HP, then cumulative HP",
+  "seam": "HOC_RESEARCH_WILD_REGEN=entrant (prod21c2 research ranked_adapter.ts): the switch is on for the entrant team only, for the whole game; HOC_RESEARCH_FIX_SEATS=both (the v22 rejection fixes on both seats, as in production); HOC_RESEARCH_ENTRANT_SEARCH=\"{}\" (the matched two-driver search); deterministic work mode",
+  "implementation": "prod21c2 = prod21 (server dbb41ce + common 1715a218 + the two v22 rejection fixes) + research seams (Castling variants, Wild Regeneration fix, Queen no-rush, the lab6 hold hook, probes), all inert without their switches; tree manifest 870e854186563198defd5398e4c3e9d5c18917c35ce70ac08554b6f301790340 (Mac = x3d). Profile v23's deep fit is not in this tree.",
+  "control": "the same tree with HOC_RESEARCH_WILD_REGEN unset (production behaviour)"
+ },
+ "bank": {
+  "namespace": "wild-regen-20261122-v1",
+  "pool": "seeds12 (allocate_v28.py): 2,628 tasks = 292 families x 9 doctrine cells, audited at allocation against 927 ledgers (every earlier namespace including rejection-fixes-20261121-v1, every league and bank file of this study, the Premium collection seeds): 0 intersections; seed-admission sha256 a5115c5b2876c743939a598bf7efab10c5f6e7f03424b8f4804e6f40b4800015",
+  "drafts": "h-drafts recipe (league-drafts4.ts, RUSH_VALUES=explore/table-a.json RUSH_PRIOR=0.5 RUSH_VAL_SLOTS=B1234 RUSH_T1=policy RUSH_T2=h1): entrant S:B1234:val against mirror S:B1234:val, owner S:B23:fast:K14, mixB12 S:B12:fast, mixB34 S:B34:fast, native",
+  "played": "only the tasks where the entrant fields a Troll (the fix cannot change any other game)",
+  "files": {
+   "bank/cfW-mirror.json": {
+    "tasks": 228,
+    "sha256": "51a7e952bd046085854b419804f8da41abcf8dc400c74d7cc440fbf8c1f03556"
+   },
+   "bank/cfW-owner.json": {
+    "tasks": 235,
+    "sha256": "27755164d2817dc95c33a2155855791cc43ab69899bcf6c3ee210a046703ca0b"
+   },
+   "bank/cfW-mixB12.json": {
+    "tasks": 207,
+    "sha256": "ece39bf55c02bfded0b9a623b3cb162147907b98fdd1c86e866ed68a00be35ef"
+   },
+   "bank/cfW-mixB34.json": {
+    "tasks": 203,
+    "sha256": "f66d5d10d8234521da7a4473256e183d104e4db630d962a124fecdb018dce03a"
+   },
+   "bank/cfW-native.json": {
+    "tasks": 204,
+    "sha256": "5a76ad710aa3343e8c2febb9e18f8ca130ee8fde01291d2f2a7aea4f0a7f8de2"
+   }
+  },
+  "allDrafts": {
+   "bank/cfW-mirror-all.json": "7b968419d24b4583616e07541c790b7d4f9d912de57fc3404398f3c289a9bf6f",
+   "bank/cfW-owner-all.json": "8047f84524eb78a64c3019db4c4c3d02520b79a682acd2b6f739d77d2b0604d7",
+   "bank/cfW-mixB12-all.json": "d2266fba95c369322f3ff1e7a6e17acfcde15cbb128b2b59a7ad10b0723a6cd8",
+   "bank/cfW-mixB34-all.json": "fd15238514a3cd4efadaf939db6944e4e8184d412941600db4a78a0555a457bd",
+   "bank/cfW-native-all.json": "f2d3790aa7b34da13723434e8571cbc55425f784ed6784f5fca324cea0366ded"
+  },
+  "tasksFile": {
+   "bank/cfW-tasks.json": "87b08dbbabf60c486e809ffc15a613e60ef6125c29218ff73871f1224bf1b7c5"
+  },
+  "g5": {
+   "bank/cfW-g5-mirror.json": "88bbcb4083312cfa83a89ea8e64a5e47e4c0ddf12a21d76f7f7438dd77cb8212",
+   "bank/cfW-g5-owner.json": "9d97cff283c5ab6c5e204031ca8c2d18615a57367ff545a7ee44616a31e9794f"
+  }
+ },
+ "specs": {
+  "mirror": "specs2/v19-both.json",
+  "others": "specs2/v19.json"
+ },
+ "populations": {
+  "mirror": "both seats draft as the default",
+  "owner": "the opponent drafts strikers from the bundle and at levels 2-3 and casters at levels 1 and 4 (guard)",
+  "mixB12": "the opponent drafts fast strikers from the bundle and at levels 1-2",
+  "mixB34": "the opponent drafts fast strikers at levels 3-4",
+  "native": "the opponent drafts natively"
+ },
+ "primary": "paired difference candidate - control over all 1,077 played tasks of the five populations, score points; 95% interval by bootstrap over pool families (fNNNN), 20,000 resamples, seed 20261122",
+ "gates": {
+  "W1": "Non-inferiority: the lower bound of the primary 95% interval is at least -2 points.",
+  "W2": "Behaviour: the candidate arm has 0 entrant Wild Regeneration gifts to an ally whose per-creature max HP is not above the caster's (HOC_RESEARCH_WR_PROBE), and the control arm has at least 1.",
+  "W3": "Owner guard: the difference over all owner tasks is at least -2 points.",
+  "W4": "Quality: candidate games with a quality error at most the control's + 2.",
+  "W5": "Second host: the 30 candidate tasks of bank/cfW-g5-mirror.json and bank/cfW-g5-owner.json rerun on x3d reproduce the digests."
+ },
+ "reported": "strength (primary difference and per population and map), changed games, gift counts, CPU",
+ "analysis": {
+  "script": "confirm_w_analyze.py",
+  "sha256": "e3ae67f13408c2446a97da4548674971841af7a045cfd1db96e6c596e9b39d44",
+  "dryRun": "validated on development rows before registration (no bank row existed)"
+ },
+ "adoption": "If W1-W5 pass, the fix is proposed for adoption into the default under the standing instruction; a failed gate stays recorded as failed."
+}

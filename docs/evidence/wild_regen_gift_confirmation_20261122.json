@@ -1,0 +1,214 @@
+{
+  "id": "wild-regen-confirmation-W-20261122",
+  "registrationSha256": "15861f7f825265f6b376b134bc1ea71f7944d364ab7fc65a2e49bd116823f712",
+  "analysis": {
+    "script": "confirm_w_analyze.py",
+    "sha256": "e3ae67f13408c2446a97da4548674971841af7a045cfd1db96e6c596e9b39d44"
+  },
+  "primary": {
+    "n": 1077,
+    "difference": 0.04642525533890436,
+    "low": -1.9654841802492808,
+    "high": 2.0852641334569046
+  },
+  "populations": {
+    "mirror": {
+      "all": {
+        "n": 228,
+        "difference": 1.9736842105263157,
+        "low": -3.004291845493562,
+        "high": 6.976744186046512
+      },
+      "maps": {
+        "1": {
+          "n": 72,
+          "difference": 0.0,
+          "low": -6.756756756756757,
+          "high": 6.944444444444445
+        },
+        "3": {
+          "n": 82,
+          "difference": 5.487804878048781,
+          "low": -1.829268292682927,
+          "high": 13.414634146341463
+        },
+        "4": {
+          "n": 74,
+          "difference": 0.0,
+          "low": -10.135135135135135,
+          "high": 10.0
+        }
+      },
+      "control": 55.70175438596491,
+      "candidate": 57.675438596491226,
+      "changedGames": 143
+    },
+    "owner": {
+      "all": {
+        "n": 235,
+        "difference": -2.3404255319148937,
+        "low": -6.2770562770562774,
+        "high": 1.5350877192982457
+      },
+      "maps": {
+        "1": {
+          "n": 73,
+          "difference": -8.219178082191782,
+          "low": -16.438356164383563,
+          "high": -0.6410256410256411
+        },
+        "3": {
+          "n": 81,
+          "difference": 3.7037037037037037,
+          "low": -2.4691358024691357,
+          "high": 9.75609756097561
+        },
+        "4": {
+          "n": 81,
+          "difference": -3.0864197530864197,
+          "low": -9.876543209876543,
+          "high": 3.0864197530864197
+        }
+      },
+      "control": 78.08510638297872,
+      "candidate": 75.74468085106383,
+      "changedGames": 144
+    },
+    "mixB12": {
+      "all": {
+        "n": 207,
+        "difference": -4.106280193236715,
+        "low": -9.004739336492891,
+        "high": 0.7317073170731707
+      },
+      "maps": {
+        "1": {
+          "n": 65,
+          "difference": -7.6923076923076925,
+          "low": -16.923076923076923,
+          "high": 0.0
+        },
+        "3": {
+          "n": 74,
+          "difference": 0.0,
+          "low": -6.666666666666667,
+          "high": 6.756756756756757
+        },
+        "4": {
+          "n": 68,
+          "difference": -5.147058823529412,
+          "low": -13.846153846153847,
+          "high": 3.125
+        }
+      },
+      "control": 81.40096618357488,
+      "candidate": 77.29468599033817,
+      "changedGames": 141
+    },
+    "mixB34": {
+      "all": {
+        "n": 203,
+        "difference": 6.403940886699507,
+        "low": 2.030456852791878,
+        "high": 10.96938775510204
+      },
+      "maps": {
+        "1": {
+          "n": 62,
+          "difference": 11.290322580645162,
+          "low": 4.615384615384615,
+          "high": 19.672131147540984
+        },
+        "3": {
+          "n": 72,
+          "difference": 4.861111111111111,
+          "low": -3.2467532467532467,
+          "high": 13.043478260869565
+        },
+        "4": {
+          "n": 69,
+          "difference": 3.6231884057971016,
+          "low": -3.7313432835820897,
+          "high": 11.267605633802816
+        }
+      },
+      "control": 79.3103448275862,
+      "candidate": 85.71428571428571,
+      "changedGames": 141
+    },
+    "native": {
+      "all": {
+        "n": 204,
+        "difference": -1.4705882352941178,
+        "low": -5.41871921182266,
+        "high": 2.4630541871921183
+      },
+      "maps": {
+        "1": {
+          "n": 58,
+          "difference": -5.172413793103448,
+          "low": -14.035087719298245,
+          "high": 3.4482758620689653
+        },
+        "3": {
+          "n": 77,
+          "difference": -2.5974025974025974,
+          "low": -9.58904109589041,
+          "high": 4.3478260869565215
+        },
+        "4": {
+          "n": 69,
+          "difference": 2.898550724637681,
+          "low": 0.0,
+          "high": 7.352941176470588
+        }
+      },
+      "control": 83.33333333333333,
+      "candidate": 81.86274509803921,
+      "changedGames": 140
+    }
+  },
+  "gifts": {
+    "control": {
+      "gifts": 871,
+      "weaker": 526
+    },
+    "candidate": {
+      "gifts": 469,
+      "weaker": 0
+    }
+  },
+  "qualityErrorGames": {
+    "control": 0,
+    "candidate": 0
+  },
+  "g5": {
+    "tasks": 30,
+    "identical": 30
+  },
+  "gates": {
+    "W1 non-inferiority: lower bound of the primary 95% interval at least -2 points": true,
+    "W2 behaviour: candidate arm 0 entrant gifts to a creature with no more HP than the caster, control arm at least 1": true,
+    "W3 owner guard: difference over all owner tasks at least -2 points": false,
+    "W4 quality: candidate games with a quality error at most control + 2": true,
+    "W5 second host: the 30 G5 candidate tasks reproduce the digests on x3d": true
+  },
+  "adoption": {
+    "decision": "owner-explicit-decision",
+    "at": "2026-11-22",
+    "note": "W3 (owner guard) failed at -2.34 (95% -6.28 to +1.54) and stays recorded as failed; it was not waived, re-run or relabeled. The owner chose to adopt the fix as a behaviour fix for the misplay he reported (\"Sure please do\"). The standing instruction alone would not have adopted it."
+  },
+  "productionPort": {
+    "note": "The research change (prod21c2, A19_RESEARCH_WILD_REGEN_<seat>=1 on the entrant seat) is ported as the seat switch A19_WILD_REGEN_GIFT_<LEFT|RIGHT> (on unless \"0\") with one shared predicate. The v0.4 native gift rule is gated to the v0.8 aliases so the frozen v0.4-v0.7 strategies keep theirs; the confirmation ran v0.8 seats only. The confirmation ran on the v22 base; combined with v23 deep fit it was not measured.",
+    "researchSources": {
+      "src/ai/candidates.ts": "dd3a66710ad09bd6b122272e31ecee0401f1a9c9e0d9db4df1939c6f4b85dd58",
+      "src/ai/versions/v0_4.ts": "0643e20f00e83f67423a7547f705b2908b8e311888b11af158cc39d7422613e4"
+    },
+    "productionSources": {
+      "src/ai/wild_regeneration_gift.ts": "1947b0ecbdc25c3a7f5284f58910193f7e37cf5a376188aaaddc75d1c53fcb20",
+      "src/ai/candidates.ts": "8f2c395b9a325ba69c2aded3141007baff0ef02da7781b894227e2dc74db4565",
+      "src/ai/versions/v0_4.ts": "171ef6adfa1c4efb14b89caed09c0e3701829fe3ed957be9d618906003116a8f"
+    }
+  },
+  "notClaimed": "A strength gain; strength against people."
+}

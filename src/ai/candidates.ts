@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { a19WildRegenGiftEnabled, isWorthwhileWildRegenerationGift } from "./wild_regeneration_gift";
 import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { getDoubleShotAbility, hasDoubleShotAbility, withDualStrikeCharm } from "../abilities/ability_helper";
@@ -3764,7 +3765,13 @@ class CandidateGenerator {
             }
 
             if (targetType === SpellTargetType.ANY_ALLY) {
+                // a19-wild-regen-gift-v1: the one-way Wild Regeneration gift goes only to an ally it is worth more to.
+                const wildRegenGift =
+                    spell.getName() === "Wild Regeneration" && a19WildRegenGiftEnabled(this.unit.getTeam());
                 for (const ally of livingAllies) {
+                    if (wildRegenGift && !isWorthwhileWildRegenerationGift(this.unit, ally)) {
+                        continue;
+                    }
                     if (
                         canCastSpell(
                             false,

@@ -126,8 +126,12 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     stock search when both fit 2,800 rollout turns (simulation/v0_8_a19_deep_fit.ts). Mirror +5.35 score points (95%
  *     +2.72 to +8.06), owner guard +3.67; its quality gate failed and stays recorded as failed
  *     (docs/deep_fit_adoption.md).
+ *   - Wild Regeneration gift (profile v24) adopted on 2026-11-22 by the owner's explicit decision after its confirmation
+ *     failed the owner-shaped guard (-2.34; registered gate W3, recorded as failed): the Troll's one-way gift goes only
+ *     to an ally whose creatures have more max HP than the caster's (ai/wild_regeneration_gift.ts). Strength on fresh
+ *     tasks +0.05 (95% -1.97 to +2.09); gifts to weaker creatures 526 -> 0 (docs/wild_regen_gift_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v23" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v24" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -351,6 +355,19 @@ export const V08_A19_DEEP_FIT_POLICY = Object.freeze({
 } as const);
 
 /**
+ * Wild Regeneration gift (profile v24): ai/wild_regeneration_gift.ts, used by the candidate generator and the v0.8 native
+ * gift. Adopted by the owner's explicit decision; its registered owner guard (W3) failed and stays recorded as failed.
+ * See docs/wild_regen_gift_adoption.md.
+ */
+export const V08_A19_WILD_REGEN_GIFT_POLICY = Object.freeze({
+    policyId: "a19-wild-regen-gift-v1" as const,
+    adoptedAt: "2026-11-22",
+    adoption: "owner-explicit-decision",
+    registrationSha256: "15861f7f825265f6b376b134bc1ea71f7944d364ab7fc65a2e49bd116823f712",
+    qualification: "behaviour-confirmed-owner-guard-failed",
+} as const);
+
+/**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
  * -> generic ranked placement -> plain v0.8. Each layer delegates on a miss; every layer needs only the public
  * roster and the map.
@@ -449,7 +466,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
         // Candidate rays share the player cursor's selectable-edge gate; Through Shot retains free aim.
-        sha256: "896f58905e7c12b52923e602970dd4701fd763faa94fc3337973443bbf62916e" as const,
+        sha256: "8f2c395b9a325ba69c2aded3141007baff0ef02da7781b894227e2dc74db4565" as const,
     }),
     Object.freeze({
         role: "ranged-target-selection" as const,
@@ -459,7 +476,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "ranged-action-validation" as const,
         source: "src/ai/versions/v0_4.ts" as const,
-        sha256: "ce69329aa0d3248847376d10c104adde09014917bc769609f96eb96e385d01ef" as const,
+        sha256: "171ef6adfa1c4efb14b89caed09c0e3701829fe3ed957be9d618906003116a8f" as const,
     }),
     Object.freeze({
         role: "player-ranged-aim" as const,
@@ -667,6 +684,11 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/simulation/v0_8_a19_deep_fit.ts" as const,
         sha256: "18b0e5e047857c995498f23589aaa0f58bbfa3affc6f31c09a662811e4accabf" as const,
     }),
+    Object.freeze({
+        role: "wild-regen-gift" as const,
+        source: "src/ai/wild_regeneration_gift.ts" as const,
+        sha256: "1947b0ecbdc25c3a7f5284f58910193f7e37cf5a376188aaaddc75d1c53fcb20" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -703,6 +725,7 @@ export const V08_A19_PROFILE = Object.freeze({
     keepAttack: V08_A19_KEEP_ATTACK_POLICY,
     rejectionFixes: V08_A19_REJECTION_FIXES_POLICY,
     deepFit: V08_A19_DEEP_FIT_POLICY,
+    wildRegenGift: V08_A19_WILD_REGEN_GIFT_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v23",
+            schema: "hoc.v0_8_a19_production_profile.v24",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -174,6 +174,14 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "standing-user-instruction",
                 registrationSha256: "aa99e261a3d7ee4f33fbe95d3cc349aa0651e01a1c1539b8e59f4a7084122616",
                 qualification: "strength-confirmed-quality-gate-failed",
+            },
+            // Profile v24: the owner adopted the Wild Regeneration gift fix; its owner guard (W3) failed and stays failed.
+            wildRegenGift: {
+                policyId: "a19-wild-regen-gift-v1",
+                adoptedAt: "2026-11-22",
+                adoption: "owner-explicit-decision",
+                registrationSha256: "15861f7f825265f6b376b134bc1ea71f7944d364ab7fc65a2e49bd116823f712",
+                qualification: "behaviour-confirmed-owner-guard-failed",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({
@@ -485,6 +493,7 @@ describe("v0.8+A19 production profile", () => {
             "coherent-melee-approach",
             "engine-reachable-routes",
             "deep-fit",
+            "wild-regen-gift",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));
