@@ -48,10 +48,18 @@ export interface ITier2ArtifactDecisionContext extends ISetupDecisionContextBase
     readonly ownProspectiveCreatureIds?: readonly number[];
 }
 
+/** One opponent creature with its drafted total, as the seat's snapshot shows it at the augment stage. */
+export interface IPublicOpponentStack {
+    readonly creatureId: number;
+    readonly amount: number;
+}
+
 /**
  * Fair information available during placement. A mode may keep the opponent roster partial during its private
- * Setup sub-stage; Board placement exposes the completed roster. Opponent placement, stack sizes, setup choices,
- * and live engine objects remain outside this boundary in either case.
+ * Setup sub-stage; Board placement exposes the completed roster. Where the seat's own snapshot shows the opponent's
+ * army and artifacts at the augment stage (ranked placement Setup is public), the context carries them too: the owner,
+ * 2026-11-22, "Need to pass artifacts and full army at augments stage. Those are visible and important to define final
+ * strat". Opponent placement, splits, doctrine, augments and live engine objects remain outside this boundary.
  */
 export interface IPlacementSetupDecisionContext extends ISetupDecisionContextBase {
     readonly decisionPhase: "placement";
@@ -60,13 +68,18 @@ export interface IPlacementSetupDecisionContext extends ISetupDecisionContextBas
     readonly gridType: GridType;
     /** Number of cells along one side of the square combat grid. */
     readonly gridSize: number;
+    /** The opponent's artifact ids, Tier-1 then Tier-2, only with a complete public roster. */
+    readonly publicOpponentArtifactIds?: readonly number[];
+    /** The opponent's drafted army, creature id ascending with its total amount, only with a complete public roster. */
+    readonly publicOpponentArmy?: readonly IPublicOpponentStack[];
 }
 
 /**
  * Fair, phase-local information that a ranked setup policy may use in addition to its decision's explicit
  * arguments. The discriminants make it impossible to treat an earlier pick as a complete roster view. This
- * is deliberately data-only: never pass the live Grid/UnitsHolder or opponent placement, artifacts, doctrine,
- * augments, synergies, stack sizes, or positions through this boundary.
+ * is deliberately data-only: never pass the live Grid/UnitsHolder or opponent placement, doctrine,
+ * augments, synergy levels, splits or positions through this boundary. The opponent's artifacts and drafted army
+ * enter only a placement context with a complete public roster, as the seat's snapshot shows them.
  */
 export type ISetupDecisionContext = ITier2ArtifactDecisionContext | IPlacementSetupDecisionContext;
 
@@ -120,14 +133,31 @@ export const createTier2ArtifactDecisionContext = (
 /** Construct placement context, defaulting to the complete public roster used once Board placement is visible. */
 export const createPlacementSetupDecisionContext = (
     context: PlacementSetupDecisionContextInput,
-): Readonly<IPlacementSetupDecisionContext> =>
-    Object.freeze({
+): Readonly<IPlacementSetupDecisionContext> => {
+    const visibility = context.opponentRosterVisibility ?? "complete";
+    // The augment stage shows the opponent's artifacts and army only with a public roster; a private Setup drops them.
+    const visible = visibility === "complete";
+    return Object.freeze({
         ...freezePublicSetupFields(context),
         decisionPhase: "placement",
-        opponentRosterVisibility: context.opponentRosterVisibility ?? "complete",
+        opponentRosterVisibility: visibility,
         gridType: context.gridType,
         gridSize: context.gridSize,
+        ...(visible && context.publicOpponentArtifactIds
+            ? { publicOpponentArtifactIds: Object.freeze(context.publicOpponentArtifactIds.filter((id) => id > 0)) }
+            : {}),
+        ...(visible && context.publicOpponentArmy
+            ? {
+                  publicOpponentArmy: Object.freeze(
+                      [...context.publicOpponentArmy]
+                          .filter((stack) => stack.amount > 0)
+                          .sort((a, b) => a.creatureId - b.creatureId)
+                          .map((stack) => Object.freeze({ creatureId: stack.creatureId, amount: stack.amount })),
+                  ),
+              }
+            : {}),
     });
+};
 
 /**
  * The setup AI's decision contract — the draft/placement counterpart to the in-fight IAIStrategy. A policy

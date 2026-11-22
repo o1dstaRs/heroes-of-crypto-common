@@ -115,6 +115,70 @@ describe("fair setup decision context", () => {
         expect(Object.isFrozen(context)).toBe(true);
     });
 
+    test("carries the opponent's artifacts and drafted army only with a complete public roster", () => {
+        const army = [
+            { creatureId: 37, amount: 12 },
+            { creatureId: 9, amount: 140 },
+            { creatureId: 15, amount: 0 },
+        ];
+        const publicSetup = createPlacementSetupDecisionContext({
+            publicOpponentCreatureIds: [9, 15, 37],
+            gridType: PBTypes.GridVals.NORMAL,
+            gridSize: 16,
+            publicOpponentArtifactIds: [3, 0],
+            publicOpponentArmy: army,
+        });
+        expect(publicSetup.publicOpponentArtifactIds).toEqual([3]);
+        expect(publicSetup.publicOpponentArmy).toEqual([
+            { creatureId: 9, amount: 140 },
+            { creatureId: 37, amount: 12 },
+        ]);
+        expect(Object.isFrozen(publicSetup.publicOpponentArtifactIds)).toBe(true);
+        expect(Object.isFrozen(publicSetup.publicOpponentArmy)).toBe(true);
+        expect(Object.isFrozen(publicSetup.publicOpponentArmy![0])).toBe(true);
+        army[0].amount = 1;
+        expect(publicSetup.publicOpponentArmy![1].amount).toBe(12);
+
+        const privateSetup = createPlacementSetupDecisionContext({
+            publicOpponentCreatureIds: [9],
+            opponentRosterVisibility: "partial",
+            gridType: PBTypes.GridVals.NORMAL,
+            gridSize: 16,
+            publicOpponentArtifactIds: [3, 17],
+            publicOpponentArmy: army,
+        });
+        expect("publicOpponentArtifactIds" in privateSetup).toBe(false);
+        expect("publicOpponentArmy" in privateSetup).toBe(false);
+    });
+
+    test("shipped setup modes decide the same with the opponent's artifacts and army in the context", () => {
+        const plain = setupContext([9, 15, 37], PBTypes.GridVals.BLOCK_CENTER);
+        const detailed = createPlacementSetupDecisionContext({
+            publicOpponentCreatureIds: [9, 15, 37],
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            gridSize: 16,
+            ownDoctrine: 4,
+            ownArtifactIds: Object.freeze([2, 10]),
+            publicOpponentArtifactIds: [5, 17],
+            publicOpponentArmy: [
+                { creatureId: 9, amount: 120 },
+                { creatureId: 15, amount: 30 },
+                { creatureId: 37, amount: 4 },
+            ],
+        });
+        for (const spec of [
+            undefined,
+            "conditional-v1",
+            RANKED_REPLAY_TACTICS_SETUP_SPEC,
+            V07_NONFIGHT_SETUP_SPEC,
+            V07_PUBLIC_ROSTER_SETUP_SPEC,
+            V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+        ]) {
+            const policy = resolveSetupPolicy(spec);
+            expect(decisions(policy, undefined, detailed)).toEqual(decisions(policy, undefined, plain));
+        }
+    });
+
     test("all currently shipped setup modes remain opponent- and map-invariant", () => {
         const firstPlacement = setupContext([9, 15, 37], PBTypes.GridVals.BLOCK_CENTER);
         const secondPlacement = setupContext([31], PBTypes.GridVals.LAVA_CENTER);
