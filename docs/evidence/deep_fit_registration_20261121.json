@@ -1,0 +1,74 @@
+{
+ "id": "deep-fit-4s-confirmation-M-20261121",
+ "registeredAt": "2026-11-21T19:43:05.476188+00:00",
+ "question": "Does the default (A19 profile v20) score higher when a bot seat plays the deep A19 search (8 rollouts, shortlist 10, max melee 16) on the decisions where it fits a think budget of 2,800 rollout turns (about 4 s on the 2-vCPU test host), through the production a19-deep-fit-v1 driver?",
+ "origin": "Owner, 2026-11-21: \"4s is fine\" (per AI move). Confirmation I: deep search on every decision +6.57 (95% +3.76..+9.44), ~4x the search work. Confirmation K (deep when it fits 1,400 turns, ~2 s): G1 FAILED, +1.22 (97.5% -1.64..+4.03); it stays failed.",
+ "candidate": {
+  "driver": "production a19-deep-fit-v1 (prod18 common src/simulation/v0_8_a19_deep_fit.ts, V08_A19_DEEP_FIT: rolloutTurnBudget 2800, predictedDeepToStockRatio 4.07, thinkMs 4000; SearchDriver.chooseDecisionWithinBudget): the unchanged stock search first; the deep search started only when stock turns x 5.07 <= 2,800, limited to 2,800 - stock turns (and, live only, 4,000 ms from the decision start); its choice played only when it completed within that budget, otherwise the stock choice",
+  "seam": "entrant seat only: HOC_RESEARCH_ENTRANT_PROD_DEEP_FIT=1 in prod18 research ranked_adapter.ts (createBotSeatSearchDriver with deepFit); the other seat keeps the stock driver; deterministic work mode",
+  "parity": "prod18 \"{}\" control == the production control (prod16-ctl) 6/6; production driver at 2,800 == an independent implementation of the rule (research drivers, deep search run to completion, budget 2800, predict 4.07) 6/6 on dfpar-dev-6; the same comparison at 1,400 was 60/60; unit tests 8/8"
+ },
+ "control": "HOC_RESEARCH_ENTRANT_SEARCH=\"{}\" on prod18: the matched two-driver stock control.",
+ "why": "Development, 600 v20 mirror tasks vs the matched control (lab trees, budgets chosen after seeing them, hence this sealed bank): deep when stock + deep <= 640 turns +0.08; <= 1,400 +5.25 (sealed in K: +1.22); <= 2,800 +7.42 (+2.9..+11.8), deep played on 84% of decisions; deep always +6.33.",
+ "populations": {
+  "mirror": "both seats draft as the v20 default (primary)",
+  "owner": "the opponent drafts strikers from the bundle and at levels 2-3 and casters at levels 1 and 4 (guard)"
+ },
+ "bank": {
+  "namespace": "deep-fit-4s-20261121-v1",
+  "tasks": 1674,
+  "families": "all 186 families 0000-0185 of the pool (seeds10), audited at allocation against 855 ledgers (every earlier namespace including keep-attack-20261121-v1, every league and bank file of this study, the Premium collection seeds) before any bank file was written: 0 intersections"
+ },
+ "primaryEndpoint": "Mean over all 1,674 mirror tasks of candidate-arm minus control-arm score for the entrant. 95% interval from 10,000 bootstrap resamples over pool families, seed 20261132, percentile 2.5 / 97.5.",
+ "gates": {
+  "G1": "Lower bound of the primary interval above zero.",
+  "G2": "No map of the mirror with an estimate below -2 points.",
+  "G3": "Owner guard: the difference over all owner tasks is at least -2 points.",
+  "G4": "Candidate-arm games with a quality error not more than control-arm games with one (both populations).",
+  "G5": "A rerun of the 30 mirror tasks of bank/cfM-g5.json (candidate arm) on the second host reproduces the digests."
+ },
+ "cost": "Recorded, not gated: CPU per game per arm and host; deep-fit statistics per game (decisions, attempted, played, overran).",
+ "adoptionRule": "If G1, G2 and G3 pass, the driver is confirmed and is adopted into the default (bot seats only; Premium advice keeps the stock search) at the owner-approved think budget of about 4 s, after the production gates. A failed gate stays failed; G4 and G5 are recorded either way. Live think time and the share of deep decisions are measured on the test host after the owner approves the deploy.",
+ "notClaimed": "Strength against people; strength under wall-clock deadlines or host load; any other budget.",
+ "execution": {
+  "runner": "life-run8.ts via life-pool8.sh",
+  "specs": "v19-both.json (mirror), v19.json (owner); same spec both arms",
+  "hosts": "x3d (hft) prod18: owner control, owner candidate, then G5 (8 processes, nice 19, own autogroup); Mac prod18: mirror control, mirror candidate (12 processes) after confirmation L finishes there",
+  "treeManifestSha256": {
+   "prod18 (Mac and x3d)": "55aced73aa944c999b6d0c382d7a2f541cba42fec20e163dec396444a1202115"
+  },
+  "analysis": "confirm_m_analyze.py (dry-run on confirmation I rows before registration)"
+ },
+ "inputsSha256": {
+  "life-run8.ts": "0af7e49b87714586466e7fc9ac76f7e3e0a68b51900b6dd8dcada8cb3c1cb87c",
+  "life-pool8.sh": "dd781069e537c889fd73cf0be47442d71e0d06efe5c7c321e7084f0512506741",
+  "specs2/v19.json": "19d1417bcd10d03181055c51a3b382adbe436c2413caef193115bab504bf76bf",
+  "specs2/v19-both.json": "31edf970176f56c691231821eeb64f2ce9e0bd655a852e91e63983f86fe9125c",
+  "confirm_m_analyze.py": "e68c6a4d782aaebd55fd88e435cb3dd064044b308aacda0ce82885eb0421cf02",
+  "g4_check.py": "92fb372e332d094a96a6157c97dd967416e09ff9201c14dcab038e6bfbcfb0c2",
+  "tree_manifest.sh": "91e0dc01bd1a13e2a6aa75e022cabc56b79c8c5fbaeda6ab336ec8473e19203e",
+  "league-drafts4.ts": "73880bc10a12622bf3bf7534f4e6fc0306d329217c727fab2893e222d0e5fb2c",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "allocate_v26.py": "7f4e29bcae1c0e28f0419f9c4ba3f72c1508193ea7634e5d379b82370cb72098",
+  "seeds10/pool.json": "0e7b69d30fb7c00861bc7ca12cbd8e5f7fd8b25992386eb8dfd77884abb3e8b7",
+  "seeds10/seed-admission.json": "067d5b23e0c110b009263bbcb1d232dc9ed587ac3018bf7678d3f624e0b5231e",
+  "seeds10/allocation-audit.txt": "68904b9a7cd78c9f8443eb7582241eaa747f945acec379f157ddb731055686cd",
+  "bank/cfM-tasks.json": "c99b3dd156c0ff854c2ccc151ab2da817bbacf6b9bdad1337bb89df05a201d94",
+  "bank/cfM-mirror.json": "36d7875ed891bb1a3a3c418515330f9d1dd8186059cb3c7ec0b1009785d6278a",
+  "bank/cfM-owner.json": "f0a76a3d63d387a3db7db81d01e0622ece25a011c5a8c141370dc968cca9025d",
+  "bank/cfM-g5.json": "b70916c00105e35f5a54e0e0a1d2358aae7bcc54f9ce161fa6c39fc2ca128014",
+  "registration-I.json": "3a16878fa06cbaa2fb5600d7a97e9f53db7bd32ff565f6cb6dbea29be9bf3b5c",
+  "registration-K.json": "cf8653ce3dc1308908d2c60fc4a76c1a2423e5e4062d45fca05d15b95e85b9cf",
+  "registration-L.json": "01cec0b5e01e328838864415a1884e7ddf35abbe879ff74ed42c3ffca15e0999",
+  "league/budget-dev-mirror.json": "383c8c074dfb00f3928c246a193334ee50800b428c26070dee0ae955dc0edc5f",
+  "v33/dfit_matrix.py": "2f18567c41295316f3251018ecc72b6d1e00ed6a89e35d33d3bf68de7a0cc479",
+  "../shipped-parity/prod18/node_modules/@heroesofcrypto/common/src/simulation/v0_8_a19_deep_fit.ts": "18b0e5e047857c995498f23589aaa0f58bbfa3affc6f31c09a662811e4accabf",
+  "../shipped-parity/prod18/node_modules/@heroesofcrypto/common/src/simulation/search_driver.ts": "235be96a69f61aec49cb0551ff05e98ccde2b85d271c006b5166a63ffb13221b",
+  "../shipped-parity/prod18/node_modules/@heroesofcrypto/common/src/simulation/a19_support.ts": "ac15f16a2b5810e269867595201b6c5dd90b364fd680fd61f5b0806bc44856a8",
+  "../shipped-parity/prod18/node_modules/@heroesofcrypto/common/src/simulation/v0_8_a19_search.ts": "6fbc520b5dccfdbd686210dc7ca4b8913f6d6047b506874e781dfefd6bf04fc9",
+  "../shipped-parity/prod18/node_modules/@heroesofcrypto/common/test/simulation/a19_deep_fit.test.ts": "46d7467cb54a69d3b422b6577015d30612c7c227c6d2c906451bac629752e4fa",
+  "../shipped-parity/prod18/src/api/game/v1/bot_search.ts": "af21eddb1e42dc65701f96d91921cc1cd47c4c94872e23e6638936de65a056fe",
+  "../shipped-parity/prod18/src/api/game/v1/play_session.ts": "0b194ecb36fbc06f536ca246556f62f47e903f8fa52db6e9569c0018efc7eb1a",
+  "../shipped-parity/prod18/src/simulation/ai_iteration/ranked_adapter.ts": "50b9964e8f10ec59ce34ec868b151c0d0fe2c42b77045e71e9113aaeb476532f"
+ }
+}

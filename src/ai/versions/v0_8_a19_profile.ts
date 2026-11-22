@@ -121,8 +121,13 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     moves and then proposes a strike from the old cell (ai/coherent_melee_approach.ts), and a move route must end
  *     where the engine's zone-of-control-aware paths reach (StrategyV0_1.isLegalMoveRoute); registered as a
  *     non-inferiority check (docs/rejection_fixes_adoption.md).
+ *   - Deep search when it fits (profile v23) adopted on 2026-11-22 under the standing instruction, at the owner-approved
+ *     think budget of about 4 s: a bot seat runs the deep A19 search (8 rollouts, shortlist 10, max melee 16) after the
+ *     stock search when both fit 2,800 rollout turns (simulation/v0_8_a19_deep_fit.ts). Mirror +5.35 score points (95%
+ *     +2.72 to +8.06), owner guard +3.67; its quality gate failed and stays recorded as failed
+ *     (docs/deep_fit_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v22" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v23" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -332,6 +337,20 @@ export const V08_A19_REJECTION_FIXES_POLICY = Object.freeze({
 } as const);
 
 /**
+ * Deep search when it fits (profile v23). The driver is V08_A19_DEEP_FIT / createV08A19DeepFitSearchDriver in
+ * simulation/v0_8_a19_deep_fit.ts (2,800 rollout turns, 4,000 ms live); the server gives it to bot seats only, and
+ * Premium advice keeps the stock search. This record keeps the decision and its registration with the profile. See
+ * docs/deep_fit_adoption.md.
+ */
+export const V08_A19_DEEP_FIT_POLICY = Object.freeze({
+    policyId: "a19-deep-fit-v1" as const,
+    adoptedAt: "2026-11-22",
+    adoption: "standing-user-instruction",
+    registrationSha256: "aa99e261a3d7ee4f33fbe95d3cc349aa0651e01a1c1539b8e59f4a7084122616",
+    qualification: "strength-confirmed-quality-gate-failed",
+} as const);
+
+/**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
  * -> generic ranked placement -> plain v0.8. Each layer delegates on a miss; every layer needs only the public
  * roster and the map.
@@ -389,7 +408,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/simulation/search_driver.ts" as const,
         // Carries the neutral cemetery barrel deliberation switch that profile v14 turns on and the keep-attack
         // switches of profile v21.
-        sha256: "65938b2be4c318a961df61973f2cfd83f127c56804922c8645cc829c055a7564" as const,
+        sha256: "5497af0fe7da4f3e9f4f42df980212c869ad1c9362821a1ab8100fdc5e0cbcb0" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
@@ -414,7 +433,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "unit-support-adapter" as const,
         source: "src/simulation/a19_support.ts" as const,
-        sha256: "7f3d44ddde59aba25540d8e0f9ea48016f93e3945947a335201377c995257db9" as const,
+        sha256: "ac15f16a2b5810e269867595201b6c5dd90b364fd680fd61f5b0806bc44856a8" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
@@ -525,7 +544,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "default-search-factory" as const,
         source: "src/simulation/v0_8_a19_search.ts" as const,
-        sha256: "558dd7252b0a94e3968a7a9d825b89edb3843258899bc9b976b1aca658306e89" as const,
+        sha256: "fb987a575e796ca47d7c65a4955abfa1e7df4bcd5c4dd7c8bb8eee9ec22d419e" as const,
     }),
     Object.freeze({
         role: "default-search-routing" as const,
@@ -643,6 +662,11 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/versions/v0_1.ts" as const,
         sha256: "0fd06f0f134a237454b6b659ee486da74cd79b870e72f9cb92f11eb90168988f" as const,
     }),
+    Object.freeze({
+        role: "deep-fit" as const,
+        source: "src/simulation/v0_8_a19_deep_fit.ts" as const,
+        sha256: "18b0e5e047857c995498f23589aaa0f58bbfa3affc6f31c09a662811e4accabf" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -678,6 +702,7 @@ export const V08_A19_PROFILE = Object.freeze({
     tier2Striker: V08_A19_TIER2_STRIKER_POLICY,
     keepAttack: V08_A19_KEEP_ATTACK_POLICY,
     rejectionFixes: V08_A19_REJECTION_FIXES_POLICY,
+    deepFit: V08_A19_DEEP_FIT_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

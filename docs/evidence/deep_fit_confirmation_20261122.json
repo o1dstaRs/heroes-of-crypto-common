@@ -1,0 +1,259 @@
+{
+  "id": "deep-fit-4s-confirmation-M-20261121",
+  "registrationSha256": "aa99e261a3d7ee4f33fbe95d3cc349aa0651e01a1c1539b8e59f4a7084122616",
+  "evidenceHeads": {
+    "server": "700527a",
+    "common": "fa886ab5c15a2de2d093dd55a765075bb442f695",
+    "productionTreeManifestSha256": "55aced73 (prod18, Mac and x3d)"
+  },
+  "primary": {
+    "n": 1674,
+    "families": 186,
+    "difference": 5.346475507765831,
+    "low": 2.7180406212664274,
+    "high": 8.064516129032258,
+    "better": 300,
+    "worse": 209
+  },
+  "populations": {
+    "mirror": {
+      "tasks": 1674,
+      "played": 1674,
+      "missing": 0,
+      "all": {
+        "n": 1674,
+        "families": 186,
+        "difference": 5.346475507765831,
+        "low": 2.7180406212664274,
+        "high": 8.064516129032258,
+        "better": 300,
+        "worse": 209
+      },
+      "maps": {
+        "Normal": {
+          "n": 558,
+          "families": 186,
+          "difference": 4.838709677419355,
+          "low": 0.6272401433691757,
+          "high": 9.050179211469533,
+          "better": 85,
+          "worse": 58
+        },
+        "Lava": {
+          "n": 558,
+          "families": 186,
+          "difference": 5.28673835125448,
+          "low": 0.5376344086021506,
+          "high": 10.03584229390681,
+          "better": 107,
+          "worse": 78
+        },
+        "Block centre": {
+          "n": 558,
+          "families": 186,
+          "difference": 5.913978494623656,
+          "low": 1.5232974910394266,
+          "high": 10.304659498207885,
+          "better": 108,
+          "worse": 73
+        }
+      },
+      "doctrines": {
+        "Scout": {
+          "n": 558,
+          "families": 186,
+          "difference": 3.942652329749104,
+          "low": -0.35842293906810035,
+          "high": 8.24372759856631,
+          "better": 91,
+          "worse": 68
+        },
+        "Spymaster": {
+          "n": 558,
+          "families": 186,
+          "difference": 3.046594982078853,
+          "low": -1.5232974910394266,
+          "high": 7.616487455197133,
+          "better": 101,
+          "worse": 84
+        },
+        "Battle Trance": {
+          "n": 558,
+          "families": 186,
+          "difference": 9.050179211469533,
+          "low": 4.301075268817205,
+          "high": 13.799283154121863,
+          "better": 108,
+          "worse": 57
+        }
+      },
+      "score": {
+        "control": 51.10513739545998,
+        "candidate": 56.451612903225815
+      }
+    },
+    "owner": {
+      "tasks": 1674,
+      "played": 1674,
+      "missing": 0,
+      "all": {
+        "n": 1674,
+        "families": 186,
+        "difference": 3.673835125448029,
+        "low": 1.5232974910394266,
+        "high": 5.854241338112306,
+        "better": 209,
+        "worse": 148
+      },
+      "maps": {
+        "Normal": {
+          "n": 558,
+          "families": 186,
+          "difference": 3.763440860215054,
+          "low": 0.35842293906810035,
+          "high": 7.168458781362006,
+          "better": 59,
+          "worse": 37
+        },
+        "Lava": {
+          "n": 558,
+          "families": 186,
+          "difference": 1.971326164874552,
+          "low": -1.5232974910394266,
+          "high": 5.555555555555555,
+          "better": 65,
+          "worse": 55
+        },
+        "Block centre": {
+          "n": 558,
+          "families": 186,
+          "difference": 5.28673835125448,
+          "low": 1.4336917562724014,
+          "high": 9.050179211469533,
+          "better": 85,
+          "worse": 56
+        }
+      },
+      "doctrines": {
+        "Scout": {
+          "n": 558,
+          "families": 186,
+          "difference": 4.659498207885305,
+          "low": 0.6272401433691757,
+          "high": 8.691756272401435,
+          "better": 82,
+          "worse": 54
+        },
+        "Spymaster": {
+          "n": 558,
+          "families": 186,
+          "difference": 3.405017921146954,
+          "low": -0.6272401433691757,
+          "high": 7.526881720430108,
+          "better": 78,
+          "worse": 61
+        },
+        "Battle Trance": {
+          "n": 558,
+          "families": 186,
+          "difference": 2.956989247311828,
+          "low": -0.08960573476702509,
+          "high": 6.003584229390681,
+          "better": 49,
+          "worse": 33
+        }
+      },
+      "score": {
+        "control": 74.7610513739546,
+        "candidate": 78.43488649940262
+      }
+    }
+  },
+  "qualityErrorGames": {
+    "control": 6,
+    "candidate": 10
+  },
+  "qualityErrorKinds": {
+    "mirror-control": {
+      "v0.8 declined melee_attack attack_not_available": 1,
+      "v0.1 declined move_unit invalid_move": 1,
+      "v0.1 declined melee_attack attack_not_available": 1,
+      "Frenzied Boar no action twice": 1
+    },
+    "mirror-candidate": {
+      "v0.8 declined melee_attack attack_not_available": 6,
+      "v0.1 declined move_unit invalid_move": 1,
+      "v0.1 declined melee_attack attack_not_available": 1,
+      "Frenzied Boar no action twice": 1
+    },
+    "owner-control": {
+      "v0.8 declined melee_attack attack_not_available": 4
+    },
+    "owner-candidate": {
+      "v0.8 declined melee_attack attack_not_available": 3
+    },
+    "note": "Every kind is a refusal cause fixed by profile v22 (a19-rejection-fixes-v1); the confirmation ran on the v20 base."
+  },
+  "cpuSecondsPerGame": {
+    "mirror": {
+      "control": 7.811863164874552,
+      "candidate": 19.875487241935485
+    },
+    "owner": {
+      "control": 13.06072744205496,
+      "candidate": 34.76402201194743
+    }
+  },
+  "deepFit": {
+    "mirror": {
+      "games": 1674,
+      "decisions": 46999,
+      "attempted": 41294,
+      "played": 38419,
+      "overran": 2875
+    },
+    "owner": {
+      "games": 1674,
+      "decisions": 48582,
+      "attempted": 43550,
+      "played": 39392,
+      "overran": 4158
+    }
+  },
+  "gates": {
+    "G1 strength in the mirror: lower bound above zero": true,
+    "G2 no map of the mirror below -2": true,
+    "G3 owner guard: difference over all owner tasks at least -2": true,
+    "G4 candidate games with a quality error not above the control arm": false,
+    "G5 thirty mirror candidate tasks reproduce on the second host (x3d)": true
+  },
+  "g5": "G5 (x3d rerun of 30 mirror candidate tasks): reruns 30, with a confirmation row 30; identical digest 30, identical opening 30, identical score 30",
+  "productionPort": {
+    "note": "The registered prod18 driver was built on common fa886ab5 (profile v20). Production merges it onto profile v22 (search_driver.ts three-way merge with the keep-attack rules, no conflict) and formats with bun fmt. The combination of deep fit with the v21 and v22 changes was not measured as a whole.",
+    "src/simulation/search_driver.ts": {
+      "registered": "235be96a69f61aec49cb0551ff05e98ccde2b85d271c006b5166a63ffb13221b",
+      "production": "5497af0fe7da4f3e9f4f42df980212c869ad1c9362821a1ab8100fdc5e0cbcb0"
+    },
+    "src/simulation/a19_support.ts": {
+      "registered": "ac15f16a2b5810e269867595201b6c5dd90b364fd680fd61f5b0806bc44856a8",
+      "production": "ac15f16a2b5810e269867595201b6c5dd90b364fd680fd61f5b0806bc44856a8"
+    },
+    "src/simulation/v0_8_a19_search.ts": {
+      "registered": "6fbc520b5dccfdbd686210dc7ca4b8913f6d6047b506874e781dfefd6bf04fc9",
+      "production": "fb987a575e796ca47d7c65a4955abfa1e7df4bcd5c4dd7c8bb8eee9ec22d419e"
+    },
+    "src/simulation/index.ts": {
+      "registered": "79ebd04d0b627f220279c9444d872be46ff7e9a21843dc0cd1ce478f40272f96",
+      "production": "79ebd04d0b627f220279c9444d872be46ff7e9a21843dc0cd1ce478f40272f96"
+    },
+    "src/simulation/v0_8_a19_deep_fit.ts": {
+      "registered": "18b0e5e047857c995498f23589aaa0f58bbfa3affc6f31c09a662811e4accabf",
+      "production": "18b0e5e047857c995498f23589aaa0f58bbfa3affc6f31c09a662811e4accabf"
+    }
+  },
+  "deviations": [
+    "The Mac mirror arms started later than first scheduled (after confirmations L and N); the launch scripts were replaced before any mirror row was played. No row was affected."
+  ],
+  "analysis": "confirm_m_analyze.py as registered, G5 by g4_check.py",
+  "notClaimed": "Strength against people; strength under wall-clock deadlines or host load; any other budget."
+}

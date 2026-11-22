@@ -19,7 +19,7 @@
  */
 export type { ILookaheadDeps } from "./lookahead";
 export { SearchDriver } from "./search_driver";
-export type { ISearchMatchInfo } from "./search_driver";
+export type { ISearchBudgetedDecision, ISearchDecisionBudget, ISearchMatchInfo } from "./search_driver";
 export {
     createV08A13SearchDriver,
     shouldUseDefaultV08A13Search,
@@ -27,6 +27,12 @@ export {
     withScopedAIEnvironment,
 } from "./v0_8_a13_search";
 export { createV08A19SearchDriver, shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
+export {
+    createV08A19DeepFitSearchDriver,
+    V08_A19_DEEP_FIT,
+    V08A19DeepFitSearchDriver,
+    type IV08A19DeepFitStatistics,
+} from "./v0_8_a19_deep_fit";
 
 export {
     prepareV08A19RoleCandidate,

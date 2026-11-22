@@ -9,10 +9,21 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Deep search when it fits — November 22, 2026
+
+Under the standing instruction and at the owner-approved think budget of about 4 s, `a19-deep-fit-v1` is active:
+**the current default is profile v23**. Read `docs/deep_fit_adoption.md`. A bot seat runs the deep A19 search (8
+rollouts, shortlist 10, max melee 16) after the stock search, whenever both fit 2,800 rollout turns, or 4,000 ms
+live. Otherwise it plays the stock choice (`src/simulation/v0_8_a19_deep_fit.ts`). Premium advice keeps the stock
+search. Preserve the registered +5.35-point mirror estimate (95% +2.72 to +8.06; every map positive) and the
+owner-shaped guard of +3.67. Its quality gate (G4: 10 candidate games against 6, all refusal causes that v22 fixes)
+failed and stays recorded as failed: do not waive, re-run or relabel it. Confirmation K, the same rule at 1,400
+turns, failed its strength gate (+1.22) and stays failed.
+
 ## Rejection fixes — November 21, 2026
 
-At the owner's request (“Need to fix all rejection causes”), `a19-rejection-fixes-v1` is active: **the current
-default is profile v22**. Read `docs/rejection_fixes_adoption.md`. Two causes are fixed in common.
+Profile v22 is retained inside v23. At the owner's request (“Need to fix all rejection causes”),
+`a19-rejection-fixes-v1` is active: **the current default is profile v22**. Read `docs/rejection_fixes_adoption.md`. Two causes are fixed in common.
 `a19CoherentMeleeApproach` (`src/ai/coherent_melee_approach.ts`) is the last step of `StrategyV0_8.decideTurn`, so
 a native decision no longer moves and then strikes from the old cell. `StrategyV0_1.isLegalMoveRoute` accepts only
 destinations in the engine-equivalent, zone-of-control-aware known paths, which a mindless Berserker or Frenzied

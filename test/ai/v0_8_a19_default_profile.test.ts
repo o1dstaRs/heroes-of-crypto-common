@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v22",
+            schema: "hoc.v0_8_a19_production_profile.v23",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -166,6 +166,14 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "owner-request",
                 registrationSha256: "0613b1987e120e72cb874aae41fb01b781c3acbb46382d3fed41d960620bbea0",
                 qualification: "non-inferiority-confirmed",
+            },
+            // Profile v23: deep search when it fits the bot seat's think budget.
+            deepFit: {
+                policyId: "a19-deep-fit-v1",
+                adoptedAt: "2026-11-22",
+                adoption: "standing-user-instruction",
+                registrationSha256: "aa99e261a3d7ee4f33fbe95d3cc349aa0651e01a1c1539b8e59f4a7084122616",
+                qualification: "strength-confirmed-quality-gate-failed",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({
@@ -476,6 +484,7 @@ describe("v0.8+A19 production profile", () => {
             "keep-attack",
             "coherent-melee-approach",
             "engine-reachable-routes",
+            "deep-fit",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));

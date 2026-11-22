@@ -8,7 +8,12 @@ import { SearchRollbackError, type SearchDriver } from "./search_driver";
 const attached = new WeakSet<SearchDriver>();
 
 /** Match-local outer layer, after neural correction. Never patches a global prototype. */
-export function attachA19SupportDecision(driver: SearchDriver, deps: ILookaheadDeps, offline: boolean): SearchDriver {
+export function attachA19SupportDecision(
+    driver: SearchDriver,
+    deps: ILookaheadDeps,
+    offline: boolean,
+    deadlineMs = 1000,
+): SearchDriver {
     if (attached.has(driver)) return driver;
     const ownChoose = Object.getOwnPropertyDescriptor(driver, "chooseDecision")?.value as
         SearchDriver["chooseDecision"] | undefined;
@@ -25,7 +30,7 @@ export function attachA19SupportDecision(driver: SearchDriver, deps: ILookaheadD
         const started = context.decisionStartedAtMs;
         if (!offline && (started === undefined || !Number.isFinite(started) || started > performance.now()))
             return selected;
-        const deadlineAt = offline ? null : started! + 1000;
+        const deadlineAt = offline ? null : started! + deadlineMs;
         try {
             const result = chooseA19SatyrContactDecision(unit, context, selected, deps, deadlineAt);
             return deadlineAt !== null && performance.now() >= deadlineAt ? selected : result.actions;

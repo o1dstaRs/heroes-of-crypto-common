@@ -54,9 +54,17 @@ export function createV08A19SearchDriver(
     deps: ILookaheadDeps,
     match: ISearchMatchInfo,
     passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver,
-    options: { neuralCorrection?: boolean } = {},
+    options: {
+        neuralCorrection?: boolean;
+        /** Budget keys merged over the sealed environment (the deep-fit driver's deep search). */
+        budgetOverrides?: Readonly<Record<string, string>>;
+        /** The Satyr support step's deadline from the start of the decision. */
+        supportDeadlineMs?: number;
+    } = {},
 ): SearchDriver {
-    const environment = buildV08A19SearchEnvironment();
+    const environment = options.budgetOverrides
+        ? Object.freeze({ ...buildV08A19SearchEnvironment(), ...options.budgetOverrides })
+        : buildV08A19SearchEnvironment();
     const neural = environment.SEARCH_A19_NEURAL_TIES;
     if (neural !== "0" && neural !== "1") throw new Error("SEARCH_A19_NEURAL_TIES must be 0 or 1");
     const support = environment.SEARCH_A19_SATYR_CONTACT_SUPPORT;
@@ -71,7 +79,12 @@ export function createV08A19SearchDriver(
                     ? attachA19NeuralCorrection(driver, { offline: match.offlineDeterministicWork === true })
                     : driver;
             return support === "1"
-                ? attachA19SupportDecision(corrected, deps, match.offlineDeterministicWork === true)
+                ? attachA19SupportDecision(
+                      corrected,
+                      deps,
+                      match.offlineDeterministicWork === true,
+                      options.supportDeadlineMs,
+                  )
                 : corrected;
         }),
     );

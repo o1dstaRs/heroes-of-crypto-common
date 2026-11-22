@@ -458,6 +458,21 @@ class SearchDecisionDeadlineExceeded extends Error {
     }
 }
 
+/** Per-decision work limits for {@link SearchDriver.chooseDecisionWithinBudget}. */
+export interface ISearchDecisionBudget {
+    /** Rollout turns the decision may simulate (the deterministic work clock); more ends it as a deadline does. */
+    readonly rolloutTurns?: number;
+    /** Wall-clock deadline from the start of this decision's search; ignored under offline deterministic work. */
+    readonly deadlineMs?: number;
+}
+
+export interface ISearchBudgetedDecision {
+    readonly actions: GameAction[];
+    /** False when the search needed more than its rollout turns or met a deadline, so `actions` is a fallback. */
+    readonly withinBudget: boolean;
+    readonly rolloutTurns: number;
+}
+
 /**
  * A rollout mutated the private battle copy and at least one authoritative restore step failed. Callers
  * must quarantine the live session; returning an incumbent or running another policy is unsafe because
@@ -1472,6 +1487,9 @@ export class SearchDriver {
      */
     private readonly adaptiveBudget: boolean;
     private degradedRemaining = 0;
+    private rolloutTurnLimit: number | null = null;
+    private decisionDeadlineOverrideMs: number | null = null;
+    private decisionBudgetExceeded = false;
     private static readonly DEGRADED_DECISIONS = 3;
     private static readonly DEGRADED_ROLLOUTS = 1;
     private static readonly DEGRADED_SHORTLIST = 2;
@@ -2358,6 +2376,55 @@ export class SearchDriver {
      * act-vs-wait by lap rollout (oracle mode), or log the Q2 wait-horizon ablation and return the
      * incumbent unchanged (ablation mode).
      */
+    /**
+     * chooseDecision under per-decision limits. A search that would simulate more than `rolloutTurns` stops at the
+     * same points a decision deadline stops it, and the result reports whether it completed within both limits.
+     */
+    public chooseDecisionWithinBudget(
+        unit: Unit,
+        version: string,
+        incumbent: GameAction[],
+        rootDecisionContext: IDecisionContext | undefined,
+        budget: ISearchDecisionBudget,
+    ): ISearchBudgetedDecision {
+        if (this.rolloutTurnLimit !== null || this.decisionDeadlineOverrideMs !== null) {
+            throw new Error("Budgeted search decisions cannot nest");
+        }
+        if (
+            budget.rolloutTurns !== undefined &&
+            !(Number.isSafeInteger(budget.rolloutTurns) && budget.rolloutTurns >= 0)
+        ) {
+            throw new Error("Search budget rolloutTurns must be a non-negative integer");
+        }
+        if (budget.deadlineMs !== undefined && !(Number.isFinite(budget.deadlineMs) && budget.deadlineMs > 0)) {
+            throw new Error("Search budget deadlineMs must be positive");
+        }
+        const startTurns = this.counters.rolloutTurnsTotal;
+        const startFallbacks = this.counters.deadlineFallbacks;
+        this.rolloutTurnLimit = budget.rolloutTurns === undefined ? null : startTurns + budget.rolloutTurns;
+        this.decisionDeadlineOverrideMs = budget.deadlineMs ?? null;
+        this.decisionBudgetExceeded = false;
+        try {
+            let actions: GameAction[];
+            try {
+                actions = this.chooseDecision(unit, version, incumbent, rootDecisionContext);
+            } catch (error) {
+                if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
+                this.decisionBudgetExceeded = true;
+                actions = incumbent;
+            }
+            const rolloutTurns = this.counters.rolloutTurnsTotal - startTurns;
+            const withinBudget =
+                !this.decisionBudgetExceeded &&
+                this.counters.deadlineFallbacks === startFallbacks &&
+                (budget.rolloutTurns === undefined || rolloutTurns <= budget.rolloutTurns);
+            return { actions, withinBudget, rolloutTurns };
+        } finally {
+            this.rolloutTurnLimit = null;
+            this.decisionDeadlineOverrideMs = null;
+            this.decisionBudgetExceeded = false;
+        }
+    }
     public chooseDecision(
         unit: Unit,
         version: string,
@@ -3120,7 +3187,7 @@ export class SearchDriver {
                         unit,
                         focusCandidates.map(({ candidate }) => candidate),
                         seedBase,
-                        this.decisionDeadlineMs === null ? null : t0 + this.decisionDeadlineMs,
+                        this.effectiveDecisionDeadlineMs() === null ? null : t0 + this.effectiveDecisionDeadlineMs()!,
                     );
                 } catch (error) {
                     if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
@@ -3281,7 +3348,7 @@ export class SearchDriver {
                         unit,
                         focusCandidates.map(({ candidate }) => candidate),
                         seedBase,
-                        this.decisionDeadlineMs === null ? null : t0 + this.decisionDeadlineMs,
+                        this.effectiveDecisionDeadlineMs() === null ? null : t0 + this.effectiveDecisionDeadlineMs()!,
                     );
                 } catch (error) {
                     if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
@@ -4073,9 +4140,9 @@ export class SearchDriver {
         const deadlineAt =
             this.match.offlineDeterministicWork ||
             deadlinePolicy === "operation_bounded" ||
-            this.decisionDeadlineMs === null
+            this.effectiveDecisionDeadlineMs() === null
                 ? null
-                : t0 + this.decisionDeadlineMs;
+                : t0 + this.effectiveDecisionDeadlineMs()!;
         let scoredCandidates: readonly IEnumeratedCandidate[];
         let means: number[];
         let bestIdx = 0;
@@ -5685,7 +5752,14 @@ export class SearchDriver {
             this.a19MaterialEvidence = { unitId: unit.getId(), candidates, means, materials, rolloutCount };
         return means;
     }
+    private effectiveDecisionDeadlineMs(): number | null {
+        return this.decisionDeadlineOverrideMs ?? this.decisionDeadlineMs;
+    }
     private assertBeforeDecisionDeadline(deadlineAt: number | null): void {
+        if (this.rolloutTurnLimit !== null && this.counters.rolloutTurnsTotal > this.rolloutTurnLimit) {
+            this.decisionBudgetExceeded = true;
+            throw new SearchDecisionDeadlineExceeded();
+        }
         if (deadlineAt !== null && performance.now() >= deadlineAt) {
             throw new SearchDecisionDeadlineExceeded();
         }
