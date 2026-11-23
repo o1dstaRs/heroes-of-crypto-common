@@ -89,23 +89,20 @@ interface IBlessingCensus {
     carried: number;
 }
 
+// Every buff of every unit is looked up on each stat refresh: one map read instead of a string switch. The six named
+// blessings are inserted last, so they keep their precedence over a stack blessing of the same name.
+let blessingBitByName: ReadonlyMap<string, number> | undefined;
 function blessingBit(name: string): number {
-    switch (name) {
-        case "Angelic Host Blessing":
-            return ANGELIC_HOST_BLESSING_BIT;
-        case "Arcane Ward Blessing":
-            return ARCANE_WARD_BLESSING_BIT;
-        case "Warding Mane Blessing":
-            return WARDING_MANE_BLESSING_BIT;
-        case "Arrows Wingshield Blessing":
-            return ARROWS_WINGSHIELD_BLESSING_BIT;
-        case "Rallying Volley Blessing":
-            return RALLYING_VOLLEY_BLESSING_BIT;
-        case "Sharpened Weapons Blessing":
-            return SHARPENED_WEAPONS_BLESSING_BIT;
-        default:
-            return STACK_BLESSING_BY_NAME.get(name)?.bit ?? 0;
-    }
+    blessingBitByName ??= new Map<string, number>([
+        ...[...STACK_BLESSING_BY_NAME].map(([blessing, { bit }]): [string, number] => [blessing, bit]),
+        ["Angelic Host Blessing", ANGELIC_HOST_BLESSING_BIT],
+        ["Arcane Ward Blessing", ARCANE_WARD_BLESSING_BIT],
+        ["Warding Mane Blessing", WARDING_MANE_BLESSING_BIT],
+        ["Arrows Wingshield Blessing", ARROWS_WINGSHIELD_BLESSING_BIT],
+        ["Rallying Volley Blessing", RALLYING_VOLLEY_BLESSING_BIT],
+        ["Sharpened Weapons Blessing", SHARPENED_WEAPONS_BLESSING_BIT],
+    ]);
+    return blessingBitByName.get(name) ?? 0;
 }
 
 /** A shot top-up. Native shooters qualify even with an empty quiver; a stolen Endless Quiver does too. */

@@ -74,6 +74,7 @@ import {
 } from "./effect_application_capture";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
+import { isUnitDescriptionRefreshSuppressed } from "./description_refresh";
 import { winningAtLeastOneEventProbability, type XY } from "../utils/math";
 import { madeOfFireBoostedMaxHp } from "./movement_stat_modifiers";
 import { projectStackDamage } from "./stack_damage";
@@ -1861,17 +1862,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public getFootprintWidth(): number {
         // A snapshot or wire payload predating footprints carries no side at all, and `size` is then the
         // square fallback. Normalizing both keeps a corrupt value (0, NaN, a fraction) from producing a
-        // footprint with no cells rather than failing loudly at the source.
-        return normalizeFootprintSide(
-            this.unitProperties.footprint_width,
-            normalizeFootprintSide(this.unitProperties.size),
-        );
+        // footprint with no cells rather than failing loudly at the source. A whole side of at least one is
+        // already normal (the hot path: every getCells/getBaseCell asks).
+        const width = this.unitProperties.footprint_width;
+        if (Number.isInteger(width) && width >= 1) {
+            return width;
+        }
+        return normalizeFootprintSide(width, normalizeFootprintSide(this.unitProperties.size));
     }
     public getFootprintHeight(): number {
-        return normalizeFootprintSide(
-            this.unitProperties.footprint_height,
-            normalizeFootprintSide(this.unitProperties.size),
-        );
+        const height = this.unitProperties.footprint_height;
+        if (Number.isInteger(height) && height >= 1) {
+            return height;
+        }
+        return normalizeFootprintSide(height, normalizeFootprintSide(this.unitProperties.size));
     }
     public isSummoned(): boolean {
         return this.summoned;
@@ -3981,9 +3985,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             rangeArmorMultiplier = rangeArmorMultiplier * (1 + Math.max(0, arrowsWingshieldBlessing.getPower()) / 100);
         }
 
-        this.refreshQuiverOfEchoesDescription();
-        this.refreshRimeCharmDescription();
-        this.refreshGravechainDescription();
+        if (!isUnitDescriptionRefreshSuppressed()) {
+            this.refreshQuiverOfEchoesDescription();
+            this.refreshRimeCharmDescription();
+            this.refreshGravechainDescription();
+        }
 
         // MDEF
         this.unitProperties.magic_resist = madeOfFireBuff
@@ -4375,8 +4381,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.adjustedBaseStatsLaps.push(currentLap);
         }
 
-        this.refreshAbilitiesDescriptions(synergyAbilityPowerIncrease);
-        this.refreshLastFuseDescription();
+        if (!isUnitDescriptionRefreshSuppressed()) {
+            this.refreshAbilitiesDescriptions(synergyAbilityPowerIncrease);
+            this.refreshLastFuseDescription();
+        }
     }
     public setRangeShotDistance(distance: number) {
         this.unitProperties.shot_distance = distance;
