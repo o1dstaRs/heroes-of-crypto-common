@@ -19,6 +19,13 @@ failed and is not adopted.
 
 Profile v27 is retained inside v28.
 
+## Never casting Wind Flow: failed, November 23, 2026
+
+Read `docs/no_wind_flow_research.md` before changing how the AI casts Wind Flow. Registered confirmation T dropped every
+Wind Flow challenger from the A19 search on armies with a Valkyrie. Its strength gate failed: +0.28 points per task (95%
+−0.19 to +0.77). It is not adopted, and `candidates.ts` still generates Wind Flow. Do not waive, re-run or relabel T1.
+Its bank is consumed. A situational variant played like never casting in development and is not pursued.
+
 ## Opponent history in the counter draft: failed, November 23, 2026
 
 Read `docs/opponent_history_draft_research.md` before giving the counter draft any opponent history. Registered

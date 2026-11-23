@@ -1,0 +1,162 @@
+{
+    "id": "confirmation-T-no-wind-flow-20261123",
+    "registeredAt": "2026-11-23T09:20:00.223602+00:00",
+    "owner": "2026-11-23: \"Valkyrie is also strong to stop flyers sometimes, very situational tho cause it gives armor\"",
+    "hypothesis": "Wind Flow gives every flyer, own and enemy, -4 movement and +4 armor for 3 laps; the A19 search casts it as a challenger (the native decision never does). An entrant whose search never casts Wind Flow scores higher in games where its army fields a Valkyrie, without losing more than 8 points on the natural drafts.",
+    "candidate": {
+        "rule": "HOC_RESEARCH_NO_WINDFLOW=entrant (tree prod21c14: A19_RESEARCH_NO_WINDFLOW_<seat> drops every Wind Flow challenger in candidates.ts; candidate 0 stays)",
+        "control": "the same tree without HOC_RESEARCH_NO_WINDFLOW",
+        "seamSha256": {
+            "node_modules/@heroesofcrypto/common/src/ai/candidates.ts": "8d38166637f4d7e3b04bcea0c4bef298b71bbcad360bdfc87a4f7921e5c17450",
+            "src/simulation/ai_iteration/ranked_adapter.ts": "2ff43944e0deea173cd21bedee074f70246158af6981338a1eb784e4624f289a",
+            "src/simulation/ai_iteration/research_flyer_formation.ts": "8245fec67214acc77cc1118d012edacb6ed0d9dc83b495addf00bd55aa039b2a",
+            "node_modules/@heroesofcrypto/common/src/ai/decoy_research.ts": "14a9cc34aba07ec9ccf61b990a8e51a2d610248116aa044f67e310037aef6158"
+        }
+    },
+    "development": {
+        "pool": "league/wf-dev.json (914 v27 drafts with a forced Valkyrie, own 389, native 525; dev seeds xp-tasks-20261122)",
+        "baseline": "v27 formation (the dev screen ran without the Valkyrie formation)",
+        "result": [
+            "wf-cand vs wf-control: 914 paired tasks (control 914, candidate 914)",
+            "all                                n= 914  +2.19 (+0.65 to +3.78)  changed  266:  +7.52 (+2.21 to +12.78) W38/L19  quality ctl 0 cand 0",
+            "wfPop=native                       n= 525  +3.71 (+1.90 to +5.81)  changed  166: +11.75 (+5.72 to +18.07) W25/L5  quality ctl 0 cand 0",
+            "wfPop=own                          n= 389  +0.13 (-2.31 to +2.57)  changed  100:  +0.50 (-9.50 to +10.00) W13/L14  quality ctl 0 cand 0"
+        ],
+        "census": "20 dev games with a Valkyrie: Wind Flow cast in 6, the AI won 1 of those vs 11 of 14 without (confounded)"
+    },
+    "bank": {
+        "namespace": "wind-flow-20261123-v1 (allocate_v38, SCAN 240,000: 3,046 families)",
+        "families": "forced ownF/nativeF 0-599; natural own/native 0-999",
+        "design": "one draft root per family; maps 1/3/4 x 3 fights; doctrines cycle by family",
+        "populations": {
+            "ownF": {
+                "tasks": 5400,
+                "families": 600,
+                "canChange": 2229,
+                "canChangeFamilies": 248,
+                "cannotChange": 3171,
+                "parity": 30,
+                "canChangeByMap": {
+                    "1": 741,
+                    "3": 744,
+                    "4": 744
+                }
+            },
+            "nativeF": {
+                "tasks": 5400,
+                "families": 600,
+                "canChange": 2556,
+                "canChangeFamilies": 285,
+                "cannotChange": 2844,
+                "parity": 30,
+                "canChangeByMap": {
+                    "1": 849,
+                    "3": 855,
+                    "4": 852
+                }
+            },
+            "own": {
+                "tasks": 9000,
+                "families": 1000,
+                "canChange": 639,
+                "canChangeFamilies": 73,
+                "cannotChange": 8361,
+                "parity": 30,
+                "canChangeByMap": {
+                    "1": 210,
+                    "3": 219,
+                    "4": 210
+                }
+            },
+            "native": {
+                "tasks": 9000,
+                "families": 1000,
+                "canChange": 357,
+                "canChangeFamilies": 40,
+                "cannotChange": 8643,
+                "parity": 30,
+                "canChangeByMap": {
+                    "1": 120,
+                    "3": 120,
+                    "4": 117
+                }
+            }
+        },
+        "selection": "played = tasks whose entrant fields a Valkyrie, plus 30 parity tasks per population without one"
+    },
+    "arms": {
+        "settings": "HOC_RESEARCH_FIX_SEATS=both HOC_RESEARCH_ENTRANT_SEARCH='{}' HOC_RESEARCH_DECOY_AWARE=both HOC_RESEARCH_FLYER_FORMATION=valkyrie (the adopted v28 formation for the entrant) life-pool14.sh, spec am-prod-prod, tree prod21c14",
+        "entrant": "MG:mix:0.5:2 with RUSH_T2=h1 RUSH_T2_MAP=A (league-drafts15, the v27/v28 default); forced populations add RUSH_FORCE=2:Valkyrie",
+        "opponents": {
+            "own/ownF": "S:B23:fast:K14 (owner-shaped)",
+            "native/nativeF": "native (stock draft: shooter armies)"
+        },
+        "hosts": "Mac cfT-mac.sh (ownF, own, native, nativeF part B); x3d cfT-hft.sh (nativeF part A, after the bs2 replication); basenode cfT-bn.sh (G5)"
+    },
+    "analysis": {
+        "script": "confirm_t_analyze.py",
+        "unit": "paired score difference per can-change task, points",
+        "interval": "bootstrap over draft-root families (per population), 20,000 resamples, seed 20261122"
+    },
+    "gates": {
+        "T1": "conditional strength: lower bound of the 95% interval of the pooled ownF + nativeF can-change difference above 0",
+        "T2": "natural guard: pooled own + native can-change difference at least -8 points",
+        "T3": "quality: candidate games with a quality error at most control (same tasks) + 2, all populations",
+        "T4": "parity: every parity task replays to its control digest",
+        "T5": "second host: the 30 G5 candidate tasks reproduce the main candidate digests on basenode"
+    },
+    "adoption": "a19-no-wind-flow-v1 is adopted when T1-T5 pass; a failed gate stays recorded as failed",
+    "notClaimed": "A win rate against people; the owner's situational use of Wind Flow (enemy flyers about to dive, own flyers idle) is not modelled.",
+    "inputs": {
+        "league-drafts15.ts": "cbe489b76fb76bf30359c0f0a92a13ae3140ab1d0b9dd590ca64c5be6d8ca281",
+        "build_t.py": "e4dccea2d7f2cba8ebbf58e9896183a553ad7251eb5008d69a78a554b100381e",
+        "confirm_t_analyze.py": "f91b08cdf6325ba4dfb920bd45e674ee028d0da6256a387330a703bf0b448cfa",
+        "register_t.py": "de4744cb0257979c28ee65dbd7fa67929d66c387eba131d217be8ac65419777d",
+        "life-run14.ts": "739a4f807dde19b25c08fd8437c927b4b4869293adcd4d707dab612e8dfc0582",
+        "life-pool14.sh": "a7be0b39bac4883c66c161f99bbf7545d22584959e458826457c23031883633a",
+        "formation_lib5.ts": "6a095308a7e0d9ae62efc389dfaa1cfac95f44bab3552d7cc86c915230fb8281",
+        "mm/model-20261122.json": "6fdcf35516e9cc99491f15e30dd3a5ab77328b012d0ae431734322fd144b988a",
+        "mm/matchups-20261122.jsonl": "49fac07afdee0460cad5e8f91418414c482b5e25b603e3b1834b5701b2e4443e",
+        "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+        "bank/creatures.json": "c90428fff0fcf0f4ba86d1d1857fa9323f2cbe320b759329fa0b23f231e20599",
+        "bank/creatures-p.json": "c4e10b9301caf8b44557f5b6d1cfc5d230ba6f53a0aaeb5846f7b9256c9efef2",
+        "specs2/am-prod-prod.json": "75d281bc2206ceb6237f51ff3b694177d9c73c851efd724695c220e533e21dbf",
+        "seeds21/seed-admission.json": "9b401a1b09a9c38a70e2931aee2fc71f84095a74dcdc8c948795b2db53d24b2e",
+        "seeds21/pool.json": "a120ac478eedb67ce6d98767b3048ad1b0e0ce1a186d47d8b1ce5ad8e8557f0c",
+        "seeds21/allocated-typed-preimages.json": "1c484b803aee523c7f06f3e3ec110c81f81b606e449f28c70c2a95658eaa7f33",
+        "allocate_v38.py": "68552471e6949bee67fcfefab0dd48b6010676b9225b54921229d236189cdc55",
+        "cfT-mac.sh": "9cbfada69accba119e1aafb7cc2191695c4130bd12ec34ae3709db3de86edf54",
+        "cfT-hft.sh": "97e788fe6238bf87fd879a265eb2f0a7aec89112d90761c6fce85ebd13ed14d3",
+        "cfT-bn.sh": "e2214b3957dc9d22bc2eef091c49cd3c82a4d864ed14db352d93c3e89d9973f3",
+        "fl_analyze.py": "4ac7cc0f372a9d8da3eb3768ff16a991bd554b7bab66fcdbbbab37d83d08f7de",
+        "league/wf-dev.json": "769a7bfdc5c353a83884881185f82e4a040e1ff4144e1d03a6a404cd50570252"
+    },
+    "banks": {
+        "bank/cfT-ownF-tasks.json": "afaea3ac56646f686ff6c80444e118bf86ca629d4646e370ca320a77864907f3",
+        "bank/cfT-ownF-drafts.json": "7c24b469015476233792a77eaafdb12a11889b8138579d80f73b3e3083804b70",
+        "bank/cfT-ownF-play.json": "a5ab70c90226b8e2f0d6def9fc706b42a9fea8845c75365d5f09a331086b98e9",
+        "bank/cfT-ownF-split.json": "01663ecbb2f6c0e5debbde6a4b422896a15a50f7a9e28b5a7417a53622afa2ea",
+        "bank/cfT-nativeF-tasks.json": "afaea3ac56646f686ff6c80444e118bf86ca629d4646e370ca320a77864907f3",
+        "bank/cfT-nativeF-drafts.json": "f6df7d86c4093d55b3e96a743891da14365dc0ba6fd96cabf413a2223a4bcdf3",
+        "bank/cfT-nativeF-play.json": "2f66545fffe630246406efc5bc0bfabab094307028a61310885e19fc61c0e5af",
+        "bank/cfT-nativeF-split.json": "408b3205be5249609617dc7d3de7cb451ec27a4e48016bf29191668236095fc4",
+        "bank/cfT-own-tasks.json": "d1be80e9e8493604be281a1e4df3e763e7e788d12bc4014420e8e47e1302ae55",
+        "bank/cfT-own-drafts.json": "09312ed84919c578859a3213ec670794736ac467b10f767b3cc29f741e27608c",
+        "bank/cfT-own-play.json": "7b8a2e57d3c2b25cd05c072a59ad74c2f3bc8144f8f9b2305c8f9994a0cc80ac",
+        "bank/cfT-own-split.json": "b297cc607a24c72dff44f7cca7eee6b566db202736915aa917a00735354fbe1c",
+        "bank/cfT-native-tasks.json": "d1be80e9e8493604be281a1e4df3e763e7e788d12bc4014420e8e47e1302ae55",
+        "bank/cfT-native-drafts.json": "8ffa422f17f71c9bf5a50bbaa1b84f2c2591a2f93940ee837d0fe7a5937ab407",
+        "bank/cfT-native-play.json": "344ee39e2e514c776b54cd1db674a3ea3659a9d985ebf3ce40f905317631e364",
+        "bank/cfT-native-split.json": "01ffac0c846693f99a7f73c1fafc1a03edc79d2159a15c6d8000bea75c96542c",
+        "bank/cfT-nativeF-play.partA.json": "ef06b839ea7f8fbf84d96e5aea2a2ad5afb34b3a358142180c1f1e5c153a815b",
+        "bank/cfT-nativeF-play.partB.json": "251368a069f51476b036e1dcf723effc496d8b604de26845a3a338c6166af909",
+        "bank/cfT-g5.json": "709e6270e490f090d22aa49c3bfcd9d77f68a9584dd2873566d6790c4ead57ef",
+        "bank/cfT-summary.json": "8834ef6e2f775c236296691fe0a90b6025f78abe03ba528839ae9f06c5753c62"
+    },
+    "trees": {
+        "prod21c14": {
+            "manifestSha256": "38f7bb97ae1580aa5f1b9963bb9cf81942b72bff31f28b610168f8d97a04ee02",
+            "files": 1274
+        }
+    }
+}

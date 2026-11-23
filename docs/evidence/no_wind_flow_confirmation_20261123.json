@@ -1,0 +1,82 @@
+{
+    "populations": {
+        "ownF": {
+            "n": 2229,
+            "families": 248,
+            "difference": 0.8075370121130552,
+            "low": -0.11230907457322552,
+            "high": 1.7921146953405018,
+            "replayedDifferently": 458,
+            "wins": 69,
+            "losses": 50,
+            "controlScore": 76.40197397936295
+        },
+        "nativeF": {
+            "n": 2556,
+            "families": 285,
+            "difference": -0.176056338028169,
+            "low": -0.4873294346978557,
+            "high": 0.09780907668231612,
+            "replayedDifferently": 136,
+            "wins": 4,
+            "losses": 9,
+            "controlScore": 85.2699530516432
+        },
+        "own": {
+            "n": 639,
+            "families": 73,
+            "difference": 2.816901408450704,
+            "low": 0.7246376811594203,
+            "high": 5.103668261562999,
+            "replayedDifferently": 174,
+            "wins": 32,
+            "losses": 14,
+            "controlScore": 68.9358372456964
+        },
+        "native": {
+            "n": 357,
+            "families": 40,
+            "difference": 0.0,
+            "low": -1.680672268907563,
+            "high": 1.4124293785310735,
+            "replayedDifferently": 39,
+            "wins": 3,
+            "losses": 3,
+            "controlScore": 78.99159663865547
+        }
+    },
+    "primary": {
+        "n": 4785,
+        "families": 533,
+        "difference": 0.28213166144200624,
+        "low": -0.18808777429467086,
+        "high": 0.7732497387669801
+    },
+    "natural": {
+        "n": 996,
+        "families": 113,
+        "difference": 1.8072289156626506,
+        "low": 0.3482587064676617,
+        "high": 3.4161490683229814
+    },
+    "qualityErrorGames": {
+        "control": 0,
+        "candidate": 0
+    },
+    "parity": {
+        "tasks": 120,
+        "identical": 120
+    },
+    "g5": {
+        "tasks": 30,
+        "identical": 30
+    },
+    "gates": {
+        "T1 conditional strength: lower bound of the pooled ownF + nativeF can-change 95% interval above 0": false,
+        "T2 natural guard: pooled own + native can-change difference at least -8 points": true,
+        "T3 quality: candidate games with a quality error at most control + 2": true,
+        "T4 parity: every parity replay reproduces the control digest": true,
+        "T5 second host: the 30 G5 candidate tasks reproduce the digests on x3d": true
+    },
+    "adopt": false
+}
