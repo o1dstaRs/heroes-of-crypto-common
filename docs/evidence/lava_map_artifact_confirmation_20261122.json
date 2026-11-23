@@ -1,0 +1,128 @@
+{
+    "id": "lava-map-artifact-confirmation-V-20261122",
+    "registrationSha256": "09fdcef677947b48b52c0baee2d6beb296aa9add6dad05c55d92a587d80a364f",
+    "populations": {
+        "mirror": {
+            "all": {
+                "n": 21015,
+                "families": 2335,
+                "difference": 0.3497501784439686,
+                "low": 0.1379966690459196,
+                "high": 0.5686414465857721
+            },
+            "changedTasks": 1455,
+            "changedDifference": 5.051546391752577,
+            "noLava": {
+                "n": 14010,
+                "families": 2335,
+                "difference": 0.4782298358315489,
+                "low": 0.23911491791577444,
+                "high": 0.728051391862955,
+                "changedTasks": 870,
+                "changedDifference": 7.7011494252873565,
+                "controlOnChanged": 42.12643678160919
+            },
+            "lava": {
+                "n": 7005,
+                "families": 2335,
+                "difference": 0.092790863668808,
+                "low": -0.32119914346895073,
+                "high": 0.5067808708065668,
+                "changedTasks": 585,
+                "changedDifference": 1.1111111111111112,
+                "controlOnChanged": 57.17948717948718
+            }
+        },
+        "own": {
+            "all": {
+                "n": 7011,
+                "families": 779,
+                "difference": 0.5134788189987163,
+                "low": 0.1568963058051633,
+                "high": 0.8843246327200114
+            },
+            "changedTasks": 663,
+            "changedDifference": 5.429864253393665,
+            "noLava": {
+                "n": 4674,
+                "families": 779,
+                "difference": 0.5134788189987163,
+                "low": 0.1069747539580659,
+                "high": 0.9306803594351734,
+                "changedTasks": 429,
+                "changedDifference": 5.594405594405594,
+                "controlOnChanged": 71.91142191142191
+            },
+            "lava": {
+                "n": 2337,
+                "families": 779,
+                "difference": 0.5134788189987163,
+                "low": -0.2139495079161318,
+                "high": 1.2409071459135643,
+                "changedTasks": 234,
+                "changedDifference": 5.128205128205129,
+                "controlOnChanged": 76.06837606837607
+            }
+        }
+    },
+    "primary": {
+        "noLava": {
+            "n": 14010,
+            "families": 2335,
+            "difference": 0.4782298358315489,
+            "low": 0.23911491791577444,
+            "high": 0.728051391862955,
+            "changedTasks": 870,
+            "changedDifference": 7.7011494252873565,
+            "controlOnChanged": 42.12643678160919
+        },
+        "lava": {
+            "n": 7005,
+            "families": 2335,
+            "difference": 0.092790863668808,
+            "low": -0.32119914346895073,
+            "high": 0.5067808708065668,
+            "changedTasks": 585,
+            "changedDifference": 1.1111111111111112,
+            "controlOnChanged": 57.17948717948718
+        },
+        "all": {
+            "n": 21015,
+            "families": 2335,
+            "difference": 0.3497501784439686,
+            "low": 0.1379966690459196,
+            "high": 0.5686414465857721
+        }
+    },
+    "qualityErrorGames": {
+        "control": 0,
+        "candidate": 0
+    },
+    "parity": {
+        "tasks": 60,
+        "identical": 60
+    },
+    "g5": {
+        "tasks": 30,
+        "identical": 30
+    },
+    "gates": {
+        "V1 no-lava strength: lower bound of the mirror maps 1+4 95% interval above 0": true,
+        "V2 lava strength: lower bound of the mirror map 3 95% interval above 0": false,
+        "V3 owner-rush guard: own changed-task difference at least -8 points": true,
+        "V4 quality: candidate games with a quality error at most control + 2": true,
+        "V5 parity: every parity replay reproduces the control digest": true,
+        "V6 second host: the 30 G5 candidate tasks reproduce the digests on x3d": true
+    },
+    "adopt": {
+        "ruleA_noLava": true,
+        "ruleB_lava": false
+    },
+    "productionPort": {
+        "note": "The confirmation drafted with the research seat (league-drafts14 RUSH_T2_MAP=1 over the RUSH_T2=h1 replica of the striker rule). Production runs rule A in src/ai/setup/a19_lava_map_artifact.ts around the server's striker rule; it keeps Lava Striders only when no other offered artifact passes the beneficiary rule, as the research seat did. Rule B (lava map) failed gate V2 and is not in production: the lava map keeps the striker rule's pick.",
+        "productionSources": {
+            "src/ai/setup/a19_lava_map_artifact.ts": "0ee31d0335359ab12ac6a712ec3b4808674343971ae1fc8fc70c0a1f839714c5"
+        }
+    },
+    "notClaimed": "A win rate against people; seats whose map is unknown at the Tier-2 pick are unchanged."
+}

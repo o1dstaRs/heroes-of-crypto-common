@@ -9,6 +9,17 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Lava Striders by map — November 22, 2026
+
+Under the standing instruction `a19-lava-map-artifact-v1` is active: **the current default is profile v27**. Read
+`docs/lava_map_artifact_adoption.md`. With the map public at the Tier-2 pick, Lava Striders is never taken on a map
+without lava while a usable artifact is offered (`src/ai/setup/a19_lava_map_artifact.ts`; server switch
+`HOC_A19_LAVA_MAP_ARTIFACT`). Confirmation V without lava +0.48 points per task (95% +0.24 to
++0.73); the owner-rush guard passed. Its lava-map rule (a striker army takes Lava Striders) failed its strength
+gate (+0.09, 95% −0.32 to +0.51) and is not adopted.
+
+Profile v26 is retained inside v27.
+
 ## Gated counter draft — November 22, 2026
 
 Under the standing instruction `a19-counter-draft-v1` is active: **the current default is profile v26**. Read

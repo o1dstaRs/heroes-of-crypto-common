@@ -138,8 +138,13 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     opposing creatures that read melee, it drafts with a matchup model of counters (ai/setup/a19_counter_draft.ts).
  *     Against the default AI +5.30 points (95% +1.19 to +9.35); every guard passed
  *     (docs/counter_draft_adoption.md).
+ *   - Lava Striders by map (profile v27) adopted on 2026-11-22 under the standing instruction, after the owner saw it
+ *     suggested on a map without lava: never taken there while a usable artifact is offered
+ *     (ai/setup/a19_lava_map_artifact.ts). Without lava +0.48 points (95% +0.24 to +0.73); the
+ *     owner-rush guard passed. The registered lava-map rule failed its strength gate (+0.09, -0.32 to
+ *     +0.51) and is not adopted (docs/lava_map_artifact_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v26" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v27" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -384,6 +389,18 @@ export const V08_A19_DECOY_AWARE_POLICY = Object.freeze({
     adoptedAt: "2026-11-22",
     adoption: "standing-user-instruction",
     registrationSha256: "9e2d00ea2bfdd5b610d2f2cf54f661b58c2aa541c929d42bc6850e3f62f1f146",
+    qualification: "strength-confirmed",
+} as const);
+
+/**
+ * Lava Striders by map (profile v27): ai/setup/a19_lava_map_artifact.ts, called by the server's Tier-2 pick around the
+ * striker rule. See docs/lava_map_artifact_adoption.md.
+ */
+export const V08_A19_LAVA_MAP_ARTIFACT_POLICY = Object.freeze({
+    policyId: "a19-lava-map-artifact-v1" as const,
+    adoptedAt: "2026-11-22",
+    adoption: "standing-user-instruction",
+    registrationSha256: "09fdcef677947b48b52c0baee2d6beb296aa9add6dad05c55d92a587d80a364f",
     qualification: "strength-confirmed",
 } as const);
 
@@ -741,6 +758,11 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/setup/draft_models/a19_counter_draft_v1.json" as const,
         sha256: "444c5cf85a25f3ef5231c99424f2c77ef1486e56b982f22f0eda7a059044734d" as const,
     }),
+    Object.freeze({
+        role: "lava-map-artifact" as const,
+        source: "src/ai/setup/a19_lava_map_artifact.ts" as const,
+        sha256: "0ee31d0335359ab12ac6a712ec3b4808674343971ae1fc8fc70c0a1f839714c5" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -780,6 +802,7 @@ export const V08_A19_PROFILE = Object.freeze({
     wildRegenGift: V08_A19_WILD_REGEN_GIFT_POLICY,
     decoyAware: V08_A19_DECOY_AWARE_POLICY,
     counterDraft: V08_A19_COUNTER_DRAFT_POLICY,
+    lavaMapArtifact: V08_A19_LAVA_MAP_ARTIFACT_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 
