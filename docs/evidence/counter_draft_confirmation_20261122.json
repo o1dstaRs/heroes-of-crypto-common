@@ -1,0 +1,97 @@
+{
+    "id": "counter-draft-confirmation-Z-20261122",
+    "registrationSha256": "7d5b23d507419eac1246f70e81916103c02ad577e0d04eb675db91e46e73bebb",
+    "populations": {
+        "mirror": {
+            "all": {
+                "n": 963,
+                "difference": 5.29595015576324,
+                "low": 1.1941848390446521,
+                "high": 9.345794392523365
+            },
+            "control": 52.284527518172375,
+            "changedTasks": 877,
+            "changedDifference": 5.815279361459521
+        },
+        "own": {
+            "all": {
+                "n": 324,
+                "difference": -0.30864197530864196,
+                "low": -4.012345679012346,
+                "high": 3.3950617283950617
+            },
+            "control": 75.46296296296296,
+            "changedTasks": 152,
+            "changedDifference": -0.6578947368421053
+        },
+        "decoy": {
+            "all": {
+                "n": 324,
+                "difference": 0.6172839506172839,
+                "low": -1.2345679012345678,
+                "high": 2.4691358024691357
+            },
+            "control": 57.407407407407405,
+            "changedTasks": 48,
+            "changedDifference": 4.166666666666667
+        },
+        "queen": {
+            "all": {
+                "n": 315,
+                "difference": 1.746031746031746,
+                "low": -1.2698412698412698,
+                "high": 4.761904761904762
+            },
+            "control": 38.41269841269841,
+            "changedTasks": 49,
+            "changedDifference": 11.224489795918368
+        },
+        "caster": {
+            "all": {
+                "n": 324,
+                "difference": 2.006172839506173,
+                "low": -0.6172839506172839,
+                "high": 4.783950617283951
+            },
+            "control": 75.30864197530865,
+            "changedTasks": 106,
+            "changedDifference": 6.132075471698113
+        }
+    },
+    "primary": {
+        "n": 963,
+        "difference": 5.29595015576324,
+        "low": 1.1941848390446521,
+        "high": 9.345794392523365
+    },
+    "qualityErrorGames": {
+        "control": 0,
+        "candidate": 0
+    },
+    "parity": {
+        "tasks": 150,
+        "identical": 150
+    },
+    "g5": {
+        "tasks": 30,
+        "identical": 30
+    },
+    "gates": {
+        "Z1 strength: lower bound of the mirror population 95% interval above 0": true,
+        "Z2 owner-rush guard: difference at least -3 points": true,
+        "Z3 decoy-fort guard: difference at least -3 points": true,
+        "Z4 Queen-fort guard: difference at least -3 points": true,
+        "Z5 caster-brawler guard: difference at least -3 points": true,
+        "Z6 quality: candidate games with a quality error at most control + 2": true,
+        "Z7 parity: every unchanged-task replay reproduces the control digest": true,
+        "Z8 second host: the 30 G5 candidate tasks reproduce the digests on x3d": true
+    },
+    "productionPort": {
+        "note": "The confirmation drafted with the research seat (league-drafts12 MG:mix:0.5:2). Production runs the same policy in src/ai/setup/a19_counter_draft.ts after the striker matchup head; its read samples are seeded by the game id (FNV-1a) instead of the harness task seed. Another random stream changes 5.3% of the picks (305 of 5,778 creatures on the 963 mirror tasks); the confirmation measures the policy over its streams.",
+        "productionSources": {
+            "src/ai/setup/a19_counter_draft.ts": "577b77596c18c2c94bac5f6d068d9c8704064973a0c84b79034d6d0674333d30",
+            "src/ai/setup/draft_models/a19_counter_draft_v1.json": "444c5cf85a25f3ef5231c99424f2c77ef1486e56b982f22f0eda7a059044734d"
+        }
+    },
+    "notClaimed": "A win rate against people; seats that see fewer than two opposing creatures are unchanged."
+}

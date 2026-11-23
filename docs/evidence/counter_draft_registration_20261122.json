@@ -1,0 +1,130 @@
+{
+ "id": "confirmation-Z-counter-draft-20261122",
+ "registeredAt": "2026-11-22T23:47:36.054320+00:00",
+ "owner": "2026-11-22: \"I need overall versatile strategy that beats me, which is able to leverage all the data it has\"; \"The idea is not to find perfect combo, but to read what opponent is doing, what units are available to counter that etc. Or build something that is very hard to counter\"",
+ "hypothesis": "A default seat that drafts with the matchup model (creature strength + creature-vs-creature counters, fitted on 40,040 production games) once it sees at least two opponent creatures and their melee probability is at least 0.5, and with the production striker draft otherwise, scores higher against the default AI without losing more than 3 points against owner-shaped rushes, decoy forts, Queen forts or caster brawlers.",
+ "candidate": {
+  "draft": "league-drafts12.ts seat MG:mix:0.5:2 (RUSH_MM mm/model-20261122.json M2, RUSH_MM_PRIOR mm/matchups-20261122.jsonl, RUSH_MM_ROLLOUTS 32)",
+  "control": "league-drafts12.ts seat S:B1234:val (the production striker draft replica)",
+  "draftEnv": "RUSH_VALUES explore/table-a.json RUSH_PRIOR 0.5 RUSH_VAL_SLOTS B1234 RUSH_T1 policy RUSH_T2 h1"
+ },
+ "development": {
+  "matrixTasks": "mirror +13.00 (+2.33..+23.33), own +2.00, decoy -0.67, queen +5.33, caster -3.33; all +3.27 (+0.07..+6.40) (entrant Spymaster; the gate was chosen on these tasks)",
+  "generalisation": "cx-tasks mirror (Scout and Battle Trance entrants): +5.50 (-1.50..+12.17)"
+ },
+ "bank": {
+  "namespace": "counter-draft-20261122-v1",
+  "allocator": "allocate_v33.py (audited 0 intersections against 1,058 ledgers)",
+  "pool": "963 tasks, 107 families x 9 doctrine cells, maps 1/3/4",
+  "populations": {
+   "mirror": {
+    "tasks": 963,
+    "changed": 877,
+    "parity": 30
+   },
+   "own": {
+    "tasks": 324,
+    "changed": 152,
+    "parity": 30
+   },
+   "decoy": {
+    "tasks": 324,
+    "changed": 48,
+    "parity": 30
+   },
+   "queen": {
+    "tasks": 315,
+    "changed": 49,
+    "parity": 30
+   },
+   "caster": {
+    "tasks": 324,
+    "changed": 106,
+    "parity": 30
+   }
+  },
+  "selection": "mirror = all tasks; own and caster = families i%3==0; decoy = i%3==1; queen = i%3==2"
+ },
+ "arms": {
+  "settings": "HOC_RESEARCH_FIX_SEATS=both HOC_RESEARCH_ENTRANT_SEARCH='{}' life-pool14.sh",
+  "mirror": "spec am-prod-prod, tree prod21c6",
+  "own": "spec am-prod-prod, tree prod21c6",
+  "decoy": "spec am-prod-decoy, tree prod21c6",
+  "queen": "spec am-prod-queen, tree prod21c6",
+  "caster": "spec am-prod-prod, tree prod21c7",
+  "tags": "cfZ-<population>-control (every task), cfZ-<population>-candidate (changed tasks), cfZ-<population>-parity (parity tasks), cfZ-g5 on x3d (30 changed mirror tasks)"
+ },
+ "analysis": {
+  "script": "confirm_z_analyze.py",
+  "unit": "paired score difference per task (0 for an unchanged matchup), points",
+  "interval": "bootstrap over pool families, 20,000 resamples, seed 20261122"
+ },
+ "gates": {
+  "Z1": "strength: lower bound of the mirror population 95% interval above 0",
+  "Z2": "owner-rush guard: difference at least -3 points",
+  "Z3": "decoy-fort guard: difference at least -3 points",
+  "Z4": "Queen-fort guard: difference at least -3 points",
+  "Z5": "caster-brawler guard: difference at least -3 points",
+  "Z6": "quality: candidate games with a quality error at most control + 2",
+  "Z7": "parity: every unchanged-task replay reproduces the control digest",
+  "Z8": "second host: the 30 G5 candidate tasks reproduce the digests on x3d"
+ },
+ "notClaimed": "A win rate against people; the effect on seats without visible opponent picks (the gate stays closed there).",
+ "inputs": {
+  "league-drafts12.ts": "f24d24b6e816b0154e931b6d5b8b2adbd8f0fd42dbbe4ad36c397dc952258b22",
+  "build_z.py": "84f06e16893b8943c83f223534c950f2aafffb7c520c1cb9fa944567b0544170",
+  "confirm_z_analyze.py": "d3e43badbf2f8d0a617b67c823ee4c06621d73842a7f3571fb45e0fe0cf20b01",
+  "life-run14.ts": "739a4f807dde19b25c08fd8437c927b4b4869293adcd4d707dab612e8dfc0582",
+  "life-pool14.sh": "a7be0b39bac4883c66c161f99bbf7545d22584959e458826457c23031883633a",
+  "formation_lib5.ts": "6a095308a7e0d9ae62efc389dfaa1cfac95f44bab3552d7cc86c915230fb8281",
+  "mm/model-20261122.json": "6fdcf35516e9cc99491f15e30dd3a5ab77328b012d0ae431734322fd144b988a",
+  "mm/matchups-20261122.jsonl": "49fac07afdee0460cad5e8f91418414c482b5e25b603e3b1834b5701b2e4443e",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "bank/creatures.json": "c90428fff0fcf0f4ba86d1d1857fa9323f2cbe320b759329fa0b23f231e20599",
+  "specs2/am-prod-prod.json": "75d281bc2206ceb6237f51ff3b694177d9c73c851efd724695c220e533e21dbf",
+  "specs2/am-prod-decoy.json": "8474d40055196b1f0115c6868022a34103e800fa8fb5862f193660c0bf4414f8",
+  "specs2/am-prod-queen.json": "255ea734d5285506c02a9372de117002a78fa0a0c0c63d1b142a7c41c478e9a8",
+  "seeds17/seed-admission.json": "390449d426d0e224c41ddd1fae6255e6ba5774d7923f72f92303d6c11179962f",
+  "seeds17/pool.json": "9ab5d7ca1bda466913176bd73657f274a49a805423e1f3df7d6062c0a58324ca",
+  "allocate_v33.py": "93d30f0869e9afa8c664cff937be7241f3007e20c2ea58c3dc6dfdde1ea26c81"
+ },
+ "banks": {
+  "bank/cfZ-mirror-tasks.json": "a1663914030c608a59bc0940be13671e2e9fe7ca00b0933a7472b8e95baf2958",
+  "bank/cfZ-mirror-control.json": "413e377a8c2c780d38a71d232a8e35e8e492ad2b1119e932bb06e0ff902b12da",
+  "bank/cfZ-mirror-candidate.json": "ab9b43cc98d167c628987cc6de362ed9dfa5e131225f3d98970d7fb17a7a1547",
+  "bank/cfZ-mirror-candidate-changed.json": "a2afddad4a4aededfdfae3dc8a2a0fb18b34a1402b6dd88494ea653ff00a43bf",
+  "bank/cfZ-mirror-candidate-parity.json": "ee0358b1afcd000b845a0641ecc807ba12f78e64f86ef4a04e72b80a959e6038",
+  "bank/cfZ-own-tasks.json": "e65507cac5642e12453cf0e9020d1a08d99499828bef407d3efb209c2a3c358d",
+  "bank/cfZ-own-control.json": "087d0bf7603e8e7a283609d4e9e0bc54e1bbd284b67cae89fdf714794b574739",
+  "bank/cfZ-own-candidate.json": "ea89390dd2c8fc43bc21cf62821c3ca71ba3bbc49814154c52198a74b19b4f23",
+  "bank/cfZ-own-candidate-changed.json": "d6d559d1412e1574ef4aa0155d2bb2bd4499b793c0f444512a00cf89cb1f7f27",
+  "bank/cfZ-own-candidate-parity.json": "2de7ac41a85ab500faed561f9e781fe8e325f37a2f13c77a06bce83e968a57fe",
+  "bank/cfZ-decoy-tasks.json": "dde9e4db97004455728ae38fa9286ce0aa41300034ab65748254365ed74f7ac7",
+  "bank/cfZ-decoy-control.json": "41cbf4c4ba7b9824aad38b95155e24d8cefde028e528ae8b2a7e7da2ec336607",
+  "bank/cfZ-decoy-candidate.json": "73096bb0c8c491ced1b6656a6bc89034f09a5588e621448f90b9e0304a65b7cd",
+  "bank/cfZ-decoy-candidate-changed.json": "472f1055ed837e9450758ee6f1e34e26f0d42d2602be231ba66c41f03df38ff5",
+  "bank/cfZ-decoy-candidate-parity.json": "6d7ffb491c076f0f49008746d9e41561d760b67ab72ea7aaac0a8020ce5a6377",
+  "bank/cfZ-queen-tasks.json": "c5d429fd4faad179d4c1887ae10c029e0e1de95a478c85335c66f33b325b49b9",
+  "bank/cfZ-queen-control.json": "3db707638029adfc43ae255f5962b8cd6f9f354621324b40c10783edcd1dc49b",
+  "bank/cfZ-queen-candidate.json": "22a2391f8be5d028892e919f9536b683c269ec975ef0da66f7e06122da9cbf54",
+  "bank/cfZ-queen-candidate-changed.json": "945493037fe4a6321ac90a6779afa1ab2e26921bfae9eec72cf62459a4c6e696",
+  "bank/cfZ-queen-candidate-parity.json": "fb572417c3d09fc8070affd75d343d1e2d60312611c44c0ec6cbb85192e5ce07",
+  "bank/cfZ-caster-tasks.json": "e65507cac5642e12453cf0e9020d1a08d99499828bef407d3efb209c2a3c358d",
+  "bank/cfZ-caster-control.json": "4fe217fda62592a9e2f7480c621b48dbbd179832f5ed8029595599d0a06efd9d",
+  "bank/cfZ-caster-candidate.json": "e6d52922c9e71b274382113e9bf9300c189cc17f81be3a318447d78531fa04f4",
+  "bank/cfZ-caster-candidate-changed.json": "39df52cf83cbb4370eb04ebeaf79d500b5c8ae26aef350631822474226a8ce1a",
+  "bank/cfZ-caster-candidate-parity.json": "048294fe934da4c7ececf87acaca868c2f184067e96a3ea3636fe36833d7d6d7",
+  "bank/cfZ-g5.json": "7968215715ecc93ea0da527a8c913811f6907340ae9270f68ee8540450bab005",
+  "bank/cfZ-summary.json": "9c70e220b6f7a0e8f400914a34dcce5a438038b442765c0113afe7787d0b3990"
+ },
+ "trees": {
+  "prod21c6": {
+   "manifestSha256": "636f61395d766a241d050bb365f38c21c94785eee80ea8be1e80d63d62f141a5",
+   "files": 1269
+  },
+  "prod21c7": {
+   "manifestSha256": "3ce26548cc1afc9b4abf10edb0f3450f780e3e387d755121a086f48ae519e76c",
+   "files": 1269
+  }
+ }
+}

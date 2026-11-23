@@ -9,6 +9,16 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Gated counter draft — November 22, 2026
+
+Under the standing instruction `a19-counter-draft-v1` is active: **the current default is profile v26**. Read
+`docs/counter_draft_adoption.md`. Once a seat sees two opposing creatures that read melee, it drafts with a matchup model
+of creature counters (`src/ai/setup/a19_counter_draft.ts`; server switch `HOC_A19_COUNTER_DRAFT`). Confirmation Z against
+the default AI +5.30 points (95% +1.19 to +9.35); owner-rush, decoy-fort, Queen-fort and
+caster guards passed.
+
+Profile v25 is retained inside v26.
+
 ## Decoy-aware targeting — November 22, 2026
 
 Under the standing instruction `a19-decoy-aware-v1` is active: **the current default is profile v25**. Read
@@ -28,6 +38,7 @@ removed every gift to a weaker creature (526 → 0). Its owner guard (W3, −2.3
 waive, re-run or relabel it. No strength gain is claimed.
 
 Profile v23 is retained inside v24.
+
 ## Deep search when it fits — November 22, 2026
 
 Under the standing instruction and at the owner-approved think budget of about 4 s, `a19-deep-fit-v1` is active:

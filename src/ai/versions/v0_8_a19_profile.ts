@@ -134,8 +134,12 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     its strike on a one-model decoy while it can strike a real stack (ai/decoy_aware.ts). Against the owner's
  *     checkerboard decoy-fort layout +6.33 points (95% +2.59 to +10.05); every guard passed
  *     (docs/decoy_aware_adoption.md).
+ *   - Gated counter draft (profile v26) adopted on 2026-11-22 under the standing instruction: once a seat sees two
+ *     opposing creatures that read melee, it drafts with a matchup model of counters (ai/setup/a19_counter_draft.ts).
+ *     Against the default AI +5.30 points (95% +1.19 to +9.35); every guard passed
+ *     (docs/counter_draft_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v25" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v26" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -380,6 +384,18 @@ export const V08_A19_DECOY_AWARE_POLICY = Object.freeze({
     adoptedAt: "2026-11-22",
     adoption: "standing-user-instruction",
     registrationSha256: "9e2d00ea2bfdd5b610d2f2cf54f661b58c2aa541c929d42bc6850e3f62f1f146",
+    qualification: "strength-confirmed",
+} as const);
+
+/**
+ * Gated counter draft (profile v26): ai/setup/a19_counter_draft.ts with its model draft_models/a19_counter_draft_v1.json,
+ * called by the server's draft decider after the striker matchup head. See docs/counter_draft_adoption.md.
+ */
+export const V08_A19_COUNTER_DRAFT_POLICY = Object.freeze({
+    policyId: "a19-counter-draft-v1" as const,
+    adoptedAt: "2026-11-22",
+    adoption: "standing-user-instruction",
+    registrationSha256: "7d5b23d507419eac1246f70e81916103c02ad577e0d04eb675db91e46e73bebb",
     qualification: "strength-confirmed",
 } as const);
 
@@ -715,6 +731,16 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/decoy_aware_redirect.ts" as const,
         sha256: "4065952f69c77117db4b81a1790f2453df42894e146978359558907f1b56f98b" as const,
     }),
+    Object.freeze({
+        role: "counter-draft" as const,
+        source: "src/ai/setup/a19_counter_draft.ts" as const,
+        sha256: "577b77596c18c2c94bac5f6d068d9c8704064973a0c84b79034d6d0674333d30" as const,
+    }),
+    Object.freeze({
+        role: "counter-draft-model" as const,
+        source: "src/ai/setup/draft_models/a19_counter_draft_v1.json" as const,
+        sha256: "444c5cf85a25f3ef5231c99424f2c77ef1486e56b982f22f0eda7a059044734d" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -753,6 +779,7 @@ export const V08_A19_PROFILE = Object.freeze({
     deepFit: V08_A19_DEEP_FIT_POLICY,
     wildRegenGift: V08_A19_WILD_REGEN_GIFT_POLICY,
     decoyAware: V08_A19_DECOY_AWARE_POLICY,
+    counterDraft: V08_A19_COUNTER_DRAFT_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 
