@@ -41,7 +41,8 @@ Registration `docs/evidence/opponent_history_registration_20261123.json` (sha256
 namespace `opponent-history-20261123-v1`, 1,867 families × maps 1/3/4, audited against 1,236 ledgers with 0
 intersections; histories drafted on 450 separate tasks per style. Every population spans all nine doctrine cells.
 3,154 distinct fights on the x3d host (8 processes, 07:24–09:48 UTC), fight trees prod21c6/c7 as in confirmation Z.
-Results: `docs/evidence/opponent_history_confirmation_20261123.json`.
+Results: `docs/evidence/opponent_history_confirmation_20261123.json`. The commit hook reformatted the registration file;
+the registered bytes are `json.dumps(json.load(file), indent=1)` in Python, whose sha256 is the one above.
 
 | Population, history                  | Tasks | Changed (won/lost) | Difference | 95% interval       |
 | ------------------------------------ | ----: | -----------------: | ---------: | ------------------ |
