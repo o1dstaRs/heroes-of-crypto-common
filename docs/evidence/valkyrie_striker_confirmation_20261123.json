@@ -1,0 +1,134 @@
+{
+    "id": "valkyrie-striker-confirmation-S",
+    "registrationSha256": "cb9274594d957678298c35f0569777cbb89a446068ade351e1efe4cdc98f3536",
+    "populations": {
+        "ownF": {
+            "n": 750,
+            "families": 84,
+            "difference": 8.866666666666667,
+            "low": 4.704301075268817,
+            "high": 13.095238095238095,
+            "replayedDifferently": 750,
+            "wins": 136,
+            "losses": 70,
+            "controlScore": 73.4
+        },
+        "nativeF": {
+            "n": 1356,
+            "families": 152,
+            "difference": 6.5265486725663715,
+            "low": 3.120411160058737,
+            "high": 9.948032665181886,
+            "replayedDifferently": 1356,
+            "wins": 218,
+            "losses": 127,
+            "controlScore": 75.81120943952803
+        },
+        "own": {
+            "n": 186,
+            "families": 22,
+            "difference": 3.4946236559139785,
+            "low": -1.6666666666666667,
+            "high": 9.13978494623656,
+            "replayedDifferently": 186,
+            "wins": 27,
+            "losses": 20,
+            "controlScore": 71.7741935483871
+        },
+        "native": {
+            "n": 399,
+            "families": 45,
+            "difference": 1.0025062656641603,
+            "low": -4.761904761904762,
+            "high": 6.361323155216285,
+            "replayedDifferently": 399,
+            "wins": 37,
+            "losses": 34,
+            "controlScore": 80.82706766917293
+        }
+    },
+    "primary": {
+        "n": 2106,
+        "families": 236,
+        "difference": 7.359924026590694,
+        "low": 4.7245963912630575,
+        "high": 10.023809523809524
+    },
+    "natural": {
+        "n": 585,
+        "families": 67,
+        "difference": 1.794871794871795,
+        "low": -2.4786324786324787,
+        "high": 5.897435897435898
+    },
+    "qualityErrorGames": {
+        "control": 0,
+        "candidate": 0
+    },
+    "parity": {
+        "tasks": 120,
+        "identical": 120
+    },
+    "g5": {
+        "tasks": 30,
+        "identical": 30
+    },
+    "gates": {
+        "S1 conditional strength: lower bound of the pooled ownF + nativeF can-change 95% interval above 0": true,
+        "S2 natural guard: pooled own + native can-change difference at least -8 points": true,
+        "S3 quality: candidate games with a quality error at most control + 2": true,
+        "S4 parity: every parity replay reproduces the control digest": true,
+        "S5 second host: the 30 G5 candidate tasks reproduce the digests on x3d": true
+    },
+    "adopt": true,
+    "failedPredecessor": {
+        "id": "confirmation-P-flyer-centre-20261122",
+        "registration": "flyer_centre_registration_20261122.json",
+        "registrationSha256": "364821e01f0b8d28455d28d2029c2e909f4ecbf7b0f52d38633a15ccd954779e",
+        "gates": {
+            "P1 owner-shaped strength: lower bound of the own per-task 95% interval above 0": false,
+            "P2 shooter guard: native can-change difference at least -8 points": true,
+            "P3 quality: candidate games with a quality error at most control + 2": true,
+            "P4 parity: every parity replay reproduces the control digest": true,
+            "P5 second host: the 30 G5 candidate tasks reproduce the digests on x3d": true
+        },
+        "adopt": false,
+        "own": {
+            "n": 4050,
+            "families": 450,
+            "difference": -0.49382716049382713,
+            "low": -1.3703703703703705,
+            "high": 0.37037037037037035
+        },
+        "native": {
+            "n": 1017,
+            "families": 113,
+            "difference": -1.671583087512291,
+            "low": -4.08062930186824,
+            "high": 0.7374631268436578
+        },
+        "ownWithValkyrie": {
+            "tasks": 108,
+            "replayedDifferently": 108,
+            "difference": 6.944444444444445,
+            "wins": 16,
+            "losses": 9,
+            "controlScore": 78.24074074074075
+        },
+        "ownWithoutValkyrie": {
+            "tasks": 1710,
+            "replayedDifferently": 1590,
+            "difference": -1.608187134502924,
+            "wins": 152,
+            "losses": 180,
+            "controlScore": 78.15789473684211
+        }
+    },
+    "productionPort": {
+        "note": "The confirmation ran the research seam research_flyer_formation.ts in mode valkyrie (tree prod21c12): isA19DeliveryMelee or isResearchFlyingStriker marks a formation striker, and the formation is a19StrikerRushFormation exactly. Production marks formation strikers with isA19FormationStriker in src/ai/setup/a19_valkyrie_striker.ts (the same test) from the server's strikerRushFormation.",
+        "productionSources": {
+            "src/ai/setup/a19_valkyrie_striker.ts": "7335b5e1055d56d996d9b08cf25f8302fbbebea826de3b0ed5f836edba0a2640"
+        }
+    },
+    "notClaimed": "A win rate against people; the effect on all games scales with how often a rushing army fields a Valkyrie."
+}

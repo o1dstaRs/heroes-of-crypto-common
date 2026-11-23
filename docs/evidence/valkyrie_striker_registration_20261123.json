@@ -1,0 +1,179 @@
+{
+ "id": "confirmation-S-valkyrie-striker-20261123",
+ "registeredAt": "2026-11-23T08:07:39.920604+00:00",
+ "owner": "2026-11-22, x3d arena game b02a58ce: \"weird it puts valkyrie at the backline, and flying units usually should be in the center\"",
+ "hypothesis": "The striker-rush formation leaves Valkyrie (Wind Flow is an amplifiable buff, so isA19DeliveryMelee excludes it) in its native back cell. A rushing entrant that moves a melee flyer with no ranged attack or spell damage (Valkyrie) with its strikers, the formation otherwise unchanged, scores higher on the rush tasks of armies that field one, without losing more than 8 points on the natural drafts.",
+ "motivation": {
+  "confirmationP": {
+   "registrationSha256": "364821e01f0b8d28455d28d2029c2e909f4ecbf7b0f52d38633a15ccd954779e",
+   "adopt": false,
+   "gates": {
+    "P1 owner-shaped strength: lower bound of the own per-task 95% interval above 0": false,
+    "P2 shooter guard: native can-change difference at least -8 points": true,
+    "P3 quality: candidate games with a quality error at most control + 2": true,
+    "P4 parity: every parity replay reproduces the control digest": true,
+    "P5 second host: the 30 G5 candidate tasks reproduce the digests on x3d": true
+   },
+   "ownWithValkyrie": {
+    "tasks": 108,
+    "replayedDifferently": 108,
+    "difference": 6.944444444444445,
+    "wins": 16,
+    "losses": 9,
+    "controlScore": 78.24074074074075
+   },
+   "ownWithoutValkyrie": {
+    "tasks": 1710,
+    "replayedDifferently": 1590,
+    "difference": -1.608187134502924,
+    "wins": 152,
+    "losses": 180,
+    "controlScore": 78.15789473684211
+   },
+   "note": "P (Valkyrie + flyers in the middle rows) failed P1 and stays failed; S is a narrower, separate candidate on fresh families"
+  },
+  "development": "fl-valk vs fl-control (163 dev tasks with a Valkyrie): +11.66 (95% +4.28 to +19.18), W32/L13"
+ },
+ "candidate": {
+  "rule": "HOC_RESEARCH_FLYER_FORMATION=valkyrie for the entrant (research_flyer_formation.ts: isResearchFlyingStriker joins the striker flag; the formation is a19StrikerRushFormation exactly, no flyer set)",
+  "control": "the same tree without HOC_RESEARCH_FLYER_FORMATION",
+  "seamSha256": {
+   "src/simulation/ai_iteration/research_flyer_formation.ts": "8245fec67214acc77cc1118d012edacb6ed0d9dc83b495addf00bd55aa039b2a",
+   "src/simulation/ai_iteration/ranked_adapter.ts": "43196530bfe7b53597e83631208a7e0eebfb622f2996da7d1785b684cb1b25c0",
+   "node_modules/@heroesofcrypto/common/src/ai/decoy_research.ts": "14a9cc34aba07ec9ccf61b990a8e51a2d610248116aa044f67e310037aef6158"
+  }
+ },
+ "bank": {
+  "namespace": "flyer-centre-20261122-v1 (allocate_v37)",
+  "families": "natural own/native: 800-1912; forced ownF/nativeF: 800-1099 (P used 0-449; 450-799 held by the unregistered Q bank)",
+  "design": "one draft root per family; maps 1/3/4 x 3 fights; doctrines cycle by family",
+  "populations": {
+   "own": {
+    "tasks": 10017,
+    "families": 1113,
+    "canChange": 186,
+    "rushWithoutValkyrie": 5175,
+    "parity": 30,
+    "canChangeByMap": {
+     "1": 60,
+     "3": 66,
+     "4": 60
+    }
+   },
+   "native": {
+    "tasks": 10017,
+    "families": 1113,
+    "canChange": 399,
+    "rushWithoutValkyrie": 9513,
+    "parity": 30,
+    "canChangeByMap": {
+     "1": 132,
+     "3": 132,
+     "4": 135
+    }
+   },
+   "ownF": {
+    "tasks": 2700,
+    "families": 300,
+    "canChange": 750,
+    "canChangeFamilies": 84,
+    "rushWithoutValkyrie": 645,
+    "parity": 30,
+    "canChangeByMap": {
+     "1": 252,
+     "3": 249,
+     "4": 249
+    }
+   },
+   "nativeF": {
+    "tasks": 2700,
+    "families": 300,
+    "canChange": 1356,
+    "canChangeFamilies": 152,
+    "rushWithoutValkyrie": 1320,
+    "parity": 30,
+    "canChangeByMap": {
+     "1": 453,
+     "3": 453,
+     "4": 450
+    }
+   }
+  },
+  "selection": "played = striker-rush tasks whose army fields a Valkyrie, plus 30 parity tasks per population that rush without one"
+ },
+ "arms": {
+  "settings": "HOC_RESEARCH_FIX_SEATS=both HOC_RESEARCH_ENTRANT_SEARCH='{}' HOC_RESEARCH_DECOY_AWARE=both life-pool14.sh, spec am-prod-prod, tree prod21c12",
+  "entrant": "MG:mix:0.5:2 with RUSH_T2=h1 RUSH_T2_MAP=A (league-drafts15, the v27 default); forced populations add RUSH_FORCE=2:Valkyrie",
+  "opponents": {
+   "own/ownF": "S:B23:fast:K14 (owner-shaped)",
+   "native/nativeF": "native (stock draft: shooter armies)"
+  },
+  "hosts": "basenode cfS-bn.sh (ownF, nativeF); Mac cfS-mac.sh (own, native); x3d cfS-hft.sh (G5)"
+ },
+ "analysis": {
+  "script": "confirm_s_analyze.py",
+  "unit": "paired score difference per can-change task, points",
+  "interval": "bootstrap over draft-root families (per population), 20,000 resamples, seed 20261122"
+ },
+ "gates": {
+  "S1": "conditional strength: lower bound of the 95% interval of the pooled ownF + nativeF can-change difference above 0",
+  "S2": "natural guard: pooled own + native can-change difference at least -8 points",
+  "S3": "quality: candidate games with a quality error at most control (same tasks) + 2, all populations",
+  "S4": "parity: every parity task replays to its control digest",
+  "S5": "second host: the 30 G5 candidate tasks reproduce the main candidate digests on x3d"
+ },
+ "adoption": "a19-valkyrie-striker-v1 is adopted when S1-S5 pass; a failed gate stays recorded as failed",
+ "notClaimed": "A win rate against people; the effect on all games scales with how often a rushing army fields a Valkyrie.",
+ "inputs": {
+  "league-drafts15.ts": "cbe489b76fb76bf30359c0f0a92a13ae3140ab1d0b9dd590ca64c5be6d8ca281",
+  "build_s.py": "7ce8994a0cd8cdfd585ac29fd9c9ea448f810e06a7360335be29fc36110670ee",
+  "build_s_forced.py": "d96d0dcdebcbfb55c6bb6ed7f2b1a58413cd23ec96e639f20ce1728f43514c16",
+  "confirm_s_analyze.py": "6ec9d35869e12e64bca273508aef5353d89ae6450edf8c534977b26428439042",
+  "register_s.py": "426f1f54e613451d1c06ccd625977efbf8338366ae92935112655df098d8ba84",
+  "life-run14.ts": "739a4f807dde19b25c08fd8437c927b4b4869293adcd4d707dab612e8dfc0582",
+  "life-pool14.sh": "a7be0b39bac4883c66c161f99bbf7545d22584959e458826457c23031883633a",
+  "formation_lib5.ts": "6a095308a7e0d9ae62efc389dfaa1cfac95f44bab3552d7cc86c915230fb8281",
+  "mm/model-20261122.json": "6fdcf35516e9cc99491f15e30dd3a5ab77328b012d0ae431734322fd144b988a",
+  "mm/matchups-20261122.jsonl": "49fac07afdee0460cad5e8f91418414c482b5e25b603e3b1834b5701b2e4443e",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "bank/creatures.json": "c90428fff0fcf0f4ba86d1d1857fa9323f2cbe320b759329fa0b23f231e20599",
+  "bank/creatures-p.json": "c4e10b9301caf8b44557f5b6d1cfc5d230ba6f53a0aaeb5846f7b9256c9efef2",
+  "specs2/am-prod-prod.json": "75d281bc2206ceb6237f51ff3b694177d9c73c851efd724695c220e533e21dbf",
+  "seeds20/seed-admission.json": "40b8e85488c32a2aed6132aeb7d07fc0ef8016e0d017bc2a2532ee3b9d34547c",
+  "seeds20/pool.json": "7798b3915684f21fdcd146e5a193130fedddf009a6f2580f79c2f47dcc763639",
+  "seeds20/allocated-typed-preimages.json": "2a50767b96b6dd9d538e4cec97e817e68ef5a80f26a226d2aaabd54ae794eb94",
+  "allocate_v37.py": "ac38ee1e0fd7bfe624aed4cfcef48da7c91e1ef76c7072c373c5ae6754007c7b",
+  "cfS-bn.sh": "5dd408dc8cd46b414ee58b74407197808cfc66b2d57051aa90f51ccb9ca669d0",
+  "cfS-mac.sh": "c5cd062b725828c4f27eb95a8eab1bdac07eedb66732526d2afe5d9884b48b08",
+  "cfS-hft.sh": "6df1d5516e75cb2d9d096753161f44dd64872b35de953cae4700df0da257a2ec",
+  "fl_analyze.py": "4ac7cc0f372a9d8da3eb3768ff16a991bd554b7bab66fcdbbbab37d83d08f7de",
+  "league/fl-dev-valk.json": "4883a9b798b4e7830f6549f7943c97bd48356e9555a485d8e8c0f63e2ceb69d5",
+  "registration-P.json": "364821e01f0b8d28455d28d2029c2e909f4ecbf7b0f52d38633a15ccd954779e"
+ },
+ "banks": {
+  "bank/cfS-own-tasks.json": "d12c1023661a26b4d6577a6092084b5c0b2e292cd2cc87279c945279bc4e5118",
+  "bank/cfS-own-drafts.json": "0d04078548008eb6fb1bd947fbc8155cb5a9ec9a565dc288a0a7a45437ab522f",
+  "bank/cfS-own-play.json": "e453b2ded8ded2828e14b50efc91b3b665a5d2cfba0bb0dea3b2001b142dd6fc",
+  "bank/cfS-own-split.json": "78442ad34832e8ad3c173dab2a838430cc7c079545c8a50ba6a89fdac79625a8",
+  "bank/cfS-native-tasks.json": "d12c1023661a26b4d6577a6092084b5c0b2e292cd2cc87279c945279bc4e5118",
+  "bank/cfS-native-drafts.json": "908d60a80880eccc94d04a37e0011e43fec0d7dfc22d6cda09c404d53cf07cb3",
+  "bank/cfS-native-play.json": "0f2362a4f8d683c9a13597ff9127b1d7677fd949e91186b13a397d66248be27b",
+  "bank/cfS-native-split.json": "1cd2d72504b5ef4dbf1ba7d923c64f113e136d61617d968978d7b8036a48f215",
+  "bank/cfS-ownF-tasks.json": "aac3d031c71e49edd388f17082ddca47d0fc1179e14cdc4a380fd54cf70c9a16",
+  "bank/cfS-ownF-drafts.json": "9a5c5d16e68329ace8c793009e6c74c4e646e68a510413665a316521ae42d134",
+  "bank/cfS-ownF-play.json": "88d3a1f81f7b38e9599a684d119733c4effd1cdb302cc9091812836328fd15cb",
+  "bank/cfS-ownF-split.json": "aeaea24be3eece290fd009d2f78612c049d6f9f7df4cbe9dc0c5db0f86d0911a",
+  "bank/cfS-nativeF-tasks.json": "aac3d031c71e49edd388f17082ddca47d0fc1179e14cdc4a380fd54cf70c9a16",
+  "bank/cfS-nativeF-drafts.json": "2d77a58131bc107a301a72004f979ec40af4cc46959471fec354be8d5b53829e",
+  "bank/cfS-nativeF-play.json": "61c8dde7f4185ea2f867ba26d51b82ae0feff4bcb76dd1b92819611aff253871",
+  "bank/cfS-nativeF-split.json": "a0fc2bae799a3b32f3a512fa47222f19d6ccdd80b4a111d810889677994eb8f6",
+  "bank/cfS-g5.json": "377a395581421a15bc5b244d43c6ac73959204721e84e2075a52cc087ada60f7",
+  "bank/cfS-summary.json": "916cd8cf9eabc94d57a1af6127d502b12ac3d688b3965ed18fe78b3a51fa3a1f"
+ },
+ "trees": {
+  "prod21c12": {
+   "manifestSha256": "9c4c346ad1612bcc9ad07c5dbdf68752b915896e66acb672075f278dff0ecd22",
+   "files": 1274
+  }
+ }
+}

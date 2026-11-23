@@ -9,6 +9,16 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Valkyrie with the strikers — November 23, 2026
+
+Under the standing instruction `a19-valkyrie-striker-v1` is active: **the current default is profile v28**. Read
+`docs/valkyrie_striker_adoption.md`. The striker-rush formation moves Valkyrie with the strikers
+(`src/ai/setup/a19_valkyrie_striker.ts`; server switch `HOC_A19_VALKYRIE_STRIKER`). Confirmation S on rush armies with a
+Valkyrie +7.36 points per task (95% +4.72 to +10.02). Confirmation P (also flyers in the middle rows)
+failed and is not adopted.
+
+Profile v27 is retained inside v28.
+
 ## Lava Striders by map — November 22, 2026
 
 Under the standing instruction `a19-lava-map-artifact-v1` is active: **the current default is profile v27**. Read

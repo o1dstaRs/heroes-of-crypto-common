@@ -1,0 +1,125 @@
+{
+ "id": "confirmation-P-flyer-centre-20261122",
+ "registeredAt": "2026-11-23T05:38:43.506239+00:00",
+ "owner": "2026-11-22, x3d arena game b02a58ce (the AI won): \"weird it puts valkyrie at the backline, and flying units usually should be in the center to have equal change to catch any side..\"",
+ "hypothesis": "The striker-rush formation moves only isA19DeliveryMelee stacks to the front column and spreads them over the rows in native row order, so a Valkyrie stack (Wind Flow is an amplifiable buff) keeps its native back cell and flyers often take a flank. An entrant whose formation also moves a melee flyer without ranged attack or spell damage (Valkyrie) and gives flying strikers the slots nearest the middle row scores higher against owner-shaped armies than the production formation, without losing more than 8 points on its can-change tasks against shooter armies.",
+ "candidate": {
+  "rule": "HOC_RESEARCH_FLYER_FORMATION=both for the entrant (tree prod21c10, research_flyer_formation.ts flyerCentreRushFormation + isResearchFlyingStriker)",
+  "control": "the same tree without HOC_RESEARCH_FLYER_FORMATION (production strikerRushFormation)",
+  "equivalence": "with no flying striker, or flying strikers only, and no Valkyrie, the formation is production's exactly (8,000 random layouts checked)",
+  "seamSha256": {
+   "src/simulation/ai_iteration/research_flyer_formation.ts": "8245fec67214acc77cc1118d012edacb6ed0d9dc83b495addf00bd55aa039b2a",
+   "src/simulation/ai_iteration/ranked_adapter.ts": "f384627140a154a59b790140b882d5c2956db7ff6e10b4b2fc1fc91d75f92dc2"
+  }
+ },
+ "development": {
+  "pools": "dev pools only (league/fl-dev.json, fl_build.py): 783 tasks predicted to change, 163 with a Valkyrie",
+  "result": [
+   "fl-both vs fl-control: 783 paired tasks (control 783, candidate 783)",
+   "all                                n= 783  +4.21 (+0.83 to +7.83)  changed  750:  +4.40 (+0.55 to +8.26) W125/L93  quality ctl 0 cand 0",
+   "flValk=False                       n= 620  +2.66 (-1.21 to +6.55)  changed  587:  +2.81 (-1.37 to +7.17) W89/L74  quality ctl 0 cand 0",
+   "flValk=True                        n= 163 +10.12 (+2.06 to +19.23)  changed  163: +10.12 (+2.06 to +19.23) W36/L19  quality ctl 0 cand 0",
+   "map 1                              n= 269  +3.16 (-2.39 to +8.79)  changed  252:  +3.37 (-2.79 to +9.88) W38/L29  quality ctl 0 cand 0",
+   "map 3                              n= 254  +7.09 (+1.08 to +13.02)  changed  245:  +7.35 (+1.23 to +13.32) W43/L25  quality ctl 0 cand 0",
+   "map 4                              n= 260  +2.50 (-4.67 to +9.22)  changed  253:  +2.57 (-4.65 to +9.80) W44/L39  quality ctl 0 cand 0"
+  ]
+ },
+ "bank": {
+  "namespace": "flyer-centre-20261122-v1",
+  "allocator": "allocate_v37.py (= allocate_v36 + the seeds19 capsule of confirmation V; SCAN 120,000)",
+  "design": "one draft root per family; maps 1/3/4 x 3 fight seeds per family; doctrines cycle by family; first 450 families",
+  "populations": {
+   "own": {
+    "tasks": 4050,
+    "families": 450,
+    "canChange": 1818,
+    "rushWithoutMix": 366,
+    "noRush": 1866,
+    "parity": 30,
+    "canChangeByMap": {
+     "1": 606,
+     "3": 603,
+     "4": 609
+    },
+    "canChangeWithValkyrie": 108
+   },
+   "native": {
+    "tasks": 1017,
+    "families": 113,
+    "canChange": 918,
+    "rushWithoutMix": 72,
+    "noRush": 27,
+    "parity": 30,
+    "canChangeByMap": {
+     "1": 306,
+     "3": 306,
+     "4": 306
+    },
+    "canChangeWithValkyrie": 9
+   }
+  },
+  "selection": "own = every family, native = families i%4==0; played = every task whose rush can apply with a Valkyrie or a flyer/ground striker mix, plus 30 parity tasks per population that cannot change"
+ },
+ "arms": {
+  "settings": "HOC_RESEARCH_FIX_SEATS=both HOC_RESEARCH_ENTRANT_SEARCH='{}' life-pool14.sh, spec am-prod-prod, tree prod21c10",
+  "entrant": "MG:mix:0.5:2 with RUSH_T2=h1 RUSH_T2_MAP=A (league-drafts15: the v27 default draft and Tier-2 rule)",
+  "ownOpponent": "S:B23:fast:K14 (owner-shaped)",
+  "nativeOpponent": "native (the stock draft: shooter armies)",
+  "tags": "cfP-<population>-control and cfP-<population>-candidate (can-change + parity tasks), cfP-g5 on x3d (30 own candidate tasks)"
+ },
+ "analysis": {
+  "script": "confirm_p_analyze.py",
+  "unit": "paired score difference per task (0 for a task that cannot change), points",
+  "interval": "bootstrap over draft-root families (nine tasks each), 20,000 resamples, seed 20261122"
+ },
+ "gates": {
+  "P1": "owner-shaped strength: lower bound of the 95% interval of the own population's per-task difference above 0",
+  "P2": "shooter guard: native population, can-change tasks: difference at least -8 points",
+  "P3": "quality: candidate games with a quality error at most control (same tasks) + 2, both populations",
+  "P4": "parity: every parity task replays to its control digest",
+  "P5": "second host: the 30 G5 candidate tasks reproduce the digests on x3d"
+ },
+ "adoption": "a19-flyer-centre-v1 is adopted when P1-P5 pass; a failed gate stays recorded as failed",
+ "notClaimed": "A win rate against people; formations other than the striker rush are unchanged; the rush eligibility is unchanged.",
+ "inputs": {
+  "league-drafts15.ts": "cbe489b76fb76bf30359c0f0a92a13ae3140ab1d0b9dd590ca64c5be6d8ca281",
+  "build_p.py": "ba1481bd589a5d1318daf091f821a5cf88ae81b27647597975f6367b0cb4b0af",
+  "confirm_p_analyze.py": "cec1b4cd5676ae9b3a4492e9ee6d1f4f9c818a24737840e9b95c165263fe3b1f",
+  "register_p.py": "4288e67082b22cd7f00952e8d4a5ccd28cd7bb63c71d077672245c5a71c65114",
+  "life-run14.ts": "739a4f807dde19b25c08fd8437c927b4b4869293adcd4d707dab612e8dfc0582",
+  "life-pool14.sh": "a7be0b39bac4883c66c161f99bbf7545d22584959e458826457c23031883633a",
+  "formation_lib5.ts": "6a095308a7e0d9ae62efc389dfaa1cfac95f44bab3552d7cc86c915230fb8281",
+  "mm/model-20261122.json": "6fdcf35516e9cc99491f15e30dd3a5ab77328b012d0ae431734322fd144b988a",
+  "mm/matchups-20261122.jsonl": "49fac07afdee0460cad5e8f91418414c482b5e25b603e3b1834b5701b2e4443e",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "bank/creatures.json": "c90428fff0fcf0f4ba86d1d1857fa9323f2cbe320b759329fa0b23f231e20599",
+  "bank/creatures-p.json": "c4e10b9301caf8b44557f5b6d1cfc5d230ba6f53a0aaeb5846f7b9256c9efef2",
+  "specs2/am-prod-prod.json": "75d281bc2206ceb6237f51ff3b694177d9c73c851efd724695c220e533e21dbf",
+  "seeds20/seed-admission.json": "40b8e85488c32a2aed6132aeb7d07fc0ef8016e0d017bc2a2532ee3b9d34547c",
+  "seeds20/pool.json": "7798b3915684f21fdcd146e5a193130fedddf009a6f2580f79c2f47dcc763639",
+  "seeds20/allocated-typed-preimages.json": "2a50767b96b6dd9d538e4cec97e817e68ef5a80f26a226d2aaabd54ae794eb94",
+  "allocate_v37.py": "ac38ee1e0fd7bfe624aed4cfcef48da7c91e1ef76c7072c373c5ae6754007c7b",
+  "cfP-mac.sh": "be6346294b5c212d71f1f84a5c6102647994f67935f4c1d50af1849c1b7b00bd",
+  "cfP-hft.sh": "8abd5fc501621bc416a990108dcb2be55b79159fee837987a19c4aae020d67f5",
+  "fl_build.py": "829c45f34bf801e3b077bdb0217aa9f8a53f65ef00ffcb628fb8b163e2db32b5",
+  "fl_analyze.py": "4ac7cc0f372a9d8da3eb3768ff16a991bd554b7bab66fcdbbbab37d83d08f7de"
+ },
+ "banks": {
+  "bank/cfP-own-tasks.json": "c93c614023927c4dbb23648768afdfc404c90112d6117e60082870131f8bb2b6",
+  "bank/cfP-own-drafts.json": "97874ef2c6db506ab0cd65b92ddea0fcab8559e218efbfed95877a7700fb8268",
+  "bank/cfP-own-play.json": "6fa794b2c8e1b3ee10cf565997dc40a7fa9935262dd5a1ee8e1a1a6876d6e6f8",
+  "bank/cfP-own-split.json": "601286d5d38ff8396cca1bc006c0225bbd50b172ecd87e3f1b04bb1272b08106",
+  "bank/cfP-native-tasks.json": "0bdd3c037c1be704de726c20d2e62a51cbce7d5350753cca2542e5ea7260a9e5",
+  "bank/cfP-native-drafts.json": "a32c9f0c12a4fac6a2d1c2f5fd0af5ba7dba5b5d8283a72700e1e0d1127f78fc",
+  "bank/cfP-native-play.json": "153af166919dafb1167a20c6c5991556cd20b26340a05b5aab15bf1c6bbeb625",
+  "bank/cfP-native-split.json": "48c0eb6dbfe74a6050742842f0fc7c9d4b197f3ec0ed80853676e4b180060822",
+  "bank/cfP-g5.json": "cae910dddd6a5dd5629fb4105bb732a29b76b913d28c5a093c7f0213e842be1d",
+  "bank/cfP-summary.json": "bc08c7c9049db9d144a1676bcf71957f1abc343d1fd492f952b37fa12447171f"
+ },
+ "trees": {
+  "prod21c10": {
+   "manifestSha256": "63c09b6c4d809c6e24275dc71a31617898814d1423955d7bbdeff1c1efd8c6bc",
+   "files": 1271
+  }
+ }
+}

@@ -143,8 +143,12 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     (ai/setup/a19_lava_map_artifact.ts). Without lava +0.48 points (95% +0.24 to +0.73); the
  *     owner-rush guard passed. The registered lava-map rule failed its strength gate (+0.09, -0.32 to
  *     +0.51) and is not adopted (docs/lava_map_artifact_adoption.md).
+ *   - Valkyrie with the strikers (profile v28) adopted on 2026-11-23 under the standing instruction, after the owner saw a
+ *     rushing AI leave its Valkyries at the back: the rush formation moves Valkyrie with the strikers
+ *     (ai/setup/a19_valkyrie_striker.ts). On rush armies with a Valkyrie +7.36 points per task (95% +4.72
+ *     to +10.02). Confirmation P, which also put flyers in the middle rows, failed (docs/valkyrie_striker_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v27" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v28" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -389,6 +393,18 @@ export const V08_A19_DECOY_AWARE_POLICY = Object.freeze({
     adoptedAt: "2026-11-22",
     adoption: "standing-user-instruction",
     registrationSha256: "9e2d00ea2bfdd5b610d2f2cf54f661b58c2aa541c929d42bc6850e3f62f1f146",
+    qualification: "strength-confirmed",
+} as const);
+
+/**
+ * Valkyrie with the strikers (profile v28): ai/setup/a19_valkyrie_striker.ts, called by the server's strikerRushFormation.
+ * See docs/valkyrie_striker_adoption.md.
+ */
+export const V08_A19_VALKYRIE_STRIKER_POLICY = Object.freeze({
+    policyId: "a19-valkyrie-striker-v1" as const,
+    adoptedAt: "2026-11-23",
+    adoption: "standing-user-instruction",
+    registrationSha256: "cb9274594d957678298c35f0569777cbb89a446068ade351e1efe4cdc98f3536",
     qualification: "strength-confirmed",
 } as const);
 
@@ -763,6 +779,11 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/setup/a19_lava_map_artifact.ts" as const,
         sha256: "0ee31d0335359ab12ac6a712ec3b4808674343971ae1fc8fc70c0a1f839714c5" as const,
     }),
+    Object.freeze({
+        role: "valkyrie-striker" as const,
+        source: "src/ai/setup/a19_valkyrie_striker.ts" as const,
+        sha256: "7335b5e1055d56d996d9b08cf25f8302fbbebea826de3b0ed5f836edba0a2640" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -803,6 +824,7 @@ export const V08_A19_PROFILE = Object.freeze({
     decoyAware: V08_A19_DECOY_AWARE_POLICY,
     counterDraft: V08_A19_COUNTER_DRAFT_POLICY,
     lavaMapArtifact: V08_A19_LAVA_MAP_ARTIFACT_POLICY,
+    valkyrieStriker: V08_A19_VALKYRIE_STRIKER_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

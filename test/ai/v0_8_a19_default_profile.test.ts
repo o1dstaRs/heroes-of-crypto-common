@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v27",
+            schema: "hoc.v0_8_a19_production_profile.v28",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -199,12 +199,20 @@ describe("v0.8+A19 production profile", () => {
                 registrationSha256: "7d5b23d507419eac1246f70e81916103c02ad577e0d04eb675db91e46e73bebb",
                 qualification: "strength-confirmed",
             },
-            // Profile v27: Lava Striders by map, confirmed on both halves.
+            // Profile v27: Lava Striders by map (rule A; the lava-map rule failed and is not adopted).
             lavaMapArtifact: {
                 policyId: "a19-lava-map-artifact-v1",
                 adoptedAt: "2026-11-22",
                 adoption: "standing-user-instruction",
                 registrationSha256: "09fdcef677947b48b52c0baee2d6beb296aa9add6dad05c55d92a587d80a364f",
+                qualification: "strength-confirmed",
+            },
+            // Profile v28: Valkyrie moves with the strikers in the rush formation.
+            valkyrieStriker: {
+                policyId: "a19-valkyrie-striker-v1",
+                adoptedAt: "2026-11-23",
+                adoption: "standing-user-instruction",
+                registrationSha256: "cb9274594d957678298c35f0569777cbb89a446068ade351e1efe4cdc98f3536",
                 qualification: "strength-confirmed",
             },
         });
@@ -523,6 +531,7 @@ describe("v0.8+A19 production profile", () => {
             "counter-draft",
             "counter-draft-model",
             "lava-map-artifact",
+            "valkyrie-striker",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));
