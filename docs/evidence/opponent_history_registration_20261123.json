@@ -1,0 +1,186 @@
+{
+    "id": "confirmation-OH-opponent-history-prior-20261123",
+    "registeredAt": "2026-11-23T07:04:56.666522+00:00",
+    "owner": "2026-11-23: \"Try 1 measurably from all angles\" (item 1: use the opponent's own match history in the counter draft); \"lock in wins if any\"; \"continue driving your research overnight\"",
+    "hypothesis": "A default seat whose gated counter draft (v27) samples the opponent's unseen slots from the opponent's own last 30 armies, blended with the global prior ((h(id) + 5 p_g(id)) / (n + 5)), with the gate itself unchanged, scores higher against an owner-shaped rush opponent whose history is its own style, without losing more than 3 points against the caster brawler, decoy fort, Queen fort or the default AI with their own histories, against any of the four owner styles with a mixed history (10 rush, 10 decoy fort, 10 Queen fort), or more than 5 points against the rush when its history is misleading (Queen fort).",
+    "candidate": {
+        "draft": "league-drafts-oh2.ts seat MH:mix:0.5:2, RUSH_OH_MODE=prior, RUSH_OH_HISTORY per condition",
+        "control": "league-drafts-oh2.ts seat MG:mix:0.5:2 (the v26/v27 counter-draft replica)",
+        "draftEnv": "RUSH_VALUES explore/table-a.json RUSH_PRIOR 0.5 RUSH_VAL_SLOTS B1234 RUSH_T1 policy RUSH_T2 h1 RUSH_T2_MAP 1 RUSH_MM mm/model-20261122.json RUSH_MM_PRIOR mm/matchups-20261122.jsonl"
+    },
+    "development": {
+        "screen": "seeds17 pool (confirmation Z's consumed bank), v26 control, 3,421 distinct fights; arms full / openprior / prior",
+        "priorArm": "own C30 +4.17 (95% +1.25 to +7.12, 67 of 324 changed); caster C30 +0.62; decoy C30 -1.23; queen C30 about -0.6; mixed history own +1.08, caster -1.85, decoy -0.62; misleading own -1.08; default AI C30 about +2.8 (partial, 54 of 221 changed tasks played when registered)",
+        "otherArms": "early gate opening (openprior/full) about -0.6 against the default AI (partial) and no better against the owner styles; full's history-closed gate -1.85 against the caster brawler",
+        "prediction": "history raises the counter draft's per-creature log-likelihood of the opponent's actual army by +0.47 (rush) to +0.99 (decoy fort) nats with 30 games; top-3 hit rate 11-35% -> 62-65%"
+    },
+    "bank": {
+        "namespace": "opponent-history-20261123-v1",
+        "allocator": "allocate_oh.py (allocate_v36 + the nineteenth namespace and this capsule)",
+        "audit": "0 intersections against 1,236 ledgers (python3 rush/allocate_oh.py audit)",
+        "pool": "5601 tasks, 1867 families x maps 1/3/4",
+        "histories": "fresh history tasks (sha256 namespace oh-conf-hist-20261123), 450 armies per opponent style",
+        "populations": {
+            "own-C30": {
+                "tasks": 1875,
+                "changed": 332
+            },
+            "own-X30": {
+                "tasks": 1875,
+                "changed": 323
+            },
+            "own-W30": {
+                "tasks": 1875,
+                "changed": 407
+            },
+            "caster-C30": {
+                "tasks": 1875,
+                "changed": 238
+            },
+            "caster-X30": {
+                "tasks": 1875,
+                "changed": 215
+            },
+            "decoy-C30": {
+                "tasks": 1863,
+                "changed": 154
+            },
+            "decoy-X30": {
+                "tasks": 1863,
+                "changed": 104
+            },
+            "queen-C30": {
+                "tasks": 1863,
+                "changed": 108
+            },
+            "queen-X30": {
+                "tasks": 1863,
+                "changed": 109
+            },
+            "mirror-C30": {
+                "tasks": 945,
+                "changed": 261
+            }
+        },
+        "parity": {
+            "own": 30,
+            "caster": 30,
+            "decoy": 30,
+            "queen": 30,
+            "mirror": 30
+        },
+        "distinctFights": {
+            "own": 1306,
+            "caster": 667,
+            "decoy": 362,
+            "queen": 297,
+            "mirror": 522
+        },
+        "selection": "own, caster: (i // 9) % 3 == 0; decoy: (i // 9) % 3 == 1; queen: (i // 9) % 3 == 2; mirror: (i // 9) % 6 == 1 (each spans all nine doctrine cells); a first build by i % 3 fixed the candidate doctrine per population and was discarded before registration with no fight played (bank/abandoned-ohc-1)"
+    },
+    "arms": {
+        "settings": "HOC_RESEARCH_FIX_SEATS=both HOC_RESEARCH_ENTRANT_SEARCH='{}' life-pool14.sh, x3d node, 8 processes",
+        "specs": {
+            "own": "am-prod-prod, tree prod21c6",
+            "caster": "am-prod-prod, tree prod21c7",
+            "decoy": "am-prod-decoy, tree prod21c6",
+            "queen": "am-prod-queen, tree prod21c6",
+            "mirror": "am-prod-prod, tree prod21c6"
+        }
+    },
+    "analysis": {
+        "script": "analyze_oh_conf.py",
+        "unit": "paired score difference per task (0 for an unchanged fight input), points",
+        "interval": "bootstrap over pool families, 20,000 resamples, seed 20261123"
+    },
+    "gates": {
+        "OH1": "strength: own C30, lower bound of the 95% interval above 0",
+        "OH2": "caster C30: difference at least -3 points",
+        "OH3": "decoy C30: difference at least -3 points",
+        "OH4": "queen C30: difference at least -3 points",
+        "OH5": "mirror (default AI) C30: difference at least -3 points",
+        "OH6": "mixed history X30 on own, caster, decoy and queen: each difference at least -3 points",
+        "OH7": "misleading history own W30: difference at least -5 points",
+        "OH8": "quality: candidate fights with a quality error at most control fights with one + 2",
+        "OH9": "parity: every parity input replays to the same digest under two tags",
+        "OH10": "second host: 30 changed own-population fights replayed on the Mac reproduce the x3d digests"
+    },
+    "notClaimed": "A win rate against people; real players' histories (the opponent styles are scripted); seats without an opponent history are unchanged by construction; the fight tree is prod21c6/c7 as in confirmation Z.",
+    "inputs": {
+        "league-drafts14.ts": "5cb7256770115fc3f287d8f46cde4a75e7d967139118e4d2f0addf249f6b0174",
+        "league-drafts-oh1.ts": "fe312b30b164c15cd477a1349f2f7c077d51b95b6a413e1d90bb323ba058b9c6",
+        "league-drafts-oh2.ts": "8f029502c86483f046ba7dae7c91683d38998b91df27302f8686f3388b002fcf",
+        "patch_oh1.py": "a3c7632e1d63867d9bbab8e5618f2aa44bd7a53b979922a8aa613a4e168b7ac9",
+        "build_oh_conf.py": "e75707980e394cd0bce3fc0127500940c94b4305fdb363db53b356668d7d7980",
+        "analyze_oh_conf.py": "983d8929c85ec72a61e37121faca2a678c23066f968bf311a22efbae693dd66e",
+        "run-ohc.sh": "239fff897caa8a386dd26a869fda4591044230533538b1dfa0bc2d86767e6311",
+        "life-run14.ts": "739a4f807dde19b25c08fd8437c927b4b4869293adcd4d707dab612e8dfc0582",
+        "life-pool14.sh": "a7be0b39bac4883c66c161f99bbf7545d22584959e458826457c23031883633a",
+        "formation_lib5.ts": "6a095308a7e0d9ae62efc389dfaa1cfac95f44bab3552d7cc86c915230fb8281",
+        "allocate_oh.py": "a490e6083737c4bd4fb544ee6002dafeb9548622795df210a2293bca8039a64b",
+        "specs2/am-prod-decoy.json": "8474d40055196b1f0115c6868022a34103e800fa8fb5862f193660c0bf4414f8",
+        "specs2/am-prod-prod.json": "75d281bc2206ceb6237f51ff3b694177d9c73c851efd724695c220e533e21dbf",
+        "specs2/am-prod-queen.json": "255ea734d5285506c02a9372de117002a78fa0a0c0c63d1b142a7c41c478e9a8",
+        "mm/matchups-20261122.jsonl": "49fac07afdee0460cad5e8f91418414c482b5e25b603e3b1834b5701b2e4443e",
+        "mm/model-20261122.json": "6fdcf35516e9cc99491f15e30dd3a5ab77328b012d0ae431734322fd144b988a",
+        "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+        "bank/creatures.json": "c90428fff0fcf0f4ba86d1d1857fa9323f2cbe320b759329fa0b23f231e20599",
+        "seeds-oh1/pool.json": "acd5726095d3bac937f72f72f2d09781b2588f6244a240e3df46af2f2b41e32c",
+        "seeds-oh1/seed-admission.json": "b1cef459fd08eedfe4e0675c16d65177515cefd8d0d9b500f9d39b2d9dc08bc3",
+        "seeds-oh1/exclusion-ledgers.json": "a5c06695fe27935f10deac0005b6b5bb3fdcbfdc595b5f74ec0a0aa68c39e5f4",
+        "hist/conf-cond-caster-C30.json": "ecf6d34dc2e2695bca3815f4c30b0ae3e28c98e8c1b5100db86b629bf61e31bc",
+        "hist/conf-cond-caster-X30.json": "2120ba2f751c7470c46e81d892f256f411e003f288c89c54949901592403a3df",
+        "hist/conf-cond-decoy-C30.json": "4969bccc627a981d47240164ca4ffa3e9d7b866ab05b0f9ad58b7696a94a062a",
+        "hist/conf-cond-decoy-X30.json": "40ab1b21be565a6a91d47199d990ffc506a77d58de2576f7ff1e565c570ebb0c",
+        "hist/conf-cond-mirror-C30.json": "1f88e7b8ccdecab606476bf8eddc788693aa15a255f4cc6963c0742a95424094",
+        "hist/conf-cond-own-C30.json": "8094b68946baaeec3155efbe4e6d556382cb4ca28da3ed60e76b280f73dedb87",
+        "hist/conf-cond-own-W30.json": "35a5961db95872947c2a3862767d78087c790d55a5dbf7df07493af2ba78a966",
+        "hist/conf-cond-own-X30.json": "29a23c552c73386d6645c7aff837619ddc55c527c670c7e502fa84d2a554b237",
+        "hist/conf-cond-queen-C30.json": "3ac07f503e248712d13f4356ba5abf1b45009a1e0373b724fd3791f88b12b5f5",
+        "hist/conf-cond-queen-X30.json": "a2b1ed97918d825dd91c35e70df55b3cbf69ed355d739da196a9fecb76e4b258",
+        "hist/conf-drafts-caster.json": "d4a616964521fa7a1da5c722da7156d859738358fbc5990a73d141b417027d94",
+        "hist/conf-drafts-decoy.json": "9fcb84c3fbd71a9c8d803cc1f63eeae40d8e5276c4b1722cdcf092b6ba991b90",
+        "hist/conf-drafts-mirror.json": "1a5a3ca72c659f02acc18a40ac98cf57f65364b007f2e813c17ffaa44e9b0654",
+        "hist/conf-drafts-own.json": "7a137526dc81887bd9790a0bd0caa4183be26368828301919842b110b1fcceb9",
+        "hist/conf-drafts-queen.json": "c51a381dec040ac753bb207b57558d753daeca985b27a753683f68cd5a860b21",
+        "hist/conf-hist-tasks.json": "d88db6156b065161dc0c230ecd9fbf7e101a319785586779deb8d1adbe0f1405",
+        "hist/conf-pool-caster.json": "729206f00f4090a5cad8376c8d6ccf17d18b41c356aab6276276e24577691a3b",
+        "hist/conf-pool-decoy.json": "f5f8252e716ba5c36b26def828ab9e4a959eb324d6cb43a3695cc672050c7356",
+        "hist/conf-pool-mirror.json": "b21cf8028555923c51dbca247ae4fde768d343fb4dc89bcfe882dc625125c197",
+        "hist/conf-pool-own.json": "8a3e89af19ce87bdd54931527247ca6b3604b344ff528d7d712883b30ef13adb",
+        "hist/conf-pool-queen.json": "748ee7c8bec325b9a053b0ebe615c60972ccaf7627057e527b276c9d0ba53ae8",
+        "bank/ohc-caster-C30.json": "5bd1577ea6ed89d4da0ea0a2a6229a13673a72eb008656724c66c14a0a48bed2",
+        "bank/ohc-caster-X30.json": "61166743fbb5f7c8de0e47b3053fd5797fb11436e45b360d87e304a7850074df",
+        "bank/ohc-caster-control.json": "140c54f66e7bd8af8f9f630ace0492651d9a0df147c0705f7c7e6e611ab1c1aa",
+        "bank/ohc-caster-tasks.json": "85f7152194f83627e8699b46df27f61bc76ba75726858133656b487fd4b999a1",
+        "bank/ohc-decoy-C30.json": "d82fe8fa18d90d6f1dbf43960d7476e6d14190de6eafb54dc1f8aa8bb91ee6ec",
+        "bank/ohc-decoy-X30.json": "8014f722a19b2ecb6af058b6029bb212302fd31f109b3f0ebe11b4ac3699c72e",
+        "bank/ohc-decoy-control.json": "a9bfc6a51335514457ed9cc071b699951b74b65ed5cc4c194ebafa35da59a14e",
+        "bank/ohc-decoy-tasks.json": "98b144240518a27ef8d055275f25956058fbe986f952cbf9469ae031f33a8e21",
+        "bank/ohc-mirror-C30.json": "3e22d427f17085b78de9fa0c120c4ab8fc9a323a0fe0bc6583c010fdc53007b8",
+        "bank/ohc-mirror-control.json": "3b4c81d3048575c4900a21e12d42f15d97fe6537292107205480de075a101088",
+        "bank/ohc-mirror-tasks.json": "5c16754411ce8456352636ca73fcfa424d3695926b0561d37b52efa8711ed173",
+        "bank/ohc-own-C30.json": "9f315a9d1aa728c2f52bd7edfe7c5eca06bd615c30e7e6e18010dfadea0d44f8",
+        "bank/ohc-own-W30.json": "71f709595257644da928a1c183e4a1d2a9c12711b3a13e3bdf6f59e6d215b3ab",
+        "bank/ohc-own-X30.json": "cb3dcc320e85aafe3bd11711edc43ecaf7b4a5a21018778d727d463252681f9a",
+        "bank/ohc-own-control.json": "b05f139f29108c8d77d85a2aacb3a729e7be616bf871fc1ef5fa093f58eb9b63",
+        "bank/ohc-own-tasks.json": "85f7152194f83627e8699b46df27f61bc76ba75726858133656b487fd4b999a1",
+        "bank/ohc-queen-C30.json": "9fd435011c0e450a24e422f73e606c544eaa40ed08d5fb4a56a0c418e1af4d9b",
+        "bank/ohc-queen-X30.json": "496fc45595a172a3dcd2fd88ee76c2b28cf46bd128f815a6392278c50ef68005",
+        "bank/ohc-queen-control.json": "e32f2f585d3396b5b3e531aa785f0df35bc3553cf3126987ecadae5eccf70344",
+        "bank/ohc-queen-tasks.json": "2a4aa216356e6753c310a81eba1facca23aa835f0a927f12dc12b215b7aba275",
+        "bank/ohc-summary.json": "fdc2376000fc60006af50c73bb1c9c1fbac4a2a79e9b69088345c006ebfb3395",
+        "bank/ohcf-caster.json": "37ba7492014371dad022f73c11acb6e8c10cad14a97a00f7f488af4b27ad4d36",
+        "bank/ohcf-decoy.json": "71a3f946d8b059397a923708ad16d0d713dc541f5202d480c9db0fc8e36d84dc",
+        "bank/ohcf-index.json": "e16bcb69f4bb35c320dd8dd629d0ec28ae4d200260042dfa186d65450dcc9ead",
+        "bank/ohcf-mirror.json": "430c26f07ae48eaab1ec0f3640c33eef7db886af3fcad547c3321c0f78b1ab47",
+        "bank/ohcf-own.json": "1086f72d53c8264d1e2b55b58a8fe8f58027743524b06390e54ee635030453c1",
+        "bank/ohcf-queen.json": "b3af3ae2fce80eedee1bd9737eb779107648d1da7930be5f0775f2a9ed2470b9",
+        "bank/ohcp-caster.json": "4dd5f2621cef4164e5e3ac94d85b010862ab352fce818840e6e6a68ddcbb389e",
+        "bank/ohcp-decoy.json": "693edb476dc50cdd3a69c722e8ee260df586552094c12582a86d243e3e8e19ed",
+        "bank/ohcp-mirror.json": "c59a381005befc337647282ae171b58f40ed83f14dbfbd3e65b0cecfcced5bfa",
+        "bank/ohcp-own.json": "9349c00f6cf7a22093f3e0e10dd176426c570fd36a2a267da69c8bd87ef6d15d",
+        "bank/ohcp-queen.json": "45c52edebafb5b7098dbc6456f11ebd31df4237b6d25412b144c42ffe983b7d1",
+        "bank/ohcs.json": "058630db05eeaa68e76ddf67dc341d6d600b75a2fa31b43a764ed1d47efd5f48"
+    }
+}

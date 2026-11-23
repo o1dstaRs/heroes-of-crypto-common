@@ -19,6 +19,14 @@ failed and is not adopted.
 
 Profile v27 is retained inside v28.
 
+## Opponent history in the counter draft: failed, November 23, 2026
+
+Read `docs/opponent_history_draft_research.md` before giving the counter draft any opponent history. Registered
+confirmation OH drew the opponent's unseen slots from its last 30 armies blended with the production prior. Its
+strength gate failed: owner-shaped rush +1.04 (95% −0.03 to +2.16). Against the default AI it lost −2.43 (−4.44 to
+−0.42). It is not adopted and `a19_counter_draft.ts` is unchanged. Do not waive, re-run or relabel it; its bank is
+consumed.
+
 ## Lava Striders by map — November 22, 2026
 
 Under the standing instruction `a19-lava-map-artifact-v1` is active: **the current default is profile v27**. Read

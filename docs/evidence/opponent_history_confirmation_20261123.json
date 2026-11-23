@@ -1,0 +1,251 @@
+{
+    "id": "confirmation-OH-opponent-history-prior-20261123",
+    "registrationSha256": "510b334a9dabc5f0d30a064d308dc674bf32dc1df0651b8b78005dd2fd163d1c",
+    "run": {
+        "host": "x3d (Ryzen 7 9800X3D), 8 processes, nice 10; second host: Mac (M4 Max), 30 fights",
+        "started": "2026-11-23T07:24:54Z",
+        "finished": "2026-11-23T09:48:47Z",
+        "distinctFights": {
+            "own": 1306,
+            "caster": 667,
+            "decoy": 362,
+            "queen": 297,
+            "mirror": 522
+        },
+        "parityReplays": "150 under each of two tags",
+        "resultsArchiveSha256": "e20f62c6fc5656698b6ae3e34a8f0cad72bd73353a8938a86905f677c134b328"
+    },
+    "unit": "points: 100 x mean over all tasks of the population of (candidate score - control score), 0 for an unchanged fight input; 95% bootstrap over pool families, 20,000 resamples, seed 20261123",
+    "results": {
+        "own:C30": {
+            "points": 1.04,
+            "low": -0.02666666666666667,
+            "high": 2.16,
+            "tasks": 1875,
+            "changed": 332,
+            "gained": 54,
+            "lost": 35,
+            "missing": 0,
+            "slices": {
+                "doctrine Battle Trance": 0.0,
+                "doctrine Scout": 1.3556618819776713,
+                "doctrine Spymaster": 1.7628205128205128,
+                "map Block": 1.84,
+                "map Lava": 0.72,
+                "map Normal": 0.56
+            }
+        },
+        "own:X30": {
+            "points": 0.9066666666666667,
+            "low": -0.13333333333333333,
+            "high": 1.9466666666666668,
+            "tasks": 1875,
+            "changed": 323,
+            "gained": 55,
+            "lost": 38,
+            "missing": 0,
+            "slices": {
+                "doctrine Battle Trance": 0.16025641025641027,
+                "doctrine Scout": 0.7177033492822966,
+                "doctrine Spymaster": 1.8429487179487178,
+                "map Block": 1.2,
+                "map Lava": 0.8,
+                "map Normal": 0.72
+            }
+        },
+        "own:W30": {
+            "points": -0.3466666666666667,
+            "low": -1.5466666666666666,
+            "high": 0.8533333333333334,
+            "tasks": 1875,
+            "changed": 407,
+            "gained": 60,
+            "lost": 66,
+            "missing": 0,
+            "slices": {
+                "doctrine Battle Trance": -0.16025641025641027,
+                "doctrine Scout": -1.1961722488038278,
+                "doctrine Spymaster": 0.32051282051282054,
+                "map Block": 0.64,
+                "map Lava": -1.28,
+                "map Normal": -0.4
+            }
+        },
+        "caster:C30": {
+            "points": 0.6666666666666667,
+            "low": -0.18666666666666668,
+            "high": 1.52,
+            "tasks": 1875,
+            "changed": 238,
+            "gained": 44,
+            "lost": 32,
+            "missing": 0,
+            "slices": {
+                "doctrine Battle Trance": 0.0,
+                "doctrine Scout": 1.4354066985645932,
+                "doctrine Spymaster": 0.5608974358974359,
+                "map Block": 1.12,
+                "map Lava": -0.08,
+                "map Normal": 0.96
+            }
+        },
+        "caster:X30": {
+            "points": -0.5066666666666666,
+            "low": -1.5466666666666666,
+            "high": 0.48,
+            "tasks": 1875,
+            "changed": 215,
+            "gained": 32,
+            "lost": 42,
+            "missing": 0,
+            "slices": {
+                "doctrine Battle Trance": 0.0,
+                "doctrine Scout": -0.5582137161084529,
+                "doctrine Spymaster": -0.9615384615384616,
+                "map Block": -0.8,
+                "map Lava": -0.64,
+                "map Normal": -0.08
+            }
+        },
+        "decoy:C30": {
+            "points": -0.45625335480407947,
+            "low": -1.3687600644122384,
+            "high": 0.4294149221685454,
+            "tasks": 1863,
+            "changed": 154,
+            "gained": 23,
+            "lost": 31,
+            "missing": 0,
+            "slices": {
+                "doctrine Battle Trance": 0.1610305958132045,
+                "doctrine Scout": -1.3687600644122384,
+                "doctrine Spymaster": -0.1610305958132045,
+                "map Block": -0.8051529790660226,
+                "map Lava": 0.1610305958132045,
+                "map Normal": -0.7246376811594203
+            }
+        },
+        "decoy:X30": {
+            "points": 0.322061191626409,
+            "low": -0.29522275899087497,
+            "high": 0.966183574879227,
+            "tasks": 1863,
+            "changed": 104,
+            "gained": 20,
+            "lost": 14,
+            "missing": 0,
+            "slices": {
+                "doctrine Battle Trance": 0.1610305958132045,
+                "doctrine Scout": -0.08051529790660225,
+                "doctrine Spymaster": 0.8856682769726248,
+                "map Block": 0.1610305958132045,
+                "map Lava": 0.966183574879227,
+                "map Normal": -0.1610305958132045
+            }
+        },
+        "queen:C30": {
+            "points": 0.0,
+            "low": -0.7514761137949544,
+            "high": 0.7514761137949544,
+            "tasks": 1863,
+            "changed": 108,
+            "gained": 21,
+            "lost": 21,
+            "missing": 0,
+            "slices": {
+                "doctrine Battle Trance": 0.0,
+                "doctrine Scout": 0.8051529790660226,
+                "doctrine Spymaster": -0.8051529790660226,
+                "map Block": 0.1610305958132045,
+                "map Lava": -0.4830917874396135,
+                "map Normal": 0.322061191626409
+            }
+        },
+        "queen:X30": {
+            "points": 0.05367686527106817,
+            "low": -0.5367686527106817,
+            "high": 0.644122383252818,
+            "tasks": 1863,
+            "changed": 109,
+            "gained": 19,
+            "lost": 18,
+            "missing": 0,
+            "slices": {
+                "doctrine Battle Trance": 0.322061191626409,
+                "doctrine Scout": 0.1610305958132045,
+                "doctrine Spymaster": -0.322061191626409,
+                "map Block": 0.0,
+                "map Lava": -0.1610305958132045,
+                "map Normal": 0.322061191626409
+            }
+        },
+        "mirror:C30": {
+            "points": -2.433862433862434,
+            "low": -4.444444444444445,
+            "high": -0.4232804232804233,
+            "tasks": 945,
+            "changed": 261,
+            "gained": 31,
+            "lost": 54,
+            "missing": 0,
+            "slices": {
+                "doctrine Battle Trance": 0.6349206349206349,
+                "doctrine Scout": -5.714285714285714,
+                "doctrine Spymaster": -2.2222222222222223,
+                "map Block": -0.31746031746031744,
+                "map Lava": -2.857142857142857,
+                "map Normal": -4.126984126984127
+            }
+        }
+    },
+    "qualityErrorFights": {
+        "control": 0,
+        "candidate": 0
+    },
+    "parity": true,
+    "secondHost": true,
+    "complete": true,
+    "gates": {
+        "OH1 strength (own C30 lower bound > 0)": false,
+        "OH2 caster C30 >= -3": true,
+        "OH3 decoy C30 >= -3": true,
+        "OH4 queen C30 >= -3": true,
+        "OH5 mirror C30 >= -3": true,
+        "OH6 mixed history X30 (own, caster, decoy, queen) >= -3": true,
+        "OH7 misleading history own W30 >= -5": true,
+        "OH8 quality (candidate <= control + 2)": true,
+        "OH9 parity (two tags, identical digests)": true,
+        "OH10 second host (30 fights reproduce)": true
+    },
+    "outcome": "NOT PASSED: OH1 (strength) failed, lower bound -0.03; OH2-OH10 passed. Not adopted.",
+    "development": {
+        "bank": "seeds17 pool (confirmation Z's consumed bank), v26 control, 3,421 distinct fights",
+        "priorArm": {
+            "own:C30": [4.17, 1.25, 7.12],
+            "own:C5": 1.85,
+            "own:X30": 1.08,
+            "own:W30": -1.08,
+            "caster:C30": 0.62,
+            "caster:X30": -1.85,
+            "decoy:C30": -1.23,
+            "decoy:X30": -0.62,
+            "queen:C30": -0.63,
+            "queen:X30": 0.0,
+            "mirror:C30": [-0.21, -2.22, 1.77],
+            "mirror:C5": 0.99
+        },
+        "openpriorArm": {
+            "own:C30": 3.09,
+            "mirror:C30": [1.71, -1.25, 4.63],
+            "mirror:C5": [4.36, 1.39, 7.26],
+            "decoy:C30": -1.23
+        },
+        "fullArm": {
+            "own:C30": 3.4,
+            "caster:C30": -1.85,
+            "mirror:C30": 1.71
+        },
+        "note": "The registration cited partial default-AI numbers (prior about +2.8, openprior about -0.6); the final development values are above. The registered arm was not changed."
+    },
+    "notClaimed": "A win rate against people; real players' histories (the opponent styles are scripted); the fights run on the frozen v21-era fight tree prod21c6/c7, as in confirmation Z."
+}
