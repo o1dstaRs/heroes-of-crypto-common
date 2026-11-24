@@ -1,0 +1,91 @@
+{
+ "id": "deep-fit-4000-confirmation-U",
+ "registrationSha256": "6f7431f0fb0d533eb3c9604e331bdc891b338ff32655b2f8a03c9007a2568729",
+ "primary": {
+  "n": 7950,
+  "families": 800,
+  "difference": 2.4779874213836477,
+  "low": 1.6741629185407296,
+  "high": 3.276247207743857
+ },
+ "populations": {
+  "mirror": {
+   "n": 1575,
+   "families": 175,
+   "difference": 3.8095238095238093,
+   "low": 1.492063492063492,
+   "high": 6.126984126984127
+  },
+  "own": {
+   "n": 1575,
+   "families": 175,
+   "difference": 0.9841269841269841,
+   "low": -0.7301587301587301,
+   "high": 2.6984126984126986
+  },
+  "native": {
+   "n": 4800,
+   "families": 800,
+   "difference": 2.53125,
+   "low": 1.6354166666666667,
+   "high": 3.4270833333333335
+  }
+ },
+ "maps": {
+  "1": {
+   "n": 3450,
+   "families": 800,
+   "difference": 2.536231884057971,
+   "low": 1.3936291240045506,
+   "high": 3.654721274175199
+  },
+  "3": {
+   "n": 3450,
+   "families": 800,
+   "difference": 2.3333333333333335,
+   "low": 1.1494252873563218,
+   "high": 3.5267857142857144
+  },
+  "4": {
+   "n": 1050,
+   "families": 175,
+   "difference": 2.761904761904762,
+   "low": 0.6666666666666666,
+   "high": 4.857142857142857
+  }
+ },
+ "changedGames": 6883,
+ "wins": 599,
+ "losses": 392,
+ "qualityErrorGames": {
+  "control": 0,
+  "candidate": 0
+ },
+ "g5": {
+  "tasks": 30,
+  "identical": 30
+ },
+ "gates": {
+  "U1 strength: lower bound of the pooled 95% interval above 0": true,
+  "U2 each population (mirror, own, native) estimate at least -2 points": true,
+  "U3 each map estimate at least -2 points": true,
+  "U4 quality: candidate games with a quality error at most control + 2": true,
+  "U5 second host: the 30 G5 candidate tasks reproduce the main candidate digests": true
+ },
+ "adopt": true,
+ "analysisOutput": [
+  "rows {'cand-mirror': 1575, 'cand-nA': 2400, 'cand-nB': 2400, 'cand-own': 1575, 'ctl-mirror': 1575, 'ctl-nA': 2400, 'ctl-nB': 2400, 'ctl-own': 1575}",
+  "pooled: n 7950 candidate - control +2.48 points (95% +1.67 to +3.28); changed 6883 W599/L392; unpaired rows 0",
+  "  mirror  n  1575 +3.81 (+1.49 to +6.13)",
+  "  own     n  1575 +0.98 (-0.73 to +2.70)",
+  "  native  n  4800 +2.53 (+1.64 to +3.43)",
+  "  map 1   n  3450 +2.54 (+1.39 to +3.65)",
+  "  map 3   n  3450 +2.33 (+1.15 to +3.53)",
+  "  map 4   n  1050 +2.76 (+0.67 to +4.86)",
+  "quality: games with a quality error ctl 0 cand 0",
+  "G5: 30 rows, digests equal to the main candidate rows: 30",
+  "ctl: deep-fit decisions 226014 attempted 199918 played 177483 (78.5%) overran 22435; CPU s/game mirror 21.2 nA 41.7 nB 100.3 own 22.3",
+  "cand: deep-fit decisions 225904 attempted 225744 played 212640 (94.1%) overran 13104; CPU s/game mirror 26.8 nA 54.7 nB 138.0 own 28.0",
+  "gates U1 PASS U2 PASS U3 PASS U4 PASS U5 PASS"
+ ]
+}

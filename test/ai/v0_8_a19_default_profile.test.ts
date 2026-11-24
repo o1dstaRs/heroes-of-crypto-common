@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v28",
+            schema: "hoc.v0_8_a19_production_profile.v29",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -213,6 +213,14 @@ describe("v0.8+A19 production profile", () => {
                 adoptedAt: "2026-11-23",
                 adoption: "standing-user-instruction",
                 registrationSha256: "cb9274594d957678298c35f0569777cbb89a446068ade351e1efe4cdc98f3536",
+                qualification: "strength-confirmed",
+            },
+            // Profile v29: the deep-fit budget fills the owner-approved 4 s (4,000 rollout turns).
+            deepFit4000: {
+                policyId: "a19-deep-fit-4000-v1",
+                adoptedAt: "2026-11-23",
+                adoption: "standing-user-instruction",
+                registrationSha256: "6f7431f0fb0d533eb3c9604e331bdc891b338ff32655b2f8a03c9007a2568729",
                 qualification: "strength-confirmed",
             },
         });

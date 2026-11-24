@@ -1,0 +1,142 @@
+{
+ "id": "confirmation-U-deep-fit-4000-20261123",
+ "registeredAt": "2026-11-23T17:30:41.743481+00:00",
+ "question": "Does the default (A19 profile v28) score higher when a bot seat's deep-fit budget is 4,000 rollout turns instead of 2,800, with the same 4,000 ms think deadline, through the production a19-deep-fit-v1 driver?",
+ "origin": "Owner, 2026-11-21: \"4s is fine\" (per AI move); confirmation M shipped the deep fit at 2,800 turns as \"about 4 s on the 2-vCPU host\". Live since the v23 deploy, 2,800 turns take at most about 2.7 s on staging (testapi, AMD EPYC-Rome, two owner games, 62 decisions: p50 ~930 ms, p90 ~2.1 s, max 2.4 / 2.7 s) and 3.3 s on prod (gameapi, Intel Skylake, 40 decisions); offline the Mac does 3.4 turns/ms per process against about 1.0-1.3 on staging and 0.85-1.0 on prod. 4,000 turns re-calibrates the turn budget to the approved 4 s on staging; the driver keeps stopping the deep search at 4,000 ms from the decision start, so a slower host plays the stock choice there, as it does today for an overrun.",
+ "candidate": {
+  "driver": "production a19-deep-fit-v1 (v0_8_a19_deep_fit.ts, byte-identical in v28 and prod18) with rolloutTurnBudget 4000 instead of 2800 (research override HOC_RESEARCH_DEEP_FIT_TURNS=4000); predictedDeepToStockRatio 4.07, deep budget R8/S10/M16 and thinkMs 4000 unchanged: the stock search first, the deep search started when stock turns x 5.07 <= 4,000, limited to 4,000 - stock turns, played when it completed, otherwise the stock choice",
+  "seam": "entrant seat only: HOC_RESEARCH_ENTRANT_PROD_DEEP_FIT=1 in prod28 ranked_adapter.ts (the production createBotSeatSearchDriver with deepFit, as a live bot seat); the other seat keeps the stock driver (as M); deterministic work mode (turn budgets, no deadlines)",
+  "seamSha256": {
+   "src/simulation/ai_iteration/ranked_adapter.ts": "e807c46f85fd27b9be464a6a0438cf42f6ae1ba805ea4886f7b1ae313cfef4e0",
+   "node_modules/@heroesofcrypto/common/src/simulation/v0_8_a19_deep_fit.ts": "592f780e3b10350b6e953ed7354f9129b2ce664017efe17821a750d393d02615"
+  },
+  "parity": "prod28 with the seams unset == prod28ctl (pristine v28) 2/2 digests; prod28 control (spec am-prod-prod) == prod28 control under spec v19 2/2 on smoke tasks; prod18c/prod18d research copies == prod18b 24/24 and 8/8 digests"
+ },
+ "control": "HOC_RESEARCH_ENTRANT_PROD_DEEP_FIT=1 on prod28 with the shipped budget (2,800 turns).",
+ "why": "Development budget curve on 1,206 v28 dev drafts (prod18b, spec v19; out/bc-analysis.txt): production deep fit vs stock +3.07 (95% +0.91..+5.21); 5,600 turns vs 2,800 +2.40 (+0.17..+4.67), deep played 79.2% -> 99.7%; arena-like R16 / 8,000 turns +3.40 (+1.37..+5.49). A middle R4/S10/M16 level inside 2,800 turns was flat (out/ad-analysis.txt: -0.33, -2.32..+1.67): the gain needs the full deep search on the big boards. Per-decision calibration (out/cal/cal-d28-own.decisions.jsonl): played 72%, overran 12% (stock 400-599 turns), skipped 16% (stock > 552). 4,000 turns admits stock <= 789 turns.",
+ "populations": {
+  "mirror": "cfDP mirror drafts: the entrant and the opponent draft as the v28 default (MG:mix:0.5:2, RUSH_T2=h1 RUSH_T2_MAP=A)",
+  "own": "cfDP own drafts: the opponent drafts owner-shaped strikers (S:B23:fast:K14)",
+  "native": "cfDP native drafts: the opponent drafts natively (shooter armies); maps 1 and 3 only"
+ },
+ "bank": {
+  "namespace": "decoy-path-20261123-v1 (allocate_v39, seeds22; audited at allocation, 0 intersections)",
+  "provenance": "drafted at 04:20 PST for confirmation DP (build_dp.py), which was never registered; no task of these banks was played on any host (checked before registration). U plays every task: all can change.",
+  "design": "one draft root per family; mirror and own: families 0-174, maps 1/3/4, 3 fights each; native: families 0-799, maps 1 and 3, 3 fights each (split by family into A 0-399 and B 400-799 for two hosts)",
+  "summary": {
+   "mirror": {
+    "tasks": 1575,
+    "families": 175,
+    "byMap": {
+     "1": 525,
+     "3": 525,
+     "4": 525
+    }
+   },
+   "own": {
+    "tasks": 1575,
+    "families": 175,
+    "byMap": {
+     "1": 525,
+     "3": 525,
+     "4": 525
+    }
+   },
+   "native": {
+    "tasks": 4800,
+    "families": 800,
+    "byMap": {
+     "1": 2400,
+     "3": 2400
+    }
+   },
+   "native-A": {
+    "tasks": 2400,
+    "families": 400,
+    "byMap": {
+     "1": 1200,
+     "3": 1200
+    }
+   },
+   "native-B": {
+    "tasks": 2400,
+    "families": 400,
+    "byMap": {
+     "1": 1200,
+     "3": 1200
+    }
+   },
+   "g5": {
+    "tasks": 30,
+    "families": 10,
+    "byMap": {
+     "1": 30
+    }
+   }
+  }
+ },
+ "arms": {
+  "runner": "life-pool8.sh / life-run8.ts, spec specs2/am-prod-prod.json (no setup overrides: v28 setup on both seats)",
+  "hosts": "Mac M4 Max (14 processes: mirror and own, both arms side by side, 6 control + 8 candidate); x3d 9800X3D (12 processes at nice 19, autogroup 19, shared with a peer's job: native A, 5 control + 7 candidate); basenode Ryzen 9 3900X (22 processes: native B, 9 control + 13 candidate; then the 30 G5 mirror tasks, candidate arm). Bun 1.4.5 on all hosts; tree manifests checked equal before launch."
+ },
+ "primaryEndpoint": "Mean over all 7,950 paired tasks (mirror 1,575 + own 1,575 + native 4,800) of candidate minus control entrant score, in points. 95% percentile interval from 20,000 bootstrap resamples of draft-root family numbers drawn jointly across populations, seed 20261123 (confirm_u_analyze.py).",
+ "gates": {
+  "U1": "Lower bound of the primary interval above zero.",
+  "U2": "Each population (mirror, own, native): estimate at least -2 points.",
+  "U3": "Each map (1, 3, 4), pooled over populations: estimate at least -2 points.",
+  "U4": "Candidate games with a quality error at most control games with one + 2.",
+  "U5": "The 30 tasks of bank/cfU-g5.json, candidate arm, replayed on a second host reproduce the main candidate digests."
+ },
+ "cost": "Recorded, not gated: deep-fit statistics per arm (decisions, attempted, played, overran) and CPU per game per population. After an adoption: live search_timing on staging and prod (p50 / p90 / max, deep-fit counts).",
+ "adoptionRule": "If U1-U5 pass, a19-deep-fit at 4,000 rollout turns becomes the next profile under the standing instruction (thinkMs stays 4,000, the owner-approved budget). A failed gate stays recorded as failed: not waived, re-run or relabelled.",
+ "notClaimed": "A win rate against people; a longer think than 4 s; anything about the x3d arena or tournament tiers; live latency beyond the existing deadline.",
+ "inputsSha256": {
+  "build_u.py": "b9be483c1f9f9482ad99a2dc987bccae5029556dc629dbee77174a6cb00f553f",
+  "confirm_u_analyze.py": "6590740f4c7e9aefec53d4205431cca72fd6e7e8df561291d8c2d9f85726fa4b",
+  "register_u.py": "4c7498d85a3a3131d6a7b1e6672063947b65cb8e3a8b028cbb00710fab7ad133",
+  "cfU-common.inc": "81791acf56c5ba66badfce7d83da13b5bd96eef2e1acd38f7330cbb994f3bb6b",
+  "cfU-mac.sh": "65ea5308b70782caaa167dada1b95aa77f504aa6ae7a2ec4c0f80aba969a143c",
+  "cfU-hft.sh": "f1bbc18ed242e58ae52cbf8425aedd9945c5b5eb43b404442ce98efeb90dc81c",
+  "cfU-bn.sh": "c6d958018635ae23e9691c04fbc807859ae8a6dba1c2d0b2b005bfaa5f388825",
+  "cfU-collect.sh": "f9eaac6d81a48f212a943e51a78f4807a90d7267650f4507c93d5f02d2d5e076",
+  "life-run8.ts": "0af7e49b87714586466e7fc9ac76f7e3e0a68b51900b6dd8dcada8cb3c1cb87c",
+  "life-pool8.sh": "dd781069e537c889fd73cf0be47442d71e0d06efe5c7c321e7084f0512506741",
+  "formation_lib.ts": "b6b64b8419d0b4bea3f2bf498f586e54ad3b44f0adc83f05b74a677371fe6f31",
+  "specs2/am-prod-prod.json": "75d281bc2206ceb6237f51ff3b694177d9c73c851efd724695c220e533e21dbf",
+  "tree_manifest.sh": "91e0dc01bd1a13e2a6aa75e022cabc56b79c8c5fbaeda6ab336ec8473e19203e",
+  "build_dp.py": "091b69051e3ea48a68289927995074c464795b92237dc2c0511637c65c5e045e",
+  "league-drafts15.ts": "cbe489b76fb76bf30359c0f0a92a13ae3140ab1d0b9dd590ca64c5be6d8ca281",
+  "allocate_v39.py": "6f5340e368789ccf58143fb0ac81b5b6cd15e99aebb463c9f9e148c2daf260e9",
+  "seeds22/pool.json": "721a90d75ebc696e84fb7601adb3babae9b0e291ceef3fbe6a32bbc84a220cfc",
+  "seeds22/allocated-typed-preimages.json": "2621e39216668413498102dab50d0872f15490dc402e3c5cc248d06ea6c33a3d",
+  "seeds22/seed-admission.json": "29e5bb9a2c680c2b99a7f72508c1c8d7c83b30471f7fbe7e89a971dd77f117ff",
+  "mm/model-20261122.json": "6fdcf35516e9cc99491f15e30dd3a5ab77328b012d0ae431734322fd144b988a",
+  "mm/matchups-20261122.jsonl": "49fac07afdee0460cad5e8f91418414c482b5e25b603e3b1834b5701b2e4443e",
+  "explore/table-a.json": "b51692724a916a44344ae36fa8b7f045cc1e1e1a9f746308c599f5aec0c25e01",
+  "bank/creatures.json": "c90428fff0fcf0f4ba86d1d1857fa9323f2cbe320b759329fa0b23f231e20599",
+  "bank/creatures-p.json": "c4e10b9301caf8b44557f5b6d1cfc5d230ba6f53a0aaeb5846f7b9256c9efef2",
+  "out/bc-analysis.txt": "a36879e964799aee0979680b09d18975f9fff8b9bb9878963a259cf095c81304",
+  "out/ad-analysis.txt": "5ffe7c6c6cb78d52a61682d8b03ea920719205e473319097020a14804629c5ef",
+  "out/cal/cal-d28-own.decisions.jsonl": "352535dce4c225e36a47502d2f43588a292f4e941c942d9db519086b75901c61"
+ },
+ "banksSha256": {
+  "bank/cfDP-mirror-drafts.json": "881d1abe0b820f3d267559c9793c5f2b615bf32cc4bef040143f91471e3997fe",
+  "bank/cfDP-own-drafts.json": "89ba3ff582972d7b479238a3820721671a990d02c8ff672f8000d26bf236f438",
+  "bank/cfDP-native-drafts.json": "fcf52cbb3807d38de7724397dbf7ff3d688bb3eebcb5e37677163c6df4d095ac",
+  "bank/cfDP-mirror-tasks.json": "d52a41cf8603e2df036250af28e3503bc6ab7f072307c09e140d2a8a021d7ec9",
+  "bank/cfDP-own-tasks.json": "d52a41cf8603e2df036250af28e3503bc6ab7f072307c09e140d2a8a021d7ec9",
+  "bank/cfDP-native-tasks.json": "bdfe630a81111c4c201650798ae36dcc49b03e5155ad17d5c35fb3b708fbd1a5",
+  "bank/cfU-native-A.json": "05f9f10e62d7e33738ff64526822e5066a15814bab5229dc28eb2fb8253ee706",
+  "bank/cfU-native-B.json": "fd8b5e7a549a30dfc0d102a9277cc24f2030d0c0f37ffeb0bbe06aca53e9b23b",
+  "bank/cfU-g5.json": "1966f6945a6af20a1c3436c70cddb83b93fe798d0bd80e224ccec40cd5a19a2a",
+  "bank/cfU-summary.json": "c2c2d5a69894cc853dabf7c7d3e010e72487f769986cbf3db7550722a76d7030"
+ },
+ "trees": {
+  "prod28": {
+   "manifest(tree_manifest.sh)": "2aa650f92269b8beb4ad366ba2161a031c21fe0fda4fb5e686d859e8fb49b109"
+  },
+  "prod28ctl": {
+   "manifest(tree_manifest.sh)": "24a9ad3ac12fff5a886d7ee336916492e41e403d7465912af48b75f486d813b1"
+  }
+ }
+}
