@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v33",
+            schema: "hoc.v0_8_a19_production_profile.v34",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -253,6 +253,14 @@ describe("v0.8+A19 production profile", () => {
                 adoptedAt: "2026-11-24",
                 adoption: "owner-request",
                 registrationSha256: "e208b2f6a36d20fa2c86aa310d451a96d6b55a34b77e3b8163a54e23169efc12",
+                qualification: "strength-confirmed",
+            },
+            // Profile v34: at level 4, the matchup model's closing pick while the counter draft stays shut (CPC).
+            closingPick: {
+                policyId: "a19-closing-pick-synergy-v1",
+                adoptedAt: "2026-11-24",
+                adoption: "standing-instruction",
+                registrationSha256: "c994f2e56535f430cfd8fc1cdac01029e47e4f423c09ec9c3ba6aa505a00b38e",
                 qualification: "strength-confirmed",
             },
         });
@@ -574,6 +582,7 @@ describe("v0.8+A19 production profile", () => {
             "valkyrie-striker",
             "carrier-cohesion",
             "queen-counter",
+            "closing-pick",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));

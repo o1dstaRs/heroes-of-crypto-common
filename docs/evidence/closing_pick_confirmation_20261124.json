@@ -1,0 +1,130 @@
+{
+    "id": "closing-pick-CPC-20261124",
+    "registration": {
+        "file": "docs/evidence/closing_pick_registration_20261124.json",
+        "sha256": "c994f2e56535f430cfd8fc1cdac01029e47e4f423c09ec9c3ba6aa505a00b38e",
+        "registeredAt": "2026-11-24T16:45:21Z"
+    },
+    "analysisScriptSha256": "3ceb8979b06ead199084b3a88b3e823cb989942c880c8e41f3d764766af6fd8d",
+    "runs": {
+        "partA": {
+            "host": "basenode (cross-host parity with x3d 12/12 on smoke tasks)",
+            "start": "2026-11-24T16:45:50Z",
+            "end": "2026-11-24T18:53:50Z",
+            "tasks": 768,
+            "rowsSha256": "85997cd195060dd64b341c38c1fafd66bd2f58c028fd5bf03e3bc9f911c8ef0e"
+        },
+        "partB": {
+            "host": "x3d, ai:iterate 12 workers",
+            "start": "2026-11-24T16:45:33Z",
+            "end": "2026-11-24T17:50:03Z",
+            "reportSha256": "2611c8175ec22191289d846bc98fdee2b60b378775ff1717066989b4f31e5096",
+            "sealFileSha256": "2878d8da4d05c9ffb7c52ee22691a8a9f9acd9b273e2e0a19387e024dcc3974e",
+            "censusSha256": "a17299a349ca807a55526bd414b44bb61e634755063522bbb0afc5b0f938a5e4"
+        }
+    },
+    "partA": {
+        "games": [
+            {
+                "game": "1a785955",
+                "swap": "Angel -> Magic Dragon",
+                "seeds": 64,
+                "control": 32.03,
+                "candidate": 92.19,
+                "difference": 60.16
+            },
+            {
+                "game": "9208870e",
+                "swap": "Champion -> Arachna Queen",
+                "seeds": 64,
+                "control": 50.0,
+                "candidate": 35.94,
+                "difference": -14.06
+            },
+            {
+                "game": "76f5f3d5",
+                "swap": "Angel -> Thunderbird",
+                "seeds": 64,
+                "control": 56.25,
+                "candidate": 60.16,
+                "difference": 3.91
+            },
+            {
+                "game": "909e7898",
+                "swap": "Angel -> Arachna Queen",
+                "seeds": 64,
+                "control": 51.56,
+                "candidate": 76.56,
+                "difference": 25.0
+            },
+            {
+                "game": "3fd7b865",
+                "swap": "Champion -> Thunderbird",
+                "seeds": 64,
+                "control": 95.31,
+                "candidate": 59.38,
+                "difference": -35.94
+            },
+            {
+                "game": "974d9737",
+                "swap": "Angel -> Thunderbird",
+                "seeds": 64,
+                "control": 98.44,
+                "candidate": 95.31,
+                "difference": -3.12
+            }
+        ],
+        "estimate": 5.99,
+        "ci95": [
+            0.52,
+            11.33
+        ],
+        "method": "equal game weights; 10,000 resamples of seeds within each game (paired), games fixed; random.Random(2611245501)",
+        "qualityErrorGames": {
+            "control": 0,
+            "candidate": 0
+        }
+    },
+    "partB": {
+        "familiesScreened": 3000,
+        "cases": 6000,
+        "changedCases": 339,
+        "changedFamilies": 339,
+        "activation": 0.0565,
+        "estimatePerChangedCase": 7.23,
+        "ci95": [
+            0.59,
+            14.01
+        ],
+        "better": 84,
+        "worse": 60,
+        "populationEstimatePerGame": 0.408,
+        "qualityErrorGames": {
+            "control": 0,
+            "candidate": 0
+        }
+    },
+    "gates": {
+        "CPC1": "passed",
+        "CPC2": "passed",
+        "CPC3": "passed"
+    },
+    "verdict": "passed",
+    "analysisOutput": [
+        "PART A (6 human games x 64 seeds, equal weights; seeds resampled within each game)",
+        "  1a785955: control  32.0%  candidate  92.2%  difference +60.16",
+        "  3fd7b865: control  95.3%  candidate  59.4%  difference -35.94",
+        "  76f5f3d5: control  56.2%  candidate  60.2%  difference  +3.91",
+        "  909e7898: control  51.6%  candidate  76.6%  difference +25.00",
+        "  9208870e: control  50.0%  candidate  35.9%  difference -14.06",
+        "  974d9737: control  98.4%  candidate  95.3%  difference  -3.12",
+        "  estimate +5.99 points (95% +0.52 to +11.33); quality-error games control 0, candidate 0",
+        "PART B (AI vs AI; 3000 families screened, 6000 cases; changed 339 cases in 339 families; activation 5.65%)",
+        "  estimate per changed case +7.23 points (95% +0.59 to +14.01); 84 better, 60 worse; population estimate +0.408 points per game",
+        "  quality-error games control 0, candidate 0",
+        "PASS  CPC1 part A estimate > 0 and lower bound > 0",
+        "PASS  CPC2 part B estimate >= -5 points",
+        "PASS  CPC3 quality (candidate <= control, each part)",
+        "VERDICT PASSED (all gates)"
+    ]
+}

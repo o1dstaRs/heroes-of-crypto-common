@@ -172,8 +172,14 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     seat takes Magic Dragon when it is offered (ai/setup/a19_queen_counter.ts, applied last by the server's draft
  *     decider). Registered confirmation QV: +58.98 points (95% +49.61 to +68.36) on the owner's exact setups
  *     (docs/queen_counter_adoption.md).
+ *   - Closing pick v2 (profile v34) adopted on 2026-11-24 under the standing instruction, for the owner's "catch and
+ *     close picks": at the level-4 pick, while the counter draft's gate is shut but an opposing creature is visible, the
+ *     matchup model's best offer (with a synergy bonus) replaces the earlier layers' choice when it is 0.05 better
+ *     (ai/setup/a19_closing_pick.ts, applied by the server's draft decider before the Queen counter). Registered
+ *     confirmation CPC: +5.99 points (95% +0.52 to +11.33) on the six human setups where it changes the pick; AI vs AI
+ *     +7.23 per changed draft (95% +0.59 to +14.01) (docs/closing_pick_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v33" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v34" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -466,6 +472,18 @@ export const V08_A19_QUEEN_COUNTER_POLICY = Object.freeze({
     adoptedAt: "2026-11-24",
     adoption: "owner-request",
     registrationSha256: "e208b2f6a36d20fa2c86aa310d451a96d6b55a34b77e3b8163a54e23169efc12",
+    qualification: "strength-confirmed",
+} as const);
+
+/**
+ * Closing pick v2 (profile v34): ai/setup/a19_closing_pick.ts, called by the server's draft decider before the Queen
+ * counter. See docs/closing_pick_adoption.md.
+ */
+export const V08_A19_CLOSING_PICK_POLICY = Object.freeze({
+    policyId: "a19-closing-pick-synergy-v1" as const,
+    adoptedAt: "2026-11-24",
+    adoption: "standing-instruction",
+    registrationSha256: "c994f2e56535f430cfd8fc1cdac01029e47e4f423c09ec9c3ba6aa505a00b38e",
     qualification: "strength-confirmed",
 } as const);
 
@@ -879,6 +897,11 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/setup/a19_queen_counter.ts" as const,
         sha256: "7ae513b9cba9d816db555b6346d63e89ed2d5cd6d0c740db3c47d9fc220eccef" as const,
     }),
+    Object.freeze({
+        role: "closing-pick" as const,
+        source: "src/ai/setup/a19_closing_pick.ts" as const,
+        sha256: "4020b15a274a461f6230badf0f907b7758e6a7eaee1f94134c1bc645d8f3a1e4" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -925,6 +948,7 @@ export const V08_A19_PROFILE = Object.freeze({
     waitClock: V08_A19_WAIT_CLOCK_POLICY,
     carrierCohesion: V08_A19_CARRIER_COHESION_POLICY,
     queenCounter: V08_A19_QUEEN_COUNTER_POLICY,
+    closingPick: V08_A19_CLOSING_PICK_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

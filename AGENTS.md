@@ -9,9 +9,22 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Closing pick v2 — November 24, 2026
+
+Under the owner's standing instruction `a19-closing-pick-synergy-v1` is active: **the current default is profile v34**.
+Read `docs/closing_pick_adoption.md`. At the level-4 pick (the seat's last creature pick), while the counter draft's gate is
+shut but the seat sees at least one opposing creature, every offer is scored with the counter draft's matchup model plus a
+synergy bonus (`src/ai/setup/a19_closing_pick.ts`); the best replaces the earlier layers' choice when it is at least 0.05
+better. The server's draft decider applies it before the Queen counter (`queen ?? closing ?? counter ?? matchup`), and
+Premium draft advice follows it. Registered confirmation CPC: +5.99 points (95% +0.52 to +11.33) on the six human setups
+where it changes the pick (two of the six lose: the gain is an average); AI vs AI +7.23 per changed draft (95% +0.59 to
++14.01; 5.65% of drafts change). Keep `a19_closing_pick.test.ts` passing: it pins the measured picks of those six games.
+
+Profile v33 is retained inside v34.
+
 ## Queen counter — November 24, 2026
 
-At the owner's request `a19-queen-counter-v1` is active: **the current default is profile v33**. Read
+At the owner's request `a19-queen-counter-v1` is active: at that date the default was profile v33. Read
 `docs/queen_counter_adoption.md`. At a level-4 pick, once the opposing Arachna Queen is visible to the seat (doctrine
 reveals and hidden-pick collisions only), it takes Magic Dragon when Magic Dragon is offered
 (`src/ai/setup/a19_queen_counter.ts`); the server's draft decider applies it after every other layer, and Premium draft
