@@ -9,9 +9,21 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Queen counter — November 24, 2026
+
+At the owner's request `a19-queen-counter-v1` is active: **the current default is profile v33**. Read
+`docs/queen_counter_adoption.md`. At a level-4 pick, once the opposing Arachna Queen is visible to the seat (doctrine
+reveals and hidden-pick collisions only), it takes Magic Dragon when Magic Dragon is offered
+(`src/ai/setup/a19_queen_counter.ts`); the server's draft decider applies it after every other layer, and Premium draft
+advice goes through the same decider. With two or more visible creatures that read melee the counter draft already takes
+Magic Dragon against the Queen; the rule decides the picks where the counter draft stays shut. Registered confirmation
+QV: +58.98 points (95% +49.61 to +68.36). Keep `a19_queen_counter.test.ts` passing.
+
+Profile v32 is retained inside v33.
+
 ## Carrier cohesion — November 24, 2026
 
-At the owner's request `a19-carrier-cohesion-v2` is active: **the current default is profile v32**. Read
+At the owner's request `a19-carrier-cohesion-v2` is active: at that date the default was profile v32. Read
 `docs/carrier_cohesion_adoption.md`. In laps 1–3 a principal blessing carrier that walks (the largest living stack of a
 creature whose blessing lasts only while it lives) does not move from at most 3 cells of its nearest ally to at least 4
 cells and 2 farther: the native move becomes a wait, else a defend, and such challengers leave the search

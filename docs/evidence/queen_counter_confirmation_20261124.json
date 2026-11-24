@@ -1,0 +1,80 @@
+{
+    "id": "queen-counter-QV-20261124",
+    "registrationSha256": "e208b2f6a36d20fa2c86aa310d451a96d6b55a34b77e3b8163a54e23169efc12",
+    "decision": "adopted: QV1-QV4 passed",
+    "partA": {
+        "games": {
+            "3a611eda": {
+                "productionPercent": 32.0,
+                "rulePercent": 96.9,
+                "differencePoints": 64.8,
+                "seeds": 64
+            },
+            "b2016809": {
+                "productionPercent": 18.8,
+                "rulePercent": 71.9,
+                "differencePoints": 53.1,
+                "seeds": 64
+            }
+        },
+        "pooled": {
+            "points": 58.98,
+            "low95": 49.61,
+            "high95": 68.36,
+            "method": "each game weighted equally; 10,000 resamples of seeds within each game (seed 2611243201)"
+        },
+        "rows": {
+            "production": 128,
+            "rule": 128
+        },
+        "qualityErrors": {
+            "production": 0,
+            "queen_visible": 0
+        }
+    },
+    "partB": {
+        "status": "screen-failed",
+        "executedTasks": 1200,
+        "qualityErrors": {
+            "production": 0,
+            "queen_visible": 0
+        },
+        "populations": {
+            "visible-queen": {
+                "cases": 300,
+                "points": 1.0,
+                "low95": -1.33,
+                "high95": 3.33,
+                "ruleFired": 32
+            },
+            "mirror": {
+                "cases": 300,
+                "points": 0.0,
+                "low95": 0.0,
+                "high95": 0.0,
+                "ruleFired": 12
+            }
+        },
+        "method": "paired by case; family bootstrap, 10,000 samples (seed 2611243201), 95%"
+    },
+    "gates": {
+        "QV1": "pass",
+        "QV2": "pass",
+        "QV3": "pass",
+        "QV4": "pass"
+    },
+    "analysis": [
+        "part A: 128 production rows, 128 rule rows, quality {'production': 0, 'queen_visible': 0}",
+        "  3a611eda: production 32.0%  rule 96.9%  diff +64.8 (n 64)",
+        "  b2016809: production 18.8%  rule 71.9%  diff +53.1 (n 64)",
+        "  pooled +58.98 points (95% +49.61 to +68.36)",
+        "part B: status screen-failed, executed 1200, quality {'production': 0, 'queen_visible': 0}",
+        "  visible-queen  cases 300  +1.00 points (95% -1.33 to +3.33)  rule fired 32",
+        "  mirror         cases 300  +0.00 points (95% +0.00 to +0.00)  rule fired 12",
+        "  QV1 part A estimate > 0 and lower bound > 0: pass",
+        "  QV2 visible-queen estimate >= 0: pass",
+        "  QV3 mirror estimate >= -2: pass",
+        "  QV4 quality not above production: pass",
+        "decision: adopt the Queen counter"
+    ]
+}

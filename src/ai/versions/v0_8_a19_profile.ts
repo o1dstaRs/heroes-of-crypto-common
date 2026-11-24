@@ -167,8 +167,13 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     seats are exempt (ai/carrier_cohesion.ts). A non-inferiority check, registered confirmation CF on v30: +0.41
  *     points (95% -0.33 to +1.24); early isolating moves outside the rush 63 -> 2. The first version, which held flying
  *     carriers too, failed confirmation CC's forced-Manticore gate and is not adopted (docs/carrier_cohesion_adoption.md).
+ *   - Queen counter (profile v33) adopted on 2026-11-24 at the owner's request ("They never pick tsar cannon, magic
+ *     dragon, zena or anything to counterbalance me"): at a level-4 pick, once the opposing Arachna Queen is visible, the
+ *     seat takes Magic Dragon when it is offered (ai/setup/a19_queen_counter.ts, applied last by the server's draft
+ *     decider). Registered confirmation QV: +58.98 points (95% +49.61 to +68.36) on the owner's exact setups
+ *     (docs/queen_counter_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v32" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v33" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -450,6 +455,18 @@ export const V08_A19_CARRIER_COHESION_POLICY = Object.freeze({
     adoption: "owner-request",
     registrationSha256: "1f2adb866f41bf506f147df36d08f23e909d6990b8f31c0a722c9f5c19124b2a",
     qualification: "non-inferiority-confirmed",
+} as const);
+
+/**
+ * Queen counter (profile v33): ai/setup/a19_queen_counter.ts, called last by the server's draft decider. See
+ * docs/queen_counter_adoption.md.
+ */
+export const V08_A19_QUEEN_COUNTER_POLICY = Object.freeze({
+    policyId: "a19-queen-counter-v1" as const,
+    adoptedAt: "2026-11-24",
+    adoption: "owner-request",
+    registrationSha256: "e208b2f6a36d20fa2c86aa310d451a96d6b55a34b77e3b8163a54e23169efc12",
+    qualification: "strength-confirmed",
 } as const);
 
 /**
@@ -857,6 +874,11 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/carrier_cohesion.ts" as const,
         sha256: "e7103949bd6386290a4b3f78917e0f2fcf0d925995e345ebb688917118c262ee" as const,
     }),
+    Object.freeze({
+        role: "queen-counter" as const,
+        source: "src/ai/setup/a19_queen_counter.ts" as const,
+        sha256: "7ae513b9cba9d816db555b6346d63e89ed2d5cd6d0c740db3c47d9fc220eccef" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -902,6 +924,7 @@ export const V08_A19_PROFILE = Object.freeze({
     stockDeadline: V08_A19_STOCK_DEADLINE_POLICY,
     waitClock: V08_A19_WAIT_CLOCK_POLICY,
     carrierCohesion: V08_A19_CARRIER_COHESION_POLICY,
+    queenCounter: V08_A19_QUEEN_COUNTER_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

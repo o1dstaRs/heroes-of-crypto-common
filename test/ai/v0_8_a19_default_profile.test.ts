@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v32",
+            schema: "hoc.v0_8_a19_production_profile.v33",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -246,6 +246,14 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "owner-request",
                 registrationSha256: "1f2adb866f41bf506f147df36d08f23e909d6990b8f31c0a722c9f5c19124b2a",
                 qualification: "non-inferiority-confirmed",
+            },
+            // Profile v33: at level 4 Magic Dragon once the opposing Arachna Queen is visible (owner request).
+            queenCounter: {
+                policyId: "a19-queen-counter-v1",
+                adoptedAt: "2026-11-24",
+                adoption: "owner-request",
+                registrationSha256: "e208b2f6a36d20fa2c86aa310d451a96d6b55a34b77e3b8163a54e23169efc12",
+                qualification: "strength-confirmed",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({
@@ -565,6 +573,7 @@ describe("v0.8+A19 production profile", () => {
             "lava-map-artifact",
             "valkyrie-striker",
             "carrier-cohesion",
+            "queen-counter",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));
