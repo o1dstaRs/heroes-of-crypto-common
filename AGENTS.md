@@ -9,9 +9,21 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Stock search deadline 2,500 ms — November 24, 2026
+
+Under the standing instruction `a19-stock-deadline-v1` is active: **the current default is profile v30**. Read
+`docs/stock_deadline_adoption.md`. A bot seat's stock search gets a live decision deadline of 2,500 ms and a circuit breaker
+of 3,750 ms (`V08_A19_DEEP_FIT.stockBudget` in `src/simulation/v0_8_a19_deep_fit.ts`) instead of the A19 profile's
+1,000 / 1,500 ms; on the production host the 1,000 ms deadline cut the stock search on about one decision in eight.
+Offline deterministic work has no clock, so no offline result changes. Registered confirmation SD, a real-time clash at
+the production host's speed: 53.12% head to head against v29 (95% 51.56 to 54.76; 720 tasks, both seats;
+owner-shaped 52.71%, mirror 53.54%); all seven gates passed.
+
+Profile v29 is retained inside v30.
+
 ## Deep fit at 4,000 rollout turns — November 23, 2026
 
-Under the standing instruction `a19-deep-fit-4000-v1` is active: **the current default is profile v29**. Read
+Under the standing instruction `a19-deep-fit-4000-v1` is active: at that date the default was profile v29. Read
 `docs/deep_fit_4000_adoption.md`. The bot seat's deep-fit budget (`V08_A19_DEEP_FIT.rolloutTurnBudget` in
 `src/simulation/v0_8_a19_deep_fit.ts`) is 4,000 rollout turns instead of 2,800; the driver, the deep search and the
 4,000 ms think deadline are unchanged. Registered confirmation U +2.48 points per task (95% +1.67 to +3.28; 7,950

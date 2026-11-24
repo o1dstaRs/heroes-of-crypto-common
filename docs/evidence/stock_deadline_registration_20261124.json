@@ -1,0 +1,48 @@
+{
+ "id": "confirmation-SD-stock-deadline-2500-20261123",
+ "registeredAt": "2026-11-24T01:59:48.511789+00:00",
+ "question": "At the production game host's speed, does the bot seat beat the production bot when its stock search gets a 2,500 ms decision deadline and a 3,750 ms circuit breaker instead of the profile's 1,000 / 1,500 ms, with the same deep fit (4,000 ms think, 4,000 rollout turns)?",
+ "origin": "Owner, 2026-11-23: \"There is no way we can optimize how much it can do in 4 seconds on this specific instance?\" Per-move probe at production speed (clash-probe.ts, 499 moves): 10% of moves ended with no completed search after about 3.6 s, because the stock search's 1,000 ms deadline (older than the deep fit) cut it and its truncated turn count then let a doomed deep search start; 37% of think time went into discarded deep searches. With SEARCH_A19_ADAPTIVE_BUDGET=1 a stock decision over its 1,500 ms breaker also degrades the next three decisions to one rollout and a shortlist of two. Real production CPU (clashProd, running): 203 games of the 4 s / 10 s clash on the mirror pool, the production bot's stock-deadline fallbacks 13.6%, deep searches cut 30.0%, mean think 2.60 s.",
+ "candidate": {
+  "change": "the bot seat's stock search (createV08A19DeepFitSearchDriver's stock driver) gets budgetOverrides SEARCH_DECISION_DEADLINE_MS \"2500\" and SEARCH_CIRCUIT_BREAKER_MS \"3750\"; the deep search, the deep-fit gate, the 4,000 ms think deadline and Premium advice are unchanged. Live timing only: offline deterministic work has no clock, so no registered offline result changes.",
+  "arm": "clash-rt2.ts --b-stock-ms 2500 (arm name 4s-x1-<turns>t-stock2500)"
+ },
+ "control": "the production bot-seat deep fit, stock deadline 1,000 ms and breaker 1,500 ms, at 4,000 turns, the budget adopted from confirmation U (SD_TURNS=4000 sets HOC_RESEARCH_DEEP_FIT_TURNS=4000 for both arms).",
+ "development": {
+  "own": "Mac, league/t2b-own-prod.json (402 development tasks x 2 orientations, F 2.368): candidate 53.2% (95% 51.1 to 55.3); production stock deadline fallbacks 7.3% -> 0.0%; mean think 2.02 -> 1.88 s (out/clash/clashStock*)",
+  "mirror": "x3d, league/t2b-mirror-prod.json, interim 774 of 804 games (F 1.564): candidate 51.2% (95% 49.5 to 53.0). Not a production-speed reading: the production arm's stock-deadline fallbacks were 1.7% (real production CPU: 13.6%) because the shared host drifted to about twice its calibrated speed; it reads as a fast-host result, where fix A has little to remove."
+ },
+ "method": "Real-time clash: both seats search with live timing (performance.now deadlines) in the same ranked game (runRankedCase of tree prod28c, exact v28 production plus research seams); the candidate plays one seat and the production bot the other. Every time limit is divided by the host's time scale F = median rollout turns per ms of <procs> simultaneous search_capacity.ts processes (the reference big board) / 0.4756, the production host's measured rate, so each arm gets the search work it would get on the production host. Every task is played in both seat orientations (normal: the candidate on the task's candidate team; swap: the other team).",
+ "bank": {
+  "files": "bank/cfSD-own-drafts.json, bank/cfSD-mirror-drafts.json (build_sd.py; tasks bank/cfSD-tasks.json)",
+  "namespace": "decoy-path-20261123-v1 (allocate_v39, seeds22; audited at allocation, 0 intersections)",
+  "provenance": "families 800-919 of seeds22, fight r0 on maps 1, 3 and 4 (360 tasks per population). Families 0-799 were drafted for DP and played by U; families 800-2208 were never drafted or played on any host (checked on the Mac, basenode, x3d and prod before drafting: no task id of families 800-999 outside seeds22/pool.json). Drafted at 17:47 PST; no task played before registration.",
+  "populations": {
+   "own": "opponent S:B23:fast:K14 (owner-shaped strikers)",
+   "mirror": "opponent MG:mix:0.5:2 (the default AI)"
+  }
+ },
+ "host": "basenode (AMD Ryzen 9 3900X, 12 cores / 24 threads, no other workload once confirmation U finished): cfSD-run.sh 20 (5 processes per population and orientation), Bun 1.4.5, tree prod28c (source manifest sha256 of src and common src .ts files 10ee9b95ec91bfdd72048fe2fe521aa8fe913267aecbd51fdf8c0625d3684410, equal on the Mac); launched with SD_TURNS=4000.",
+ "primaryEndpoint": "Mean over all 720 tasks (own 360 + mirror 360) of the candidate's seat-balanced score (mean of its two orientation scores; win 1, draw 0.5, loss 0). 95% percentile interval from 20,000 bootstrap resamples of the 120 draft-root families (both populations of a family together), seed 20261123 (confirm_sd_analyze.py). All 1,440 games must be present; otherwise no gate is evaluated and the confirmation is incomplete.",
+ "gates": {
+  "SD1": "Lower bound of the primary interval above 50%.",
+  "SD2": "Each population (own, mirror): estimate at least 49%.",
+  "SD3": "Each map (1, 3, 4), pooled over populations: estimate at least 49%.",
+  "SD4": "Games with any quality error: at most 2 of 1,440.",
+  "SD5": "Latency, production seconds (ms x F) over all decisions: the candidate's mean think at most the production bot's + 0.10 s, and its share of decisions over 4.5 s at most the production bot's + 1.0 percentage point.",
+  "SD6": "The time scale F calibrated again after the run (the same <procs> processes) within 10% of the F used.",
+  "SD7": "Production-speed fidelity: the production bot's stock-deadline fallback rate over all its decisions at least 5% (real production CPU on the mirror pool: 13.6%; a shared x3d run that drifted to about twice its calibrated speed showed 1.7%)."
+ },
+ "recorded": "per arm: deep attempted / played / cut, stock deadline fallbacks, over-6 s share, max think; scores by orientation and by population; the real-CPU production clash for reference.",
+ "decision": "All seven gates pass: adopt (common v0_8_a19_deep_fit.ts stock budget overrides for bot seats, profile and revision bump, deploy to all servers). Any gate fails: not adopted; a failed gate stays recorded as failed and is never waived, re-run or relabelled.",
+ "sha256": {
+  "clash-rt2.ts": "e314c250073c1ebfcb4530e6bb8f68b88bb80e8fc25a55dea5d127bdb396339d",
+  "cfSD-run.sh": "41e393f7eceb5b9f9f32903aee21b974630edf39695a3ef6886a3a3720023ddb",
+  "confirm_sd_analyze.py": "278f126d018ea248bd2c0d27988caa12ed5e81a3c26b8145fb2477430c2ea896",
+  "build_sd.py": "597c584fe561dbab53a9f34961e89b74b74ee347e8220502760669149568ef18",
+  "bank/cfSD-tasks.json": "b924bace180b15d6b8c5f31641d987b77fce7309d35fe4bffd888277bcad11aa",
+  "bank/cfSD-own-drafts.json": "d22808eeb831101811b8ed9642155e69b7de58349a20df11c71086a7b5f87e6c",
+  "bank/cfSD-mirror-drafts.json": "eaaac670046ac9001cec75c96a49e231d4ff366857681f438e5522d5be1c0147",
+  "bank/cfSD-summary.json": "2d8ccb86474e87a23f9423579a6cf83b31b94a7750bf187aabf81e704d1163f1"
+ }
+}

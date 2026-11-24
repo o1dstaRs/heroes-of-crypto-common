@@ -131,11 +131,9 @@ describe("SearchDriver.chooseDecisionWithinBudget", () => {
     test("a limit of exactly the search's work completes it; one turn less ends it and leaves the battle as it was", () => {
         const f = fixture();
         const full = f.driver().chooseDecisionWithinBudget(f.griffin, "v0.8", f.incumbent(), f.context, {});
-        const exact = f
-            .driver()
-            .chooseDecisionWithinBudget(f.griffin, "v0.8", f.incumbent(), f.context, {
-                rolloutTurns: full.rolloutTurns,
-            });
+        const exact = f.driver().chooseDecisionWithinBudget(f.griffin, "v0.8", f.incumbent(), f.context, {
+            rolloutTurns: full.rolloutTurns,
+        });
         expect(exact).toEqual(full);
         const before = f.board();
         const cut = f.driver().chooseDecisionWithinBudget(f.griffin, "v0.8", f.incumbent(), f.context, {
@@ -241,15 +239,22 @@ describe("V08A19DeepFitSearchDriver", () => {
         expect(late.chosen).toBe(STOCK);
     });
 
-    test("builds the unchanged stock driver and a deep driver with the deep budget and the think deadline", () => {
+    test("builds the stock driver with the stock deadline and a deep driver with the deep budget and the think deadline", () => {
         const f = fixture();
         const composite = createV08A19DeepFitSearchDriver(f.deps, MATCH) as unknown as {
             stock: Record<string, unknown>;
             deep: Record<string, unknown>;
         };
         const stock = createV08A19SearchDriver(f.deps, MATCH) as unknown as Record<string, unknown>;
-        for (const key of ["rollouts", "shortlist", "caps", "horizon", "decisionDeadlineMs", "circuitBreakerMs"])
+        for (const key of ["rollouts", "shortlist", "caps", "horizon"])
             expect(composite.stock[key]).toEqual(stock[key]);
+        // Profile v30: the stock search's live deadline 2,500 ms (profile 1,000) and breaker 3,750 ms (profile 1,500).
+        expect(stock).toMatchObject({ decisionDeadlineMs: 1000, circuitBreakerMs: 1500 });
+        expect(composite.stock).toMatchObject({ decisionDeadlineMs: 2500, circuitBreakerMs: 3750 });
+        expect(V08_A19_DEEP_FIT.stockBudget).toEqual({
+            SEARCH_DECISION_DEADLINE_MS: "2500",
+            SEARCH_CIRCUIT_BREAKER_MS: "3750",
+        });
         expect(composite.deep).toMatchObject({
             rollouts: 8,
             shortlist: 10,

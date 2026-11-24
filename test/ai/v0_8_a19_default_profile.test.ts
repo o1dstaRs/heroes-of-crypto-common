@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v29",
+            schema: "hoc.v0_8_a19_production_profile.v30",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -221,6 +221,14 @@ describe("v0.8+A19 production profile", () => {
                 adoptedAt: "2026-11-23",
                 adoption: "standing-user-instruction",
                 registrationSha256: "6f7431f0fb0d533eb3c9604e331bdc891b338ff32655b2f8a03c9007a2568729",
+                qualification: "strength-confirmed",
+            },
+            // Profile v30: the bot seat's stock search gets a 2,500 ms live deadline (registered confirmation SD).
+            stockDeadline: {
+                policyId: "a19-stock-deadline-v1",
+                adoptedAt: "2026-11-24",
+                adoption: "standing-user-instruction",
+                registrationSha256: "0861b6ac1fa9f09ad5831b15ddcdf3103a9bb79f328fa7a8128a42ab8c20eef1",
                 qualification: "strength-confirmed",
             },
         });

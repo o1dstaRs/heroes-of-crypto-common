@@ -1,0 +1,87 @@
+{
+ "id": "stock-deadline-confirmation-SD",
+ "registrationSha256": "0861b6ac1fa9f09ad5831b15ddcdf3103a9bb79f328fa7a8128a42ab8c20eef1",
+ "host": "basenode (Ryzen 9 3900X), 20 processes, tree prod28c with HOC_RESEARCH_DEEP_FIT_TURNS=4000 (profile v29 control)",
+ "timeScale": {
+  "before": 0.8364,
+  "after": 0.8206
+ },
+ "primary": {
+  "tasks": 720,
+  "families": 120,
+  "games": 1440,
+  "candidateScore": 53.12,
+  "low": 51.56,
+  "high": 54.76
+ },
+ "populations": {
+  "own": {
+   "tasks": 360,
+   "candidateScore": 52.71,
+   "candidateTeam": 83.3,
+   "otherTeam": 22.1
+  },
+  "mirror": {
+   "tasks": 360,
+   "candidateScore": 53.54,
+   "candidateTeam": 55.8,
+   "otherTeam": 51.2
+  }
+ },
+ "maps": {
+  "1": 51.88,
+  "3": 54.06,
+  "4": 53.44
+ },
+ "qualityErrorGames": 0,
+ "production": {
+  "decisions": 37085,
+  "deepAttempted": 99.8,
+  "deepPlayed": 76.0,
+  "deepCut": 23.8,
+  "stockDeadlineFallbacks": 6.1,
+  "meanThinkSeconds": 2.42,
+  "over4500": 8.02,
+  "over6000": 3.36,
+  "maxSeconds": 14.41
+ },
+ "candidate": {
+  "decisions": 37755,
+  "deepAttempted": 99.6,
+  "deepPlayed": 76.4,
+  "deepCut": 23.2,
+  "stockDeadlineFallbacks": 0.0,
+  "meanThinkSeconds": 2.38,
+  "over4500": 7.69,
+  "over6000": 3.33,
+  "maxSeconds": 14.77
+ },
+ "gates": {
+  "SD1 strength: lower bound of the primary interval above 50%": true,
+  "SD2 each population at least 49%": true,
+  "SD3 each map at least 49%": true,
+  "SD4 at most 2 games with a quality error": true,
+  "SD5 latency: mean think at most +0.10 s and over-4.5 s share at most +1.0 pp": true,
+  "SD6 time scale recalibrated within 10%": true,
+  "SD7 production-speed fidelity: production stock fallbacks at least 5%": true
+ },
+ "adopt": true,
+ "analysisOutput": [
+  "before: 20 processes, turns/ms median 0.398 (min 0.353 max 0.439); F = 0.8364",
+  "after: 20 processes, turns/ms median 0.390 (min 0.349 max 0.414); F = 0.8206",
+  "rows 1440 of 1440; arm B ['4s-x1-4000t-stock2500']; time scale [0.8364]",
+  "primary: 720 tasks, 120 families: candidate seat-balanced score 53.12% (95% 51.56 to 54.76)",
+  "  own: 52.71% (candidate on the candidate team 83.3%, on the other team 22.1%)",
+  "  mirror: 53.54% (candidate on the candidate team 55.8%, on the other team 51.2%)",
+  "production: decisions 37085; deep attempted 99.8%, played 76.0%, cut 23.8%; stock deadline fallbacks 6.1%; mean think 2.42 s, over 4.5 s 8.02%, over 6 s 3.36%, max 14.41 s (production seconds)",
+  "candidate: decisions 37755; deep attempted 99.6%, played 76.4%, cut 23.2%; stock deadline fallbacks 0.0%; mean think 2.38 s, over 4.5 s 7.69%, over 6 s 3.33%, max 14.77 s (production seconds)",
+  "SD1 PASS: lower bound 51.56% > 50%",
+  "SD2 PASS: each population >= 49%: own 52.71%, mirror 53.54%",
+  "SD3 PASS: each map >= 49%: map 1 51.88%, map 3 54.06%, map 4 53.44%",
+  "SD4 PASS: games with a quality error 0 <= 2",
+  "SD5 PASS: mean think 2.381 s <= 2.419 + 0.10 s; over 4.5 s 7.69% <= 8.02% + 1.0 pp",
+  "SD6 PASS: time scale after the run 0.8206 within 10% of 0.8364",
+  "SD7 PASS: production-speed fidelity: the production bot's stock deadline fallbacks 6.11% >= 5% (real production CPU, mirror pool: 13.6%)",
+  "ALL GATES PASS"
+ ]
+}

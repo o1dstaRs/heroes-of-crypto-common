@@ -24,11 +24,17 @@ import { createV08A19SearchDriver } from "./v0_8_a19_search";
  * think deadline, counted from the start of the decision. Profile v29 (a19-deep-fit-4000-v1) raised the budget from
  * 2,800 to 4,000 turns: live, 2,800 turns took at most about 2.7 s on the 2-vCPU test host and 3.3 s on the production
  * host, so 4,000 turns spend the owner-approved 4 s, and the 4,000 ms deadline still stops a search a slower host cannot
- * finish (registered confirmation U, docs/deep_fit_4000_adoption.md).
+ * finish (registered confirmation U, docs/deep_fit_4000_adoption.md). Profile v30 (a19-stock-deadline-v1) gives the
+ * stock search a live deadline of 2,500 ms and a circuit breaker of 3,750 ms instead of the profile's 1,000 / 1,500 ms:
+ * on the production host the 1,000 ms deadline cut the stock search on about one decision in eight, which then played
+ * the native move after a doomed deep search (registered confirmation SD, docs/stock_deadline_adoption.md). Offline
+ * deterministic work has no clock, so it is unchanged.
  */
 export const V08_A19_DEEP_FIT = Object.freeze({
     id: "a19-deep-fit-v1",
     deepBudget: Object.freeze({ SEARCH_ROLLOUTS: "8", SEARCH_SHORTLIST: "10", SEARCH_MAX_MELEE: "16" }),
+    /** The stock search's live deadline and circuit breaker (profile v30, a19-stock-deadline-v1). */
+    stockBudget: Object.freeze({ SEARCH_DECISION_DEADLINE_MS: "2500", SEARCH_CIRCUIT_BREAKER_MS: "3750" }),
     rolloutTurnBudget: 4000,
     predictedDeepToStockRatio: 4.07,
     thinkMs: 4000,
@@ -101,7 +107,10 @@ export function createV08A19DeepFitSearchDriver(
     match: ISearchMatchInfo,
     options: { neuralCorrection?: boolean } = {},
 ): V08A19DeepFitSearchDriver {
-    const stock = createV08A19SearchDriver(deps, match, undefined, options);
+    const stock = createV08A19SearchDriver(deps, match, undefined, {
+        ...options,
+        budgetOverrides: V08_A19_DEEP_FIT.stockBudget,
+    });
     const deep = createV08A19SearchDriver(deps, match, undefined, {
         ...options,
         budgetOverrides: {
