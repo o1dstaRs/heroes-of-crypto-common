@@ -1,0 +1,548 @@
+{
+    "id": "carrier-cohesion-K2-CC-CF-results-20261124",
+    "registration": "docs/evidence/carrier_cohesion_registration_20261124.json",
+    "measure": "The rule (cohesion arm, candidate seat) minus production, points per game (win 100, draw 50, loss 0), paired by case; family bootstrap 10,000 samples, 95% percentile interval. K2 and CC measure R6 (a19-carrier-cohesion-v1), CF measures R7 (a19-carrier-cohesion-v2, flying carriers exempt); CF counts the isolating moves of walking carriers only. The tool's own report status asks for a gain and is not a registered gate.",
+    "K2": {
+        "reportStatusOfTheTool": "screen-failed",
+        "seal": "226f832d83584deea77f56d53aec37d553b531e90e631b99d0b5d4253618213e",
+        "executedTasks": 1808,
+        "wallHours": 2.21,
+        "gamesWithQualityError": {
+            "production": 0,
+            "cohesion": 0
+        },
+        "primary": {
+            "cases": 904,
+            "families": 604,
+            "estimatePoints": -0.17,
+            "interval95": [-1.61, 1.28],
+            "gamesChanged": 162,
+            "candidateBetter": 17,
+            "candidateWorse": 18,
+            "isolatingMovesChosen": {
+                "production": 351,
+                "r6": 183
+            },
+            "isolatingMovesChosenOutsideRush": {
+                "production": 170,
+                "r6": 2
+            },
+            "nativeIsolationsHeld": 266,
+            "principalCarriersDeadLaps1to3": {
+                "production": 493,
+                "r6": 455
+            },
+            "carrierStacksDeadLaps1to3": {
+                "production": 679,
+                "r6": 641
+            },
+            "crusaderDeadLaps1to3": {
+                "production": 56,
+                "r6": 47
+            }
+        },
+        "populations": {
+            "forced-crusader": {
+                "cases": 120,
+                "families": 120,
+                "estimatePoints": -1.25,
+                "interval95": [-4.17, 0.83],
+                "gamesChanged": 15,
+                "candidateBetter": 1,
+                "candidateWorse": 2,
+                "isolatingMovesChosen": {
+                    "production": 75,
+                    "r6": 58
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 18,
+                    "r6": 1
+                },
+                "nativeIsolationsHeld": 40,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 64,
+                    "r6": 62
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 89,
+                    "r6": 87
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 26,
+                    "r6": 26
+                }
+            },
+            "forced-manticore": {
+                "cases": 120,
+                "families": 120,
+                "estimatePoints": -1.25,
+                "interval95": [-6.67, 4.17],
+                "gamesChanged": 37,
+                "candidateBetter": 5,
+                "candidateWorse": 7,
+                "isolatingMovesChosen": {
+                    "production": 83,
+                    "r6": 45
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 38,
+                    "r6": 0
+                },
+                "nativeIsolationsHeld": 65,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 123,
+                    "r6": 115
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 149,
+                    "r6": 141
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 2,
+                    "r6": 1
+                }
+            },
+            "natural": {
+                "cases": 600,
+                "families": 300,
+                "estimatePoints": 0.33,
+                "interval95": [-1.08, 1.67],
+                "gamesChanged": 75,
+                "candidateBetter": 10,
+                "candidateWorse": 9,
+                "isolatingMovesChosen": {
+                    "production": 151,
+                    "r6": 80
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 72,
+                    "r6": 1
+                },
+                "nativeIsolationsHeld": 118,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 245,
+                    "r6": 233
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 317,
+                    "r6": 306
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 17,
+                    "r6": 15
+                }
+            },
+            "owner": {
+                "cases": 64,
+                "families": 64,
+                "estimatePoints": 1.56,
+                "interval95": [0.0, 4.69],
+                "gamesChanged": 35,
+                "candidateBetter": 1,
+                "candidateWorse": 0,
+                "isolatingMovesChosen": {
+                    "production": 42,
+                    "r6": 0
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 42,
+                    "r6": 0
+                },
+                "nativeIsolationsHeld": 43,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 61,
+                    "r6": 45
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 124,
+                    "r6": 107
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 11,
+                    "r6": 5
+                }
+            }
+        },
+        "rushSeats": {
+            "cases": 395,
+            "gamesChanged": 0
+        },
+        "parity": {
+            "host": "x3d (linux-x64)",
+            "matched": 20,
+            "replayed": 20
+        },
+        "gates": {
+            "1 primary lower bound >= -2": "pass",
+            "2 every population estimate >= -2": "pass",
+            "3 quality errors not above production": "pass",
+            "4 isolating moves outside the rush <= 10% of production, production > 0": "pass",
+            "5 early principal-carrier deaths not above production": "pass",
+            "6 parity: 20 natural cases replayed on x3d with identical digests": "pass",
+            "7 every rush seat plays the same game in both arms": "pass"
+        },
+        "allGatesPass": true
+    },
+    "CC": {
+        "reportStatusOfTheTool": "screen-failed",
+        "seal": "7fd8e56fc7584f366446434c74ac6b8ded2971619d6d2e0d0eda054843a1abd5",
+        "executedTasks": 1808,
+        "wallHours": 2.65,
+        "gamesWithQualityError": {
+            "production": 0,
+            "cohesion": 0
+        },
+        "primary": {
+            "cases": 904,
+            "families": 604,
+            "estimatePoints": 0.0,
+            "interval95": [-1.41, 1.41],
+            "gamesChanged": 159,
+            "candidateBetter": 17,
+            "candidateWorse": 16,
+            "isolatingMovesChosen": {
+                "production": 329,
+                "r6": 162
+            },
+            "isolatingMovesChosenOutsideRush": {
+                "production": 168,
+                "r6": 1
+            },
+            "nativeIsolationsHeld": 273,
+            "principalCarriersDeadLaps1to3": {
+                "production": 506,
+                "r6": 463
+            },
+            "carrierStacksDeadLaps1to3": {
+                "production": 673,
+                "r6": 629
+            },
+            "crusaderDeadLaps1to3": {
+                "production": 65,
+                "r6": 51
+            }
+        },
+        "populations": {
+            "forced-crusader": {
+                "cases": 120,
+                "families": 120,
+                "estimatePoints": -1.67,
+                "interval95": [-5.0, 1.67],
+                "gamesChanged": 16,
+                "candidateBetter": 1,
+                "candidateWorse": 3,
+                "isolatingMovesChosen": {
+                    "production": 55,
+                    "r6": 39
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 17,
+                    "r6": 1
+                },
+                "nativeIsolationsHeld": 40,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 78,
+                    "r6": 70
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 105,
+                    "r6": 96
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 35,
+                    "r6": 30
+                }
+            },
+            "forced-manticore": {
+                "cases": 120,
+                "families": 120,
+                "estimatePoints": -2.5,
+                "interval95": [-6.67, 1.67],
+                "gamesChanged": 39,
+                "candidateBetter": 2,
+                "candidateWorse": 5,
+                "isolatingMovesChosen": {
+                    "production": 72,
+                    "r6": 30
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 42,
+                    "r6": 0
+                },
+                "nativeIsolationsHeld": 60,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 126,
+                    "r6": 120
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 134,
+                    "r6": 128
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 3,
+                    "r6": 5
+                }
+            },
+            "natural": {
+                "cases": 600,
+                "families": 300,
+                "estimatePoints": 0.5,
+                "interval95": [-0.67, 1.83],
+                "gamesChanged": 62,
+                "candidateBetter": 10,
+                "candidateWorse": 7,
+                "isolatingMovesChosen": {
+                    "production": 157,
+                    "r6": 93
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 64,
+                    "r6": 0
+                },
+                "nativeIsolationsHeld": 125,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 225,
+                    "r6": 215
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 304,
+                    "r6": 293
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 9,
+                    "r6": 9
+                }
+            },
+            "owner": {
+                "cases": 64,
+                "families": 64,
+                "estimatePoints": 5.47,
+                "interval95": [0.0, 12.5],
+                "gamesChanged": 42,
+                "candidateBetter": 4,
+                "candidateWorse": 1,
+                "isolatingMovesChosen": {
+                    "production": 45,
+                    "r6": 0
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 45,
+                    "r6": 0
+                },
+                "nativeIsolationsHeld": 48,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 77,
+                    "r6": 58
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 130,
+                    "r6": 112
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 18,
+                    "r6": 7
+                }
+            }
+        },
+        "rushSeats": {
+            "cases": 358,
+            "gamesChanged": 0
+        },
+        "parity": {
+            "host": "x3d (linux-x64)",
+            "matched": 20,
+            "replayed": 20
+        },
+        "gates": {
+            "1 primary lower bound >= -2": "pass",
+            "2 every population estimate >= -2": "FAIL",
+            "3 quality errors not above production": "pass",
+            "4 isolating moves outside the rush <= 10% of production, production > 0": "pass",
+            "5 early principal-carrier deaths not above production": "pass",
+            "6 parity: 20 natural cases replayed on x3d with identical digests": "pass",
+            "7 every rush seat plays the same game in both arms": "pass"
+        },
+        "allGatesPass": false
+    },
+    "CF": {
+        "reportStatusOfTheTool": "screen-failed",
+        "seal": "26e7a07bd6b71d1e9622163a0d665fef480871fcc77a09d4c0558834b21d2c7a",
+        "executedTasks": 1808,
+        "wallHours": 2.45,
+        "gamesWithQualityError": {
+            "production": 0,
+            "cohesion": 0
+        },
+        "primary": {
+            "cases": 904,
+            "families": 604,
+            "estimatePoints": 0.41,
+            "interval95": [-0.33, 1.24],
+            "gamesChanged": 62,
+            "candidateBetter": 6,
+            "candidateWorse": 5,
+            "isolatingMovesChosen": {
+                "production": 149,
+                "r7": 88
+            },
+            "isolatingMovesChosenOutsideRush": {
+                "production": 63,
+                "r7": 2
+            },
+            "nativeIsolationsHeld": 95,
+            "principalCarriersDeadLaps1to3": {
+                "production": 477,
+                "r7": 461
+            },
+            "carrierStacksDeadLaps1to3": {
+                "production": 636,
+                "r7": 621
+            },
+            "crusaderDeadLaps1to3": {
+                "production": 56,
+                "r7": 51
+            }
+        },
+        "populations": {
+            "forced-crusader": {
+                "cases": 120,
+                "families": 120,
+                "estimatePoints": 1.67,
+                "interval95": [0.0, 4.17],
+                "gamesChanged": 12,
+                "candidateBetter": 2,
+                "candidateWorse": 0,
+                "isolatingMovesChosen": {
+                    "production": 37,
+                    "r7": 25
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 12,
+                    "r7": 0
+                },
+                "nativeIsolationsHeld": 24,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 58,
+                    "r7": 56
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 74,
+                    "r7": 72
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 31,
+                    "r7": 29
+                }
+            },
+            "forced-manticore": {
+                "cases": 120,
+                "families": 120,
+                "estimatePoints": 0.42,
+                "interval95": [-1.25, 2.5],
+                "gamesChanged": 3,
+                "candidateBetter": 1,
+                "candidateWorse": 1,
+                "isolatingMovesChosen": {
+                    "production": 17,
+                    "r7": 13
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 4,
+                    "r7": 0
+                },
+                "nativeIsolationsHeld": 6,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 117,
+                    "r7": 115
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 133,
+                    "r7": 131
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 0,
+                    "r7": 0
+                }
+            },
+            "natural": {
+                "cases": 600,
+                "families": 300,
+                "estimatePoints": -0.5,
+                "interval95": [-1.33, 0.17],
+                "gamesChanged": 33,
+                "candidateBetter": 1,
+                "candidateWorse": 4,
+                "isolatingMovesChosen": {
+                    "production": 84,
+                    "r7": 50
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 36,
+                    "r7": 2
+                },
+                "nativeIsolationsHeld": 46,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 237,
+                    "r7": 229
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 300,
+                    "r7": 291
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 16,
+                    "r7": 16
+                }
+            },
+            "owner": {
+                "cases": 64,
+                "families": 64,
+                "estimatePoints": 2.34,
+                "interval95": [0.0, 6.25],
+                "gamesChanged": 14,
+                "candidateBetter": 2,
+                "candidateWorse": 0,
+                "isolatingMovesChosen": {
+                    "production": 11,
+                    "r7": 0
+                },
+                "isolatingMovesChosenOutsideRush": {
+                    "production": 11,
+                    "r7": 0
+                },
+                "nativeIsolationsHeld": 19,
+                "principalCarriersDeadLaps1to3": {
+                    "production": 65,
+                    "r7": 61
+                },
+                "carrierStacksDeadLaps1to3": {
+                    "production": 129,
+                    "r7": 127
+                },
+                "crusaderDeadLaps1to3": {
+                    "production": 9,
+                    "r7": 6
+                }
+            }
+        },
+        "rushSeats": {
+            "cases": 370,
+            "gamesChanged": 0
+        },
+        "parity": {
+            "host": "x3d (linux-x64)",
+            "matched": 20,
+            "replayed": 20
+        },
+        "gates": {
+            "1 primary lower bound >= -2": "pass",
+            "2 every population estimate >= -2": "pass",
+            "3 quality errors not above production": "pass",
+            "4 isolating moves outside the rush <= 10% of production, production > 0": "pass",
+            "5 early principal-carrier deaths not above production": "pass",
+            "6 parity: 20 natural cases replayed on x3d with identical digests": "pass",
+            "7 every rush seat plays the same game in both arms": "pass"
+        },
+        "allGatesPass": true
+    }
+}

@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v31",
+            schema: "hoc.v0_8_a19_production_profile.v32",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -237,6 +237,14 @@ describe("v0.8+A19 production profile", () => {
                 adoptedAt: "2026-11-24",
                 adoption: "owner-request",
                 registrationSha256: "2820fe568be7bda58822bca3ab62bb14233dd84d648a93b68e81a96feb98ec0e",
+                qualification: "non-inferiority-confirmed",
+            },
+            // Profile v32: a principal blessing carrier keeps with its army in laps 1-3 (owner request).
+            carrierCohesion: {
+                policyId: "a19-carrier-cohesion-v2",
+                adoptedAt: "2026-11-24",
+                adoption: "owner-request",
+                registrationSha256: "1f2adb866f41bf506f147df36d08f23e909d6990b8f31c0a722c9f5c19124b2a",
                 qualification: "non-inferiority-confirmed",
             },
         });
@@ -556,6 +564,7 @@ describe("v0.8+A19 production profile", () => {
             "counter-draft-model",
             "lava-map-artifact",
             "valkyrie-striker",
+            "carrier-cohesion",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));

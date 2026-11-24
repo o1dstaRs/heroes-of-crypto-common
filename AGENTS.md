@@ -9,9 +9,25 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Carrier cohesion — November 24, 2026
+
+At the owner's request `a19-carrier-cohesion-v2` is active: **the current default is profile v32**. Read
+`docs/carrier_cohesion_adoption.md`. In laps 1–3 a principal blessing carrier that walks (the largest living stack of a
+creature whose blessing lasts only while it lives) does not move from at most 3 cells of its nearest ally to at least 4
+cells and 2 farther: the native move becomes a wait, else a defend, and such challengers leave the search
+(`src/ai/carrier_cohesion.ts`, hooks in `src/simulation/search_driver.ts`). Flying carriers (Manticore, Angel) and a
+seat that bought the striker rush are exempt. Switch `A19_CARRIER_COHESION_<LEFT|RIGHT>` (on unless `0`). A
+non-inferiority result, not a strength gain: registered confirmation CF on v30 +0.41 points (95% −0.33 to +1.24). The
+first version, R6, held flyers too: it passed confirmation K2 on v28 and failed confirmation CC on v29 at gate CC2
+(forced-Manticore armies −2.50 points, 95% −6.67 to +1.67, against the −2 bar). CC2 stays recorded as failed: do not
+waive, re-run or relabel it, and do not hold flying carriers again without a new registered confirmation. Keep
+`carrier_cohesion.test.ts` passing: it pins the blessing list to `abilities.json`.
+
+Profile v31 is retained inside v32.
+
 ## WAIT comparisons under the clock — November 24, 2026
 
-At the owner's request ("Keep v29, confirm cap") `a19-wait-clock-v1` is active: **the current default is profile v31**.
+At the owner's request ("Keep v29, confirm cap") `a19-wait-clock-v1` is active: at that date the default was profile v31.
 Read `docs/wait_clock_adoption.md`. The bot seat's stock and deep searches run WAIT comparisons under the same deadline as
 every other comparison (`V08_A19_DEEP_FIT.waitBudget`: `SEARCH_WAIT_DEADLINE_POLICY` `profile` instead of the A19 profile's
 `operation_bounded`), so no move outruns the owner's 4 s. Offline deterministic work and Premium are unchanged. Registered

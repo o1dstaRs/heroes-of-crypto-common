@@ -161,8 +161,14 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     operation_bounded; simulation/v0_8_a19_deep_fit.ts; offline work is unchanged), so no move outruns the owner's 4 s.
  *     Registered non-inferiority confirmation WC (real-time clash at production speed): 49.05% head to head against v30
  *     (95% 47.89 to 50.19; 1,080 tasks x both seats); longest move 4.09 s, none over 4.5 s (docs/wait_clock_adoption.md).
+ *   - Carrier cohesion (profile v32) adopted on 2026-11-24 at the owner's request ("AI needs to be more cautious", after
+ *     losing its Crusader early): in laps 1-3 a principal blessing carrier that walks does not leave its army; the
+ *     native move becomes a wait, else a defend, and such challengers are removed; flying carriers and striker-rush
+ *     seats are exempt (ai/carrier_cohesion.ts). A non-inferiority check, registered confirmation CF on v30: +0.41
+ *     points (95% -0.33 to +1.24); early isolating moves outside the rush 63 -> 2. The first version, which held flying
+ *     carriers too, failed confirmation CC's forced-Manticore gate and is not adopted (docs/carrier_cohesion_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v31" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v32" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -435,6 +441,18 @@ export const V08_A19_WAIT_CLOCK_POLICY = Object.freeze({
 } as const);
 
 /**
+ * Carrier cohesion (profile v32). The rule lives in ai/carrier_cohesion.ts and the search driver; this record keeps the
+ * decision and its registration with the profile. See docs/carrier_cohesion_adoption.md.
+ */
+export const V08_A19_CARRIER_COHESION_POLICY = Object.freeze({
+    policyId: "a19-carrier-cohesion-v2" as const,
+    adoptedAt: "2026-11-24",
+    adoption: "owner-request",
+    registrationSha256: "1f2adb866f41bf506f147df36d08f23e909d6990b8f31c0a722c9f5c19124b2a",
+    qualification: "non-inferiority-confirmed",
+} as const);
+
+/**
  * Deep fit at 4,000 rollout turns (profile v29): V08_A19_DEEP_FIT.rolloutTurnBudget in simulation/v0_8_a19_deep_fit.ts,
  * the same a19-deep-fit-v1 driver and deadline. See docs/deep_fit_4000_adoption.md.
  */
@@ -538,9 +556,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Carries the neutral cemetery barrel deliberation switch that profile v14 turns on and the keep-attack
-        // switches of profile v21.
-        sha256: "5497af0fe7da4f3e9f4f42df980212c869ad1c9362821a1ab8100fdc5e0cbcb0" as const,
+        // Carries the neutral cemetery barrel deliberation switch that profile v14 turns on, the keep-attack
+        // switches of profile v21 and the carrier cohesion rule of profile v32.
+        sha256: "4aa58ee987acf7abe3d8656e3343ec87fafa4096fa3a69500c331b65c0ff808c" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
@@ -834,6 +852,11 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/setup/a19_valkyrie_striker.ts" as const,
         sha256: "7335b5e1055d56d996d9b08cf25f8302fbbebea826de3b0ed5f836edba0a2640" as const,
     }),
+    Object.freeze({
+        role: "carrier-cohesion" as const,
+        source: "src/ai/carrier_cohesion.ts" as const,
+        sha256: "e7103949bd6386290a4b3f78917e0f2fcf0d925995e345ebb688917118c262ee" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -878,6 +901,7 @@ export const V08_A19_PROFILE = Object.freeze({
     deepFit4000: V08_A19_DEEP_FIT_4000_POLICY,
     stockDeadline: V08_A19_STOCK_DEADLINE_POLICY,
     waitClock: V08_A19_WAIT_CLOCK_POLICY,
+    carrierCohesion: V08_A19_CARRIER_COHESION_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

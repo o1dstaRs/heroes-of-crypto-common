@@ -177,6 +177,7 @@ import {
     VALUE_FEATURE_NAMES,
     VALUE_FEATURE_NAMES_V2,
 } from "./value_features";
+import { a19CarrierCohesionHoldsBack, a19IsEarlyIsolatingCarrierMove } from "../ai/carrier_cohesion";
 import { applyA19KeepAttack } from "../ai/keep_attack";
 import { assertNoLegacySeatEnv, seatEnvName } from "../ai/seat_env";
 
@@ -2411,7 +2412,7 @@ export class SearchDriver {
             } catch (error) {
                 if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
                 this.decisionBudgetExceeded = true;
-                actions = incumbent;
+                actions = this.carrierCohesionIncumbent(unit, version, incumbent, rootDecisionContext);
             }
             const rolloutTurns = this.counters.rolloutTurnsTotal - startTurns;
             const withinBudget =
@@ -2424,6 +2425,36 @@ export class SearchDriver {
             this.decisionDeadlineOverrideMs = null;
             this.decisionBudgetExceeded = false;
         }
+    }
+    /**
+     * a19-carrier-cohesion-v1 (`src/ai/carrier_cohesion.ts`): a native move that isolates a principal blessing carrier
+     * in the first laps becomes a wait while the hourglass allows one, else a defend.
+     */
+    private carrierCohesionIncumbent(
+        unit: Unit,
+        version: string,
+        incumbent: GameAction[],
+        rootDecisionContext?: IDecisionContext,
+    ): GameAction[] {
+        if (
+            !this.enabled ||
+            version !== "v0.8" ||
+            !this.versions.has(version) ||
+            this.observeOnly ||
+            (this.teamScope !== null && !this.teamScope.has(unit.getTeam())) ||
+            !rootDecisionContext?.fightProperties ||
+            !a19CarrierCohesionHoldsBack(unit.getTeam(), this.deps.fightProperties) ||
+            !a19IsEarlyIsolatingCarrierMove(
+                unit,
+                this.deps.unitsHolder,
+                this.deps.fightProperties.getCurrentLap(),
+                incumbent,
+            )
+        ) {
+            return incumbent;
+        }
+        const wait = canWaitOnHourglass(unit, rootDecisionContext.fightProperties, this.deps.unitsHolder.getAllUnits());
+        return [{ type: wait ? "wait_turn" : "defend_turn", unitId: unit.getId() }];
     }
     public chooseDecision(
         unit: Unit,
@@ -2448,6 +2479,7 @@ export class SearchDriver {
         ) {
             incumbent = [{ type: "wait_turn", unitId: unit.getId() }];
         }
+        incumbent = this.carrierCohesionIncumbent(unit, version, incumbent, rootDecisionContext);
         this.resetA19MaterialEvidence();
         this.captureA19Material =
             this.a19MaterialArbitration !== undefined &&
@@ -2864,6 +2896,8 @@ export class SearchDriver {
                     !this.observeOnly && this.rapidChargeReservationVersions.has(version),
             };
             let rejectedIsolatingFastFlyerMove = false;
+            const carrierCohesion =
+                isV08Search && a19CarrierCohesionHoldsBack(unit.getTeam(), this.deps.fightProperties);
             const keepCandidate = (candidate: IEnumeratedCandidate): boolean => {
                 if (candidate.kind === "incumbent") return true;
                 if (
@@ -2876,6 +2910,11 @@ export class SearchDriver {
                         this.deps.unitsHolder.getAllUnits(),
                     ) &&
                     isEarlyUnsupportedHealerDive(unit, this.deps.unitsHolder, currentLap, candidate)
+                )
+                    return false;
+                if (
+                    carrierCohesion &&
+                    a19IsEarlyIsolatingCarrierMove(unit, this.deps.unitsHolder, currentLap, candidate.actions)
                 )
                     return false;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
