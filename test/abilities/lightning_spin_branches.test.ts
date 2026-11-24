@@ -13,6 +13,7 @@ import { describe, expect, it } from "bun:test";
 
 import { processLightningSpinAbility } from "../../src/abilities/lightning_spin_ability";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import type { ISecondaryDamage } from "../../src/scene/animations";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { createCombatTestContext, createTestUnit, DamageStatisticHolder, placeUnit } from "../helpers/combat";
 
@@ -39,6 +40,7 @@ describe("lightning spin branches", () => {
             });
             placeUnit(grid, unitsHolder, spinner, { x: 5, y: 5 });
             placeUnit(grid, unitsHolder, shield, { x: 5, y: 6 });
+            const secondary: ISecondaryDamage[] = [];
 
             const result = processLightningSpinAbility(
                 spinner,
@@ -48,12 +50,60 @@ describe("lightning spin branches", () => {
                 new DamageStatisticHolder(),
                 { x: 5, y: 5 },
                 isAttack,
+                secondary,
             );
 
             expect(result.landed).toBe(true);
             expect(spinner.isDead()).toBe(true);
             expect(shield.isDead()).toBe(false);
             expect(result.unitIdsDied).toEqual([spinner.getId()]);
+            // The client draws the killing burn from this entry; without it the spinner died with nothing shown.
+            const burns = secondary.filter((hit) => hit.source === "fire_shield");
+            expect(burns).toHaveLength(1);
+            expect(burns[0]).toMatchObject({ unitId: spinner.getId(), unitsDied: 1 });
+        });
+
+        it(`reports the Fire Shield burn on a surviving spinner (${isAttack ? "attack" : "response"})`, () => {
+            // Game 0c41ae1f: a Hydra spun back at an Efreet and lost 31 HP to its Fire Shield with no number shown.
+            const { grid, unitsHolder } = createCombatTestContext();
+            const spinner = createTestUnit({
+                name: "Spinner",
+                team: PBTypes.TeamVals.RIGHT,
+                abilities: ["Lightning Spin"],
+                maxHp: 1000,
+                amountAlive: 5,
+                attack: 50,
+                damageMin: 50,
+                damageMax: 50,
+            });
+            const shield = createTestUnit({
+                name: "Shield",
+                team: PBTypes.TeamVals.LEFT,
+                maxHp: 1000,
+                amountAlive: 10,
+                abilities: ["Fire Shield"],
+            });
+            placeUnit(grid, unitsHolder, spinner, { x: 5, y: 5 });
+            placeUnit(grid, unitsHolder, shield, { x: 5, y: 6 });
+            const hpBefore = spinner.getCumulativeHp();
+            const secondary: ISecondaryDamage[] = [];
+
+            processLightningSpinAbility(
+                spinner,
+                new SceneLogMock(),
+                unitsHolder,
+                0,
+                new DamageStatisticHolder(),
+                { x: 5, y: 5 },
+                isAttack,
+                secondary,
+            );
+
+            expect(spinner.isDead()).toBe(false);
+            const lost = hpBefore - spinner.getCumulativeHp();
+            expect(lost).toBeGreaterThan(0);
+            expect(secondary.map((hit) => hit.source)).toEqual(["lightning_spin", "fire_shield"]);
+            expect(secondary[1]).toMatchObject({ unitId: spinner.getId(), amount: lost, unitsDied: 0 });
         });
     }
 

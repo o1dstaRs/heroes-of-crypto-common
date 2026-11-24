@@ -327,6 +327,8 @@ export function processLightningSpinAbility(
             if (!wasDead.includes(enemy)) {
                 const damageFromAttack = enemyIdDamageFromAttack.get(enemy.getId());
                 if (damageFromAttack) {
+                    // Pass the visible-damage list so the reflected burn reaches the client. Without it the
+                    // spinner lost HP (or died) to the shield with no number, flame or death shown.
                     const fireShieldResult = processFireShieldAbility(
                         enemy,
                         fromUnit,
@@ -334,6 +336,7 @@ export function processLightningSpinAbility(
                         damageFromAttack,
                         unitsHolder,
                         damageStatisticHolder,
+                        secondaryDamage,
                     );
 
                     if (fireShieldResult.increaseMorale) {
