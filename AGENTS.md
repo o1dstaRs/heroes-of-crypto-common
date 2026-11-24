@@ -9,9 +9,21 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## WAIT comparisons under the clock — November 24, 2026
+
+At the owner's request ("Keep v29, confirm cap") `a19-wait-clock-v1` is active: **the current default is profile v31**.
+Read `docs/wait_clock_adoption.md`. The bot seat's stock and deep searches run WAIT comparisons under the same deadline as
+every other comparison (`V08_A19_DEEP_FIT.waitBudget`: `SEARCH_WAIT_DEADLINE_POLICY` `profile` instead of the A19 profile's
+`operation_bounded`), so no move outruns the owner's 4 s. Offline deterministic work and Premium are unchanged. Registered
+confirmation WC, a non-inferiority real-time clash at the production host's speed: 49.05% head to head against v30 (95%
+47.89 to 50.19; 1,080 tasks, both seats); the capped bot's longest move 4.09 s and none over 4.5 s, against 7.22% over
+4.5 s and a longest 11.0 s for v30. All seven gates passed. Do not report it as a strength gain.
+
+Profile v30 is retained inside v31.
+
 ## Stock search deadline 2,500 ms — November 24, 2026
 
-Under the standing instruction `a19-stock-deadline-v1` is active: **the current default is profile v30**. Read
+Under the standing instruction `a19-stock-deadline-v1` is active: at that date the default was profile v30. Read
 `docs/stock_deadline_adoption.md`. A bot seat's stock search gets a live decision deadline of 2,500 ms and a circuit breaker
 of 3,750 ms (`V08_A19_DEEP_FIT.stockBudget` in `src/simulation/v0_8_a19_deep_fit.ts`) instead of the A19 profile's
 1,000 / 1,500 ms; on the production host the 1,000 ms deadline cut the stock search on about one decision in eight.

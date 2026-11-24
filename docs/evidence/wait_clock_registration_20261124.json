@@ -1,0 +1,45 @@
+{
+ "id": "confirmation-WC-wait-clock-20261124",
+ "registeredAt": "2026-11-24T05:10:47.307934+00:00",
+ "question": "At the production game host's speed, does the bot seat keep every move within the owner's 4 s, without losing more than 2.5 points head to head against the production bot, when its WAIT comparisons run under the wall clock (SEARCH_WAIT_DEADLINE_POLICY=profile instead of operation_bounded) in both its stock and its deep search? Production: profile v30 (with the 2,500 ms stock deadline of confirmation SD), 4,000 rollout turns, 4,000 ms think.",
+ "origin": "Owner, 2026-11-21: \"4s is fine\" (per AI move); 2026-11-23: \"on the prod server we cant think longer really\". The production search profile exempts aggressive WAIT comparisons from the wall clock (SEARCH_WAIT_DEADLINE_POLICY=operation_bounded): their work is bounded only by the rollout-turn budget, so on the slow production host such moves run long, and profile v29's 4,000-turn budget made them longer. In confirmation SD's production arm (v29 at production speed on basenode, 37,085 decisions) 8.0% of decisions took over 4.5 s and the longest 14.4 s; the v28 probe at production speed had 2.6% over 4.5 s (longest 7.4 s). Owner, 2026-11-24, asked about it: \"Keep v29, confirm cap\".",
+ "candidate": {
+  "change": "the bot seat's stock and deep searches (createV08A19DeepFitSearchDriver) get budgetOverrides SEARCH_WAIT_DEADLINE_POLICY \"profile\": a WAIT comparison stops at the same deadline as every other comparison (the stock search's decision deadline, then the think time left for the deep search). Premium advice is unchanged. Live timing only: offline deterministic work has no clock, so no registered offline result changes.",
+  "arm": "clash-rt3.ts --a-stock-ms 2500 --b-stock-ms 2500 --b-wait-policy profile"
+ },
+ "control": "the production bot-seat deep fit, profile v30 (with the 2,500 ms stock deadline of confirmation SD), WAIT comparisons operation_bounded.",
+ "development": "Mac, league/t2b-own-prod.json (402 development tasks x 2 orientations, F 4.596; both arms v29 with the 2,500 ms stock deadline of confirmation SD): candidate 48.9% (95% 47.3 to 50.6); the production arm's decisions over 4.5 s 10.2% / 11.8% by orientation (longest 21.4 s), the candidate's 0.02% / 0.00% (longest 4.55 s); mean think 3.04 -> 2.38 s (normal orientation).",
+ "method": "Real-time clash, as confirmation SD: both seats search with live timing in the same ranked game (tree prod28c, exact v28 production plus research seams, both arms at 4,000 turns), the candidate in one seat and the production bot in the other. Every time limit is divided by the host's time scale F = median rollout turns per ms of <procs> simultaneous search_capacity.ts processes on the reference big board / 0.4756, the production host's rate. Every task is played in both seat orientations.",
+ "bank": {
+  "files": "bank/cfWC-own-drafts.json, bank/cfWC-mirror-drafts.json (build_wc.py; tasks bank/cfWC-tasks.json)",
+  "namespace": "decoy-path-20261123-v1 (allocate_v39, seeds22; audited at allocation, 0 intersections)",
+  "provenance": "families 920-1099 of seeds22, fight r0 on maps 1, 3 and 4 (540 tasks per population). Families 0-799 were drafted for DP and played by U, 800-919 drafted for SD; 920-2208 were never drafted or played on any host (checked on the Mac, basenode, x3d and prod before drafting: no task id of families 920-1099 outside seeds22/pool.json). Drafted at 19:04 PST; no task played before registration.",
+  "populations": {
+   "own": "opponent S:B23:fast:K14 (owner-shaped strikers)",
+   "mirror": "opponent MG:mix:0.5:2 (the default AI)"
+  }
+ },
+ "host": "basenode (AMD Ryzen 9 3900X, no other workload once confirmation SD finished): WC_TURNS=4000 WC_STOCK_MS=2500 cfWC-run.sh 20 (5 processes per population and orientation), Bun 1.4.5, tree prod28c (source manifest sha256 10ee9b95ec91bfdd72048fe2fe521aa8fe913267aecbd51fdf8c0625d3684410).",
+ "primaryEndpoint": "Mean over all 1,080 tasks (own 540 + mirror 540) of the candidate's seat-balanced score (mean of its two orientation scores; win 1, draw 0.5, loss 0). 95% percentile interval from 20,000 bootstrap resamples of the 180 draft-root families (both populations of a family together), seed 20261123 (confirm_wc_analyze.py). All 2,160 games must be present; otherwise no gate is evaluated and the confirmation is incomplete.",
+ "gates": {
+  "WC1": "Non-inferiority: lower bound of the primary interval at least 47.5%.",
+  "WC2": "Each population (own, mirror): estimate at least 47%.",
+  "WC3": "Each map (1, 3, 4), pooled over populations: estimate at least 47%.",
+  "WC4": "Games with any quality error: at most 2 of 2,160.",
+  "WC5": "Latency, production seconds (ms x F): the candidate's share of decisions over 4.5 s at most 0.5%, and its longest decision at most 5.0 s.",
+  "WC6": "The time scale F calibrated again after the run (the same <procs> processes) within 10% of the F used.",
+  "WC7": "Production-speed fidelity: the production bot's share of decisions over 4.5 s at least 3% (the problem the candidate fixes must be present in the run)."
+ },
+ "recorded": "per arm: mean think, over-6 s share, deep attempted / played / cut, stock deadline fallbacks; scores by orientation and by population.",
+ "decision": "All seven gates pass: adopt (common v0_8_a19_deep_fit.ts wait-deadline override for bot seats, profile and revision bump, deploy to all servers). Any gate fails: not adopted; a failed gate stays recorded as failed and is never waived, re-run or relabelled; the measured strength and latency go to the owner.",
+ "sha256": {
+  "clash-rt3.ts": "1e2a2fcf64e39162dbcda8ab459988f4824632934f94643bc3be2ee4f1dbd872",
+  "cfWC-run.sh": "6a0b7cf37af6af14ff9fcfe276ec1441b9004a83febbee9fd75a6f5fabc73943",
+  "confirm_wc_analyze.py": "d6e11e0dfe7d4b9c1f778eff3189c120415e1284f4a60d964a687257437db91e",
+  "build_wc.py": "b4072ea5d21f56e01638c5763f866d07a84f136dda7f675ebf615c7501c9245e",
+  "bank/cfWC-tasks.json": "8b098c2f649f3a70f3e258e1974162de4628f7f546a9ce0265f11fcc3dbf5842",
+  "bank/cfWC-own-drafts.json": "ecaa3b4620cd8e7ac0789497cea9c3339e7acd455418aba6afaadd3f8b0e8650",
+  "bank/cfWC-mirror-drafts.json": "e4cf159003e074eb22983e93e474bf47bbaa16fabef3471250c7c6004eacb439",
+  "bank/cfWC-summary.json": "8d6347b04c227a99fc409d8394eb892a37a2457f7bcf7352fd2244b186b8f2b1"
+ }
+}

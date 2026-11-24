@@ -1,0 +1,87 @@
+{
+    "id": "wait-clock-confirmation-WC",
+    "registrationSha256": "2820fe568be7bda58822bca3ab62bb14233dd84d648a93b68e81a96feb98ec0e",
+    "host": "basenode (Ryzen 9 3900X), 20 processes, tree prod28c with HOC_RESEARCH_DEEP_FIT_TURNS=4000 and both arms' stock deadline 2,500 ms (profile v30 control)",
+    "timeScale": {
+        "before": 0.8235,
+        "after": 0.8468
+    },
+    "primary": {
+        "tasks": 1080,
+        "families": 180,
+        "games": 2160,
+        "candidateScore": 49.05,
+        "low": 47.89,
+        "high": 50.19
+    },
+    "populations": {
+        "own": {
+            "tasks": 540,
+            "candidateScore": 49.58,
+            "candidateTeam": 76.3,
+            "otherTeam": 22.9
+        },
+        "mirror": {
+            "tasks": 540,
+            "candidateScore": 48.52,
+            "candidateTeam": 50.6,
+            "otherTeam": 46.5
+        }
+    },
+    "maps": {
+        "1": 49.03,
+        "3": 47.92,
+        "4": 50.21
+    },
+    "qualityErrorGames": 0,
+    "production": {
+        "decisions": 55407,
+        "deepAttempted": 99.6,
+        "deepPlayed": 77.4,
+        "deepCut": 22.1,
+        "stockDeadlineFallbacks": 0.0,
+        "meanThinkSeconds": 2.31,
+        "over4500": 7.22,
+        "over6000": 2.69,
+        "maxSeconds": 11.0
+    },
+    "candidate": {
+        "decisions": 55498,
+        "deepAttempted": 99.6,
+        "deepPlayed": 73.7,
+        "deepCut": 25.9,
+        "stockDeadlineFallbacks": 0.0,
+        "meanThinkSeconds": 2.18,
+        "over4500": 0.0,
+        "over6000": 0.0,
+        "maxSeconds": 4.09
+    },
+    "gates": {
+        "WC1 non-inferiority: lower bound of the primary interval at least 47.5%": true,
+        "WC2 each population at least 47%": true,
+        "WC3 each map at least 47%": true,
+        "WC4 at most 2 games with a quality error": true,
+        "WC5 latency: candidate over 4.5 s at most 0.5% and longest at most 5.0 s (production seconds)": true,
+        "WC6 time scale recalibrated within 10%": true,
+        "WC7 production-speed fidelity: production over 4.5 s at least 3%": true
+    },
+    "adopt": true,
+    "analysisOutput": [
+        "before: 20 processes, turns/ms median 0.392 (min 0.376 max 0.428); F = 0.8235",
+        "after: 20 processes, turns/ms median 0.403 (min 0.375 max 0.430); F = 0.8468",
+        "rows 2160 of 2160; arm B ['4s-x1-4000t-stock2500-wait-profile']; time scale [0.8235]",
+        "primary: 1080 tasks, 180 families: candidate seat-balanced score 49.05% (95% 47.89 to 50.19)",
+        "  own: 49.58% (candidate on the candidate team 76.3%, on the other team 22.9%)",
+        "  mirror: 48.52% (candidate on the candidate team 50.6%, on the other team 46.5%)",
+        "production: decisions 55407; deep attempted 99.6%, played 77.4%, cut 22.1%; stock deadline fallbacks 0.0%; mean think 2.31 s, over 4.5 s 7.22%, over 6 s 2.69%, max 11.00 s (production seconds)",
+        "candidate: decisions 55498; deep attempted 99.6%, played 73.7%, cut 25.9%; stock deadline fallbacks 0.0%; mean think 2.18 s, over 4.5 s 0.00%, over 6 s 0.00%, max 4.09 s (production seconds)",
+        "WC1 PASS: non-inferiority: lower bound 47.89% >= 47.5%",
+        "WC2 PASS: each population >= 47%: own 49.58%, mirror 48.52%",
+        "WC3 PASS: each map >= 47%: map 1 49.03%, map 3 47.92%, map 4 50.21%",
+        "WC4 PASS: games with a quality error 0 <= 2",
+        "WC5 PASS: latency: candidate decisions over 4.5 s 0.00% <= 0.5% and its longest 4.09 s <= 5.0 s (production seconds)",
+        "WC6 PASS: time scale after the run 0.8468 within 10% of 0.8235",
+        "WC7 PASS: production-speed fidelity: the production bot's decisions over 4.5 s 7.22% >= 3%",
+        "ALL GATES PASS"
+    ]
+}

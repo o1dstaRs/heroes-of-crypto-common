@@ -156,8 +156,13 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     a 3,750 ms breaker instead of 1,000 / 1,500 (simulation/v0_8_a19_deep_fit.ts; offline work is unchanged).
  *     Registered confirmation SD (real-time clash at production speed): 53.12% head to head against v29 (95% 51.56 to
  *     54.76; 720 tasks x both seats) (docs/stock_deadline_adoption.md).
+ *   - Wait clock (profile v31) adopted on 2026-11-24 at the owner's request ("Keep v29, confirm cap"): the bot seat's stock
+ *     and deep searches run WAIT comparisons under their deadline (SEARCH_WAIT_DEADLINE_POLICY profile instead of
+ *     operation_bounded; simulation/v0_8_a19_deep_fit.ts; offline work is unchanged), so no move outruns the owner's 4 s.
+ *     Registered non-inferiority confirmation WC (real-time clash at production speed): 49.05% head to head against v30
+ *     (95% 47.89 to 50.19; 1,080 tasks x both seats); longest move 4.09 s, none over 4.5 s (docs/wait_clock_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v30" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v31" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -415,6 +420,18 @@ export const V08_A19_STOCK_DEADLINE_POLICY = Object.freeze({
     adoption: "standing-user-instruction",
     registrationSha256: "0861b6ac1fa9f09ad5831b15ddcdf3103a9bb79f328fa7a8128a42ab8c20eef1",
     qualification: "strength-confirmed",
+} as const);
+
+/**
+ * Wait clock (profile v31): V08_A19_DEEP_FIT.waitBudget in simulation/v0_8_a19_deep_fit.ts, the bot seat's stock and deep
+ * searches under live timing. See docs/wait_clock_adoption.md.
+ */
+export const V08_A19_WAIT_CLOCK_POLICY = Object.freeze({
+    policyId: "a19-wait-clock-v1" as const,
+    adoptedAt: "2026-11-24",
+    adoption: "owner-request",
+    registrationSha256: "2820fe568be7bda58822bca3ab62bb14233dd84d648a93b68e81a96feb98ec0e",
+    qualification: "non-inferiority-confirmed",
 } as const);
 
 /**
@@ -780,7 +797,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "deep-fit" as const,
         source: "src/simulation/v0_8_a19_deep_fit.ts" as const,
-        sha256: "caf75648fa0739701eaed8863baa688d906304a378611e1850842ce76efdf7bd" as const,
+        sha256: "4ec72ae84e513c49b0e888a4c7440e0442d2925b00451503274aafcbdb092a9c" as const,
     }),
     Object.freeze({
         role: "wild-regen-gift" as const,
@@ -860,6 +877,7 @@ export const V08_A19_PROFILE = Object.freeze({
     valkyrieStriker: V08_A19_VALKYRIE_STRIKER_POLICY,
     deepFit4000: V08_A19_DEEP_FIT_4000_POLICY,
     stockDeadline: V08_A19_STOCK_DEADLINE_POLICY,
+    waitClock: V08_A19_WAIT_CLOCK_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

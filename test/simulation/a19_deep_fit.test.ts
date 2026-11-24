@@ -239,7 +239,7 @@ describe("V08A19DeepFitSearchDriver", () => {
         expect(late.chosen).toBe(STOCK);
     });
 
-    test("builds the stock driver with the stock deadline and a deep driver with the deep budget and the think deadline", () => {
+    test("builds the stock driver with the stock deadline and a deep driver with the deep budget and the think deadline; both put WAIT comparisons under the clock", () => {
         const f = fixture();
         const composite = createV08A19DeepFitSearchDriver(f.deps, MATCH) as unknown as {
             stock: Record<string, unknown>;
@@ -255,6 +255,10 @@ describe("V08A19DeepFitSearchDriver", () => {
             SEARCH_DECISION_DEADLINE_MS: "2500",
             SEARCH_CIRCUIT_BREAKER_MS: "3750",
         });
+        // Profile v31: WAIT comparisons of both searches stop at their deadline (the profile exempts them from the clock).
+        expect(stock).toMatchObject({ waitDeadlinePolicy: "operation_bounded" });
+        expect(composite.stock).toMatchObject({ waitDeadlinePolicy: "profile" });
+        expect(V08_A19_DEEP_FIT.waitBudget).toEqual({ SEARCH_WAIT_DEADLINE_POLICY: "profile" });
         expect(composite.deep).toMatchObject({
             rollouts: 8,
             shortlist: 10,
@@ -262,6 +266,7 @@ describe("V08A19DeepFitSearchDriver", () => {
             horizon: stock.horizon,
             decisionDeadlineMs: V08_A19_DEEP_FIT.thinkMs,
             circuitBreakerMs: V08_A19_DEEP_FIT.thinkMs * 30,
+            waitDeadlinePolicy: "profile",
         });
     });
 });

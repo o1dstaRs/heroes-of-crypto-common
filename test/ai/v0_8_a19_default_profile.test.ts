@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v30",
+            schema: "hoc.v0_8_a19_production_profile.v31",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -230,6 +230,14 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "standing-user-instruction",
                 registrationSha256: "0861b6ac1fa9f09ad5831b15ddcdf3103a9bb79f328fa7a8128a42ab8c20eef1",
                 qualification: "strength-confirmed",
+            },
+            // Profile v31: WAIT comparisons of the bot seat's searches run under the clock (registered confirmation WC).
+            waitClock: {
+                policyId: "a19-wait-clock-v1",
+                adoptedAt: "2026-11-24",
+                adoption: "owner-request",
+                registrationSha256: "2820fe568be7bda58822bca3ab62bb14233dd84d648a93b68e81a96feb98ec0e",
+                qualification: "non-inferiority-confirmed",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({
