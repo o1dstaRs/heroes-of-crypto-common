@@ -34,6 +34,7 @@ layers' one-use budgets. Premium draft advice goes through the same decider and 
 | Other level-4 rules on the same 59 games        | half B (25 games) as holdout       | Thunderbird first, a creature prior and legal-feature models all failed the holdout |
 | AI-vs-AI development screen (seed 2)            | 195 changed of 4,000 drafted cases | +2.3 per changed case (95% −6.2 to +10.8; 37 better, 32 worse)                      |
 | Confirmation CPC, registered before a game      | see below                          | Passed all three gates (below)                                                      |
+| Replication CPC-R on the real games' terrain    | part A again, 64 fresh seeds       | Passed its gate: +15.36 (95% +9.64 to +20.96)                                       |
 
 The rule was written before the 49 held-out games were measured and was not changed after the development screen.
 
@@ -79,6 +80,35 @@ The per-game effects moved a lot from the battery, which used the v29 driver and
 Scorecard (goals 2 and 4): by battery lookup, production's level-4 score against the owner's ten recent setups goes
 37.2 (v32) → 49.1 (v33) → 54.1 (v34) points per game, and 83.7 → 86.1 on the 59-game battery; on the confirmation's
 fresh seeds and the v33 driver the two owner games the rule changes give +4.6 points per owner game.
+
+## Replication on the real games' terrain (CPC-R)
+
+Erratum. CPC part A ran on a tree whose replay adapter (`ranked_adapter.ts` in the server's ai_iteration tools) used
+`sim-${terrainSeed}` as the game id instead of the task's real one, so on the two Block boards (3fd7b865 and 909e7898) the
+game-id-seeded stones were not the real games' stones, although CPC's registration stated real game ids. Both arms shared
+each board, so CPC's paired estimate was internally valid, but its population was not exactly the registered one. CPC's
+result and the adoption stand as recorded.
+
+Replication CPC-R, registered before any of its games (`docs/evidence/closing_pick_replication_registration_20261124.json`,
+sha256 `600b3d353fec93d3419a20257f3c9b8491e1239026a93d72b1efe43a5cc9b8fe`): CPC part A again, the same six games, armies,
+arms, replay seat and v33/v34 fight driver, with the replay adapter taking the task's game id (checked before registration:
+the replayed stones equal `scatteredMountainsForSeed(real game id)` on both Block boards); 64 fresh seeds per game, both
+arms on the same seeds; the same estimate and interval as part A. Gate R1: the estimate above 0 with its 95% lower bound
+above 0. Results: `docs/evidence/closing_pick_replication_20261124.json`.
+
+| Game                         | Level 4                  | Production |  Rule |                       Difference | In CPC |
+| ---------------------------- | ------------------------ | ---------: | ----: | -------------------------------: | -----: |
+| 1a785955 (recent owner game) | Angel → Magic Dragon     |      28.1% | 89.1% |                           +60.94 |  +60.2 |
+| 3fd7b865 (held out)          | Champion → Thunderbird   |      96.9% | 80.5% |                           −16.41 |  −35.9 |
+| 76f5f3d5 (held out)          | Angel → Thunderbird      |      48.4% | 50.8% |                            +2.34 |   +3.9 |
+| 909e7898 (held out)          | Angel → Arachna Queen    |      32.8% | 79.7% |                           +46.88 |  +25.0 |
+| 9208870e (recent owner game) | Champion → Arachna Queen |      42.2% | 46.9% |                            +4.69 |  −14.1 |
+| 974d9737 (held out)          | Angel → Thunderbird      |     100.0% | 93.8% |                            −6.25 |   −3.1 |
+| **CPC-R**                    |                          |            |       | **+15.36 (95% +9.64 to +20.96)** |  +5.99 |
+
+R1 passed; no game had a quality error. With the real stones the two Block games move toward the rule (3fd7b865 −35.9 →
+−16.4, 909e7898 +25.0 → +46.9), and 9208870e (not a Block board) turns from −14.1 to +4.7 on the fresh seeds. Two of the
+six still lose: the gain is an average.
 
 ## What the estimate is and is not
 

@@ -1,0 +1,111 @@
+{
+    "id": "closing-pick-CPC-R-20261124",
+    "registrationSha256": "600b3d353fec93d3419a20257f3c9b8491e1239026a93d72b1efe43a5cc9b8fe",
+    "registeredAt": "2026-11-24T21:52:17Z",
+    "analysisSha256": "e150e92d0d6d10c258f372990659270ae4b1a0b7c6e70b700a5be499abb27c1d",
+    "ran": {
+        "host": "x3d (linux-x64)",
+        "start": "2026-11-24T21:52:34Z",
+        "end": "2026-11-24T23:13:57Z",
+        "rows": 768,
+        "tree": "server 565bc0e + common 9b80f76e + closing pick v2 (the CPC tree) with the replay game-id override (ranked_adapter.ts e91e1733)"
+    },
+    "why": "CPC part A ran on a tree whose replay adapter used sim-${terrainSeed} instead of the task's real game id, so the game-id-seeded stones of the two Block boards (3fd7b865, 909e7898) were not the real games'. CPC-R measures part A again with the real game ids.",
+    "games": [
+        {
+            "game": "1a785955",
+            "kind": "recent owner game",
+            "level4": "Angel → Magic Dragon",
+            "controlPercent": 28.1,
+            "candidatePercent": 89.1,
+            "differencePoints": 60.94,
+            "cpc": {
+                "controlPercent": 32.0,
+                "candidatePercent": 92.2,
+                "differencePoints": 60.2
+            }
+        },
+        {
+            "game": "3fd7b865",
+            "kind": "held out",
+            "level4": "Champion → Thunderbird",
+            "controlPercent": 96.9,
+            "candidatePercent": 80.5,
+            "differencePoints": -16.41,
+            "cpc": {
+                "controlPercent": 95.3,
+                "candidatePercent": 59.4,
+                "differencePoints": -35.9
+            }
+        },
+        {
+            "game": "76f5f3d5",
+            "kind": "held out",
+            "level4": "Angel → Thunderbird",
+            "controlPercent": 48.4,
+            "candidatePercent": 50.8,
+            "differencePoints": 2.34,
+            "cpc": {
+                "controlPercent": 56.2,
+                "candidatePercent": 60.2,
+                "differencePoints": 3.9
+            }
+        },
+        {
+            "game": "909e7898",
+            "kind": "held out",
+            "level4": "Angel → Arachna Queen",
+            "controlPercent": 32.8,
+            "candidatePercent": 79.7,
+            "differencePoints": 46.88,
+            "cpc": {
+                "controlPercent": 51.6,
+                "candidatePercent": 76.6,
+                "differencePoints": 25.0
+            }
+        },
+        {
+            "game": "9208870e",
+            "kind": "recent owner game",
+            "level4": "Champion → Arachna Queen",
+            "controlPercent": 42.2,
+            "candidatePercent": 46.9,
+            "differencePoints": 4.69,
+            "cpc": {
+                "controlPercent": 50.0,
+                "candidatePercent": 35.9,
+                "differencePoints": -14.1
+            }
+        },
+        {
+            "game": "974d9737",
+            "kind": "held out",
+            "level4": "Angel → Thunderbird",
+            "controlPercent": 100.0,
+            "candidatePercent": 93.8,
+            "differencePoints": -6.25,
+            "cpc": {
+                "controlPercent": 98.4,
+                "candidatePercent": 95.3,
+                "differencePoints": -3.1
+            }
+        }
+    ],
+    "estimatePoints": 15.36,
+    "interval95": [
+        9.64,
+        20.96
+    ],
+    "intervalMethod": "10,000 bootstrap resamples of seeds within each game (paired; random.Random(2611245501)), the games fixed, each game weighted equally",
+    "qualityErrorGames": {
+        "control": 0,
+        "candidate": 0
+    },
+    "gates": {
+        "R1": {
+            "rule": "the estimate is above 0 and its 95% lower bound is above 0",
+            "passed": true
+        }
+    },
+    "decision": "R1 passed: profile v34 stands; CPC's record gains this replication and the terrain erratum."
+}

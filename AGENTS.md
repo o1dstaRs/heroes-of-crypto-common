@@ -18,7 +18,9 @@ synergy bonus (`src/ai/setup/a19_closing_pick.ts`); the best replaces the earlie
 better. The server's draft decider applies it before the Queen counter (`queen ?? closing ?? counter ?? matchup`), and
 Premium draft advice follows it. Registered confirmation CPC: +5.99 points (95% +0.52 to +11.33) on the six human setups
 where it changes the pick (two of the six lose: the gain is an average); AI vs AI +7.23 per changed draft (95% +0.59 to
-+14.01; 5.65% of drafts change). Keep `a19_closing_pick.test.ts` passing: it pins the measured picks of those six games.
++14.01; 5.65% of drafts change). Replicated on the real games' terrain (registered CPC-R; CPC's replay adapter had used
+sim stones on the two Block boards): +15.36 (95% +9.64 to +20.96). Keep `a19_closing_pick.test.ts` passing: it pins the
+measured picks of those six games.
 
 Profile v33 is retained inside v34.
 
