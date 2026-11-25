@@ -28,7 +28,7 @@ seats and Premium "Arrange army") passes it to the planner, and the client's Pre
 
 The owner was offered three ways to ship it: both now, Premium now and AI seats after a check, or both after a check
 (the v35 way). The owner chose "Both now" (`docs/evidence/shield_screen_decision_20261125.json`, sha256
-`4f5683ebb2a0184f71854ea153ee83ba4aaf5df6c53943493e30f7e81033d954`, the policy's `registrationSha256`). So the profile
+`e50024247b049178de58d092acca14ac93433c405e843647b7b6b20799bf3ddc`, the policy's `registrationSha256`). So the profile
 records `qualification: "owner-decision-check-pending"`.
 
 A registered non-inferiority check follows once research hosts are free: AI seats whose army holds a splittable

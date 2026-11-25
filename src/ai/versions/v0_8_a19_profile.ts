@@ -521,7 +521,7 @@ export const V08_A19_SHIELD_SCREEN_POLICY = Object.freeze({
     policyId: "a19-shield-screen-v1" as const,
     adoptedAt: "2026-11-25",
     adoption: "owner-explicit-decision",
-    registrationSha256: "4f5683ebb2a0184f71854ea153ee83ba4aaf5df6c53943493e30f7e81033d954",
+    registrationSha256: "e50024247b049178de58d092acca14ac93433c405e843647b7b6b20799bf3ddc",
     qualification: "owner-decision-check-pending",
 } as const);
 
