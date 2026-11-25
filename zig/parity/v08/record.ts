@@ -26,6 +26,8 @@ import creaturesJson from "../../../src/configuration/creatures.json";
 import { GameActionEngine } from "../../../src/engine/action_engine";
 import { TurnEngine } from "../../../src/engine/turn_engine";
 import { getAIStrategy } from "../../../src/ai";
+import { StrategyV0_8 } from "../../../src/ai/versions/v0_8";
+import { beginDecision, endDecision, installLayerLog, type Layer } from "./layers";
 import { PathHelper } from "../../../src/grid/path_helper";
 import { buildRoster, creaturesByLevel, makeRng } from "../../../src/simulation/army";
 import { getAbilityConfig, getEffectConfig } from "../../../src/configuration/config_provider";
@@ -377,6 +379,15 @@ function main(): void {
         };
     }
 
+    // RECORD_LAYERS=1 (v0.8 only): each decision also records every inheritance level's and v0.8 pass's output.
+    // Installed before the decision wrapper below captures decideTurn, so the wrapper calls the logged copy.
+    const layerLog = process.env.RECORD_LAYERS === "1";
+    let layersSha: string | undefined;
+    if (layerLog) {
+        if (!(getAIStrategy(version) instanceof StrategyV0_8)) throw new Error("RECORD_LAYERS needs a v0.8 strategy");
+        layersSha = installLayerLog(() => rng?.state ?? 0);
+    }
+
     // AI decisions: the unit, the random state around the call and the actions it returned. Engine calls made
     // inside a decision (none are expected for v0.1) are not recorded as steps.
     const decideTurn = strategyClass.prototype.decideTurn;
@@ -388,9 +399,12 @@ function main(): void {
         depth += 1;
         let actions: unknown[];
         const t0 = process.hrtime.bigint();
+        if (layerLog) beginDecision();
+        let layers: Layer[] | undefined;
         try {
             actions = decideTurn.call(this, unit, context);
         } finally {
+            if (layerLog) layers = endDecision();
             decideNanos += process.hrtime.bigint() - t0;
             decisions += 1;
             depth -= 1;
@@ -402,6 +416,7 @@ function main(): void {
             r1: rng.state,
             draws: rng.draws - d0,
             out: JSON.parse(JSON.stringify(actions)),
+            ...(layers ? { layers } : {}),
         });
         return actions;
     };
@@ -475,6 +490,7 @@ function main(): void {
         keepRate: KEEP_RATE,
         version,
         decisionOrigin: rolloutOrigin ? "rollout" : "match",
+        layers: layerLog ? { decideTurnSourceSha256: layersSha } : null,
     };
     writeFileSync(out.replace(/\.jsonl$/, ".meta.json"), JSON.stringify(meta, null, 2) + "\n");
     console.log(JSON.stringify(meta));
