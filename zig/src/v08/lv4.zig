@@ -1,0 +1,454 @@
+//! The v0.4 level of the v0.8 chain (src/ai/versions/v0_4.ts StrategyV0_4.decideTurn), default environment, with
+//! v0.8's overrides: rangedOutput is v08TeamRangedOutput, frontMove is StrategyV0_8.frontMove around v0.4's.
+//!
+//! In scope (no spells or abilities) the pipeline is: hold when out-gunning at range, v0.3, the Goblin Knight's
+//! low-level victim, the flyer's patient hunt, the landing guard, the melee legality guard, the lap-1 mass-buff
+//! wait, the front move, the range legality guard. Identity in scope, so not ported: retargetHeal (heal casts),
+//! auraRepositionMelee (no buff auras: every cover is 0), rapidChargeReposition, aoeMeleeReposition,
+//! hydraSpinReposition and chainLightningTarget (abilities), and the Ogre Mage Riot, Healer and Troll Wild
+//! Regeneration plays (spells). Off by default: the siege mute (MUTE_SIEGE_ENABLED), the boxed-shooter hold
+//! (V04_BOXHOLD), the caster self-delays (V04_OGRESELF / V04_BEHESELF).
+
+const std = @import("std");
+const rec = @import("../recording.zig");
+const st = @import("../state.zig");
+const engine = @import("../engine.zig");
+const combat = @import("../combat.zig");
+const pathing = @import("../path.zig");
+const ai = @import("../ai.zig");
+const util = @import("util.zig");
+const policy = @import("policy.zig");
+const lv3 = @import("lv3.zig");
+
+const Cell = st.Cell;
+const State = st.State;
+const AT = st.AttackType;
+
+pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    const rin = s.rng.state;
+    defer policy.note("v0.4", out, s, rin);
+    // (2) Out-gunning them at range, a shooter that cannot fire yet holds (canMove() is true in scope).
+    if (u.attack_type == AT.RANGE and engine.getRangeShots(u) > 0 and holdWhenRangedSuperior(c, out)) return;
+    lv3.decide(c, out);
+    var base: ai.Decision = undefined;
+    util.copyDecision(&base, out);
+    preferLowLevelMelee(c, out);
+    flyerPatientHunt(c, out);
+    preferValidMove(c, out, &base);
+    enforceMeleeLegality(c, out);
+    waitForMassBuff(c, out);
+    frontMove(c, out);
+    enforceRangeLegality(c, out);
+}
+
+fn enemyAdjacent(c: *const ai.Ctx) bool {
+    const s = c.s;
+    const u = c.unit();
+    const mine = engine.unitCells(u);
+    const opp = engine.opposite(u.team);
+    for (s.units[0..s.n_units], 0..) |*e, i| {
+        if (!util.livingOf(s, i, opp)) continue;
+        const ec = engine.unitCells(e);
+        if (util.footprintsNear(ec.slice(), mine.slice())) return true;
+    }
+    return false;
+}
+
+/// (2) holdWhenRangedSuperior: wait (else hold) while out-gunning them, when the shot is not there yet and no enemy
+/// is adjacent.
+fn holdWhenRangedSuperior(c: *ai.Ctx, out: *ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    if (util.teamRangedOutput(s, u.team) <= util.teamRangedOutput(s, engine.opposite(u.team))) return false;
+    if (engine.canLandRangeAttack(s, u)) return false;
+    if (enemyAdjacent(c)) return false;
+    if (util.canHourglass(s, c.ui)) util.setWait(out, c.ui) else util.setEndTurn(out, c.ui);
+    return true;
+}
+
+fn firstMelee(out: *const ai.Decision) ?usize {
+    for (out.slice(), 0..) |a, i| if (a == .melee_attack) return i;
+    return null;
+}
+
+/// (7) The Goblin Knight swaps an in-place strike to the lowest-level adjacent enemy below the target's level.
+fn preferLowLevelMelee(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (util.creature(c.ui) != .goblin_knight or u.target >= 0) return;
+    const i = firstMelee(out) orelse return;
+    const strike = out.actions[i].melee_attack;
+    const base = engine.baseCell(u);
+    if (strike.path.len > 0 or !ai.sameCell(strike.attack_from, base)) return;
+    const current = &s.units[strike.target];
+    if (!current.in_holder) return;
+    const mine = engine.unitCells(u);
+    const opp = engine.opposite(u.team);
+    var best: ?u8 = null;
+    var best_level: u8 = 0;
+    for (s.units[0..s.n_units], 0..) |*e, k| {
+        if (!util.livingOf(s, k, opp) or e.level >= current.level) continue;
+        const ec = engine.unitCells(e);
+        if (!util.footprintsNear(ec.slice(), mine.slice())) continue;
+        if (best == null or e.level < best_level) {
+            best = @intCast(k);
+            best_level = e.level;
+        }
+    }
+    const b = best orelse return;
+    out.actions[i].melee_attack.target = b;
+}
+
+/// flyerPatientHunt (V04_FHUNT2, on): a melee flyer with no strike waits until an ally is in contact, then closes
+/// on the nearest enemy shooter or caster.
+fn flyerPatientHunt(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (!engine.canFly(u) or u.attack_type != AT.MELEE) return;
+    if (util.strikes(out)) return;
+    const opp = engine.opposite(u.team);
+    var ranges: [st.MAX_UNITS]Cell = undefined;
+    var n_ranges: usize = 0;
+    for (s.units[0..s.n_units], 0..) |*e, i| {
+        if (!util.livingOf(s, i, opp)) continue;
+        if (e.attack_type == AT.RANGE or e.attack_type == AT.MAGIC) {
+            ranges[n_ranges] = engine.baseCell(e);
+            n_ranges += 1;
+        }
+    }
+    if (n_ranges == 0) return;
+    var clash = false;
+    outer: for (s.units[0..s.n_units], 0..) |*a, i| {
+        if (!util.livingOf(s, i, u.team) or i == c.ui) continue;
+        const ac = engine.unitCells(a);
+        for (s.units[0..s.n_units], 0..) |*e, k| {
+            if (!util.livingOf(s, k, opp)) continue;
+            const ec = engine.unitCells(e);
+            if (util.footprintsNear(ec.slice(), ac.slice())) {
+                clash = true;
+                break :outer;
+            }
+        }
+    }
+    if (!clash) {
+        if (util.canHourglass(s, c.ui)) util.setWait(out, c.ui);
+        return;
+    }
+    const Nearest = struct {
+        fn of(cell: Cell, targets: []const Cell) f64 {
+            var d = std.math.inf(f64);
+            for (targets) |t| d = @min(d, ai.cellDistance(cell, t));
+            return d;
+        }
+    };
+    const mp = c.actualPath();
+    var best: ?*const pathing.Route = null;
+    var best_dist = Nearest.of(engine.baseCell(u), ranges[0..n_ranges]);
+    var buf: [64]Cell = undefined;
+    for (mp.known()) |*r| {
+        if (mp.routeCells(r, &buf) == 0) continue;
+        const d = Nearest.of(r.cell, ranges[0..n_ranges]);
+        if (d < best_dist) {
+            best_dist = d;
+            best = r;
+        }
+    }
+    const r = best orelse return;
+    util.setMove(out, s, c.ui, mp, r);
+}
+
+/// decisionLandingIsBlocked: a path-bearing strike whose stand cell the unit cannot land on, or (V04_MVGUARD, on) a
+/// move whose footprint is not free.
+fn landingBlocked(c: *const ai.Ctx, d: *const ai.Decision) bool {
+    const s = c.s;
+    for (d.slice()) |a| {
+        if (a == .melee_attack) {
+            const m = a.melee_attack;
+            if (m.path.len > 0 and !ai.canLandAt(s, c.ui, m.attack_from)) return true;
+            break;
+        }
+    }
+    for (d.slice()) |a| {
+        if (a == .move_unit) {
+            const fp = a.move_unit.target_cells;
+            return fp.len > 0 and !engine.cellsFreeFor(s, c.ui, fp);
+        }
+    }
+    return false;
+}
+
+/// preferValidMove: keep the tuned decision unless it lands blocked; then the validated v0.3 decision; else hold.
+fn preferValidMove(c: *ai.Ctx, out: *ai.Decision, base: *const ai.Decision) void {
+    if (!landingBlocked(c, out)) return;
+    if (!landingBlocked(c, base)) return util.copyDecision(out, base);
+    if (util.canHourglass(c.s, c.ui)) util.setWait(out, c.ui) else util.setEndTurn(out, c.ui);
+}
+
+fn inPlaceStrike(c: *ai.Ctx, out: *ai.Decision, target: u8) void {
+    const u = c.unit();
+    out.* = .{};
+    if (u.attack_type_selected != AT.MELEE) out.push(.{ .select_attack_type = .{ .unit = c.ui, .attack_type = AT.MELEE } });
+    out.push(.{ .melee_attack = .{ .attacker = c.ui, .target = target, .attack_from = engine.baseCell(u), .path = &.{} } });
+}
+
+/// (11) enforceMeleeLegality: only the forced (Aggr) target may be struck; a strike on a gone target retargets in
+/// place or advances. Cowardice and Hidden are out of scope.
+fn enforceMeleeLegality(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    const i = firstMelee(out) orelse return;
+    const strike = out.actions[i].melee_attack;
+    const mine = engine.unitCells(u);
+    const Strikable = struct {
+        fn ok(st_: *const State, t: u8, my: []const Cell) bool {
+            const e = &st_.units[t];
+            if (!e.in_holder or e.isDead()) return false;
+            const ec = engine.unitCells(e);
+            return util.footprintsNear(ec.slice(), my);
+        }
+    };
+    if (u.target >= 0 and u.target != @as(i8, @intCast(strike.target))) {
+        const f: u8 = @intCast(u.target);
+        if (s.units[f].in_holder and !s.units[f].isDead()) {
+            if (Strikable.ok(s, f, mine.slice())) return inPlaceStrike(c, out, f);
+            return ai.fallbackTurn(c, out);
+        }
+    }
+    const t = &s.units[strike.target];
+    if (!t.in_holder or t.isDead()) {
+        if (u.target >= 0) return ai.fallbackTurn(c, out);
+        const opp = engine.opposite(u.team);
+        for (0..s.n_units) |k| {
+            if (s.units[k].in_holder and s.units[k].team == opp and Strikable.ok(s, @intCast(k), mine.slice())) {
+                return inPlaceStrike(c, out, @intCast(k));
+            }
+        }
+        return ai.fallbackTurn(c, out);
+    }
+}
+
+/// waitForMassBuff (V04_BUFFWAIT, on): on lap 1 a unit without a strike waits while its army's Behemoth roar or Ogre
+/// Mage riot is still pending. No buff can land in scope, so a pending one stays pending.
+fn waitForMassBuff(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    if (s.fight.lap > 1) return;
+    if (util.strikes(out)) return;
+    const team = c.unit().team;
+    var ranged: usize = 0;
+    var behemoth = false;
+    var ogre = false;
+    for (s.units[0..s.n_units], 0..) |*a, i| {
+        if (!util.livingOf(s, i, team)) continue;
+        if (a.attack_type == AT.RANGE) ranged += 1;
+        switch (util.creature(@intCast(i))) {
+            .behemoth => behemoth = true,
+            .ogre_mage => ogre = true,
+            else => {},
+        }
+    }
+    const roar_pending = ranged < 3 and behemoth; // no Battle Roar buff in scope
+    const riot_pending = ogre; // no Mass Riot / Riot buff in scope
+    const me = util.creature(c.ui);
+    const wait = (roar_pending and me != .behemoth) or (riot_pending and me != .ogre_mage);
+    if (wait and util.canHourglass(s, c.ui)) util.setWait(out, c.ui);
+}
+
+fn isPureAdvance(d: *const ai.Decision) bool {
+    if (!util.has(d, .move_unit)) return false;
+    for (d.slice()) |a| if (a != .move_unit and a != .select_attack_type) return false;
+    return true;
+}
+
+/// v08HasStrongerRangedPosture (obstacle attacks and casts are out of scope).
+fn hasStrongerRangedPosture(c: *const ai.Ctx, d: *const ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    if (u.attack_type != AT.MELEE or engine.isRangeCapable(u)) return false;
+    if (util.strikes(d)) return false;
+    if (util.dominantFinishState(s, u.team).active) return false;
+    return util.teamRangedOutput(s, u.team) > util.teamRangedOutput(s, engine.opposite(u.team));
+}
+
+const Front = union(enum) { keep, wait, move: *const pathing.Route };
+
+/// StrategyV0_4.frontMove (V04_FRONTMOVE, on): a melee unit of a range-heavy army (3+ living shooters) without a
+/// strike waits while its side out-guns theirs; otherwise a Unicorn or Scavenger leads toward the nearest enemy.
+fn v04FrontMove(c: *ai.Ctx, d: *const ai.Decision) Front {
+    const s = c.s;
+    const u = c.unit();
+    if (u.attack_type != AT.MELEE) return .keep;
+    const opp = engine.opposite(u.team);
+    var my_ranged: usize = 0;
+    var enemies: [st.MAX_UNITS]Cell = undefined;
+    var n_enemies: usize = 0;
+    for (s.units[0..s.n_units], 0..) |*a, i| {
+        if (util.livingOf(s, i, u.team) and a.attack_type == AT.RANGE) my_ranged += 1;
+        if (util.livingOf(s, i, opp)) {
+            enemies[n_enemies] = engine.baseCell(a);
+            n_enemies += 1;
+        }
+    }
+    if (my_ranged < 3) return .keep;
+    if (util.strikes(d)) return .keep;
+    if (n_enemies == 0) return .keep;
+    if (util.teamRangedOutput(s, u.team) > util.teamRangedOutput(s, opp)) {
+        return if (util.canHourglass(s, c.ui)) .wait else .keep;
+    }
+    switch (util.creature(c.ui)) {
+        .unicorn, .scavenger => {},
+        else => return .keep,
+    }
+    const Nearest = struct {
+        fn of(cell: Cell, targets: []const Cell) f64 {
+            var best = std.math.inf(f64);
+            for (targets) |t| best = @min(best, ai.cellDistance(cell, t));
+            return best;
+        }
+    };
+    const mp = c.actualPath();
+    var best: ?*const pathing.Route = null;
+    var best_dist = Nearest.of(engine.baseCell(u), enemies[0..n_enemies]);
+    var buf: [64]Cell = undefined;
+    for (mp.known()) |*r| {
+        if (mp.routeCells(r, &buf) == 0) continue;
+        const dd = Nearest.of(r.cell, enemies[0..n_enemies]);
+        if (dd < best_dist) {
+            best_dist = dd;
+            best = r;
+        }
+    }
+    return if (best) |r| .{ .move = r } else .keep;
+}
+
+/// StrategyV0_8.frontMove: hold for a stronger ranged posture; never let v0.4's proxy turn a pure advance into a wait.
+fn frontMove(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const stronger = hasStrongerRangedPosture(c, out);
+    if (stronger and util.canHourglass(s, c.ui)) return util.setWait(out, c.ui);
+    const inherited = v04FrontMove(c, out);
+    switch (inherited) {
+        .keep => {},
+        .wait => {
+            if (!stronger and isPureAdvance(out)) return;
+            util.setWait(out, c.ui);
+        },
+        .move => |r| util.setMove(out, s, c.ui, c.actualPath(), r),
+    }
+}
+
+// =====================================================================================================================
+// enforceRangeLegality
+// =====================================================================================================================
+
+const Edge = struct { cell: Cell, side: u8 };
+
+/// resolveRangeAttackAimEdge: the requested edge if observable, else the observable edge nearest the attacker.
+fn resolveAimEdge(s: *const State, att: *const st.Unit, tgt: *const st.Unit, aim_cell: ?Cell, aim_side: u8) ?Edge {
+    const cells = engine.unitCells(tgt);
+    if (aim_cell) |ac| {
+        for (cells.slice()) |cl| {
+            if (cl.x == ac.x and cl.y == ac.y and aim_side < 4 and combat.sideObservable(s, cl, aim_side, att.team)) return .{ .cell = cl, .side = aim_side };
+        }
+    }
+    var best: ?Edge = null;
+    var best_d: f64 = 0;
+    for (cells.slice()) |cl| {
+        for ([_]u8{ 0, 1, 2, 3 }) |side| {
+            if (!combat.sideObservable(s, cl, side, att.team)) continue;
+            const p = combat.sideCenter(cl, side, att.pos_x, att.pos_y);
+            const d = engine.distance(att.pos_x, att.pos_y, p[0], p[1]);
+            if (best == null or d < best_d) {
+                best = .{ .cell = cl, .side = side };
+                best_d = d;
+            }
+        }
+    }
+    return best;
+}
+
+/// rangeShotLands (requireResolvedPrimaryRangeTarget: true; no Through Shot, AOE, Hidden, Cowardice or Gaze).
+fn rangeShotLands(c: *const ai.Ctx, shot: anytype) bool {
+    const s = c.s;
+    const u = c.unit();
+    const target = &s.units[shot.target];
+    if (!target.in_holder or target.isDead()) return false;
+    if (!engine.canLandRangeAttack(s, u)) return false;
+    const from = [2]f64{ u.pos_x, u.pos_y };
+    const edge = resolveAimEdge(s, u, target, shot.aim_cell, shot.aim_side) orelse return false;
+    if (!util.sideSelectable(s, edge.cell, edge.side, from, .{ target.pos_x, target.pos_y }, engine.isSmall(u), engine.isSmall(target), u.team)) return false;
+    // resolveRangeTargetPosition, replicated: the aim cell (else the target cell nearest the attacker), then the aim
+    // side if observable (else the observable side nearest the attacker).
+    const cells = engine.unitCells(target);
+    var cell: ?Cell = null;
+    if (shot.aim_cell) |ac| {
+        for (cells.slice()) |cl| if (cl.x == ac.x and cl.y == ac.y) {
+            cell = cl;
+            break;
+        };
+    }
+    if (cell == null) {
+        var best_d: f64 = std.math.floatMax(f64);
+        for (cells.slice()) |cl| {
+            const p = engine.positionForCell(@floatFromInt(cl.x), @floatFromInt(cl.y));
+            const d = engine.distance(from[0], from[1], p[0], p[1]);
+            if (d < best_d) {
+                best_d = d;
+                cell = cl;
+            }
+        }
+    }
+    const cl = cell orelse return false;
+    var sides: [4]u8 = undefined;
+    var n_sides: usize = 0;
+    for ([_]u8{ 0, 1, 2, 3 }) |side| {
+        if (combat.sideObservable(s, cl, side, u.team)) {
+            sides[n_sides] = side;
+            n_sides += 1;
+        }
+    }
+    var to = [2]f64{ target.pos_x, target.pos_y };
+    if (n_sides > 0) {
+        var side = sides[0];
+        var requested = false;
+        if (shot.aim_cell != null) {
+            for (sides[0..n_sides]) |sd| if (sd == shot.aim_side) {
+                requested = true;
+            };
+        }
+        if (requested) {
+            side = shot.aim_side;
+        } else {
+            var best_d: f64 = std.math.floatMax(f64);
+            for (sides[0..n_sides]) |sd| {
+                const p = combat.sideCenter(cl, sd, from[0], from[1]);
+                const d = engine.distance(from[0], from[1], p[0], p[1]);
+                if (d < best_d) {
+                    best_d = d;
+                    side = sd;
+                }
+            }
+        }
+        to = combat.sideCenter(cl, side, from[0], from[1]);
+    }
+    const hits = combat.evaluateRange(s, c.ui, from[0], from[1], to[0], to[1]);
+    if (hits.len == 0) return false;
+    const first = &s.units[hits.units[0]];
+    if (first.isDead() or first.team == u.team) return false;
+    if (u.target >= 0 and u.target != @as(i8, @intCast(hits.units[0]))) {
+        const f = &s.units[@intCast(u.target)];
+        if (f.in_holder and !f.isDead()) return false;
+    }
+    return true;
+}
+
+/// Final range-legality guard: a shot that would not land becomes v0.1's fallback advance.
+fn enforceRangeLegality(c: *ai.Ctx, out: *ai.Decision) void {
+    for (out.slice()) |a| {
+        if (a == .range_attack) {
+            if (!rangeShotLands(c, a.range_attack)) ai.fallbackTurn(c, out);
+            return;
+        }
+    }
+}

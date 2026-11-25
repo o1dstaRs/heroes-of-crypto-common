@@ -26,6 +26,7 @@ import creaturesJson from "../../../src/configuration/creatures.json";
 import { GameActionEngine } from "../../../src/engine/action_engine";
 import { TurnEngine } from "../../../src/engine/turn_engine";
 import { getAIStrategy } from "../../../src/ai";
+import { captureAITargetMemory } from "../../../src/ai/ai";
 import { StrategyV0_8 } from "../../../src/ai/versions/v0_8";
 import { beginDecision, endDecision, installLayerLog, type Layer } from "./layers";
 import { PathHelper } from "../../../src/grid/path_helper";
@@ -399,6 +400,9 @@ function main(): void {
         depth += 1;
         let actions: unknown[];
         const t0 = process.hrtime.bigint();
+        // The AI's target memory (ai.ts previousTargetsByBattle) before the decision, so each logged decision can be
+        // checked on its own: attacker id -> remembered target id.
+        const memory = layerLog ? [...captureAITargetMemory(context.unitsHolder)] : undefined;
         if (layerLog) beginDecision();
         let layers: Layer[] | undefined;
         try {
@@ -416,7 +420,7 @@ function main(): void {
             r1: rng.state,
             draws: rng.draws - d0,
             out: JSON.parse(JSON.stringify(actions)),
-            ...(layers ? { layers } : {}),
+            ...(layers ? { layers, memory } : {}),
         });
         return actions;
     };
