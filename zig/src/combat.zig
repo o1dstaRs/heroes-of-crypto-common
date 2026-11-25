@@ -1,5 +1,6 @@
-//! Melee and ranged attacks: GameActionEngine.meleeAttack / rangeAttack and the AttackHandler paths they take
-//! in scope (the abilities in abilities.zig, no spells, NORMAL grid).
+//! Melee, ranged and obstacle attacks: GameActionEngine.meleeAttack / rangeAttack / obstacleAttack and the
+//! AttackHandler paths they take in scope (the abilities in abilities.zig, no spells; NORMAL, LAVA_CENTER and
+//! BLOCK_CENTER grids).
 
 const std = @import("std");
 const rec = @import("recording.zig");
@@ -7,6 +8,7 @@ const st = @import("state.zig");
 const js = @import("jsnum.zig");
 const engine = @import("engine.zig");
 const abilities = @import("abilities.zig");
+const terrain = @import("terrain.zig");
 
 const Cell = st.Cell;
 const State = st.State;
@@ -189,6 +191,9 @@ fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, pat
 pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, events: *Events) Reject!void {
     try engine.validateTurnAction(s, ai);
     if (!s.units[ti].in_holder) return error.Rejected;
+    // A path-bearing approach (resolveKnownPaths trusts the client route) must not walk a ground body over "B".
+    const approaching = !(engine.baseCell(&s.units[ai]).x == from.x and engine.baseCell(&s.units[ai]).y == from.y);
+    if (approaching and path.len != 0 and engine.groundRouteCrossesObstacle(s, &s.units[ai], path)) return error.Rejected;
 
     const att = &s.units[ai];
     const tgt = &s.units[ti];
@@ -217,7 +222,7 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
         rapid_cells = @floatFromInt(path.len);
         ability_multiplier = abilities.rapidCharge(att, rapid_cells);
     }
-    ability_multiplier *= abilities.positionMultiplier(att, from, engine.baseCell(tgt), tgt.fh);
+    ability_multiplier *= abilities.positionMultiplierOn(att, from, engine.baseCell(tgt), tgt.fw, tgt.fh, s.fight.side_oriented);
 
     var died: Died = .{};
     var decrease: MoraleDecrease = .{};
@@ -230,7 +235,21 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
         abilities.penetratingBite(att, tgt); // M2: drawn even when a spin replaces the blow
 
     const spin_attack = lightningSpin(s, ai, from, true, ai, rapid_cells, &died);
-    if (att.ability_mask & st.AbilityId.skewer_strike.bit() != 0) skewerStrike(s, ai, ti, from, true, &died, &decrease, &attacker_plus);
+    // The same radial impact knocks down every scattered stone in the spin's ring.
+    if (spin_attack) spinStones(s, ai, from);
+    if (att.ability_mask & st.AbilityId.skewer_strike.bit() != 0) {
+        skewerStrike(s, ai, ti, from, true, &died, &decrease, &attacker_plus);
+        // Past a small target the skewer runs on into a stone standing behind it (skewerStrikeObstacleCell).
+        if (engine.isSmall(tgt) and terrain.hasScatteredMountains(s)) {
+            if (pierceCellBehind(att, from, engine.baseCell(tgt))) |behind| {
+                if (engine.cellWithinGrid(behind) and terrain.isScatteredMountainCell(s, behind) and
+                    s.grid.board[@intCast(behind.x)][@intCast(behind.y)] == st.BLOCK)
+                {
+                    terrain.spendObstacleHit(s, behind, behind.x >= st.GRID >> 1);
+                }
+            }
+        }
+    }
 
     // The response lands first.
     var spin_response = meleeResponse(s, ai, ti, from, &died, &decrease, &target_plus);
@@ -328,7 +347,7 @@ fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell, died: *Died, decrease: *
     if (tgt.ability_mask & st.AbilityId.skewer_strike.bit() != 0) skewerStrike(s, ti, ai, tgt_base, false, died, decrease, target_plus);
     const spin = lightningSpin(s, ti, tgt_base, false, ai, 1, died);
     if (!missed and !spin and !att.isDead()) {
-        const ability_multiplier = abilities.positionMultiplier(tgt, tgt_base, from, att.fh);
+        const ability_multiplier = abilities.positionMultiplierOn(tgt, tgt_base, from, att.fw, att.fh, s.fight.side_oriented);
         const damage_from_response = luckyStrike(s, tgt, calculateAttackDamage(s, tgt, att, AT.MELEE, 1, ability_multiplier)) +
             abilities.penetratingBite(tgt, att); // M4
         const absorbed = damage_from_response > 0 and abilities.absorbs(s, att);
@@ -375,7 +394,7 @@ pub fn enemiesAround(s: *const State, ui: u8, first: Cell, out: *engine.UnitList
         fn cell(st_: *const State, attacker: u8, c: Cell, list: *engine.UnitList) void {
             if (!engine.cellWithinGrid(c)) return;
             const o = st_.grid.board[@intCast(c.x)][@intCast(c.y)];
-            if (o == st.EMPTY or o == st.HOLE) return;
+            if (!st.isUnitCode(o)) return;
             const x: u8 = o - 1;
             if (x == attacker) return;
             const e = &st_.units[x];
@@ -450,17 +469,26 @@ fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: 
 /// bookkeeping. Only 1x1 units (Pikemen) carry the ability.
 fn skewerStrike(s: *State, from_i: u8, to_i: u8, from_cell: Cell, is_attack: bool, died: *Died, decrease: *MoraleDecrease, plus: *f64) void {
     const from = &s.units[from_i];
-    const a = from.ability(.skewer_strike) orelse return;
+    if (!from.has(.skewer_strike)) return;
     const to = &s.units[to_i];
     if (!engine.isSmall(to)) return;
     const tb = engine.baseCell(to);
     const c = Cell{ .x = tb.x + (tb.x - from_cell.x), .y = tb.y + (tb.y - from_cell.y) };
     if (!engine.cellWithinGrid(c)) return;
     const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
-    if (o == st.EMPTY or o == st.HOLE) return;
+    if (!st.isUnitCode(o)) return; // a stone behind the target is broken by the caller, not skewered
     const vi: u8 = o - 1;
     const next = &s.units[vi];
     if (!next.in_holder or vi == from_i or vi == to_i or next.team == from.team) return;
+    strikeSkewerTarget(s, from_i, vi, is_attack, died, decrease, plus);
+}
+
+/// strikeSkewerTargets for one chosen victim: its miss roll and damage roll (no Lucky Strike, no response), the
+/// riders of a landed unabsorbed hit, and the kill's bookkeeping in the caller's lists.
+fn strikeSkewerTarget(s: *State, from_i: u8, vi: u8, is_attack: bool, died: *Died, decrease: *MoraleDecrease, plus: *f64) void {
+    const from = &s.units[from_i];
+    const a = from.ability(.skewer_strike) orelse return;
+    const next = &s.units[vi];
     if (next.isDead()) return;
     if (missRoll(s, from, next)) return; // S1
     var damage = calculateAttackDamage(s, from, next, AT.MELEE, 1, abilities.abilityMultiplier(from, a)); // S2
@@ -609,7 +637,8 @@ pub fn evaluateRange(s: *const State, from_ui: u8, fx: f64, fy: f64, tx: f64, ty
     for (ray.items[0..ray.len]) |h| {
         if (!engine.cellWithinGrid(h.cell)) continue;
         const o = s.grid.board[@intCast(h.cell.x)][@intCast(h.cell.y)];
-        if (o == st.EMPTY or o == st.HOLE) continue;
+        if (o == st.BLOCK) break; // the ray stops at the first mountain or stone (attackObstacle)
+        if (!st.isUnitCode(o)) continue; // empty, a hole, or lava (an affectedCells entry no one reads in scope)
         const ui: u8 = o - 1;
         if (ui == from_ui) continue;
         var seen = false;
@@ -627,7 +656,8 @@ pub fn evaluateRange(s: *const State, from_ui: u8, fx: f64, fy: f64, tx: f64, ty
     return hits;
 }
 
-/// isRangeAttackSideObservable: the neighbour across that side is empty, a hole, off the board, or the shooter's own team.
+/// isRangeAttackSideObservable: the neighbour across that side is empty, a hole, lava, off the board, or the shooter's
+/// own team (a mountain or stone hides it).
 pub fn sideObservable(s: *const State, cell: Cell, side: u8, from_team: u8) bool {
     const n: Cell = switch (side) {
         0 => .{ .x = cell.x - 1, .y = cell.y },
@@ -637,7 +667,8 @@ pub fn sideObservable(s: *const State, cell: Cell, side: u8, from_team: u8) bool
     };
     if (!engine.cellWithinGrid(n)) return true;
     const o = s.grid.board[@intCast(n.x)][@intCast(n.y)];
-    if (o == st.EMPTY or o == st.HOLE) return true;
+    if (o == st.BLOCK) return false;
+    if (!st.isUnitCode(o)) return true;
     return s.units[o - 1].team == from_team;
 }
 
@@ -838,5 +869,201 @@ pub fn rangeAttack(s: *State, ai: u8, ti: u8, aim_cell: ?Cell, aim_side: u8, eve
     }
 
     cleanupDeadUnits(s, &died, events);
+    engine.completeTurn(s, ai, false, false, events);
+}
+
+// =====================================================================================================================
+// Obstacles (BLOCK_CENTER): GameActionEngine.obstacleAttack, AttackHandler.handleObstacleAttack
+// =====================================================================================================================
+
+/// AbilityHelper.pierceCellBehind: the cell one step past `target` on the line from the attacker's body cell closest
+/// to it (a 2x2 in its hand-written order, first strictly closer wins), or null when the attacker is not in contact.
+fn pierceCellBehind(att: *const Unit, from: Cell, target: Cell) ?Cell {
+    var a = from;
+    if (!engine.isSmall(att)) {
+        var body: engine.Cells = .{};
+        if (att.fw == 2 and att.fh == 2) {
+            body.push(from);
+            body.push(.{ .x = from.x - 1, .y = from.y });
+            body.push(.{ .x = from.x, .y = from.y - 1 });
+            body.push(.{ .x = from.x - 1, .y = from.y - 1 });
+        } else body = engine.cellsForAnchor(from, att.fw, att.fh);
+        a = body.items[0];
+        var best = cellDist(a, target);
+        for (body.slice()) |c| {
+            const d = cellDist(c, target);
+            if (d < best) {
+                a = c;
+                best = d;
+            }
+        }
+    }
+    const dx = target.x - a.x;
+    const dy = target.y - a.y;
+    if (@max(@abs(dx), @abs(dy)) != 1) return null;
+    return .{ .x = target.x + dx, .y = target.y + dy };
+}
+
+inline fn cellDist(a: Cell, b: Cell) f64 {
+    return engine.distance(@floatFromInt(a.x), @floatFromInt(a.y), @floatFromInt(b.x), @floatFromInt(b.y));
+}
+
+/// AttackHandler.spinScatteredObstaclesAround (lightningSpinObstacleCells): every standing stone in the spin's ring
+/// (UnitsHolder.cellsAroundUnit at the strike anchor) goes down.
+fn spinStones(s: *State, ui: u8, first: Cell) void {
+    if (!terrain.hasScatteredMountains(s)) return;
+    const u = &s.units[ui];
+    const Visit = struct {
+        fn cell(st_: *State, c: Cell) void {
+            if (!engine.cellWithinGrid(c)) return;
+            if (!terrain.isScatteredMountainCell(st_, c) or st_.grid.board[@intCast(c.x)][@intCast(c.y)] != st.BLOCK) return;
+            terrain.spendObstacleHit(st_, c, c.x >= st.GRID >> 1);
+        }
+    };
+    var i: i32 = if (engine.isSmall(u)) -1 else -@as(i32, u.fw);
+    while (i <= 1) : (i += 1) {
+        var j: i32 = if (engine.isSmall(u)) -1 else -@as(i32, u.fh);
+        while (j <= 1) : (j += 1) {
+            if (engine.isSmall(u) and i == 0 and j == 0) continue;
+            Visit.cell(s, .{ .x = first.x + i, .y = first.y + j });
+        }
+    }
+}
+
+/// AttackHandler.pierceScatteredObstacleBehind for Skewer Strike (no Fire Breath in scope): past a struck stone the
+/// skewer breaks the stone behind it, or strikes the live enemy standing there (strikeSkewerTargets, then the
+/// attacker's morale and the same-name morale losses at once). Kills go to `died`.
+fn pierceStoneBehind(s: *State, ai: u8, from: Cell, target: Cell, died: *Died) void {
+    const att = &s.units[ai];
+    if (!terrain.isScatteredMountainCell(s, target) or !att.has(.skewer_strike)) return;
+    const behind = pierceCellBehind(att, from, target) orelse return;
+    if (!engine.cellWithinGrid(behind)) return;
+    const o = s.grid.board[@intCast(behind.x)][@intCast(behind.y)];
+    if (o == st.BLOCK) {
+        if (terrain.isScatteredMountainCell(s, behind)) terrain.spendObstacleHit(s, behind, behind.x >= st.GRID >> 1);
+        return;
+    }
+    if (!st.isUnitCode(o)) return;
+    const vi: u8 = o - 1;
+    const v = &s.units[vi];
+    if (!v.in_holder or v.isDead() or v.team == att.team) return;
+    var decrease: MoraleDecrease = .{};
+    var plus: f64 = 0;
+    strikeSkewerTarget(s, ai, vi, true, died, &decrease, &plus);
+    if (!att.isDead()) engine.changeMorale(att, plus, true);
+    decrease.apply(s);
+}
+
+/// AttackHandler.handleObstacleAttack, melee branch (the ranged branch needs a shooter with RANGE selected, which the
+/// caller refuses first): the walk in (or a strike in place), the hit, Skewer Strike's pierce, Double Punch's
+/// second hit, then Hydra's Lightning Spin around the strike anchor. No miss or damage roll on the stone itself.
+/// Returns `completed`; kills from the pierce and the spin go to `died`.
+fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from: Cell, path: []const Cell, died: *Died) bool {
+    const att = &s.units[ai];
+    const target = engine.cellForPosition(tx, ty);
+    const is_right = target.x >= st.GRID >> 1;
+    if ((!terrain.hasScatteredMountains(s) and s.fight.grid_type != st.GridType.BLOCK_CENTER) or !terrain.obstacleStillStands(s) or
+        att.isDead() or !engine.positionWithinGrid(tx, ty) or !engine.positionWithinGrid(att.pos_x, att.pos_y)) return false;
+    if (forcedTarget(s, att) != null) return false;
+    var center: terrain.CenterCells = undefined;
+    terrain.centerCells(s, &center);
+    var found = false;
+    for (center.slice()) |c| {
+        if (c.x == target.x and c.y == target.y) found = true;
+    }
+    if (!found) return false;
+
+    // isAdjacentToCenter: any cell of the body at the strike anchor touches any standing obstacle cell.
+    const from_cells = engine.cellsForAnchor(from, att.fw, att.fh);
+    var adjacent_to_center = false;
+    outer: for (from_cells.slice()) |c| {
+        for (center.slice()) |cc| {
+            if (@abs(c.x - cc.x) <= 1 and @abs(c.y - cc.y) <= 1) {
+                adjacent_to_center = true;
+                break :outer;
+            }
+        }
+    }
+    if (!adjacent_to_center) return false;
+    const base = engine.baseCell(att);
+    const stationary = base.x == from.x and base.y == from.y;
+    const has_route = path.len != 0; // currentActiveKnownPaths.get(attackFrom)?.length
+    if (engine.isSmall(att)) {
+        if (!(engine.cellsFreeFor(s, ai, from_cells.slice()) and (stationary or has_route))) return false;
+        const pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
+        if (!stationary) {
+            if (!applyStrikeMoveModifiers(s, ai, path)) return false;
+            if (!engine.occupyCell(s, ai, from)) return false;
+        }
+        att.pos_x = pos[0];
+        att.pos_y = pos[1];
+    } else {
+        const anchor_pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
+        const pos = [2]f64{
+            anchor_pos[0] - (@as(f64, @floatFromInt(@max(1, att.fw))) - 1) * engine.HALF,
+            anchor_pos[1] - (@as(f64, @floatFromInt(@max(1, att.fh))) - 1) * engine.HALF,
+        };
+        const cells = engine.cellsForPosition(pos[0], pos[1], att.fw, att.fh);
+        if (!(engine.cellsFreeFor(s, ai, cells.slice()) and (stationary or has_route))) return false;
+        if (!stationary) {
+            if (!applyStrikeMoveModifiers(s, ai, path)) return false;
+            if (!engine.occupyCells(s, ai, cells.slice())) return false;
+        }
+        att.pos_x = pos[0];
+        att.pos_y = pos[1];
+    }
+    terrain.spendObstacleHit(s, target, is_right);
+    pierceStoneBehind(s, ai, from, target, died);
+    if (terrain.obstacleStillStands(s) and att.has(.double_punch)) terrain.spendObstacleHit(s, target, is_right);
+
+    // spinAroundObstacleStrike: the spin lands as off a unit strike (chargedRouteCells ?? 1), then the stones around.
+    if (att.has(.lightning_spin)) {
+        var rapid_cells: f64 = 1;
+        if (stationary and att.moved_this_turn and att.moved_route_cells > 0) {
+            rapid_cells = att.moved_route_cells;
+        } else if (has_route) {
+            rapid_cells = @floatFromInt(path.len);
+        }
+        _ = lightningSpin(s, ai, from, true, ai, rapid_cells, died);
+        spinStones(s, ai, from);
+    }
+    // Kills off an obstacle strike feed Devour Essence the way a unit strike's do.
+    if (died.len != 0) {
+        engine.refreshStackPowerForAllUnits(s);
+        abilities.devourEssence(s, ai, died.items[0..died.len]);
+    }
+    return true;
+}
+
+/// GameActionEngine.obstacleAttack: strike a classic mountain cell or a scattered stone at `targetPosition` from
+/// `attackFrom` (a moving strike carries the client route in `path`). RNG: none of its own; a Pikeman's pierce and a
+/// Hydra's spin roll as on a unit strike. A refusal after the walk in keeps the move, as in TypeScript.
+pub fn obstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from: Cell, path: []const Cell, events: *Events) Reject!void {
+    try engine.validateTurnAction(s, ai);
+    const att = &s.units[ai];
+    const target = engine.cellForPosition(tx, ty);
+    const scattered = terrain.isScatteredMountainCell(s, target);
+    const standing_before = terrain.standingCount(s);
+    if ((!scattered and s.fight.grid_type != st.GridType.BLOCK_CENTER) or
+        (if (scattered) standing_before == 0 else terrain.hitsLeft(s) <= 0)) return error.Rejected; // obstacle_not_available
+    // A shooter with RANGE selected that can land a shot strikes from range: not ported (v0.1 never mines with one).
+    if (att.attack_type_selected == AT.RANGE and engine.canLandRangeAttack(s, att)) return error.Rejected;
+    const hits_before = terrain.hitsLeft(s);
+    const base = engine.baseCell(att);
+    const approaching = !(base.x == from.x and base.y == from.y);
+    if (approaching and path.len != 0 and engine.groundRouteCrossesObstacle(s, att, path)) return error.Rejected;
+
+    var died: Died = .{};
+    const completed = handleObstacleAttack(s, ai, tx, ty, from, path, &died);
+    const landed = if (scattered) terrain.standingCount(s) < standing_before else terrain.hitsLeft(s) < hits_before;
+    if (!completed or !landed) return error.Rejected;
+
+    engine.refreshStackPowerForAllUnits(s);
+    cleanupDeadUnits(s, &died, events);
+    // Clear whichever classic mountain ran out of hits (clearMountainSide is idempotent).
+    if (!scattered) {
+        if (s.fight.hits_left <= 0) _ = terrain.clearMountainSide(s, false);
+        if (s.fight.hits_right <= 0) _ = terrain.clearMountainSide(s, true);
+    }
     engine.completeTurn(s, ai, false, false, events);
 }

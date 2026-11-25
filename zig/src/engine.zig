@@ -1,7 +1,8 @@
 //! The Zig engine: battle start state, and `apply` for each top-level engine call.
 //!
 //! Every function names the TypeScript it mirrors. Scope: the abilities in abilities.zig, no spells, artifacts,
-//! augments, synergies or doctrines; NORMAL grid. See zig/README.md.
+//! augments, synergies or doctrines; the NORMAL, LAVA_CENTER and BLOCK_CENTER grids, classic or side-oriented
+//! (terrain.zig). See zig/README.md.
 
 const std = @import("std");
 const rec = @import("recording.zig");
@@ -9,6 +10,8 @@ const st = @import("state.zig");
 const js = @import("jsnum.zig");
 const combat = @import("combat.zig");
 const abilities = @import("abilities.zig");
+const terrain = @import("terrain.zig");
+const pathing = @import("path.zig");
 const Rng = @import("rng.zig").Rng;
 
 const Cell = st.Cell;
@@ -863,7 +866,7 @@ fn finishDirectedMove(s: *State, ui: u8, target: []const Cell, new_pos: ?[2]f64,
 /// MoveHandler.moveUnitTowardsCenter + TurnEngine.handleSystemMoveResult. Returns whether the unit was destroyed.
 fn moveUnitTowardsCenter(s: *State, cell: Cell, dir: Dir, laps_narrowed: i32, events: *Events) void {
     const o = occ(s, cell);
-    if (o == st.EMPTY or o == st.HOLE) return;
+    if (!st.isUnitCode(o)) return; // a hole, a stone or lava: unitsHolder.get("B") is undefined
     const ui: u8 = o - 1;
     const u = &s.units[ui];
     if (!u.in_holder) return;
@@ -913,8 +916,10 @@ fn moveUnitTowardsCenter(s: *State, cell: Cell, dir: Dir, laps_narrowed: i32, ev
     }
 }
 
+/// Grid.occupyByHole: a hole swallows a standing scattered stone.
 fn occupyByHole(s: *State, cell: Cell) void {
     if (!cellWithinGrid(cell)) return;
+    _ = terrain.clearScatteredMountainAt(s, cell);
     setOcc(s, cell, st.HOLE);
 }
 
@@ -1013,7 +1018,12 @@ fn handleLapTransition(s: *State, o: *const Ordered, all_made: bool, damage_deal
     }
     const f = &s.fight;
     if (damage_dealt and f.lap >= 0 and f.lap < 128) f.damage_laps |= @as(u128, 1) << @intCast(f.lap);
-    if (f.first_turn_made) flipLap(f);
+    if (f.first_turn_made) {
+        flipLap(f);
+        // The lava dries once getLapsNarrowed() (this transition's lap, the additional laps before this
+        // transition's increment) reaches the laps till narrowing. runMatch never passes centerAlreadyDried.
+        if (f.grid_type == st.GridType.LAVA_CENTER and terrain.lapsNarrowed(f) >= f.laps_till_narrowing) terrain.cleanupCenterObstacle(s);
+    }
 
     var lr: UnitList = .{};
     for (o.left.slice()) |ui| lr.push(ui);
@@ -1302,6 +1312,19 @@ fn sameCellSet(a: []const Cell, b: []const Cell) bool {
     return true;
 }
 
+/// GameActionEngine.groundRouteCrossesObstacle: a walker's footprint at some anchor of the route stands on "B" (lava
+/// is not a ground obstacle here; flyers are exempt).
+pub fn groundRouteCrossesObstacle(s: *const State, u: *const Unit, route: []const Cell) bool {
+    if (canFly(u) or s.fight.grid_type != st.GridType.BLOCK_CENTER) return false;
+    for (route) |anchor| {
+        const fp = cellsForAnchor(anchor, u.fw, u.fh);
+        for (fp.slice()) |c| {
+            if (cellWithinGrid(c) and occ(s, c) == st.BLOCK) return true;
+        }
+    }
+    return false;
+}
+
 /// applyDistanceMoraleModifier
 pub fn applyDistanceMorale(s: *State, ui: u8, from: [2]f64, to: [2]f64) void {
     const u = &s.units[ui];
@@ -1338,6 +1361,7 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) R
         if ((dx == 0 and dy == 0) or dx > 1 or dy > 1) return error.Rejected;
         prev = c;
     }
+    if (groundRouteCrossesObstacle(s, u, path)) return error.Rejected; // move_blocked
     if (!cellsFreeFor(s, ui, target_cells)) return error.Rejected;
     const from = [2]f64{ u.pos_x, u.pos_y };
     const to = positionForCells(target_cells) orelse return error.Rejected;
@@ -1488,8 +1512,10 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
                 return rec.num(rec.get(v, key));
             }
         }.f;
+        const cid = rec.get(u, "creatureId");
         s.units[i] = .{
             .in_holder = true,
+            .creature_id = if (cid == .integer) @intCast(cid.integer) else 0,
             .team = @intCast(rec.int(rec.get(u, "team"))),
             .faction = @intCast(rec.int(rec.get(props, "faction"))),
             .level = @intCast(rec.int(rec.get(u, "level"))),
@@ -1616,7 +1642,7 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
         s.ember_laps = rec.num(rec.get(cfg, "laps"));
         s.ember_power = rec.num(rec.get(cfg, "power"));
     }
-    // Grid: register each unit's placement cells, then build the threat boards from them.
+    // Grid: stamp the terrain, register each unit's placement cells, then build the threat boards from them.
     for (0..st.GRID) |x| {
         for (0..st.GRID) |y| s.grid.board[x][y] = st.EMPTY;
     }
@@ -1625,6 +1651,9 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
             for (0..st.GRID) |y| s.grid.aggr[t][x][y] = 1;
         }
     }
+    s.fight = .{};
+    s.fight.grid_type = @intCast(rec.int(rec.get(rec.get(init, "grid"), "gridType")));
+    try terrain.load(init, &s);
     for (units, 0..) |u, i| {
         const cells = rec.get(u, "cells").array.items;
         const unit = &s.units[i];
@@ -1635,9 +1664,17 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
         unit.n_reg = @intCast(cells.len);
         stampAggrRing(&s, unit.team, unit.reg[0..unit.n_reg], 1);
     }
-    s.fight = .{};
     s.fight.laps_till_narrowing = @intCast(rec.int(rec.get(rec.get(init, "fight"), "numberOfLapsTillNarrowing")));
-    s.fight.grid_type = @intCast(rec.int(rec.get(rec.get(init, "grid"), "gridType")));
+    // Cross-check the rebuilt board against the recorded grid.getMatrix() (matrix[y][x]).
+    const rows = rec.get(rec.get(init, "grid"), "matrix");
+    if (rows == .array) {
+        const m = pathing.buildMatrix(&s);
+        for (rows.array.items, 0..) |row, y| {
+            for (row.array.items, 0..) |v, x| {
+                if (x >= st.GRID or y >= st.GRID or rec.int(v) != m[x][y]) return error.TerrainMismatch;
+            }
+        }
+    }
     s.rng = Rng.init(0);
     s.active = -1;
     s.ai_prev_target = .{-1} ** st.MAX_UNITS;
@@ -1661,6 +1698,7 @@ pub fn apply(s: *State, action: rec.Action, events: *Events) bool {
         .move_unit => |a| if (moveUnit(s, a.unit, a.path, a.target_cells)) true else |_| false,
         .melee_attack => |a| if (combat.meleeAttack(s, a.attacker, a.target, a.attack_from, a.path, events)) true else |_| false,
         .range_attack => |a| if (combat.rangeAttack(s, a.attacker, a.target, a.aim_cell, a.aim_side, events)) true else |_| false,
+        .obstacle_attack => |a| if (combat.obstacleAttack(s, a.attacker, a.target_x, a.target_y, a.attack_from, a.path, events)) true else |_| false,
         .decide => true, // AI decisions are not engine calls
     };
     for (events.slice()) |e| {

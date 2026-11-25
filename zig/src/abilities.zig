@@ -110,10 +110,19 @@ pub fn rapidCharge(u: *const Unit, cells: f64) f64 {
 /// getAbilitiesWithPosisionCoefficient + the caller's product: Backstab from `from` (the attacker's anchor) at a
 /// victim anchored at `to`, `to_h` cells tall, on the classic (not side-oriented) board.
 pub fn positionMultiplier(u: *const Unit, from: st.Cell, to: st.Cell, to_h: u8) f64 {
+    return positionMultiplierOn(u, from, to, 1, to_h, false);
+}
+
+/// getAbilitiesWithPosisionCoefficient's Backstab, along the axis of advance: y on the classic board, x on the
+/// side-oriented one (isSideOrientedPlacement), with the RIGHT attacker clearing the target's extent along that axis.
+pub fn positionMultiplierOn(u: *const Unit, from: st.Cell, to: st.Cell, to_w: u8, to_h: u8, side: bool) f64 {
     var m: f64 = 1;
     const a = u.ability(.backstab) orelse return m;
-    if (u.team == st.Team.LEFT and from.y > to.y) m *= abilityMultiplier(u, a);
-    if (u.team == st.Team.RIGHT and from.y < to.y - (@as(i32, @max(1, to_h)) - 1)) m *= abilityMultiplier(u, a);
+    const along = if (side) from.x else from.y;
+    const target_along = if (side) to.x else to.y;
+    const extent: i32 = @max(1, if (side) to_w else to_h);
+    if (u.team == st.Team.LEFT and along > target_along) m *= abilityMultiplier(u, a);
+    if (u.team == st.Team.RIGHT and along < target_along - (extent - 1)) m *= abilityMultiplier(u, a);
     return m;
 }
 
@@ -505,7 +514,7 @@ pub fn spitBall(s: *State, tgt_i: u8) void {
     const c = st.Cell{ .x = b.src_x, .y = b.src_y };
     if (!engine.cellWithinGrid(c)) return;
     const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
-    if (o == st.EMPTY or o == st.HOLE) return;
+    if (!st.isUnitCode(o)) return;
     _ = s.rng.int(0, 100); // getRandomInt(0, 100) < floor(power) && !source.isDead(): discarded
 }
 

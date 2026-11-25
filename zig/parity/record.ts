@@ -4,7 +4,9 @@
  *   bun zig/parity/record.ts [games=50] [firstSeed=1] [out=zig/parity/out/battles.jsonl]
  *
  * Scope of the spike: every creature's abilities and spells are stripped (except the creatures named in
- * RECORD_KEEP_ABILITIES), no artifacts, augments, synergies or doctrines, NORMAL grid, v0.1 AI on both sides. The AI only chooses actions; what is recorded is every
+ * RECORD_KEEP_ABILITIES), no artifacts, augments, synergies or doctrines, v0.1 AI on both sides. The map is NORMAL
+ * on a classic board unless RECORD_GRID / RECORD_SIDE say otherwise (below). The AI only chooses actions; what is
+ * recorded is every
  * top-level call into the engine (GameActionEngine.apply and TurnEngine.advanceAfterNoActiveUnit) with
  *   - the seeded random state before and after the call (mulberry32 state, so Zig can resume the stream),
  *   - the events the call emitted (headless set),
@@ -20,6 +22,7 @@ import { GameActionEngine } from "../../src/engine/action_engine";
 import { TurnEngine } from "../../src/engine/turn_engine";
 import { StrategyV0_1 } from "../../src/ai/versions/v0_1";
 import { PathHelper } from "../../src/grid/path_helper";
+import { creatureIdForName } from "../../src/ai/setup/creature_score";
 import { buildRoster, creaturesByLevel, makeRng } from "../../src/simulation/army";
 import {
     getAbilityConfig,
@@ -78,6 +81,36 @@ function rosterFor(seed: number): ReturnType<typeof buildRoster> {
             amount: spec.amount,
         };
     });
+}
+
+// ---- map and board orientation ----
+// RECORD_GRID=1|3|4|mix picks NORMAL, LAVA_CENTER or BLOCK_CENTER for every battle, or a per-seed mix weighted by
+// RECORD_MAP_WEIGHTS (NORMAL,LAVA,BLOCK; default 1,1,1 = production's thirds). The mix hashes the seed into a private
+// mulberry32 stream, so it touches no battle stream and a seed always gets the same map and roster.
+// RECORD_SIDE=1 plays the production side-oriented boards (side deployment zones, the Backstab axis on x, and on
+// BLOCK_CENTER the scattered stones seeded `sim-${seed}`). The defaults (1, 0) reproduce the classic NORMAL recordings.
+const GRID_MODE = process.env.RECORD_GRID ?? process.env.RECORD_GRID_TYPE ?? "1";
+const MAP_WEIGHTS = (process.env.RECORD_MAP_WEIGHTS ?? "1,1,1").split(",").map(Number);
+const SIDE_ORIENTED = (process.env.RECORD_SIDE ?? process.env.RECORD_SIDE_ORIENTED) === "1";
+if (!["1", "3", "4", "mix"].includes(GRID_MODE))
+    throw new Error(`RECORD_GRID: expected 1, 3, 4 or mix, got ${GRID_MODE}`);
+if (
+    MAP_WEIGHTS.length !== 3 ||
+    MAP_WEIGHTS.some((w) => !(w >= 0)) ||
+    MAP_WEIGHTS[0] + MAP_WEIGHTS[1] + MAP_WEIGHTS[2] <= 0
+) {
+    throw new Error("RECORD_MAP_WEIGHTS: expected three non-negative weights NORMAL,LAVA,BLOCK");
+}
+/** Terrain columns (start state and digest) are written whenever the board is not the classic NORMAL one. */
+const TERRAIN = GRID_MODE !== "1" || SIDE_ORIENTED;
+
+function gridTypeFor(seed: number): number {
+    if (GRID_MODE !== "mix") return Number(GRID_MODE);
+    const u = makeRng(Math.imul(seed ^ 0x51ed270b, 0x2c1b3c6d) >>> 0)();
+    let r = u * (MAP_WEIGHTS[0] + MAP_WEIGHTS[1] + MAP_WEIGHTS[2]);
+    if ((r -= MAP_WEIGHTS[0]) < 0) return 1;
+    if ((r -= MAP_WEIGHTS[1]) < 0) return 3;
+    return 4;
 }
 
 // ---- seeded stream with an observable state ----
@@ -231,11 +264,26 @@ function fightDigest(fp: any): Record<string, unknown> {
     };
 }
 
+/** Terrain state the engine changes during play: the classic hit counters and cleared sides, the dried lava centre,
+ * and the standing scattered stones in layout order (Grid's fields are private). */
+function terrainDigest(grid: any, fp: any): Record<string, unknown> {
+    return {
+        hitsL: fp.getObstacleHitsLeftLeft(),
+        hitsR: fp.getObstacleHitsLeftRight(),
+        leftCleared: grid.leftMountainCleared ? 1 : 0,
+        rightCleared: grid.rightMountainCleared ? 1 : 0,
+        cleanedUpCenter: grid.cleanedUpCenter ? 1 : 0,
+        standing: grid.getScatteredMountainsStanding().map((c: any) => [c.x, c.y]),
+    };
+}
+
 function digest(ctx: Ctx): { units: unknown[][]; fight: Record<string, unknown> } {
     const units: unknown[][] = [];
     for (const u of ctx.unitsHolder.getAllUnits().values()) units.push(unitDigest(u));
     const emberTeams = [...(ctx.unitsHolder.emberCovenantTeams ?? [])].sort();
-    return { units, fight: { ...fightDigest(ctx.fightProperties), emberTeams } };
+    const fight: Record<string, unknown> = { ...fightDigest(ctx.fightProperties), emberTeams };
+    if (TERRAIN) fight.terrain = terrainDigest(ctx.grid, ctx.fightProperties);
+    return { units, fight };
 }
 
 function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
@@ -246,6 +294,8 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
         units.push({
             id: u.getId(),
             name: u.getName(),
+            // PBTypes.CreatureVals of the creature (creature_score.creatureIdForName), 0 when it has none.
+            creatureId: creatureIdForName(u.getName()) ?? 0,
             faction: p.faction,
             team: u.getTeam(),
             level: u.getLevel(),
@@ -303,6 +353,18 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
             maxY: settings.getMaxY(),
             matrix: ctx.grid.getMatrix(),
         },
+        // The Zig start state rebuilds the board from these (grid.matrix stays as a cross-check): the scattered
+        // layout in roll order (getCenterCells and the AI's strike search read that order), the stones standing,
+        // the classic hit counters and cleared sides, the dried centre, and the board orientation.
+        ...(TERRAIN
+            ? {
+                  terrain: {
+                      ...terrainDigest(ctx.grid, fp),
+                      layout: ctx.grid.scatteredMountainLayout.map((c: any) => [c.x, c.y]),
+                      sideOriented: fp.isSideOrientedPlacement() ? 1 : 0,
+                  },
+              }
+            : {}),
         fight: {
             ...fightDigest(fp),
             numberOfLapsTillNarrowing: fp.getNumberOfLapsTillNarrowing(),
@@ -376,7 +438,7 @@ function main(): void {
                 const known: unknown[] = [];
                 for (const [key, routes] of result.knownPaths) {
                     const r = routes[0];
-                    known.push([key, r.weight, r.route.map((c: any) => [c.x, c.y])]);
+                    known.push([key, r.weight, r.route.map((c: any) => [c.x, c.y]), r.hasLavaCell ? 1 : 0]);
                 }
                 pathLines.push(
                     JSON.stringify({
@@ -427,11 +489,14 @@ function main(): void {
     };
 
     const lines: string[] = [];
+    const gridCounts: Record<string, number> = {};
     let totalSteps = 0;
     const t0 = performance.now();
     for (let g = 0; g < games; g += 1) {
         const seed = firstSeed + g;
         const roster = rosterFor(seed);
+        const gridType = gridTypeFor(seed);
+        gridCounts[gridType] = (gridCounts[gridType] ?? 0) + 1;
         steps = [];
         let init: Record<string, unknown> | undefined;
         const result = runMatch({
@@ -441,6 +506,8 @@ function main(): void {
             seed,
             maxLaps: 60,
             headlessEvents: true,
+            gridType,
+            ...(SIDE_ORIENTED ? { sideOrientedPlacement: true } : {}),
             beforeFightStart: (context) => {
                 ctx = context as unknown as Ctx;
                 // Replace the match's seeded stream with one whose state we can observe. Still deterministic.
@@ -493,6 +560,10 @@ function main(): void {
         digestFields: DIGEST_FIELDS,
         keep: [...KEEP],
         keepRate: KEEP_RATE,
+        gridMode: GRID_MODE,
+        mapWeights: MAP_WEIGHTS,
+        sideOriented: SIDE_ORIENTED,
+        gridTypes: gridCounts,
     };
     writeFileSync(out.replace(/\.jsonl$/, ".meta.json"), JSON.stringify(meta, null, 2) + "\n");
     console.log(JSON.stringify(meta));

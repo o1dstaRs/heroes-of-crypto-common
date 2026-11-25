@@ -286,6 +286,8 @@ pub const BaseStats = struct {
 
 pub const Unit = struct {
     in_holder: bool,
+    /// PBTypes.CreatureVals of the unit's creature (recorded `creatureId`; 0 in recordings that predate it).
+    creature_id: u16,
     team: u8,
     faction: u8,
     level: u8,
@@ -433,6 +435,13 @@ pub const Fight = struct {
     additional_narrowing_laps: i32 = 0,
     laps_till_narrowing: i32 = 3,
     grid_type: u8 = 1,
+    /// sideOrientedPlacement: the side deployment zones and the x axis of advance (Backstab, the AI's
+    /// isSideAxisPolicyTeam; no legacy-axis seats in scope).
+    side_oriented: bool = false,
+    /// obstacleHitsLeftLeft / obstacleHitsLeftRight: the classic BLOCK_CENTER mountains' hit points (3/3 on every
+    /// BLOCK_CENTER board, scattered ones included, where they never move; 0/0 elsewhere).
+    hits_left: i32 = 0,
+    hits_right: i32 = 0,
 
     up_next: Queue = .{},
     hourglass_q: Queue = .{},
@@ -448,13 +457,49 @@ pub const Fight = struct {
 };
 
 pub const EMPTY: u8 = 0;
+/// "H": a narrowing hole.
 pub const HOLE: u8 = 0xff;
+/// "B": a classic BLOCK_CENTER mountain cell or a standing scattered stone.
+pub const BLOCK: u8 = 0xfe;
+/// "L": the undried LAVA_CENTER square.
+pub const LAVA: u8 = 0xfd;
+
+/// Whether a board code names a unit (index + 1) rather than EMPTY, a hole or terrain.
+pub inline fn isUnitCode(o: u8) bool {
+    return o != EMPTY and o < LAVA;
+}
+
+/// GridVals (src/generated/protobuf/v1/types.ts). WATER_CENTER is never played.
+pub const GridType = struct {
+    pub const NORMAL: u8 = 1;
+    pub const WATER_CENTER: u8 = 2;
+    pub const LAVA_CENTER: u8 = 3;
+    pub const BLOCK_CENTER: u8 = 4;
+};
+
+/// Up to 12 seeded stones (scatteredMountainCountForSeed is 9..12).
+pub const MAX_STONES = 16;
+
+/// The terrain fields of Grid (all private in TypeScript).
+pub const Terrain = struct {
+    /// scatteredMountainLayout, in roll order (getCenterCells and the AI's strike search read this order). Never
+    /// shortened in scope, so hasScatteredMountains stays true all game once a layout is installed.
+    layout: [MAX_STONES]Cell = undefined,
+    n_layout: u8 = 0,
+    /// scatteredMountainsStanding: bit i = layout[i] still stands.
+    standing: u16 = 0,
+    left_cleared: bool = false,
+    right_cleared: bool = false,
+    /// cleanedUpCenter: the lava has dried.
+    cleaned_up_center: bool = false,
+};
 
 pub const Grid = struct {
-    /// boardCoord[x][y]: EMPTY, HOLE, or unit index + 1.
+    /// boardCoord[x][y]: EMPTY, HOLE, BLOCK, LAVA, or unit index + 1.
     board: [GRID][GRID]u8,
-    /// boardAggrPerTeam[team][x][y], baseline 1, +1 per ring stamp of that team's units.
+    /// boardAggrPerTeam[team][x][y], baseline 1, +1 per ring stamp of that team's units (terrain ignored).
     aggr: [3][GRID][GRID]i16,
+    terrain: Terrain = .{},
 };
 
 pub const State = struct {

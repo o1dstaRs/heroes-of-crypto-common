@@ -5,6 +5,7 @@ const rec = @import("recording.zig");
 const st = @import("state.zig");
 const engine = @import("engine.zig");
 const ai = @import("ai.zig");
+const terrain = @import("terrain.zig");
 
 pub const Mismatch = struct {
     buf: [512]u8 = undefined,
@@ -250,6 +251,16 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
         m.set("fight damageLaps differ", .{});
         return false;
     }
+    // Terrain (recordings of LAVA_CENTER / BLOCK_CENTER or side boards): hit counters, cleared sides, the dried
+    // centre and the standing stones in layout order.
+    const tv = rec.get(f, "terrain");
+    if (tv == .object) {
+        var why: []const u8 = "";
+        if (!terrain.matches(s, tv, &why)) {
+            m.set("fight terrain {s} differs", .{why});
+            return false;
+        }
+    }
     return true;
 }
 
@@ -278,9 +289,17 @@ pub fn actionsEqual(a: rec.Action, b: rec.Action) bool {
         .wait_turn => |x| x.unit == b.wait_turn.unit,
         .defend_turn => |x| x.unit == b.defend_turn.unit,
         .select_attack_type => |x| x.unit == b.select_attack_type.unit and x.attack_type == b.select_attack_type.attack_type,
-        .move_unit => |x| x.unit == b.move_unit.unit and cellsEqual(x.path, b.move_unit.path) and cellsEqual(x.target_cells, b.move_unit.target_cells),
+        .move_unit => |x| x.unit == b.move_unit.unit and cellsEqual(x.path, b.move_unit.path) and
+            cellsEqual(x.target_cells, b.move_unit.target_cells) and x.has_lava == b.move_unit.has_lava,
         .melee_attack => |x| x.attacker == b.melee_attack.attacker and x.target == b.melee_attack.target and
-            x.attack_from.x == b.melee_attack.attack_from.x and x.attack_from.y == b.melee_attack.attack_from.y and cellsEqual(x.path, b.melee_attack.path),
+            x.attack_from.x == b.melee_attack.attack_from.x and x.attack_from.y == b.melee_attack.attack_from.y and
+            cellsEqual(x.path, b.melee_attack.path) and x.has_lava == b.melee_attack.has_lava,
+        .obstacle_attack => |x| blk: {
+            const y = b.obstacle_attack;
+            break :blk x.attacker == y.attacker and x.target_x == y.target_x and x.target_y == y.target_y and
+                x.attack_from.x == y.attack_from.x and x.attack_from.y == y.attack_from.y and cellsEqual(x.path, y.path) and
+                x.has_lava == y.has_lava;
+        },
         .range_attack => |x| blk: {
             const y = b.range_attack;
             if (x.attacker != y.attacker or x.target != y.target) break :blk false;

@@ -1,6 +1,7 @@
 //! The v0.1 AI (src/ai/versions/v0_1.ts StrategyV0_1.decideTurn and src/ai/ai.ts findTarget) and the v0.1 match
 //! loop (runMatchInner in src/simulation/battle_engine.ts), in scope: the abilities in abilities.zig (the AI reads
-//! only Backstab), no spells, NORMAL grid.
+//! only Backstab), no spells; NORMAL, LAVA_CENTER and BLOCK_CENTER grids (the mountain strategy), classic or
+//! side-oriented boards.
 
 const std = @import("std");
 const rec = @import("recording.zig");
@@ -9,6 +10,7 @@ const js = @import("jsnum.zig");
 const engine = @import("engine.zig");
 const combat = @import("combat.zig");
 const pathing = @import("path.zig");
+const terrain = @import("terrain.zig");
 
 const Cell = st.Cell;
 const State = st.State;
@@ -39,7 +41,7 @@ pub const Decision = struct {
     }
 };
 
-pub const Kind = enum { melee, range, move, move_and_melee };
+pub const Kind = enum { melee, range, move, move_and_melee, obstacle };
 
 /// BasicAIAction. `paths` null is the empty `new Map()`.
 pub const AIAction = struct {
@@ -119,7 +121,7 @@ pub inline fn sameCell(a: Cell, b: Cell) bool {
 pub inline fn occupant(s: *const State, c: Cell) ?u8 {
     if (!engine.cellWithinGrid(c)) return null;
     const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
-    if (o == st.EMPTY or o == st.HOLE) return null;
+    if (!st.isUnitCode(o)) return null;
     return o - 1;
 }
 
@@ -255,6 +257,27 @@ pub fn lineBlockedByFriendly(m: *const Matrix, from: Cell, to: Cell, friendly: u
     return false;
 }
 
+/// isLineBlockedByObstacle: the cells between two cells, stepped on accumulated f64 fractions and Math.round, hold a
+/// mountain or stone (-1). Not the engine's ray: only the AI's target preference reads it.
+pub fn lineBlockedByObstacle(m: *const Matrix, from: Cell, to: Cell) bool {
+    const len_i = @max(@abs(to.x - from.x), @abs(to.y - from.y));
+    if (len_i <= 1) return false;
+    const len: f64 = @floatFromInt(len_i);
+    const sx = @as(f64, @floatFromInt(to.x - from.x)) / len;
+    const sy = @as(f64, @floatFromInt(to.y - from.y)) / len;
+    var cx_f = @as(f64, @floatFromInt(from.x)) + sx;
+    var cy_f = @as(f64, @floatFromInt(from.y)) + sy;
+    var i: u32 = 1;
+    while (i < len_i) : (i += 1) {
+        const cx: i32 = @intFromFloat(js.round(cx_f));
+        const cy: i32 = @intFromFloat(js.round(cy_f));
+        if (cx >= 0 and cy >= 0 and cx < st.GRID and cy < st.GRID and mat(m, cx, cy) == pathing.BLOCK) return true;
+        cx_f += sx;
+        cy_f += sy;
+    }
+    return false;
+}
+
 pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
     const s = c.s;
     const u = c.unit();
@@ -276,7 +299,7 @@ pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
             const t = Cell{ .x = x, .y = y };
             const d: f64 = @floatFromInt(@max(@abs(t.x - unit_cell.x), @abs(t.y - unit_cell.y)));
             if (d > max_range) continue;
-            // isLineBlockedByObstacle: no BLOCK cells on NORMAL.
+            if (lineBlockedByObstacle(&c.m, unit_cell, t)) continue;
             if (lineBlockedByFriendly(&c.m, unit_cell, t, u.team, body.slice())) continue;
             var divisor: f64 = 1;
             if (band > 0) {
@@ -673,8 +696,11 @@ pub fn findTarget(c: *Ctx) ?AIAction {
     const engaged = countThreats(&c.m, unit_cell, enemy_team) > 0;
 
     if (action == null and !ranged and !engaged) {
-        if (eng.total_ranged > eng.total_melee and eng.total_ranged >= 2 and !eng.pressing) return null;
-        if (eng.total_melee > 0 and eng.nearest_melee > 4 and eng.engaged_melee == 0 and !eng.pressing) {
+        if (evaluateMountainStrategy(c, &eng)) |mountain| {
+            action = mountain; // takes priority over the ranged-heavy hold and the regroup (BLOCK_CENTER only)
+        } else if (eng.total_ranged > eng.total_melee and eng.total_ranged >= 2 and !eng.pressing) {
+            return null;
+        } else if (eng.total_melee > 0 and eng.nearest_melee > 4 and eng.engaged_melee == 0 and !eng.pressing) {
             action = doFindTarget(c);
             if (action) |a| {
                 if (a.kind == .move) {
@@ -710,9 +736,89 @@ pub fn findTarget(c: *Ctx) ?AIAction {
     return action;
 }
 
+// ---- Mountain (BLOCK_CENTER) strategy (ai.ts) ----
+
+/// GROUP_REGROUP_DIST
+pub const GROUP_REGROUP_DIST: f64 = 4;
+
+/// teamRangedFirepower: the sum of remaining shots x max(1, max damage) over the team's living RANGE units.
+pub fn teamRangedFirepower(s: *const State, team: u8) f64 {
+    var firepower: f64 = 0;
+    for (s.units[0..s.n_units]) |*u| {
+        if (!u.in_holder or u.team != team or u.isDead() or u.attack_type != AT.RANGE) continue;
+        const shots = engine.getRangeShots(u);
+        if (shots <= 0) continue;
+        firepower += shots * @max(1, u.attack_damage_max);
+    }
+    return firepower;
+}
+
+/// mountainHitsLeft: the classic hit counters on BLOCK_CENTER (6 all game on a scattered board), else 0.
+pub fn mountainHitsLeft(s: *const State) i32 {
+    if (s.fight.grid_type != st.GridType.BLOCK_CENTER) return 0;
+    return terrain.hitsLeft(s);
+}
+
+pub const MountainStrike = struct { from: Cell, target: Cell };
+
+/// findMountainMeleeStrike: the cheapest landable stand cell (in place first at weight 0, then knownPaths in
+/// insertion order, strictly cheaper wins) whose ANCHOR touches a standing obstacle cell, with the first such cell
+/// in getCenterCells order. The move path is the decision's actual path (the same getMovePath arguments).
+pub fn findMountainMeleeStrike(c: *Ctx) ?MountainStrike {
+    const s = c.s;
+    var outer: terrain.CenterCells = undefined;
+    terrain.centerCells(s, &outer);
+    if (outer.len == 0) return null;
+    const unit_cell = engine.baseCell(c.unit());
+    const mp = c.actualPath();
+    var best: ?MountainStrike = null;
+    var best_weight: f64 = 0;
+    const Consider = struct {
+        fn f(ctx: *const Ctx, cells: []const Cell, stand: Cell, weight: f64, b: *?MountainStrike, bw: *f64) void {
+            if (!canLandAt(ctx.s, ctx.ui, stand)) return;
+            for (cells) |oc| {
+                if (@abs(stand.x - oc.x) <= 1 and @abs(stand.y - oc.y) <= 1) {
+                    if (b.* == null or weight < bw.*) {
+                        b.* = .{ .from = stand, .target = oc };
+                        bw.* = weight;
+                    }
+                    break;
+                }
+            }
+        }
+    };
+    Consider.f(c, outer.slice(), unit_cell, 0, &best, &best_weight);
+    for (mp.known()) |r| Consider.f(c, outer.slice(), r.cell, r.weight, &best, &best_weight);
+    return best;
+}
+
+/// evaluateMountainStrategy: an otherwise idle, unpressed melee unit strikes the mountain, in place always, after a
+/// move only when its team out-ranges the enemy or its melee is grouped.
+pub fn evaluateMountainStrategy(c: *Ctx, eng: *const Engagement) ?AIAction {
+    const s = c.s;
+    const u = c.unit();
+    if (mountainHitsLeft(s) <= 0) return null;
+    // canMove() is true in scope; a live forced target (Aggr) must be fought first.
+    if (u.attack_type == AT.RANGE or eng.pressing or combat.forcedTarget(s, u) != null) return null;
+    if (eng.total_melee > 0 and eng.nearest_melee > GROUP_REGROUP_DIST and eng.engaged_melee == 0 and !eng.pressing) return null;
+    const strike = findMountainMeleeStrike(c) orelse return null;
+    const out_range = teamRangedFirepower(s, u.team) > teamRangedFirepower(s, engine.opposite(u.team));
+    const in_place = sameCell(strike.from, engine.baseCell(u));
+    if (!out_range and !in_place and !(eng.nearest_melee <= GROUP_REGROUP_DIST)) return null;
+    return .{ .kind = .obstacle, .move = strike.from, .attack = strike.target, .paths = c.actualPath() };
+}
+
 /// isBackstabCell on the classic board: a LEFT attacker stands above the target, a RIGHT one below.
 pub inline fn isBackstabCell(team: u8, from: Cell, target: Cell) bool {
-    return if (team == Team.LEFT) from.y > target.y else from.y < target.y;
+    return isBackstabCellOn(team, from, target, false);
+}
+
+/// isBackstabCell along the axis of advance: y on the classic board, x on a side-oriented one (isSideAxisPolicyTeam;
+/// no legacy-axis seats in scope).
+pub inline fn isBackstabCellOn(team: u8, from: Cell, target: Cell, side: bool) bool {
+    const along = if (side) from.x else from.y;
+    const target_along = if (side) target.x else target.y;
+    return if (team == Team.LEFT) along > target_along else along < target_along;
 }
 
 /// knownPaths.get((x << 4) | y) with JavaScript's int32 key, which an off-board cell can alias onto a real one.
@@ -732,7 +838,8 @@ pub fn preferBackstabAttackCell(c: *Ctx, a: AIAction) AIAction {
     const from = a.move orelse return a;
     const t = occupant(c.s, target_cell) orelse return a;
     if (!engine.isSmall(&c.s.units[t])) return a;
-    if (isBackstabCell(u.team, from, target_cell)) return a;
+    const side = c.s.fight.side_oriented;
+    if (isBackstabCellOn(u.team, from, target_cell, side)) return a;
     const unit_cell = engine.baseCell(u);
     const mp = c.actualPath(); // the same getMovePath arguments as the decision's actual path
     var best: ?Cell = null;
@@ -743,7 +850,7 @@ pub fn preferBackstabAttackCell(c: *Ctx, a: AIAction) AIAction {
         while (dx <= 1) : (dx += 1) {
             if (dx == 0 and dy == 0) continue;
             const cell = Cell{ .x = target_cell.x + dx, .y = target_cell.y + dy };
-            if (!isBackstabCell(u.team, cell, target_cell)) continue;
+            if (!isBackstabCellOn(u.team, cell, target_cell, side)) continue;
             const weight = if (sameCell(cell, unit_cell)) 0 else (routeAtJsKey(mp, cell.x, cell.y) orelse continue).weight;
             if (weight < best_weight) {
                 best_weight = weight;
@@ -843,7 +950,7 @@ pub fn completeMoveWithMelee(c: *Ctx, mp: *const MovePath, r: *const Route, pref
     const targets = footprintForAnchor(u, r.cell);
     for (targets.slice(), 0..) |t, i| out.targets[i] = t;
     const len = mp.routeCells(r, &out.path);
-    const move = rec.Action{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..targets.len] } };
+    const move = rec.Action{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..targets.len], .has_lava = r.has_lava } };
 
     var adjacent_enemies: engine.UnitList = .{};
     for (s.units[0..s.n_units], 0..) |*e, i| {
@@ -1026,6 +1133,22 @@ pub fn decideWith(c: *Ctx, out: *Decision) void {
             const r = mp.get(pathing.key(tc.x, tc.y)) orelse return fallbackTurn(c, out);
             if (!isLegalMoveRoute(c, tc, mp, r)) return fallbackTurn(c, out);
             completeMoveWithMelee(c, mp, r, null, out);
+        },
+        .obstacle => {
+            // No select_attack_type prefix and no route legality check; no mindless ("AI Driven") unit in scope.
+            const struck = a.attack orelse return fallbackTurn(c, out);
+            const from = a.move orelse return fallbackTurn(c, out);
+            const pos = engine.positionForCell(@floatFromInt(struck.x), @floatFromInt(struck.y));
+            var len: usize = 0;
+            var has_lava = false;
+            if (!sameCell(from, engine.baseCell(u))) {
+                const mp = a.paths orelse return fallbackTurn(c, out);
+                const r = mp.get(pathing.key(from.x, from.y)) orelse return fallbackTurn(c, out);
+                len = mp.routeCells(r, &out.path);
+                if (len == 0) return fallbackTurn(c, out);
+                has_lava = r.has_lava;
+            }
+            out.push(.{ .obstacle_attack = .{ .attacker = ui, .target_x = pos[0], .target_y = pos[1], .attack_from = from, .path = out.path[0..len], .has_lava = has_lava } });
         },
     }
 }

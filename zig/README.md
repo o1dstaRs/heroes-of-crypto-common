@@ -10,10 +10,13 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
 - every creature's stats, sizes (1x1, 2x1, 2x2), walking and flying, melee and ranged;
 - the abilities of the creatures ported so far (batches 1 and 2, below); every other creature's abilities, and all
   spells, stripped; no artifacts, augments, synergies or doctrines;
-- the NORMAL grid, including board narrowing (holes, shoves, crushes) and the Armageddon waves;
-- the v0.1 AI on both sides.
+- the NORMAL, LAVA_CENTER and BLOCK_CENTER grids (production rolls a third each), on classic or side-oriented boards
+  (production is side-oriented on every map, and its BLOCK_CENTER boards carry the seeded scattered stones; the classic
+  2x2 mountains of non-side BLOCK_CENTER are ported too), including board narrowing (holes, shoves, crushes) and the
+  Armageddon waves;
+- the v0.1 AI on both sides, with its BLOCK_CENTER mountain strategy.
 
-The engine also replays (`hoc-sim parity`) the actions later AI versions emit on that board: move-then-strike
+The engine also replays (`hoc-sim parity`) the actions later AI versions emit on these boards: move-then-strike
 (`melee_attack` with a `path`), `wait_turn`, `defend_turn`, aimed shots and refused `select_attack_type`.
 
 Ported:
@@ -25,9 +28,11 @@ Ported:
 - **Random stream** (`rng.zig`): `mulberry32` plus `getRandomInt` rejection sampling, bit for bit.
 - **Path search** (`path.zig`): `PathHelper.getMovePath` as v0.1 uses it (the first-come FIFO walk, threat costs,
   diagonal sneak rules, the closest-move pass).
+- **Terrain** (`terrain.zig`, below): lava, mountains, stones and `obstacle_attack`.
 - **AI and match loop** (`ai.zig`): `StrategyV0_1.decideTurn`, `findTarget`, `doFindTarget`'s two passes, the melee
-  target layers, target memory, the safer-move search, shooter line checks, `preferBackstabAttackCell`, and the
-  `runMatchInner` loop for v0.1 seats. The recovery net and `forceStalledLap` are not ported (never reached in the
+  target layers, target memory, the safer-move search, shooter line checks, `preferBackstabAttackCell`, the mountain
+  strategy (`evaluateMountainStrategy`, `findMountainMeleeStrike`, `teamRangedFirepower`, `isLineBlockedByObstacle`),
+  and the `runMatchInner` loop for v0.1 seats. The recovery net and `forceStalledLap` are not ported (never reached in the
   recordings or in a 2,000-battle probe of the TypeScript code); a battle that would need them stops with
   `unsupported` or `stuck`, which the parity check reports.
 
@@ -116,6 +121,56 @@ Added by batch 2:
   `getAbsorptionTarget`'s roll on every landed shot and landed counter-shot whose victim carries the aura and whose
   source cell holds a unit; the result is unused).
 
+### Maps and board orientation
+
+The framework the maps added (all exact in both modes, see the coverage below):
+
+- **Board** (`state.zig`): `Grid.board` holds `BLOCK` ("B", a classic mountain cell or a standing stone) and `LAVA`
+  ("L") beside `EMPTY`, `HOLE` and unit codes; `st.isUnitCode` is the one test for "a unit stands here" (every
+  `board - 1` read goes through it). `Grid.terrain` (`st.Terrain`) holds the scattered layout in roll order, a standing
+  bit per layout cell, the cleared classic sides and `cleanedUpCenter`; `Fight` holds the classic hit counters
+  (`hits_left`, `hits_right`: 3/3 on every BLOCK_CENTER board, scattered ones included, where they never move) and
+  `side_oriented`. `path.buildMatrix` gives -1, -2, -3 as `getOccupantNumeric` does. The aggression boards ignore
+  terrain, as in TypeScript.
+- **Grid terrain** (`terrain.zig`): `load` (the recorded start state; then the loader cross-checks the rebuilt board
+  against the recorded `grid.matrix`), `isScatteredMountainCell` (layout membership: true after the stone is gone),
+  `clearScatteredMountainAt`, `clearMountainSide`, `encounterObstacleHit` (a classic hit sets the lap's damage fact; a
+  stone hit sets none), `spendObstacleHit`, `obstacleStillStands`, `centerCells` (`getCenterCells` order: standing
+  stones in layout order, then each uncleared classic side), `cleanupCenterObstacle` and `lapsNarrowed`.
+- **Lap transition** (`engine.handleLapTransition`): the lava dries right after `flipLap` once `getLapsNarrowed()`
+  reaches the laps till narrowing (lap 10 without additional narrowing; the additional laps are read before this
+  transition's increment). Narrowing holes swallow stones (`occupyByHole`), a sweep cell holding a stone or lava moves
+  nothing, and BLOCK_CENTER's 4 laps till narrowing (from the start state) put the narrowing laps at 5, 9 and 13.
+- **Moves**: `groundRouteCrossesObstacle` (a walker's footprint on "B" at any route anchor) on `move_unit` and on a
+  path-bearing `melee_attack`; every landing test already refuses terrain.
+- **Path search** (`path.zig`): the predicates read literally. A walker is stopped by any non-zero cell (the diagonal
+  sneak, 2x2 pairs and 2x1 shear included), a flyer by any non-zero cell except lava and water, and the closest-move
+  pass is blocked by any non-zero cell for both. `Route.has_lava` is `hasLavaCell` (a flyer route over lava:
+  `crossesLava` over the anchor, all four 2x2 cells, or a rectangle's cells up to the first blocking one).
+  `knownPaths` keeps a flyer's lava destinations (only `cells` drops them, and nothing reads `cells`). `getMovePath` is
+  specialised at compile time for walkers and flyers.
+- **Line of fire** (`combat.evaluateRange`): the ray stops at the first "B" (nothing behind it is hit; a shot whose ray
+  meets a stone first is refused, and a counter-shot whose return ray does is not fired, so its miss and damage rolls
+  are not drawn); lava does not stop it. `sideObservable`: a side facing "B" is not an aim edge, one facing lava is.
+- **Obstacle strikes** (`combat.obstacleAttack`, `handleObstacleAttack`): `rec.Action.obstacle_attack` (target
+  position, `attackFrom`, the approach `path`, `hasLavaCell`); the gates, the walk in (the same route-trusting move
+  modifiers as a path-bearing melee strike: distance morale to the anchor cell's centre, no `movedThisTurn`), the hit,
+  Double Punch's second hit, the classic side clearing, then `completeTurn`. A rejection after the walk in keeps the
+  move. With batch 2: a Pikeman's skewer breaks the stone behind the struck one or strikes the enemy standing there
+  (`pierceScatteredObstacleBehind`, with its rolls and its morale settled at once), a Hydra's strike spins
+  (`spinAroundObstacleStrike`: the full Lightning Spin on the enemies around, then every stone in the ring), and kills
+  feed Devour Essence.
+- **Stones off unit strikes** (`combat.meleeAttack`): a Hydra's attack spin knocks down every stone in its ring
+  (`spinScatteredObstaclesAround`), a Pikeman's skewer breaks a stone behind a small target (`skewerStrikeObstacleCell`).
+- **Side orientation**: Backstab measures "behind" along x with the target's width as the RIGHT margin
+  (`abilities.positionMultiplierOn`, attack and response), and so does the AI (`isBackstabCellOn` in
+  `preferBackstabAttackCell`). Nothing else v0.1 or the engine reads depends on orientation in scope (deployment zones
+  are in the recorded start state).
+- **AI**: the `OBSTACLE_ATTACK` kind (`Kind.obstacle`) from `evaluateMountainStrategy` ahead of the ranged-heavy hold
+  and the regroup, its `decideTurn` branch (no attack-type prefix, no route legality check), `isLineBlockedByObstacle`
+  in `findRangeAttackAction`, and `move_unit.has_lava` from the route.
+- **Recording**: `Unit.creature_id` (`creatureId`, PBTypes.CreatureVals; 0 for older recordings).
+
 ### Porting the next batch
 
 - Add the ability to `AbilityId` (and any buff, debuff or effect it applies to `SpellId`), then port its branches from
@@ -131,6 +186,21 @@ Added by batch 2:
 - Keep the ability-free path cheap: probes go through the unit's ability mask, the blessing census runs only when
   `State.blessings` is set, the aura refresh only when `State.auras` is, the batch-2 stat hooks only when
   `State.stat_hooks` is, and the Ember Covenant check only while a team holds one.
+- Map lessons (for the next batches on these boards):
+  - Terrain is state the digest must name: the stones in layout order, the counters, the cleared sides, the dried
+    centre. `initState` used to ignore `grid.matrix`; it now rebuilds the board from `init.terrain` and checks it
+    against the matrix, so a missing terrain field fails at load instead of drifting.
+  - An ability with a sweep (spin, skewer, Fire Breath, splash) also touches stones: grep the handler for
+    `spendObstacleHit` / `ObstacleCells` before porting it, and check the obstacle strike path, which runs the same
+    abilities (the Hydra's spin off a stone strike draws as off a unit strike).
+  - Rays and aim edges read "B"; adjacency, auras and the aggression boards do not.
+  - A flyer route can carry `hasLavaCell: true`; every action built from a route must copy it (`move_unit`, and a
+    path-bearing `melee_attack` or `obstacle_attack`), or the native check reports an action mismatch on LAVA.
+  - Augments and synergies: placement augments and the side zones are in the recorded start state, but anything that
+    reads the axis of advance (`isSideOrientedPlacement`, `isSideAxisPolicyTeam`) must take `s.fight.side_oriented`.
+    The Chaos break roll lives in `Unit.applyDamage(damage, getBreakChancePerTeam(team), ...)`: `engine.applyDamage`
+    takes no break chance yet, so every damage path (the obstacle strike's pierce and spin included) must thread the
+    attacking team's chance and its roll, and `Unit.has` / `ability` must become Break-aware (they ignore Break now).
 - Batch 2 lessons:
   - Inert is not absent: Trent's abilities change nothing in scope, but the loader must still know their names.
   - A refresh-time value is stale until the next refresh: aura rows after `move_unit` (no refresh), Absorb power at a
@@ -155,12 +225,31 @@ of the turn queues.
 - `hoc-sim parity` replays each recorded engine call from its random state (engine only).
 - `hoc-sim native` plays each battle in Zig from its start state with the Zig AI and checks every decision and engine
   call against the recording: the action, the random stream, accept/reject, the events and the digest.
-- `hoc-sim paths` recomputes recorded `getMovePath` calls (record with `RECORD_PATHS=<file>`), comparing every route
-  and weight.
+- `hoc-sim paths` recomputes recorded `getMovePath` calls (record with `RECORD_PATHS=<file>`), comparing every route,
+  weight and lava flag.
+
+Map options (the defaults reproduce the classic NORMAL recordings; the only new start-state field there is
+`creatureId`):
+
+- `RECORD_GRID=1|3|4|mix` (also `RECORD_GRID_TYPE`): NORMAL, LAVA_CENTER, BLOCK_CENTER, or a per-seed pick weighted by
+  `RECORD_MAP_WEIGHTS=n,l,b` (default `1,1,1`, production's thirds). The pick hashes the seed into a private mulberry32
+  stream, so it touches no battle stream and a seed always gets the same map and roster.
+- `RECORD_SIDE=1` (also `RECORD_SIDE_ORIENTED`): production's side-oriented boards (side zones, the Backstab axis on x,
+  and on BLOCK_CENTER the stones seeded `sim-${seed}`).
+- On any non-classic-NORMAL recording the start state gains `init.terrain` (`layout` in roll order, `standing`, `hitsL`,
+  `hitsR`, `leftCleared`, `rightCleared`, `cleanedUpCenter`, `sideOriented`) and the fight digest gains `terrain` (the
+  same minus the layout and the orientation); the `.meta.json` gains `gridMode`, `mapWeights`, `sideOriented` and the
+  battles per map (`gridTypes`). `RECORD_PATHS` lines gain each route's `hasLavaCell` (a fourth element; `hoc-sim
+  paths` compares it when present, accepts and ignores `vine: true`, and counts a made-of-fire call as a mismatch).
+
+```bash
+RECORD_GRID=mix RECORD_SIDE=1 zig/parity/check.sh 500       # production maps and boards
+RECORD_GRID=4 RECORD_SIDE=1 RECORD_PATHS=/tmp/p.jsonl bun zig/parity/record.ts 200 1 /tmp/b.jsonl
+```
 
 The unit digest holds every compared stat, the buff/debuff/effect names, laps and powers, and some hidden state
 (position, base morale, luck per turn, initial base attack, moved route cells, the Aggr forced target, magic resist and
-each buff's source cell); the fight digest adds the Ember Covenant teams. The field list is in each recording's
+each buff's source cell); the fight digest adds the Ember Covenant teams and, on map recordings, the terrain. The field list is in each recording's
 `.meta.json`; columns a recording lacks are skipped, so older recordings stay comparable. The start state carries the
 configs the engine reads without an ability naming them: `auraEffectConfigs`, `effectConfigs.Poison` and
 `spellConfigs["Ember Covenant Blessing"]`.
@@ -176,6 +265,30 @@ cd zig && zig build test         # unit tests (random stream, JS number rounding
 ```
 
 Run `check.sh` after changing any rules or v0.1 AI code the port covers, both with and without the batch kept.
+
+Maps, checked on 2026-11-25 against common `2061f9ce` (both modes, every battle identical):
+
+- ability-free, side-oriented: NORMAL 1,000 battles, 182,867 steps (seeds 2000000–2000999); LAVA_CENTER 1,000,
+  187,391 steps (2100000–2100999); BLOCK_CENTER 1,000, 197,951 steps (2200000–2200999); the production mix 1,000,
+  189,766 steps (2300000–2300999: 356 NORMAL, 324 LAVA, 320 BLOCK);
+- batches 1 and 2 kept, production mix: 1,800 battles, 344,461 steps (seeds 2400000–2401499 at the default keep rate,
+  2402000–2402299 at keep rate 1);
+- smaller dev runs: 100 each of ability-free classic BLOCK, LAVA side, BLOCK side and NORMAL side (seeds 1–100), and
+  at keep rate 1 BLOCK side (5000–5099), classic BLOCK (6000–6099) and LAVA side (7000–7099);
+- `getMovePath`: 17,136 calls on side BLOCK (seeds 2600000–2600199), 17,912 on side LAVA (2700000–2700199; 2,916 with
+  lava routes), 9,367 with Trent, Hydra, Pegasus and Wyvern kept on the mix (2750000–2750099; 2,090 vine-strider
+  calls), every route, weight and lava flag identical;
+- unchanged: classic NORMAL ability-free (`check.sh 500 2800000` and the benchmark recording), batches 1 and 2 kept on
+  classic NORMAL (`check.sh 500 2900000`), and the v0.8 replays (`hoc-sim parity`, 100/100 for v0.2, v0.8s and v0.8sr);
+  the v0.8 port at `39705fcc` builds against the new API and its layer check stays 7,308/7,308;
+- reached, in the side BLOCK_CENTER thousand: 7,560 obstacle strikes (6,895 walking in, 665 in place), 1,463 aimed
+  shots, 802 stones swallowed by narrowing holes, additional narrowing laps; in the side LAVA_CENTER thousand: 365
+  battles that dried the lava (all at lap 10) and 422 flyer moves with `hasLavaCell: true`; in the kept mix: 281 Hydra
+  obstacle strikes (24 with a spin that rolled, 11 killing a stack) and 268 stones broken by Hydra unit strikes, 308
+  Pikeman obstacle strikes (29 breaking the stone behind, 2 skewer rolls at the enemy behind it), 326 Crusader strikes; in
+  the classic BLOCK dev run, 59 mountain sides cleared and Double Punch's second hit;
+- a negative check: playing the kept mix with the orientation forced to classic diverges in 136 of 500 battles
+  (Backstab).
 
 Batch 2, checked on 2026-11-25 against common `7dedbbe3` (both modes, every battle identical):
 
@@ -268,6 +381,13 @@ slower (medians 603 and 614 ns per step at load 25; about 4% more instructions),
 forced-target checks on every strike and stat refresh. Building the 18 KB decision context by value had cost 7%;
 `initCtxInto` builds it in place.
 
+The maps kept the classic path within noise too, on a far busier host (load 82 to 113, so only the comparison
+means anything): eight alternated pairs of `native-bench --reps 5` on the benchmark recording gave medians of 770.7 µs
+(old) and 719.3 µs (new) per battle, pairwise -3%, and five pairs of the engine-only bench 1,501 and 1,386 ns per
+step, with the same run checksums. `getMovePath` is now specialised at compile time for walkers and flyers. On that
+host, one run each: side NORMAL battles cost about what classic ones do (538 against 528 µs), side BLOCK_CENTER about
+1.15 times (618 µs) and side LAVA_CENTER about 1.25 times (683 µs).
+
 A battle state is a flat value of about 41 KB (36 KB before abilities), so a search rollout's snapshot and restore
 is one copy.
 
@@ -276,8 +396,11 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 
 ## Not covered yet
 
-- the abilities of every creature outside batches 1 and 2, spells, artifacts, augments, synergies, obstacles and other
-  maps. The ported code leaves out what no battle in scope can reach: Break, Made of Fire, Mechanism, Paralysis, the
+- the abilities of every creature outside batches 1 and 2, spells, artifacts, augments and synergies; WATER_CENTER
+  (never played); on the maps, the ranged obstacle shot (`obstacle_attack` with RANGE selected and a landable shot, which
+  v0.1 never sends: refused), Area Throw / Large Caliber on stones, Fire Breath through stones, artifact barrels, and
+  `forceStalledLap` / the recovery net (never reached: 0 rejected engine calls in every map recording). The ported code
+  leaves out what no battle in scope can reach: Break, Made of Fire, Mechanism, Paralysis, the
   forbidden target (Terrifying Gaze), Water Shield and Water Element, Flesh Shield, the Dual Strike Charm, the aura
   power types outside the three in scope, Skewer Strike from a large attacker, the Vine Throw cast, vines and the
   Earth/Wind element pair (Thunderbird is not ported);

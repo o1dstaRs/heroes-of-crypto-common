@@ -1,5 +1,7 @@
-//! PathHelper.getMovePath as the v0.1 AI uses it (src/grid/path_helper.ts, indexed fast path), in scope: NORMAL
-//! grid with holes, no lava/water/vines/fire walls, footprints 1x1, 2x1 and 2x2.
+//! PathHelper.getMovePath as the v0.1 AI uses it (src/grid/path_helper.ts, indexed fast path), in scope: holes,
+//! mountains and stones (-1) and lava (-3), no water/vines/fire walls and nothing made of fire, footprints 1x1, 2x1
+//! and 2x2. The terrain predicates are read literally: a walker is stopped by any non-zero cell, a flyer by any
+//! non-zero cell except lava and water, and a flyer route over lava carries hasLavaCell.
 //!
 //! The search is a first-come FIFO walk, not Dijkstra: a cell keeps the route of the first dequeued parent that can
 //! afford it. Neighbour order (L, U, D, R, LD, LU, RD, RU) and queue order therefore decide every route and weight.
@@ -10,15 +12,28 @@ const st = @import("state.zig");
 const Cell = st.Cell;
 pub const DIAGONAL_MOVE_COST: f64 = 1.4142135623730951;
 
-/// `grid.getMatrix()` viewed as m[x][y]: 0 empty, the occupant's team (1 or 2), -2 hole.
+/// `grid.getMatrix()` viewed as m[x][y]: 0 empty, the occupant's team (1 or 2), -1 mountain or stone, -2 hole,
+/// -3 lava (ObstacleType).
 pub const Matrix = [st.GRID][st.GRID]i8;
 
+pub const BLOCK: i8 = -1;
+pub const HOLE: i8 = -2;
+pub const LAVA: i8 = -3;
+pub const WATER: i8 = -4;
+
+/// Grid.getOccupantNumeric: a unit's team wins over terrain (no unit ever stands on terrain in scope).
 pub fn buildMatrix(s: *const st.State) Matrix {
     var m: Matrix = undefined;
     for (0..st.GRID) |x| {
         for (0..st.GRID) |y| {
             const o = s.grid.board[x][y];
-            m[x][y] = if (o == st.EMPTY) 0 else if (o == st.HOLE) -2 else @intCast(s.units[o - 1].team);
+            m[x][y] = switch (o) {
+                st.EMPTY => 0,
+                st.HOLE => HOLE,
+                st.BLOCK => BLOCK,
+                st.LAVA => LAVA,
+                else => @intCast(s.units[o - 1].team),
+            };
         }
     }
     return m;
@@ -41,6 +56,8 @@ pub const Route = struct {
     weight: f64,
     remaining: f64,
     first_aggr_met: bool,
+    /// hasLavaCell: the route (a flyer's) touched lava. hasWaterCell is always false (no water in scope).
+    has_lava: bool = false,
 };
 
 pub const MAX_ROUTES = 260;
@@ -122,8 +139,20 @@ pub const Params = struct {
     h: u8,
 };
 
-/// getMovePath -> calculateMovePath (indexed branch) -> filterUnallowedDestinations (identity here).
+/// getMovePath -> calculateMovePath (indexed branch) -> filterUnallowedDestinations (it filters only `cells`, which
+/// nothing here reads: knownPaths keeps a flyer's lava destinations). No vines exist in scope, so a vine strider
+/// ("In Its Own World") gets the normal path.
 pub fn getMovePath(m: *const Matrix, p: Params, out: *MovePath) void {
+    if (p.can_fly) search(true, m, p, out) else search(false, m, p, out);
+}
+
+/// The body test of calculateMovePath for one footprint cell value: a walker is stopped by anything non-zero, a flyer
+/// by anything it cannot fly over (lava and water it can).
+inline fn blocksBody(comptime fly: bool, el: i8) bool {
+    return if (fly) el != 0 and el != LAVA and el != WATER else el != 0;
+}
+
+fn search(comptime fly: bool, m: *const Matrix, p: Params, out: *MovePath) void {
     out.* = .{};
     const w: i32 = p.w;
     const h: i32 = p.h;
@@ -219,21 +248,32 @@ pub fn getMovePath(m: *const Matrix, p: Params, out: *MovePath) void {
             return if (v == 0) 1 else @floatFromInt(v);
         }
 
-        fn blocked(self: @This(), n: Cell, initial_cells: *const Bits) bool {
+        /// The footprint test. `crosses` gets crossesLava: the anchor, all four 2x2 cells, or a rectangle's cells
+        /// up to the first blocking one (only a flyer can stand its body over lava, so walkers skip it).
+        fn blocked(self: @This(), n: Cell, initial_cells: *const Bits, crosses: *bool) bool {
             if (self.small) {
-                return at(self.m, n.x, n.y) != 0 and !initial_cells.has(key(n.x, n.y));
+                const el = at(self.m, n.x, n.y);
+                if (fly) crosses.* = el == LAVA;
+                return blocksBody(fly, el) and !initial_cells.has(key(n.x, n.y));
             }
             if (self.legacy) {
                 const cells = [4][2]i32{ .{ n.x, n.y }, .{ n.x - 1, n.y }, .{ n.x - 1, n.y - 1 }, .{ n.x, n.y - 1 } };
+                if (fly) {
+                    for (cells) |c| {
+                        if (at(self.m, c[0], c[1]) == LAVA) crosses.* = true;
+                    }
+                }
                 for (cells) |c| {
-                    if (at(self.m, c[0], c[1]) != 0 and !initial_cells.has(key(c[0], c[1]))) return true;
+                    if (blocksBody(fly, at(self.m, c[0], c[1])) and !initial_cells.has(key(c[0], c[1]))) return true;
                 }
                 return false;
             }
             for (0..self.n_off) |i| {
                 const fx = n.x - self.off_x[i];
                 const fy = n.y - self.off_y[i];
-                if (at(self.m, fx, fy) != 0 and !initial_cells.has(key(fx, fy))) return true;
+                const el = at(self.m, fx, fy);
+                if (fly and el == LAVA) crosses.* = true;
+                if (blocksBody(fly, el) and !initial_cells.has(key(fx, fy))) return true;
             }
             return false;
         }
@@ -286,7 +326,8 @@ pub fn getMovePath(m: *const Matrix, p: Params, out: *MovePath) void {
         }
         for (nbrs[0..nn]) |n| {
             const kn = key(n.x, n.y);
-            if (ctx.blocked(n, &initial)) {
+            var crosses = false;
+            if (ctx.blocked(n, &initial, &crosses)) {
                 visited.put(kn);
                 continue;
             }
@@ -295,11 +336,11 @@ pub fn getMovePath(m: *const Matrix, p: Params, out: *MovePath) void {
             const remaining = parent.remaining;
             var cost: f64 = undefined;
             if (diag) {
-                cost = if (p.can_fly) DIAGONAL_MOVE_COST else DIAGONAL_MOVE_COST * ctx.aggr(n, parent);
+                cost = if (fly) DIAGONAL_MOVE_COST else DIAGONAL_MOVE_COST * ctx.aggr(n, parent);
                 if (!(remaining >= cost)) continue;
-                if (!p.can_fly and ctx.sneaks(cur, n)) continue;
+                if (!fly and ctx.sneaks(cur, n)) continue;
             } else {
-                cost = if (p.can_fly) 1 else ctx.aggr(n, parent);
+                cost = if (fly) 1 else ctx.aggr(n, parent);
                 if (!(remaining >= cost)) continue;
             }
             const child = Route{
@@ -308,6 +349,7 @@ pub fn getMovePath(m: *const Matrix, p: Params, out: *MovePath) void {
                 .weight = parent.weight + cost,
                 .remaining = remaining - cost,
                 .first_aggr_met = parent.first_aggr_met,
+                .has_lava = fly and (parent.has_lava or crosses),
             };
             const ci = out.append(child);
             out.by_key[kn] = @intCast(ci);

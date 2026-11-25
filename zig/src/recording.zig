@@ -14,9 +14,13 @@ pub const Action = union(enum) {
     wait_turn: struct { unit: u8 },
     defend_turn: struct { unit: u8 },
     select_attack_type: struct { unit: u8, attack_type: u8 },
-    move_unit: struct { unit: u8, path: []const Cell, target_cells: []const Cell },
-    melee_attack: struct { attacker: u8, target: u8, attack_from: Cell, path: []const Cell },
+    /// `has_lava` is the action's hasLavaCell (a flyer's route over lava; no state reads it in scope).
+    move_unit: struct { unit: u8, path: []const Cell, target_cells: []const Cell, has_lava: bool = false },
+    melee_attack: struct { attacker: u8, target: u8, attack_from: Cell, path: []const Cell, has_lava: bool = false },
     range_attack: struct { attacker: u8, target: u8, aim_cell: ?Cell = null, aim_side: u8 = 0 },
+    /// A strike on a mountain cell or a stone at `targetPosition` (a cell centre) from `attackFrom`; `path` is the
+    /// approach route (empty when striking in place, where the recorded action has no path or route flags).
+    obstacle_attack: struct { attacker: u8, target_x: f64, target_y: f64, attack_from: Cell, path: []const Cell, has_lava: bool = false },
     /// An AI decision: the unit and the actions `decideTurn` returned (not an engine call).
     decide: struct { unit: u8, out: []const Action },
 };
@@ -78,6 +82,10 @@ pub fn get(v: std.json.Value, key: []const u8) std.json.Value {
     };
 }
 
+fn flag(v: std.json.Value) bool {
+    return v == .bool and v.bool;
+}
+
 fn cell(v: std.json.Value) Cell {
     return .{ .x = @intCast(int(get(v, "x"))), .y = @intCast(int(get(v, "y"))) };
 }
@@ -133,6 +141,7 @@ pub fn parseAction(arena: std.mem.Allocator, ids: []const []const u8, kind: []co
             .unit = try unitArg(ids, get(a, "unitId")),
             .path = try cells(arena, get(a, "path")),
             .target_cells = try cells(arena, get(a, "targetCells")),
+            .has_lava = flag(get(a, "hasLavaCell")),
         } };
     }
     if (std.mem.eql(u8, t, "melee_attack")) {
@@ -141,6 +150,20 @@ pub fn parseAction(arena: std.mem.Allocator, ids: []const []const u8, kind: []co
             .target = try unitArg(ids, get(a, "targetId")),
             .attack_from = cell(get(a, "attackFrom")),
             .path = try cells(arena, get(a, "path")),
+            .has_lava = flag(get(a, "hasLavaCell")),
+        } };
+    }
+    if (std.mem.eql(u8, t, "obstacle_attack")) {
+        const pos = get(a, "targetPosition");
+        if (get(a, "attackFrom") == .null) return error.UnsupportedObstacleAttack; // ranged obstacle shots: not ported
+        if (flag(get(a, "hasWaterCell"))) return error.UnsupportedObstacleAttack;
+        return .{ .obstacle_attack = .{
+            .attacker = try unitArg(ids, get(a, "attackerId")),
+            .target_x = num(get(pos, "x")),
+            .target_y = num(get(pos, "y")),
+            .attack_from = cell(get(a, "attackFrom")),
+            .path = try cells(arena, get(a, "path")),
+            .has_lava = flag(get(a, "hasLavaCell")),
         } };
     }
     if (std.mem.eql(u8, t, "range_attack")) {

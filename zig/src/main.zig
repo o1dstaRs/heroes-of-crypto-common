@@ -188,7 +188,9 @@ fn bench(gpa: std.mem.Allocator, path: []const u8, reps: usize, threads: usize) 
     );
 }
 
-/// Recomputes every recorded getMovePath call and compares knownPaths order, weights and routes exactly.
+/// Recomputes every recorded getMovePath call and compares knownPaths order, weights, routes and (when recorded) each
+/// route's hasLavaCell exactly. `vine` is accepted and ignored (no vines exist in scope, so a vine strider gets the
+/// normal path); a made-of-fire call is not ported and counts as a mismatch.
 fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
     const buf = try readAll(gpa, file);
     defer gpa.free(buf);
@@ -214,6 +216,11 @@ fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
             for (0..st.GRID) |y| aggr[x][y] = @intCast(rec.int(cols[x].array.items[y]));
         }
         const cell = rec.get(v, "cell").array.items;
+        if (rec.get(v, "fire") == .bool and rec.get(v, "fire").bool) {
+            fails += 1;
+            if (fails <= max_fail) std.debug.print("call {d}: made of fire (not ported)\n", .{calls});
+            continue;
+        }
         pathing.getMovePath(&m, .{
             .start = .{ .x = @intCast(rec.int(cell[0])), .y = @intCast(rec.int(cell[1])) },
             .max_steps = rec.num(rec.get(v, "maxSteps")),
@@ -249,6 +256,10 @@ fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
                     if (rec.int(c.array.items[0]) != z.x or rec.int(c.array.items[1]) != z.y) why = "route cells";
                 }
                 if (why != null) break;
+                if (kk.len > 3 and (rec.int(kk[3]) == 1) != r.has_lava) {
+                    why = "hasLavaCell";
+                    break;
+                }
             }
         }
         if (why) |reason| {
