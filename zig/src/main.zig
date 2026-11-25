@@ -450,6 +450,8 @@ pub fn main() !void {
     if (std.mem.eql(u8, cmd, "parity")) {
         const ok = try parity(gpa, path_arg, argValue(args, "--max-fail", 10));
         if (!ok) std.process.exit(1);
+    } else if (std.mem.eql(u8, cmd, "v08")) {
+        try @import("v08/main.zig").run(gpa, args[2..]);
     } else if (std.mem.eql(u8, cmd, "native")) {
         if (!try native(gpa, path_arg, argValue(args, "--max-fail", 10))) std.process.exit(1);
     } else if (std.mem.eql(u8, cmd, "native-bench")) {
