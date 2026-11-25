@@ -206,7 +206,7 @@ fn meleeFallback(c: *ai.Ctx, out: *ai.Decision) void {
     if (meleeApproach(c)) |ap| {
         if (need_select) out.push(select);
         const len = c.actualPath().routeCells(ap.route, &out.path);
-        out.push(.{ .melee_attack = .{ .attacker = ui, .target = ap.target, .attack_from = ap.route.cell, .path = out.path[0..len] } });
+        out.push(.{ .melee_attack = .{ .attacker = ui, .target = ap.target, .attack_from = ap.route.cell, .path = out.path[0..len], .has_lava = ap.route.has_lava } });
         return;
     }
     // 3) Advance (fallbackTurn holds the turn when the unit cannot move).

@@ -349,6 +349,12 @@ pub fn strikes(d: *const ai.Decision) bool {
     return has(d, .melee_attack) or has(d, .range_attack);
 }
 
+/// v0.5's COMBAT_ACTIONS and v0.8's posture-protected types: a strike or an obstacle attack (casts and Area Throw are
+/// out of scope).
+pub fn combatAction(d: *const ai.Decision) bool {
+    return strikes(d) or has(d, .obstacle_attack);
+}
+
 pub fn setWait(d: *ai.Decision, ui: u8) void {
     d.* = .{};
     d.push(.{ .wait_turn = .{ .unit = ui } });
@@ -365,7 +371,7 @@ pub fn setMove(d: *ai.Decision, s: *const State, ui: u8, mp: *const pathing.Move
     const len = mp.routeCells(r, &d.path);
     const fp = ai.footprintForAnchor(&s.units[ui], r.cell);
     for (fp.slice(), 0..) |t, i| d.targets[i] = t;
-    d.push(.{ .move_unit = .{ .unit = ui, .path = d.path[0..len], .target_cells = d.targets[0..fp.len] } });
+    d.push(.{ .move_unit = .{ .unit = ui, .path = d.path[0..len], .target_cells = d.targets[0..fp.len], .has_lava = r.has_lava } });
 }
 
 // =====================================================================================================================
@@ -422,8 +428,8 @@ fn averageCenterDistance(cells: []const Cell, span: f64) f64 {
 
 pub const VALUE_FEATURES = 20;
 
-/// The 20 LiveTwin value features from `team`'s perspective. Classic boards only (the side-oriented board reads
-/// advancement along x: not in scope until the map batch).
+/// The 20 LiveTwin value features from `team`'s perspective; advancement reads x on a side-oriented board
+/// (isSideAxisPolicyTeam, no legacy-axis seats in scope).
 pub fn valueFeatures(s: *const State, team: u8, out: *[VALUE_FEATURES]f64) void {
     var our_hp: f64 = 0;
     var enemy_hp: f64 = 0;
@@ -454,7 +460,7 @@ pub fn valueFeatures(s: *const State, team: u8, out: *[VALUE_FEATURES]f64) void 
         const alive = u.amount_alive;
         const wounded = if (died + alive > 0) died / (died + alive) else 0;
         const cell = engine.baseCell(u);
-        const along: f64 = @floatFromInt(cell.y);
+        const along: f64 = @floatFromInt(if (s.fight.side_oriented) cell.x else cell.y);
         const adv = if (u.team == st.Team.LEFT) along / span else (span - along) / span;
         const yet: f64 = if (!madeTurn(s, ui) and !hourglassed(s, ui)) 1 else 0;
         if (u.team == team) {

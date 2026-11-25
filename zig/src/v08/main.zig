@@ -76,6 +76,7 @@ fn cloneActions(arena: std.mem.Allocator, actions: []const rec.Action) ![]rec.Ac
                 m.target_cells = try arena.dupe(rec.Cell, m.target_cells);
             },
             .melee_attack => |*m| m.path = try arena.dupe(rec.Cell, m.path),
+            .obstacle_attack => |*o| o.path = try arena.dupe(rec.Cell, o.path),
             else => {},
         }
     }
@@ -109,9 +110,33 @@ fn parseLayers(arena: std.mem.Allocator, ids: []const []const u8, raw: std.json.
     return out;
 }
 
+fn printCells(cells: []const rec.Cell) void {
+    std.debug.print("[", .{});
+    for (cells) |c| std.debug.print("({d},{d})", .{ c.x, c.y });
+    std.debug.print("]", .{});
+}
+
 fn printActions(label: []const u8, actions: []const rec.Action) void {
     std.debug.print("      {s}:", .{label});
-    for (actions) |a| std.debug.print(" {any}", .{a});
+    for (actions) |a| {
+        switch (a) {
+            .move_unit => |m| {
+                std.debug.print(" move{s} ", .{if (m.has_lava) "(lava)" else ""});
+                printCells(m.path);
+                std.debug.print(" to ", .{});
+                printCells(m.target_cells);
+            },
+            .melee_attack => |m| {
+                std.debug.print(" melee #{d} from ({d},{d}){s} ", .{ m.target, m.attack_from.x, m.attack_from.y, if (m.has_lava) "(lava)" else "" });
+                printCells(m.path);
+            },
+            .obstacle_attack => |o| {
+                std.debug.print(" obstacle ({d},{d}) from ({d},{d}){s} ", .{ o.target_x, o.target_y, o.attack_from.x, o.attack_from.y, if (o.has_lava) "(lava)" else "" });
+                printCells(o.path);
+            },
+            else => std.debug.print(" {any}", .{a}),
+        }
+    }
     std.debug.print("\n", .{});
 }
 
@@ -135,6 +160,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, max_fail:
     var stats = std.StringArrayHashMap(Stat).init(gpa);
     defer stats.deinit();
     var games: usize = 0;
+    var unparsed: usize = 0;
     var engine_stops: usize = 0;
     var decisions: usize = 0;
     var decisions_ok: usize = 0;
@@ -144,7 +170,11 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, max_fail:
     while (lines.next()) |line| {
         _ = arena_state.reset(.retain_capacity);
         const arena = arena_state.allocator();
-        const game = try rec.parseGame(arena, line, true);
+        const game = rec.parseGame(arena, line, true) catch |err| {
+            unparsed += 1;
+            std.debug.print("game {d}: recording not parsed ({s})\n", .{ games + unparsed, @errorName(err) });
+            continue;
+        };
         const root = try std.json.parseFromSliceLeaky(std.json.Value, arena, line, .{});
         const raw_steps = rec.get(root, "steps").array.items;
         games += 1;
@@ -234,7 +264,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, max_fail:
             }
         }
     }
-    std.debug.print("layers: {d} games ({d} stopped early at an engine divergence), {d}/{d} decisions with every compared layer identical\n", .{ games, engine_stops, decisions_ok, decisions });
+    std.debug.print("layers: {d} games ({d} stopped early at an engine divergence, {d} not parsed), {d}/{d} decisions with every compared layer identical\n", .{ games, engine_stops, unparsed, decisions_ok, decisions });
     var it = stats.iterator();
     while (it.next()) |e| {
         std.debug.print("  {s}: {d}/{d}\n", .{ e.key_ptr.*, e.value_ptr.matched, e.value_ptr.compared });

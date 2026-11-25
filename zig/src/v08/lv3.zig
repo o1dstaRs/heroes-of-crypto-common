@@ -64,7 +64,7 @@ fn pushMove(c: *ai.Ctx, out: *ai.Decision, r: *const pathing.Route) void {
     const len = c.actualPath().routeCells(r, &out.path);
     const fp = ai.footprintForAnchor(u, r.cell);
     for (fp.slice(), 0..) |t, i| out.targets[i] = t;
-    out.push(.{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..fp.len] } });
+    out.push(.{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..fp.len], .has_lava = r.has_lava } });
 }
 
 /// Pull a boxed-in shooter back: the reachable cell furthest from every enemy that keeps near its melee screen;

@@ -266,7 +266,7 @@ fn hasStrongerRangedPosture(c: *const ai.Ctx, d: *const ai.Decision) bool {
     const s = c.s;
     const u = c.unit();
     if (u.attack_type != AT.MELEE or engine.isRangeCapable(u)) return false;
-    if (util.strikes(d)) return false;
+    if (util.combatAction(d)) return false;
     if (util.dominantFinishState(s, u.team).active) return false;
     return util.teamRangedOutput(s, u.team) > util.teamRangedOutput(s, engine.opposite(u.team));
 }

@@ -1,11 +1,12 @@
 //! The v0.5 level of the v0.8 chain (src/ai/versions/v0_5.ts StrategyV0_5.decideTurn), default environment, with
 //! v0.8's learned weight vector (weights.zig: v0.6's weights with v0.8's melee dims).
 //!
-//! In scope (no spells or abilities, NORMAL grid) the pipeline is: v0.4, the learned melee re-rank (meleeByPolicy),
+//! In scope (no spells or abilities) the pipeline is: v0.4, the learned mountain mining (mineByPolicy, BLOCK_CENTER),
+//! the learned melee re-rank (meleeByPolicy),
 //! the learned move re-rank (repositionByPolicy), the charge hourglass (hourglassByPolicy), the blocked-move guard
 //! (dropBlockedMove) and the free adjacent attack (takeAdjacentAttack). Identity in scope, so not ported:
 //! healerPolicy (no Healer spells), noMeleeRetreat (only No-Melee shooters can move: an ordinary shooter's score
-//! never beats its +Infinity start), mineByPolicy (BLOCK_CENTER only), aoeMeleeByPolicy (abilities),
+//! never beats its +Infinity start), aoeMeleeByPolicy (abilities),
 //! excludeHiddenAttack (no Hidden), auraFlyerSupport (no auras), meleeAuraSupport (V05_AURASUPPORT off) and
 //! repairUnavailableMovePrefixedAttack (no Fire Wall, no Cowardice). Zero-weight or always-zero score terms (War
 //! Anger, punish-melee, target caster, Rapid Charge, bait, Armageddon, Dulling swing, hazard, aura) add exactly 0.
@@ -32,6 +33,7 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     const rin = s.rng.state;
     defer policy.note("v0.5", out, s, rin);
     lv4.decide(c, out);
+    mineByPolicy(c, out);
     meleeByPolicy(c, out);
     repositionByPolicy(c, out);
     hourglassByPolicy(c, out);
@@ -60,6 +62,65 @@ fn fmExposure(c: *const ai.Ctx) f64 {
 fn firstIndex(out: *const ai.Decision, comptime tag: std.meta.Tag(rec.Action)) ?usize {
     for (out.slice(), 0..) |a, i| if (a == tag) return i;
     return null;
+}
+
+// =====================================================================================================================
+// mineByPolicy
+// =====================================================================================================================
+
+const MAX_HITS_MOUNTAIN: f64 = 5;
+
+/// Learned center-mountain mining (BLOCK_CENTER): an otherwise pure advance strikes the mountain instead when the
+/// learned score over (in place, closeness, grouping, out-ranging, lane blocked, progress) is positive.
+fn mineByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (u.attack_type == AT.RANGE) return; // canMove() is true in scope
+    if (u.target >= 0) {
+        const f = &s.units[@intCast(u.target)];
+        if (f.in_holder and !f.isDead()) return;
+    }
+    const hits: f64 = @floatFromInt(ai.mountainHitsLeft(s));
+    if (hits <= 0) return;
+    if (!util.has(out, .move_unit) or util.combatAction(out)) return;
+    const strike = ai.findMountainMeleeStrike(c) orelse return;
+    const base = engine.baseCell(u);
+    const in_place = ai.sameCell(strike.from, base);
+    const mp = c.actualPath();
+    const route = mp.get(pathing.key(strike.from.x, strike.from.y));
+    const move_cost: f64 = if (in_place) 0 else if (route) |r| r.weight else engine.getSteps(u);
+    const f_close = @max(0, 1 - move_cost / @max(1, engine.getSteps(u)));
+    const eng = ai.analyzeEngagement(c);
+    const f_group = @max(0, 1 - eng.nearest_melee / 10);
+    const opp = engine.opposite(u.team);
+    const f_out_range = std.math.sign(ai.teamRangedFirepower(s, u.team) - ai.teamRangedFirepower(s, opp));
+    const f_progress = (MAX_HITS_MOUNTAIN - hits) / MAX_HITS_MOUNTAIN;
+    var nearest: ?Cell = null;
+    var nearest_d = std.math.inf(f64);
+    for (s.units[0..s.n_units], 0..) |*e, i| {
+        if (!util.livingOf(s, i, opp)) continue;
+        const ec = engine.baseCell(e);
+        const d = ai.cellDistance(base, ec);
+        if (d < nearest_d) {
+            nearest_d = d;
+            nearest = ec;
+        }
+    }
+    const f_lane: f64 = if (nearest) |n| (if (ai.lineBlockedByObstacle(&c.m, base, n)) 1 else 0) else 0;
+    const score = W[26] + W[27] * @as(f64, if (in_place) 1 else 0) + W[28] * f_close + W[29] * f_group +
+        W[30] * f_out_range + W[31] * f_lane + W[32] * f_progress;
+    if (score <= 0) return;
+    const target = engine.positionForCell(@floatFromInt(strike.target.x), @floatFromInt(strike.target.y));
+    out.* = .{};
+    var len: usize = 0;
+    var lava = false;
+    if (!in_place) {
+        const r = route orelse return;
+        len = mp.routeCells(r, &out.path);
+        if (len == 0) return;
+        lava = r.has_lava;
+    }
+    out.push(.{ .obstacle_attack = .{ .attacker = c.ui, .target_x = target[0], .target_y = target[1], .attack_from = strike.from, .path = out.path[0..len], .has_lava = lava } });
 }
 
 // =====================================================================================================================
@@ -193,7 +254,7 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
             const len = mp.routeCells(r, &out.path);
             const fp = ai.footprintForAnchor(u, b.cell);
             for (fp.slice(), 0..) |t, i| out.targets[i] = t;
-            out.push(.{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..fp.len] } });
+            out.push(.{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..fp.len], .has_lava = r.has_lava } });
         }
     }
     out.push(.{ .melee_attack = .{ .attacker = c.ui, .target = b.target, .attack_from = b.cell, .path = &.{} } });
@@ -208,7 +269,7 @@ fn repositionByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
     const mi = firstIndex(out, .move_unit) orelse return;
-    if (util.strikes(out)) return;
+    if (util.combatAction(out)) return;
     const team = u.team;
     const opp = engine.opposite(team);
     var enemies: [st.MAX_UNITS]Cell = undefined;
@@ -261,11 +322,12 @@ fn repositionByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         const ed = Geo.minEnemy(cell, en);
         const advance = (base_enemy - ed) / steps;
         const cohesion = (base_centroid - Geo.toCentroid(cell, cx, cy)) / steps;
+        const hazard: f64 = if (r.has_lava) 1 else 0;
         const incumbent: f64 = if (ai.sameCell(cell, dest)) 1 else 0;
         const threat = @as(f64, @floatFromInt(ai.countThreats(&c.m, cell, opp))) / 3;
         const aggr_zone: f64 = if (r.first_aggr_met) 1 else 0;
         const shoot_ready: f64 = if (shooter and ed >= 2 and ed <= shot_dist) 1 else 0;
-        const value = W[6] * advance + W[7] * cohesion + W[9] * incumbent + W[10] * threat + W[11] * aggr_zone +
+        const value = W[6] * advance + W[7] * cohesion + W[8] * hazard + W[9] * incumbent + W[10] * threat + W[11] * aggr_zone +
             W[12] * shoot_ready + W[24] * advance * fm;
         if (value > best_score) {
             const fp = ai.footprintForAnchor(u, cell);
@@ -312,12 +374,14 @@ fn takeAdjacentAttack(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
     if (u.attack_type != AT.MELEE and u.attack_type != AT.MELEE_MAGIC) return;
-    if (util.strikes(out)) return;
+    if (util.combatAction(out)) return;
     const mi = firstIndex(out, .move_unit);
     var pure_move = false;
     var path: []const Cell = &.{};
+    var lava = false;
     if (mi) |i| {
         path = out.actions[i].move_unit.path;
+        lava = out.actions[i].move_unit.has_lava;
         pure_move = path.len > 0;
     }
     const idle_end = mi == null and util.has(out, .end_turn); // no Stun / Blindness / Freeze in scope
@@ -345,5 +409,5 @@ fn takeAdjacentAttack(c: *ai.Ctx, out: *ai.Decision) void {
     const t = best orelse return;
     out.n = 0; // keep the buffers: `path` still points into out.path
     if (u.attack_type_selected != AT.MELEE) out.push(.{ .select_attack_type = .{ .unit = c.ui, .attack_type = AT.MELEE } });
-    out.push(.{ .melee_attack = .{ .attacker = c.ui, .target = t, .attack_from = dest, .path = if (pure_move) path else &.{} } });
+    out.push(.{ .melee_attack = .{ .attacker = c.ui, .target = t, .attack_from = dest, .path = if (pure_move) path else &.{}, .has_lava = pure_move and lava } });
 }
