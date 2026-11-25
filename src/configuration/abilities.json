@@ -1047,7 +1047,7 @@
             "Applies Deep Wounds effect on attack or response",
             "to deal {}% more damage next time. Only for the ability owner. The effect stacks"
         ],
-        "power": 13,
+        "power": 10,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,
         "stack_powered": true,
@@ -1062,7 +1062,7 @@
             "Applies Deep Wounds effect on attack or response",
             "to deal {}% more damage next time. Only for the ability owner. The effect stacks"
         ],
-        "power": 21,
+        "power": 15,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,
         "stack_powered": true,

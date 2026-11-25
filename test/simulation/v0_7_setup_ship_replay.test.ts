@@ -181,7 +181,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned 2026-11-19 for Battle Mage armor 9 -> 8 and max melee damage 5 -> 4. The old-stat
 // control restores the previous digest; two new-stat runs agree.
 // Previous digest: e9da2d3035da5538cf41c7f0a12ef60bfcbeb802bbd16e0b3d9d8a866abbeb5a.
-const EXPECTED_REPLAY_SHA256 = "b3a86ddadb52d118d1c3312e4b481db4c4daa3bc140c443f5192d5dc8c2c0600";
+// Re-pinned 2026-11-25 for Deep Wounds Level 2 power 13 -> 10 and Level 3 21 -> 15 (owner request).
+// The old-power control restores the previous digest; two new-power runs agree, with zero rejected
+// actions across all eight fights.
+// Previous digest: b3a86ddadb52d118d1c3312e4b481db4c4daa3bc140c443f5192d5dc8c2c0600.
+const EXPECTED_REPLAY_SHA256 = "057852b507a8f5e6345cc57696094d674659eeb2230e966348e9a673e829527f";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
