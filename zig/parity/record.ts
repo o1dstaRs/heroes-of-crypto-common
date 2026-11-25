@@ -21,7 +21,12 @@ import { TurnEngine } from "../../src/engine/turn_engine";
 import { StrategyV0_1 } from "../../src/ai/versions/v0_1";
 import { PathHelper } from "../../src/grid/path_helper";
 import { buildRoster, creaturesByLevel, makeRng } from "../../src/simulation/army";
-import { getAbilityConfig, getEffectConfig } from "../../src/configuration/config_provider";
+import {
+    getAbilityConfig,
+    getAuraEffectConfig,
+    getEffectConfig,
+    getSpellConfig,
+} from "../../src/configuration/config_provider";
 import { runMatch } from "../../src/simulation/battle_engine";
 import { getDeterministicRandomSource, setDeterministicRandomSource } from "../../src/utils/lib";
 
@@ -142,6 +147,12 @@ function unitDigest(u: any): unknown[] {
         p.applied_effects_powers.join(","),
         u.initialUnitProperties.base_attack,
         u.getMovedRouteCellsThisTurn(),
+        u.getTarget() ?? "",
+        p.magic_resist,
+        u
+            .getBuffs()
+            .map((b: any) => `${b.getFirstSpellProperty() ?? ""};${b.getSecondSpellProperty() ?? ""}`)
+            .join(","),
     ];
 }
 
@@ -190,6 +201,9 @@ const DIGEST_FIELDS = [
     "effects_powers",
     "base_attack_init",
     "moved_route_cells",
+    "target",
+    "magic_resist",
+    "buffs_sources",
 ];
 
 function fightDigest(fp: any): Record<string, unknown> {
@@ -220,7 +234,8 @@ function fightDigest(fp: any): Record<string, unknown> {
 function digest(ctx: Ctx): { units: unknown[][]; fight: Record<string, unknown> } {
     const units: unknown[][] = [];
     for (const u of ctx.unitsHolder.getAllUnits().values()) units.push(unitDigest(u));
-    return { units, fight: fightDigest(ctx.fightProperties) };
+    const emberTeams = [...(ctx.unitsHolder.emberCovenantTeams ?? [])].sort();
+    return { units, fight: { ...fightDigest(ctx.fightProperties), emberTeams } };
 }
 
 function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
@@ -255,12 +270,29 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
             }
         }
     }
+    // Configs the engine reads without an ability naming them: aura effects (range, power, recipients), the
+    // Poison effect a Venom Cloud hit applies, and the System spell Ember Covenant seeds.
+    const auraEffectConfigs: Record<string, unknown> = {};
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        for (const name of u.getUnitProperties().aura_effects ?? []) {
+            if (!(name in auraEffectConfigs)) {
+                auraEffectConfigs[name] = JSON.parse(JSON.stringify(getAuraEffectConfig(name) ?? null));
+            }
+        }
+    }
+    if (!("Poison" in effectConfigs))
+        effectConfigs.Poison = JSON.parse(JSON.stringify(getEffectConfig("Poison") ?? null));
+    const spellConfigs: Record<string, unknown> = {
+        "Ember Covenant Blessing": JSON.parse(JSON.stringify(getSpellConfig("System", "Ember Covenant Blessing"))),
+    };
     const fp = ctx.fightProperties;
     return {
         rosterSeed,
         keep: [...KEEP],
         abilityConfigs,
         effectConfigs,
+        auraEffectConfigs,
+        spellConfigs,
         grid: {
             gridType: fp.getGridType(),
             size: settings.getGridSize(),

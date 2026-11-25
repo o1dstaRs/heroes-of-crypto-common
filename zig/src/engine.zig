@@ -220,7 +220,7 @@ fn stampAggrRing(s: *State, team: u8, footprint: []const Cell, d: i16) void {
 }
 
 /// occupyCell (1x1 movers).
-fn occupyCell(s: *State, ui: u8, cell: Cell) bool {
+pub fn occupyCell(s: *State, ui: u8, cell: Cell) bool {
     if (!cellWithinGrid(cell)) return false;
     if (occ(s, cell) != st.EMPTY) return false;
     const u = &s.units[ui];
@@ -249,7 +249,7 @@ fn dedupCells(cells: []const Cell) Cells {
 }
 
 /// occupyCells (multi-cell registration).
-fn occupyCells(s: *State, ui: u8, cells: []const Cell) bool {
+pub fn occupyCells(s: *State, ui: u8, cells: []const Cell) bool {
     if (cells.len == 0) return false;
     const u = &s.units[ui];
     for (cells) |c| {
@@ -284,7 +284,7 @@ fn cleanupAll(s: *State, ui: u8) void {
 }
 
 /// areAllCellsEmpty(cells, id) || canOccupyCells(cells, false, false, id): on board and empty or own.
-fn cellsFreeFor(s: *const State, ui: u8, cells: []const Cell) bool {
+pub fn cellsFreeFor(s: *const State, ui: u8, cells: []const Cell) bool {
     if (cells.len == 0) return false;
     for (cells) |c| {
         if (!cellWithinGrid(c)) return false;
@@ -363,12 +363,11 @@ pub fn changeMorale(u: *Unit, amount: f64, increase: bool) void {
     u.init.morale = m;
 }
 
-/// applyDamage -> projectStackDamage (no break, no shields in scope). Returns the applied damage.
-pub fn applyDamage(u: *Unit, minus_hp: f64) f64 {
-    if (minus_hp <= 0) return 0;
+/// projectStackDamage, written into the unit: the applied damage, and whether creatures died with the stack alive.
+fn projectStackDamage(u: *Unit, minus_hp: f64) struct { applied: f64, lost_and_survived: bool } {
     if (minus_hp < u.hp) {
         u.hp -= minus_hp;
-        return minus_hp;
+        return .{ .applied = minus_hp, .lost_and_survived = false };
     }
     const front = u.hp;
     u.amount_died += 1;
@@ -380,12 +379,35 @@ pub fn applyDamage(u: *Unit, minus_hp: f64) f64 {
         u.amount_died += u.amount_alive;
         const were = u.amount_alive;
         u.amount_alive = 0;
-        return @floor(were * u.max_hp) + front;
+        return .{ .applied = @floor(were * u.max_hp) + front, .lost_and_survived = false };
     }
     u.amount_died += additional;
     u.amount_alive -= additional;
     u.hp -= @rem(remaining, u.max_hp);
-    return remaining + front;
+    return .{ .applied = remaining + front, .lost_and_survived = true };
+}
+
+/// Unit.applyDamage (no break chance, Water Shield, Water Element or Last Fuse in scope): an Ember Covenant ring
+/// absorbs the hit and dissolves its team's covenant; otherwise the stack damage projection, then Bitter
+/// Experience (+1 armor and step, live and initial, when creatures died and the stack survived). Returns the
+/// applied damage.
+pub fn applyDamage(s: *State, ui: u8, minus_hp: f64) f64 {
+    const u = &s.units[ui];
+    if (minus_hp <= 0) return 0;
+    // Only a covenant team's units carry the ring (seeded per team, removed team-wide when the team's bit clears).
+    if (s.ember_teams != 0 and abilities.absorbsHit(u)) {
+        abilities.breakEmberCovenant(s, u.team); // notifyEmberCovenantDamage
+        return 0;
+    }
+    const r = projectStackDamage(u, minus_hp);
+    if (r.applied > 0 and s.ember_teams != 0) abilities.breakEmberCovenant(s, u.team);
+    if (r.lost_and_survived and u.has(.bitter_experience)) {
+        u.base_armor += 1;
+        u.init.base_armor += 1;
+        u.steps += 1;
+        u.init.steps += 1;
+    }
+    return r.applied;
 }
 
 // =====================================================================================================================
@@ -397,6 +419,9 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     const f = &s.fight;
     const lap_bit: u128 = if (f.lap >= 0 and f.lap < 128) @as(u128, 1) << @intCast(f.lap) else 0;
     const lap_adjusted = u.adjusted_laps & lap_bit != 0;
+
+    // resetTarget unless the Aggr status is still applied
+    if (s.stat_hooks and u.target >= 0 and u.effects.find(.aggr) == null and u.debuffs.find(.aggr) == null) u.target = -1;
 
     // HP
     const was_full = u.hp >= u.max_hp;
@@ -437,7 +462,9 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     if (u.morale < -MORALE_MAX) u.morale = -MORALE_MAX;
 
     // ARMOR
+    const pegasus_might = if (s.stat_hooks and s.auras) abilities.appliedAuraPower(u, .pegasus_might_aura) else null;
     u.base_armor = js.roundUnitStat(u.init.base_armor + 0, 2);
+    if (pegasus_might) |pm| u.base_armor += pm;
     var base_armor_multiplier: f64 = 1;
     if (u.ability(.heavy_armor)) |ha| {
         base_armor_multiplier = base_armor_multiplier *
@@ -451,7 +478,12 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     u.magic_resist = u.init.magic_resist;
     u.magic_resist_mod = 0;
     const p = (if (u.magic_resist_mod != 0) u.magic_resist_mod else u.magic_resist) / 100;
-    u.magic_resist = js.roundUnitStat((1 - (1 * (1 - p))) * 100, 2);
+    // winningAtLeastOneEventProbability([getMagicResist() / 100, Wardguard's multiplier])
+    var no_resist = 1 * (1 - p);
+    if (s.stat_hooks) {
+        if (u.ability(.wardguard)) |wg| no_resist = no_resist * (1 - abilities.abilityMultiplier(u, wg));
+    }
+    u.magic_resist = js.roundUnitStat((1 - no_resist) * 100, 2);
 
     // INITIATIVE
     u.initiative = u.init.initiative;
@@ -469,6 +501,7 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     u.attack_damage_max = u.init.attack_damage_max;
     var base_attack_multiplier: f64 = 1;
     if (u.buffs.power(.sharpened_weapons_blessing)) |sw| base_attack_multiplier = base_attack_multiplier * (1 + sw / 100);
+    if (pegasus_might) |pm| u.base_attack += pm;
     u.attack_mod = u.init.attack_mod;
     u.attack_mod = js.roundUnitStat(u.attack_mod + 0, 2);
     u.base_attack = js.roundUnitStat(u.base_attack * base_attack_multiplier, 2);
@@ -493,9 +526,12 @@ fn setStackPowers(s: *State) void {
     }
 }
 
-/// UnitsHolder.refreshStackPowerForAllUnits (no auras, Water Shield or Disguise in scope).
+/// UnitsHolder.refreshStackPowerForAllUnits (no Water Shield or Disguise in scope): stack powers, the aura refresh
+/// (reading the new stack power and the luck left by the previous refresh), the blessings, then every unit's stats.
+/// getUnitAuraAttackMod is 0 (no War Anger).
 pub fn refreshStackPowerForAllUnits(s: *State) void {
     setStackPowers(s);
+    if (s.auras) abilities.refreshAuras(s);
     if (s.blessings) abilities.refreshBlessings(s);
     for (s.units[0..s.n_units]) |*u| {
         if (!u.in_holder or !cellWithinGrid(baseCell(u))) continue;
@@ -551,12 +587,15 @@ pub fn distanceToEnemyCentroid(s: *const State, enemy_team: u8, x: f64, y: f64) 
     return distance(x, y, sx / n, sy / n);
 }
 
-/// deleteUnitById (no resurrection in scope). Always returns true for a real id.
+/// deleteUnitById (no resurrection in scope). Always returns true for a real id. Releases every Aggr lock on the unit.
 pub fn deleteUnit(s: *State, ui: u8) void {
     const u = &s.units[ui];
     if (u.in_holder) {
         u.in_holder = false;
         cleanupAll(s, ui);
+    }
+    for (s.units[0..s.n_units]) |*x| {
+        if (x.in_holder and x.target == @as(i8, @intCast(ui))) x.target = -1;
     }
     _ = s.fight.hourglass_q.removeOnce(ui);
     _ = s.fight.morale_minus_q.removeOnce(ui);
@@ -919,8 +958,8 @@ fn applyNarrowing(s: *State, encounter_current: bool, events: *Events) void {
     }
 }
 
-/// Unit.applyArmageddonDamage
-fn armageddonDamage(u: *Unit, wave: i32) f64 {
+/// Unit.applyArmageddonDamage's amount (the caller applies it).
+fn armageddonDamage(u: *const Unit, wave: i32) f64 {
     if (wave <= 0 or wave > NUMBER_OF_ARMAGEDDON_WAVES) return 0;
     const part = @as(f64, @floatFromInt(wave)) / @as(f64, @floatFromInt(NUMBER_OF_ARMAGEDDON_WAVES));
     const total = u.amount_died + u.amount_alive;
@@ -928,7 +967,6 @@ fn armageddonDamage(u: *Unit, wave: i32) f64 {
         @max(MIN_ARMAGEDDON_DAMAGE_FIRST_WAVE, @floor(u.max_hp * total * part))
     else
         @ceil(total * part) * u.max_hp;
-    _ = applyDamage(u, dmg);
     return dmg;
 }
 
@@ -938,7 +976,7 @@ fn applyArmageddon(s: *State, units: []const u8, events: *Events) void {
     for (units) |ui| {
         const u = &s.units[ui];
         if (u.isDead() or !u.in_holder) continue;
-        _ = armageddonDamage(u, wave);
+        _ = applyDamage(s, ui, armageddonDamage(u, wave));
         events.push(.armageddon_applied, ui);
         if (u.isDead()) {
             deleteUnit(s, ui);
@@ -1046,7 +1084,9 @@ pub fn possibleIncludes(u: *const Unit, t: u8) bool {
     return false;
 }
 
-fn activateNextUnit(s: *State, ui: u8) void {
+/// TurnEngine.activateNextUnit. Returns false when the unit's poison tick killed it (it is deleted, and the caller
+/// emits unit_destroyed after next_unit_selected); the tick runs no stat refresh and grants no morale.
+fn activateNextUnit(s: *State, ui: u8) bool {
     const u = &s.units[ui];
     u.moved_this_turn = false;
     u.moved_route_cells = 0;
@@ -1059,8 +1099,21 @@ fn activateNextUnit(s: *State, ui: u8) void {
         }
         s.fight.team_units_alive[side] = n;
     }
+    // refreshPreTurnState: no Wild Regeneration or Web in scope.
+    if (u.effects.len != 0) {
+        if (u.effects.power(.poison)) |poison| {
+            if (poison > 0) {
+                _ = applyDamage(s, ui, poison);
+                if (u.isDead()) {
+                    deleteUnit(s, ui);
+                    return false;
+                }
+            }
+        }
+    }
     refreshPossibleAttackTypes(u, canLandRangeAttack(s, u));
     s.fight.first_turn_made = true;
+    return true;
 }
 
 /// One list's pass of Unit.minusLap: each entry loses a lap (sentinel counts excepted) and is deleted at 0.
@@ -1130,8 +1183,9 @@ fn advance(s: *State, damage_dealt: bool, events: *Events) void {
     if (next) |n| {
         const nu = &s.units[n];
         if (!nu.in_holder or nu.isDead()) return;
-        activateNextUnit(s, n);
+        const alive = activateNextUnit(s, n);
         events.push(.next_unit_selected, n);
+        if (!alive) events.push(.unit_destroyed, n);
     }
 }
 
@@ -1164,6 +1218,7 @@ fn startFight(s: *State) bool {
     s.fight.team_units_alive[Team.LEFT] = left;
     s.fight.team_units_alive[Team.RIGHT] = right;
     refreshStackPowerForAllUnits(s);
+    abilities.seedEmberCovenant(s);
     return true;
 }
 
@@ -1363,9 +1418,54 @@ fn loadAbilities(init: std.json.Value, props: std.json.Value, u: *Unit) !void {
     }
 }
 
+/// The unit's emitted auras from `props.aura_effects` and the recorded `init.auraEffectConfigs`, interned in
+/// State.aura_defs.
+fn loadAuras(init: std.json.Value, props: std.json.Value, s: *State, u: *Unit) !void {
+    u.n_auras = 0;
+    const names = rec.get(props, "aura_effects");
+    if (names != .array) return;
+    for (names.array.items) |n| {
+        var buf: [64]u8 = undefined;
+        const buff_name = std.fmt.bufPrint(&buf, "{s} Aura", .{n.string}) catch return error.UnsupportedAura;
+        const buff = st.SpellId.fromName(buff_name) orelse {
+            unsupported_name = n.string;
+            return error.UnsupportedAura;
+        };
+        var idx: ?u8 = null;
+        for (s.aura_defs[0..s.n_aura_defs], 0..) |d, k| {
+            if (d.buff == buff) idx = @intCast(k);
+        }
+        if (idx == null) {
+            const cfg = rec.get(rec.get(init, "auraEffectConfigs"), n.string);
+            if (cfg == .null) return error.MissingAuraConfig;
+            const def = st.AuraDef{
+                .buff = buff,
+                .range = rec.num(rec.get(cfg, "range")),
+                .power = rec.num(rec.get(cfg, "power")),
+                .is_buff = rec.get(cfg, "is_buff") == .bool and rec.get(cfg, "is_buff").bool,
+                .power_type = @intCast(rec.int(rec.get(cfg, "power_type"))),
+            };
+            switch (def.power_type) {
+                st.PowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR, st.PowerType.POISON_ON_HIT, st.PowerType.ABSORB_DEBUFF => {},
+                else => {
+                    unsupported_name = n.string;
+                    return error.UnsupportedAura;
+                },
+            }
+            if (s.n_aura_defs >= st.MAX_AURA_DEFS) return error.TooManyAuras;
+            s.aura_defs[s.n_aura_defs] = def;
+            idx = s.n_aura_defs;
+            s.n_aura_defs += 1;
+        }
+        if (u.n_auras >= st.MAX_UNIT_AURAS) return error.TooManyAuras;
+        u.auras[u.n_auras] = idx.?;
+        u.n_auras += 1;
+    }
+}
+
 pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
-    _ = ids;
     var s: st.State = undefined;
+    s.n_aura_defs = 0;
     const units = rec.get(init, "units").array.items;
     if (units.len > st.MAX_UNITS) return error.TooManyUnits;
     s.n_units = @intCast(units.len);
@@ -1465,19 +1565,56 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
             .ability_mask = 0,
             .luck_dependent = false,
             .moved_route_cells = 0,
+            .target = -1,
+            .auras = undefined,
+            .n_auras = 0,
         };
         const unit = &s.units[i];
         try loadAbilities(init, props, unit);
+        try loadAuras(init, props, &s, unit);
+        const target = rec.get(props, "target");
+        if (target == .string and target.string.len > 0) unit.target = @intCast(try rec.unitIndex(ids, target.string));
         unit.buffs = try loadSpells(props, "buffs");
         unit.debuffs = try loadSpells(props, "debuffs");
         unit.effects = try loadSpells(props, "effects");
     }
     s.blessings = false;
+    s.auras = false;
+    s.stat_hooks = false;
+    var poisons = false;
+    var covenant = false;
     for (s.units[0..s.n_units]) |*u| {
         if (u.has(.luck_blessing) or u.has(.sharpened_weapons_blessing)) s.blessings = true;
+        if (u.n_auras != 0) s.auras = true;
+        if (u.has(.aggr) or u.has(.wardguard) or u.target >= 0) s.stat_hooks = true;
+        if (u.has(.ember_covenant_blessing)) covenant = true;
+        for (u.auras[0..u.n_auras]) |d| {
+            if (s.aura_defs[d].power_type == st.PowerType.POISON_ON_HIT) poisons = true;
+        }
         for (u.buffs.items[0..u.buffs.len]) |b| {
             if (b.id == .luck_blessing or b.id == .sharpened_weapons_blessing) s.blessings = true;
+            if (b.laps == st.LAPS_AURA) s.auras = true;
+            if (b.id == .ember_covenant_blessing) covenant = true;
         }
+        if (u.effects.find(.poison) != null) poisons = true;
+    }
+    // Configs read without an ability naming them (record.ts: effectConfigs.Poison, spellConfigs).
+    if (s.auras) s.stat_hooks = true;
+    s.poison_laps = st.NUMBER_OF_LAPS_TOTAL;
+    if (poisons) {
+        const cfg = rec.get(rec.get(init, "effectConfigs"), "Poison");
+        if (cfg == .null) return error.MissingEffectConfig;
+        s.poison_laps = rec.num(rec.get(cfg, "laps"));
+    }
+    s.ember_seeded = false;
+    s.ember_teams = 0;
+    s.ember_laps = st.NUMBER_OF_LAPS_TOTAL;
+    s.ember_power = 0;
+    if (covenant) {
+        const cfg = rec.get(rec.get(init, "spellConfigs"), "Ember Covenant Blessing");
+        if (cfg == .null) return error.MissingSpellConfig;
+        s.ember_laps = rec.num(rec.get(cfg, "laps"));
+        s.ember_power = rec.num(rec.get(cfg, "power"));
     }
     // Grid: register each unit's placement cells, then build the threat boards from them.
     for (0..st.GRID) |x| {

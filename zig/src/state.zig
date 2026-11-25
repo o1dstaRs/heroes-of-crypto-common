@@ -32,8 +32,8 @@ pub const Movement = struct {
 pub const Cell = @import("recording.zig").Cell;
 
 /// Buffs, debuffs and effects the scoped battles can carry, by their TypeScript names (the string table is for
-/// loading the start state and for digests). Buffs: Morale and the team blessings; debuffs: Dismorale and Dulling
-/// Defense; effects: Shatter Armor.
+/// loading the start state and for digests). Buffs: Morale, the team blessings, Ember Covenant and the aura rows
+/// ("<effect> Aura"); debuffs: Dismorale and Dulling Defense; effects: Shatter Armor, Poison, Aggr, Pegasus Light.
 pub const SpellId = enum(u8) {
     morale,
     dismorale,
@@ -41,6 +41,13 @@ pub const SpellId = enum(u8) {
     sharpened_weapons_blessing,
     dulling_defense,
     shatter_armor,
+    ember_covenant_blessing,
+    venom_cloud_aura,
+    pegasus_might_aura,
+    absorb_penalties_aura,
+    poison,
+    aggr,
+    pegasus_light,
 
     pub fn name(self: SpellId) []const u8 {
         return switch (self) {
@@ -50,6 +57,13 @@ pub const SpellId = enum(u8) {
             .sharpened_weapons_blessing => "Sharpened Weapons Blessing",
             .dulling_defense => "Dulling Defense",
             .shatter_armor => "Shatter Armor",
+            .ember_covenant_blessing => "Ember Covenant Blessing",
+            .venom_cloud_aura => "Venom Cloud Aura",
+            .pegasus_might_aura => "Pegasus Might Aura",
+            .absorb_penalties_aura => "Absorb Penalties Aura",
+            .poison => "Poison",
+            .aggr => "Aggr",
+            .pegasus_light => "Pegasus Light",
         };
     }
 
@@ -72,6 +86,9 @@ pub const NUMBER_OF_LAPS_TOTAL: f64 = 15;
 /// first), so both always agree and one record holds them.
 pub const AppliedSpell = struct {
     id: SpellId,
+    /// firstSpellProperty / secondSpellProperty: an aura row's source cell (the emitter's base cell), else -1.
+    src_x: i8 = -1,
+    src_y: i8 = -1,
     laps: f64,
     power: f64 = 0,
 };
@@ -89,14 +106,25 @@ pub const SpellList = struct {
         for (self.items[0..self.len]) |s| if (s.id == id) return s.power;
         return null;
     }
+    /// The first entry of that name (`getBuff(name)`, `getEffect(name)`).
+    pub fn get(self: *const SpellList, id: SpellId) ?*const AppliedSpell {
+        for (self.items[0..self.len]) |*s| if (s.id == id) return s;
+        return null;
+    }
     pub fn removeAt(self: *SpellList, i: usize) void {
         var j = i;
         while (j + 1 < self.len) : (j += 1) self.items[j] = self.items[j + 1];
         self.len -= 1;
     }
     pub fn push(self: *SpellList, s: AppliedSpell) void {
+        std.debug.assert(self.len < MAX_SPELLS);
         self.items[self.len] = s;
         self.len += 1;
+    }
+    /// Unit.applyEffect / applyAuraEffect: a re-application deletes the old entry and appends at the end.
+    pub fn replace(self: *SpellList, s: AppliedSpell) void {
+        self.delete(s.id);
+        self.push(s);
     }
     /// deleteBuff / deleteDebuff / deleteEffect: every entry of that name, keeping the order of the rest.
     pub fn delete(self: *SpellList, id: SpellId) void {
@@ -113,6 +141,7 @@ pub const SpellList = struct {
 // =====================================================================================================================
 
 pub const MAX_ABILITIES = 4;
+pub const AbilityMask = u64;
 
 /// The abilities the port implements. A recorded unit carrying any other ability is refused at load.
 pub const AbilityId = enum(u8) {
@@ -129,6 +158,21 @@ pub const AbilityId = enum(u8) {
     penetrating_bite,
     backstab,
     dodge,
+    // batch 2
+    venom_cloud_aura,
+    wardguard,
+    aggr,
+    skewer_strike,
+    bitter_experience,
+    absorb_penalties_aura,
+    pegasus_might_aura,
+    pegasus_light,
+    lightning_spin,
+    devour_essence,
+    ember_covenant_blessing,
+    earth_element,
+    vine_throw,
+    in_its_own_world,
 
     pub fn name(self: AbilityId) []const u8 {
         return switch (self) {
@@ -145,6 +189,20 @@ pub const AbilityId = enum(u8) {
             .penetrating_bite => "Penetrating Bite",
             .backstab => "Backstab",
             .dodge => "Dodge",
+            .venom_cloud_aura => "Venom Cloud Aura",
+            .wardguard => "Wardguard",
+            .aggr => "Aggr",
+            .skewer_strike => "Skewer Strike",
+            .bitter_experience => "Bitter Experience",
+            .absorb_penalties_aura => "Absorb Penalties Aura",
+            .pegasus_might_aura => "Pegasus Might Aura",
+            .pegasus_light => "Pegasus Light",
+            .lightning_spin => "Lightning Spin",
+            .devour_essence => "Devour Essence",
+            .ember_covenant_blessing => "Ember Covenant Blessing",
+            .earth_element => "Earth Element",
+            .vine_throw => "Vine Throw",
+            .in_its_own_world => "In Its Own World",
         };
     }
 
@@ -156,9 +214,22 @@ pub const AbilityId = enum(u8) {
         return null;
     }
 
-    pub inline fn bit(self: AbilityId) u32 {
-        return @as(u32, 1) << @as(u5, @intCast(@intFromEnum(self)));
+    pub inline fn bit(self: AbilityId) AbilityMask {
+        return @as(AbilityMask, 1) << @as(u6, @intCast(@intFromEnum(self)));
     }
+};
+
+pub const MAX_AURA_DEFS = 4;
+pub const MAX_UNIT_AURAS = 2;
+
+/// One aura effect (aura_effects.json, recorded in `init.auraEffectConfigs`): the buff row it grants on its
+/// recipients ("<effect> Aura") and its configured range, default power, recipient side and power type.
+pub const AuraDef = struct {
+    buff: SpellId,
+    range: f64,
+    power: f64,
+    is_buff: bool,
+    power_type: u8,
 };
 
 /// AbilityPowerType values the ported formulas branch on (src/abilities/ability_properties.ts).
@@ -178,6 +249,8 @@ pub const PowerType = struct {
     pub const ADDITIONAL_STEPS: u8 = 29;
     pub const STEAL_ARMOR_ON_HIT: u8 = 35;
     pub const MAGIC_DAMAGE: u8 = 41;
+    pub const ADDITIONAL_BASE_ATTACK_AND_ARMOR: u8 = 32;
+    pub const POISON_ON_HIT: u8 = 56;
     pub const GAIN_ATTACK_AND_ARMOR_EACH_STEP: u8 = 44;
     pub const REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK: u8 = 47;
 };
@@ -282,11 +355,16 @@ pub const Unit = struct {
     /// `abilities`, in the order of the unit's configuration, and a bit per AbilityId for quick probes.
     abilities: [MAX_ABILITIES]Ability,
     n_abilities: u8,
-    ability_mask: u32,
+    ability_mask: AbilityMask,
     /// The unit's ability names include a LUCK_DEPENDENT_BLESSINGS name (UnitsHolder's early luck pass).
     luck_dependent: bool,
     /// movedRouteCellsThisTurn: the last move's route length, read by Rapid Charge; 0 when not moved.
     moved_route_cells: f64,
+    /// unitProperties.target: the unit an Aggr forces this one to attack (-1 = none, the initial "").
+    target: i8,
+    /// `auraEffects`, in `aura_effects` order: indices into State.aura_defs.
+    auras: [MAX_UNIT_AURAS]u8,
+    n_auras: u8,
 
     pub fn isDead(self: *const Unit) bool {
         return self.amount_alive <= 0;
@@ -393,4 +471,17 @@ pub const State = struct {
     damage_lap: i32,
     /// Some unit carries a team-blessing ability, so the stat refresh runs the blessing census.
     blessings: bool,
+    /// Some unit emits an aura (or carries an aura row at load), so the stat refresh runs the aura refresh.
+    auras: bool,
+    /// Some unit can be Aggr'd, buffed by an aura or carries Wardguard: adjustBaseStats runs those hooks.
+    stat_hooks: bool,
+    aura_defs: [MAX_AURA_DEFS]AuraDef,
+    n_aura_defs: u8,
+    /// UnitsHolder.emberCovenantSeeded and emberCovenantTeams (bit = team).
+    ember_seeded: bool,
+    ember_teams: u8,
+    /// The System spell "Ember Covenant Blessing" (laps, power) and the "Poison" effect's laps.
+    ember_laps: f64,
+    ember_power: f64,
+    poison_laps: f64,
 };

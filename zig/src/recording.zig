@@ -101,7 +101,7 @@ fn unitArg(ids: []const []const u8, v: std.json.Value) !u8 {
     return unitIndex(ids, v.string);
 }
 
-fn parseAction(arena: std.mem.Allocator, ids: []const []const u8, kind: []const u8, a: std.json.Value) !Action {
+pub fn parseAction(arena: std.mem.Allocator, ids: []const []const u8, kind: []const u8, a: std.json.Value) !Action {
     if (std.mem.eql(u8, kind, "decide")) {
         return .{ .decide = .{ .unit = try unitArg(ids, get(a, "unitId")), .out = &.{} } };
     }

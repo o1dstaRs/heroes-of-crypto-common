@@ -19,7 +19,7 @@ const Reject = error{Rejected};
 // Damage (Unit.calculateAttackDamage and the damage chain)
 // =====================================================================================================================
 
-fn damageBound(att: *const Unit, tgt: *const Unit, dmg: f64, is_range: bool, divisor_in: f64) f64 {
+pub fn damageBound(att: *const Unit, tgt: *const Unit, dmg: f64, is_range: bool, divisor_in: f64) f64 {
     const rate = engine.getAttack(att);
     const armor = if (is_range) engine.getRangeArmor(tgt) else engine.getArmor(tgt);
     const divisor = if (divisor_in <= 0) 1 else divisor_in;
@@ -66,9 +66,10 @@ inline fn missRoll(s: *State, att: *const Unit, tgt: *const Unit) bool {
 
 /// The `moraleDecreaseForTheUnitTeam` record: "<name>:<team>" keys in insertion order.
 const MoraleDecrease = struct {
-    keys: [4]struct { name: u16, team: u8, amount: f64 } = undefined,
+    keys: [8]struct { name: u16, team: u8, amount: f64 } = undefined,
     len: u8 = 0,
 
+    /// updateMoraleDecreaseForTheUnitTeam with one "<name>:<team>" entry (positive amounts only).
     fn add(self: *MoraleDecrease, u: *const Unit, amount: f64) void {
         if (amount <= 0) return;
         for (self.keys[0..self.len]) |*k| {
@@ -92,7 +93,7 @@ const MoraleDecrease = struct {
 };
 
 const Died = struct {
-    items: [4]u8 = undefined,
+    items: [st.MAX_UNITS]u8 = undefined,
     len: u8 = 0,
 
     fn includes(self: *const Died, u: u8) bool {
@@ -138,130 +139,347 @@ fn adjacent(a: []const Cell, b: []const Cell) bool {
 // Melee
 // =====================================================================================================================
 
+/// MoveHandler.applyMoveModifiers for a path-bearing strike: the client's route (resolveKnownPaths trusts it verbatim)
+/// minus its origin; distance morale from the current position to the CENTRE OF THE LAST ROUTE CELL (not the
+/// footprint centre). Returns false when nothing is left to travel.
+fn applyStrikeMoveModifiers(s: *State, ui: u8, path: []const Cell) bool {
+    const u = &s.units[ui];
+    const base = engine.baseCell(u);
+    const travelled = if (path.len > 0 and path[0].x == base.x and path[0].y == base.y) path[1..] else path; // travelledMovePath
+    if (travelled.len == 0) return false;
+    const last = travelled[travelled.len - 1];
+    const to = engine.positionForCell(@floatFromInt(last.x), @floatFromInt(last.y));
+    engine.applyDistanceMorale(s, ui, .{ u.pos_x, u.pos_y }, to);
+    return true; // applyTravelledDistanceModifier (Crusade) and applyLavaWaterModifier: no-ops in scope
+}
+
+/// handleMeleeAttack's movement prefix: a stationary strike, or (with a client `path`) the walk to `from`. A refusal
+/// after the move modifiers keeps their morale change, as in TypeScript.
+fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, path: []const Cell, stationary: bool) Reject!void {
+    const att = &s.units[ai];
+    // A stationary strike passes the occupancy checks on the unit's own cells and setPosition writes the same value.
+    if (stationary) return;
+    // canMove(): no Paralysis, Whirlpool or web lock in scope.
+    const has_route = path.len != 0; // currentActiveKnownPaths.get(attackFrom key)?.length
+    if (engine.isSmall(att)) {
+        if (!engine.cellsFreeFor(s, ai, &.{from})) return error.Rejected;
+        if (!has_route) return error.Rejected;
+        const pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
+        if (!applyStrikeMoveModifiers(s, ai, path)) return error.Rejected;
+        if (!engine.occupyCell(s, ai, from)) return error.Rejected;
+        att.pos_x = pos[0];
+        att.pos_y = pos[1];
+        return;
+    }
+    // getPositionForFootprintAnchor, then that position's footprint cells
+    const anchor_pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
+    const pos = [2]f64{
+        anchor_pos[0] - (@as(f64, @floatFromInt(@max(1, att.fw))) - 1) * engine.HALF,
+        anchor_pos[1] - (@as(f64, @floatFromInt(@max(1, att.fh))) - 1) * engine.HALF,
+    };
+    const cells = engine.cellsForPosition(pos[0], pos[1], att.fw, att.fh);
+    if (!engine.cellsFreeFor(s, ai, cells.slice()) and !engine.cellsFreeFor(s, ai, from_cells)) return error.Rejected;
+    if (!has_route) return error.Rejected;
+    if (!applyStrikeMoveModifiers(s, ai, path)) return error.Rejected;
+    if (!engine.occupyCells(s, ai, cells.slice())) return error.Rejected;
+    att.pos_x = pos[0];
+    att.pos_y = pos[1];
+}
+
 pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, events: *Events) Reject!void {
     try engine.validateTurnAction(s, ai);
     if (!s.units[ti].in_holder) return error.Rejected;
-    // Move-then-strike (a `path`) is never produced by v0.1; without a path the strike must be stationary.
-    if (path.len != 0) return error.Rejected;
 
     const att = &s.units[ai];
     const tgt = &s.units[ti];
     if (att.isDead() or tgt.isDead()) return error.Rejected;
     if (att.attack_type_selected != AT.MELEE and att.attack_type_selected != AT.MELEE_MAGIC) return error.Rejected;
     if (att.team == tgt.team) return error.Rejected;
+    // An Aggr'd attacker may strike only its live forced target.
+    if (forcedTarget(s, att)) |f| {
+        if (f != ti) return error.Rejected;
+    }
     const current = engine.baseCell(att);
     const from_cells = engine.cellsForAnchor(from, att.fw, att.fh);
     const tgt_cells = engine.unitCells(tgt);
     if (!adjacent(from_cells.slice(), tgt_cells.slice())) return error.Rejected;
-    if (current.x != from.x or current.y != from.y) return error.Rejected;
-    // Stationary strike: the occupancy checks pass on the unit's own cells and setPosition writes the same value.
+    const stationary = current.x == from.x and current.y == from.y;
+    try strikeMovePrefix(s, ai, from, from_cells.slice(), path, stationary);
 
-    // chargedRouteCells: a stationary strike after this turn's move charges that move's route (no knownPaths
-    // provider in the simulation, so a strike without one leaves the multiplier at 1).
+    // chargedRouteCells: a stationary strike after this turn's move charges that move's route; a path-bearing strike
+    // charges its whole route (path.length, origin included); otherwise there are no known paths and no charge.
     var ability_multiplier: f64 = 1;
-    if (att.moved_this_turn and att.moved_route_cells > 0) ability_multiplier = abilities.rapidCharge(att, att.moved_route_cells);
-    ability_multiplier *= abilities.positionMultiplier(att, from, engine.baseCell(tgt), tgt.fh);
-
-    const missed = missRoll(s, att, tgt);
-    att.attack_mod = @max(0, att.attack_mod); // cleanupAttackModIncrease (+0)
-    const damage_from_attack = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.MELEE, 1, ability_multiplier)) +
-        abilities.penetratingBite(att, tgt);
-
-    // The response lands first.
-    meleeResponse(s, ai, ti, from);
-    if (!missed and !tgt.isDead()) {
-        _ = engine.applyDamage(tgt, damage_from_attack);
-        s.damage_lap = s.fight.lap;
-        meleeRiders(s, ai, ti);
+    var rapid_cells: f64 = 1;
+    if (stationary and att.moved_this_turn and att.moved_route_cells > 0) {
+        rapid_cells = att.moved_route_cells;
+        ability_multiplier = abilities.rapidCharge(att, rapid_cells);
+    } else if (path.len != 0) {
+        rapid_cells = @floatFromInt(path.len);
+        ability_multiplier = abilities.rapidCharge(att, rapid_cells);
     }
-    engine.refreshStackPowerForAllUnits(s);
-
-    const punch = doublePunch(s, ai, ti);
+    ability_multiplier *= abilities.positionMultiplier(att, from, engine.baseCell(tgt), tgt.fh);
 
     var died: Died = .{};
     var decrease: MoraleDecrease = .{};
     var attacker_plus: f64 = 0;
     var target_plus: f64 = 0;
-    if (att.isDead() and !died.includes(ai)) {
+
+    const missed = missRoll(s, att, tgt); // M1
+    att.attack_mod = @max(0, att.attack_mod); // cleanupAttackModIncrease (+ getUnitAuraAttackMod = 0)
+    const damage_from_attack = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.MELEE, 1, ability_multiplier)) +
+        abilities.penetratingBite(att, tgt); // M2: drawn even when a spin replaces the blow
+
+    const spin_attack = lightningSpin(s, ai, from, true, ai, rapid_cells, &died);
+    if (att.ability_mask & st.AbilityId.skewer_strike.bit() != 0) skewerStrike(s, ai, ti, from, true, &died, &decrease, &attacker_plus);
+
+    // The response lands first.
+    var spin_response = meleeResponse(s, ai, ti, from, &died, &decrease, &target_plus);
+    if (!spin_attack and !missed and !tgt.isDead()) {
+        const absorbed = damage_from_attack > 0 and abilities.absorbs(s, tgt);
+        _ = engine.applyDamage(s, ti, damage_from_attack);
+        s.damage_lap = s.fight.lap;
+        if (!absorbed) {
+            meleeRiders(s, ai, ti, damage_from_attack);
+            attacker_plus += abilities.pegasusLightMorale(tgt);
+        }
+    }
+    engine.refreshStackPowerForAllUnits(s);
+
+    const punch = doublePunch(s, ai, ti);
+
+    if (!spin_response and att.isDead() and !died.includes(ai)) {
         died.push(ai);
         target_plus += engine.MORALE_CHANGE_FOR_KILL;
         decrease.add(att, engine.MORALE_CHANGE_FOR_KILL);
     }
-    if (tgt.isDead() and !died.includes(ti)) {
+    if (!spin_attack and tgt.isDead() and !died.includes(ti)) {
         died.push(ti);
         attacker_plus += engine.MORALE_CHANGE_FOR_KILL;
         decrease.add(tgt, engine.MORALE_CHANGE_FOR_KILL);
     } else if (punch.applied) {
-        meleeResponse(s, ai, ti, from);
+        spin_response = meleeResponse(s, ai, ti, from, &died, &decrease, &target_plus);
+        const absorbed = punch.damage > 0 and abilities.absorbs(s, tgt);
         if (punch.damage > 0) {
-            _ = engine.applyDamage(tgt, punch.damage);
+            _ = engine.applyDamage(s, ti, punch.damage);
             s.damage_lap = s.fight.lap;
         }
-        if (!punch.missed) meleeRiders(s, ai, ti);
-        if (att.isDead() and !died.includes(ai)) {
+        if (!punch.missed and !absorbed) meleeRiders(s, ai, ti, punch.damage); // no Pegasus Light morale read after them
+        if (!spin_response and att.isDead() and !died.includes(ai)) {
             died.push(ai);
             target_plus += engine.MORALE_CHANGE_FOR_KILL;
             decrease.add(att, engine.MORALE_CHANGE_FOR_KILL);
         }
-        if (tgt.isDead() and !died.includes(ti)) {
+        if (!spin_attack and tgt.isDead() and !died.includes(ti)) {
             died.push(ti);
             attacker_plus += engine.MORALE_CHANGE_FOR_KILL;
             decrease.add(tgt, engine.MORALE_CHANGE_FOR_KILL);
         }
     }
     engine.changeMorale(tgt, target_plus, true);
-    engine.changeMorale(att, attacker_plus, true);
+    engine.changeMorale(att, attacker_plus + punch.morale, true);
     decrease.apply(s);
     engine.refreshStackPowerForAllUnits(s);
+    abilities.devourEssence(s, ai, died.items[0..died.len]);
+    abilities.devourEssence(s, ti, died.items[0..died.len]);
 
     cleanupDeadUnits(s, &died, events);
     engine.completeTurn(s, ai, false, false, events);
 }
 
-/// The on-hit riders of a landed melee blow from `from_i` on `to_i`, in handleMeleeAttack's order (the ported ones:
-/// Dulling Defense, Shatter Armor). The attacker is the active unit.
-fn meleeRiders(s: *State, from_i: u8, to_i: u8) void {
-    abilities.dullingDefense(&s.units[from_i], &s.units[to_i]);
-    abilities.shatterArmor(s, from_i, to_i, from_i);
+/// getTarget() resolved the way the engine and liveForcedTargetId do: the forced unit while it is alive in the holder.
+pub fn forcedTarget(s: *const State, u: *const Unit) ?u8 {
+    if (u.target < 0) return null;
+    const t: u8 = @intCast(u.target);
+    const fu = &s.units[t];
+    if (!fu.in_holder or fu.isDead()) return null;
+    return t;
 }
 
-/// canUnitRespondToMelee (src/handlers/melee_response.ts)
-fn canRespondToMelee(s: *const State, att: *const Unit, ti: u8) bool {
+/// The on-hit riders of a landed, unabsorbed melee blow or second punch from `from_i` (the active unit) on `to_i`, in
+/// handleMeleeAttack's order: Dulling Defense, Aggr, Pegasus Light, Shatter Armor, Venom Cloud poison.
+fn meleeRiders(s: *State, from_i: u8, to_i: u8, damage: f64) void {
+    if (s.units[from_i].ability_mask != 0) {
+        abilities.dullingDefense(&s.units[from_i], &s.units[to_i]);
+        abilities.aggr(s, from_i, to_i, from_i);
+        abilities.pegasusLight(s, from_i, to_i, from_i);
+        abilities.shatterArmor(s, from_i, to_i, from_i);
+    }
+    abilities.poisonAura(s, from_i, to_i, damage);
+}
+
+/// canUnitRespondToMelee (src/handlers/melee_response.ts): an Aggr'd target answers only its forced attacker (the raw
+/// target id, alive or not), nobody answers a Lightning Spin attacker, and the reply is spent once.
+fn canRespondToMelee(s: *const State, att: *const Unit, ai: u8, ti: u8) bool {
     const tgt = &s.units[ti];
-    return !abilities.skipsResponse(att) and !tgt.responded and s.fight.replied & engine.unitBit(ti) == 0;
+    if (abilities.skipsResponse(att)) return false;
+    if (tgt.target >= 0 and tgt.target != @as(i8, @intCast(ai))) return false;
+    return !tgt.responded and s.fight.replied & engine.unitBit(ti) == 0;
 }
 
-/// handleMeleeAttack's captureResponse: the target strikes back once (its reply is spent even on a miss).
-fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell) void {
+/// handleMeleeAttack's captureResponse: the target strikes back once (its reply is spent even on a miss). A
+/// responding Pikeman skewers behind the attacker and a responding Hydra spins (whatever the miss roll says);
+/// a spin replaces the plain response. Returns whether a response spin landed.
+fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell, died: *Died, decrease: *MoraleDecrease, target_plus: *f64) bool {
     const att = &s.units[ai];
     const tgt = &s.units[ti];
-    if (tgt.isDead() or !canRespondToMelee(s, att, ti)) return;
-    const missed = missRoll(s, tgt, att);
-    if (!missed and !att.isDead()) {
-        const ability_multiplier = abilities.positionMultiplier(tgt, engine.baseCell(tgt), from, att.fh);
+    if (tgt.isDead() or !canRespondToMelee(s, att, ai, ti)) return false;
+    const missed = missRoll(s, tgt, att); // M3
+    const tgt_base = engine.baseCell(tgt);
+    if (tgt.ability_mask & st.AbilityId.skewer_strike.bit() != 0) skewerStrike(s, ti, ai, tgt_base, false, died, decrease, target_plus);
+    const spin = lightningSpin(s, ti, tgt_base, false, ai, 1, died);
+    if (!missed and !spin and !att.isDead()) {
+        const ability_multiplier = abilities.positionMultiplier(tgt, tgt_base, from, att.fh);
         const damage_from_response = luckyStrike(s, tgt, calculateAttackDamage(s, tgt, att, AT.MELEE, 1, ability_multiplier)) +
-            abilities.penetratingBite(tgt, att);
-        _ = engine.applyDamage(att, damage_from_response);
+            abilities.penetratingBite(tgt, att); // M4
+        const absorbed = damage_from_response > 0 and abilities.absorbs(s, att);
+        _ = engine.applyDamage(s, ai, damage_from_response);
         s.damage_lap = s.fight.lap;
-        // The responder's riders (Shatter Armor rides only the attacker's blows).
-        abilities.dullingDefense(tgt, att);
+        if (!absorbed) {
+            target_plus.* += abilities.pegasusLightMorale(att);
+            // The responder's riders: Dulling Defense, Aggr, Venom Cloud poison, Pegasus Light (Shatter Armor rides
+            // only the attacker's blows).
+            if (tgt.ability_mask != 0) {
+                abilities.dullingDefense(tgt, att);
+                abilities.aggr(s, ti, ai, ai);
+            }
+            abilities.poisonAura(s, ti, ai, damage_from_response);
+            if (tgt.ability_mask != 0) abilities.pegasusLight(s, ti, ai, ai);
+        }
     }
     spendReply(s, ti);
+    return spin;
 }
 
-const Punch = struct { applied: bool = false, missed: bool = false, damage: f64 = 0 };
+const Punch = struct { applied: bool = false, missed: bool = false, damage: f64 = 0, morale: f64 = 0 };
 
-/// processDoublePunchAbility: a second strike with its own miss roll.
+/// processDoublePunchAbility: a second strike with its own miss roll (an Aggr'd puncher only at its forced target).
 fn doublePunch(s: *State, ai: u8, ti: u8) Punch {
     const att = &s.units[ai];
     const tgt = &s.units[ti];
     const a = att.ability(.double_punch) orelse return .{};
     if (att.isDead() or tgt.isDead()) return .{};
+    if (att.target >= 0 and att.target != @as(i8, @intCast(ti))) return .{};
     if (missRoll(s, att, tgt)) return .{ .applied = true, .missed = true };
     const ability_multiplier = abilities.abilityMultiplier(att, a);
     const damage = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.MELEE, 1, ability_multiplier)) +
         abilities.penetratingBite(att, tgt);
-    return .{ .applied = true, .damage = damage };
+    return .{ .applied = true, .damage = damage, .morale = abilities.pegasusLightMorale(tgt) };
+}
+
+/// UnitsHolder.allEnemiesAroundUnit(unit, isAttack, attackFromCell): enemies on the cells touching the body anchored
+/// at `first` (getCellsAroundCell for a 1x1; the (w+2) x (h+2) box, x outer, for larger bodies), first-seen order.
+pub fn enemiesAround(s: *const State, ui: u8, first: Cell, out: *engine.UnitList) void {
+    const u = &s.units[ui];
+    out.* = .{};
+    const Visit = struct {
+        fn cell(st_: *const State, attacker: u8, c: Cell, list: *engine.UnitList) void {
+            if (!engine.cellWithinGrid(c)) return;
+            const o = st_.grid.board[@intCast(c.x)][@intCast(c.y)];
+            if (o == st.EMPTY or o == st.HOLE) return;
+            const x: u8 = o - 1;
+            if (x == attacker) return;
+            const e = &st_.units[x];
+            if (!e.in_holder or e.team == st_.units[attacker].team) return;
+            for (list.slice()) |y| if (y == x) return;
+            list.push(x);
+        }
+    };
+    if (engine.isSmall(u)) {
+        // getCellsAroundCell order, in-grid only.
+        const ring = [8][2]i32{ .{ -1, 1 }, .{ 0, 1 }, .{ -1, 0 }, .{ 1, 1 }, .{ 1, 0 }, .{ -1, -1 }, .{ 0, -1 }, .{ 1, -1 } };
+        for (ring) |d| Visit.cell(s, ui, .{ .x = first.x + d[0], .y = first.y + d[1] }, out);
+        return;
+    }
+    var i: i32 = -@as(i32, u.fw);
+    while (i <= 1) : (i += 1) {
+        var j: i32 = -@as(i32, u.fh);
+        while (j <= 1) : (j += 1) Visit.cell(s, ui, .{ .x = first.x + i, .y = first.y + j }, out);
+    }
+}
+
+/// processLightningSpinAbility: every enemy around the spinner (at its strike cell, or where it stands when
+/// responding) takes a sub-hit in ring order, each with its own miss roll and, when not missed, damage roll; the
+/// spin's kill and Pegasus Light morale and its same-name morale losses apply at once. Returns whether it landed
+/// (whenever the unit has the ability).
+fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: u8, rapid_cells: f64, died: *Died) bool {
+    const from = &s.units[from_i];
+    if (from.ability_mask & st.AbilityId.lightning_spin.bit() == 0) return false;
+    const a = from.ability(.lightning_spin).?;
+    var ring: engine.UnitList = undefined;
+    enemiesAround(s, from_i, first, &ring); // no Terrifying Gaze lock or Flesh Shield owners in scope
+    const common = abilities.rapidCharge(from, rapid_cells);
+    var dead: Died = .{};
+    var morale: f64 = 0;
+    var decrease: MoraleDecrease = .{};
+    for (ring.slice()) |ei| {
+        const enemy = &s.units[ei];
+        if (enemy.isDead()) continue;
+        if (missRoll(s, from, enemy)) continue;
+        const ability_multiplier = abilities.abilityMultiplier(from, a) * common;
+        var damage = luckyStrike(s, from, calculateAttackDamage(s, from, enemy, AT.MELEE, 1, ability_multiplier)) +
+            abilities.penetratingBite(from, enemy);
+        damage = @floor(damage * 1); // getPhysicalAoeDamageMultiplier
+        const absorbed = damage > 0 and abilities.absorbs(s, enemy);
+        const dealt = engine.applyDamage(s, ei, damage);
+        abilities.poisonAura(s, from_i, ei, dealt);
+        s.damage_lap = s.fight.lap;
+        if (!absorbed) morale += abilities.pegasusLightMorale(enemy);
+        if (enemy.isDead()) {
+            dead.push(ei);
+        } else if (!absorbed) {
+            abilities.dullingDefense(from, enemy);
+            abilities.aggr(s, from_i, ei, active_i);
+            abilities.pegasusLight(s, from_i, ei, active_i);
+            if (is_attack) abilities.shatterArmor(s, from_i, ei, active_i);
+        }
+    }
+    for (dead.items[0..dead.len]) |d| {
+        died.push(d);
+        morale += engine.MORALE_CHANGE_FOR_KILL;
+        decrease.add(&s.units[d], engine.MORALE_CHANGE_FOR_KILL);
+    }
+    if (!is_attack) spendReply(s, from_i);
+    if (!from.isDead()) engine.changeMorale(from, morale, true);
+    decrease.apply(s);
+    return true;
+}
+
+/// processSkewerStrikeAbility -> nextStandingTargets(pierceLargeUnits = false, onlyOppositeTeam) -> strikeSkewerTargets:
+/// past a 1x1 target, the enemy on the cell straight behind it (as seen from `from_cell`, the striker's cell) takes
+/// a hit with its own miss and damage rolls (no Lucky Strike, no response). Kills and morale go to the caller's
+/// bookkeeping. Only 1x1 units (Pikemen) carry the ability.
+fn skewerStrike(s: *State, from_i: u8, to_i: u8, from_cell: Cell, is_attack: bool, died: *Died, decrease: *MoraleDecrease, plus: *f64) void {
+    const from = &s.units[from_i];
+    const a = from.ability(.skewer_strike) orelse return;
+    const to = &s.units[to_i];
+    if (!engine.isSmall(to)) return;
+    const tb = engine.baseCell(to);
+    const c = Cell{ .x = tb.x + (tb.x - from_cell.x), .y = tb.y + (tb.y - from_cell.y) };
+    if (!engine.cellWithinGrid(c)) return;
+    const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
+    if (o == st.EMPTY or o == st.HOLE) return;
+    const vi: u8 = o - 1;
+    const next = &s.units[vi];
+    if (!next.in_holder or vi == from_i or vi == to_i or next.team == from.team) return;
+    if (next.isDead()) return;
+    if (missRoll(s, from, next)) return; // S1
+    var damage = calculateAttackDamage(s, from, next, AT.MELEE, 1, abilities.abilityMultiplier(from, a)); // S2
+    damage = @floor(damage * 1); // getPhysicalAoeDamageMultiplier
+    const absorbed = damage > 0 and abilities.absorbs(s, next);
+    const dealt = engine.applyDamage(s, vi, damage);
+    s.damage_lap = s.fight.lap;
+    if (!next.isDead() and !absorbed) {
+        abilities.poisonAura(s, from_i, vi, dealt);
+        abilities.dullingDefense(from, next);
+        abilities.aggr(s, from_i, vi, from_i); // A3
+        abilities.pegasusLight(s, from_i, vi, from_i);
+        if (is_attack) abilities.shatterArmor(s, from_i, vi, from_i);
+    }
+    if (next.isDead()) {
+        died.push(vi);
+        plus.* += engine.MORALE_CHANGE_FOR_KILL;
+        decrease.add(next, engine.MORALE_CHANGE_FOR_KILL);
+    }
 }
 
 // =====================================================================================================================
@@ -424,7 +642,7 @@ pub fn sideObservable(s: *const State, cell: Cell, side: u8, from_team: u8) bool
 }
 
 /// getRangeAttackSideCenter
-fn sideCenter(cell: Cell, side: u8, ax: f64, ay: f64) [2]f64 {
+pub fn sideCenter(cell: Cell, side: u8, ax: f64, ay: f64) [2]f64 {
     const c = engine.positionForCell(@floatFromInt(cell.x), @floatFromInt(cell.y));
     var p: [2]f64 = switch (side) {
         0 => .{ c[0] - engine.HALF, c[1] },
@@ -507,13 +725,20 @@ pub fn rangeAttack(s: *State, ai: u8, ti: u8, aim_cell: ?Cell, aim_side: u8, eve
     var target_ui = hits.units[0];
     var tgt = &s.units[target_ui];
     if (tgt.team == att.team or tgt.isDead()) return error.Rejected;
+    // An Aggr'd shooter's shot must land first on its live forced target.
+    if (forcedTarget(s, att)) |f| {
+        if (f != target_ui) return error.Rejected;
+    }
     var idx: usize = 1;
 
     const missed = missRoll(s, att, tgt);
     var responder_target: ?u8 = null;
     var response_missed = false;
+    var response_absorbed = false;
     if (response_victim) |rv| {
-        if (!abilities.skipsResponse(att) and s.fight.replied & engine.unitBit(target_ui) == 0 and engine.canLandRangeAttack(s, tgt)) {
+        // An Aggr'd target counter-shoots only its forced attacker (the raw target id).
+        const aggr_ok = tgt.target < 0 or tgt.target == @as(i8, @intCast(ai));
+        if (!abilities.skipsResponse(att) and s.fight.replied & engine.unitBit(target_ui) == 0 and engine.canLandRangeAttack(s, tgt) and aggr_ok) {
             response_missed = missRoll(s, tgt, &s.units[rv]);
             responder_target = rv;
         }
@@ -530,15 +755,26 @@ pub fn rangeAttack(s: *State, ai: u8, ti: u8, aim_cell: ?Cell, aim_side: u8, eve
         const victim = &s.units[rv];
         if (!response_missed) {
             const damage_from_response = luckyStrike(s, tgt, calculateAttackDamage(s, tgt, victim, AT.RANGE, response_divisor, 1));
-            _ = engine.applyDamage(victim, damage_from_response);
+            response_absorbed = damage_from_response > 0 and abilities.absorbs(s, victim);
+            _ = engine.applyDamage(s, rv, damage_from_response);
             s.damage_lap = s.fight.lap;
+            if (!response_absorbed) {
+                target_plus += abilities.pegasusLightMorale(victim); // dropped unless an early return applies it
+                abilities.poisonAura(s, target_ui, rv, damage_from_response);
+            }
         }
         spendReply(s, target_ui);
     }
 
     if (!missed) {
-        _ = engine.applyDamage(tgt, damage_from_attack);
+        const absorbed = damage_from_attack > 0 and abilities.absorbs(s, tgt);
+        _ = engine.applyDamage(s, target_ui, damage_from_attack);
         s.damage_lap = s.fight.lap;
+        if (!absorbed) attacker_plus += abilities.pegasusLightMorale(tgt);
+        if (!tgt.isDead() and !absorbed) {
+            abilities.spitBall(s, target_ui); // the Absorb Penalties roll
+            abilities.poisonAura(s, ai, target_ui, damage_from_attack);
+        }
     }
     var switch_target = false;
     if (tgt.isDead()) {
@@ -565,6 +801,8 @@ pub fn rangeAttack(s: *State, ai: u8, ti: u8, aim_cell: ?Cell, aim_side: u8, eve
                     decrease.apply(s);
                     break :done;
                 }
+            } else if (!response_missed and !response_absorbed) {
+                abilities.spitBall(s, rv); // the counter-shot victim's Absorb Penalties roll
             }
         }
 

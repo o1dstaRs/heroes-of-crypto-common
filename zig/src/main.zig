@@ -26,12 +26,6 @@ fn describe(action: rec.Action) []const u8 {
     return @tagName(action);
 }
 
-fn eventsMatch(got: []const rec.Event, want: []const rec.Event) bool {
-    if (got.len != want.len) return false;
-    for (got, want) |g, w| if (g.kind != w.kind or g.arg != w.arg) return false;
-    return true;
-}
-
 fn printEvents(label: []const u8, evs: []const rec.Event) void {
     std.debug.print("    {s}:", .{label});
     for (evs) |e| std.debug.print(" {s}({d})", .{ @tagName(e.kind), e.arg });
@@ -83,7 +77,7 @@ fn parity(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
                 why = "accepted/rejected differs";
             } else if (s.rng.state != step.r1) {
                 why = "random stream differs";
-            } else if (!eventsMatch(events.slice(), step.events)) {
+            } else if (!compare.eventsMatch(events.slice(), step.events)) {
                 why = "events differ";
             } else if (!compare.state(&s, game.ids, step.digest.?, &m)) {
                 why = m.text();
@@ -268,82 +262,6 @@ fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
     return ok_calls == calls;
 }
 
-fn cellsEqual(a: []const rec.Cell, b: []const rec.Cell) bool {
-    if (a.len != b.len) return false;
-    for (a, b) |x, y| if (x.x != y.x or x.y != y.y) return false;
-    return true;
-}
-
-fn actionsEqual(a: rec.Action, b: rec.Action) bool {
-    if (std.meta.activeTag(a) != std.meta.activeTag(b)) return false;
-    return switch (a) {
-        .start_fight => true,
-        .advance => |x| x.damage_dealt_this_lap == b.advance.damage_dealt_this_lap,
-        .end_turn => |x| x.unit == b.end_turn.unit and x.reason == b.end_turn.reason,
-        .wait_turn => |x| x.unit == b.wait_turn.unit,
-        .defend_turn => |x| x.unit == b.defend_turn.unit,
-        .select_attack_type => |x| x.unit == b.select_attack_type.unit and x.attack_type == b.select_attack_type.attack_type,
-        .move_unit => |x| x.unit == b.move_unit.unit and cellsEqual(x.path, b.move_unit.path) and cellsEqual(x.target_cells, b.move_unit.target_cells),
-        .melee_attack => |x| x.attacker == b.melee_attack.attacker and x.target == b.melee_attack.target and
-            x.attack_from.x == b.melee_attack.attack_from.x and x.attack_from.y == b.melee_attack.attack_from.y and cellsEqual(x.path, b.melee_attack.path),
-        .range_attack => |x| blk: {
-            const y = b.range_attack;
-            if (x.attacker != y.attacker or x.target != y.target) break :blk false;
-            if ((x.aim_cell == null) != (y.aim_cell == null)) break :blk false;
-            if (x.aim_cell) |ac| break :blk ac.x == y.aim_cell.?.x and ac.y == y.aim_cell.?.y and x.aim_side == y.aim_side;
-            break :blk true;
-        },
-        .decide => |x| blk: {
-            const y = b.decide;
-            if (x.unit != y.unit or x.out.len != y.out.len) break :blk false;
-            for (x.out, y.out) |p, q| if (!actionsEqual(p, q)) break :blk false;
-            break :blk true;
-        },
-    };
-}
-
-const NativeCheck = struct {
-    game: *const rec.Game,
-    ids: []const []const u8,
-    next: usize = 0,
-    failed: ?[]const u8 = null,
-    mismatch: compare.Mismatch = .{},
-    zig_action: rec.Action = .start_fight,
-
-    fn step(ctx: *anyopaque, kind: ai.StepKind, action: rec.Action, r0: u32, s: *const st.State, ok: bool, events: []const rec.Event) bool {
-        const self: *NativeCheck = @ptrCast(@alignCast(ctx));
-        self.zig_action = action;
-        if (self.next >= self.game.steps.len) {
-            self.failed = "zig made more steps than the recording";
-            return false;
-        }
-        const want = self.game.steps[self.next];
-        const want_kind: ai.StepKind = switch (want.action) {
-            .advance => .advance,
-            .decide => .decide,
-            else => .apply,
-        };
-        if (kind != want_kind) {
-            self.failed = "step kind differs";
-        } else if (!actionsEqual(action, want.action)) {
-            self.failed = "action differs";
-        } else if (r0 != want.r0) {
-            self.failed = "random state before the step differs";
-        } else if (s.rng.state != want.r1) {
-            self.failed = "random stream differs";
-        } else if (kind != .decide and ok != want.ok) {
-            self.failed = "accepted/rejected differs";
-        } else if (kind != .decide and !eventsMatch(events, want.events)) {
-            self.failed = "events differ";
-        } else if (want.digest) |d| {
-            if (!compare.state(s, self.ids, d, &self.mismatch)) self.failed = self.mismatch.text();
-        }
-        if (self.failed != null) return false;
-        self.next += 1;
-        return true;
-    }
-};
-
 /// Plays every recorded battle natively (Zig AI + engine) and checks each step against the recording.
 fn native(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
     const buf = try readAll(gpa, file);
@@ -367,8 +285,8 @@ fn native(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
             continue;
         };
         s.rng.state = game.steps[0].r0;
-        var check = NativeCheck{ .game = &game, .ids = game.ids };
-        const end = ai.playMatch(&s, 60, .{ .ctx = &check, .step = NativeCheck.step });
+        var check = compare.NativeCheck{ .game = &game, .ids = game.ids };
+        const end = ai.playMatch(&s, 60, .{ .ctx = &check, .step = compare.NativeCheck.step });
         if (check.failed == null and check.next != game.steps.len) check.failed = "zig stopped early";
         steps_ok += check.next;
         if (check.failed) |why| {
