@@ -17,7 +17,10 @@ const AT = st.AttackType;
 pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     const rin = c.s.rng.state;
     defer policy.note("v0.6", out, c.s, rin);
+    // setPreferAttackOverMining(V06_LEGACY_MINE !== "1") around super.decideTurn: mining never preempts an attack.
+    c.prefer_attack_over_mining = true;
     lv5.decide(c, out);
+    c.prefer_attack_over_mining = false;
     finalizeDecision(c, out);
 }
 
