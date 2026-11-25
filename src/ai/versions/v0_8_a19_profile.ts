@@ -783,7 +783,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "neural-adapter" as const,
         source: "src/simulation/a19_neural.ts" as const,
-        sha256: "d37efcce4a123294b133c71de94bf85ebfcda9c44d0ab62a26d78982cfbae14d" as const,
+        sha256: "cf00b2ebaba0acc13ff80d7b1dca17fa88a23724bd32501090d55262e1c5c362" as const,
     }),
     Object.freeze({
         role: "neural-model" as const,

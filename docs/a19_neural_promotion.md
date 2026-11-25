@@ -19,3 +19,19 @@ The fixed 144-game production CPU study stopped at its registered 30-minute cap 
 The 6,000-game qualification and confirmation banks remain unopened. Legally preferred Black Dragon and funded budget coverage have not been repeated for this exact default. The previous single-model Black Dragon map-floor failure remains a failed study. The original 55% learner goal is not reclassified as achieved. Current mainline also contains the newer Satyr/Wolf Rider blessings and Thunderbird health change; the historical strength estimates retain their frozen source identities.
 
 Adoption is the user's explicit release decision based on the measured improvement over production, with these remaining uncertainties recorded. Future research should use fresh fixed banks and retain both helpful and harmful outcomes. Default-routing, fallback, browser build, instance isolation and source/model identity checks must remain passing.
+
+## Live gate since profile v30 (found 2026-11-25)
+
+The correction runs only inside the budget it was measured in: `attachA19NeuralCorrection` (`src/simulation/a19_neural.ts`)
+plays the native choice on a live driver whose stock budget is not 1,000 ms / 1,500 ms. Profile v30
+(`a19-stock-deadline-v1`, [stock_deadline_adoption.md](stock_deadline_adoption.md)) gave the bot seat's stock search
+2,500 ms / 3,750 ms, so since November 24, 2026 no live bot seat has applied a neural correction. That adoption did not
+mention it. Its registered real-time clash SD measured this neural-off bot against neural-on v29, so the deployed
+behaviour is a measured state; offline drivers, which skipped the deadline check, still applied the correction. A probe
+on real server game sessions counted 0 corrections live against 104 offline.
+
+From common's 2026-11-25 gate change, offline follows live wherever the driver's budget names a live deadline: an offline
+driver on the deep-fit stock budget plays the native choice too, so offline research measures the AI that bot seats run
+(`test/simulation/a19_default_neural.test.ts`). An offline driver with no deadline, as the older deterministic-work tools
+use, keeps the correction, and the A19 profile's own 1,000 / 1,500 ms budget keeps it offline and live. Restoring the
+correction live under the deep-fit stock budget is a behaviour change that needs its own registered real-time clash.

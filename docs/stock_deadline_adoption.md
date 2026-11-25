@@ -8,6 +8,11 @@ circuit breaker of 3,750 ms (`V08_A19_DEEP_FIT.stockBudget`) instead of the A19 
 search, the deep-fit gate, the 4,000-turn budget, the 4,000 ms think deadline and Premium advice are unchanged. Offline
 deterministic work has no clock, so no offline result changes.
 
+Correction (2026-11-25): the new stock budget also switched off the A19 neural tie correction on live bot seats, whose
+gate accepts only the 1,000 / 1,500 ms budget it was measured in, while offline drivers still applied it. SD below
+measured that neural-off bot. Offline now follows the same gate; see
+[a19_neural_promotion.md](a19_neural_promotion.md#live-gate-since-profile-v30-found-2026-11-25).
+
 ## Why
 
 The stock search's 1,000 ms deadline is older than the deep fit: it was set when the stock search was the whole think.

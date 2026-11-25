@@ -61,13 +61,18 @@ export function attachA19NeuralCorrection(
     ): GameAction[] {
         const nativeChoose = ownChoose ?? (Object.getPrototypeOf(this) as SearchDriver).chooseDecision;
         const budget = this as unknown as INeuralBudget;
+        // The correction was measured inside the A19 profile's 1,000 ms native allowance and 1,500 ms breaker; a live
+        // driver on any other budget (the deep-fit stock search's 2,500 / 3,750 ms since profile v30) plays the native
+        // choice. Offline follows live wherever the budget names a live deadline, so offline research measures the AI
+        // that bot seats run. An offline driver with no deadline (deterministic-work tools) keeps the correction.
+        const otherBudget = budget.decisionDeadlineMs !== 1000 || budget.circuitBreakerMs !== 1500;
         if (
             version !== "v0.8" ||
             budget.horizon !== 64 ||
             budget.rollouts !== 2 ||
             !budget.complementaryR2 ||
             budget.a19MaterialArbitration !== "ties" ||
-            (!options.offline && (budget.decisionDeadlineMs !== 1000 || budget.circuitBreakerMs !== 1500))
+            (otherBudget && (!options.offline || budget.decisionDeadlineMs !== null))
         )
             return nativeChoose.call(this, unit, version, incumbent, context);
         const descriptor = Object.getOwnPropertyDescriptor(this, "chooseDecision");

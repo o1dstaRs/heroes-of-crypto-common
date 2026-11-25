@@ -141,6 +141,37 @@ test("the public default supplies native timestamps and actually runs both bundl
     }
 }, 120_000);
 
+test("offline follows the live deadline gate: the deep-fit stock budget runs no correction", () => {
+    const clock = spyOn(performance, "now").mockReturnValue(0);
+    const drivers = new Set<SearchDriver>();
+    const original = SearchDriver.prototype.onFightReady;
+    const ready = spyOn(SearchDriver.prototype, "onFightReady").mockImplementation(function (this: SearchDriver) {
+        original.call(this);
+        drivers.add(this);
+    });
+    const inferred = (budget: Record<string, string>): number => {
+        drivers.clear();
+        runMatch({
+            ...match,
+            searchOfflineDeterministicWork: true,
+            researchCaptureDecisionStart: false,
+            researchA19BaseSearchEnvironment: { SEARCH_A19_NEURAL_TIES: "1", ...budget },
+        });
+        const states = [...drivers].map((driver) => getA19NeuralState(driver)).filter((state) => state !== undefined);
+        expect(states.length).toBeGreaterThan(0);
+        return states.reduce((n, state) => n + state.decisions + state.inferred, 0);
+    };
+    try {
+        // The A19 profile's own 1,000 / 1,500 ms budget keeps the correction offline, as it does live.
+        expect(inferred({})).toBeGreaterThan(0);
+        // Profile v30's stock budget: live bot seats play the native choice, so offline research does too.
+        expect(inferred({ SEARCH_DECISION_DEADLINE_MS: "2500", SEARCH_CIRCUIT_BREAKER_MS: "3750" })).toBe(0);
+    } finally {
+        ready.mockRestore();
+        clock.mockRestore();
+    }
+}, 120_000);
+
 function injected(model: Pick<V09A19CpuModel, "predict">) {
     const drivers = new Set<SearchDriver>();
     const original = SearchDriver.prototype.onFightReady;
