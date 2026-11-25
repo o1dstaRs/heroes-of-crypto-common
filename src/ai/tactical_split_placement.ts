@@ -178,6 +178,19 @@ export function planTacticalStackSplits(
         slots -= 1;
     };
 
+    // a19-shield-screen-v1 (profile v36): a splittable Water Shield stack takes the spare slots before any other split,
+    // aura splits included (the owner: "it is always better to split mermaid if we have it").
+    if (screen && options.shieldScreen) {
+        const shieldBody = eligible
+            .filter((candidate) => candidate.waterShieldUtilityCount > 0 && candidate.auraUtilityCount === 0)
+            .sort(compareShield)[0];
+        if (shieldBody) {
+            for (let child = 0; child < shieldBody.amount - 1 && slots > 0; child += 1) {
+                take(shieldBody, child === 0 ? "shield" : "bait");
+            }
+        }
+    }
+
     const auraSources = eligible.filter((candidate) => candidate.auraUtilityCount > 0).sort(compareUtility);
     const support = eligible
         .filter((candidate) => candidate.supportSpellCount > 0 && candidate.auraUtilityCount === 0)
@@ -214,17 +227,6 @@ export function planTacticalStackSplits(
 
     if (screen) {
         const ranged = (unit: ITacticalSplitUnit): boolean => unit.rangedCoverCount > 0;
-        // a19-shield-screen-v1: a Water Shield stack (already split once for its "shield" role) keeps splitting first;
-        // slots it cannot fill go to the split-screen body below, chosen among the stacks not yet split.
-        const shieldBody = options.shieldScreen
-            ? screenEligible
-                  .filter((candidate) => candidate.waterShieldUtilityCount > 0 && candidate.auraUtilityCount === 0)
-                  .sort(compareShield)[0]
-            : undefined;
-        if (shieldBody) {
-            const children = plans.filter((plan) => plan.sourceUnitId === shieldBody.id).length;
-            for (let child = children; child < shieldBody.amount - 1 && slots > 0; child += 1) take(shieldBody, "bait");
-        }
         const body = screenEligible
             .filter((candidate) => !splitSources.has(candidate.id) && candidate.auraUtilityCount === 0)
             .sort(

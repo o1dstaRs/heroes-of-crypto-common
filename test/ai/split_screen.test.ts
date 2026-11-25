@@ -139,6 +139,29 @@ describe(A19_SHIELD_SCREEN_ID, () => {
         ).toEqual(["mermaid", "peasant", "peasant"]);
     });
 
+    it("Mermaid outranks aura splits: the owner's army with an aura Peasant still screens with Mermaids", () => {
+        const withAura = mermaidArmy.map((entry) =>
+            entry.id === "peasant" ? { ...entry, auraUtilityCount: 1 } : entry,
+        );
+        expect(
+            planTacticalStackSplits(withAura, 9, { screen: true }).map((plan) => [plan.sourceUnitId, plan.role]),
+        ).toEqual([
+            ["peasant", "aura"],
+            ["peasant", "aura"],
+            ["mermaid", "shield"],
+        ]);
+        expect(
+            planTacticalStackSplits(withAura, 9, { screen: true, shieldScreen: true }).map((plan) => [
+                plan.sourceUnitId,
+                plan.role,
+            ]),
+        ).toEqual([
+            ["mermaid", "shield"],
+            ["mermaid", "bait"],
+            ["mermaid", "bait"],
+        ]);
+    });
+
     it("armies without a Water Shield stack keep the split-screen body", () => {
         expect(planTacticalStackSplits(army, 9, { screen: true, shieldScreen: true })).toEqual(
             planTacticalStackSplits(army, 9, { screen: true }),

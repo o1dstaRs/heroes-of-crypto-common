@@ -950,7 +950,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "tactical-split-placement" as const,
         source: "src/ai/tactical_split_placement.ts" as const,
         // The split planner; profile v35 adds its screen mode, profile v36 the Water Shield screen body.
-        sha256: "d35588055f36556006d1bf791f19770794da619e94fee9f25351b61c9510bc99" as const,
+        sha256: "65bd3ad1822330a542871ae3f1fa37f576a40a8535c3e7758ebdec0d203abea8" as const,
     }),
 ] as const);
 
