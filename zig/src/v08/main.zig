@@ -153,6 +153,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, max_fail:
             std.debug.print("seed {d}: start state not supported ({s})\n", .{ game.seed, @errorName(err) });
             continue;
         };
+        util.battle.primeProfile(&s);
         var events: engine.Events = .{};
         for (game.steps, 0..) |step, i| {
             if (step.action == .decide) {

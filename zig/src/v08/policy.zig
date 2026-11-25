@@ -10,6 +10,9 @@ const ai = @import("../ai.zig");
 const lv2 = @import("lv2.zig");
 const lv3 = @import("lv3.zig");
 const lv4 = @import("lv4.zig");
+const lv5 = @import("lv5.zig");
+const lv6 = @import("lv6.zig");
+const lv7 = @import("lv7.zig");
 
 /// Observes each level's output: its name (the recorder's layer names: "v0.1" ... "v0.7", then the v0.8 passes),
 /// its actions and the random state on entry and return.
@@ -25,13 +28,16 @@ pub inline fn note(name: []const u8, out: *const ai.Decision, s: *const st.State
 }
 
 /// The top of the chain a run stops at (`hoc-sim v08 layers --top`), for checking a partial port.
-pub const Level = enum { v01, v02, v03, v04 };
+pub const Level = enum { v01, v02, v03, v04, v05, v06, v07 };
 
 pub fn levelFromName(n: []const u8) ?Level {
     if (std.mem.eql(u8, n, "v0.1")) return .v01;
     if (std.mem.eql(u8, n, "v0.2")) return .v02;
     if (std.mem.eql(u8, n, "v0.3")) return .v03;
     if (std.mem.eql(u8, n, "v0.4")) return .v04;
+    if (std.mem.eql(u8, n, "v0.5")) return .v05;
+    if (std.mem.eql(u8, n, "v0.6")) return .v06;
+    if (std.mem.eql(u8, n, "v0.7")) return .v07;
     return null;
 }
 
@@ -53,5 +59,8 @@ pub fn decideTo(s: *st.State, ui: u8, out: *ai.Decision, top: Level) void {
         .v02 => lv2.decide(&c, out),
         .v03 => lv3.decide(&c, out),
         .v04 => lv4.decide(&c, out),
+        .v05 => lv5.decide(&c, out),
+        .v06 => lv6.decide(&c, out),
+        .v07 => lv7.decide(&c, out),
     }
 }

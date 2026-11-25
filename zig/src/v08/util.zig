@@ -70,9 +70,21 @@ pub const Creature = enum(u8) {
     }
 };
 
-/// Per-battle facts the engine state does not carry (until Unit has a creature id): each unit's creature.
+/// Per-battle facts the engine state does not carry (until Unit has a creature id): each unit's creature, and v0.7's
+/// immutable initial-army profile per team (primeArmyProfile at placement: the stacks a team starts the fight with).
 pub const Battle = struct {
     creature: [st.MAX_UNITS]Creature = .{.other} ** st.MAX_UNITS,
+    /// MELEE_MAGIC stacks per team at the start; two or more make v0.7's meleeMagicAnchor army (no Resurrection or
+    /// Wind Flow in scope), which keeps v0.6's decisions without the wait scorer.
+    melee_magic: [3]u8 = .{ 0, 0, 0 },
+
+    /// The profile from the fight's start state (every holder unit).
+    pub fn primeProfile(self: *Battle, s: *const State) void {
+        self.melee_magic = .{ 0, 0, 0 };
+        for (s.units[0..s.n_units]) |*u| {
+            if (u.in_holder and u.team < 3 and u.attack_type == AT.MELEE_MAGIC) self.melee_magic[u.team] += 1;
+        }
+    }
 
     /// From a recording's `init` (units in holder order, as engine.initState reads them).
     pub fn fromInit(init: std.json.Value) Battle {
@@ -354,4 +366,225 @@ pub fn setMove(d: *ai.Decision, s: *const State, ui: u8, mp: *const pathing.Move
     const fp = ai.footprintForAnchor(&s.units[ui], r.cell);
     for (fp.slice(), 0..) |t, i| d.targets[i] = t;
     d.push(.{ .move_unit = .{ .unit = ui, .path = d.path[0..len], .target_cells = d.targets[0..fp.len] } });
+}
+
+// =====================================================================================================================
+// Value features (src/simulation/value_features.ts fillValueFeatures) and the wait scorer's features
+// (src/ai/versions/wait_scorer.ts extractWaitFeatures)
+// =====================================================================================================================
+
+pub inline fn hourglassed(s: *const State, ui: u8) bool {
+    return s.fight.hourglass_set & engine.unitBit(ui) != 0;
+}
+
+inline fn chebyshev(a: Cell, b: Cell) f64 {
+    return @floatFromInt(@max(@abs(a.x - b.x), @abs(a.y - b.y)));
+}
+
+inline fn normalizedDifference(a: f64, b: f64) f64 {
+    return (a - b) / (a + b + 1);
+}
+
+fn nearestEnemyDistance(own: []const Cell, other: []const Cell, span: f64) f64 {
+    if (own.len == 0 or other.len == 0) return 0;
+    var sum: f64 = 0;
+    for (own) |c| {
+        var best = std.math.inf(f64);
+        for (other) |e| {
+            const d = chebyshev(c, e);
+            if (d < best) best = d;
+        }
+        sum += best;
+    }
+    return sum / @as(f64, @floatFromInt(own.len)) / span;
+}
+
+fn averageSpread(cells: []const Cell, span: f64) f64 {
+    if (cells.len < 2) return 0;
+    var sum: f64 = 0;
+    var pairs: f64 = 0;
+    for (cells, 0..) |a, i| {
+        for (cells[i + 1 ..]) |b| {
+            sum += chebyshev(a, b);
+            pairs += 1;
+        }
+    }
+    return sum / pairs / span;
+}
+
+fn averageCenterDistance(cells: []const Cell, span: f64) f64 {
+    if (cells.len == 0) return 0;
+    const center = span / 2;
+    var sum: f64 = 0;
+    for (cells) |c| sum += @max(@abs(@as(f64, @floatFromInt(c.x)) - center), @abs(@as(f64, @floatFromInt(c.y)) - center));
+    return sum / @as(f64, @floatFromInt(cells.len)) / center;
+}
+
+pub const VALUE_FEATURES = 20;
+
+/// The 20 LiveTwin value features from `team`'s perspective. Classic boards only (the side-oriented board reads
+/// advancement along x: not in scope until the map batch).
+pub fn valueFeatures(s: *const State, team: u8, out: *[VALUE_FEATURES]f64) void {
+    var our_hp: f64 = 0;
+    var enemy_hp: f64 = 0;
+    var our_cnt: f64 = 0;
+    var enemy_cnt: f64 = 0;
+    var our_atk: f64 = 0;
+    var enemy_atk: f64 = 0;
+    var our_ranged: f64 = 0;
+    var enemy_ranged: f64 = 0;
+    var our_wounded: f64 = 0;
+    var enemy_wounded: f64 = 0;
+    var our_adv: f64 = 0;
+    var enemy_adv: f64 = 0;
+    var our_yet: f64 = 0;
+    var enemy_yet: f64 = 0;
+    var our_cells: [st.MAX_UNITS]Cell = undefined;
+    var n_our: usize = 0;
+    var enemy_cells: [st.MAX_UNITS]Cell = undefined;
+    var n_enemy: usize = 0;
+    const span: f64 = st.GRID - 1;
+    for (s.units[0..s.n_units], 0..) |*u, i| {
+        if (!u.in_holder or u.isDead()) continue;
+        const ui: u8 = @intCast(i);
+        const hp = cumulativeHp(u);
+        const atk = engine.getAttack(u) * u.amount_alive;
+        const ranged: f64 = if (u.attack_type == AT.RANGE) 1 else 0;
+        const died = u.amount_died;
+        const alive = u.amount_alive;
+        const wounded = if (died + alive > 0) died / (died + alive) else 0;
+        const cell = engine.baseCell(u);
+        const along: f64 = @floatFromInt(cell.y);
+        const adv = if (u.team == st.Team.LEFT) along / span else (span - along) / span;
+        const yet: f64 = if (!madeTurn(s, ui) and !hourglassed(s, ui)) 1 else 0;
+        if (u.team == team) {
+            our_hp += hp;
+            our_cnt += 1;
+            our_atk += atk;
+            our_ranged += ranged;
+            our_wounded += wounded;
+            our_adv += adv;
+            our_yet += yet;
+            our_cells[n_our] = cell;
+            n_our += 1;
+        } else {
+            enemy_hp += hp;
+            enemy_cnt += 1;
+            enemy_atk += atk;
+            enemy_ranged += ranged;
+            enemy_wounded += wounded;
+            enemy_adv += adv;
+            enemy_yet += yet;
+            enemy_cells[n_enemy] = cell;
+            n_enemy += 1;
+        }
+    }
+    const total = our_cnt + enemy_cnt + 1;
+    out[0] = normalizedDifference(our_hp, enemy_hp);
+    out[1] = normalizedDifference(our_cnt, enemy_cnt);
+    out[2] = normalizedDifference(our_atk, enemy_atk);
+    out[3] = (our_ranged - enemy_ranged) / total;
+    out[4] = if (our_cnt != 0) our_wounded / our_cnt else 0;
+    out[5] = if (enemy_cnt != 0) enemy_wounded / enemy_cnt else 0;
+    out[6] = if (our_cnt != 0) our_adv / our_cnt else 0;
+    out[7] = if (enemy_cnt != 0) enemy_adv / enemy_cnt else 0;
+    out[8] = @min(@as(f64, @floatFromInt(s.fight.lap)) / 10, 1);
+    out[9] = (enemy_yet - our_yet) / total;
+    out[10] = enemy_yet / total;
+    out[11] = our_yet / total;
+    out[12] = @as(f64, @floatFromInt(s.fight.hourglass_q.len)) / total;
+    out[13] = @as(f64, @floatFromInt(s.fight.up_next.len)) / total;
+    out[14] = nearestEnemyDistance(our_cells[0..n_our], enemy_cells[0..n_enemy], span);
+    out[15] = nearestEnemyDistance(enemy_cells[0..n_enemy], our_cells[0..n_our], span);
+    out[16] = averageSpread(our_cells[0..n_our], span);
+    out[17] = averageSpread(enemy_cells[0..n_enemy], span);
+    out[18] = averageCenterDistance(our_cells[0..n_our], span);
+    out[19] = averageCenterDistance(enemy_cells[0..n_enemy], span);
+}
+
+pub const WAIT_FEATURES = 41;
+
+/// The v0.5 hourglass rule's counterfactual verdict (incumbentRuleWaits): a melee charge, a legal wait, fm >= 0.67.
+fn incumbentRuleWaits(s: *const State, ui: u8, incumbent: []const rec.Action, fm: f64) bool {
+    if (s.units[ui].attack_type == AT.RANGE) return false;
+    var charge = false;
+    for (incumbent) |a| {
+        if (a == .melee_attack and a.melee_attack.path.len > 0) charge = true;
+    }
+    if (!charge or !canHourglass(s, ui)) return false;
+    return fm >= 0.67;
+}
+
+/// extractWaitFeatures: the value features, then the tempo / hourglass block.
+pub fn waitFeatures(s: *const State, ui: u8, incumbent: []const rec.Action, out: *[WAIT_FEATURES]f64) void {
+    const u = &s.units[ui];
+    valueFeatures(s, u.team, out[0..VALUE_FEATURES]);
+    var own_alive: f64 = 0;
+    var enemy_alive: f64 = 0;
+    var own_yet: f64 = 0;
+    var enemy_yet: f64 = 0;
+    var own_init_sum: f64 = 0;
+    var enemy_init_sum: f64 = 0;
+    var own_init_max: f64 = 0;
+    var enemy_init_max: f64 = 0;
+    var enemies: f64 = 0;
+    var enemies_yet: f64 = 0;
+    for (s.units[0..s.n_units], 0..) |*o, i| {
+        if (!o.in_holder or o.isDead()) continue;
+        const oi: u8 = @intCast(i);
+        const own = o.team == u.team;
+        if (!own) {
+            enemies += 1;
+            if (!madeTurn(s, oi)) enemies_yet += 1;
+        }
+        if (own) own_alive += 1 else enemy_alive += 1;
+        if (madeTurn(s, oi) or hourglassed(s, oi)) continue;
+        if (own) {
+            own_yet += 1;
+            own_init_sum += o.initiative;
+            own_init_max = @max(own_init_max, o.initiative);
+        } else {
+            enemy_yet += 1;
+            enemy_init_sum += o.initiative;
+            enemy_init_max = @max(enemy_init_max, o.initiative);
+        }
+    }
+    const clampCnt = struct {
+        fn f(n: f64) f64 {
+            return @min(n / 8, 1);
+        }
+    }.f;
+    const lap: f64 = @floatFromInt(s.fight.lap);
+    const till_i: i32 = @max(1, s.fight.laps_till_narrowing);
+    const till: f64 = @floatFromInt(till_i);
+    const narrowed: f64 = @floatFromInt(@divFloor(s.fight.lap - 1, till_i) + s.fight.additional_narrowing_laps);
+    const at = u.attack_type;
+    const fm = if (enemies != 0) enemies_yet / enemies else 0;
+    const enemy_yet_frac = if (enemy_alive != 0) enemy_yet / enemy_alive else 0;
+    const lap_capped = @min(lap, 8) / 8;
+    const is_melee: f64 = if (at == AT.MELEE or at == AT.MELEE_MAGIC) 1 else 0;
+    const is_ranged: f64 = if (at == AT.RANGE) 1 else 0;
+    const made: f64 = @floatFromInt(@popCount(s.fight.made));
+    var f = out[VALUE_FEATURES..];
+    f[0] = fm;
+    f[1] = clampCnt(own_yet);
+    f[2] = clampCnt(enemy_yet);
+    f[3] = if (own_alive != 0) own_yet / own_alive else 0;
+    f[4] = enemy_yet_frac;
+    f[5] = if (own_alive + enemy_alive > 0) made / (own_alive + enemy_alive) else 0;
+    f[6] = lap_capped;
+    f[7] = normalizedDifference(own_init_max, enemy_init_max);
+    f[8] = normalizedDifference(if (own_yet != 0) own_init_sum / own_yet else 0, if (enemy_yet != 0) enemy_init_sum / enemy_yet else 0);
+    f[9] = is_melee;
+    f[10] = is_ranged;
+    f[11] = if (at == AT.MAGIC or at == AT.MELEE_MAGIC) 1 else 0;
+    f[12] = if (engine.canFly(u)) 1 else 0;
+    f[13] = clampCnt(own_alive);
+    f[14] = clampCnt(enemy_alive);
+    f[15] = @min(narrowed / till, 1);
+    f[16] = @as(f64, @floatFromInt(@mod(s.fight.lap - 1, till_i))) / till;
+    f[17] = if (incumbentRuleWaits(s, ui, incumbent, fm)) 1 else 0;
+    f[18] = fm * lap_capped;
+    f[19] = enemy_yet_frac * is_melee;
+    f[20] = enemy_yet_frac * is_ranged;
 }
