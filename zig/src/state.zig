@@ -31,21 +31,45 @@ pub const Movement = struct {
 
 pub const Cell = @import("recording.zig").Cell;
 
-/// System spells the scoped battles can carry as buffs/debuffs. The string table is only for digests.
+/// Buffs, debuffs and effects the scoped battles can carry, by their TypeScript names (the string table is for
+/// loading the start state and for digests). Buffs: Morale and the team blessings; debuffs: Dismorale and Dulling
+/// Defense; effects: Shatter Armor.
 pub const SpellId = enum(u8) {
     morale,
     dismorale,
-    luck_shield,
+    luck_blessing,
+    sharpened_weapons_blessing,
+    dulling_defense,
+    shatter_armor,
 
     pub fn name(self: SpellId) []const u8 {
         return switch (self) {
             .morale => "Morale",
             .dismorale => "Dismorale",
-            .luck_shield => "Luck Shield",
+            .luck_blessing => "Luck Blessing",
+            .sharpened_weapons_blessing => "Sharpened Weapons Blessing",
+            .dulling_defense => "Dulling Defense",
+            .shatter_armor => "Shatter Armor",
         };
+    }
+
+    pub fn fromName(n: []const u8) ?SpellId {
+        inline for (std.meta.fields(SpellId)) |f| {
+            const id: SpellId = @enumFromInt(f.value);
+            if (std.mem.eql(u8, n, id.name())) return id;
+        }
+        return null;
     }
 };
 
+/// Lap counts that `minusLap` never decrements: aura buffs (Number.MAX_SAFE_INTEGER) and whole-fight ones
+/// (NUMBER_OF_LAPS_TOTAL = 12 + 4 - 1, src/constants.ts).
+pub const LAPS_AURA: f64 = 9007199254740991;
+pub const NUMBER_OF_LAPS_TOTAL: f64 = 15;
+
+/// One applied buff/debuff/effect. TypeScript keeps the object (AppliedSpell / Effect) and the parallel
+/// `applied_*` display arrays; in scope a name is never applied twice to one list (every apply deletes the name
+/// first), so both always agree and one record holds them.
 pub const AppliedSpell = struct {
     id: SpellId,
     laps: f64,
@@ -60,6 +84,11 @@ pub const SpellList = struct {
         for (self.items[0..self.len], 0..) |s, i| if (s.id == id) return i;
         return null;
     }
+    /// The first entry's power (`getBuff(name)?.getPower()`, `getEffect(name)?.getPower()`).
+    pub fn power(self: *const SpellList, id: SpellId) ?f64 {
+        for (self.items[0..self.len]) |s| if (s.id == id) return s.power;
+        return null;
+    }
     pub fn removeAt(self: *SpellList, i: usize) void {
         var j = i;
         while (j + 1 < self.len) : (j += 1) self.items[j] = self.items[j + 1];
@@ -69,6 +98,100 @@ pub const SpellList = struct {
         self.items[self.len] = s;
         self.len += 1;
     }
+    /// deleteBuff / deleteDebuff / deleteEffect: every entry of that name, keeping the order of the rest.
+    pub fn delete(self: *SpellList, id: SpellId) void {
+        var i: usize = self.len;
+        while (i > 0) {
+            i -= 1;
+            if (self.items[i].id == id) self.removeAt(i);
+        }
+    }
+};
+
+// =====================================================================================================================
+// Abilities (src/abilities/ability_properties.ts, the creature configs in src/configuration)
+// =====================================================================================================================
+
+pub const MAX_ABILITIES = 4;
+
+/// The abilities the port implements. A recorded unit carrying any other ability is refused at load.
+pub const AbilityId = enum(u8) {
+    luck_blessing,
+    lucky_strike,
+    shatter_armor,
+    rapid_charge,
+    double_punch,
+    sharpened_weapons_blessing,
+    shadow_touch,
+    small_specie,
+    heavy_armor,
+    dulling_defense,
+    penetrating_bite,
+    backstab,
+    dodge,
+
+    pub fn name(self: AbilityId) []const u8 {
+        return switch (self) {
+            .luck_blessing => "Luck Blessing",
+            .lucky_strike => "Lucky Strike",
+            .shatter_armor => "Shatter Armor",
+            .rapid_charge => "Rapid Charge",
+            .double_punch => "Double Punch",
+            .sharpened_weapons_blessing => "Sharpened Weapons Blessing",
+            .shadow_touch => "Shadow Touch",
+            .small_specie => "Small Specie",
+            .heavy_armor => "Heavy Armor",
+            .dulling_defense => "Dulling Defense",
+            .penetrating_bite => "Penetrating Bite",
+            .backstab => "Backstab",
+            .dodge => "Dodge",
+        };
+    }
+
+    pub fn fromName(n: []const u8) ?AbilityId {
+        inline for (std.meta.fields(AbilityId)) |f| {
+            const id: AbilityId = @enumFromInt(f.value);
+            if (std.mem.eql(u8, n, id.name())) return id;
+        }
+        return null;
+    }
+
+    pub inline fn bit(self: AbilityId) u32 {
+        return @as(u32, 1) << @as(u5, @intCast(@intFromEnum(self)));
+    }
+};
+
+/// AbilityPowerType values the ported formulas branch on (src/abilities/ability_properties.ts).
+pub const PowerType = struct {
+    pub const TOTAL_DAMAGE_PERCENTAGE: u8 = 1;
+    pub const ADDITIONAL_DAMAGE_PERCENTAGE: u8 = 2;
+    pub const MAGIC_RESIST_100: u8 = 6;
+    pub const APPLY_EFFECT: u8 = 7;
+    pub const IGNORE_ARMOR: u8 = 8;
+    pub const BOOST_HEALTH: u8 = 13;
+    pub const ADDITIONAL_MELEE_DAMAGE_PERCENTAGE: u8 = 16;
+    pub const ADDITIONAL_RANGE_ARMOR_PERCENTAGE: u8 = 19;
+    pub const MAGIC_RESIST_50: u8 = 21;
+    pub const ABSORB_DEBUFF: u8 = 25;
+    pub const KILL_RANDOM_AMOUNT: u8 = 27;
+    pub const MAGIC_RESIST_25: u8 = 28;
+    pub const ADDITIONAL_STEPS: u8 = 29;
+    pub const STEAL_ARMOR_ON_HIT: u8 = 35;
+    pub const MAGIC_DAMAGE: u8 = 41;
+    pub const GAIN_ATTACK_AND_ARMOR_EACH_STEP: u8 = 44;
+    pub const REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK: u8 = 47;
+};
+
+/// One configured ability (getAbilityConfig(name)), plus the default of the effect it applies, if any.
+pub const Ability = struct {
+    id: AbilityId,
+    power: f64,
+    power_type: u8,
+    ty: u8,
+    stack_powered: bool,
+    skip_response: bool,
+    effect_laps: f64 = 0,
+    effect_power: f64 = 0,
 };
 
 /// `initialUnitProperties`: the base values every stat refresh recomputes from. Only `morale` changes in scope.
@@ -156,8 +279,29 @@ pub const Unit = struct {
     reg: [4]Cell,
     n_reg: u8,
 
+    /// `abilities`, in the order of the unit's configuration, and a bit per AbilityId for quick probes.
+    abilities: [MAX_ABILITIES]Ability,
+    n_abilities: u8,
+    ability_mask: u32,
+    /// The unit's ability names include a LUCK_DEPENDENT_BLESSINGS name (UnitsHolder's early luck pass).
+    luck_dependent: bool,
+    /// movedRouteCellsThisTurn: the last move's route length, read by Rapid Charge; 0 when not moved.
+    moved_route_cells: f64,
+
     pub fn isDead(self: *const Unit) bool {
         return self.amount_alive <= 0;
+    }
+
+    /// hasAbilityActive. No Break effect exists in scope, so an ability is active whenever the unit has it.
+    pub inline fn has(self: *const Unit, id: AbilityId) bool {
+        return self.ability_mask & id.bit() != 0;
+    }
+
+    /// getAbility (Break-aware in TypeScript; see `has`).
+    pub fn ability(self: *const Unit, id: AbilityId) ?*const Ability {
+        if (!self.has(id)) return null;
+        for (self.abilities[0..self.n_abilities]) |*a| if (a.id == id) return a;
+        return null;
     }
 };
 
@@ -247,4 +391,6 @@ pub const State = struct {
     ai_prev_target: [MAX_UNITS]i8,
     /// Lap of the latest damage-statistic entry (a landed hit or response); feeds damageDealtThisLap.
     damage_lap: i32,
+    /// Some unit carries a team-blessing ability, so the stat refresh runs the blessing census.
+    blessings: bool,
 };

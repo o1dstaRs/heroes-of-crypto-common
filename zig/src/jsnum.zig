@@ -58,6 +58,13 @@ pub fn round(x: f64) f64 {
     return if (x - f >= 0.5) f + 1 else f;
 }
 
+/// `Math.max(a, b)` for non-NaN values: +0 wins over -0 (an IEEE max may return either).
+pub inline fn max(a: f64, b: f64) f64 {
+    if (a > b) return a;
+    if (b > a) return b;
+    return if (std.math.signbit(a)) b else a;
+}
+
 test "toFixed matches JavaScript" {
     const t = std.testing;
     try t.expectEqual(@as(f64, -0.1), toFixed(0.05 * -1.0, 1));
@@ -70,4 +77,7 @@ test "toFixed matches JavaScript" {
     try t.expectEqual(@as(f64, 3), round(2.5));
     try t.expectEqual(@as(f64, -2), round(-2.5));
     try t.expectEqual(@as(f64, 0), round(0.49999999999999994));
+    try t.expect(!std.math.signbit(max(-0.0, 0.0)));
+    try t.expect(!std.math.signbit(max(0.0, -0.0)));
+    try t.expectEqual(@as(f64, 2), max(-std.math.inf(f64), 2));
 }

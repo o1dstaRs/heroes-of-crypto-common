@@ -1,13 +1,14 @@
 //! The Zig engine: battle start state, and `apply` for each top-level engine call.
 //!
-//! Every function names the TypeScript it mirrors. Scope: no abilities, spells, artifacts, augments, synergies or
-//! doctrines; NORMAL grid. See zig/README.md.
+//! Every function names the TypeScript it mirrors. Scope: the abilities in abilities.zig, no spells, artifacts,
+//! augments, synergies or doctrines; NORMAL grid. See zig/README.md.
 
 const std = @import("std");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
 const js = @import("jsnum.zig");
 const combat = @import("combat.zig");
+const abilities = @import("abilities.zig");
 const Rng = @import("rng.zig").Rng;
 
 const Cell = st.Cell;
@@ -391,7 +392,8 @@ pub fn applyDamage(u: *Unit, minus_hp: f64) f64 {
 // Stat refresh (UnitsHolder.refreshStackPowerForAllUnits, Unit.adjustBaseStats)
 // =====================================================================================================================
 
-fn adjustBaseStats(s: *State, u: *Unit) void {
+/// Unit.adjustBaseStats
+pub fn adjustBaseStats(s: *State, u: *Unit) void {
     const f = &s.fight;
     const lap_bit: u128 = if (f.lap >= 0 and f.lap < 128) @as(u128, 1) << @intCast(f.lap) else 0;
     const lap_adjusted = u.adjusted_laps & lap_bit != 0;
@@ -414,7 +416,7 @@ fn adjustBaseStats(s: *State, u: *Unit) void {
         u.luck_per_turn = luck;
     }
     if (!f.started) u.luck_per_turn = 0;
-    u.luck_mod = u.luck_per_turn + 0;
+    u.luck_mod = u.luck_per_turn + 0 + 0 + (u.buffs.power(.luck_blessing) orelse 0);
     if (u.luck_mod + u.luck > LUCK_MAX) {
         u.luck_mod = LUCK_MAX - u.luck;
     } else if (u.luck_mod + u.luck < -LUCK_MAX) {
@@ -436,8 +438,14 @@ fn adjustBaseStats(s: *State, u: *Unit) void {
 
     // ARMOR
     u.base_armor = js.roundUnitStat(u.init.base_armor + 0, 2);
-    u.base_armor = js.roundUnitStat(u.base_armor * 1, 2);
-    u.armor_mod = u.init.armor_mod;
+    var base_armor_multiplier: f64 = 1;
+    if (u.ability(.heavy_armor)) |ha| {
+        base_armor_multiplier = base_armor_multiplier *
+            (1 + ((ha.power + getLuck(u) + 0 + 0) / 100 / abilities.MAX_UNIT_STACK_POWER) * getStackPower(u));
+    }
+    u.base_armor = js.roundUnitStat(u.base_armor * base_armor_multiplier, 2);
+    const shatter = u.effects.power(.shatter_armor) orelse 0;
+    u.armor_mod = if (shatter > 0) -shatter else u.init.armor_mod;
 
     // MAGIC RESIST
     u.magic_resist = u.init.magic_resist;
@@ -459,9 +467,11 @@ fn adjustBaseStats(s: *State, u: *Unit) void {
     u.shot_distance = u.init.shot_distance;
     u.attack_damage_min = u.init.attack_damage_min;
     u.attack_damage_max = u.init.attack_damage_max;
+    var base_attack_multiplier: f64 = 1;
+    if (u.buffs.power(.sharpened_weapons_blessing)) |sw| base_attack_multiplier = base_attack_multiplier * (1 + sw / 100);
     u.attack_mod = u.init.attack_mod;
     u.attack_mod = js.roundUnitStat(u.attack_mod + 0, 2);
-    u.base_attack = js.roundUnitStat(u.base_attack * 1, 2);
+    u.base_attack = js.roundUnitStat(u.base_attack * base_attack_multiplier, 2);
     u.shot_distance = js.roundUnitStat(u.shot_distance, 2);
     u.range_armor = js.roundUnitStat(u.base_armor * 1, 2);
 
@@ -483,8 +493,10 @@ fn setStackPowers(s: *State) void {
     }
 }
 
+/// UnitsHolder.refreshStackPowerForAllUnits (no auras, Water Shield or Disguise in scope).
 pub fn refreshStackPowerForAllUnits(s: *State) void {
     setStackPowers(s);
+    if (s.blessings) abilities.refreshBlessings(s);
     for (s.units[0..s.n_units]) |*u| {
         if (!u.in_holder or !cellWithinGrid(baseCell(u))) continue;
         adjustBaseStats(s, u);
@@ -943,20 +955,12 @@ fn applyMoraleRolls(s: *State, units: []const u8) void {
         const chance: f64 = @floatFromInt(s.rng.int(0, 100));
         if (chance >= @abs(m)) continue;
         if (m > 0) {
-            u.buffs.push(.{ .id = .morale, .laps = 1 });
+            u.buffs.push(.{ .id = .morale, .laps = 1, .power = 0 });
             s.fight.morale_plus_q.push(ui);
         } else {
-            u.debuffs.push(.{ .id = .dismorale, .laps = 1 });
+            u.debuffs.push(.{ .id = .dismorale, .laps = 1, .power = 0 });
             s.fight.morale_minus_q.push(ui);
         }
-    }
-}
-
-fn deleteSpell(list: *st.SpellList, id: st.SpellId) void {
-    var i: usize = list.len;
-    while (i > 0) {
-        i -= 1;
-        if (list.items[i].id == id) list.removeAt(i);
     }
 }
 
@@ -997,8 +1001,8 @@ fn handleLapTransition(s: *State, o: *const Ordered, all_made: bool, damage_deal
 
     for (refreshed.all.slice()) |ui| {
         const u = &s.units[ui];
-        if (u.buffs.find(.morale) != null) deleteSpell(&u.buffs, .morale);
-        if (u.debuffs.find(.dismorale) != null) deleteSpell(&u.debuffs, .dismorale);
+        if (u.buffs.find(.morale) != null) u.buffs.delete(.morale);
+        if (u.debuffs.find(.dismorale) != null) u.debuffs.delete(.dismorale);
     }
     refreshStackPowerForAllUnits(s);
     applyMoraleRolls(s, refreshed.all.slice());
@@ -1045,6 +1049,7 @@ pub fn possibleIncludes(u: *const Unit, t: u8) bool {
 fn activateNextUnit(s: *State, ui: u8) void {
     const u = &s.units[ui];
     u.moved_this_turn = false;
+    u.moved_route_cells = 0;
     u.on_hourglass = false;
     // startTurn's timers are not modelled; stacksToAct refreshes the team counts.
     for ([_]u8{ Team.LEFT, Team.RIGHT }) |side| {
@@ -1058,6 +1063,24 @@ fn activateNextUnit(s: *State, ui: u8) void {
     s.fight.first_turn_made = true;
 }
 
+/// One list's pass of Unit.minusLap: each entry loses a lap (sentinel counts excepted) and is deleted at 0.
+fn minusLapList(list: *st.SpellList) void {
+    var i: usize = 0;
+    while (i < list.len) {
+        const e = &list.items[i];
+        if (e.laps > 0 and e.laps != st.LAPS_AURA and e.laps != st.NUMBER_OF_LAPS_TOTAL) e.laps -= 1;
+        if (e.laps != 0) i += 1 else list.removeAt(i);
+    }
+}
+
+/// Unit.minusLap: Dismorale holds the effects and debuffs, Morale holds the buffs.
+fn minusLap(u: *Unit) void {
+    const dismorale = hasDismorale(u);
+    if (!dismorale) minusLapList(&u.effects);
+    if (!hasMoraleBuff(u)) minusLapList(&u.buffs);
+    if (!dismorale) minusLapList(&u.debuffs);
+}
+
 /// TurnEngine.completeTurn
 pub fn completeTurn(s: *State, ui: u8, hourglass: bool, skip: bool, events: *Events) void {
     const u = &s.units[ui];
@@ -1066,13 +1089,14 @@ pub fn completeTurn(s: *State, ui: u8, hourglass: bool, skip: bool, events: *Eve
         events.push(.unit_skipped, ui);
     }
     if (!hourglass) {
-        // minusLap: no state change in scope (only Morale/Dismorale exist, deleted at the lap start).
+        minusLap(u);
         s.fight.made |= unitBit(ui);
         _ = s.fight.up_next.removeOnce(ui);
         u.on_hourglass = false;
     }
     refreshStackPowerForAllUnits(s);
     u.moved_this_turn = false;
+    u.moved_route_cells = 0;
     events.push(.turn_completed, ui);
 }
 
@@ -1266,11 +1290,78 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) R
     // applyRouteMoveModifiers: getTravelledRoute strips nothing here; the route is non-empty.
     applyDistanceMorale(s, ui, from, to);
     u.moved_this_turn = true;
+    u.moved_route_cells = @floatFromInt(path.len); // setMovedRouteCellsThisTurn(action.path.length)
 }
 
 // =====================================================================================================================
 // Entry points
 // =====================================================================================================================
+
+/// The name behind the last UnsupportedAbility / UnsupportedSpell load error (diagnostics only).
+pub var unsupported_name: []const u8 = "";
+
+/// The applied_* parallel arrays of a recorded unit (names, laps, powers) as one list.
+fn loadSpells(props: std.json.Value, comptime kind: []const u8) !st.SpellList {
+    var list: st.SpellList = .{};
+    const names = rec.get(props, "applied_" ++ kind).array.items;
+    const laps = rec.get(props, "applied_" ++ kind ++ "_laps").array.items;
+    const powers = rec.get(props, "applied_" ++ kind ++ "_powers").array.items;
+    if (names.len > st.MAX_SPELLS) return error.TooManySpells;
+    for (names, 0..) |n, i| {
+        const id = st.SpellId.fromName(n.string) orelse {
+            unsupported_name = n.string;
+            return error.UnsupportedSpell;
+        };
+        list.push(.{ .id = id, .laps = rec.num(laps[i]), .power = rec.num(powers[i]) });
+    }
+    return list;
+}
+
+/// LUCK_DEPENDENT_BLESSINGS (src/units/units_holder.ts)
+const LUCK_DEPENDENT_BLESSINGS = [_][]const u8{
+    "Tie up the Horses Blessing",
+    "Sharpened Weapons Blessing",
+    "Arcane Ward Blessing",
+    "Warding Mane Blessing",
+    "Arrows Wingshield Blessing",
+};
+
+/// The unit's abilities from `props.abilities` and the recorded `getAbilityConfig` / `getEffectConfig` entries.
+fn loadAbilities(init: std.json.Value, props: std.json.Value, u: *Unit) !void {
+    u.n_abilities = 0;
+    u.ability_mask = 0;
+    u.luck_dependent = false;
+    for (rec.get(props, "abilities").array.items) |n| {
+        for (LUCK_DEPENDENT_BLESSINGS) |name| {
+            if (std.mem.eql(u8, n.string, name)) u.luck_dependent = true;
+        }
+        const id = st.AbilityId.fromName(n.string) orelse {
+            unsupported_name = n.string;
+            return error.UnsupportedAbility;
+        };
+        const cfg = rec.get(rec.get(init, "abilityConfigs"), n.string);
+        if (cfg == .null) return error.MissingAbilityConfig;
+        var a = st.Ability{
+            .id = id,
+            .power = rec.num(rec.get(cfg, "power")),
+            .power_type = @intCast(rec.int(rec.get(cfg, "power_type"))),
+            .ty = @intCast(rec.int(rec.get(cfg, "type"))),
+            .stack_powered = rec.get(cfg, "stack_powered") == .bool and rec.get(cfg, "stack_powered").bool,
+            .skip_response = rec.get(cfg, "skip_response") == .bool and rec.get(cfg, "skip_response").bool,
+        };
+        const effect = rec.get(cfg, "effect");
+        if (effect == .string) {
+            const ecfg = rec.get(rec.get(init, "effectConfigs"), effect.string);
+            if (ecfg == .null) return error.MissingEffectConfig;
+            a.effect_laps = rec.num(rec.get(ecfg, "laps"));
+            a.effect_power = rec.num(rec.get(ecfg, "power"));
+        }
+        if (u.n_abilities >= st.MAX_ABILITIES) return error.TooManyAbilities;
+        u.abilities[u.n_abilities] = a;
+        u.n_abilities += 1;
+        u.ability_mask |= id.bit();
+    }
+}
 
 pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
     _ = ids;
@@ -1369,7 +1460,24 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
             .n_possible = 0,
             .reg = undefined,
             .n_reg = 0,
+            .abilities = undefined,
+            .n_abilities = 0,
+            .ability_mask = 0,
+            .luck_dependent = false,
+            .moved_route_cells = 0,
         };
+        const unit = &s.units[i];
+        try loadAbilities(init, props, unit);
+        unit.buffs = try loadSpells(props, "buffs");
+        unit.debuffs = try loadSpells(props, "debuffs");
+        unit.effects = try loadSpells(props, "effects");
+    }
+    s.blessings = false;
+    for (s.units[0..s.n_units]) |*u| {
+        if (u.has(.luck_blessing) or u.has(.sharpened_weapons_blessing)) s.blessings = true;
+        for (u.buffs.items[0..u.buffs.len]) |b| {
+            if (b.id == .luck_blessing or b.id == .sharpened_weapons_blessing) s.blessings = true;
+        }
     }
     // Grid: register each unit's placement cells, then build the threat boards from them.
     for (0..st.GRID) |x| {

@@ -46,10 +46,12 @@ fn eqNum(a: f64, e: f64) bool {
     return a == e or (std.math.isNan(a) and std.math.isNan(e));
 }
 
-/// Compares "Morale,Dismorale" + "1,2" style lists.
-fn spellsMatch(list: *const st.SpellList, names: []const u8, laps: []const u8) bool {
+/// Compares "Morale,Luck Blessing" + "1,15" + "0,4" style lists: names, laps and powers in order. `powers` is null
+/// for recordings made before the powers column existed.
+fn spellsMatch(list: *const st.SpellList, names: []const u8, laps: []const u8, powers: ?[]const u8) bool {
     var it = std.mem.tokenizeScalar(u8, names, ',');
     var lit = std.mem.tokenizeScalar(u8, laps, ',');
+    var pit = std.mem.tokenizeScalar(u8, powers orelse "", ',');
     var i: usize = 0;
     while (it.next()) |n| : (i += 1) {
         if (i >= list.len) return false;
@@ -57,8 +59,17 @@ fn spellsMatch(list: *const st.SpellList, names: []const u8, laps: []const u8) b
         const l = lit.next() orelse return false;
         const lv = std.fmt.parseFloat(f64, l) catch return false;
         if (lv != list.items[i].laps) return false;
+        if (powers != null) {
+            const p = pit.next() orelse return false;
+            const pv = std.fmt.parseFloat(f64, p) catch return false;
+            if (pv != list.items[i].power) return false;
+        }
     }
     return i == list.len;
+}
+
+fn column(row: []const std.json.Value, i: usize) ?[]const u8 {
+    return if (i < row.len and row[i] == .string) row[i].string else null;
 }
 
 fn idSet(ids: []const []const u8, set: st.UnitSet, expected: std.json.Value, m: *Mismatch, what: []const u8) bool {
@@ -121,26 +132,32 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
                 return false;
             }
         }
-        if (!spellsMatch(&u.buffs, row[29].string, row[30].string)) {
-            m.set("unit {d} buffs: ts '{s}' laps '{s}' (zig has {d})", .{ idx, row[29].string, row[30].string, u.buffs.len });
-            return false;
-        }
-        if (!spellsMatch(&u.debuffs, row[31].string, row[32].string)) {
-            m.set("unit {d} debuffs: ts '{s}' laps '{s}' (zig has {d})", .{ idx, row[31].string, row[32].string, u.debuffs.len });
-            return false;
-        }
-        if (!spellsMatch(&u.effects, row[33].string, row[34].string)) {
-            m.set("unit {d} effects: ts '{s}'", .{ idx, row[33].string });
-            return false;
-        }
-        const hidden = [_]struct { []const u8, f64 }{
-            .{ "px", u.pos_x },
-            .{ "py", u.pos_y },
-            .{ "base_morale", u.init.morale },
-            .{ "luck_per_turn", u.luck_per_turn },
+        const lists = [_]struct { []const u8, *const st.SpellList, usize, usize }{
+            .{ "buffs", &u.buffs, 29, 39 },
+            .{ "debuffs", &u.debuffs, 31, 40 },
+            .{ "effects", &u.effects, 33, 41 },
         };
-        for (hidden, 35..) |h, col| {
-            const e = rec.num(row[col]);
+        for (lists) |l| {
+            if (!spellsMatch(l[1], row[l[2]].string, row[l[2] + 1].string, column(row, l[3]))) {
+                const first = if (l[1].len > 0) l[1].items[0] else st.AppliedSpell{ .id = .morale, .laps = 0 };
+                m.set("unit {d} {s}: ts '{s}' laps '{s}' powers '{s}' (zig has {d}; first {s} laps {d} power {d})", .{
+                    idx,                                        l[0],       row[l[2]].string, row[l[2] + 1].string, column(row, l[3]) orelse "", l[1].len,
+                    if (l[1].len > 0) first.id.name() else "-", first.laps, first.power,
+                });
+                return false;
+            }
+        }
+        const hidden = [_]struct { []const u8, f64, usize }{
+            .{ "px", u.pos_x, 35 },
+            .{ "py", u.pos_y, 36 },
+            .{ "base_morale", u.init.morale, 37 },
+            .{ "luck_per_turn", u.luck_per_turn, 38 },
+            .{ "base_attack_init", u.init.base_attack, 42 },
+            .{ "moved_route_cells", u.moved_route_cells, 43 },
+        };
+        for (hidden) |h| {
+            if (h[2] >= row.len) continue; // older recordings stop at an earlier column
+            const e = rec.num(row[h[2]]);
             if (!eqNum(h[1], e)) {
                 m.set("unit {d} {s}: zig {d}, ts {d}", .{ idx, h[0], h[1], e });
                 return false;

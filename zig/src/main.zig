@@ -58,7 +58,12 @@ fn parity(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
         const arena = arena_state.allocator();
         const game = try rec.parseGame(arena, line, true);
         games += 1;
-        var s = try engine.initState(game.init, game.ids);
+        var s = engine.initState(game.init, game.ids) catch |err| {
+            failures += 1;
+            steps_total += game.steps.len;
+            if (failures <= max_fail) std.debug.print("seed {d}: start state not supported ({s} {s})\n", .{ game.seed, @errorName(err), engine.unsupported_name });
+            continue;
+        };
         var events: engine.Events = .{};
         var failed = false;
         for (game.steps, 0..) |step, i| {
@@ -356,7 +361,11 @@ fn native(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
         const game = try rec.parseGame(arena_state.allocator(), line, true);
         games += 1;
         steps_total += game.steps.len;
-        var s = try engine.initState(game.init, game.ids);
+        var s = engine.initState(game.init, game.ids) catch |err| {
+            fails += 1;
+            if (fails <= max_fail) std.debug.print("seed {d}: start state not supported ({s} {s})\n", .{ game.seed, @errorName(err), engine.unsupported_name });
+            continue;
+        };
         s.rng.state = game.steps[0].r0;
         var check = NativeCheck{ .game = &game, .ids = game.ids };
         const end = ai.playMatch(&s, 60, .{ .ctx = &check, .step = NativeCheck.step });

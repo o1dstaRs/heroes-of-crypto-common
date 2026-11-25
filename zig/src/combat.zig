@@ -1,11 +1,12 @@
 //! Melee and ranged attacks: GameActionEngine.meleeAttack / rangeAttack and the AttackHandler paths they take
-//! in scope (no abilities, no spells, NORMAL grid).
+//! in scope (the abilities in abilities.zig, no spells, NORMAL grid).
 
 const std = @import("std");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
 const js = @import("jsnum.zig");
 const engine = @import("engine.zig");
+const abilities = @import("abilities.zig");
 
 const Cell = st.Cell;
 const State = st.State;
@@ -26,8 +27,9 @@ fn damageBound(att: *const Unit, tgt: *const Unit, dmg: f64, is_range: bool, div
     return @max(1, @ceil(((((dmg * rate * att.amount_alive) / armor) * (1 - luck / 100)) / divisor) * att.attack_multiplier * 1));
 }
 
-/// Unit.calculateAttackDamage. A ranged roll spends the attacker's shot before rolling.
-fn calculateAttackDamage(s: *State, att: *Unit, tgt: *const Unit, attack_type: u8, divisor: f64) f64 {
+/// Unit.calculateAttackDamage. A ranged roll spends the attacker's shot before rolling; the ability multiplier is
+/// applied after the roll (resolveAttackDamageChain / applyAttackDamageChain).
+fn calculateAttackDamage(s: *State, att: *Unit, tgt: *const Unit, attack_type: u8, divisor: f64, ability_multiplier: f64) f64 {
     const is_range = attack_type == AT.RANGE;
     const lo = damageBound(att, tgt, att.attack_damage_min, is_range, divisor);
     const hi = damageBound(att, tgt, att.attack_damage_max, is_range, divisor);
@@ -41,7 +43,21 @@ fn calculateAttackDamage(s: *State, att: *Unit, tgt: *const Unit, attack_type: u
         att.range_shots = @floor(att.range_shots);
     }
     const roll: f64 = @floatFromInt(s.rng.int(@intFromFloat(lo), @intFromFloat(hi)));
-    return @floor(roll * type_mult * 1 * 1 * 1);
+    return @floor(roll * type_mult * ability_multiplier * 1 * 1);
+}
+
+/// processLuckyStrikeAbility: a chance to multiply the rolled damage.
+fn luckyStrike(s: *State, u: *const Unit, damage: f64) f64 {
+    const a = u.ability(.lucky_strike) orelse return damage;
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) < abilities.applyChance(u, a)) {
+        return @floor(damage * abilities.abilityMultiplier(u, a));
+    }
+    return damage;
+}
+
+/// The miss roll: `getRandomInt(0, 100) < attacker.calculateMissChance(target)`.
+inline fn missRoll(s: *State, att: *const Unit, tgt: *const Unit) bool {
+    return @as(f64, @floatFromInt(s.rng.int(0, 100))) < abilities.missChance(att, tgt);
 }
 
 // =====================================================================================================================
@@ -140,25 +156,27 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     if (current.x != from.x or current.y != from.y) return error.Rejected;
     // Stationary strike: the occupancy checks pass on the unit's own cells and setPosition writes the same value.
 
-    _ = s.rng.int(0, 100); // miss roll; the miss chance is 0 in scope
+    // chargedRouteCells: a stationary strike after this turn's move charges that move's route (no knownPaths
+    // provider in the simulation, so a strike without one leaves the multiplier at 1).
+    var ability_multiplier: f64 = 1;
+    if (att.moved_this_turn and att.moved_route_cells > 0) ability_multiplier = abilities.rapidCharge(att, att.moved_route_cells);
+    ability_multiplier *= abilities.positionMultiplier(att, from, engine.baseCell(tgt), tgt.fh);
+
+    const missed = missRoll(s, att, tgt);
     att.attack_mod = @max(0, att.attack_mod); // cleanupAttackModIncrease (+0)
-    const damage_from_attack = calculateAttackDamage(s, att, tgt, AT.MELEE, 1);
+    const damage_from_attack = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.MELEE, 1, ability_multiplier)) +
+        abilities.penetratingBite(att, tgt);
 
     // The response lands first.
-    if (!tgt.isDead() and !tgt.responded and s.fight.replied & engine.unitBit(ti) == 0) {
-        _ = s.rng.int(0, 100);
-        if (!att.isDead()) {
-            const damage_from_response = calculateAttackDamage(s, tgt, att, AT.MELEE, 1);
-            _ = engine.applyDamage(att, damage_from_response);
-            s.damage_lap = s.fight.lap;
-        }
-        spendReply(s, ti);
-    }
-    if (!tgt.isDead()) {
+    meleeResponse(s, ai, ti, from);
+    if (!missed and !tgt.isDead()) {
         _ = engine.applyDamage(tgt, damage_from_attack);
         s.damage_lap = s.fight.lap;
+        meleeRiders(s, ai, ti);
     }
     engine.refreshStackPowerForAllUnits(s);
+
+    const punch = doublePunch(s, ai, ti);
 
     var died: Died = .{};
     var decrease: MoraleDecrease = .{};
@@ -173,6 +191,23 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
         died.push(ti);
         attacker_plus += engine.MORALE_CHANGE_FOR_KILL;
         decrease.add(tgt, engine.MORALE_CHANGE_FOR_KILL);
+    } else if (punch.applied) {
+        meleeResponse(s, ai, ti, from);
+        if (punch.damage > 0) {
+            _ = engine.applyDamage(tgt, punch.damage);
+            s.damage_lap = s.fight.lap;
+        }
+        if (!punch.missed) meleeRiders(s, ai, ti);
+        if (att.isDead() and !died.includes(ai)) {
+            died.push(ai);
+            target_plus += engine.MORALE_CHANGE_FOR_KILL;
+            decrease.add(att, engine.MORALE_CHANGE_FOR_KILL);
+        }
+        if (tgt.isDead() and !died.includes(ti)) {
+            died.push(ti);
+            attacker_plus += engine.MORALE_CHANGE_FOR_KILL;
+            decrease.add(tgt, engine.MORALE_CHANGE_FOR_KILL);
+        }
     }
     engine.changeMorale(tgt, target_plus, true);
     engine.changeMorale(att, attacker_plus, true);
@@ -181,6 +216,52 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
 
     cleanupDeadUnits(s, &died, events);
     engine.completeTurn(s, ai, false, false, events);
+}
+
+/// The on-hit riders of a landed melee blow from `from_i` on `to_i`, in handleMeleeAttack's order (the ported ones:
+/// Dulling Defense, Shatter Armor). The attacker is the active unit.
+fn meleeRiders(s: *State, from_i: u8, to_i: u8) void {
+    abilities.dullingDefense(&s.units[from_i], &s.units[to_i]);
+    abilities.shatterArmor(s, from_i, to_i, from_i);
+}
+
+/// canUnitRespondToMelee (src/handlers/melee_response.ts)
+fn canRespondToMelee(s: *const State, att: *const Unit, ti: u8) bool {
+    const tgt = &s.units[ti];
+    return !abilities.skipsResponse(att) and !tgt.responded and s.fight.replied & engine.unitBit(ti) == 0;
+}
+
+/// handleMeleeAttack's captureResponse: the target strikes back once (its reply is spent even on a miss).
+fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell) void {
+    const att = &s.units[ai];
+    const tgt = &s.units[ti];
+    if (tgt.isDead() or !canRespondToMelee(s, att, ti)) return;
+    const missed = missRoll(s, tgt, att);
+    if (!missed and !att.isDead()) {
+        const ability_multiplier = abilities.positionMultiplier(tgt, engine.baseCell(tgt), from, att.fh);
+        const damage_from_response = luckyStrike(s, tgt, calculateAttackDamage(s, tgt, att, AT.MELEE, 1, ability_multiplier)) +
+            abilities.penetratingBite(tgt, att);
+        _ = engine.applyDamage(att, damage_from_response);
+        s.damage_lap = s.fight.lap;
+        // The responder's riders (Shatter Armor rides only the attacker's blows).
+        abilities.dullingDefense(tgt, att);
+    }
+    spendReply(s, ti);
+}
+
+const Punch = struct { applied: bool = false, missed: bool = false, damage: f64 = 0 };
+
+/// processDoublePunchAbility: a second strike with its own miss roll.
+fn doublePunch(s: *State, ai: u8, ti: u8) Punch {
+    const att = &s.units[ai];
+    const tgt = &s.units[ti];
+    const a = att.ability(.double_punch) orelse return .{};
+    if (att.isDead() or tgt.isDead()) return .{};
+    if (missRoll(s, att, tgt)) return .{ .applied = true, .missed = true };
+    const ability_multiplier = abilities.abilityMultiplier(att, a);
+    const damage = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.MELEE, 1, ability_multiplier)) +
+        abilities.penetratingBite(att, tgt);
+    return .{ .applied = true, .damage = damage };
 }
 
 // =====================================================================================================================
@@ -428,15 +509,17 @@ pub fn rangeAttack(s: *State, ai: u8, ti: u8, aim_cell: ?Cell, aim_side: u8, eve
     if (tgt.team == att.team or tgt.isDead()) return error.Rejected;
     var idx: usize = 1;
 
-    _ = s.rng.int(0, 100); // miss roll; the miss chance is 0 in scope
+    const missed = missRoll(s, att, tgt);
     var responder_target: ?u8 = null;
+    var response_missed = false;
     if (response_victim) |rv| {
-        if (s.fight.replied & engine.unitBit(target_ui) == 0 and engine.canLandRangeAttack(s, tgt)) {
-            _ = s.rng.int(0, 100);
+        if (!abilities.skipsResponse(att) and s.fight.replied & engine.unitBit(target_ui) == 0 and engine.canLandRangeAttack(s, tgt)) {
+            response_missed = missRoll(s, tgt, &s.units[rv]);
             responder_target = rv;
         }
     }
-    const damage_from_attack = calculateAttackDamage(s, att, tgt, AT.RANGE, hits.divisors[0]);
+    // A missed shot rolls no damage and spends no arrow.
+    const damage_from_attack = if (missed) 0 else luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.RANGE, hits.divisors[0], 1));
 
     var died: Died = .{};
     var decrease: MoraleDecrease = .{};
@@ -445,14 +528,18 @@ pub fn rangeAttack(s: *State, ai: u8, ti: u8, aim_cell: ?Cell, aim_side: u8, eve
 
     if (responder_target) |rv| {
         const victim = &s.units[rv];
-        const damage_from_response = calculateAttackDamage(s, tgt, victim, AT.RANGE, response_divisor);
-        _ = engine.applyDamage(victim, damage_from_response);
-        s.damage_lap = s.fight.lap;
+        if (!response_missed) {
+            const damage_from_response = luckyStrike(s, tgt, calculateAttackDamage(s, tgt, victim, AT.RANGE, response_divisor, 1));
+            _ = engine.applyDamage(victim, damage_from_response);
+            s.damage_lap = s.fight.lap;
+        }
         spendReply(s, target_ui);
     }
 
-    _ = engine.applyDamage(tgt, damage_from_attack);
-    s.damage_lap = s.fight.lap;
+    if (!missed) {
+        _ = engine.applyDamage(tgt, damage_from_attack);
+        s.damage_lap = s.fight.lap;
+    }
     var switch_target = false;
     if (tgt.isDead()) {
         if (!died.includes(target_ui)) {

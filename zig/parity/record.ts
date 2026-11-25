@@ -3,8 +3,8 @@
  *
  *   bun zig/parity/record.ts [games=50] [firstSeed=1] [out=zig/parity/out/battles.jsonl]
  *
- * Scope of the spike: every creature's abilities and spells are stripped, no artifacts, augments, synergies
- * or doctrines, NORMAL grid, v0.1 AI on both sides. The AI only chooses actions; what is recorded is every
+ * Scope of the spike: every creature's abilities and spells are stripped (except the creatures named in
+ * RECORD_KEEP_ABILITIES), no artifacts, augments, synergies or doctrines, NORMAL grid, v0.1 AI on both sides. The AI only chooses actions; what is recorded is every
  * top-level call into the engine (GameActionEngine.apply and TurnEngine.advanceAfterNoActiveUnit) with
  *   - the seeded random state before and after the call (mulberry32 state, so Zig can resume the stream),
  *   - the events the call emitted (headless set),
@@ -20,19 +20,59 @@ import { GameActionEngine } from "../../src/engine/action_engine";
 import { TurnEngine } from "../../src/engine/turn_engine";
 import { StrategyV0_1 } from "../../src/ai/versions/v0_1";
 import { PathHelper } from "../../src/grid/path_helper";
-import { buildRoster, makeRng } from "../../src/simulation/army";
+import { buildRoster, creaturesByLevel, makeRng } from "../../src/simulation/army";
+import { getAbilityConfig, getEffectConfig } from "../../src/configuration/config_provider";
 import { runMatch } from "../../src/simulation/battle_engine";
 import { getDeterministicRandomSource, setDeterministicRandomSource } from "../../src/utils/lib";
 
 type Ctx = { grid: any; fightProperties: any; unitsHolder: any };
 
 // ---- scope: strip abilities and spells from every creature (harness-local mutation of the shared config) ----
+// RECORD_KEEP_ABILITIES="Leprechaun,Nomad" keeps those creatures' abilities and spells, so the ported abilities can be
+// checked batch by batch. RECORD_KEEP_RATE (default 0.6) is the chance each roster slot is swapped for a kept creature
+// of the same level.
+const KEEP = new Set(
+    (process.env.RECORD_KEEP_ABILITIES ?? "")
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean),
+);
+const KEEP_RATE = Number(process.env.RECORD_KEEP_RATE ?? 0.6);
 for (const [faction, creatures] of Object.entries(creaturesJson as Record<string, any>)) {
     if (faction === "version" || typeof creatures !== "object") continue;
-    for (const creature of Object.values(creatures as Record<string, any>)) {
+    for (const [name, creature] of Object.entries(creatures as Record<string, any>)) {
+        if (KEEP.has(name)) continue;
         creature.abilities = [];
         creature.spells = [];
     }
+}
+for (const name of KEEP) {
+    const known = Object.entries(creaturesJson as Record<string, any>).some(
+        ([faction, creatures]) => faction !== "version" && name in creatures,
+    );
+    if (!known) throw new Error(`RECORD_KEEP_ABILITIES: unknown creature ${name}`);
+}
+
+/** buildRoster, then each slot swapped (deterministically per seed) for a kept creature of the same level. */
+function rosterFor(seed: number): ReturnType<typeof buildRoster> {
+    const base = buildRoster(makeRng(seed));
+    if (!KEEP.size) return base;
+    const rng = makeRng(Math.imul(seed, 7919) >>> 0);
+    return base.map((spec) => {
+        const pool = creaturesByLevel(spec.level).filter((entry) => KEEP.has(entry.creatureName));
+        if (!pool.length || rng() >= KEEP_RATE) return spec;
+        const pick = pool[Math.floor(rng() * pool.length)];
+        return {
+            faction: pick.faction,
+            creatureName: pick.creatureName,
+            level: pick.level,
+            size: pick.size,
+            ...(pick.footprintWidth === undefined || pick.footprintHeight === undefined
+                ? {}
+                : { footprintWidth: pick.footprintWidth, footprintHeight: pick.footprintHeight }),
+            amount: spec.amount,
+        };
+    });
 }
 
 // ---- seeded stream with an observable state ----
@@ -97,6 +137,11 @@ function unitDigest(u: any): unknown[] {
         u.getPosition().y,
         u.initialUnitProperties.morale,
         u.luckPerTurn,
+        p.applied_buffs_powers.join(","),
+        p.applied_debuffs_powers.join(","),
+        p.applied_effects_powers.join(","),
+        u.initialUnitProperties.base_attack,
+        u.getMovedRouteCellsThisTurn(),
     ];
 }
 
@@ -140,6 +185,11 @@ const DIGEST_FIELDS = [
     "py",
     "base_morale",
     "luck_per_turn",
+    "buffs_powers",
+    "debuffs_powers",
+    "effects_powers",
+    "base_attack_init",
+    "moved_route_cells",
 ];
 
 function fightDigest(fp: any): Record<string, unknown> {
@@ -193,9 +243,24 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
             props: JSON.parse(JSON.stringify(p)),
         });
     }
+    const abilityConfigs: Record<string, any> = {};
+    const effectConfigs: Record<string, unknown> = {};
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        for (const name of u.getUnitProperties().abilities) {
+            if (name in abilityConfigs) continue;
+            abilityConfigs[name] = JSON.parse(JSON.stringify(getAbilityConfig(name)));
+            const effect = abilityConfigs[name].effect;
+            if (effect && !(effect in effectConfigs)) {
+                effectConfigs[effect] = JSON.parse(JSON.stringify(getEffectConfig(effect) ?? null));
+            }
+        }
+    }
     const fp = ctx.fightProperties;
     return {
         rosterSeed,
+        keep: [...KEEP],
+        abilityConfigs,
+        effectConfigs,
         grid: {
             gridType: fp.getGridType(),
             size: settings.getGridSize(),
@@ -334,7 +399,7 @@ function main(): void {
     const t0 = performance.now();
     for (let g = 0; g < games; g += 1) {
         const seed = firstSeed + g;
-        const roster = buildRoster(makeRng(seed));
+        const roster = rosterFor(seed);
         steps = [];
         let init: Record<string, unknown> | undefined;
         const result = runMatch({
@@ -394,6 +459,8 @@ function main(): void {
             games > warmup ? Number(engineNanos + warmNanos) / Math.max(1, totalSteps + warmSteps) : null,
         wallMs: wall,
         digestFields: DIGEST_FIELDS,
+        keep: [...KEEP],
+        keepRate: KEEP_RATE,
     };
     writeFileSync(out.replace(/\.jsonl$/, ".meta.json"), JSON.stringify(meta, null, 2) + "\n");
     console.log(JSON.stringify(meta));

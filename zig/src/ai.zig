@@ -1,5 +1,6 @@
 //! The v0.1 AI (src/ai/versions/v0_1.ts StrategyV0_1.decideTurn and src/ai/ai.ts findTarget) and the v0.1 match
-//! loop (runMatchInner in src/simulation/battle_engine.ts), in scope: no abilities or spells, NORMAL grid.
+//! loop (runMatchInner in src/simulation/battle_engine.ts), in scope: the abilities in abilities.zig (the AI reads
+//! only Backstab), no spells, NORMAL grid.
 
 const std = @import("std");
 const rec = @import("recording.zig");
@@ -708,7 +709,53 @@ fn findTarget(c: *Ctx) ?AIAction {
             }
         }
     }
+    if (action) |a| action = preferBackstabAttackCell(c, a);
     return action;
+}
+
+/// isBackstabCell on the classic board: a LEFT attacker stands above the target, a RIGHT one below.
+inline fn isBackstabCell(team: u8, from: Cell, target: Cell) bool {
+    return if (team == Team.LEFT) from.y > target.y else from.y < target.y;
+}
+
+/// knownPaths.get((x << 4) | y) with JavaScript's int32 key, which an off-board cell can alias onto a real one.
+fn routeAtJsKey(mp: *const MovePath, x: i32, y: i32) ?*const Route {
+    const k: i32 = (x * 16) | y;
+    if (k < 0 or k > 255) return null;
+    return mp.get(@intCast(k));
+}
+
+/// preferBackstabAttackCell (ai.ts): a small Backstab unit striking a small enemy moves to the cheapest reachable
+/// cell on the target's far side, when there is one.
+fn preferBackstabAttackCell(c: *Ctx, a: AIAction) AIAction {
+    if (a.kind != .melee and a.kind != .move_and_melee) return a;
+    const u = c.unit();
+    if (!engine.isSmall(u) or !u.has(.backstab)) return a; // canMove() is true in scope
+    const target_cell = a.attack orelse return a;
+    const from = a.move orelse return a;
+    const t = occupant(c.s, target_cell) orelse return a;
+    if (!engine.isSmall(&c.s.units[t])) return a;
+    if (isBackstabCell(u.team, from, target_cell)) return a;
+    const unit_cell = engine.baseCell(u);
+    const mp = c.actualPath(); // the same getMovePath arguments as the decision's actual path
+    var best: ?Cell = null;
+    var best_weight = INF;
+    var dy: i32 = -1;
+    while (dy <= 1) : (dy += 1) {
+        var dx: i32 = -1;
+        while (dx <= 1) : (dx += 1) {
+            if (dx == 0 and dy == 0) continue;
+            const cell = Cell{ .x = target_cell.x + dx, .y = target_cell.y + dy };
+            if (!isBackstabCell(u.team, cell, target_cell)) continue;
+            const weight = if (sameCell(cell, unit_cell)) 0 else (routeAtJsKey(mp, cell.x, cell.y) orelse continue).weight;
+            if (weight < best_weight) {
+                best_weight = weight;
+                best = cell;
+            }
+        }
+    }
+    const b = best orelse return a;
+    return .{ .kind = if (sameCell(b, unit_cell)) .melee else .move_and_melee, .move = b, .attack = target_cell, .paths = mp };
 }
 
 // =====================================================================================================================
