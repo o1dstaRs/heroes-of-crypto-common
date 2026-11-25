@@ -8,7 +8,12 @@ const Rng = @import("rng.zig").Rng;
 
 pub const MAX_UNITS = 32;
 pub const GRID = 16;
-pub const MAX_SPELLS = 8;
+/// Buffs a unit can carry in scope: Morale, Luck Blessing, Sharpened Weapons, Ember Covenant, three aura rows and
+/// the five augments.
+pub const MAX_SPELLS = 12;
+/// Debuffs (Dismorale, Dulling Defense) and effects (Shatter Armor, Poison, Aggr, Pegasus Light, Break), with room.
+pub const MAX_DEBUFFS = 4;
+pub const MAX_EFFECTS = 6;
 
 pub const Team = struct {
     pub const NO_TEAM: u8 = 0;
@@ -32,8 +37,9 @@ pub const Movement = struct {
 pub const Cell = @import("recording.zig").Cell;
 
 /// Buffs, debuffs and effects the scoped battles can carry, by their TypeScript names (the string table is for
-/// loading the start state and for digests). Buffs: Morale, the team blessings, Ember Covenant and the aura rows
-/// ("<effect> Aura"); debuffs: Dismorale and Dulling Defense; effects: Shatter Armor, Poison, Aggr, Pegasus Light.
+/// loading the start state and for digests). Buffs: Morale, the team blessings, Ember Covenant, the aura rows
+/// ("<effect> Aura") and the augments ("<kind> Augment", System spells of NUMBER_OF_LAPS_TOTAL laps); debuffs:
+/// Dismorale and Dulling Defense; effects: Shatter Armor, Poison, Aggr, Pegasus Light and Break.
 pub const SpellId = enum(u8) {
     morale,
     dismorale,
@@ -48,6 +54,14 @@ pub const SpellId = enum(u8) {
     poison,
     aggr,
     pegasus_light,
+    /// The Chaos break-on-attack effect (effects.json "Break"): every ability is off while it lasts.
+    break_,
+    armor_augment,
+    might_augment,
+    sniper_augment,
+    movement_augment,
+    /// Read only by magic-damage abilities (none in scope): carried and digested, never read.
+    empower_augment,
 
     pub fn name(self: SpellId) []const u8 {
         return switch (self) {
@@ -64,7 +78,18 @@ pub const SpellId = enum(u8) {
             .poison => "Poison",
             .aggr => "Aggr",
             .pegasus_light => "Pegasus Light",
+            .break_ => "Break",
+            .armor_augment => "Armor Augment",
+            .might_augment => "Might Augment",
+            .sniper_augment => "Sniper Augment",
+            .movement_augment => "Movement Augment",
+            .empower_augment => "Empower Augment",
         };
+    }
+
+    /// An augment buff (UnitsHolder.applyAugments).
+    pub inline fn isAugment(self: SpellId) bool {
+        return @intFromEnum(self) >= @intFromEnum(SpellId.armor_augment);
     }
 
     pub fn fromName(n: []const u8) ?SpellId {
@@ -86,55 +111,66 @@ pub const NUMBER_OF_LAPS_TOTAL: f64 = 15;
 /// first), so both always agree and one record holds them.
 pub const AppliedSpell = struct {
     id: SpellId,
-    /// firstSpellProperty / secondSpellProperty: an aura row's source cell (the emitter's base cell), else -1.
+    /// firstSpellProperty / secondSpellProperty: an aura row's source cell (the emitter's base cell), the Sniper
+    /// Augment's base-attack and shot-distance percentages (27 and 70 at level 3), else -1 (undefined).
     src_x: i8 = -1,
     src_y: i8 = -1,
     laps: f64,
     power: f64 = 0,
 };
 
-pub const SpellList = struct {
-    items: [MAX_SPELLS]AppliedSpell = undefined,
-    len: u8 = 0,
+/// A unit's buff list (the widest of the three).
+pub const SpellList = SpellListN(MAX_SPELLS);
 
-    pub fn find(self: *const SpellList, id: SpellId) ?usize {
-        for (self.items[0..self.len], 0..) |s, i| if (s.id == id) return i;
-        return null;
-    }
-    /// The first entry's power (`getBuff(name)?.getPower()`, `getEffect(name)?.getPower()`).
-    pub fn power(self: *const SpellList, id: SpellId) ?f64 {
-        for (self.items[0..self.len]) |s| if (s.id == id) return s.power;
-        return null;
-    }
-    /// The first entry of that name (`getBuff(name)`, `getEffect(name)`).
-    pub fn get(self: *const SpellList, id: SpellId) ?*const AppliedSpell {
-        for (self.items[0..self.len]) |*s| if (s.id == id) return s;
-        return null;
-    }
-    pub fn removeAt(self: *SpellList, i: usize) void {
-        var j = i;
-        while (j + 1 < self.len) : (j += 1) self.items[j] = self.items[j + 1];
-        self.len -= 1;
-    }
-    pub fn push(self: *SpellList, s: AppliedSpell) void {
-        std.debug.assert(self.len < MAX_SPELLS);
-        self.items[self.len] = s;
-        self.len += 1;
-    }
-    /// Unit.applyEffect / applyAuraEffect: a re-application deletes the old entry and appends at the end.
-    pub fn replace(self: *SpellList, s: AppliedSpell) void {
-        self.delete(s.id);
-        self.push(s);
-    }
-    /// deleteBuff / deleteDebuff / deleteEffect: every entry of that name, keeping the order of the rest.
-    pub fn delete(self: *SpellList, id: SpellId) void {
-        var i: usize = self.len;
-        while (i > 0) {
-            i -= 1;
-            if (self.items[i].id == id) self.removeAt(i);
+/// An ordered list of applied buffs, debuffs or effects with room for `cap` entries. A push past the capacity is
+/// dropped (it would show as a digest mismatch, never as a write past the list).
+pub fn SpellListN(comptime cap: u8) type {
+    return struct {
+        items: [cap]AppliedSpell = undefined,
+        len: u8 = 0,
+
+        pub const capacity = cap;
+        const Self = @This();
+
+        pub fn find(self: *const Self, id: SpellId) ?usize {
+            for (self.items[0..self.len], 0..) |s, i| if (s.id == id) return i;
+            return null;
         }
-    }
-};
+        /// The first entry's power (`getBuff(name)?.getPower()`, `getEffect(name)?.getPower()`).
+        pub fn power(self: *const Self, id: SpellId) ?f64 {
+            for (self.items[0..self.len]) |s| if (s.id == id) return s.power;
+            return null;
+        }
+        /// The first entry of that name (`getBuff(name)`, `getEffect(name)`).
+        pub fn get(self: *const Self, id: SpellId) ?*const AppliedSpell {
+            for (self.items[0..self.len]) |*s| if (s.id == id) return s;
+            return null;
+        }
+        pub fn removeAt(self: *Self, i: usize) void {
+            var j = i;
+            while (j + 1 < self.len) : (j += 1) self.items[j] = self.items[j + 1];
+            self.len -= 1;
+        }
+        pub fn push(self: *Self, s: AppliedSpell) void {
+            if (self.len >= cap) return;
+            self.items[self.len] = s;
+            self.len += 1;
+        }
+        /// Unit.applyEffect / applyAuraEffect: a re-application deletes the old entry and appends at the end.
+        pub fn replace(self: *Self, s: AppliedSpell) void {
+            self.delete(s.id);
+            self.push(s);
+        }
+        /// deleteBuff / deleteDebuff / deleteEffect: every entry of that name, keeping the order of the rest.
+        pub fn delete(self: *Self, id: SpellId) void {
+            var i: usize = self.len;
+            while (i > 0) {
+                i -= 1;
+                if (self.items[i].id == id) self.removeAt(i);
+            }
+        }
+    };
+}
 
 // =====================================================================================================================
 // Abilities (src/abilities/ability_properties.ts, the creature configs in src/configuration)
@@ -267,7 +303,9 @@ pub const Ability = struct {
     effect_power: f64 = 0,
 };
 
-/// `initialUnitProperties`: the base values every stat refresh recomputes from. Only `morale` changes in scope.
+/// `initialUnitProperties`: the base values every stat refresh recomputes from (recorded `initialProps`; older
+/// recordings, made without setup, take them from `props`). In scope `morale` changes (morale moves), `base_attack`
+/// (Dulling Defense), `base_armor` and `steps` (Bitter Experience), and `amount_alive` (the Life supply synergy).
 pub const BaseStats = struct {
     max_hp: f64,
     luck: f64,
@@ -282,6 +320,27 @@ pub const BaseStats = struct {
     initiative: f64,
     magic_resist: f64,
     shot_distance: f64,
+    amount_alive: f64,
+};
+
+/// One team's synergy values (FightProperties.getAdditional*PerTeam and getBreakChancePerTeam): fixed for the whole
+/// battle once runMatch's setup block has run (recorded as `init.setup.perTeam`; all 0 without setup).
+pub const TeamSetup = struct {
+    /// getAdditionalAbilityPowerPerTeam (Might, PLUS_STACK_ABILITIES_POWER): every ability formula of the team.
+    ability_power: f64 = 0,
+    /// getAdditionalMovementStepsPerTeam (Chaos, MOVEMENT): added to steps_mod.
+    movement_steps: f64 = 0,
+    /// getAdditionalFlyArmorPerTeam (Nature, PLUS_FLY_ARMOR): % of base armor as armor_mod for flyers.
+    fly_armor: f64 = 0,
+    /// getAdditionalMoralePerTeam / getAdditionalLuckPerTeam (Life, PLUS_MORALE_AND_LUCK).
+    morale: f64 = 0,
+    luck: f64 = 0,
+    /// getAdditionalSupplyPerTeam (Life, PLUS_SUPPLY_PERCENTAGE): % more creatures at start_fight.
+    supply: f64 = 0,
+    /// getAdditionalAuraRangePerTeam (Might, PLUS_AURAS_RANGE): added to every aura the team emits.
+    aura_range: f64 = 0,
+    /// getBreakChancePerTeam (Chaos, BREAK_ON_ATTACK): the striker's chance to Break the unit it hits.
+    break_chance: f64 = 0,
 };
 
 pub const Unit = struct {
@@ -336,8 +395,8 @@ pub const Unit = struct {
     moved_this_turn: bool,
 
     buffs: SpellList,
-    debuffs: SpellList,
-    effects: SpellList,
+    debuffs: SpellListN(MAX_DEBUFFS),
+    effects: SpellListN(MAX_EFFECTS),
 
     init: BaseStats,
     luck_per_turn: f64,
@@ -367,21 +426,36 @@ pub const Unit = struct {
     /// `auraEffects`, in `aura_effects` order: indices into State.aura_defs.
     auras: [MAX_UNIT_AURAS]u8,
     n_auras: u8,
+    /// getAdditionalAbilityPowerPerTeam(team): the synergy power every ability formula of this unit adds (the
+    /// owner's team at every call site in scope; State.setup[team].ability_power).
+    syn_power: f64,
 
     pub fn isDead(self: *const Unit) bool {
         return self.amount_alive <= 0;
     }
 
-    /// hasAbilityActive. No Break effect exists in scope, so an ability is active whenever the unit has it.
-    pub inline fn has(self: *const Unit, id: AbilityId) bool {
-        return self.ability_mask & id.bit() != 0;
+    /// hasEffectActive("Break")
+    pub inline fn isBroken(self: *const Unit) bool {
+        return self.effects.len != 0 and self.effects.find(.break_) != null;
     }
 
-    /// getAbility (Break-aware in TypeScript; see `has`).
+    /// hasAbilityActive: the unit has the ability and is not Broken (absence is settled before Break is read, as in
+    /// TypeScript, so a unit without the ability never scans its effects).
+    pub inline fn has(self: *const Unit, id: AbilityId) bool {
+        return self.ability_mask & id.bit() != 0 and !self.isBroken();
+    }
+
+    /// getAbility: null when the unit lacks it or is Broken.
     pub fn ability(self: *const Unit, id: AbilityId) ?*const Ability {
         if (!self.has(id)) return null;
         for (self.abilities[0..self.n_abilities]) |*a| if (a.id == id) return a;
         return null;
+    }
+
+    /// getAuraEffects().length: no auras while Broken.
+    pub inline fn auraCount(self: *const Unit) u8 {
+        if (self.n_auras == 0 or self.isBroken()) return 0;
+        return self.n_auras;
     }
 };
 
@@ -529,4 +603,11 @@ pub const State = struct {
     ember_laps: f64,
     ember_power: f64,
     poison_laps: f64,
+    /// Per team (index Team.RIGHT / Team.LEFT): the synergy values runMatch's setup fixed for the battle.
+    setup: [3]TeamSetup,
+    /// Some unit carries an augment buff, so adjustBaseStats looks the augments up.
+    augments: bool,
+    /// The "Break" effect's configured laps and power (effects.json, recorded in `init.effectConfigs.Break`).
+    break_laps: f64,
+    break_power: f64,
 };

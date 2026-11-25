@@ -50,28 +50,29 @@ fn eqNum(a: f64, e: f64) bool {
 
 /// Compares "Morale,Luck Blessing" + "1,15" + "0,4" style lists: names, laps and powers in order. `powers` is null
 /// for recordings made before the powers column existed.
-fn spellsMatch(list: *const st.SpellList, names: []const u8, laps: []const u8, powers: ?[]const u8) bool {
+fn spellsMatch(list: []const st.AppliedSpell, names: []const u8, laps: []const u8, powers: ?[]const u8) bool {
     var it = std.mem.tokenizeScalar(u8, names, ',');
     var lit = std.mem.tokenizeScalar(u8, laps, ',');
     var pit = std.mem.tokenizeScalar(u8, powers orelse "", ',');
     var i: usize = 0;
     while (it.next()) |n| : (i += 1) {
         if (i >= list.len) return false;
-        if (!std.mem.eql(u8, n, list.items[i].id.name())) return false;
+        if (!std.mem.eql(u8, n, list[i].id.name())) return false;
         const l = lit.next() orelse return false;
         const lv = std.fmt.parseFloat(f64, l) catch return false;
-        if (lv != list.items[i].laps) return false;
+        if (lv != list[i].laps) return false;
         if (powers != null) {
             const p = pit.next() orelse return false;
             const pv = std.fmt.parseFloat(f64, p) catch return false;
-            if (pv != list.items[i].power) return false;
+            if (pv != list[i].power) return false;
         }
     }
     return i == list.len;
 }
 
-/// Compares the "x;y,;,..." column (each buff's first and second spell property) with the aura rows' source cells.
-/// Other rows are skipped: a team blessing stores its power there (`applyBuff(buff, power)`), compared as its power.
+/// Compares the "x;y,;,..." column (each buff's first and second spell property) with the aura rows' source cells
+/// and the augments' stored properties (Sniper "27;70", the others ";"). Other rows are skipped: a team blessing
+/// stores its power there (`applyBuff(buff, power)`), compared as its power.
 fn sourcesMatch(list: *const st.SpellList, srcs: []const u8) bool {
     var it = std.mem.splitScalar(u8, srcs, ',');
     var i: usize = 0;
@@ -79,7 +80,7 @@ fn sourcesMatch(list: *const st.SpellList, srcs: []const u8) bool {
     while (it.next()) |entry| : (i += 1) {
         if (i >= list.len) return false;
         const b = list.items[i];
-        if (b.laps != st.LAPS_AURA) continue;
+        if (b.laps != st.LAPS_AURA and !b.id.isAugment()) continue;
         var parts = std.mem.splitScalar(u8, entry, ';');
         const xs = parts.next() orelse return false;
         const ys = parts.next() orelse return false;
@@ -154,14 +155,14 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
                 return false;
             }
         }
-        const lists = [_]struct { []const u8, *const st.SpellList, usize, usize }{
-            .{ "buffs", &u.buffs, 29, 39 },
-            .{ "debuffs", &u.debuffs, 31, 40 },
-            .{ "effects", &u.effects, 33, 41 },
+        const lists = [_]struct { []const u8, []const st.AppliedSpell, usize, usize }{
+            .{ "buffs", u.buffs.items[0..u.buffs.len], 29, 39 },
+            .{ "debuffs", u.debuffs.items[0..u.debuffs.len], 31, 40 },
+            .{ "effects", u.effects.items[0..u.effects.len], 33, 41 },
         };
         for (lists) |l| {
             if (!spellsMatch(l[1], row[l[2]].string, row[l[2] + 1].string, column(row, l[3]))) {
-                const first = if (l[1].len > 0) l[1].items[0] else st.AppliedSpell{ .id = .morale, .laps = 0 };
+                const first = if (l[1].len > 0) l[1][0] else st.AppliedSpell{ .id = .morale, .laps = 0 };
                 m.set("unit {d} {s}: ts '{s}' laps '{s}' powers '{s}' (zig has {d}; first {s} laps {d} power {d})", .{
                     idx,                                        l[0],       row[l[2]].string, row[l[2] + 1].string, column(row, l[3]) orelse "", l[1].len,
                     if (l[1].len > 0) first.id.name() else "-", first.laps, first.power,
@@ -200,6 +201,21 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
         if (column(row, 46)) |srcs| {
             if (!sourcesMatch(&u.buffs, srcs)) {
                 m.set("unit {d} buffs_sources: ts '{s}'", .{ idx, srcs });
+                return false;
+            }
+        }
+        // Setup columns (recordings with augments or synergies): the Sniper shot distance and the two bases Bitter
+        // Experience moves.
+        const setup_cols = [_]struct { []const u8, f64, usize }{
+            .{ "shot_distance", u.shot_distance, 47 },
+            .{ "base_armor_init", u.init.base_armor, 48 },
+            .{ "steps_init", u.init.steps, 49 },
+        };
+        for (setup_cols) |h| {
+            if (h[2] >= row.len) break;
+            const e = rec.num(row[h[2]]);
+            if (!eqNum(h[1], e)) {
+                m.set("unit {d} {s}: zig {d}, ts {d}", .{ idx, h[0], h[1], e });
                 return false;
             }
         }
@@ -296,9 +312,10 @@ pub fn actionsEqual(a: rec.Action, b: rec.Action) bool {
             cellsEqual(x.path, b.melee_attack.path) and x.has_lava == b.melee_attack.has_lava,
         .obstacle_attack => |x| blk: {
             const y = b.obstacle_attack;
+            if (x.has_from != y.has_from) break :blk false;
+            if (x.has_from and (x.attack_from.x != y.attack_from.x or x.attack_from.y != y.attack_from.y)) break :blk false;
             break :blk x.attacker == y.attacker and x.target_x == y.target_x and x.target_y == y.target_y and
-                x.attack_from.x == y.attack_from.x and x.attack_from.y == y.attack_from.y and cellsEqual(x.path, y.path) and
-                x.has_lava == y.has_lava;
+                cellsEqual(x.path, y.path) and x.has_lava == y.has_lava;
         },
         .range_attack => |x| blk: {
             const y = b.range_attack;

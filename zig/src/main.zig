@@ -32,6 +32,12 @@ fn printEvents(label: []const u8, evs: []const rec.Event) void {
     std.debug.print("\n", .{});
 }
 
+/// A game the loader cannot parse (an action or event outside the port): reported and skipped like an unsupported
+/// start state.
+fn reportUnparseable(err: anyerror) void {
+    std.debug.print("seed {d}: recording not supported at step {d} ({s})\n", .{ rec.parse_seed, rec.parse_step, @errorName(err) });
+}
+
 fn parity(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
     const buf = try readAll(gpa, path);
     defer gpa.free(buf);
@@ -50,8 +56,12 @@ fn parity(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
     while (lines.next()) |line| {
         _ = arena_state.reset(.retain_capacity);
         const arena = arena_state.allocator();
-        const game = try rec.parseGame(arena, line, true);
         games += 1;
+        const game = rec.parseGame(arena, line, true) catch |err| {
+            failures += 1;
+            if (failures <= max_fail) reportUnparseable(err);
+            continue;
+        };
         var s = engine.initState(game.init, game.ids) catch |err| {
             failures += 1;
             steps_total += game.steps.len;
@@ -149,7 +159,10 @@ fn bench(gpa: std.mem.Allocator, path: []const u8, reps: usize, threads: usize) 
     var total_steps: usize = 0;
     while (lines.next()) |line| {
         // Digests are dropped; the parsed JSON tree for `init` is only read once below.
-        const game = try rec.parseGame(arena, line, false);
+        const game = rec.parseGame(arena, line, false) catch |err| {
+            reportUnparseable(err);
+            continue;
+        };
         try list.append(arena, .{ .init = try engine.initState(game.init, game.ids), .steps = game.steps });
         for (game.steps) |step| {
             if (step.action != .decide) total_steps += 1;
@@ -287,8 +300,12 @@ fn native(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
     var lines = rec.lines(buf);
     while (lines.next()) |line| {
         _ = arena_state.reset(.retain_capacity);
-        const game = try rec.parseGame(arena_state.allocator(), line, true);
         games += 1;
+        const game = rec.parseGame(arena_state.allocator(), line, true) catch |err| {
+            fails += 1;
+            if (fails <= max_fail) reportUnparseable(err);
+            continue;
+        };
         steps_total += game.steps.len;
         var s = engine.initState(game.init, game.ids) catch |err| {
             fails += 1;
@@ -339,7 +356,10 @@ fn nativeBench(gpa: std.mem.Allocator, file: []const u8, reps: usize, threads: u
     var r0s: std.ArrayList(u32) = .empty;
     var lines = rec.lines(buf);
     while (lines.next()) |line| {
-        const game = try rec.parseGame(arena_state.allocator(), line, false);
+        const game = rec.parseGame(arena_state.allocator(), line, false) catch |err| {
+            reportUnparseable(err);
+            continue;
+        };
         try inits.append(arena_state.allocator(), try engine.initState(game.init, game.ids));
         try r0s.append(arena_state.allocator(), game.steps[0].r0);
     }

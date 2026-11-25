@@ -9,7 +9,10 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
 
 - every creature's stats, sizes (1x1, 2x1, 2x2), walking and flying, melee and ranged;
 - the abilities of the creatures ported so far (batches 1 and 2, below); every other creature's abilities, and all
-  spells, stripped; no artifacts, augments, synergies or doctrines;
+  spells, stripped; no artifacts;
+- the army setup `runMatch` applies before the fight: the augments (Armor, Might, Sniper, Movement, Placement; Empower
+  is carried but read by nothing in scope), doctrines (their upgrade budget) and synergies (Life, Chaos, Might and
+  Nature, both variants, levels 1 to 3), including the Chaos break-on-attack roll and the Break effect;
 - the NORMAL, LAVA_CENTER and BLOCK_CENTER grids (production rolls a third each), on classic or side-oriented boards
   (production is side-oriented on every map, and its BLOCK_CENTER boards carry the seeded scattered stones; the classic
   2x2 mountains of non-side BLOCK_CENTER are ported too), including board narrowing (holes, shoves, crushes) and the
@@ -17,7 +20,8 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
 - the v0.1 AI on both sides, with its BLOCK_CENTER mountain strategy.
 
 The engine also replays (`hoc-sim parity`) the actions later AI versions emit on these boards: move-then-strike
-(`melee_attack` with a `path`), `wait_turn`, `defend_turn`, aimed shots and refused `select_attack_type`.
+(`melee_attack` with a `path`), `wait_turn`, `defend_turn`, aimed shots, refused `select_attack_type`, and ranged
+obstacle shots (`obstacle_attack` without `attackFrom`, which v0.8 sends).
 
 Ported:
 
@@ -171,6 +175,54 @@ The framework the maps added (all exact in both modes, see the coverage below):
   in `findRangeAttackAction`, and `move_unit.has_lava` from the route.
 - **Recording**: `Unit.creature_id` (`creatureId`, PBTypes.CreatureVals; 0 for older recordings).
 
+### Augments, synergies and Break
+
+The framework the army setup added (exact in both modes, coverage below):
+
+- **Base stats** (`st.BaseStats`, the loader): runMatch's setup refresh folds augments and synergies into `props`
+  before recording, so the loader reads `initialUnitProperties` from the recorded `initialProps` (and still from
+  `props` in setup-free recordings). `BaseStats.amount_alive` is new (the Life supply).
+- **Team setup** (`st.TeamSetup`, `State.setup[team]`, loaded from `init.setup.perTeam`): the constant
+  `getAdditional*PerTeam` values and `getBreakChancePerTeam`. The ability power is also copied to every unit
+  (`Unit.syn_power`): every ability formula in scope reads its owner's team (miss chance the dodger's, the response
+  formulas the responder's), so `abilityMultiplier`, `applyChance`, `abilityCount`, Pegasus Light, the Sharpened
+  Weapons census, Heavy Armor, Wardguard and the Absorb Penalties aura power keep their signatures.
+- **Augments** (`SpellId.*_augment`, laps 15, before every later buff; `State.augments` gates the lookups):
+  `engine.adjustBaseStats` adds Armor as a % of the running base armor (after Pegasus Might, before Heavy Armor's
+  multiplier) and as flat magic armor (before the resist rolls), Movement as flat steps, and Might or Sniper off the
+  attack type SELECTED at refresh time (Sniper also widens `shot_distance`). The Sniper buff's two stored properties
+  (`27;70`) sit in `AppliedSpell.src_x/src_y` (the "first;second spell property" slot aura rows use for their source
+  cell), loaded from `init.units[].buffsSources`. Placement only shapes the recorded start state.
+- **Synergies** in `adjustBaseStats`: Life's luck into `luck_mod` and morale (when positive) onto the base morale,
+  Chaos's steps into `steps_mod`, Nature's flyer armor as `armor_mod` (a flying creature, grounded or not; an active
+  Shatter Armor is subtracted twice), Might's aura range in `abilities.refreshAuras` (per emission, `Emission.range`)
+  and Might's ability power through `syn_power`. The Life supply grows every holder unit of the team in
+  `start_fight` (`increaseUnitsSupplyIfNeededPerTeam`, LEFT then RIGHT, before the distances and the refresh).
+  Morale changes never read the synergy (TypeScript ignores the argument).
+- **Break** (`SpellId.break_`, an effect; laps and power from `init.effectConfigs.Break`): `Unit.has` / `ability`
+  are Break-aware (absence is settled before the effects are scanned, so ability-free units pay nothing),
+  `Unit.auraCount` gives no auras while Broken (the aura refresh and the Luck Blessing early pass read it),
+  `abilities.skipsResponse` is off while Broken, and the lists tick and expire like any effect.
+- **The break roll** (`engine.applyDamageBreak(s, victim, damage, chance, extend)`; `applyDamage` keeps its signature
+  with chance 0 for Armageddon and the poison tick): after the Ember Covenant check and before the stack projection,
+  drawn when the striker's team chance is positive and the victim is not already Broken, or always when `extend`; an
+  extended Break lasts a lap longer. `combat.hit` threads the striker's team chance through every unit hit: the melee
+  blow (`attack_handler.ts:3214`), the melee response (`:3072`, extended: the attacker is the active unit), the second
+  punch (`:3400`), the ranged shot (`:1886`), the counter-shot (`:1763`, extended only when it hits the shooter whose
+  turn it is, not a bystander on the return line), every Lightning Spin sub-hit (`lightning_spin_ability.ts:239`,
+  attack, response and the obstacle strike's spin) and every Skewer Strike hit (`skewer_strike_ability.ts:210`, the
+  unit strike, the response and the obstacle pierce), each right after that hit's damage roll.
+- **Lists**: `st.SpellListN(cap)`; buffs hold 12 (Morale, three blessings, Ember Covenant, three aura rows, five
+  augments), debuffs 4, effects 6. A push past the capacity is dropped (a digest mismatch, never memory corruption:
+  with 8 slots a fully augmented, blessed and aura'd unit overflowed in release builds).
+- **Obstacle shots** (`combat.obstacleAttackAt`, `rec.Action.obstacle_attack.has_from`): a shooter with RANGE
+  selected that can land a shot fires instead of striking: on a scattered board it breaks the FIRST stone on its ray
+  (`getObstacleIntersections`), on the classic board it spends the aimed mountain's hit; one arrow either way, no roll;
+  refused after this turn's move; a shot that breaks nothing falls through to the melee branch when `attackFrom` is
+  given.
+- **AI** (`ai.Ctx.prefer_attack_over_mining`, false for v0.1): v0.6's `setPreferAttackOverMining`, for the v0.8 port.
+  The v0.1 AI reads Break only through Backstab (`preferBackstabAttackCell`) and no synergy getter.
+
 ### Porting the next batch
 
 - Add the ability to `AbilityId` (and any buff, debuff or effect it applies to `SpellId`), then port its branches from
@@ -196,11 +248,37 @@ The framework the maps added (all exact in both modes, see the coverage below):
   - Rays and aim edges read "B"; adjacency, auras and the aggression boards do not.
   - A flyer route can carry `hasLavaCell: true`; every action built from a route must copy it (`move_unit`, and a
     path-bearing `melee_attack` or `obstacle_attack`), or the native check reports an action mismatch on LAVA.
-  - Augments and synergies: placement augments and the side zones are in the recorded start state, but anything that
-    reads the axis of advance (`isSideOrientedPlacement`, `isSideAxisPolicyTeam`) must take `s.fight.side_oriented`.
-    The Chaos break roll lives in `Unit.applyDamage(damage, getBreakChancePerTeam(team), ...)`: `engine.applyDamage`
-    takes no break chance yet, so every damage path (the obstacle strike's pierce and spin included) must thread the
-    attacking team's chance and its roll, and `Unit.has` / `ability` must become Break-aware (they ignore Break now).
+  - Placement augments and the side zones are in the recorded start state, but anything that reads the axis of
+    advance (`isSideOrientedPlacement`, `isSideAxisPolicyTeam`) must take `s.fight.side_oriented`.
+- Setup lessons (for artifacts and the next creatures):
+  - Every new unit hit goes through `combat.hit` (or `engine.applyDamageBreak`) with the STRIKER's team chance and the
+    call site's `extendBreak`; grep the TypeScript handler for `getBreakChancePerTeam` next to each `applyDamage`.
+    A hit's break roll comes right after its damage roll, and a killing blow still rolls.
+  - Every new ability read must be Break-aware: use `Unit.has` / `ability` / `auraCount`, never `ability_mask` or
+    `n_auras` (those are only load-time "can it ever happen" flags and cheap pre-filters). TypeScript reads
+    `hasAbilityActive` / `getAbility` / `getAbilities()` / `getAuraEffects()`, which all respect Break, except where it
+    reads `props.abilities` names (the luck-dependent blessings, the blessing census's stack blessings).
+  - A Break taken mid-action switches the rest of the action off: a Crusader broken by the response gets no second
+    punch, its blow lands without riders, a Hydra broken by the attacker's spin does not spin back, a Broken Fairy is
+    answered. Read abilities at their TypeScript point in the action, never hoisted.
+  - Every ability formula takes the owner's team ability power (`Unit.syn_power`); confirm the team at each new call
+    site (miss chance: the dodger's; responses: the responder's).
+  - Refresh-time values are stale until the next refresh: Might/Sniper follow the attack type selected at the last
+    refresh (a shooter that drops to MELEE on activation keeps its sniped shot distance for that turn).
+  - A setup refresh runs before recording, so the start state can carry blessings and aura rows (with their
+    `buffsSources`), and Life morale can lift a unit off 0 so it draws lap morale rolls, or settle the first turn by
+    morale so the coin flip is not drawn.
+  - Artifacts: `RECORD_ARTIFACTS` already records them (`init.setup.perTeam.artifactT1/T2`; the loader refuses their
+    buffs). Their stored properties may not fit `src_x/src_y` (i8, integers: Pendant of Vitality's 12.5 is
+    `parseFloat`ed), the buff list may need more room, Broken Aegis adds +20 to the recorded break chance and a self
+    miss chance, Quiver of Echoes adds a roll to every landed shot and to the ranged obstacle shot (the branch skips it
+    now), Barrel Barricade places barrels inside `start_fight` (after the supply, before `fightProperties.startFight`),
+    and Cursed Ward / Crown of Command move luck and morale in `adjustBaseStats`.
+  - Next creatures: Squire's Arcane Ward Blessing is a luck-dependent census blessing (the early luck pass) and a
+    magic-resist roll; Monk's Magic Shield is another resist roll; Troglodyte's Madness pins morale to 0 (a
+    `hasAbilityActive` gate on morale changes too) and Blind Fury adds attack_mod; Zena's Chakram rolls its bounces in
+    flight order and Rallying Volley is a census blessing; Arachna Queen's Web Aura locks flyers at activation
+    (`refreshPreTurnState`). All of them are Break-aware in TypeScript.
 - Batch 2 lessons:
   - Inert is not absent: Trent's abilities change nothing in scope, but the loader must still know their names.
   - A refresh-time value is stale until the next refresh: aura rows after `move_unit` (no refresh), Absorb power at a
@@ -247,9 +325,38 @@ RECORD_GRID=mix RECORD_SIDE=1 zig/parity/check.sh 500       # production maps an
 RECORD_GRID=4 RECORD_SIDE=1 RECORD_PATHS=/tmp/p.jsonl bun zig/parity/record.ts 200 1 /tmp/b.jsonl
 ```
 
+Setup options (all off by default, and then the recording is byte-identical to a setup-free one; the full list is in
+the header of `record.ts`):
+
+- `RECORD_AUGMENTS=random|production|"Armor:3,Sniper:3,Might:1"|"<green>|<red>"`: random plans inside the budget,
+  production's plan (`resolveSetupPolicy` of the v0.8 setup spec, then the a19 striker-rush or shooterless rewrite;
+  the revealed-ranged delivery layer needs the live draft and is left out), or explicit plans (Empower allowed).
+- `RECORD_DOCTRINE=random|1|2|3` (the upgrade budget 6/5/7; unset is 7), `RECORD_PLACEMENT_TIMING=setup-before-placement`.
+- `RECORD_SYNERGIES=1`: every faction with two distinct creatures fields the board variant; with
+  `RECORD_SYNERGY_VARIANTS=default|seed|random|"Life:2,Chaos:2,Might:2,Nature:1"` (`seed` is production's
+  `synergyVariantsForSeed`; `default` never fields Chaos break or Life morale/luck).
+- `RECORD_DISTINCT_RED=1`: red drafts its own roster (asymmetric synergies and plans); `RECORD_FACTION="Chaos|"`
+  drafts a team from one faction so its synergy reaches level 2 or 3.
+- `RECORD_ARTIFACTS=random|"t1:t2"|...` (for the artifact batch) and `RECORD_TRACE_DRAWS=1` (each step's `ds`, the
+  `getRandomInt` caller of every raw draw, the break roll naming its hit, and a `<out>.sites.json` tally).
+
+With any setup option the start state gains `initialProps`, `buffsSources`, `setup` (variants and per-team values)
+and `effectConfigs.Break`, each battle line gains `requested`, the unit digest gains `shot_distance`,
+`base_armor_init` and `steps_init`, and the `.meta.json` gains `setup`. Production-like:
+
+```bash
+RECORD_GRID=mix RECORD_SIDE=1 RECORD_AUGMENTS=production RECORD_DOCTRINE=random RECORD_SYNERGIES=1 \
+  RECORD_SYNERGY_VARIANTS=seed RECORD_DISTINCT_RED=1 RECORD_PLACEMENT_TIMING=setup-before-placement \
+  zig/parity/check.sh 500
+```
+
+`hoc-sim parity` and `native` report a game they cannot parse (an action or event outside the port) as "recording not
+supported" with its seed and step and go on, as they do for an unsupported start state.
+
 The unit digest holds every compared stat, the buff/debuff/effect names, laps and powers, and some hidden state
-(position, base morale, luck per turn, initial base attack, moved route cells, the Aggr forced target, magic resist and
-each buff's source cell); the fight digest adds the Ember Covenant teams and, on map recordings, the terrain. The field list is in each recording's
+(position, base morale, luck per turn, initial base attack, moved route cells, the Aggr forced target, magic resist,
+each buff's stored properties and, with setup, the shot distance and the initial base armor and steps); the fight
+digest adds the Ember Covenant teams and, on map recordings, the terrain. The field list is in each recording's
 `.meta.json`; columns a recording lacks are skipped, so older recordings stay comparable. The start state carries the
 configs the engine reads without an ability naming them: `auraEffectConfigs`, `effectConfigs.Poison` and
 `spellConfigs["Ember Covenant Blessing"]`.
@@ -265,6 +372,42 @@ cd zig && zig build test         # unit tests (random stream, JS number rounding
 ```
 
 Run `check.sh` after changing any rules or v0.1 AI code the port covers, both with and without the batch kept.
+
+Setup (augments, synergies, Break), checked on 2026-11-25 against common `7babe862` (both modes, every battle
+identical; all on side-oriented production-mix maps, `RECORD_GRID=mix RECORD_SIDE=1`):
+
+- production-like setup (augments `production`, random doctrines, synergies at the seed's board variants, distinct
+  red rosters, `setup-before-placement`): ability-free 1,000 battles, 158,723 steps (seeds 4000000–4000499 and
+  4100000–4100499); batches 1 and 2 kept 1,500 battles, 253,519 steps (4200000–4200499 and 4210000–4210499 at the
+  default keep rate, 4300000–4300499 at keep rate 1);
+- forced augments, 1,700 battles, 289,148 steps: Armor 3 + Might 3 + Movement 1 ability-free and kept (seeds
+  4500000, 4510000, 300 each), Sniper 3 + Placement 2 + Movement 2 with `setup-before-placement` (4520000, 4530000),
+  Empower 3 + Armor 2 + Might 2 (4540000, 200) and random plans with random doctrines, kept (4550000);
+- forced synergies (`RECORD_SYNERGIES=1 RECORD_DISTINCT_RED=1`), 4,500 battles, 796,216 steps: every variant at
+  every level, with one-faction rosters (`RECORD_FACTION`) and the batch kept or only that faction's kept creatures:
+  Chaos break 6/11/17% (4600000, 4610000, 4620000, 4710000, 4720000), Chaos movement +1/+2/+3 (4630000, 4780000),
+  Life morale and luck up to +20/+9 (4640000, 4730000), Life supply 6/12/19% (4650000, 4770000), Nature flyer armor
+  up to 35% (4660000, 4740000), Might ability power up to 12 (4670000, 4750000), Might aura range +1 to +3 (4680000,
+  4760000) and random variants (4690000);
+- branch counts (an instrumented copy, those 8,700 battles): Armor 3.4M refreshes, Might 2.5M, Sniper 264k (50k
+  refreshes of a shooter with MELEE selected holding Sniper), Movement 2.1M, Empower carried 208k; Life morale/luck 1.3M,
+  Chaos steps 1.3M, flyer armor 423k (8,421 under Shatter Armor), supply 13,320 stacks, aura range 150k emissions,
+  ability power in 104k formula calls, 69,873 lap morale rolls on Life teams, 3,926 first turns settled by morale and
+  2,221 coin flips; break rolls on the melee blow 41,616, the response 29,736, the second punch 861, Lightning Spin
+  sub-hits 19,090, Skewer Strike hits 191, ranged shots 10,280, counter-shots 591 on the shooter (extended) and 45 on a
+  bystander; 8,408 Breaks applied (2,590 extended), 12,509 rolls skipped on a Broken victim and 4,882 extended re-rolls
+  on one; while Broken, 42,837 ability probes refused, 2,358 spins and 239 second punches suppressed, 1,709
+  skip-response checks off (a Broken Fairy or Hydra is answered), 13,674 refreshes of a silent aura emitter, and 69
+  Bitter Experience gains suppressed;
+- the break-roll draw sites with abilities kept (`RECORD_TRACE_DRAWS=1`, 80 battles from seed 4700000): melee blow
+  `attack_handler.ts:3214`, response `:3072`, second punch `:3400`, `lightning_spin_ability.ts:239` and
+  `skewer_strike_ability.ts:210` (each right after its own damage roll; a response spin's rolls come before the
+  attacker's blow);
+- unchanged: the default recorder output is byte-identical to the previous recorder's (classic NORMAL seeds 1001–1020,
+  and batches 1+2 kept on the side mix, 2001–2020); classic NORMAL ability-free `check.sh 500 2810000` (84,900 steps);
+  the side mix without setup, ability-free 300 (2820000) and batches 1+2 kept 300 (2830000); the v0.8 replays
+  (`hoc-sim parity` 100/100 on v0.8s and v0.8sr, and 100/100, 22,816 steps, on 100 v0.8 rollout-origin battles on
+  side-oriented mixed maps, seeds 4001–4100, whose three ranged obstacle shots now replay); `zig build test`.
 
 Maps, checked on 2026-11-25 against common `2061f9ce` (both modes, every battle identical):
 
@@ -388,19 +531,27 @@ step, with the same run checksums. `getMovePath` is now specialised at compile t
 host, one run each: side NORMAL battles cost about what classic ones do (538 against 528 µs), side BLOCK_CENTER about
 1.15 times (618 µs) and side LAVA_CENTER about 1.25 times (683 µs).
 
-A battle state is a flat value of about 41 KB (36 KB before abilities), so a search rollout's snapshot and restore
-is one copy.
+The setup batch (augments, synergies, Break-aware ability probes, the break-roll check on every hit) kept the
+classic path within noise, on a busy host (load 9 to 88): twelve alternated pairs of `native-bench --reps 5` gave
+medians of 387.5 µs (old) and 383.5 µs (new) per battle, pairwise +0.6% (an earlier eight pairs: 387.7 and 401.3 µs,
+pairwise 0%), and four pairs of the engine-only bench 609 and 601 ns per step, with the same run checksums. The
+ability-free path pays a mask test per ability probe (as before), one `State.augments` test per refresh and a zero
+break-chance test per hit.
+
+A battle state is a flat value of about 40 KB (40,432 bytes; 36 KB before abilities, 41 KB with three 8-entry spell
+lists per unit before the setup batch sized them 12/4/6), so a search rollout's snapshot and restore is one copy.
 
 Where Zig spends battle time (sampled, before the layer bitmap): `getMovePath` 31%, `doFindTarget` 14%, the melee
 target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the layers.
 
 ## Not covered yet
 
-- the abilities of every creature outside batches 1 and 2, spells, artifacts, augments and synergies; WATER_CENTER
-  (never played); on the maps, the ranged obstacle shot (`obstacle_attack` with RANGE selected and a landable shot, which
-  v0.1 never sends: refused), Area Throw / Large Caliber on stones, Fire Breath through stones, artifact barrels, and
-  `forceStalledLap` / the recovery net (never reached: 0 rejected engine calls in every map recording). The ported code
-  leaves out what no battle in scope can reach: Break, Made of Fire, Mechanism, Paralysis, the
+- the abilities of every creature outside batches 1 and 2, spells and artifacts (and so Broken Aegis's +20 break
+  chance and self-miss); the revealed-ranged delivery layer of production's augment plan (it needs the live draft);
+  WATER_CENTER (never played); on the maps, Area Throw / Large Caliber on stones (`areaStrikeAtCell`), Quiver of
+  Echoes' extra obstacle shot, Fire Breath through stones, artifact barrels, and `forceStalledLap` / the recovery net
+  (never reached: 0 rejected engine calls in every map recording). The ported code leaves out what no battle in scope
+  can reach: Made of Fire, Mechanism, Paralysis, the
   forbidden target (Terrifying Gaze), Water Shield and Water Element, Flesh Shield, the Dual Strike Charm, the aura
   power types outside the three in scope, Skewer Strike from a large attacker, the Vine Throw cast, vines and the
   Earth/Wind element pair (Thunderbird is not ported);

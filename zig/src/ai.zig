@@ -63,6 +63,10 @@ pub const Ctx = struct {
     /// decideTurn's melee branch re-targets through preferRespondedMeleeTarget only for v0.1 (`this.version === "v0.1"`);
     /// a later version's port sets this false. completeMoveWithAdjacentMelee applies it either way.
     prefer_responded: bool = true,
+    /// v0.6's setPreferAttackOverMining (ai.ts findTarget): when the mountain strategy offers a strike, doFindTarget
+    /// runs (side effects included) and its action replaces the strike when it is an attack. False for v0.1; a
+    /// later version's port sets it around its inherited findTarget call.
+    prefer_attack_over_mining: bool = false,
     route_buf: [64]Cell = undefined,
     /// isFreeAt for the melee layers: on the board and empty, or one of the attacker's own cells. Bit y of free[x].
     free: [st.GRID]u16 = .{0} ** st.GRID,
@@ -698,6 +702,11 @@ pub fn findTarget(c: *Ctx) ?AIAction {
     if (action == null and !ranged and !engaged) {
         if (evaluateMountainStrategy(c, &eng)) |mountain| {
             action = mountain; // takes priority over the ranged-heavy hold and the regroup (BLOCK_CENTER only)
+            if (c.prefer_attack_over_mining) {
+                if (doFindTarget(c)) |normal| {
+                    if (normal.kind == .melee or normal.kind == .move_and_melee or normal.kind == .range) action = normal;
+                }
+            }
         } else if (eng.total_ranged > eng.total_melee and eng.total_ranged >= 2 and !eng.pressing) {
             return null;
         } else if (eng.total_melee > 0 and eng.nearest_melee > 4 and eng.engaged_melee == 0 and !eng.pressing) {
@@ -1072,6 +1081,7 @@ pub fn initCtxInto(c: *Ctx, s: *State, ui: u8) void {
     c.m = pathing.buildMatrix(s);
     c.have_actual = false;
     c.prefer_responded = true;
+    c.prefer_attack_over_mining = false;
     c.initFree();
 }
 

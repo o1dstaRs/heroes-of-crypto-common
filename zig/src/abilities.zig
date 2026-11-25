@@ -2,8 +2,10 @@
 //! the processors in src/abilities/*.ts that need no damage roll, and the team blessings of
 //! UnitsHolder.refreshStackPowerForAllUnits (`captureBlessingCensus`, `reapplyTeamBlessing`).
 //!
-//! In scope there are no synergies, artifacts, Made of Fire, Break, Mechanism or Empower, so every synergy term is 0
-//! and those branches are left out; the arithmetic keeps TypeScript's evaluation order so every double matches.
+//! The synergy term of every formula is the owner's team ability power (`Unit.syn_power`, Might's
+//! PLUS_STACK_ABILITIES_POWER); Break turns abilities and emitted auras off through `Unit.has` / `ability` /
+//! `auraCount`. In scope there are no artifacts, Made of Fire, Mechanism or Empower readers, so those branches are
+//! left out; the arithmetic keeps TypeScript's evaluation order so every double matches.
 
 const std = @import("std");
 const st = @import("state.zig");
@@ -17,8 +19,6 @@ const PT = st.PowerType;
 const AT = st.AttackType;
 
 pub const MAX_UNIT_STACK_POWER: f64 = 5;
-/// FightProperties.getAdditionalAbilityPowerPerTeam: no synergies in scope.
-const SYNERGY: f64 = 0;
 
 // =====================================================================================================================
 // Ability formulas (src/units/unit.ts)
@@ -29,7 +29,7 @@ pub fn abilityMultiplier(u: *const Unit, a: *const Ability) f64 {
     var coeff: f64 = 1;
     switch (a.power_type) {
         PT.TOTAL_DAMAGE_PERCENTAGE, PT.MAGIC_DAMAGE, PT.KILL_RANDOM_AMOUNT, PT.IGNORE_ARMOR, PT.MAGIC_RESIST_50, PT.MAGIC_RESIST_25, PT.ABSORB_DEBUFF, PT.BOOST_HEALTH => {
-            var combined = a.power + engine.getLuck(u) + 0 + SYNERGY;
+            var combined = a.power + engine.getLuck(u) + 0 + u.syn_power;
             if (combined < 0) combined = 1;
             if (a.stack_powered) {
                 coeff *= (combined / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u);
@@ -39,7 +39,7 @@ pub fn abilityMultiplier(u: *const Unit, a: *const Ability) f64 {
         },
         PT.ADDITIONAL_DAMAGE_PERCENTAGE, PT.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE, PT.ADDITIONAL_RANGE_ARMOR_PERCENTAGE => {
             const own = if (a.stack_powered) (a.power / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) else a.power / 100;
-            coeff += own + (engine.getLuck(u) + SYNERGY) / 100 + @as(f64, 0) / 100;
+            coeff += own + (engine.getLuck(u) + u.syn_power) / 100 + @as(f64, 0) / 100;
         },
         else => {},
     }
@@ -49,7 +49,7 @@ pub fn abilityMultiplier(u: *const Unit, a: *const Ability) f64 {
 
 /// Unit.calculateAbilityApplyChance
 pub fn applyChance(u: *const Unit, a: *const Ability) f64 {
-    const combined = engine.getLuck(u) + SYNERGY + ((a.power + 0) / MAX_UNIT_STACK_POWER) * engine.getStackPower(u);
+    const combined = engine.getLuck(u) + u.syn_power + ((a.power + 0) / MAX_UNIT_STACK_POWER) * engine.getStackPower(u);
     return if (combined < 0) 0 else combined;
 }
 
@@ -61,14 +61,14 @@ pub fn abilityCount(u: *const Unit, a: *const Ability) f64 {
     const luck = engine.getLuck(u);
     const sp = engine.getStackPower(u);
     if (a.power_type != PT.GAIN_ATTACK_AND_ARMOR_EACH_STEP) {
-        return (a.power / MAX_UNIT_STACK_POWER) * sp + luck / 10 + SYNERGY / 10 + @as(f64, 0) / 10;
+        return (a.power / MAX_UNIT_STACK_POWER) * sp + luck / 10 + u.syn_power / 10 + @as(f64, 0) / 10;
     }
-    return js.toFixed((a.power / MAX_UNIT_STACK_POWER) * sp + ((luck + 0 + SYNERGY) / 100) * a.power, 1);
+    return js.toFixed((a.power / MAX_UNIT_STACK_POWER) * sp + ((luck + 0 + u.syn_power) / 100) * a.power, 1);
 }
 
-/// Unit.canSkipResponse: an ability that is never answered (Shadow Touch).
+/// Unit.canSkipResponse: an ability that is never answered (Shadow Touch, Lightning Spin), unless Broken.
 pub fn skipsResponse(u: *const Unit) bool {
-    if (u.ability_mask == 0) return false;
+    if (u.ability_mask == 0 or u.isBroken()) return false;
     for (u.abilities[0..u.n_abilities]) |a| if (a.skip_response) return true;
     return false;
 }
@@ -210,7 +210,7 @@ fn stackBlessingPower(u: *const Unit, a: *const Ability) f64 {
 
 /// Unit.calculateSharpenedWeaponsBlessingPower
 fn sharpenedWeaponsPower(u: *const Unit, a: *const Ability) f64 {
-    return js.toFixed((a.power / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + engine.getLuck(u) + SYNERGY + 0, 2);
+    return js.toFixed((a.power / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + engine.getLuck(u) + u.syn_power + 0, 2);
 }
 
 inline fn onGrid(u: *const Unit) bool {
@@ -272,7 +272,8 @@ pub fn refreshBlessings(s: *State) void {
     if (refresh_luck) {
         reapply(s, &c, &c.luck, LUCK_BLESSING_BIT, .luck_blessing, .all, false);
         for (s.units[0..s.n_units]) |*u| {
-            if (!u.in_holder or u.isDead() or !onGrid(u) or (u.n_auras == 0 and !u.luck_dependent)) continue;
+            // getAuraEffects() is empty while Broken; the luck-dependent names are read off props.abilities.
+            if (!u.in_holder or u.isDead() or !onGrid(u) or (u.auraCount() == 0 and !u.luck_dependent)) continue;
             engine.adjustBaseStats(s, u);
         }
         if (s.auras) refreshAuras(s);
@@ -285,13 +286,13 @@ pub fn refreshBlessings(s: *State) void {
 // Auras (UnitsHolder.refreshAuraEffectsForAllUnits, Unit.calculateAuraPower / cleanAuraEffects / applyAuraEffect)
 // =====================================================================================================================
 
-/// Unit.calculateAuraPower(auraEffect, 0), for the power types the loader accepts.
+/// Unit.calculateAuraPower(auraEffect, the emitter's team ability power), for the power types the loader accepts.
 pub fn auraPower(u: *const Unit, def: *const st.AuraDef) f64 {
     return switch (def.power_type) {
         PT.ADDITIONAL_BASE_ATTACK_AND_ARMOR, PT.POISON_ON_HIT => def.power,
         PT.ABSORB_DEBUFF => blk: {
             var coeff: f64 = 1;
-            coeff += (def.power / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + (engine.getLuck(u) + SYNERGY) / 100 +
+            coeff += (def.power / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + (engine.getLuck(u) + u.syn_power) / 100 +
                 @as(f64, 0) / 100; // Made of Fire: not in scope
             break :blk js.toFixed(coeff * 100, 2) - 100;
         },
@@ -301,7 +302,7 @@ pub fn auraPower(u: *const Unit, def: *const st.AuraDef) f64 {
 
 /// Unit.cleanAuraEffects: every row whose laps are MAX_SAFE_INTEGER goes, with every other row of its name
 /// (deleteBuff / deleteDebuff remove by name); the rest keep their order.
-fn cleanAuraRows(list: *st.SpellList) void {
+fn cleanAuraRows(list: anytype) void {
     var i: usize = list.len;
     while (i > 0) {
         i -= 1;
@@ -323,8 +324,9 @@ pub fn appliedAuraPower(u: *const Unit, id: st.SpellId) ?f64 {
 const MAX_EMITTERS = st.MAX_UNITS * st.MAX_UNIT_AURAS;
 
 /// One emitted aura of this refresh (an AppliedAuraEffectProperties source): the emitter, its aura, the power
-/// computed once per refresh, the side it lands on and the emitter's base cell (the recorded source cell).
-const Emission = struct { unit: u8, def: u8, power: f64, team: u8, src: st.Cell };
+/// computed once per refresh, the side it lands on, the emitter's base cell (the recorded source cell) and the
+/// range with the team's Might aura-range synergy.
+const Emission = struct { unit: u8, def: u8, power: f64, team: u8, src: st.Cell, range: f64 };
 
 /// A (name -> strongest emission) list in first-seen order: a cell's list, then the receiver's strongestAuraPerName.
 const AuraRows = struct {
@@ -370,13 +372,14 @@ pub fn refreshAuras(s: *State) void {
         // isFootprintWithinGrid: NORMAL bodies never leave the board.
         cleanAuraRows(&u.buffs);
         cleanAuraRows(&u.debuffs);
-        for (u.auras[0..u.n_auras]) |d| {
+        for (u.auras[0..u.auraCount()]) |d| {
             const def = &s.aura_defs[d];
             const power = if (def.power != 0) auraPower(u, def) else def.power;
-            if (def.range + 0 < 0) continue; // getAdditionalAuraRangePerTeam: 0
+            const range = def.range + s.setup[u.team].aura_range;
+            if (range < 0) continue;
             const team = if (def.is_buff) u.team else engine.opposite(u.team);
             if (team != st.Team.LEFT and team != st.Team.RIGHT) continue;
-            ems[n_ems] = .{ .unit = @intCast(i), .def = d, .power = power, .team = team, .src = engine.baseCell(u) };
+            ems[n_ems] = .{ .unit = @intCast(i), .def = d, .power = power, .team = team, .src = engine.baseCell(u), .range = range };
             n_ems += 1;
         }
     }
@@ -392,7 +395,7 @@ pub fn refreshAuras(s: *State) void {
             var cell_rows: AuraRows = .{};
             for (ems[0..n_ems], 0..) |e, ei| {
                 if (e.team != u.team) continue;
-                if (!covers(bodies[e.unit].slice(), c, s.aura_defs[e.def].range)) continue;
+                if (!covers(bodies[e.unit].slice(), c, e.range)) continue;
                 cell_rows.offer(ems[0..n_ems], @intCast(ei));
             }
             for (cell_rows.em[0..cell_rows.len]) |ei| rows.offer(ems[0..n_ems], ei);
@@ -465,7 +468,7 @@ pub fn pegasusLight(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     const a = from.ability(.pegasus_light) orelse return;
     if (to.effects.find(.pegasus_light) != null) return;
     // calculateEffectMultiplier: Pegasus Light returns the combined power, flat
-    var power = a.effect_power + engine.getLuck(from) + SYNERGY;
+    var power = a.effect_power + engine.getLuck(from) + from.syn_power;
     if (power < 0) power = 1;
     const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
     to.effects.replace(.{ .id = .pegasus_light, .laps = laps, .power = power });
@@ -574,4 +577,20 @@ test "Absorb Penalties aura power is 10 * stack power + luck" {
             try std.testing.expectEqual(p, js.toFixed(p, 1));
         }
     }
+}
+
+test "Break turns abilities, auras and skip-response off while it lasts" {
+    var u = std.mem.zeroes(Unit);
+    u.abilities[0] = .{ .id = .lightning_spin, .power = 50, .power_type = PT.TOTAL_DAMAGE_PERCENTAGE, .ty = 0, .stack_powered = false, .skip_response = true };
+    u.n_abilities = 1;
+    u.ability_mask = st.AbilityId.lightning_spin.bit();
+    u.n_auras = 1;
+    try std.testing.expect(u.has(.lightning_spin) and u.ability(.lightning_spin) != null);
+    try std.testing.expect(skipsResponse(&u) and u.auraCount() == 1);
+    u.effects.replace(.{ .id = .break_, .laps = 2 });
+    try std.testing.expect(!u.has(.lightning_spin) and u.ability(.lightning_spin) == null);
+    try std.testing.expect(!skipsResponse(&u) and u.auraCount() == 0);
+    try std.testing.expect(!u.has(.dodge)); // absent stays absent
+    u.effects.delete(.break_);
+    try std.testing.expect(u.has(.lightning_spin));
 }

@@ -4,9 +4,9 @@
  *   bun zig/parity/record.ts [games=50] [firstSeed=1] [out=zig/parity/out/battles.jsonl]
  *
  * Scope of the spike: every creature's abilities and spells are stripped (except the creatures named in
- * RECORD_KEEP_ABILITIES), no artifacts, augments, synergies or doctrines, v0.1 AI on both sides. The map is NORMAL
- * on a classic board unless RECORD_GRID / RECORD_SIDE say otherwise (below). The AI only chooses actions; what is
- * recorded is every
+ * RECORD_KEEP_ABILITIES), v0.1 AI on both sides. No artifacts, augments, synergies or doctrines unless the setup options
+ * say otherwise (RECORD_AUGMENTS, RECORD_SYNERGIES, ..., below). The map is NORMAL on a classic board unless
+ * RECORD_GRID / RECORD_SIDE say otherwise (below). The AI only chooses actions; what is recorded is every
  * top-level call into the engine (GameActionEngine.apply and TurnEngine.advanceAfterNoActiveUnit) with
  *   - the seeded random state before and after the call (mulberry32 state, so Zig can resume the stream),
  *   - the events the call emitted (headless set),
@@ -23,7 +23,22 @@ import { TurnEngine } from "../../src/engine/turn_engine";
 import { StrategyV0_1 } from "../../src/ai/versions/v0_1";
 import { PathHelper } from "../../src/grid/path_helper";
 import { creatureIdForName } from "../../src/ai/setup/creature_score";
+import { a19ShooterlessAugments } from "../../src/ai/setup/a19_shooterless_setup";
+import {
+    A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS,
+    a19StrikerRushAugments,
+    isA19StrikerRushSetup,
+} from "../../src/ai/setup/a19_striker_rush";
+import { resolveSetupPolicy } from "../../src/ai/setup/setup_ship";
+import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../../src/artifacts/artifact_properties";
+import { getUpgradePoints } from "../../src/doctrines/doctrine_properties";
+import { ToFactionType } from "../../src/factions/faction_type";
 import { buildRoster, creaturesByLevel, makeRng } from "../../src/simulation/army";
+import {
+    DEFAULT_SYNERGY_VARIANTS,
+    FACTION_SYNERGY_PAIRS,
+    synergyVariantsForSeed,
+} from "../../src/synergies/synergy_properties";
 import {
     getAbilityConfig,
     getAuraEffectConfig,
@@ -61,9 +76,23 @@ for (const name of KEEP) {
     if (!known) throw new Error(`RECORD_KEEP_ABILITIES: unknown creature ${name}`);
 }
 
+// RECORD_FACTION="Chaos" (or "Chaos|Life", green|red; an empty side keeps the full pool) drafts that team's roster
+// from one faction (buildRoster's factionFilter), so its synergy reaches level 2 or 3 (Chaos break 11/17%, Life
+// morale +13/+20, Nature flyer armor 24/35%). A setup option: it changes the rosters.
+const FACTION_MODE = (process.env.RECORD_FACTION ?? "").trim();
+const FACTIONS = FACTION_MODE.split("|").map((part) => part.trim());
+for (const faction of FACTIONS) {
+    if (faction && !["Life", "Chaos", "Might", "Nature"].includes(faction)) {
+        throw new Error(`RECORD_FACTION: unknown faction ${faction}`);
+    }
+}
+const factionFor = (teamIndex: number): string | undefined =>
+    FACTION_MODE ? (teamIndex === 0 ? FACTIONS[0] : (FACTIONS[1] ?? FACTIONS[0])) || undefined : undefined;
+
 /** buildRoster, then each slot swapped (deterministically per seed) for a kept creature of the same level. */
-function rosterFor(seed: number): ReturnType<typeof buildRoster> {
-    const base = buildRoster(makeRng(seed));
+function rosterFor(seed: number, teamIndex = 0): ReturnType<typeof buildRoster> {
+    const faction = factionFor(teamIndex);
+    const base = faction ? buildRoster(makeRng(seed), undefined, undefined, faction) : buildRoster(makeRng(seed));
     if (!KEEP.size) return base;
     const rng = makeRng(Math.imul(seed, 7919) >>> 0);
     return base.map((spec) => {
@@ -111,6 +140,197 @@ function gridTypeFor(seed: number): number {
     if ((r -= MAP_WEIGHTS[0]) < 0) return 1;
     if ((r -= MAP_WEIGHTS[1]) < 0) return 3;
     return 4;
+}
+
+// ---- army setup (augments, doctrines, synergies, artifacts) ----
+// All off by default; then the recording is exactly the setup-free one. Any setup option turns on the setup columns:
+// each start-state unit gains `initialProps` (initialUnitProperties: runMatch's setup refresh folds augments and
+// synergies into props before recording, so props are no longer the base the engine recomputes from) and
+// `buffsSources` (each buff's first;second stored property, e.g. Sniper Augment "27;70"), the start state gains
+// `setup` (the synergy variants and, per team, the doctrine, augment levels, artifacts, synergy list and the
+// constant getAdditional*PerTeam / getBreakChancePerTeam values) and `effectConfigs.Break`, every battle line gains
+// `requested` (the setup passed to runMatch), and the unit digest gains shot_distance, base_armor_init and steps_init.
+//   RECORD_AUGMENTS=random            per team, kinds in random order, each a uniform level 0..min(cap, remaining)
+//                                     inside the doctrine budget (caps Placement 2, Armor 3, Might 3, Sniper 3,
+//                                     Movement 2)
+//   RECORD_AUGMENTS=production        resolveSetupPolicy(v0.8 spec).pickAugments, then the a19 striker-rush or
+//                                     shooterless rewrite the server applies (the revealed-ranged delivery layer is
+//                                     left out: it needs the live draft state)
+//   RECORD_AUGMENTS="Armor:3,Sniper:3,Might:1"             one plan for both teams (Empower allowed)
+//   RECORD_AUGMENTS="Armor:3,Movement:2|Sniper:3,Might:2"  green|red
+//   RECORD_DOCTRINE=random|1|2|3      per-team doctrine (upgrade budget 6/5/7); unset = NO_DOCTRINE (budget 7)
+//   RECORD_SYNERGIES=1                every faction with >= 2 distinct creatures fields the board's variant
+//                                     (liveRankedDraftSynergies); any listed synergy turns on every faction the army
+//                                     qualifies for (setSynergyUnitsPerFactions)
+//   RECORD_SYNERGY_VARIANTS=default|seed|random|"Life:2,Chaos:2,Might:2,Nature:1"
+//                                     the board variants (seed = synergyVariantsForSeed(`rec-${seed}`), production's
+//                                     function; default never fields Chaos break or Life morale/luck)
+//   RECORD_DISTINCT_RED=1             red drafts its own roster (rosterFor(seed ^ 0x5bd1e995)): asymmetric synergies
+//                                     and augment plans; not comparable with mirrored recordings
+//   RECORD_PLACEMENT_TIMING=setup-before-placement   production's zone timing (Placement widens the zone first)
+//   RECORD_FACTION="Chaos|"           one-faction rosters, so synergies reach level 2 or 3 (see rosterFor above)
+//   RECORD_ARTIFACTS=random|"t1:t2"|"t1:t2|t1:t2"   Tier-1/Tier-2 ids (random = the live pools plus 0), for the
+//                                     artifact batch (the Zig loader refuses artifact buffs)
+//   RECORD_TRACE_DRAWS=1              every engine/decide step gets `ds`, the getRandomInt caller of each raw draw
+//                                     (applyDamage's break roll also names the hit that called it), and
+//                                     <out>.sites.json tallies them
+// Production-like setup: RECORD_AUGMENTS=production RECORD_DOCTRINE=random RECORD_SYNERGIES=1
+// RECORD_SYNERGY_VARIANTS=seed RECORD_DISTINCT_RED=1 RECORD_PLACEMENT_TIMING=setup-before-placement.
+type AugKind = "Placement" | "Armor" | "Might" | "Sniper" | "Movement" | "Empower";
+type Aug = { kind: AugKind; value: number };
+const AUG_MODE = (process.env.RECORD_AUGMENTS ?? "").trim();
+const DOCTRINE_MODE = (process.env.RECORD_DOCTRINE ?? "").trim();
+const SYN_ON = ["1", "on", "true"].includes((process.env.RECORD_SYNERGIES ?? "").trim().toLowerCase());
+const VARIANT_MODE = (process.env.RECORD_SYNERGY_VARIANTS ?? "default").trim();
+const DISTINCT_RED = process.env.RECORD_DISTINCT_RED === "1";
+const PLACEMENT_TIMING = (process.env.RECORD_PLACEMENT_TIMING ?? "").trim();
+const ARTIFACT_MODE = (process.env.RECORD_ARTIFACTS ?? "").trim();
+const TRACE = process.env.RECORD_TRACE_DRAWS === "1";
+if (PLACEMENT_TIMING && PLACEMENT_TIMING !== "setup-before-placement") {
+    throw new Error(`RECORD_PLACEMENT_TIMING: expected setup-before-placement, got ${PLACEMENT_TIMING}`);
+}
+/** Any setup option: the setup columns are written. */
+const SETUP = !!(
+    AUG_MODE ||
+    DOCTRINE_MODE ||
+    SYN_ON ||
+    VARIANT_MODE !== "default" ||
+    DISTINCT_RED ||
+    PLACEMENT_TIMING ||
+    ARTIFACT_MODE ||
+    FACTION_MODE
+);
+/** RECORD_AUGMENTS=random levels; the explicit plans also accept Empower (read only by magic damage). */
+const RANDOM_AUG_CAP: Record<string, number> = { Placement: 2, Armor: 3, Might: 3, Sniper: 3, Movement: 2 };
+const AUG_KINDS = new Set<string>(["Placement", "Armor", "Might", "Sniper", "Movement", "Empower"]);
+const V08_SETUP_SPEC = "artifact-fit-v8:conditional-v1:sniper+t2a19";
+const v08SetupPolicy = AUG_MODE === "production" ? resolveSetupPolicy(V08_SETUP_SPEC) : undefined;
+
+const parsePlan = (spec: string): Aug[] =>
+    spec
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => {
+            const [kind, value] = part.split(":");
+            if (!AUG_KINDS.has(kind)) throw new Error(`RECORD_AUGMENTS: unknown kind ${kind}`);
+            return { kind: kind as AugKind, value: Number(value) };
+        });
+
+const creatureIds = (roster: { creatureName: string }[]): number[] => [
+    ...new Set(roster.map((spec) => creatureIdForName(spec.creatureName) ?? 0).filter((id) => id > 0)),
+];
+
+function augmentsFor(
+    seed: number,
+    teamIndex: number,
+    budget: number,
+    own: { creatureName: string }[],
+    opp: { creatureName: string }[],
+): Aug[] | undefined {
+    if (!AUG_MODE) return undefined;
+    if (AUG_MODE === "random") {
+        const rng = makeRng((Math.imul(seed, 2654435761) ^ (teamIndex * 0x27d4eb2d)) >>> 0);
+        const kinds = Object.keys(RANDOM_AUG_CAP)
+            .map((kind) => ({ kind, r: rng() }))
+            .sort((a, b) => a.r - b.r)
+            .map((entry) => entry.kind);
+        let remaining = budget;
+        const out: Aug[] = [];
+        for (const kind of kinds) {
+            const level = Math.floor(rng() * (Math.min(RANDOM_AUG_CAP[kind], remaining) + 1));
+            if (level > 0) {
+                out.push({ kind: kind as AugKind, value: level });
+                remaining -= level;
+            }
+        }
+        return out;
+    }
+    if (AUG_MODE === "production") {
+        const ownIds = creatureIds(own);
+        const oppIds = creatureIds(opp);
+        const base = v08SetupPolicy!.pickAugments(budget, ownIds) as any[];
+        const plan = isA19StrikerRushSetup(ownIds, oppIds, true, A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS)
+            ? a19StrikerRushAugments(base, budget, ownIds)
+            : a19ShooterlessAugments(base, ownIds);
+        return (plan as any[]).map((a) => ({ kind: a.kind, value: a.value }));
+    }
+    const [green, red] = AUG_MODE.split("|");
+    return parsePlan(teamIndex === 0 ? green : (red ?? green));
+}
+
+function artifactsFor(seed: number, teamIndex: number): [number, number] | undefined {
+    if (!ARTIFACT_MODE) return undefined;
+    if (ARTIFACT_MODE === "random") {
+        const rng = makeRng((Math.imul(seed, 0x2c1b3c6d) ^ (teamIndex * 0x297a2d39)) >>> 0);
+        const t1 = [0, ...TIER1_ARTIFACT_LIST.map((a: any) => a.id)];
+        const t2 = [0, ...TIER2_ARTIFACT_LIST.map((a: any) => a.id)];
+        return [t1[Math.floor(rng() * t1.length)], t2[Math.floor(rng() * t2.length)]];
+    }
+    const [green, red] = ARTIFACT_MODE.split("|");
+    const [t1, t2] = (teamIndex === 0 ? green : (red ?? green)).split(":").map(Number);
+    return [t1 || 0, t2 || 0];
+}
+
+function doctrineFor(seed: number, teamIndex: number): number | undefined {
+    if (!DOCTRINE_MODE) return undefined;
+    if (DOCTRINE_MODE === "random") return 1 + (((Math.imul(seed ^ 0x9e37, 0x85ebca6b) >>> 0) + teamIndex * 7) % 3);
+    return Number(DOCTRINE_MODE);
+}
+
+function variantsFor(seed: number): Record<string, number> | undefined {
+    if (VARIANT_MODE === "default") return undefined;
+    if (VARIANT_MODE === "seed") return synergyVariantsForSeed(`rec-${seed}`);
+    if (VARIANT_MODE === "random") {
+        const rng = makeRng((Math.imul(seed, 0x1b873593) ^ 0x77) >>> 0);
+        return Object.fromEntries(
+            Object.entries(FACTION_SYNERGY_PAIRS).map(([faction, pair]: [string, any]) => [
+                faction,
+                pair[rng() < 0.5 ? 0 : 1],
+            ]),
+        );
+    }
+    return Object.fromEntries(
+        VARIANT_MODE.split(",").map((part) => {
+            const [faction, variant] = part.split(":");
+            return [faction.trim(), Number(variant)];
+        }),
+    );
+}
+
+/** Every faction with at least two DISTINCT creatures fields the board's variant (liveRankedDraftSynergies). */
+function synergiesFor(
+    roster: { faction: string; creatureName: string }[],
+    variants: Record<string, number>,
+): { faction: number; synergy: number }[] | undefined {
+    if (!SYN_ON) return undefined;
+    const distinct = new Map<string, Set<string>>();
+    for (const spec of roster) {
+        const names = distinct.get(spec.faction) ?? new Set<string>();
+        names.add(spec.creatureName);
+        distinct.set(spec.faction, names);
+    }
+    const out: { faction: number; synergy: number }[] = [];
+    for (const faction of ["Life", "Nature", "Chaos", "Might"]) {
+        if ((distinct.get(faction)?.size ?? 0) >= 2) {
+            out.push({ faction: (ToFactionType as any)[faction], synergy: variants[faction] });
+        }
+    }
+    return out;
+}
+
+/** Caller (basename:line) of the getRandomInt that drew the current raw value. */
+function drawSite(): string {
+    const lines = (new Error().stack ?? "").split("\n");
+    const at = lines.findIndex((line) => line.includes("getRandomInt"));
+    const name = (frame: string): string => {
+        const match = frame.match(/at (\S+) .*\/([^/]+\.ts):(\d+)/) ?? frame.match(/\/([^/]+\.ts):(\d+)/);
+        if (!match) return frame.trim();
+        return match.length === 4 ? `${match[1]}@${match[2]}:${match[3]}` : `${match[1]}:${match[2]}`;
+    };
+    const site = name(at >= 0 ? (lines[at + 1] ?? "") : (lines[3] ?? ""));
+    // A break roll is drawn inside applyDamage: name the hit that called it too.
+    return site.startsWith("applyDamage@") && at >= 0 ? `${site}<${name(lines[at + 2] ?? "")}` : site;
 }
 
 // ---- seeded stream with an observable state ----
@@ -186,6 +406,8 @@ function unitDigest(u: any): unknown[] {
             .getBuffs()
             .map((b: any) => `${b.getFirstSpellProperty() ?? ""};${b.getSecondSpellProperty() ?? ""}`)
             .join(","),
+        // Setup columns: Sniper moves shot_distance on every refresh; Bitter Experience moves the two bases.
+        ...(SETUP ? [p.shot_distance, u.initialUnitProperties.base_armor, u.initialUnitProperties.steps] : []),
     ];
 }
 
@@ -237,6 +459,7 @@ const DIGEST_FIELDS = [
     "target",
     "magic_resist",
     "buffs_sources",
+    ...(SETUP ? ["shot_distance", "base_armor_init", "steps_init"] : []),
 ];
 
 function fightDigest(fp: any): Record<string, unknown> {
@@ -306,6 +529,14 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
             cells: u.getCells().map((c: any) => ({ ...c })),
             position: { ...u.getPosition() },
             props: JSON.parse(JSON.stringify(p)),
+            ...(SETUP
+                ? {
+                      initialProps: JSON.parse(JSON.stringify(u.initialUnitProperties)),
+                      buffsSources: u
+                          .getBuffs()
+                          .map((b: any) => `${b.getFirstSpellProperty() ?? ""};${b.getSecondSpellProperty() ?? ""}`),
+                  }
+                : {}),
         });
     }
     const abilityConfigs: Record<string, any> = {};
@@ -332,6 +563,9 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
     }
     if (!("Poison" in effectConfigs))
         effectConfigs.Poison = JSON.parse(JSON.stringify(getEffectConfig("Poison") ?? null));
+    // The Chaos synergy's break-on-attack effect.
+    if (SETUP && !("Break" in effectConfigs))
+        effectConfigs.Break = JSON.parse(JSON.stringify(getEffectConfig("Break") ?? null));
     const spellConfigs: Record<string, unknown> = {
         "Ember Covenant Blessing": JSON.parse(JSON.stringify(getSpellConfig("System", "Ember Covenant Blessing"))),
     };
@@ -370,8 +604,41 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
             numberOfLapsTillNarrowing: fp.getNumberOfLapsTillNarrowing(),
             teamUnitsAlive: [...fp.teamUnitsAlive.entries()],
         },
+        ...(SETUP ? { setup: setupState(fp) } : {}),
         units,
     };
+}
+
+/** Per-team setup as FightProperties holds it after the runMatch setup block (team 2 = LEFT/green, 1 = RIGHT/red). */
+function setupState(fp: any): Record<string, unknown> {
+    const perTeam: Record<string, unknown> = {};
+    for (const team of [2, 1]) {
+        perTeam[team] = {
+            doctrine: fp.getDoctrine(team),
+            upgradePoints: fp.getUpgradePoints(team),
+            augments: {
+                Placement: fp.getAugmentPlacementLevel(team),
+                Armor: fp.getAugmentArmor(team),
+                Might: fp.getAugmentMight(team),
+                Sniper: fp.getAugmentSniper(team),
+                Movement: fp.getAugmentMovement(team),
+                Empower: fp.getAugmentEmpower(team),
+            },
+            artifactT1: fp.getArtifactTier1(team),
+            artifactT2: fp.getArtifactTier2(team),
+            synergies: [...fp.getSynergiesPerTeam(team)],
+            abilityPower: fp.getAdditionalAbilityPowerPerTeam(team),
+            movementSteps: fp.getAdditionalMovementStepsPerTeam(team),
+            flyArmor: fp.getAdditionalFlyArmorPerTeam(team),
+            morale: fp.getAdditionalMoralePerTeam(team),
+            luck: fp.getAdditionalLuckPerTeam(team),
+            supply: fp.getAdditionalSupplyPerTeam(team),
+            auraRange: fp.getAdditionalAuraRangePerTeam(team),
+            breakChance: fp.getBreakChancePerTeam(team),
+            boardUnits: fp.getNumberOfUnitsAvailableForPlacement(team),
+        };
+    }
+    return { variants: fp.getSynergyVariants(), perTeam };
 }
 
 function main(): void {
@@ -394,12 +661,17 @@ function main(): void {
     let warmNanos = 0n;
     let warmSteps = 0;
 
+    // getRandomInt call sites (one entry per raw draw) while recording, for RECORD_TRACE_DRAWS.
+    const siteLog: string[] = [];
+    const siteTally = new Map<string, number>();
+
     const wrap = (proto: any, method: string, kind: string): void => {
         const original = proto[method];
         proto[method] = function (this: unknown, arg: unknown) {
             if (!recording || depth > 0 || !ctx || !rng) return original.call(this, arg);
             const r0 = rng.state;
             const d0 = rng.draws;
+            const site0 = siteLog.length;
             depth += 1;
             const t0 = process.hrtime.bigint();
             let result: any;
@@ -419,6 +691,7 @@ function main(): void {
                 rej: result.rejectionReason ?? null,
                 ev: result.events.map((e: any) => [e.type, e.unitId ?? e.winningTeam ?? null]),
                 s: digest(ctx),
+                ...(TRACE ? { ds: siteLog.slice(site0) } : {}),
             });
             return result;
         };
@@ -467,6 +740,7 @@ function main(): void {
         if (!recording || depth > 0 || !rng) return decideTurn.call(this, unit, context);
         const r0 = rng.state;
         const d0 = rng.draws;
+        const site0 = siteLog.length;
         depth += 1;
         let actions: unknown[];
         const t0 = process.hrtime.bigint();
@@ -484,6 +758,7 @@ function main(): void {
             r1: rng.state,
             draws: rng.draws - d0,
             out: JSON.parse(JSON.stringify(actions)),
+            ...(TRACE ? { ds: siteLog.slice(site0) } : {}),
         });
         return actions;
     };
@@ -497,23 +772,60 @@ function main(): void {
         const roster = rosterFor(seed);
         const gridType = gridTypeFor(seed);
         gridCounts[gridType] = (gridCounts[gridType] ?? 0) + 1;
+        const redRoster = DISTINCT_RED ? rosterFor((seed ^ 0x5bd1e995) >>> 0, 1) : roster;
+        const greenDoctrine = doctrineFor(seed, 0);
+        const redDoctrine = doctrineFor(seed, 1);
+        const greenAugments = augmentsFor(seed, 0, getUpgradePoints(greenDoctrine ?? 0), roster, redRoster);
+        const redAugments = augmentsFor(seed, 1, getUpgradePoints(redDoctrine ?? 0), redRoster, roster);
+        const greenArtifacts = artifactsFor(seed, 0);
+        const redArtifacts = artifactsFor(seed, 1);
+        const synergyVariants = variantsFor(seed);
+        const boardVariants = synergyVariants ?? (DEFAULT_SYNERGY_VARIANTS as Record<string, number>);
+        const greenSynergies = synergiesFor(roster, boardVariants);
+        const redSynergies = synergiesFor(redRoster, boardVariants);
+        siteLog.length = 0;
         steps = [];
         let init: Record<string, unknown> | undefined;
         const result = runMatch({
             greenVersion: "v0.1",
             redVersion: "v0.1",
             roster,
+            ...(DISTINCT_RED ? { redRoster } : {}),
             seed,
             maxLaps: 60,
             headlessEvents: true,
             gridType,
             ...(SIDE_ORIENTED ? { sideOrientedPlacement: true } : {}),
+            ...(greenDoctrine ? { greenDoctrine } : {}),
+            ...(redDoctrine ? { redDoctrine } : {}),
+            ...(greenAugments ? { greenAugments } : {}),
+            ...(redAugments ? { redAugments } : {}),
+            ...(greenSynergies ? { greenSynergies } : {}),
+            ...(redSynergies ? { redSynergies } : {}),
+            ...(synergyVariants ? { synergyVariants } : {}),
+            ...(greenArtifacts?.[0] ? { greenArtifactT1: greenArtifacts[0] } : {}),
+            ...(greenArtifacts?.[1] ? { greenArtifactT2: greenArtifacts[1] } : {}),
+            ...(redArtifacts?.[0] ? { redArtifactT1: redArtifacts[0] } : {}),
+            ...(redArtifacts?.[1] ? { redArtifactT2: redArtifacts[1] } : {}),
+            ...(PLACEMENT_TIMING ? { placementAugmentTiming: PLACEMENT_TIMING as "setup-before-placement" } : {}),
             beforeFightStart: (context) => {
                 ctx = context as unknown as Ctx;
                 // Replace the match's seeded stream with one whose state we can observe. Still deterministic.
                 if (!getDeterministicRandomSource()) throw new Error("expected a seeded match");
                 rng = new Mulberry(Math.imul(seed, 0x9e3779b1) >>> 0);
-                setDeterministicRandomSource(rng.next);
+                const next = rng.next;
+                setDeterministicRandomSource(
+                    TRACE
+                        ? () => {
+                              if (recording && depth > 0) {
+                                  const site = drawSite();
+                                  siteLog.push(site);
+                                  siteTally.set(site, (siteTally.get(site) ?? 0) + 1);
+                              }
+                              return next();
+                          }
+                        : next,
+                );
                 init = initialState(ctx, seed);
                 recording = true;
             },
@@ -535,6 +847,20 @@ function main(): void {
                 endReason: result.endReason,
                 laps: result.laps,
                 init,
+                ...(SETUP
+                    ? {
+                          requested: {
+                              greenAugments,
+                              redAugments,
+                              greenSynergies,
+                              redSynergies,
+                              greenDoctrine,
+                              redDoctrine,
+                              greenArtifacts,
+                              redArtifacts,
+                          },
+                      }
+                    : {}),
                 steps,
             }),
         );
@@ -564,8 +890,26 @@ function main(): void {
         mapWeights: MAP_WEIGHTS,
         sideOriented: SIDE_ORIENTED,
         gridTypes: gridCounts,
+        ...(SETUP
+            ? {
+                  setup: {
+                      augments: AUG_MODE || null,
+                      doctrine: DOCTRINE_MODE || null,
+                      synergies: SYN_ON,
+                      synergyVariants: VARIANT_MODE,
+                      distinctRed: DISTINCT_RED,
+                      placementTiming: PLACEMENT_TIMING || null,
+                      artifacts: ARTIFACT_MODE || null,
+                      faction: FACTION_MODE || null,
+                  },
+              }
+            : {}),
     };
     writeFileSync(out.replace(/\.jsonl$/, ".meta.json"), JSON.stringify(meta, null, 2) + "\n");
+    if (TRACE) {
+        const tally = Object.fromEntries([...siteTally.entries()].sort((a, b) => b[1] - a[1]));
+        writeFileSync(out.replace(/\.jsonl$/, ".sites.json"), JSON.stringify(tally, null, 2) + "\n");
+    }
     console.log(JSON.stringify(meta));
     void num;
 }

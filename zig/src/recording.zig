@@ -20,7 +20,8 @@ pub const Action = union(enum) {
     range_attack: struct { attacker: u8, target: u8, aim_cell: ?Cell = null, aim_side: u8 = 0 },
     /// A strike on a mountain cell or a stone at `targetPosition` (a cell centre) from `attackFrom`; `path` is the
     /// approach route (empty when striking in place, where the recorded action has no path or route flags).
-    obstacle_attack: struct { attacker: u8, target_x: f64, target_y: f64, attack_from: Cell, path: []const Cell, has_lava: bool = false },
+    /// `has_from` false: the action carries no attackFrom (a shooter's ranged shot at the obstacle).
+    obstacle_attack: struct { attacker: u8, target_x: f64, target_y: f64, attack_from: Cell, path: []const Cell, has_lava: bool = false, has_from: bool = true },
     /// An AI decision: the unit and the actions `decideTurn` returned (not an engine call).
     decide: struct { unit: u8, out: []const Action },
 };
@@ -155,15 +156,16 @@ pub fn parseAction(arena: std.mem.Allocator, ids: []const []const u8, kind: []co
     }
     if (std.mem.eql(u8, t, "obstacle_attack")) {
         const pos = get(a, "targetPosition");
-        if (get(a, "attackFrom") == .null) return error.UnsupportedObstacleAttack; // ranged obstacle shots: not ported
         if (flag(get(a, "hasWaterCell"))) return error.UnsupportedObstacleAttack;
+        const from = get(a, "attackFrom");
         return .{ .obstacle_attack = .{
             .attacker = try unitArg(ids, get(a, "attackerId")),
             .target_x = num(get(pos, "x")),
             .target_y = num(get(pos, "y")),
-            .attack_from = cell(get(a, "attackFrom")),
+            .attack_from = if (from == .null) .{ .x = 0, .y = 0 } else cell(from),
             .path = try cells(arena, get(a, "path")),
             .has_lava = flag(get(a, "hasLavaCell")),
+            .has_from = from != .null,
         } };
     }
     if (std.mem.eql(u8, t, "range_attack")) {
@@ -205,9 +207,18 @@ fn parseEvent(ids: []const []const u8, v: std.json.Value) !Event {
     return error.UnsupportedEvent;
 }
 
+/// The seed of the game parseGame last started (diagnostics for a game it refuses; -1 before the root parsed).
+pub var parse_seed: i64 = -1;
+/// The step index parseGame was reading when it refused a game.
+pub var parse_step: usize = 0;
+
 /// Parses one recorded game. Everything is allocated from `arena`; `keep_digests` retains the expected digests.
+/// On an error `parse_seed` / `parse_step` name the game and step (callers report it and skip the game).
 pub fn parseGame(arena: std.mem.Allocator, line: []const u8, keep_digests: bool) !Game {
+    parse_seed = -1;
+    parse_step = 0;
     const root = try std.json.parseFromSliceLeaky(std.json.Value, arena, line, .{});
+    parse_seed = int(get(root, "seed"));
     const init = get(root, "init");
     const units = get(init, "units").array.items;
     const ids = try arena.alloc([]const u8, units.len);
@@ -216,6 +227,7 @@ pub fn parseGame(arena: std.mem.Allocator, line: []const u8, keep_digests: bool)
     const raw_steps = get(root, "steps").array.items;
     const steps = try arena.alloc(Step, raw_steps.len);
     for (raw_steps, 0..) |s, i| {
+        parse_step = i;
         const ev_raw = if (get(s, "ev") == .array) get(s, "ev").array.items else &[_]std.json.Value{};
         const events = try arena.alloc(Event, ev_raw.len);
         for (ev_raw, 0..) |e, j| events[j] = try parseEvent(ids, e);
