@@ -1,9 +1,11 @@
 //! The v0.8 policy port: entry point for `hoc-sim v08 <command> ...`. Everything outside src/v08/ is read-only API.
 //!
-//!   hoc-sim v08 layers <recording.jsonl> [--top v0.2] [--max-fail N]
+//!   hoc-sim v08 layers <recording.jsonl> [--top v0.2] [--passes] [--max-fail N]
 //!       Replays a layer recording (zig/parity/v08/record.ts with RECORD_LAYERS=1) in the Zig engine and, at every
 //!       decision, runs the Zig chain up to --top on a copy of the state, comparing each level's output and random
 //!       state with the logged layer of the same name (the k-th Zig "v0.2" against the k-th logged "v0.2").
+//!       --passes also checks every ported v0.8 pass (lv8.zig) in isolation: run on the logged output of the layer
+//!       before it, its output must equal its own logged layer. Passes not ported yet are skipped.
 
 const std = @import("std");
 const rec = @import("../recording.zig");
@@ -13,12 +15,18 @@ const compare = @import("../compare.zig");
 const ai = @import("../ai.zig");
 const policy = @import("policy.zig");
 const util = @import("util.zig");
+const lv8 = @import("lv8.zig");
 
 fn argValue(args: []const []const u8, name: []const u8) ?[]const u8 {
     for (args, 0..) |a, i| {
         if (std.mem.eql(u8, a, name) and i + 1 < args.len) return args[i + 1];
     }
     return null;
+}
+
+fn hasFlag(args: []const []const u8, name: []const u8) bool {
+    for (args) |a| if (std.mem.eql(u8, a, name)) return true;
+    return false;
 }
 
 fn argNumber(args: []const []const u8, name: []const u8, default: usize) usize {
@@ -29,12 +37,12 @@ fn argNumber(args: []const []const u8, name: []const u8, default: usize) usize {
 /// `args` are the command-line arguments after `hoc-sim v08`.
 pub fn run(gpa: std.mem.Allocator, args: []const []const u8) !void {
     if (args.len < 2) {
-        std.debug.print("usage: hoc-sim v08 layers <recording.jsonl> [--top v0.2] [--max-fail N]\n", .{});
+        std.debug.print("usage: hoc-sim v08 layers <recording.jsonl> [--top v0.2] [--passes] [--max-fail N]\n", .{});
         return error.Usage;
     }
     if (std.mem.eql(u8, args[0], "layers")) {
         const top = policy.levelFromName(argValue(args, "--top") orelse "v0.2") orelse return error.UnknownLevel;
-        if (!try layers(gpa, args[1], top, argNumber(args, "--max-fail", 10))) std.process.exit(1);
+        if (!try layers(gpa, args[1], top, hasFlag(args, "--passes"), argNumber(args, "--max-fail", 10))) std.process.exit(1);
         return;
     }
     std.debug.print("hoc-sim v08: unknown command {s}\n", .{args[0]});
@@ -149,7 +157,7 @@ fn dumpUnits(s: *const st.State, actor: u8) void {
     }
 }
 
-fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, max_fail: usize) !bool {
+fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: bool, max_fail: usize) !bool {
     const buf = try std.fs.cwd().readFileAlloc(gpa, path, 1 << 34);
     defer gpa.free(buf);
     var arena_state = std.heap.ArenaAllocator.init(gpa);
@@ -246,6 +254,40 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, max_fail:
                             if (std.posix.getenv("V08_DEBUG") != null) dumpUnits(&s, step.action.decide.unit);
                         }
                         break; // later layers build on this one
+                    }
+                    if (passes) {
+                        // Each ported v0.8 pass on the logged output of the layer before it.
+                        for (logged, 0..) |l, li| {
+                            if (li == 0) continue;
+                            const pass = lv8.passFromName(l.name) orelse continue;
+                            var input: ai.Decision = .{};
+                            if (!lv8.fromActions(&input, logged[li - 1].out)) continue;
+                            var pcopy = s;
+                            pcopy.rng.state = l.rin;
+                            var pc: ai.Ctx = undefined;
+                            ai.initCtxInto(&pc, &pcopy, step.action.decide.unit);
+                            var pout: ai.Decision = .{};
+                            if (!lv8.runPass(&pc, pass, &input, &pout)) continue;
+                            const key = try std.fmt.allocPrint(da, "pass {s}", .{l.name});
+                            const gop = try stats.getOrPut(key);
+                            if (!gop.found_existing) {
+                                gop.key_ptr.* = try gpa.dupe(u8, key);
+                                gop.value_ptr.* = .{};
+                            }
+                            gop.value_ptr.compared += 1;
+                            if (sameActions(pout.slice(), l.out) and pcopy.rng.state == l.rout) {
+                                gop.value_ptr.matched += 1;
+                                continue;
+                            }
+                            all_ok = false;
+                            fails += 1;
+                            if (fails <= max_fail) {
+                                std.debug.print("seed {d} step {d} unit {d} pass {s}: differs (rng out {d}/{d})\n", .{ game.seed, i, step.action.decide.unit, l.name, pcopy.rng.state, l.rout });
+                                printActions("in ", logged[li - 1].out);
+                                printActions("ts ", l.out);
+                                printActions("zig", pout.slice());
+                            }
+                        }
                     }
                     if (all_ok) decisions_ok += 1;
                 }
