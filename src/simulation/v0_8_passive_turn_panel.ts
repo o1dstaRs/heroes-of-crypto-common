@@ -17,6 +17,7 @@ import { join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
 
 import { AI_VERSIONS } from "../ai";
+import { a19CarrierCohesionHoldsBack, a19IsEarlyIsolatingCarrierMove } from "../ai/carrier_cohesion";
 import { enumerateCandidates, type CandidateKind, type IEnumeratedCandidate } from "../ai/candidates";
 import type { IDecisionContext } from "../ai/ai_strategy";
 import {
@@ -31,6 +32,7 @@ import { buildV08A13SearchEnvironment } from "../ai/versions/v0_8_a13_profile";
 import { isV08DirectCombatDecision } from "../ai/versions/v0_8_dominant_finish";
 import type { GameAction } from "../engine/actions";
 import type { GameEvent } from "../engine/events";
+import { canWaitOnHourglass } from "../engine/hourglass";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { Unit } from "../units/unit";
 import {
@@ -208,6 +210,12 @@ export interface IV08PassivePreparedDecision {
     creatureName: string;
     lap: number;
     rawIncumbent: readonly GameAction[];
+    /**
+     * The incumbent SearchDriver searches from when it is not the native decision: a19-carrier-cohesion-v2 (profile
+     * v32) turns an early isolating carrier move into a wait, else a defend, before the search. Its passive probe
+     * describes this incumbent.
+     */
+    searchIncumbent?: readonly GameAction[];
     defendClass: V08PassiveDefendClass;
     /** Production v0.8 defend classifications must be confirmed by SearchDriver's real-engine probe. */
     requiresProductiveProbe?: boolean;
@@ -494,6 +502,26 @@ const passiveActionKind = (actions: readonly Readonly<GameAction>[]): SearchPass
     return undefined;
 };
 
+/** SearchDriver's carrier cohesion incumbent (profile v32) for a v0.8 seat, when it differs from the native move. */
+const carrierCohesionSearchIncumbent = (
+    unit: Unit,
+    context: IDecisionContext,
+    incumbent: readonly GameAction[],
+    strategyVersion: string,
+): GameAction[] | undefined => {
+    const fightProperties = context.fightProperties;
+    if (
+        strategyVersion !== "v0.8" ||
+        !fightProperties ||
+        !a19CarrierCohesionHoldsBack(unit.getTeam(), fightProperties) ||
+        !a19IsEarlyIsolatingCarrierMove(unit, context.unitsHolder, fightProperties.getCurrentLap(), [...incumbent])
+    ) {
+        return undefined;
+    }
+    const wait = canWaitOnHourglass(unit, fightProperties, context.unitsHolder.getAllUnits());
+    return [{ type: wait ? "wait_turn" : "defend_turn", unitId: unit.getId() }];
+};
+
 export const requiresV08PassiveProductiveProbe = (
     strategyVersion: string,
     actions: readonly Readonly<GameAction>[],
@@ -649,15 +677,22 @@ export class V08PassiveTurnAuditor {
                                   isV08BacklineWardPureMoveMeaningful(wardIntent, unit, context, candidate.actions))))
                 : undefined;
         const defendClass = classifyV08PassiveDefendOpportunity(candidateSet.candidates, preservesIntent);
+        const searchIncumbent = carrierCohesionSearchIncumbent(
+            unit,
+            context,
+            observation.incumbent,
+            observation.strategyVersion,
+        );
         this.observePreparedDecision({
             unitId: unit.getId(),
             creatureName: unit.getName(),
             lap: context.fightProperties?.getCurrentLap() ?? 0,
             rawIncumbent: observation.incumbent,
+            ...(searchIncumbent ? { searchIncumbent } : {}),
             defendClass,
             requiresProductiveProbe: requiresV08PassiveProductiveProbe(
                 observation.strategyVersion,
-                observation.incumbent,
+                searchIncumbent ?? observation.incumbent,
             ),
             enumerationTruncations: candidateSet.truncated.length,
             isDead: () => unit.isDead(),
@@ -667,7 +702,7 @@ export class V08PassiveTurnAuditor {
         if (pending.productiveProbe !== undefined) {
             this.add(pending.creatureName, "observerPairingFaults");
         }
-        const expectedKind = passiveActionKind(pending.rawIncumbent);
+        const expectedKind = passiveActionKind(pending.searchIncumbent ?? pending.rawIncumbent);
         if (expectedKind === undefined || probe.incumbentKind !== expectedKind || probe.lap !== pending.lap) {
             this.add(pending.creatureName, "observerPairingFaults");
         }

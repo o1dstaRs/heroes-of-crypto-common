@@ -474,6 +474,48 @@ describe("v0.8 random-roster passive-turn panel", () => {
         expect(orphan.metrics.observerPairingFaults).toBe(1);
     });
 
+    test("pairs the probe of a carrier whose native move the search turned into a defend (profile v32)", () => {
+        // a19-carrier-cohesion-v2 holds an early isolating carrier back before the search, so SearchDriver probes
+        // the defend it searches from while the native decision observed here is still the move.
+        const carrier = new V08PassiveTurnAuditor("green");
+        carrier.observePreparedDecision({
+            unitId: "carrier",
+            creatureName: "Wolf Rider",
+            lap: 1,
+            rawIncumbent: [move("carrier")],
+            searchIncumbent: [defend("carrier")],
+            defendClass: "forced",
+            requiresProductiveProbe: true,
+        });
+        carrier.observeProductiveProbe(productiveProbe("carrier"));
+        carrier.observeExecution(
+            execution({
+                unitId: "carrier",
+                creatureName: "Wolf Rider",
+                raw: [move("carrier")],
+                chosen: [defend("carrier")],
+            }),
+        );
+        carrier.finish();
+        expect(carrier.metrics.observerPairingFaults).toBe(0);
+        expect(carrier.metrics.rawDefendTurns).toBe(0);
+        expect(carrier.metrics.chosenDefendTurns).toBe(1);
+
+        const unconverted = new V08PassiveTurnAuditor("green");
+        unconverted.observePreparedDecision({
+            unitId: "walker",
+            creatureName: "Wolf Rider",
+            lap: 1,
+            rawIncumbent: [move("walker")],
+            defendClass: "forced",
+        });
+        unconverted.observeProductiveProbe(productiveProbe("walker"));
+        unconverted.observeExecution(execution({ unitId: "walker", raw: [move("walker")], chosen: [move("walker")] }));
+        unconverted.finish();
+        // Without the search incumbent, the same probe does not pair with the native move.
+        expect(unconverted.metrics.observerPairingFaults).toBeGreaterThan(0);
+    });
+
     test("records scored avoidable passives, explicit exemptions, and a terminal avoidable streak", () => {
         const auditor = new V08PassiveTurnAuditor("green");
         const retain = (
