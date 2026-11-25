@@ -185,8 +185,13 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     (ai/split_screen.ts, ai/tactical_split_placement.ts; the server's split plan for AI seats and Premium "Arrange
  *     army"). A non-inferiority check, registered confirmation OA: +0.87 points (95% −0.15 to +1.88)
  *     (docs/owner_asks_adoption.md).
+ *   - Shield screen (profile v36) adopted on 2026-11-25 by the owner's decision ("it is always better to split mermaid
+ *     if we have it, because it takes two shots to kill her"; "Both now": AI seats and Premium): in screen mode a
+ *     splittable Water Shield stack (Mermaid) is the screen body before any other, so every spare slot becomes a
+ *     one-model Mermaid that takes two attacks to kill (ai/split_screen.ts, ai/tactical_split_placement.ts). A
+ *     registered non-inferiority check follows (docs/shield_screen_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v35" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v36" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -505,6 +510,19 @@ export const V08_A19_SPLIT_SCREEN_POLICY = Object.freeze({
     adoption: "owner-request",
     registrationSha256: "01fdd229c2e6ac7a8d4ea3d99f0dd13c20e60991dc8c71401fa63f24e86b89e4",
     qualification: "non-inferiority-confirmed",
+} as const);
+
+/**
+ * Shield screen (profile v36): ai/split_screen.ts switches the Water Shield screen body of ai/tactical_split_placement.ts
+ * for the server's split plan (AI seats and Premium "Arrange army") and the client's Premium projection. Adopted by the
+ * owner's decision before its check; the registration is the frozen decision record. See docs/shield_screen_adoption.md.
+ */
+export const V08_A19_SHIELD_SCREEN_POLICY = Object.freeze({
+    policyId: "a19-shield-screen-v1" as const,
+    adoptedAt: "2026-11-25",
+    adoption: "owner-explicit-decision",
+    registrationSha256: "4f5683ebb2a0184f71854ea153ee83ba4aaf5df6c53943493e30f7e81033d954",
+    qualification: "owner-decision-check-pending",
 } as const);
 
 /**
@@ -925,13 +943,14 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "split-screen" as const,
         source: "src/ai/split_screen.ts" as const,
-        sha256: "e20eff24d373127bf9ee23196354f828814904b0bb0fbdc27974a3e7af0832c0" as const,
+        // Profile v36 adds the shield screen switch.
+        sha256: "1da2ce928e8f4483d3b56f5fdf27cea56ffa80441f387b1382b8b42a22e673dd" as const,
     }),
     Object.freeze({
         role: "tactical-split-placement" as const,
         source: "src/ai/tactical_split_placement.ts" as const,
-        // The split planner; profile v35 adds its screen mode.
-        sha256: "c134ad27c1b607b01d052c2a31a5e01835341614a7839957061cddce65c764c3" as const,
+        // The split planner; profile v35 adds its screen mode, profile v36 the Water Shield screen body.
+        sha256: "d35588055f36556006d1bf791f19770794da619e94fee9f25351b61c9510bc99" as const,
     }),
 ] as const);
 
@@ -981,6 +1000,7 @@ export const V08_A19_PROFILE = Object.freeze({
     queenCounter: V08_A19_QUEEN_COUNTER_POLICY,
     closingPick: V08_A19_CLOSING_PICK_POLICY,
     splitScreen: V08_A19_SPLIT_SCREEN_POLICY,
+    shieldScreen: V08_A19_SHIELD_SCREEN_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

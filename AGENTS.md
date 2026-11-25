@@ -9,12 +9,25 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Shield screen — November 25, 2026
+
+**The current default is profile v36.** `a19-shield-screen-v1` refines v35's split screen at the owner's request ("it
+is always better to split mermaid if we have it, because it takes two shots to kill her"). In screen mode a splittable
+Water Shield stack (Mermaid, the only one) is the screen body before any other, so every spare slot becomes a one-model
+Mermaid. Its shield absorbs the first attack, so each split takes two attacks to kill. The owner chose "Both now": AI
+seats and Premium "Arrange army" at once, with a registered non-inferiority check to follow (OA's bar) and a rollback if
+it fails. The profile records `qualification: "owner-decision-check-pending"`; it is not a measured strength gain. The
+switch is `A19_SHIELD_SCREEN_<LEFT|RIGHT>` (`src/ai/split_screen.ts`), on unless `0`; the server's split plan and the
+client's Premium projection read it. Read `docs/shield_screen_adoption.md`; keep `split_screen.test.ts` passing.
+
+Profile v35 is retained inside v36.
+
 ## The owner's asks — November 25, 2026
 
 The owner asked for three behaviour fixes on November 24, 2026. Each had measured flat in development, so the owner
 chose to check each one first. One registered non-inferiority confirmation, OA, checked all three against one production
 control: the 95% lower bound may not fall below −2 points per game. The rules that passed were adopted on November
-25, 2026. Read `docs/owner_asks_adoption.md`. **The current default is profile v35.**
+25, 2026. Read `docs/owner_asks_adoption.md`.
 
 - **v35, `a19-split-screen-v1`** ("wolf is much better to split to cover, as it is 1x2 unit"; owner decision "AI seats +
   Premium, after a check"): the split plan reserves no shooter cover split, lets 1x2/2x1 stacks split, and spends every

@@ -45,6 +45,12 @@ export interface ITacticalSplitUnit {
  */
 export interface ITacticalSplitOptions {
     readonly screen?: boolean;
+    /**
+     * a19-shield-screen-v1 (profile v36, `split_screen.ts`; the owner, November 25, 2026: "it is always better to split
+     * mermaid if we have it, because it takes two shots to kill her"). With `screen`, a splittable Water Shield stack is
+     * the screen body: its shield absorbs the first attack, so each one-model split costs the enemy two attacks.
+     */
+    readonly shieldScreen?: boolean;
 }
 
 export interface ITacticalSplitPlan {
@@ -208,6 +214,17 @@ export function planTacticalStackSplits(
 
     if (screen) {
         const ranged = (unit: ITacticalSplitUnit): boolean => unit.rangedCoverCount > 0;
+        // a19-shield-screen-v1: a Water Shield stack (already split once for its "shield" role) keeps splitting first;
+        // slots it cannot fill go to the split-screen body below, chosen among the stacks not yet split.
+        const shieldBody = options.shieldScreen
+            ? screenEligible
+                  .filter((candidate) => candidate.waterShieldUtilityCount > 0 && candidate.auraUtilityCount === 0)
+                  .sort(compareShield)[0]
+            : undefined;
+        if (shieldBody) {
+            const children = plans.filter((plan) => plan.sourceUnitId === shieldBody.id).length;
+            for (let child = children; child < shieldBody.amount - 1 && slots > 0; child += 1) take(shieldBody, "bait");
+        }
         const body = screenEligible
             .filter((candidate) => !splitSources.has(candidate.id) && candidate.auraUtilityCount === 0)
             .sort(

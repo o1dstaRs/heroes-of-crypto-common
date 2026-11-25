@@ -28,3 +28,21 @@ export function a19SplitScreenEnabled(team: number): boolean {
     assertNoLegacySeatEnv(A19_SPLIT_SCREEN_ENV);
     return process.env[seatEnvName(A19_SPLIT_SCREEN_ENV, team)] !== "0";
 }
+
+/**
+ * a19-shield-screen-v1 (profile v36; the owner, November 25, 2026: "it is always better to split mermaid if we have
+ * it, because it takes two shots to kill her"; owner decision "Both now": AI seats and Premium). In screen mode the
+ * split planner takes a splittable Water Shield stack (Mermaid) as the screen body before any other: its shield
+ * absorbs the first attack, so every one-model split costs the enemy two attacks. The server's split plan (AI seats
+ * and Premium "Arrange army") and the client's Premium projection read the seat switch. See
+ * docs/shield_screen_adoption.md.
+ */
+export const A19_SHIELD_SCREEN_ID = "a19-shield-screen-v1";
+
+/** Per-seat switch (seat_env): on unless `A19_SHIELD_SCREEN_<LEFT|RIGHT>=0`. */
+export const A19_SHIELD_SCREEN_ENV = "A19_SHIELD_SCREEN";
+
+export function a19ShieldScreenEnabled(team: number): boolean {
+    assertNoLegacySeatEnv(A19_SHIELD_SCREEN_ENV);
+    return process.env[seatEnvName(A19_SHIELD_SCREEN_ENV, team)] !== "0";
+}

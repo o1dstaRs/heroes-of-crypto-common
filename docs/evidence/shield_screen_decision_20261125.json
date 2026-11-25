@@ -1,0 +1,19 @@
+{
+    "schema": "hoc.owner_decision.v1",
+    "policyId": "a19-shield-screen-v1",
+    "profile": "hoc.v0_8_a19_production_profile.v36",
+    "date": "2026-11-25",
+    "request": {
+        "words": "it is always better to split mermaid if we have it, because it takes two shots to kill her",
+        "context": "the owner's staging game 4a48d1ca; Premium \"Arrange army\" split one Mermaid and spent the other spare slots on the next cheapest body, and the owner re-split by hand (\"i had to resplit to what AI did\")"
+    },
+    "mechanics": "Mermaid (Might, level 1, 12 hp) has Water Shield: once per battle it absorbs the first incoming attack (0 damage) and breaks, and fire passes through. Every stack keeps its own shield, so a one-model Mermaid split takes two attacks to kill.",
+    "rule": "In the split planner's screen mode a splittable Water Shield stack is the screen body before any other: after its reserved shield split, every spare slot becomes one more one-model split of it; slots it cannot fill go to the split-screen body (the cheapest stack not yet split). Only armies with a splittable Mermaid and spare slots change.",
+    "decision": {
+        "question": "How should the Mermaid rule ship?",
+        "options": ["Both now (Recommended)", "Premium now, AI later", "Both after a check"],
+        "answer": "Both now (Recommended)",
+        "meaning": "adopt for Premium \"Arrange army\" and the AI seats as profile v36 at once; a registered non-inferiority check runs when hosts free up, and the rule is rolled back if it fails"
+    },
+    "switch": "A19_SHIELD_SCREEN_<LEFT|RIGHT>, on unless 0"
+}

@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v35",
+            schema: "hoc.v0_8_a19_production_profile.v36",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -270,6 +270,14 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "owner-request",
                 registrationSha256: "01fdd229c2e6ac7a8d4ea3d99f0dd13c20e60991dc8c71401fa63f24e86b89e4",
                 qualification: "non-inferiority-confirmed",
+            },
+            // Profile v36: a splittable Water Shield stack (Mermaid) is the screen body first (the owner's decision).
+            shieldScreen: {
+                policyId: "a19-shield-screen-v1",
+                adoptedAt: "2026-11-25",
+                adoption: "owner-explicit-decision",
+                registrationSha256: "4f5683ebb2a0184f71854ea153ee83ba4aaf5df6c53943493e30f7e81033d954",
+                qualification: "owner-decision-check-pending",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({
