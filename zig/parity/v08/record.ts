@@ -30,7 +30,7 @@ import { TurnEngine } from "../../../src/engine/turn_engine";
 import { getAIStrategy } from "../../../src/ai";
 import { captureAITargetMemory } from "../../../src/ai/ai";
 import { StrategyV0_8 } from "../../../src/ai/versions/v0_8";
-import { beginDecision, endDecision, installLayerLog, type Layer } from "./layers";
+import { beginDecision, endCandidates, endDecision, installLayerLog, type Layer } from "./layers";
 import { PathHelper } from "../../../src/grid/path_helper";
 import { creatureIdForName } from "../../../src/ai/setup/creature_score";
 import { buildRoster, creaturesByLevel, makeRng } from "../../../src/simulation/army";
@@ -499,10 +499,14 @@ function main(): void {
         const memory = layerLog ? [...captureAITargetMemory(context.unitsHolder)] : undefined;
         if (layerLog) beginDecision();
         let layers: Layer[] | undefined;
+        let candidates: unknown[] | undefined;
         try {
             actions = decideTurn.call(this, unit, context);
         } finally {
-            if (layerLog) layers = endDecision();
+            if (layerLog) {
+                layers = endDecision();
+                candidates = endCandidates();
+            }
             decideNanos += process.hrtime.bigint() - t0;
             decisions += 1;
             depth -= 1;
@@ -514,7 +518,7 @@ function main(): void {
             r1: rng.state,
             draws: rng.draws - d0,
             out: JSON.parse(JSON.stringify(actions)),
-            ...(layers ? { layers, memory } : {}),
+            ...(layers ? { layers, memory, ...(candidates?.length ? { candidates } : {}) } : {}),
         });
         return actions;
     };

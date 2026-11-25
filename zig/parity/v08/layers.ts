@@ -40,7 +40,10 @@ import {
     prioritizeV08NightmareFireWall,
     prioritizeV08WanderingMageSmoke,
 } from "../../../src/ai/versions/v0_8_support_roles";
-import { prioritizeV08A13FinishDecision } from "../../../src/ai/versions/v0_8s_finish";
+import { prioritizeV08A13FinishDecision, V08S_URGENT_FINISH_START_LAP } from "../../../src/ai/versions/v0_8s_finish";
+import { enumerateCandidates, type IEnumeratedCandidate } from "../../../src/ai/candidates";
+import { battleMageTargetsEnabled } from "../../../src/ai/battle_mage_targets";
+import { v08DominantFinishState } from "../../../src/ai/versions/v0_8_dominant_finish";
 
 /** sha256 of StrategyV0_8.prototype.decideTurn.toString() that the copy below reproduces. */
 const V08_DECIDE_TURN_SOURCE_SHA256 = "200fc55671dbf23d215721daaaccf2f6a09952263c5bf654a9606eb991695b6a";
@@ -52,6 +55,81 @@ const V08_DECIDE_TURN_SOURCE_SHA256 = "200fc55671dbf23d215721daaaccf2f6a09952263
 export type Layer = [string, GameAction[] | null, number, number];
 
 let log: Layer[] | undefined;
+
+/**
+ * The candidate lists v0.8's passes enumerate (the oracle for the Zig enumerateCandidates): where ("boundary" for
+ * prioritizeV08Decision, "finish" for prioritizeV08A13FinishDecision), and per candidate its kind, actions, target,
+ * stand / target cell and the expected damage and kill the passes rank by. Logged only where the pass enumerates.
+ */
+export interface ICandidateLog {
+    at: "boundary" | "finish";
+    list: unknown[];
+}
+let candidateLog: ICandidateLog[] | undefined;
+
+function noteCandidates(at: ICandidateLog["at"], candidates: readonly IEnumeratedCandidate[]): void {
+    candidateLog?.push({
+        at,
+        list: candidates.map((c) => ({
+            kind: c.kind,
+            actions: JSON.parse(JSON.stringify(c.actions)),
+            targetId: c.targetId ?? null,
+            standCell: c.standCell ?? null,
+            targetCell: c.targetCell ?? null,
+            ed: c.features.expectedDamage,
+            ek: c.features.expectedKill,
+        })),
+    });
+}
+
+const V08_PASSIVE = new Set(["defend_turn", "obstacle_attack", "end_turn"]);
+const V08_PRODUCTIVE = new Set(["move_unit", "melee_attack", "range_attack", "area_throw_attack", "cast_spell"]);
+
+/** prioritizeV08Decision enumerates when the finish window is active or the incumbent is passive (v0_8.ts). */
+function logBoundaryCandidates(unit: any, context: any, decision: GameAction[]): void {
+    if (!candidateLog) return;
+    const finish = v08DominantFinishState(
+        context.unitsHolder,
+        unit.getTeam(),
+        context.fightProperties?.getCurrentLap() ?? 0,
+    );
+    const passive = decision.some((a) => V08_PASSIVE.has(a.type));
+    const productive = decision.some((a) => V08_PRODUCTIVE.has(a.type));
+    const obstacle = decision.some((a) => a.type === "obstacle_attack");
+    if (!finish.active && !(passive && (!productive || obstacle))) return;
+    noteCandidates(
+        "boundary",
+        enumerateCandidates(unit, context, decision, {
+            maxMoveDestinations: 1,
+            maxMeleePairs: 8,
+            maxShotAims: 6,
+            maxAreaThrowCells: 4,
+            includeMountainAttacks: false,
+            preserveMeteoriteTargetCoverage: battleMageTargetsEnabled(unit),
+            enrichIncumbentMetadata: true,
+        }).candidates,
+    );
+}
+
+/** prioritizeV08A13FinishDecision enumerates from V08S_URGENT_FINISH_START_LAP (v0_8s_finish.ts). */
+function logFinishCandidates(unit: any, context: any, decision: GameAction[]): void {
+    if (!candidateLog) return;
+    const lap = context.fightProperties?.getCurrentLap() ?? 0;
+    if (!Number.isFinite(lap) || lap < V08S_URGENT_FINISH_START_LAP) return;
+    noteCandidates(
+        "finish",
+        enumerateCandidates(unit, context, decision, {
+            maxMoveDestinations: 1,
+            maxMeleePairs: 8,
+            maxShotAims: 6,
+            maxAreaThrowCells: 4,
+            maxMoveShotComposites: context.decisionOrigin === "rollout" ? 0 : 1,
+            discoverMoveShotTargetsAfterMove: context.decisionOrigin !== "rollout",
+            enrichIncumbentMetadata: true,
+            preserveAttackTargetCoverage: true,
+        }).candidates,
+    );
+}
 let previous = "";
 let previousExit = 0;
 let rngState: () => number = () => 0;
@@ -65,8 +143,12 @@ function note(name: string, actions: GameAction[], entered = previousExit): void
     previousExit = exit;
 }
 
+/** RECORD_CANDIDATES=1 also logs the candidate lists (they do not change the battle; check with a plain recording). */
+const CANDIDATES = process.env.RECORD_CANDIDATES === "1";
+
 export function beginDecision(): void {
     log = [];
+    candidateLog = CANDIDATES ? [] : undefined;
     previous = "";
     previousExit = rngState();
 }
@@ -74,6 +156,13 @@ export function beginDecision(): void {
 export function endDecision(): Layer[] {
     const out = log ?? [];
     log = undefined;
+    return out;
+}
+
+/** The candidate lists of the decision that just ended (call after endDecision). */
+export function endCandidates(): ICandidateLog[] {
+    const out = candidateLog ?? [];
+    candidateLog = undefined;
     return out;
 }
 
@@ -113,6 +202,7 @@ export function installLayerLog(state: () => number): string {
         const self = this as any;
         const explicit = ensureExplicitV08Action(unit.getId(), parent.decideTurn.call(this, unit, context));
         note("explicit", explicit);
+        logBoundaryCandidates(unit, context, explicit);
         const prioritized = prioritizeV08Decision(unit, context, explicit);
         note("prioritize", prioritized);
         const onlyForcedFallback =
@@ -130,6 +220,7 @@ export function installLayerLog(state: () => number): string {
                 ? [{ type: "wait_turn", unitId: unit.getId() }]
                 : prioritized;
         note("defend-to-wait", active);
+        logFinishCandidates(unit, context, active);
         const finished = prioritizeV08A13FinishDecision(unit, context, active);
         note("finish", finished);
         const positioned = prioritizeV08RangedPositioning(unit, context, finished, this.version);
