@@ -1,0 +1,1033 @@
+//! The v0.1 AI (src/ai/versions/v0_1.ts StrategyV0_1.decideTurn and src/ai/ai.ts findTarget) and the v0.1 match
+//! loop (runMatchInner in src/simulation/battle_engine.ts), in scope: no abilities or spells, NORMAL grid.
+
+const std = @import("std");
+const rec = @import("recording.zig");
+const st = @import("state.zig");
+const js = @import("jsnum.zig");
+const engine = @import("engine.zig");
+const combat = @import("combat.zig");
+const pathing = @import("path.zig");
+
+const Cell = st.Cell;
+const State = st.State;
+const Unit = st.Unit;
+const AT = st.AttackType;
+const Team = st.Team;
+const Matrix = pathing.Matrix;
+const MovePath = pathing.MovePath;
+const Route = pathing.Route;
+const INF = std.math.inf(f64);
+
+// =====================================================================================================================
+// Decision output
+// =====================================================================================================================
+
+pub const Decision = struct {
+    actions: [3]rec.Action = undefined,
+    n: u8 = 0,
+    path: [64]Cell = undefined,
+    targets: [4]Cell = undefined,
+
+    fn push(self: *Decision, a: rec.Action) void {
+        self.actions[self.n] = a;
+        self.n += 1;
+    }
+    pub fn slice(self: *const Decision) []const rec.Action {
+        return self.actions[0..self.n];
+    }
+};
+
+const Kind = enum { melee, range, move, move_and_melee };
+
+/// BasicAIAction. `paths` null is the empty `new Map()`.
+const AIAction = struct {
+    kind: Kind,
+    move: ?Cell = null,
+    attack: ?Cell = null,
+    paths: ?*const MovePath = null,
+};
+
+/// Per-decision scratch: the decision's matrix and its two move paths (the "actual" one is shared by doFindTarget,
+/// fallbackTurn and engineReachableCellKeys: identical arguments, and getMovePath draws nothing in scope).
+const Ctx = struct {
+    s: *State,
+    ui: u8,
+    m: Matrix,
+    infinite: MovePath = undefined,
+    actual: MovePath = undefined,
+    have_actual: bool = false,
+    route_buf: [64]Cell = undefined,
+    /// isFreeAt for the melee layers: on the board and empty, or one of the attacker's own cells. Bit y of free[x].
+    free: [st.GRID]u16 = .{0} ** st.GRID,
+
+    fn initFree(self: *Ctx) void {
+        const body = engine.unitCells(self.unit());
+        for (0..st.GRID) |x| {
+            var col: u16 = 0;
+            for (0..st.GRID) |y| {
+                if (self.m[x][y] == 0) col |= @as(u16, 1) << @intCast(y);
+            }
+            self.free[x] = col;
+        }
+        for (body.slice()) |b| {
+            if (engine.cellWithinGrid(b)) self.free[@intCast(b.x)] |= @as(u16, 1) << @intCast(b.y);
+        }
+    }
+
+    inline fn unit(self: *const Ctx) *Unit {
+        return &self.s.units[self.ui];
+    }
+
+    fn params(self: *const Ctx, max_steps: f64) pathing.Params {
+        const u = self.unit();
+        return .{
+            .start = engine.baseCell(u),
+            .max_steps = max_steps,
+            .aggr = &self.s.grid.aggr[engine.opposite(u.team)],
+            .can_fly = engine.canFly(u),
+            .w = u.fw,
+            .h = u.fh,
+        };
+    }
+
+    fn actualPath(self: *Ctx) *const MovePath {
+        if (!self.have_actual) {
+            pathing.getMovePath(&self.m, self.params(engine.getSteps(self.unit())), &self.actual);
+            self.have_actual = true;
+        }
+        return &self.actual;
+    }
+};
+
+// =====================================================================================================================
+// Small helpers
+// =====================================================================================================================
+
+inline fn mat(m: *const Matrix, x: i32, y: i32) i8 {
+    return pathing.at(m, x, y);
+}
+
+inline fn sameCell(a: Cell, b: Cell) bool {
+    return a.x == b.x and a.y == b.y;
+}
+
+inline fn occupant(s: *const State, c: Cell) ?u8 {
+    if (!engine.cellWithinGrid(c)) return null;
+    const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
+    if (o == st.EMPTY or o == st.HOLE) return null;
+    return o - 1;
+}
+
+/// footprintCellsForAnchor (src/simulation/footprint.ts): 1x1 [a]; 2x2 [a, (x-1,y), (x,y-1), (x-1,y-1)];
+/// otherwise getFootprintCellsForAnchor (dx outer, dy inner).
+fn footprintForAnchor(u: *const Unit, a: Cell) engine.Cells {
+    var out: engine.Cells = .{};
+    if (u.fw == 2 and u.fh == 2) {
+        out.push(a);
+        out.push(.{ .x = a.x - 1, .y = a.y });
+        out.push(.{ .x = a.x, .y = a.y - 1 });
+        out.push(.{ .x = a.x - 1, .y = a.y - 1 });
+        return out;
+    }
+    return engine.cellsForAnchor(a, u.fw, u.fh);
+}
+
+/// canUnitLandAt -> Grid.canOccupyFootprintAt: on board, and empty or the unit's own cells (holes block).
+fn canLandAt(s: *const State, ui: u8, a: Cell) bool {
+    const u = &s.units[ui];
+    var dx: i32 = 0;
+    while (dx < u.fw) : (dx += 1) {
+        var dy: i32 = 0;
+        while (dy < u.fh) : (dy += 1) {
+            const c = Cell{ .x = a.x - dx, .y = a.y - dy };
+            if (!engine.cellWithinGrid(c)) return false;
+            const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
+            if (o != st.EMPTY and o != ui + 1) return false;
+        }
+    }
+    return true;
+}
+
+fn adjacent(a: []const Cell, b: []const Cell) bool {
+    for (a) |c1| {
+        for (b) |c2| {
+            const dx = @abs(c1.x - c2.x);
+            const dy = @abs(c1.y - c2.y);
+            if ((dx == 1 and dy == 0) or (dx == 0 and dy == 1) or (dx == 1 and dy == 1)) return true;
+        }
+    }
+    return false;
+}
+
+inline fn cellDistance(a: Cell, b: Cell) f64 {
+    return engine.distance(@floatFromInt(a.x), @floatFromInt(a.y), @floatFromInt(b.x), @floatFromInt(b.y));
+}
+
+/// countMeleeThreatsToCell: enemy CELLS around the cell.
+fn countThreats(m: *const Matrix, c: Cell, enemy: u8) u32 {
+    var n: u32 = 0;
+    var dy: i32 = -1;
+    while (dy <= 1) : (dy += 1) {
+        var dx: i32 = -1;
+        while (dx <= 1) : (dx += 1) {
+            if (dx == 0 and dy == 0) continue;
+            const nx = c.x + dx;
+            const ny = c.y + dy;
+            if (nx < 0 or ny < 0 or nx >= st.GRID or ny >= st.GRID) continue;
+            if (mat(m, nx, ny) == @as(i8, @intCast(enemy))) n += 1;
+        }
+    }
+    return n;
+}
+
+fn isMeleeSelection(t: u8) bool {
+    return t == AT.MELEE or t == AT.MELEE_MAGIC;
+}
+
+/// meleeAttackTypeSelectionPrefix
+fn meleePrefix(u: *const Unit) ?u8 {
+    if (isMeleeSelection(u.attack_type_selected)) return null;
+    if (engine.possibleIncludes(u, AT.MELEE)) return AT.MELEE;
+    if (engine.possibleIncludes(u, AT.MELEE_MAGIC)) return AT.MELEE_MAGIC;
+    return null;
+}
+
+// =====================================================================================================================
+// findTarget and its helpers (src/ai/ai.ts)
+// =====================================================================================================================
+
+/// UnitsHolder.allEnemiesAroundUnit(unit, false): first-seen order over cellsAroundUnit.
+fn enemiesAround(s: *const State, ui: u8, out: *engine.UnitList) void {
+    const u = &s.units[ui];
+    const b = engine.baseCell(u);
+    out.* = .{};
+    const Visit = struct {
+        fn cell(st_: *const State, attacker: u8, c: Cell, list: *engine.UnitList) void {
+            const o = occupant(st_, c) orelse return;
+            if (o == attacker) return;
+            const e = &st_.units[o];
+            if (!e.in_holder or e.team == st_.units[attacker].team) return;
+            for (list.slice()) |x| if (x == o) return;
+            list.push(o);
+        }
+    };
+    if (engine.isSmall(u)) {
+        // getCellsAroundCell order, in-grid only.
+        const ring = [8][2]i32{ .{ -1, 1 }, .{ 0, 1 }, .{ -1, 0 }, .{ 1, 1 }, .{ 1, 0 }, .{ -1, -1 }, .{ 0, -1 }, .{ 1, -1 } };
+        for (ring) |d| {
+            const c = Cell{ .x = b.x + d[0], .y = b.y + d[1] };
+            if (engine.cellWithinGrid(c)) Visit.cell(s, ui, c, out);
+        }
+        return;
+    }
+    var i: i32 = -@as(i32, u.fw);
+    while (i <= 1) : (i += 1) {
+        var j: i32 = -@as(i32, u.fh);
+        while (j <= 1) : (j += 1) Visit.cell(s, ui, .{ .x = b.x + i, .y = b.y + j }, out);
+    }
+}
+
+/// isLineBlockedByFriendlyUnit: walk the line on accumulated f64 steps; the first friendly that is not the
+/// shooter's own body blocks, an enemy first means clear.
+fn lineBlockedByFriendly(m: *const Matrix, from: Cell, to: Cell, friendly: u8, own: []const Cell) bool {
+    const dx: f64 = @floatFromInt(to.x - from.x);
+    const dy: f64 = @floatFromInt(to.y - from.y);
+    const len_i = @max(@abs(to.x - from.x), @abs(to.y - from.y));
+    if (len_i <= 1) return false;
+    const len: f64 = @floatFromInt(len_i);
+    const enemy: i8 = @intCast(engine.opposite(friendly));
+    const sx = dx / len;
+    const sy = dy / len;
+    var cx_f = @as(f64, @floatFromInt(from.x)) + sx;
+    var cy_f = @as(f64, @floatFromInt(from.y)) + sy;
+    var i: u32 = 1;
+    while (i < len_i) : (i += 1) {
+        const cx: i32 = @intFromFloat(js.round(cx_f));
+        const cy: i32 = @intFromFloat(js.round(cy_f));
+        if (cx >= 0 and cy >= 0 and cx < st.GRID and cy < st.GRID) {
+            const v = mat(m, cx, cy);
+            if (v == @as(i8, @intCast(friendly))) {
+                var own_body = false;
+                for (own) |oc| {
+                    if (oc.x == cx and oc.y == cy) own_body = true;
+                }
+                if (!own_body) return true;
+            }
+            if (v == enemy) return false;
+        }
+        cx_f += sx;
+        cy_f += sy;
+    }
+    return false;
+}
+
+fn findRangeAttackAction(c: *Ctx) ?AIAction {
+    const s = c.s;
+    const u = c.unit();
+    if (engine.getRangeShots(u) <= 0) return null;
+    const unit_cell = engine.baseCell(u);
+    const enemy: i8 = @intCast(engine.opposite(u.team));
+    const body = engine.unitCells(u);
+    const shot_distance = u.shot_distance;
+    if (shot_distance <= 0) return null;
+    const band = if (std.math.isFinite(shot_distance) and shot_distance > 0) @floor(shot_distance) else 0;
+    const max_range = band * 4;
+    var best: ?Cell = null;
+    var best_score: f64 = -1;
+    var y: i32 = 0;
+    while (y < st.GRID) : (y += 1) {
+        var x: i32 = 0;
+        while (x < st.GRID) : (x += 1) {
+            if (mat(&c.m, x, y) != enemy) continue;
+            const t = Cell{ .x = x, .y = y };
+            const d: f64 = @floatFromInt(@max(@abs(t.x - unit_cell.x), @abs(t.y - unit_cell.y)));
+            if (d > max_range) continue;
+            // isLineBlockedByObstacle: no BLOCK cells on NORMAL.
+            if (lineBlockedByFriendly(&c.m, unit_cell, t, u.team, body.slice())) continue;
+            var divisor: f64 = 1;
+            if (band > 0) {
+                var dd = d;
+                while (dd > band) {
+                    dd -= band;
+                    divisor *= 2;
+                }
+                if (divisor > 8) divisor = 8;
+            }
+            const score = 1 / divisor;
+            if (score > best_score) {
+                best_score = score;
+                best = t;
+            }
+        }
+    }
+    const b = best orelse return null;
+    if (occupant(s, b)) |o| s.ai_prev_target[c.ui] = @intCast(o);
+    return .{ .kind = .range, .attack = b };
+}
+
+const Engagement = struct {
+    total_melee: u32 = 0,
+    total_ranged: u32 = 0,
+    engaged_melee: u32 = 0,
+    center: ?Cell = null,
+    nearest_melee: f64 = 0,
+    pressing: bool = false,
+};
+
+fn analyzeEngagement(c: *const Ctx) Engagement {
+    const s = c.s;
+    const u = c.unit();
+    const enemy: i8 = @intCast(engine.opposite(u.team));
+    const unit_cell = engine.baseCell(u);
+    var e: Engagement = .{};
+    var sum_x: f64 = 0;
+    var sum_y: f64 = 0;
+    var nearest = INF;
+    for (s.units[0..s.n_units], 0..) |*a, i| {
+        if (!a.in_holder or a.team != u.team or i == c.ui or a.isDead()) continue;
+        const ac = engine.baseCell(a);
+        if (a.attack_type == AT.RANGE) {
+            e.total_ranged += 1;
+        } else {
+            e.total_melee += 1;
+            sum_x += @floatFromInt(ac.x);
+            sum_y += @floatFromInt(ac.y);
+            nearest = @min(nearest, cellDistance(unit_cell, ac));
+            if (countThreats(&c.m, ac, @intCast(enemy)) > 0) e.engaged_melee += 1;
+        }
+        if (!e.pressing) {
+            var dy: i32 = -3;
+            outer: while (dy <= 3) : (dy += 1) {
+                var dx: i32 = -3;
+                while (dx <= 3) : (dx += 1) {
+                    const nx = ac.x + dx;
+                    const ny = ac.y + dy;
+                    if (nx >= 0 and ny >= 0 and nx < st.GRID and ny < st.GRID and mat(&c.m, nx, ny) == enemy) {
+                        e.pressing = true;
+                        break :outer;
+                    }
+                }
+            }
+        }
+    }
+    if (e.total_melee > 0) {
+        const n: f64 = @floatFromInt(e.total_melee);
+        e.center = .{ .x = @intFromFloat(js.round(sum_x / n)), .y = @intFromFloat(js.round(sum_y / n)) };
+    }
+    e.nearest_melee = if (nearest == INF) 0 else nearest;
+    return e;
+}
+
+/// findSaferMoveCell(preferred, knownPaths, matrix, enemyTeam, true, canUnitLandAt). Returns the replacement cell
+/// when a candidate beat the preferred cell, else null (the caller keeps its action).
+fn saferMoveCell(c: *const Ctx, preferred: ?Cell, paths: ?*const MovePath) ?Cell {
+    const p = preferred orelse return null;
+    const kp = paths orelse return null;
+    if (kp.size() == 0) return null;
+    const enemy: i8 = @intCast(engine.opposite(c.unit().team));
+    const Land = struct {
+        fn ok(ctx: *const Ctx, cell: Cell, en: i8) bool {
+            const v = mat(&ctx.m, cell.x, cell.y);
+            if (v == -1 or v == -2 or v == en) return false;
+            return canLandAt(ctx.s, ctx.ui, cell);
+        }
+    };
+    const preferred_threats = countThreats(&c.m, p, @intCast(enemy));
+    const preferred_legal = Land.ok(c, p, enemy);
+    if (preferred_threats == 0 and preferred_legal) return null;
+    var safest: ?Cell = null;
+    var replaced = false;
+    var safest_threats: f64 = if (preferred_legal) @floatFromInt(preferred_threats) else INF;
+    var safest_dist = INF;
+    for (kp.known()) |r| {
+        const cand = r.cell;
+        if (!Land.ok(c, cand, enemy)) continue;
+        const threats: f64 = @floatFromInt(countThreats(&c.m, cand, @intCast(enemy)));
+        const dist = cellDistance(cand, p);
+        if (threats < safest_threats or (threats == safest_threats and dist < safest_dist)) {
+            safest_threats = threats;
+            safest_dist = dist;
+            safest = cand;
+            replaced = true;
+        }
+    }
+    return if (replaced) safest else null;
+}
+
+// ---- buildMeleeTargetLayers (src/ai/internal/melee_target_layers.ts) ----
+
+const Layer = struct {
+    cells: [64]Cell = undefined,
+    n: u8 = 0,
+
+    fn push(self: *Layer, c: Cell) void {
+        self.cells[self.n] = c;
+        self.n += 1;
+    }
+};
+
+inline fn freeAt(c: *const Ctx, x: i32, y: i32, body: []const Cell) bool {
+    _ = body;
+    if (x < 0 or x >= st.GRID or y < 0 or y >= st.GRID) return false;
+    return c.free[@intCast(x)] & (@as(u16, 1) << @intCast(y)) != 0;
+}
+
+fn buildLayer(c: *const Ctx, target: Cell, d: i32, body: []const Cell, out: *Layer) void {
+    out.* = .{};
+    const u = c.unit();
+    const cx = target.x;
+    const cy = target.y;
+    const span = d * 2 + 1;
+    if (u.fw == 1 and u.fh == 1) {
+        var o: i32 = 0;
+        while (o < span) : (o += 1) if (freeAt(c, cx - d + o, cy - d, body)) out.push(.{ .x = cx - d + o, .y = cy - d });
+        o = 0;
+        while (o < span) : (o += 1) if (freeAt(c, cx - d + o, cy + d, body)) out.push(.{ .x = cx - d + o, .y = cy + d });
+        o = 0;
+        while (o < span) : (o += 1) if (freeAt(c, cx - d, cy - d + o, body)) out.push(.{ .x = cx - d, .y = cy - d + o });
+        o = 0;
+        while (o < span) : (o += 1) if (freeAt(c, cx + d, cy - d + o, body)) out.push(.{ .x = cx + d, .y = cy - d + o });
+    } else if (u.fw == 2 and u.fh == 2) {
+        const Fits = struct {
+            fn f(ctx: *const Ctx, x: i32, y: i32, bd: []const Cell) bool {
+                return freeAt(ctx, x, y, bd) and freeAt(ctx, x - 1, y, bd) and freeAt(ctx, x - 1, y - 1, bd) and freeAt(ctx, x, y - 1, bd);
+            }
+        };
+        var o: i32 = 0;
+        while (o < span) : (o += 1) if (Fits.f(c, cx - d + o, cy - d, body)) out.push(.{ .x = cx - d + o, .y = cy - d });
+        o = 0;
+        while (o < span) : (o += 1) if (Fits.f(c, cx - d + o, cy + d + 1, body)) out.push(.{ .x = cx - d + o, .y = cy + d + 1 });
+        o = 0;
+        while (o < span) : (o += 1) if (Fits.f(c, cx - d, cy - d + o, body)) out.push(.{ .x = cx - d, .y = cy - d + o });
+        o = 0;
+        while (o < span) : (o += 1) if (Fits.f(c, cx + d + 1, cy - d + o, body)) out.push(.{ .x = cx + d + 1, .y = cy - d + o });
+        if (Fits.f(c, cx + d + 1, cy + d + 1, body)) out.push(.{ .x = cx + d + 1, .y = cy + d + 1 });
+    } else {
+        const w: i32 = u.fw;
+        const h: i32 = u.fh;
+        const x_min = cx - d;
+        const x_max = cx + d + w - 1;
+        const y_min = cy - d;
+        const y_max = cy + d + h - 1;
+        const Fits = struct {
+            fn f(ctx: *const Ctx, x: i32, y: i32, bd: []const Cell, fw: u8, fh: u8) bool {
+                const fp = engine.cellsForAnchor(.{ .x = x, .y = y }, fw, fh);
+                for (fp.slice()) |cell| if (!freeAt(ctx, cell.x, cell.y, bd)) return false;
+                return true;
+            }
+        };
+        var x = x_min;
+        while (x <= x_max) : (x += 1) if (Fits.f(c, x, y_min, body, u.fw, u.fh)) out.push(.{ .x = x, .y = y_min });
+        x = x_min;
+        while (x <= x_max) : (x += 1) if (Fits.f(c, x, y_max, body, u.fw, u.fh)) out.push(.{ .x = x, .y = y_max });
+        var y = y_min + 1;
+        while (y < y_max) : (y += 1) {
+            if (Fits.f(c, x_min, y, body, u.fw, u.fh)) out.push(.{ .x = x_min, .y = y });
+            if (Fits.f(c, x_max, y, body, u.fw, u.fh)) out.push(.{ .x = x_max, .y = y });
+        }
+    }
+}
+
+/// selectableMeleeTargetIdAt: a living enemy unit on that cell.
+fn selectableTargetAt(s: *const State, ui: u8, cell: Cell) ?u8 {
+    const o = occupant(s, cell) orelse return null;
+    const t = &s.units[o];
+    if (t.isDead() or t.team == s.units[ui].team) return null;
+    return o;
+}
+
+const ResultRoute = struct { infinite: bool, index: u16 };
+
+fn routeOf(c: *const Ctx, r: ResultRoute) *const Route {
+    return if (r.infinite) &c.infinite.routes[r.index] else &c.actual.routes[r.index];
+}
+
+fn routeIndex(mp: *const MovePath, r: *const Route) u16 {
+    return @intCast((@intFromPtr(r) - @intFromPtr(&mp.routes[0])) / @sizeOf(Route));
+}
+
+/// doFindTarget (ai.ts:1548)
+fn doFindTarget(c: *Ctx) ?AIAction {
+    const s = c.s;
+    const u = c.unit();
+    const unit_cell = engine.baseCell(u);
+    const team: i8 = @intCast(u.team);
+    const steps = engine.getSteps(u);
+    pathing.getMovePath(&c.m, c.params(100 + steps), &c.infinite);
+    _ = c.actualPath();
+    const body = engine.unitCells(u);
+
+    var closest: ?Cell = null;
+    var closest_distance = INF;
+    var result: ?ResultRoute = null;
+    var result_index: ?i32 = null;
+    var result_movement = INF;
+    var result_left = INF;
+    var result_depth = INF;
+    var used_infinite = true;
+
+    var layer: Layer = .{};
+    var route_cells: [64]Cell = undefined;
+
+    // ---- pass A: infinite path, distance-one layer ----
+    {
+        const mp = &c.infinite;
+        var y: i32 = 0;
+        while (y < st.GRID) : (y += 1) {
+            var x: i32 = 0;
+            while (x < st.GRID) : (x += 1) {
+                const el = mat(&c.m, x, y);
+                if (el == team or el == 0 or el < 0) continue;
+                const target = selectableTargetAt(s, c.ui, .{ .x = x, .y = y }) orelse continue;
+                var depth: i32 = 0;
+                while (depth < 7) : (depth += 1) {
+                    var layer_left = INF;
+                    buildLayer(c, .{ .x = x, .y = y }, depth + 1, body.slice(), &layer);
+                    for (layer.cells[0..layer.n]) |lc| {
+                        if (depth == 0 and sameCell(lc, unit_cell)) {
+                            s.ai_prev_target[c.ui] = @intCast(target);
+                            return .{ .kind = .melee, .move = unit_cell, .attack = .{ .x = x, .y = y }, .paths = mp };
+                        }
+                        if (!canLandAt(s, c.ui, lc)) continue;
+                        const r = mp.get(pathing.key(lc.x, lc.y)) orelse continue;
+                        const weight = r.weight;
+                        if (!(weight < closest_distance)) continue;
+                        closest_distance = weight;
+                        closest = .{ .x = x, .y = y };
+                        const len = mp.routeCells(r, &route_cells);
+                        var idx: i32 = 0;
+                        var next_dist: ?f64 = null;
+                        while (true) {
+                            const cell = route_cells[@intCast(idx)];
+                            if (idx + 1 >= len) break;
+                            const next = route_cells[@intCast(idx + 1)];
+                            if (sameCell(cell, lc)) break;
+                            next_dist = if (mp.get(pathing.key(next.x, next.y))) |nr| nr.weight else null;
+                            if (next_dist) |nd| {
+                                if (nd > steps) break;
+                            }
+                            idx += 1;
+                            const nd = next_dist orelse break;
+                            if (!(nd <= steps and idx < len)) break;
+                        }
+                        while (idx >= 0) {
+                            if (idx >= len) break;
+                            if (canLandAt(s, c.ui, route_cells[@intCast(idx)])) break;
+                            idx -= 1;
+                        }
+                        if (idx < 0) continue; // route[-1] is undefined: currentDistance undefined
+                        const left: f64 = @floatFromInt(@as(i32, @intCast(len)) - 1 - idx);
+                        const move_to = route_cells[@intCast(idx)];
+                        const cur_dist = (mp.get(pathing.key(move_to.x, move_to.y)) orelse continue).weight;
+                        if (left < layer_left or (left == layer_left and cur_dist < result_movement)) {
+                            result = .{ .infinite = true, .index = routeIndex(mp, r) };
+                            result_index = idx;
+                            result_movement = cur_dist;
+                            layer_left = left;
+                        }
+                    }
+                    if (result_movement != 0 and !std.math.isNan(result_movement)) break;
+                }
+            }
+        }
+    }
+
+    const settled = blk: {
+        const r = result orelse break :blk false;
+        const len = c.infinite.routeCells(routeOf(c, r), &route_cells);
+        break :blk result_index != null and @as(i32, @intCast(len)) - 1 == result_index.?;
+    };
+    if (!settled) {
+        // ---- pass B: actual path, all layers ----
+        used_infinite = false;
+        const mp = c.actualPath();
+        var y: i32 = 0;
+        while (y < st.GRID) : (y += 1) {
+            var x: i32 = 0;
+            while (x < st.GRID) : (x += 1) {
+                const el = mat(&c.m, x, y);
+                if (el == team or el == 0 or el < 0) continue;
+                const target = selectableTargetAt(s, c.ui, .{ .x = x, .y = y }) orelse continue;
+                var depth: i32 = 0;
+                while (depth < 7) : (depth += 1) {
+                    buildLayer(c, .{ .x = x, .y = y }, depth + 1, body.slice(), &layer);
+                    for (layer.cells[0..layer.n]) |lc| {
+                        if (depth == 0 and sameCell(lc, unit_cell)) {
+                            s.ai_prev_target[c.ui] = @intCast(target);
+                            return .{ .kind = .melee, .move = unit_cell, .attack = .{ .x = x, .y = y }, .paths = mp };
+                        }
+                        if (!canLandAt(s, c.ui, lc)) continue;
+                        const r = mp.get(pathing.key(lc.x, lc.y)) orelse continue;
+                        const movement = r.weight;
+                        const left = cellDistance(lc, .{ .x = x, .y = y });
+                        const fd: f64 = @floatFromInt(depth);
+                        if (result_depth > fd or (result_depth == fd and (left < result_left or (left == result_left and movement < result_movement)))) {
+                            result = .{ .infinite = false, .index = routeIndex(mp, r) };
+                            result_movement = movement;
+                            result_left = left;
+                            result_depth = fd;
+                            closest = .{ .x = x, .y = y };
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    const target_cell = closest orelse return null;
+    if (result_index) |ri| {
+        if (ri == 0) {
+            if (occupant(s, target_cell)) |o| s.ai_prev_target[c.ui] = @intCast(o);
+            const end: ?Cell = if (result) |r| routeOf(c, r).cell else null;
+            return .{ .kind = .melee, .move = end, .attack = target_cell, .paths = if (used_infinite) &c.infinite else c.actualPath() };
+        }
+    }
+    const end: ?Cell = if (result) |r| routeOf(c, r).cell else null;
+    if ((!used_infinite and result_depth == 0) or (used_infinite and settled)) {
+        if (occupant(s, target_cell)) |o| s.ai_prev_target[c.ui] = @intCast(o);
+        return .{ .kind = .move_and_melee, .move = end, .attack = target_cell, .paths = if (used_infinite) &c.infinite else c.actualPath() };
+    }
+    s.ai_prev_target[c.ui] = -1;
+    return .{ .kind = .move, .move = end, .paths = c.actualPath() };
+}
+
+/// findTarget (ai.ts:197)
+fn findTarget(c: *Ctx) ?AIAction {
+    const s = c.s;
+    const u = c.unit();
+    const enemy_team = engine.opposite(u.team);
+    const unit_cell = engine.baseCell(u);
+    var around: engine.UnitList = undefined;
+    enemiesAround(s, c.ui, &around);
+    // canSelectMeleeTarget + isPositionWithinGrid: living enemies on the board.
+    var list: engine.UnitList = .{};
+    for (around.slice()) |e| {
+        const eu = &s.units[e];
+        if (!eu.isDead() and engine.positionWithinGrid(eu.pos_x, eu.pos_y)) list.push(e);
+    }
+    var selected: ?u8 = null;
+    const prev = s.ai_prev_target[c.ui];
+    if (prev >= 0) {
+        for (list.slice()) |e| if (e == prev) {
+            selected = e;
+        };
+    }
+    if (selected == null and list.len > 0) selected = list.items[@intCast(s.rng.int(0, list.len))];
+
+    var action: ?AIAction = null;
+    if (selected) |e| {
+        const ec_list = engine.unitCells(&s.units[e]);
+        const uc_list = engine.unitCells(u);
+        outer: for (ec_list.slice()) |ec| {
+            for (uc_list.slice()) |uc| {
+                if (@abs(ec.x - uc.x) <= 1 and @abs(ec.y - uc.y) <= 1) {
+                    action = .{ .kind = .melee, .move = unit_cell, .attack = ec };
+                    break :outer;
+                }
+            }
+        }
+    }
+    if (action == null and u.attack_type == AT.RANGE and engine.getRangeShots(u) > 0) action = findRangeAttackAction(c);
+
+    const eng = analyzeEngagement(c);
+    const ranged = u.attack_type == AT.RANGE;
+    const engaged = countThreats(&c.m, unit_cell, enemy_team) > 0;
+
+    if (action == null and !ranged and !engaged) {
+        if (eng.total_ranged > eng.total_melee and eng.total_ranged >= 2 and !eng.pressing) return null;
+        if (eng.total_melee > 0 and eng.nearest_melee > 4 and eng.engaged_melee == 0 and !eng.pressing) {
+            action = doFindTarget(c);
+            if (action) |a| {
+                if (a.kind == .move) {
+                    if (a.paths) |p| {
+                        const center = eng.center.?;
+                        if (center.x >= 0 and center.x < st.GRID and center.y >= 0 and center.y < st.GRID) {
+                            if (p.get(pathing.key(center.x, center.y))) |r| action = .{ .kind = .move, .move = r.cell, .paths = p };
+                        }
+                    }
+                }
+            }
+        } else {
+            action = doFindTarget(c);
+        }
+    } else if (action == null) {
+        action = doFindTarget(c);
+    }
+
+    if (action) |a| {
+        if (a.kind == .move) {
+            if (ranged) {
+                if (saferMoveCell(c, a.move, a.paths)) |safer| action = .{ .kind = .move, .move = safer, .paths = a.paths };
+            } else {
+                const dest_threats: u32 = if (a.move) |d| countThreats(&c.m, d, enemy_team) else 0;
+                if (!engaged and eng.engaged_melee > 0 and dest_threats >= 2) {
+                    if (saferMoveCell(c, a.move, a.paths)) |safer| action = .{ .kind = .move, .move = safer, .paths = a.paths };
+                }
+                if (!engaged and eng.total_ranged >= 2 and eng.total_ranged > eng.total_melee and dest_threats >= 2 and eng.engaged_melee == 0) return null;
+            }
+        }
+    }
+    return action;
+}
+
+// =====================================================================================================================
+// StrategyV0_1 (src/ai/versions/v0_1.ts)
+// =====================================================================================================================
+
+fn threat(u: *const Unit) f64 {
+    return @max(1, u.attack_damage_max) * @max(1, u.amount_alive);
+}
+
+/// The sortByThreat comparator: higher threat first, then base y, then base x.
+fn threatBefore(s: *const State, a: u8, b: u8) bool {
+    const ta = threat(&s.units[a]);
+    const tb = threat(&s.units[b]);
+    if (ta != tb) return tb - ta < 0;
+    const ca = engine.baseCell(&s.units[a]);
+    const cb = engine.baseCell(&s.units[b]);
+    if (ca.y != cb.y) return ca.y < cb.y;
+    return ca.x < cb.x;
+}
+
+fn sortByThreat(s: *const State, list: *engine.UnitList) void {
+    var i: usize = 1;
+    while (i < list.len) : (i += 1) {
+        const x = list.items[i];
+        var j = i;
+        while (j > 0 and threatBefore(s, x, list.items[j - 1])) : (j -= 1) list.items[j] = list.items[j - 1];
+        list.items[j] = x;
+    }
+}
+
+fn hasResponded(s: *const State, t: u8) bool {
+    return s.units[t].responded or s.fight.replied & engine.unitBit(t) != 0;
+}
+
+/// preferRespondedMeleeTarget
+fn preferRespondedTarget(s: *const State, ui: u8, current_id: u8, from_cells: []const Cell) ?u8 {
+    var candidates: engine.UnitList = .{};
+    for (s.units[0..s.n_units], 0..) |*t, i| {
+        if (!t.in_holder or t.team == s.units[ui].team or t.isDead()) continue;
+        const tc = engine.unitCells(t);
+        if (adjacent(from_cells, tc.slice())) candidates.push(@intCast(i));
+    }
+    var current: ?u8 = null;
+    for (candidates.slice()) |t| if (t == current_id) {
+        current = t;
+    };
+    if (current) |cur| {
+        if (hasResponded(s, cur)) return cur;
+    }
+    var responded: engine.UnitList = .{};
+    for (candidates.slice()) |t| {
+        if (t != current_id and hasResponded(s, t)) responded.push(t);
+    }
+    sortByThreat(s, &responded);
+    if (responded.len > 0) return responded.items[0];
+    if (current) |cur| return cur;
+    sortByThreat(s, &candidates);
+    return if (candidates.len > 0) candidates.items[0] else null;
+}
+
+/// isLegalMoveRoute (+ engineReachesCell via the actual path's keys)
+fn isLegalMoveRoute(c: *Ctx, target: Cell, mp: *const MovePath, r: *const Route) bool {
+    const u = c.unit();
+    if (!canLandAt(c.s, c.ui, target)) return false;
+    var cells: [64]Cell = undefined;
+    const len = mp.routeCells(r, &cells);
+    if (len == 0 or !sameCell(cells[len - 1], target)) return false;
+    const base = engine.baseCell(u);
+    const travelled = if (sameCell(cells[0], base)) cells[1..len] else cells[0..len];
+    const steps = engine.getSteps(u);
+    const max_cells = @max(1, @ceil(steps));
+    if (travelled.len == 0 or @as(f64, @floatFromInt(travelled.len)) > max_cells or !std.math.isFinite(r.weight) or r.weight < 0 or r.weight > steps + 1e-9) return false;
+    var prev = base;
+    for (travelled) |cell| {
+        const dx = @abs(cell.x - prev.x);
+        const dy = @abs(cell.y - prev.y);
+        if (!engine.cellWithinGrid(cell) or (dx == 0 and dy == 0) or dx > 1 or dy > 1) return false;
+        prev = cell;
+    }
+    return c.actualPath().get(pathing.key(target.x, target.y)) != null;
+}
+
+/// completeMoveWithAdjacentMelee
+fn completeMoveWithMelee(c: *Ctx, mp: *const MovePath, r: *const Route, preferred: ?u8, out: *Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    const targets = footprintForAnchor(u, r.cell);
+    for (targets.slice(), 0..) |t, i| out.targets[i] = t;
+    const len = mp.routeCells(r, &out.path);
+    const move = rec.Action{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..targets.len] } };
+
+    var adjacent_enemies: engine.UnitList = .{};
+    for (s.units[0..s.n_units], 0..) |*e, i| {
+        if (!e.in_holder or e.team == u.team or e.isDead()) continue;
+        const ec = engine.unitCells(e);
+        if (adjacent(targets.slice(), ec.slice())) adjacent_enemies.push(@intCast(i));
+    }
+    var target: ?u8 = null;
+    if (preferred) |p| {
+        for (adjacent_enemies.slice()) |e| if (e == p) {
+            target = e;
+        };
+    }
+    if (target == null and adjacent_enemies.len > 0) target = adjacent_enemies.items[0];
+    const resolved = if (target) |t| preferRespondedTarget(s, c.ui, t, targets.slice()) else null;
+    const victim = resolved orelse {
+        out.push(move);
+        return;
+    };
+    const prefix = meleePrefix(u);
+    if (!isMeleeSelection(u.attack_type_selected) and prefix == null) {
+        out.push(move);
+        return;
+    }
+    if (prefix) |t| out.push(.{ .select_attack_type = .{ .unit = c.ui, .attack_type = t } });
+    out.push(move);
+    out.push(.{ .melee_attack = .{ .attacker = c.ui, .target = victim, .attack_from = r.cell, .path = &.{} } });
+}
+
+fn idleTurn(c: *const Ctx, out: *Decision) void {
+    out.push(.{ .end_turn = .{ .unit = c.ui, .reason = .manual } });
+}
+
+/// fallbackTurn
+fn fallbackTurn(c: *Ctx, out: *Decision) void {
+    out.n = 0;
+    const s = c.s;
+    const u = c.unit();
+    const mp = c.actualPath();
+    var enemies: engine.UnitList = .{};
+    for (s.units[0..s.n_units], 0..) |*e, i| {
+        if (e.in_holder and e.team != u.team and !e.isDead()) enemies.push(@intCast(i));
+    }
+    if (enemies.len == 0 or mp.size() == 0) return idleTurn(c, out);
+    const base = engine.baseCell(u);
+    var best: ?*const Route = null;
+    var best_score: i32 = std.math.maxInt(i32);
+    for (mp.known()) |*r| {
+        const cell = r.cell;
+        if (sameCell(cell, base)) continue;
+        if (!canLandAt(s, c.ui, cell)) continue;
+        if (!isLegalMoveRoute(c, cell, mp, r)) continue;
+        var score: i32 = std.math.maxInt(i32);
+        for (enemies.slice()) |e| {
+            const ec = engine.baseCell(&s.units[e]);
+            score = @min(score, @as(i32, @intCast(@abs(cell.x - ec.x) + @abs(cell.y - ec.y))));
+        }
+        if (score < best_score) {
+            best_score = score;
+            best = r;
+        }
+    }
+    const b = best orelse return idleTurn(c, out);
+    completeMoveWithMelee(c, mp, b, null, out);
+}
+
+/// isRangeShotLandable
+fn rangeShotLandable(s: *const State, ui: u8, ti: u8, aim_cell: ?Cell, aim_side: u8) bool {
+    const u = &s.units[ui];
+    const t = &s.units[ti];
+    if (!t.in_holder or t.isDead() or t.team == u.team) return false;
+    if (!engine.canLandRangeAttack(s, u)) return false;
+    const to = combat.aimEdge(s, u, t, aim_cell, aim_side) orelse return false;
+    const hits = combat.evaluateRange(s, ui, u.pos_x, u.pos_y, to[0], to[1]);
+    if (hits.len == 0) return false;
+    const first = &s.units[hits.units[0]];
+    return !first.isDead() and first.team != u.team;
+}
+
+/// findLegalRangeAttack
+fn findLegalRangeAttack(c: *const Ctx, preferred: u8) ?rec.Action {
+    const s = c.s;
+    const u = c.unit();
+    var order: engine.UnitList = .{};
+    var has_preferred = false;
+    for (s.units[0..s.n_units], 0..) |*e, i| {
+        if (e.in_holder and e.team != u.team and !e.isDead() and i == preferred) has_preferred = true;
+    }
+    if (has_preferred) order.push(preferred);
+    for (s.units[0..s.n_units], 0..) |*e, i| {
+        if (!e.in_holder or e.team == u.team or e.isDead()) continue;
+        if (has_preferred and i == preferred) continue;
+        order.push(@intCast(i));
+    }
+    for (order.slice()) |t| {
+        if (rangeShotLandable(s, c.ui, t, null, 0)) return .{ .range_attack = .{ .attacker = c.ui, .target = t } };
+        const cells = engine.unitCells(&s.units[t]);
+        for (cells.slice()) |cell| {
+            for ([_]u8{ 0, 1, 2, 3 }) |side| {
+                if (!combat.sideObservable(s, cell, side, u.team)) continue;
+                if (rangeShotLandable(s, c.ui, t, cell, side)) {
+                    return .{ .range_attack = .{ .attacker = c.ui, .target = t, .aim_cell = cell, .aim_side = side } };
+                }
+            }
+        }
+    }
+    return null;
+}
+
+/// StrategyV0_1.decideTurn
+pub fn decideTurn(s: *State, ui: u8, out: *Decision) void {
+    out.* = .{};
+    var c = Ctx{ .s = s, .ui = ui, .m = pathing.buildMatrix(s) };
+    c.initFree();
+    const u = c.unit();
+    const a = findTarget(&c) orelse return fallbackTurn(&c, out);
+    switch (a.kind) {
+        .range => {
+            if (!engine.possibleIncludes(u, AT.RANGE)) return fallbackTurn(&c, out);
+            const tc = a.attack orelse return fallbackTurn(&c, out);
+            const target = occupant(s, tc) orelse return fallbackTurn(&c, out);
+            const shot = findLegalRangeAttack(&c, target) orelse return fallbackTurn(&c, out);
+            if (u.attack_type_selected != AT.RANGE) out.push(.{ .select_attack_type = .{ .unit = ui, .attack_type = AT.RANGE } });
+            out.push(shot);
+        },
+        .melee, .move_and_melee => {
+            const tc = a.attack orelse return fallbackTurn(&c, out);
+            const from = a.move orelse engine.baseCell(u);
+            const target0 = occupant(s, tc) orelse return fallbackTurn(&c, out);
+            const from_cells = footprintForAnchor(u, from);
+            const target = preferRespondedTarget(s, ui, target0, from_cells.slice()) orelse return fallbackTurn(&c, out);
+            const t = &s.units[target];
+            if (!t.in_holder or t.isDead() or t.team == u.team) return fallbackTurn(&c, out);
+            const tcells = engine.unitCells(t);
+            if (!adjacent(from_cells.slice(), tcells.slice())) return fallbackTurn(&c, out);
+            const base = engine.baseCell(u);
+            if (!sameCell(from, base)) {
+                const mp = a.paths orelse return fallbackTurn(&c, out);
+                const r = mp.get(pathing.key(from.x, from.y)) orelse return fallbackTurn(&c, out);
+                if (!isLegalMoveRoute(&c, from, mp, r)) return fallbackTurn(&c, out);
+                return completeMoveWithMelee(&c, mp, r, target, out);
+            }
+            const prefix = meleePrefix(u);
+            if (!isMeleeSelection(u.attack_type_selected) and prefix == null) return fallbackTurn(&c, out);
+            if (prefix) |pt| out.push(.{ .select_attack_type = .{ .unit = ui, .attack_type = pt } });
+            out.push(.{ .melee_attack = .{ .attacker = ui, .target = target, .attack_from = from, .path = &.{} } });
+        },
+        .move => {
+            const tc = a.move orelse return fallbackTurn(&c, out);
+            const mp = a.paths orelse return fallbackTurn(&c, out);
+            const r = mp.get(pathing.key(tc.x, tc.y)) orelse return fallbackTurn(&c, out);
+            if (!isLegalMoveRoute(&c, tc, mp, r)) return fallbackTurn(&c, out);
+            completeMoveWithMelee(&c, mp, r, null, out);
+        },
+    }
+}
+
+// =====================================================================================================================
+// The v0.1 match loop (runMatchInner)
+// =====================================================================================================================
+
+pub const StepKind = enum { apply, advance, decide };
+
+/// Called after every engine call and decision, in recording order.
+pub const Observer = struct {
+    ctx: *anyopaque,
+    step: *const fn (ctx: *anyopaque, kind: StepKind, action: rec.Action, r0: u32, s: *const State, ok: bool, events: []const rec.Event) bool,
+};
+
+pub const EndReason = enum { elimination, turn_cap, stuck, observer_stop, unsupported };
+
+fn call(s: *State, action: rec.Action, kind: StepKind, obs: ?Observer, events: *engine.Events) struct { ok: bool, stop: bool } {
+    const r0 = s.rng.state;
+    events.len = 0;
+    const ok = engine.apply(s, action, events);
+    if (obs) |o| {
+        if (!o.step(o.ctx, kind, action, r0, s, ok, events.slice())) return .{ .ok = ok, .stop = true };
+    }
+    return .{ .ok = ok, .stop = false };
+}
+
+/// Plays a whole battle from a start state (before start_fight) with v0.1 on both sides.
+pub fn playMatch(s: *State, max_laps: i32, obs: ?Observer) EndReason {
+    var events: engine.Events = .{};
+    if (call(s, .start_fight, .apply, obs, &events).stop) return .observer_stop;
+    var decision: Decision = .{};
+    while (!s.fight.finished) {
+        if (s.fight.lap > max_laps) return .turn_cap;
+        if (s.active < 0) {
+            var holder: usize = 0;
+            for (s.units[0..s.n_units]) |*u| {
+                if (u.in_holder) holder += 1;
+            }
+            const attempts = holder + 2;
+            var i: usize = 0;
+            while (i < attempts and !s.fight.finished and s.active < 0) : (i += 1) {
+                const r = call(s, .{ .advance = .{ .damage_dealt_this_lap = s.damage_lap == s.fight.lap } }, .advance, obs, &events);
+                if (r.stop) return .observer_stop;
+                if (s.fight.finished or s.active >= 0) break;
+                if (events.len == 0 and s.fight.up_next.len == 0) break;
+            }
+            if (s.fight.finished) break;
+            if (s.active < 0) return .stuck; // forceStalledLap is not ported (never seen)
+            continue;
+        }
+        const ui: u8 = @intCast(s.active);
+        if (!s.units[ui].in_holder or s.units[ui].isDead()) {
+            s.active = -1;
+            continue;
+        }
+        const r0 = s.rng.state;
+        decideTurn(s, ui, &decision);
+        if (obs) |o| {
+            if (!o.step(o.ctx, .decide, .{ .decide = .{ .unit = ui, .out = decision.slice() } }, r0, s, true, &.{})) return .observer_stop;
+        }
+        var did_something = false;
+        for (decision.slice()) |a| {
+            const r = call(s, a, .apply, obs, &events);
+            if (r.stop) return .observer_stop;
+            if (r.ok and a != .select_attack_type) did_something = true;
+            if (s.fight.finished) break;
+        }
+        if (!s.fight.finished and s.active == ui and !did_something) return .unsupported; // recovery net not ported
+        if (!s.fight.finished and s.active == ui) {
+            const r = call(s, .{ .end_turn = .{ .unit = ui, .reason = .manual } }, .apply, obs, &events);
+            if (r.stop) return .observer_stop;
+            if (!r.ok) s.active = -1;
+        }
+    }
+    return .elimination;
+}
