@@ -1196,6 +1196,13 @@ pub fn playMatch(s: *State, max_laps: i32, obs: ?Observer) EndReason {
 pub fn playMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *const fn (*State, u8, *Decision) void) EndReason {
     var events: engine.Events = .{};
     if (call(s, .start_fight, .apply, obs, &events).stop) return .observer_stop;
+    return continueMatchWith(s, max_laps, obs, decide);
+}
+
+/// The runMatchInner loop after start_fight, from any point it reaches: a fight start, or a battle loaded mid-fight
+/// (snapshot.zig) at a decision boundary (`State.active` set, its decision not taken) or with no active unit.
+pub fn continueMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *const fn (*State, u8, *Decision) void) EndReason {
+    var events: engine.Events = .{};
     var decision: Decision = .{};
     while (!s.fight.finished) {
         if (s.fight.lap > max_laps) return .turn_cap;

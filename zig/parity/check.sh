@@ -2,7 +2,8 @@
 # Engine parity check: record fresh battles from the TypeScript engine, then
 #   1. replay every recorded engine call in the Zig engine (engine only), and
 #   2. play every battle natively in Zig (v0.1 AI + engine) from its start state,
-# failing on the first step whose action, state, events, random stream or accept/reject result differs.
+# failing on the first step whose action, state, events, random stream or accept/reject result differs. With
+# RECORD_RESUME set (e.g. random:2) it also runs `hoc-sim resume` on the embedded mid-battle exports.
 #
 #   zig/parity/check.sh [games=200] [firstSeed=<random>]
 #
@@ -19,4 +20,5 @@ echo "recording ${games} battles from seed ${seed}"
 bun zig/parity/record.ts "${games}" "${seed}" "${out}" >/dev/null
 zig/zig-out/bin/hoc-sim parity "${out}" --max-fail 5
 zig/zig-out/bin/hoc-sim native "${out}" --max-fail 5
+if [ -n "${RECORD_RESUME:-}" ]; then zig/zig-out/bin/hoc-sim resume "${out}" --max-fail 5; fi
 rm -f "${out}" "${out%.jsonl}.meta.json"

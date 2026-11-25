@@ -3,6 +3,10 @@
 A native port of a slice of the common battle engine and the v0.1 AI, built to measure how much faster AI research
 could run on a native simulator. It is not wired into the package build, lint, tests or any shipped code.
 
+A bridge (`BRIDGE.md`) hands a live TypeScript battle to the engine mid-fight: `parity/state_export.ts` exports it,
+`src/snapshot.zig` loads it (refusing what the port does not model), and a C ABI (`zig build lib`, `ffi/bridge.ts`)
+plays it out or runs search rollouts on it.
+
 ## Scope
 
 Zig plays whole battles that match the TypeScript `runMatch` step for step, for battles with:
@@ -305,6 +309,27 @@ of the turn queues.
   call against the recording: the action, the random stream, accept/reject, the events and the digest.
 - `hoc-sim paths` recomputes recorded `getMovePath` calls (record with `RECORD_PATHS=<file>`), comparing every route,
   weight and lava flag.
+- `hoc-sim resume` loads the mid-battle exports a `RECORD_RESUME` recording embeds (below; the loader is
+  `src/snapshot.zig`), checks each loaded state against the recorded digest of the step before, then replays the
+  remaining engine steps and plays natively from there (`ai.continueMatchWith`), comparing every remaining step as
+  `parity` and `native` do. It is the oracle for the bridge (`BRIDGE.md`); `hoc-sim play-state <state.json>` plays one
+  exported battle out and prints the result and the final digest.
+
+Resume points and AI options (off by default; the recording is then byte-identical):
+
+- `RECORD_RESUME=random|random:<n>|<k>[,<k>...]`: at a decision boundary (an advance has selected the unit, its
+  decideTurn has not run) the recorder embeds `exportBattleState` and the harness state (`resume: [{step, decision,
+  unitId, rng, state}]`). `random` keeps one decision per battle, uniformly (reservoir sampling on a private stream
+  hashed from the seed), `random:<n>` n of them, `<k>` the k-th decision.
+- `RECORD_VERSION=<version>` records that strategy version on both seats (the decision wrapper goes on
+  `getAIStrategy(version)`'s class; `v0.8s` is StrategyV0_8's), `RECORD_ORIGIN=rollout` passes decisionOrigin
+  "rollout", and `RECORD_LAYERS=1` (v0.8 only) adds the v0.8 layer log and the AI target memory to each decision
+  (`parity/v08/layers.ts`); the `.meta.json` then gains `version`, `decisionOrigin` and `layers`. These fold in the v0.8
+  port's recorder (`parity/v08/record.ts`), whose output they reproduce byte for byte.
+
+```bash
+RECORD_RESUME=random:2 bun zig/parity/record.ts 300 8100000 /tmp/r.jsonl && zig/zig-out/bin/hoc-sim resume /tmp/r.jsonl
+```
 
 Map options (the defaults reproduce the classic NORMAL recordings; the only new start-state field there is
 `creatureId`):
@@ -372,6 +397,20 @@ cd zig && zig build test         # unit tests (random stream, JS number rounding
 ```
 
 Run `check.sh` after changing any rules or v0.1 AI code the port covers, both with and without the batch kept.
+
+Bridge (mid-battle export and load, resume, the C ABI and rollouts), checked on 2026-11-25 against common `50ae51c2`
+(details and overheads in `BRIDGE.md`):
+
+- `hoc-sim resume`, every point identical in both modes and every loaded state equal to its recorded digest: classic
+  NORMAL ability-free 300 battles, 600 points (seeds 8100000-8100299); production-like ability-free 300, 600 points
+  (8200000-8200299); production-like with batches 1 and 2 kept 500, 1,250 points (8300000-8300249, and 8310000-8310249
+  at keep rate 1); 204,139 remaining steps; points spread early / mid / late 779 / 836 / 835;
+- `ffi/smoke.ts` 60 battles (kept and ability-free) and 34,240 rollouts identical to `SearchDriver.rollout` with v0.1
+  seats (every horizon, exact terminal on and off);
+- unchanged: the default recorder output byte-identical to the previous recorder's (classic seeds 1001-1020, the kept
+  side mix 2001-2020, production-like kept 3001-3020); `check.sh 300 8400000`; production-like kept `check.sh 300
+  8500000`; the v0.8 replays (`hoc-sim parity` 100/100 on v0.8s and v0.8sr side-mix layers); `RECORD_VERSION` v0.7 and
+  v0.8s with `RECORD_ORIGIN=rollout RECORD_LAYERS=1` byte-identical to `parity/v08/record.ts`; `zig build test`.
 
 Setup (augments, synergies, Break), checked on 2026-11-25 against common `7babe862` (both modes, every battle
 identical; all on side-oriented production-mix maps, `RECORD_GRID=mix RECORD_SIDE=1`):
@@ -557,4 +596,6 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
   Earth/Wind element pair (Thunderbird is not ported);
 - the AI versions the research uses (v0.8 with the a19 search). The production rollout policy is the v0.8 chain, about
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
-  `playMatchWith` takes the decide function, `initCtxInto` builds a decision context) and `compare.NativeCheck`.
+  `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and
+  `compare.NativeCheck`. The bridge's rollouts take a seat's decide function from `rollout.policies` (v0.1 today); what
+  the a19 search port needs from the bridge is listed in `BRIDGE.md`.

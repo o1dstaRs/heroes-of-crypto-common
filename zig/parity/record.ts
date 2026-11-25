@@ -4,9 +4,10 @@
  *   bun zig/parity/record.ts [games=50] [firstSeed=1] [out=zig/parity/out/battles.jsonl]
  *
  * Scope of the spike: every creature's abilities and spells are stripped (except the creatures named in
- * RECORD_KEEP_ABILITIES), v0.1 AI on both sides. No artifacts, augments, synergies or doctrines unless the setup options
- * say otherwise (RECORD_AUGMENTS, RECORD_SYNERGIES, ..., below). The map is NORMAL on a classic board unless
- * RECORD_GRID / RECORD_SIDE say otherwise (below). The AI only chooses actions; what is recorded is every
+ * RECORD_KEEP_ABILITIES), v0.1 AI on both sides (RECORD_VERSION picks another). No artifacts, augments, synergies or
+ * doctrines unless the setup options say otherwise (RECORD_AUGMENTS, RECORD_SYNERGIES, ..., below). The map is NORMAL on
+ * a classic board unless RECORD_GRID / RECORD_SIDE say otherwise (below). RECORD_RESUME embeds mid-battle snapshots for
+ * `hoc-sim resume` (below). The AI only chooses actions; what is recorded is every
  * top-level call into the engine (GameActionEngine.apply and TurnEngine.advanceAfterNoActiveUnit) with
  *   - the seeded random state before and after the call (mulberry32 state, so Zig can resume the stream),
  *   - the events the call emitted (headless set),
@@ -20,7 +21,9 @@ import { dirname } from "node:path";
 import creaturesJson from "../../src/configuration/creatures.json";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { TurnEngine } from "../../src/engine/turn_engine";
-import { StrategyV0_1 } from "../../src/ai/versions/v0_1";
+import { getAIStrategy } from "../../src/ai";
+import { captureAITargetMemory } from "../../src/ai/ai";
+import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { PathHelper } from "../../src/grid/path_helper";
 import { creatureIdForName } from "../../src/ai/setup/creature_score";
 import { a19ShooterlessAugments } from "../../src/ai/setup/a19_shooterless_setup";
@@ -47,6 +50,8 @@ import {
 } from "../../src/configuration/config_provider";
 import { runMatch } from "../../src/simulation/battle_engine";
 import { getDeterministicRandomSource, setDeterministicRandomSource } from "../../src/utils/lib";
+import { battleDigest, digestFields, fightDigest, terrainDigest } from "./digest";
+import { exportBattleState } from "./state_export";
 
 type Ctx = { grid: any; fightProperties: any; unitsHolder: any };
 
@@ -200,6 +205,46 @@ const SETUP = !!(
     ARTIFACT_MODE ||
     FACTION_MODE
 );
+// ---- resume points, AI version and decision origin ----
+// RECORD_RESUME=random|random:<n>|<k>[,<k>...] embeds mid-battle snapshots for `hoc-sim resume`: at a decision boundary
+// (an advance has just selected the active unit; its decideTurn has not run) the recorder exports the whole battle
+// (state_export.ts) with the harness state the loop needs (the active unit, the random state = the decide step's r0;
+// the damage-statistic laps are part of the export). `random` keeps one uniformly chosen decision per battle and
+// `random:<n>` n of them (reservoir sampling on a private stream hashed from the seed: deterministic per seed, and it
+// touches no battle stream); `<k>` keeps the k-th decision (0-based), so a battle with fewer decisions gets none. The
+// game line gains `resume: [{step, decision, unitId, rng, state}]`, sorted by step (`step` indexes the decide step in
+// `steps`), and the .meta.json gains `resume`.
+// RECORD_VERSION=<version> (default v0.1) plays and records that strategy version on both seats: the decision wrapper
+// goes on getAIStrategy(version)'s class (StrategyV0_1 for v0.1, StrategyV0_8 for v0.8, ...).
+// RECORD_ORIGIN=rollout passes decisionOrigin "rollout" to every recorded decision (the mode A19 rollouts run the
+// native policy in). RECORD_LAYERS=1 (v0.8 only) installs zig/parity/v08/layers.ts and adds `layers` and `memory`
+// (the AI target memory before the decision) to each decide step. The .meta.json gains version, decisionOrigin and
+// layers whenever one of the three is set.
+const RESUME_MODE = (process.env.RECORD_RESUME ?? "").trim();
+const VERSION = (process.env.RECORD_VERSION ?? "v0.1").trim();
+const ROLLOUT_ORIGIN = process.env.RECORD_ORIGIN === "rollout";
+const LAYER_LOG = process.env.RECORD_LAYERS === "1";
+const AI_OPTIONS = process.env.RECORD_VERSION !== undefined || ROLLOUT_ORIGIN || LAYER_LOG;
+if (process.env.RECORD_ORIGIN && !["rollout", "match"].includes(process.env.RECORD_ORIGIN)) {
+    throw new Error(`RECORD_ORIGIN: expected rollout or match, got ${process.env.RECORD_ORIGIN}`);
+}
+type ResumePlan = { kind: "random"; count: number } | { kind: "list"; decisions: Set<number> };
+function parseResume(mode: string): ResumePlan | undefined {
+    if (!mode) return undefined;
+    const random = mode.match(/^random(?::(\d+))?$/);
+    if (random) {
+        const count = random[1] === undefined ? 1 : Number(random[1]);
+        if (!(count >= 1)) throw new Error(`RECORD_RESUME: random:<n> needs n >= 1, got ${mode}`);
+        return { kind: "random", count };
+    }
+    const decisions = mode.split(",").map((part) => Number(part.trim()));
+    if (decisions.some((k) => !Number.isSafeInteger(k) || k < 0)) {
+        throw new Error(`RECORD_RESUME: expected random, random:<n> or decision indices, got ${mode}`);
+    }
+    return { kind: "list", decisions: new Set(decisions) };
+}
+const RESUME = parseResume(RESUME_MODE);
+
 /** RECORD_AUGMENTS=random levels; the explicit plans also accept Empower (read only by magic damage). */
 const RANDOM_AUG_CAP: Record<string, number> = { Placement: 2, Armor: 3, Might: 3, Sniper: 3, Movement: 2 };
 const AUG_KINDS = new Set<string>(["Placement", "Armor", "Might", "Sniper", "Movement", "Empower"]);
@@ -352,161 +397,10 @@ class Mulberry {
 
 const num = (v: unknown): number => (typeof v === "number" ? v : Number(v ?? 0));
 
-function unitDigest(u: any): unknown[] {
-    const p = u.getUnitProperties();
-    const c = u.getBaseCell();
-    return [
-        u.getId(),
-        p.amount_alive,
-        p.amount_died,
-        p.hp,
-        p.max_hp,
-        c.x,
-        c.y,
-        u.isDead() ? 1 : 0,
-        u.getResponded() ? 1 : 0,
-        u.isOnHourglass() ? 1 : 0,
-        u.hasMovedThisTurn() ? 1 : 0,
-        p.stack_power,
-        p.morale,
-        p.luck,
-        p.luck_mod,
-        p.attack_mod,
-        p.armor_mod,
-        p.base_armor,
-        p.base_attack,
-        p.steps,
-        p.steps_mod,
-        p.initiative,
-        p.range_shots,
-        p.range_shots_mod,
-        p.range_armor,
-        p.attack_multiplier,
-        p.attack_damage_min,
-        p.attack_damage_max,
-        p.attack_type_selected,
-        p.applied_buffs.join(","),
-        p.applied_buffs_laps.join(","),
-        p.applied_debuffs.join(","),
-        p.applied_debuffs_laps.join(","),
-        p.applied_effects.join(","),
-        p.applied_effects_laps.join(","),
-        u.getPosition().x,
-        u.getPosition().y,
-        u.initialUnitProperties.morale,
-        u.luckPerTurn,
-        p.applied_buffs_powers.join(","),
-        p.applied_debuffs_powers.join(","),
-        p.applied_effects_powers.join(","),
-        u.initialUnitProperties.base_attack,
-        u.getMovedRouteCellsThisTurn(),
-        u.getTarget() ?? "",
-        p.magic_resist,
-        u
-            .getBuffs()
-            .map((b: any) => `${b.getFirstSpellProperty() ?? ""};${b.getSecondSpellProperty() ?? ""}`)
-            .join(","),
-        // Setup columns: Sniper moves shot_distance on every refresh; Bitter Experience moves the two bases.
-        ...(SETUP ? [p.shot_distance, u.initialUnitProperties.base_armor, u.initialUnitProperties.steps] : []),
-    ];
-}
-
-const DIGEST_FIELDS = [
-    "id",
-    "amount_alive",
-    "amount_died",
-    "hp",
-    "max_hp",
-    "x",
-    "y",
-    "dead",
-    "responded",
-    "hourglass",
-    "moved",
-    "stack_power",
-    "morale",
-    "luck",
-    "luck_mod",
-    "attack_mod",
-    "armor_mod",
-    "base_armor",
-    "base_attack",
-    "steps",
-    "steps_mod",
-    "initiative",
-    "range_shots",
-    "range_shots_mod",
-    "range_armor",
-    "attack_multiplier",
-    "attack_damage_min",
-    "attack_damage_max",
-    "attack_type_selected",
-    "buffs",
-    "buffs_laps",
-    "debuffs",
-    "debuffs_laps",
-    "effects",
-    "effects_laps",
-    "px",
-    "py",
-    "base_morale",
-    "luck_per_turn",
-    "buffs_powers",
-    "debuffs_powers",
-    "effects_powers",
-    "base_attack_init",
-    "moved_route_cells",
-    "target",
-    "magic_resist",
-    "buffs_sources",
-    ...(SETUP ? ["shot_distance", "base_armor_init", "steps_init"] : []),
-];
-
-function fightDigest(fp: any): Record<string, unknown> {
-    const sorted = (s: Set<string>): string[] => [...s].sort();
-    return {
-        lap: fp.currentLap,
-        started: fp.fightStarted ? 1 : 0,
-        finished: fp.fightFinished ? 1 : 0,
-        firstTurnMade: fp.firstTurnMade ? 1 : 0,
-        previousTurnTeam: fp.previousTurnTeam,
-        highestInitiative: fp.highestInitiativeThisTurn,
-        stepsMoraleMultiplier: fp.stepsMoraleMultiplier,
-        additionalNarrowingLaps: fp.additionalNarrowingLaps,
-        upNext: fp.upNextQueue.toArray(),
-        hourglassQ: fp.hourglassQueue.toArray(),
-        moralePlusQ: fp.moralePlusQueue.toArray(),
-        moraleMinusQ: fp.moraleMinusQueue.toArray(),
-        made: sorted(fp.alreadyMadeTurn),
-        hourglassSet: sorted(fp.alreadyHourglass),
-        replied: sorted(fp.alreadyRepliedAttack),
-        damageLaps: [...fp.damageDealFactPerLap.entries()]
-            .filter(([, v]: [number, boolean]) => v)
-            .map(([k]: [number, boolean]) => k)
-            .sort((a: number, b: number) => a - b),
-    };
-}
-
-/** Terrain state the engine changes during play: the classic hit counters and cleared sides, the dried lava centre,
- * and the standing scattered stones in layout order (Grid's fields are private). */
-function terrainDigest(grid: any, fp: any): Record<string, unknown> {
-    return {
-        hitsL: fp.getObstacleHitsLeftLeft(),
-        hitsR: fp.getObstacleHitsLeftRight(),
-        leftCleared: grid.leftMountainCleared ? 1 : 0,
-        rightCleared: grid.rightMountainCleared ? 1 : 0,
-        cleanedUpCenter: grid.cleanedUpCenter ? 1 : 0,
-        standing: grid.getScatteredMountainsStanding().map((c: any) => [c.x, c.y]),
-    };
-}
+const DIGEST_FIELDS = digestFields(SETUP);
 
 function digest(ctx: Ctx): { units: unknown[][]; fight: Record<string, unknown> } {
-    const units: unknown[][] = [];
-    for (const u of ctx.unitsHolder.getAllUnits().values()) units.push(unitDigest(u));
-    const emberTeams = [...(ctx.unitsHolder.emberCovenantTeams ?? [])].sort();
-    const fight: Record<string, unknown> = { ...fightDigest(ctx.fightProperties), emberTeams };
-    if (TERRAIN) fight.terrain = terrainDigest(ctx.grid, ctx.fightProperties);
-    return { units, fight };
+    return battleDigest(ctx, { setup: SETUP, terrain: TERRAIN });
 }
 
 function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
@@ -641,11 +535,16 @@ function setupState(fp: any): Record<string, unknown> {
     return { variants: fp.getSynergyVariants(), perTeam };
 }
 
+// zig/parity/v08/layers.ts (owned by the v0.8 port) is loaded only for RECORD_LAYERS=1.
+const layersModule = LAYER_LOG ? await import("./v08/layers") : undefined;
+
 function main(): void {
     const games = Number(process.argv[2] ?? 50);
     const firstSeed = Number(process.argv[3] ?? 1);
     const out = process.argv[4] ?? "zig/parity/out/battles.jsonl";
     mkdirSync(dirname(out), { recursive: true });
+    const strategyClass = Object.getPrototypeOf(getAIStrategy(VERSION)).constructor;
+    if (!strategyClass?.prototype?.decideTurn) throw new Error(`RECORD_VERSION: no strategy for ${VERSION}`);
 
     let ctx: Ctx | undefined;
     let rng: Mulberry | undefined;
@@ -733,20 +632,63 @@ function main(): void {
         };
     }
 
+    // RECORD_LAYERS=1 (v0.8 only): each decision also records every inheritance level's and v0.8 pass's output.
+    // Installed before the decision wrapper below captures decideTurn, so the wrapper calls the logged copy.
+    let layersSha: string | undefined;
+    if (layersModule) {
+        if (!(getAIStrategy(VERSION) instanceof StrategyV0_8)) throw new Error("RECORD_LAYERS needs a v0.8 strategy");
+        layersSha = layersModule.installLayerLog(() => rng?.state ?? 0);
+    }
+
+    // RECORD_RESUME: the decision points kept for this battle (reset per battle) and the private stream that picks
+    // them.
+    type ResumePoint = { step: number; decision: number; unitId: string; rng: number; state: unknown };
+    let resumePoints: ResumePoint[] = [];
+    let resumeRng: () => number = () => 0;
+    let decisionIndex = 0;
+    const keepResumePoint = (unit: any): void => {
+        const index = decisionIndex;
+        decisionIndex += 1;
+        if (!RESUME || !ctx || !rng) return;
+        const point = (): ResumePoint => ({
+            step: steps.length,
+            decision: index,
+            unitId: unit.getId(),
+            rng: rng!.state,
+            state: exportBattleState(ctx as any),
+        });
+        if (RESUME.kind === "list") {
+            if (RESUME.decisions.has(index)) resumePoints.push(point());
+        } else if (index < RESUME.count) {
+            resumePoints.push(point());
+        } else {
+            const slot = Math.floor(resumeRng() * (index + 1));
+            if (slot < RESUME.count) resumePoints[slot] = point();
+        }
+    };
+
     // AI decisions: the unit, the random state around the call and the actions it returned. Engine calls made
     // inside a decision (none are expected for v0.1) are not recorded as steps.
-    const decideTurn = StrategyV0_1.prototype.decideTurn;
-    StrategyV0_1.prototype.decideTurn = function (this: unknown, unit: any, context: any) {
+    const decideTurn = strategyClass.prototype.decideTurn;
+    strategyClass.prototype.decideTurn = function (this: unknown, unit: any, context: any) {
+        if (ROLLOUT_ORIGIN) context = { ...context, decisionOrigin: "rollout" };
         if (!recording || depth > 0 || !rng) return decideTurn.call(this, unit, context);
+        if (RESUME) keepResumePoint(unit);
         const r0 = rng.state;
         const d0 = rng.draws;
         const site0 = siteLog.length;
         depth += 1;
         let actions: unknown[];
         const t0 = process.hrtime.bigint();
+        // The AI's target memory (ai.ts previousTargetsByBattle) before the decision, so each logged decision can be
+        // checked on its own: attacker id -> remembered target id.
+        const memory = layersModule ? [...captureAITargetMemory(context.unitsHolder)] : undefined;
+        if (layersModule) layersModule.beginDecision();
+        let layers: unknown[] | undefined;
         try {
             actions = decideTurn.call(this, unit, context);
         } finally {
+            if (layersModule) layers = layersModule.endDecision();
             decideNanos += process.hrtime.bigint() - t0;
             decisions += 1;
             depth -= 1;
@@ -759,6 +701,7 @@ function main(): void {
             draws: rng.draws - d0,
             out: JSON.parse(JSON.stringify(actions)),
             ...(TRACE ? { ds: siteLog.slice(site0) } : {}),
+            ...(layers ? { layers, memory } : {}),
         });
         return actions;
     };
@@ -785,10 +728,13 @@ function main(): void {
         const redSynergies = synergiesFor(redRoster, boardVariants);
         siteLog.length = 0;
         steps = [];
+        resumePoints = [];
+        decisionIndex = 0;
+        if (RESUME) resumeRng = makeRng(Math.imul(seed ^ 0x2545f491, 0x9e3779b1) >>> 0);
         let init: Record<string, unknown> | undefined;
         const result = runMatch({
-            greenVersion: "v0.1",
-            redVersion: "v0.1",
+            greenVersion: VERSION,
+            redVersion: VERSION,
             roster,
             ...(DISTINCT_RED ? { redRoster } : {}),
             seed,
@@ -862,6 +808,7 @@ function main(): void {
                       }
                     : {}),
                 steps,
+                ...(RESUME ? { resume: [...resumePoints].sort((a, b) => a.step - b.step) } : {}),
             }),
         );
     }
@@ -904,6 +851,14 @@ function main(): void {
                   },
               }
             : {}),
+        ...(AI_OPTIONS
+            ? {
+                  version: VERSION,
+                  decisionOrigin: ROLLOUT_ORIGIN ? "rollout" : "match",
+                  layers: layersModule ? { decideTurnSourceSha256: layersSha } : null,
+              }
+            : {}),
+        ...(RESUME ? { resume: RESUME_MODE } : {}),
     };
     writeFileSync(out.replace(/\.jsonl$/, ".meta.json"), JSON.stringify(meta, null, 2) + "\n");
     if (TRACE) {

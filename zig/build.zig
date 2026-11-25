@@ -16,6 +16,15 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run.addArgs(args);
     b.step("run", "Run hoc-sim (parity | bench) <recording.jsonl>").dependOn(&run.step);
 
+    // The bridge's shared library (zig/BRIDGE.md): zig-out/lib/libhocsim.dylib on macOS, libhocsim.so on Linux.
+    const lib_mod = b.createModule(.{
+        .root_source_file = b.path("src/ffi.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const lib = b.addLibrary(.{ .linkage = .dynamic, .name = "hocsim", .root_module = lib_mod });
+    b.step("lib", "Build the bridge's shared library (zig-out/lib/libhocsim)").dependOn(&b.addInstallArtifact(lib, .{}).step);
+
     const test_mod = b.createModule(.{
         .root_source_file = b.path("src/tests.zig"),
         .target = target,

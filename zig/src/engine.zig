@@ -1440,7 +1440,7 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) R
 pub var unsupported_name: []const u8 = "";
 
 /// The applied_* parallel arrays of a recorded unit (names, laps, powers) as one list.
-fn loadSpells(comptime List: type, props: std.json.Value, comptime kind: []const u8) !List {
+pub fn loadSpells(comptime List: type, props: std.json.Value, comptime kind: []const u8) !List {
     var list: List = .{};
     const names = rec.get(props, "applied_" ++ kind).array.items;
     const laps = rec.get(props, "applied_" ++ kind ++ "_laps").array.items;
@@ -1482,7 +1482,7 @@ fn loadBuffSources(unit: std.json.Value, list: *st.SpellList) !void {
 }
 
 /// `init.setup.perTeam[team]` (record.ts setupState): the team's synergy values; zero without setup.
-fn loadTeamSetup(init: std.json.Value, team: u8) st.TeamSetup {
+pub fn loadTeamSetup(init: std.json.Value, team: u8) st.TeamSetup {
     var key: [4]u8 = undefined;
     const k = std.fmt.bufPrint(&key, "{d}", .{team}) catch unreachable;
     const row = rec.get(rec.get(rec.get(init, "setup"), "perTeam"), k);
@@ -1509,7 +1509,7 @@ const LUCK_DEPENDENT_BLESSINGS = [_][]const u8{
 };
 
 /// The unit's abilities from `props.abilities` and the recorded `getAbilityConfig` / `getEffectConfig` entries.
-fn loadAbilities(init: std.json.Value, props: std.json.Value, u: *Unit) !void {
+pub fn loadAbilities(init: std.json.Value, props: std.json.Value, u: *Unit) !void {
     u.n_abilities = 0;
     u.ability_mask = 0;
     u.luck_dependent = false;
@@ -1547,7 +1547,7 @@ fn loadAbilities(init: std.json.Value, props: std.json.Value, u: *Unit) !void {
 
 /// The unit's emitted auras from `props.aura_effects` and the recorded `init.auraEffectConfigs`, interned in
 /// State.aura_defs.
-fn loadAuras(init: std.json.Value, props: std.json.Value, s: *State, u: *Unit) !void {
+pub fn loadAuras(init: std.json.Value, props: std.json.Value, s: *State, u: *Unit) !void {
     u.n_auras = 0;
     const names = rec.get(props, "aura_effects");
     if (names != .array) return;
@@ -1587,6 +1587,70 @@ fn loadAuras(init: std.json.Value, props: std.json.Value, s: *State, u: *Unit) !
         if (u.n_auras >= st.MAX_UNIT_AURAS) return error.TooManyAuras;
         u.auras[u.n_auras] = idx.?;
         u.n_auras += 1;
+    }
+}
+
+/// The flags that keep the ability-free path cheap (`State.blessings`, `auras`, `stat_hooks`, `augments`) and the configs
+/// read without an ability naming them (the Poison laps, the Break effect, the Ember Covenant spell), from the units
+/// already loaded into `s` and `init`'s effectConfigs / spellConfigs. Clears the Ember Covenant state. Shared by
+/// initState and the mid-battle loader (snapshot.zig).
+pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
+    s.blessings = false;
+    s.auras = false;
+    s.stat_hooks = false;
+    s.augments = false;
+    var poisons = false;
+    var covenant = false;
+    var breaks = false;
+    for (s.setup) |row| {
+        if (row.break_chance > 0) breaks = true;
+    }
+    const AB = st.AbilityId;
+    for (s.units[0..s.n_units]) |*u| {
+        // The flags say what can ever happen, so they read the configured abilities, Break or not.
+        const mask = u.ability_mask;
+        if (mask & (AB.luck_blessing.bit() | AB.sharpened_weapons_blessing.bit()) != 0) s.blessings = true;
+        if (u.n_auras != 0) s.auras = true;
+        if (mask & (AB.aggr.bit() | AB.wardguard.bit()) != 0 or u.target >= 0) s.stat_hooks = true;
+        if (mask & AB.ember_covenant_blessing.bit() != 0) covenant = true;
+        if (u.effects.find(.break_) != null) breaks = true;
+        for (u.auras[0..u.n_auras]) |d| {
+            if (s.aura_defs[d].power_type == st.PowerType.POISON_ON_HIT) poisons = true;
+        }
+        for (u.buffs.items[0..u.buffs.len]) |b| {
+            if (b.id == .luck_blessing or b.id == .sharpened_weapons_blessing) s.blessings = true;
+            if (b.laps == st.LAPS_AURA) s.auras = true;
+            if (b.id == .ember_covenant_blessing) covenant = true;
+            if (b.id.isAugment()) s.augments = true;
+        }
+        if (u.effects.find(.poison) != null) poisons = true;
+    }
+    // Configs read without an ability naming them (record.ts: effectConfigs.Poison, spellConfigs).
+    if (s.auras) s.stat_hooks = true;
+    s.poison_laps = st.NUMBER_OF_LAPS_TOTAL;
+    if (poisons) {
+        const cfg = rec.get(rec.get(init, "effectConfigs"), "Poison");
+        if (cfg == .null) return error.MissingEffectConfig;
+        s.poison_laps = rec.num(rec.get(cfg, "laps"));
+    }
+    // effects.json "Break" (laps 2, power 0), recorded with setup; read only when a team can break.
+    s.break_laps = 2;
+    s.break_power = 0;
+    if (breaks) {
+        const cfg = rec.get(rec.get(init, "effectConfigs"), "Break");
+        if (cfg == .null) return error.MissingEffectConfig;
+        s.break_laps = rec.num(rec.get(cfg, "laps"));
+        s.break_power = rec.num(rec.get(cfg, "power"));
+    }
+    s.ember_seeded = false;
+    s.ember_teams = 0;
+    s.ember_laps = st.NUMBER_OF_LAPS_TOTAL;
+    s.ember_power = 0;
+    if (covenant) {
+        const cfg = rec.get(rec.get(init, "spellConfigs"), "Ember Covenant Blessing");
+        if (cfg == .null) return error.MissingSpellConfig;
+        s.ember_laps = rec.num(rec.get(cfg, "laps"));
+        s.ember_power = rec.num(rec.get(cfg, "power"));
     }
 }
 
@@ -1715,63 +1779,7 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
         unit.effects = try loadSpells(@TypeOf(unit.effects), props, "effects");
         try loadBuffSources(u, &unit.buffs);
     }
-    s.blessings = false;
-    s.auras = false;
-    s.stat_hooks = false;
-    s.augments = false;
-    var poisons = false;
-    var covenant = false;
-    var breaks = false;
-    for (s.setup) |row| {
-        if (row.break_chance > 0) breaks = true;
-    }
-    const AB = st.AbilityId;
-    for (s.units[0..s.n_units]) |*u| {
-        // The flags say what can ever happen, so they read the configured abilities, Break or not.
-        const mask = u.ability_mask;
-        if (mask & (AB.luck_blessing.bit() | AB.sharpened_weapons_blessing.bit()) != 0) s.blessings = true;
-        if (u.n_auras != 0) s.auras = true;
-        if (mask & (AB.aggr.bit() | AB.wardguard.bit()) != 0 or u.target >= 0) s.stat_hooks = true;
-        if (mask & AB.ember_covenant_blessing.bit() != 0) covenant = true;
-        if (u.effects.find(.break_) != null) breaks = true;
-        for (u.auras[0..u.n_auras]) |d| {
-            if (s.aura_defs[d].power_type == st.PowerType.POISON_ON_HIT) poisons = true;
-        }
-        for (u.buffs.items[0..u.buffs.len]) |b| {
-            if (b.id == .luck_blessing or b.id == .sharpened_weapons_blessing) s.blessings = true;
-            if (b.laps == st.LAPS_AURA) s.auras = true;
-            if (b.id == .ember_covenant_blessing) covenant = true;
-            if (b.id.isAugment()) s.augments = true;
-        }
-        if (u.effects.find(.poison) != null) poisons = true;
-    }
-    // Configs read without an ability naming them (record.ts: effectConfigs.Poison, spellConfigs).
-    if (s.auras) s.stat_hooks = true;
-    s.poison_laps = st.NUMBER_OF_LAPS_TOTAL;
-    if (poisons) {
-        const cfg = rec.get(rec.get(init, "effectConfigs"), "Poison");
-        if (cfg == .null) return error.MissingEffectConfig;
-        s.poison_laps = rec.num(rec.get(cfg, "laps"));
-    }
-    // effects.json "Break" (laps 2, power 0), recorded with setup; read only when a team can break.
-    s.break_laps = 2;
-    s.break_power = 0;
-    if (breaks) {
-        const cfg = rec.get(rec.get(init, "effectConfigs"), "Break");
-        if (cfg == .null) return error.MissingEffectConfig;
-        s.break_laps = rec.num(rec.get(cfg, "laps"));
-        s.break_power = rec.num(rec.get(cfg, "power"));
-    }
-    s.ember_seeded = false;
-    s.ember_teams = 0;
-    s.ember_laps = st.NUMBER_OF_LAPS_TOTAL;
-    s.ember_power = 0;
-    if (covenant) {
-        const cfg = rec.get(rec.get(init, "spellConfigs"), "Ember Covenant Blessing");
-        if (cfg == .null) return error.MissingSpellConfig;
-        s.ember_laps = rec.num(rec.get(cfg, "laps"));
-        s.ember_power = rec.num(rec.get(cfg, "power"));
-    }
+    try loadScopeFlags(&s, init);
     // Grid: stamp the terrain, register each unit's placement cells, then build the threat boards from them.
     for (0..st.GRID) |x| {
         for (0..st.GRID) |y| s.grid.board[x][y] = st.EMPTY;

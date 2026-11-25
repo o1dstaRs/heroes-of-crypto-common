@@ -6,11 +6,24 @@
  * The field lists are the ones src/simulation/battle_snapshot.ts captures for search rollouts, and the same
  * fail-closed coverage check applies: an object with a field these lists don't classify throws, so new
  * TypeScript state can't silently go missing from the export.
+ *
+ * Besides the raw fields, the export carries what the Zig loader (zig/src/snapshot.zig) would otherwise have to
+ * recompute from TypeScript code it does not port: each unit's name and creature id, the configs the engine reads by
+ * name (the abilities and aura effects on the board, Poison, Break, the Ember Covenant spell; the same shape as a
+ * recording's start state), and each team's synergy values (FightProperties' getAdditional*PerTeam and
+ * getBreakChancePerTeam) with the laps till narrowing. The format is documented in zig/BRIDGE.md.
  */
 
 import Denque from "denque";
 
 import { captureAITargetMemory } from "../../src/ai/ai";
+import { creatureIdForName } from "../../src/ai/setup/creature_score";
+import {
+    getAbilityConfig,
+    getAuraEffectConfig,
+    getEffectConfig,
+    getSpellConfig,
+} from "../../src/configuration/config_provider";
 
 const UNIT_FIELDS = [
     "unitProperties",
@@ -184,8 +197,66 @@ export interface IExportContext {
     attackHandler?: any;
 }
 
+/**
+ * The harness state outside the engine objects that a loop resuming the battle needs: the random stream's state
+ * (mulberry32, as zig/src/rng.zig keeps it), the active unit (runMatch's currentActiveUnitId, "" for none) and the
+ * deterministic UUID counter (lib.ts captureDeterministicRandomState().uuidSequence: the ids of units a rollout
+ * creates; carried by the Zig handle, which creates none).
+ */
+export interface IExportHarness {
+    rng?: number;
+    activeUnitId?: string;
+    uuidSequence?: number;
+}
+
+const plainConfig = (value: unknown): unknown => JSON.parse(JSON.stringify(value ?? null));
+
+/** The configs the engine reads by name, as record.ts writes them into a recording's start state. */
+function engineConfigs(unitsHolder: any): Record<string, Record<string, unknown>> {
+    const abilityConfigs: Record<string, any> = {};
+    const effectConfigs: Record<string, unknown> = {};
+    const auraEffectConfigs: Record<string, unknown> = {};
+    for (const unit of unitsHolder.getAllUnits().values()) {
+        const props = unit.getUnitProperties();
+        for (const name of props.abilities ?? []) {
+            if (name in abilityConfigs) continue;
+            abilityConfigs[name] = plainConfig(getAbilityConfig(name));
+            const effect = abilityConfigs[name]?.effect;
+            if (effect && !(effect in effectConfigs)) effectConfigs[effect] = plainConfig(getEffectConfig(effect));
+        }
+        for (const name of props.aura_effects ?? []) {
+            if (!(name in auraEffectConfigs)) auraEffectConfigs[name] = plainConfig(getAuraEffectConfig(name));
+        }
+    }
+    for (const effect of ["Poison", "Break"]) {
+        if (!(effect in effectConfigs)) effectConfigs[effect] = plainConfig(getEffectConfig(effect));
+    }
+    const spellConfigs = {
+        "Ember Covenant Blessing": plainConfig(getSpellConfig("System", "Ember Covenant Blessing")),
+    };
+    return { abilityConfigs, effectConfigs, auraEffectConfigs, spellConfigs };
+}
+
+/** Each team's synergy values (constant once the setup ran) and the laps till narrowing. */
+function setupValues(fp: any): Record<string, unknown> {
+    const perTeam: Record<string, unknown> = {};
+    for (const team of [2, 1]) {
+        perTeam[team] = {
+            abilityPower: fp.getAdditionalAbilityPowerPerTeam(team),
+            movementSteps: fp.getAdditionalMovementStepsPerTeam(team),
+            flyArmor: fp.getAdditionalFlyArmorPerTeam(team),
+            morale: fp.getAdditionalMoralePerTeam(team),
+            luck: fp.getAdditionalLuckPerTeam(team),
+            supply: fp.getAdditionalSupplyPerTeam(team),
+            auraRange: fp.getAdditionalAuraRangePerTeam(team),
+            breakChance: fp.getBreakChancePerTeam(team),
+        };
+    }
+    return { lapsTillNarrowing: fp.getNumberOfLapsTillNarrowing(), perTeam };
+}
+
 /** The full mutable battle state as plain JSON (see the module comment). */
-export function exportBattleState(ctx: IExportContext): Record<string, unknown> {
+export function exportBattleState(ctx: IExportContext, harness?: IExportHarness): Record<string, unknown> {
     const { unitsHolder, grid, fightProperties } = ctx;
     assertCoverage("Grid", grid, GRID_FIELDS, GRID_SHARED);
     assertCoverage("FightProperties", fightProperties, FIGHT_FIELDS, []);
@@ -195,6 +266,8 @@ export function exportBattleState(ctx: IExportContext): Record<string, unknown> 
         assertCoverage("Unit", unit, UNIT_FIELDS, UNIT_SHARED);
         units.push({
             id,
+            name: unit.getName(),
+            creatureId: creatureIdForName(unit.getName()) ?? 0,
             team: unit.teamType,
             unitType: unit.unitType,
             summoned: unit.summoned,
@@ -203,12 +276,23 @@ export function exportBattleState(ctx: IExportContext): Record<string, unknown> 
     }
     const damage = ctx.attackHandler?.damageStatisticHolder?.get?.() ?? [];
     return {
-        version: 1,
+        version: 2,
         units,
         grid: capture(grid, GRID_FIELDS, "grid"),
         fight: capture(fightProperties, FIGHT_FIELDS, "fight"),
         holder: capture(unitsHolder, HOLDER_FIELDS, "holder"),
         aiTargetMemory: [...captureAITargetMemory(unitsHolder).entries()],
         damageStatLaps: [...new Set(damage.map((d: { lap: number }) => d.lap))].sort((a: any, b: any) => a - b),
+        configs: engineConfigs(unitsHolder),
+        setup: setupValues(fightProperties),
+        ...(harness
+            ? {
+                  harness: {
+                      rng: harness.rng ?? null,
+                      activeUnitId: harness.activeUnitId ?? "",
+                      uuidSequence: harness.uuidSequence ?? null,
+                  },
+              }
+            : {}),
     };
 }

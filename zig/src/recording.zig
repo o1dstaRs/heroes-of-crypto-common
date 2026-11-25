@@ -218,6 +218,12 @@ pub fn parseGame(arena: std.mem.Allocator, line: []const u8, keep_digests: bool)
     parse_seed = -1;
     parse_step = 0;
     const root = try std.json.parseFromSliceLeaky(std.json.Value, arena, line, .{});
+    return parseGameValue(arena, root, keep_digests);
+}
+
+/// parseGame on an already parsed line (callers that also read other keys of the game, e.g. `resume`).
+pub fn parseGameValue(arena: std.mem.Allocator, root: std.json.Value, keep_digests: bool) !Game {
+    parse_step = 0;
     parse_seed = int(get(root, "seed"));
     const init = get(root, "init");
     const units = get(init, "units").array.items;

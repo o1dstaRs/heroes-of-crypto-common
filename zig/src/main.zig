@@ -1,6 +1,10 @@
 //! hoc-sim: the Zig engine spike.
 //!
 //!   hoc-sim parity <recording.jsonl> [--max-fail N]   replay every step and compare with the TypeScript digests
+//!   hoc-sim native <recording.jsonl> [--max-fail N]   play every battle natively and compare every step
+//!   hoc-sim resume <recording.jsonl> [--max-fail N]   load each embedded mid-battle export, then replay and play
+//!                                                     natively from there (RECORD_RESUME recordings)
+//!   hoc-sim play-state <state.json> [--max-laps N]    play an exported battle out natively; prints the result
 //!   hoc-sim bench  <recording.jsonl> [--reps N] [--threads N]   time the replay of the same steps
 
 const std = @import("std");
@@ -10,6 +14,9 @@ const engine = @import("engine.zig");
 const compare = @import("compare.zig");
 const pathing = @import("path.zig");
 const ai = @import("ai.zig");
+const snapshot = @import("snapshot.zig");
+const rollout = @import("rollout.zig");
+const digest = @import("digest.zig");
 
 fn readAll(alloc: std.mem.Allocator, path: []const u8) ![]u8 {
     return std.fs.cwd().readFileAlloc(alloc, path, 1 << 34);
@@ -330,6 +337,219 @@ fn native(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
     return games_ok == games;
 }
 
+/// Per-mode tallies of `hoc-sim resume`.
+const ResumeTally = struct {
+    points: usize = 0,
+    ok: usize = 0,
+    steps_ok: usize = 0,
+    steps_total: usize = 0,
+    fails: usize = 0,
+};
+
+/// One resume point of a recording (record.ts RECORD_RESUME): replays the remaining engine steps (`native` false) or
+/// plays natively from the snapshot (`native` true), checking every remaining step. Returns the failure, if any.
+fn resumeOne(game: *const rec.Game, start: *const st.State, k: usize, native_mode: bool, tally: *ResumeTally, max_fail: usize) void {
+    const label = if (native_mode) "native" else "replay";
+    var s = start.*;
+    tally.points += 1;
+    tally.steps_total += game.steps.len - k;
+    if (native_mode) {
+        var check = compare.NativeCheck{ .game = game, .ids = game.ids, .next = k };
+        const end = ai.continueMatchWith(&s, 60, .{ .ctx = &check, .step = compare.NativeCheck.step }, ai.decideTurn);
+        if (check.failed == null and check.next != game.steps.len) check.failed = "zig stopped early";
+        tally.steps_ok += check.next - k;
+        if (check.failed) |why| {
+            tally.fails += 1;
+            if (tally.fails <= max_fail) {
+                std.debug.print("seed {d} resume@{d} {s} step {d}/{d}: {s} (end {s})\n", .{ game.seed, k, label, check.next, game.steps.len, why, @tagName(end) });
+                if (check.next < game.steps.len) std.debug.print("    ts  {any}\n", .{game.steps[check.next].action});
+                std.debug.print("    zig {any}\n", .{check.zig_action});
+            }
+            return;
+        }
+        tally.ok += 1;
+        return;
+    }
+    var events: engine.Events = .{};
+    for (game.steps[k..], k..) |step, i| {
+        if (step.action == .decide) {
+            s.rng.state = step.r1;
+            tally.steps_ok += 1;
+            continue;
+        }
+        s.rng.state = step.r0;
+        events.len = 0;
+        const ok = engine.apply(&s, step.action, &events);
+        var m: compare.Mismatch = .{};
+        var why: ?[]const u8 = null;
+        if (ok != step.ok) {
+            why = "accepted/rejected differs";
+        } else if (s.rng.state != step.r1) {
+            why = "random stream differs";
+        } else if (!compare.eventsMatch(events.slice(), step.events)) {
+            why = "events differ";
+        } else if (!compare.state(&s, game.ids, step.digest.?, &m)) {
+            why = m.text();
+        }
+        if (why) |reason| {
+            tally.fails += 1;
+            if (tally.fails <= max_fail) {
+                std.debug.print("seed {d} resume@{d} {s} step {d}/{d} {s}: {s}\n", .{ game.seed, k, label, i, game.steps.len, describe(step.action), reason });
+                std.debug.print("    action {any}\n", .{step.action});
+            }
+            return;
+        }
+        tally.steps_ok += 1;
+    }
+    tally.ok += 1;
+}
+
+/// `hoc-sim resume`: for every resume point of a RECORD_RESUME recording, loads the embedded mid-battle export
+/// (snapshot.zig), checks it against the recorded digest of the step before, then (a) replays the remaining recorded
+/// engine steps and (b) plays natively from there, comparing every remaining step as `parity` and `native` do.
+fn resumeCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
+    const buf = try readAll(gpa, file);
+    defer gpa.free(buf);
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    var games: usize = 0;
+    var games_without: usize = 0;
+    var unparseable: usize = 0;
+    var unsupported: usize = 0;
+    var load_fail: usize = 0;
+    var loaded: usize = 0;
+    // Where the points fall in their battles: thirds of the step count.
+    var thirds = [3]usize{ 0, 0, 0 };
+    var reasons = std.StringHashMap(usize).init(gpa);
+    defer {
+        var it = reasons.keyIterator();
+        while (it.next()) |k| gpa.free(k.*);
+        reasons.deinit();
+    }
+    var replay: ResumeTally = .{};
+    var native_tally: ResumeTally = .{};
+    var load_ns: u64 = 0;
+    var lines = rec.lines(buf);
+    while (lines.next()) |line| {
+        _ = arena_state.reset(.retain_capacity);
+        const arena = arena_state.allocator();
+        games += 1;
+        const root = std.json.parseFromSliceLeaky(std.json.Value, arena, line, .{}) catch |err| {
+            unparseable += 1;
+            if (unparseable <= max_fail) std.debug.print("game {d}: bad JSON ({s})\n", .{ games, @errorName(err) });
+            continue;
+        };
+        const points = rec.get(root, "resume");
+        const game = rec.parseGameValue(arena, root, true) catch |err| {
+            unparseable += 1;
+            if (unparseable <= max_fail) reportUnparseable(err);
+            // The steps are outside the port, but the loader can still say what it refuses in the exports.
+            if (points == .array) {
+                const units = rec.get(rec.get(root, "init"), "units");
+                if (units != .array) continue;
+                const ids = try arena.alloc([]const u8, units.array.items.len);
+                for (units.array.items, 0..) |u, i| ids[i] = rec.get(u, "id").string;
+                for (points.array.items) |p| {
+                    var why: snapshot.Why = .{};
+                    _ = snapshot.load(rec.get(p, "state"), ids, .{}, &why) catch |lerr| {
+                        if (lerr != error.UnsupportedState) continue;
+                        unsupported += 1;
+                        const gop = try reasons.getOrPut(why.text());
+                        if (!gop.found_existing) {
+                            gop.key_ptr.* = try gpa.dupe(u8, why.text());
+                            gop.value_ptr.* = 0;
+                        }
+                        gop.value_ptr.* += 1;
+                    };
+                }
+            }
+            continue;
+        };
+        if (points != .array or points.array.items.len == 0) {
+            games_without += 1;
+            continue;
+        }
+        for (points.array.items) |p| {
+            const k: usize = @intCast(rec.int(rec.get(p, "step")));
+            if (k == 0 or k >= game.steps.len or game.steps[k].action != .decide) {
+                load_fail += 1;
+                if (load_fail <= max_fail) std.debug.print("seed {d}: resume step {d} is not a decision\n", .{ game.seed, k });
+                continue;
+            }
+            var why: snapshot.Why = .{};
+            var timer = try std.time.Timer.start();
+            const s = snapshot.load(rec.get(p, "state"), game.ids, .{
+                .rng = @intCast(rec.int(rec.get(p, "rng"))),
+                .active = rec.get(p, "unitId").string,
+            }, &why) catch |err| {
+                if (err == error.UnsupportedState) {
+                    unsupported += 1;
+                    const gop = try reasons.getOrPut(why.text());
+                    if (!gop.found_existing) {
+                        gop.key_ptr.* = try gpa.dupe(u8, why.text());
+                        gop.value_ptr.* = 0;
+                    }
+                    gop.value_ptr.* += 1;
+                    if (unsupported <= max_fail) std.debug.print("seed {d} resume@{d}: unsupported state ({s})\n", .{ game.seed, k, why.text() });
+                } else {
+                    load_fail += 1;
+                    if (load_fail <= max_fail) std.debug.print("seed {d} resume@{d}: {s} ({s})\n", .{ game.seed, k, @errorName(err), why.text() });
+                }
+                continue;
+            };
+            load_ns += timer.read();
+            // The snapshot is the state after the step before the decision.
+            var m: compare.Mismatch = .{};
+            const r0_ok = s.rng.state == game.steps[k].r0 and s.active == game.steps[k].action.decide.unit;
+            if (!r0_ok or (game.steps[k - 1].digest != null and !compare.state(&s, game.ids, game.steps[k - 1].digest.?, &m))) {
+                load_fail += 1;
+                if (load_fail <= max_fail) std.debug.print("seed {d} resume@{d}: loaded state differs from the recorded digest: {s}\n", .{ game.seed, k, if (r0_ok) m.text() else "random state or active unit" });
+                continue;
+            }
+            loaded += 1;
+            thirds[@min(2, k * 3 / game.steps.len)] += 1;
+            resumeOne(&game, &s, k, false, &replay, max_fail);
+            resumeOne(&game, &s, k, true, &native_tally, max_fail);
+        }
+    }
+    std.debug.print("resume: {d} games ({d} without a resume point, {d} unparseable); {d} points loaded and identical to the recorded digest, {d} unsupported, {d} failed to load\n", .{ games, games_without, unparseable, loaded, unsupported, load_fail });
+    std.debug.print("  points by battle third: early {d}, mid {d}, late {d}; load {d:.1} us per snapshot\n", .{ thirds[0], thirds[1], thirds[2], if (loaded > 0) @as(f64, @floatFromInt(load_ns)) / @as(f64, @floatFromInt(loaded)) / 1000 else 0 });
+    for ([_]struct { []const u8, *const ResumeTally }{ .{ "replay", &replay }, .{ "native", &native_tally } }) |t| {
+        std.debug.print("  {s}: {d}/{d} resumed battles identical, {d}/{d} remaining steps before the first divergence\n", .{ t[0], t[1].ok, t[1].points, t[1].steps_ok, t[1].steps_total });
+    }
+    var it = reasons.iterator();
+    while (it.next()) |e| std.debug.print("  unsupported: {s}: {d}\n", .{ e.key_ptr.*, e.value_ptr.* });
+    return load_fail == 0 and unparseable == 0 and replay.fails == 0 and native_tally.fails == 0;
+}
+
+/// `hoc-sim play-state`: loads one exported battle (state_export.ts, with its `harness` block), plays it out with v0.1
+/// on both seats, and prints `{"result": {...}, "digest": {...}}` (rollout.PlayResult, digest.zig) on stdout.
+fn playState(gpa: std.mem.Allocator, file: []const u8, max_laps: i32) !bool {
+    const buf = try readAll(gpa, file);
+    defer gpa.free(buf);
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const root = try std.json.parseFromSliceLeaky(std.json.Value, arena, buf, .{});
+    var why: snapshot.Why = .{};
+    const ids = snapshot.unitIds(arena, root, &why) catch |err| {
+        std.debug.print("state not loaded: {s} ({s})\n", .{ @errorName(err), why.text() });
+        return false;
+    };
+    var s = snapshot.load(root, ids, .{}, &why) catch |err| {
+        std.debug.print("state not loaded: {s} ({s})\n", .{ @errorName(err), why.text() });
+        return false;
+    };
+    const r = rollout.play(&s, max_laps, ai.decideTurn);
+    var out: std.Io.Writer.Allocating = .init(gpa);
+    defer out.deinit();
+    try out.writer.print("{{\"result\":{{\"end\":{d},\"winner\":{d},\"lap\":{d},\"steps\":{d},\"decisions\":{d},\"rng\":{d}}},\"digest\":", .{ r.end, r.winner, r.lap, r.steps, r.decisions, r.rng });
+    try digest.write(&out.writer, &s, ids);
+    try out.writer.writeAll("}\n");
+    try std.fs.File.stdout().writeAll(out.written());
+    return true;
+}
+
 fn nativeBenchWorker(inits: []const st.State, r0s: []const u32, reps: usize, out_games: *u64, out_check: *u64) void {
     var n: u64 = 0;
     var check: u64 = 0;
@@ -391,7 +611,7 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(gpa);
     defer std.process.argsFree(gpa, args);
     if (args.len < 3) {
-        std.debug.print("usage: hoc-sim (parity|bench) <recording.jsonl> [--max-fail N] [--reps N] [--threads N]\n", .{});
+        std.debug.print("usage: hoc-sim (parity|native|resume|bench|native-bench|paths) <recording.jsonl> [--max-fail N] [--reps N] [--threads N]\n       hoc-sim play-state <state.json> [--max-laps N]\n", .{});
         std.process.exit(2);
     }
     const cmd = args[1];
@@ -403,6 +623,10 @@ pub fn main() !void {
         try @import("v08/main.zig").run(gpa, args[2..]);
     } else if (std.mem.eql(u8, cmd, "native")) {
         if (!try native(gpa, path_arg, argValue(args, "--max-fail", 10))) std.process.exit(1);
+    } else if (std.mem.eql(u8, cmd, "resume")) {
+        if (!try resumeCheck(gpa, path_arg, argValue(args, "--max-fail", 10))) std.process.exit(1);
+    } else if (std.mem.eql(u8, cmd, "play-state")) {
+        if (!try playState(gpa, path_arg, @intCast(argValue(args, "--max-laps", 60)))) std.process.exit(1);
     } else if (std.mem.eql(u8, cmd, "native-bench")) {
         try nativeBench(gpa, path_arg, argValue(args, "--reps", 5), argValue(args, "--threads", 1));
     } else if (std.mem.eql(u8, cmd, "paths")) {
