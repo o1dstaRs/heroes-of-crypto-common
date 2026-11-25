@@ -21,8 +21,8 @@ import * as EffectHelper from "../effects/effect_helper";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 /**
- * Hamstring (Dryad): on a landed attack, a stack-powered chance to apply "Hamstrung" (-30% movement, like
- * Quagmire but stronger). The chance comes from the shared stack+luck formula (calculateAbilityApplyChance):
+ * Hamstring (Dryad): on a landed attack, a stack-powered chance to apply "Hamstrung": the flyer cannot fly and
+ * walks (Unit.isGrounded), with -30% movement, like Quagmire but stronger. The chance comes from the shared stack+luck formula (calculateAbilityApplyChance):
  * power/MAX_UNIT_STACK_POWER * stackPower + luck + synergy, i.e. 8/16/24/32/40 by stack tier (+ luck), a
  * default of 40% at full stack. Absorbable (Absorb Penalties), resistible by magic resist, and mirrored.
  */
@@ -44,9 +44,10 @@ export function processHamstringAbility(
         targetUnit = absorptionTarget;
     }
 
-    // Hamstring only cuts the wings of a FLYING enemy — grounding/slowing it. Ground units (and a
-    // ground unit that absorbed the penalty) are never Hamstrung. Checked on the final recipient.
-    if (!targetUnit.canFly()) {
+    // Hamstring only cuts the wings of a FLYING creature — grounding and slowing it. Ground units (and a
+    // ground unit that absorbed the penalty) are never Hamstrung. Checked on the final recipient. A flyer
+    // already grounded by Gravebound still has wings to cut, so this reads the creature, not canFly().
+    if (!targetUnit.isFlyingCreature()) {
         return;
     }
 

@@ -87,6 +87,14 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 // getPhysicalAoeDamageMultiplier): a flat -50, so with no other status resist they take ~50% more.
 const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
 
+/** Debuffs that pin a flying creature to the ground: it walks until they wear off (owner ruling, 2026-11-25). */
+export const GROUNDING_DEBUFFS: readonly string[] = ["Gravebound", "Hamstrung"];
+
+/** The display-list form of {@link Unit.isGrounded}, for UI that holds only a unit's properties. */
+export function isGroundedByDebuffNames(appliedDebuffs: readonly string[] | undefined): boolean {
+    return !!appliedDebuffs && GROUNDING_DEBUFFS.some((name) => appliedDebuffs.includes(name));
+}
+
 // Shot range a natively-melee unit gains when it holds a stolen Endless Quiver (Predatory
 // Assimilation): the quiver's native owner's (Medusa's) shot_distance from creatures.json. Applied in
 // adjustBaseStats only while the initial shot_distance is 0, so natural shooters keep their own range.
@@ -194,6 +202,10 @@ export interface IUnitPropertiesProvider {
     getMovementType(): MovementType;
 
     canFly(): boolean;
+
+    isFlyingCreature(): boolean;
+
+    isGrounded(): boolean;
 
     getExp(): number;
 
@@ -1626,7 +1638,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const properties = buffDescriptionSuffix(this.unitProperties.applied_buffs_descriptions[index]);
         const laps = Number(secondBuffProperty(properties)) || ARTIFACT_POWER.GRAVECHAIN_SLOW_LAPS;
         this.unitProperties.applied_buffs_descriptions[index] =
-            `Artifact. Attacks have a ${this.getGravechainChance()}% chance per enemy to inflict Gravebound, chaining through connected enemies up to ${ARTIFACT_POWER.GRAVECHAIN_CONNECTIONS} links away: −25% movement for ${laps} laps. Failed rolls do not stop the chain.;${properties}`;
+            `Artifact. Attacks have a ${this.getGravechainChance()}% chance per enemy to inflict Gravebound, chaining through connected enemies up to ${ARTIFACT_POWER.GRAVECHAIN_CONNECTIONS} links away: −25% movement for ${laps} laps, and a flying unit cannot fly and walks. Failed rolls do not stop the chain.;${properties}`;
     }
     public projectRangeShotsAfterVolleys(target?: Unit, volleys = 1): number {
         const cost = projectShotCost(this, target) * Math.max(0, volleys);
@@ -1704,11 +1716,30 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public getCanCastSpells(): boolean {
         return this.unitProperties.can_cast_spells;
     }
+    /** How the unit moves right now: a grounded flyer walks. The creature's own type is isFlyingCreature(). */
     public getMovementType(): MovementType {
-        return this.unitProperties.movement_type;
+        return this.isGrounded() ? PBTypes.MovementVals.WALK : this.unitProperties.movement_type;
     }
+    /**
+     * Whether the unit flies right now: path finding, terrain, Fire Wall, Web and the flyer/walker auras read
+     * this. Gravebound or Hamstrung grounds a flying creature, which then moves and counts as a walker.
+     */
     public canFly(): boolean {
+        return this.isFlyingCreature() && !this.isGrounded();
+    }
+    /**
+     * The creature flies by nature, grounded or not. What it holds for being a flyer reads this: its
+     * artifact (Winged Boots, not Swift Boots), Nature's flyer armor, and Hamstring's choice of target.
+     */
+    public isFlyingCreature(): boolean {
         return this.unitProperties.movement_type === PBTypes.MovementVals.FLY;
+    }
+    /**
+     * A flying creature under Gravebound or Hamstrung cannot fly and walks. hasStatusApplied keeps this
+     * identical on a ranked client, which holds the server's debuffs only as display names.
+     */
+    public isGrounded(): boolean {
+        return this.isFlyingCreature() && GROUNDING_DEBUFFS.some((name) => this.hasStatusApplied(name));
     }
     // Whether lava is passable AND standable for this unit: either it is innately Made of Fire, or its
     // army carries the Lava Striders artifact ("may move over and stand in lava"). Used as the
@@ -3915,7 +3946,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.armor_mod =
             shatterArmorEffectPower > 0 ? -shatterArmorEffectPower : this.initialUnitProperties.armor_mod;
         let armorModMultiplier = 0;
-        if (this.getMovementType() === PBTypes.MovementVals.FLY && synergyFlyArmorIncrease > 0) {
+        // A creature bonus: a grounded flyer keeps it.
+        if (this.isFlyingCreature() && synergyFlyArmorIncrease > 0) {
             armorModMultiplier = synergyFlyArmorIncrease / 100;
         }
         const spiritualArmorBuff = statBuffs.get("Spiritual Armor");

@@ -543,7 +543,9 @@ export class UnitsHolder {
             const tier1 = fightProperties.getArtifactTier1(team);
             const tier2 = fightProperties.getArtifactTier2(team);
             const isRange = unit.getAttackType() === PBTypes.AttackVals.RANGE;
-            const isFlyer = unit.canFly();
+            // The creature's nature, not its state: a flyer grounded by Gravebound or Hamstrung keeps Winged Boots
+            // and never picks up Swift Boots, since this recomputes on every refresh.
+            const isFlyer = unit.isFlyingCreature();
             // Swift Boots' "melee units": plain melee and melee-magic walkers (Troll, Battle Mage, Ogre Mage, Behemoth).
             const isMelee =
                 (unit.getAttackType() === PBTypes.AttackVals.MELEE ||
@@ -800,7 +802,7 @@ export class UnitsHolder {
                 case Tier2Artifact.GRAVECHAIN:
                     applyDualArtifact(
                         "Gravechain",
-                        `Artifact. Attacks have a {}% chance per enemy to inflict Gravebound, chaining through connected enemies up to ${AP.GRAVECHAIN_CONNECTIONS} links away: −25% movement for ${AP.GRAVECHAIN_SLOW_LAPS} laps. Failed rolls do not stop the chain.`,
+                        `Artifact. Attacks have a {}% chance per enemy to inflict Gravebound, chaining through connected enemies up to ${AP.GRAVECHAIN_CONNECTIONS} links away: −25% movement for ${AP.GRAVECHAIN_SLOW_LAPS} laps, and a flying unit cannot fly and walks. Failed rolls do not stop the chain.`,
                         "Cursed: −{} movement step for every unit in the army.",
                         AP.GRAVECHAIN_CHANCE,
                         AP.GRAVECHAIN_SLOW_LAPS,

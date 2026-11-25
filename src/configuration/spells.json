@@ -1083,7 +1083,7 @@
             "name": "Gravechain",
             "level": 0,
             "desc": [
-                "Artifact. Attacks have a {}% chance per enemy to inflict Gravebound, chaining through connected enemies up to 3 links away: −25% movement for [] laps. Failed rolls do not stop the chain.",
+                "Artifact. Attacks have a {}% chance per enemy to inflict Gravebound, chaining through connected enemies up to 3 links away: −25% movement for [] laps, and a flying unit cannot fly and walks. Failed rolls do not stop the chain.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",
@@ -1791,7 +1791,11 @@
         "Gravebound": {
             "name": "Gravebound",
             "level": 1,
-            "desc": ["Spectral chains reduce the unit's movement range by 25%.", "Lasts 3 laps."],
+            "desc": [
+                "Spectral chains reduce the unit's movement range by 25%.",
+                "A flying unit cannot fly and walks.",
+                "Lasts 3 laps."
+            ],
             "target": "ANY_ENEMY",
             "power": 25,
             "power_type": "COMMON",
@@ -1809,7 +1813,7 @@
         "Hamstrung": {
             "name": "Hamstrung",
             "level": 1,
-            "desc": ["A flying unit's movement range is reduced by 30%.", "Lasts 3 laps."],
+            "desc": ["A flying unit cannot fly and walks, its movement range reduced by 30%.", "Lasts 3 laps."],
             "target": "ANY_ENEMY",
             "power": 30,
             "power_type": "COMMON",

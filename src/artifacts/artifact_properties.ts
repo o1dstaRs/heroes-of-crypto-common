@@ -447,7 +447,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "gravechain",
         "Gravechain",
         "Gravechain",
-        "Cursed: attacks have a {}% chance per enemy to inflict Gravebound on the target and connected enemies up to <> links away, reducing movement by 25% for [] laps. Failed rolls do not stop the chain. Every unit in your army loses {} movement step.",
+        "Cursed: attacks have a {}% chance per enemy to inflict Gravebound on the target and connected enemies up to <> links away, reducing movement by 25% for [] laps; a flying unit cannot fly and walks. Failed rolls do not stop the chain. Every unit in your army loses {} movement step.",
     ),
     [Tier2Artifact.AEGIS_OF_THE_ARCANE]: t2(
         Tier2Artifact.AEGIS_OF_THE_ARCANE,

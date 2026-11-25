@@ -645,7 +645,9 @@
     "Hamstring": {
         "name": "Hamstring",
         "type": "STATUS",
-        "desc": ["On attack, {}% chance to reduce a flying enemy's movement range by 30% (Hamstrung) for 3 laps"],
+        "desc": [
+            "On attack, {}% chance to Hamstring a flying enemy for 3 laps: it cannot fly and walks, its movement range reduced by 30%"
+        ],
         "power": 40,
         "power_type": "HAMSTRING",
         "skip_reponse": false,
