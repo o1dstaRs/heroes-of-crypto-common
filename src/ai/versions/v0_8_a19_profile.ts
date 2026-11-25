@@ -178,8 +178,15 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     (ai/setup/a19_closing_pick.ts, applied by the server's draft decider before the Queen counter). Registered
  *     confirmation CPC: +5.99 points (95% +0.52 to +11.33) on the six human setups where it changes the pick; AI vs AI
  *     +7.23 per changed draft (95% +0.59 to +14.01) (docs/closing_pick_adoption.md).
+ *   - Split screen (profile v35) adopted on 2026-11-25 at the owner's request ("premium for some reason always decides
+ *     to split ranges instead of melee ... wolf is much better to split to cover, as it is 1x2 unit"; owner decision
+ *     "AI seats + Premium, after a check"): the split plan reserves no shooter cover split, lets 1x2/2x1 stacks split,
+ *     and spends every slot left after the aura/support/shield splits on one-model screen splits of the cheapest body
+ *     (ai/split_screen.ts, ai/tactical_split_placement.ts; the server's split plan for AI seats and Premium "Arrange
+ *     army"). A non-inferiority check, registered confirmation OA: +0.87 points (95% −0.15 to +1.88)
+ *     (docs/owner_asks_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v34" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v35" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -488,6 +495,19 @@ export const V08_A19_CLOSING_PICK_POLICY = Object.freeze({
 } as const);
 
 /**
+ * Split screen (profile v35): ai/split_screen.ts switches ai/tactical_split_placement.ts's screen mode for the
+ * server's split plan (AI seats and Premium "Arrange army") and the client's Premium projection. See
+ * docs/owner_asks_adoption.md.
+ */
+export const V08_A19_SPLIT_SCREEN_POLICY = Object.freeze({
+    policyId: "a19-split-screen-v1" as const,
+    adoptedAt: "2026-11-25",
+    adoption: "owner-request",
+    registrationSha256: "01fdd229c2e6ac7a8d4ea3d99f0dd13c20e60991dc8c71401fa63f24e86b89e4",
+    qualification: "non-inferiority-confirmed",
+} as const);
+
+/**
  * Deep fit at 4,000 rollout turns (profile v29): V08_A19_DEEP_FIT.rolloutTurnBudget in simulation/v0_8_a19_deep_fit.ts,
  * the same a19-deep-fit-v1 driver and deadline. See docs/deep_fit_4000_adoption.md.
  */
@@ -598,17 +618,17 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "unit-support-setup" as const,
         source: "src/ai/support_setup.ts" as const,
-        sha256: "540fd13ca8861af1442f136d75e3236caaa488fad2e406af03c205fd0605e622" as const,
+        sha256: "c072fd7e5165863573d2e807401477593039fba85a9b6c00b8ae76f18f06e1a0" as const,
     }),
     Object.freeze({
         role: "healer-support-setup" as const,
         source: "src/ai/healer_support_setup.ts" as const,
-        sha256: "052d847e336793704059ad9361729b7604eabeed1d9d73708d5a37a0b84bbd18" as const,
+        sha256: "e4abe8065a750f832b4a944f70c2a62770983a889418a06b262c63943add38cf" as const,
     }),
     Object.freeze({
         role: "wandering-mage-support" as const,
         source: "src/ai/wandering_mage_support.ts" as const,
-        sha256: "0487911c030deae457a009180c7131277e9610a01e5d22eb805de28e00bdc923" as const,
+        sha256: "4c6d87f98498388ff7f41fc3a29ce9f0825dea28c62450987c5052d32de98c97" as const,
     }),
     Object.freeze({
         role: "satyr-contact-support" as const,
@@ -902,6 +922,17 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/ai/setup/a19_closing_pick.ts" as const,
         sha256: "4020b15a274a461f6230badf0f907b7758e6a7eaee1f94134c1bc645d8f3a1e4" as const,
     }),
+    Object.freeze({
+        role: "split-screen" as const,
+        source: "src/ai/split_screen.ts" as const,
+        sha256: "e20eff24d373127bf9ee23196354f828814904b0bb0fbdc27974a3e7af0832c0" as const,
+    }),
+    Object.freeze({
+        role: "tactical-split-placement" as const,
+        source: "src/ai/tactical_split_placement.ts" as const,
+        // The split planner; profile v35 adds its screen mode.
+        sha256: "c134ad27c1b607b01d052c2a31a5e01835341614a7839957061cddce65c764c3" as const,
+    }),
 ] as const);
 
 export const V08_A19_PROFILE = Object.freeze({
@@ -949,6 +980,7 @@ export const V08_A19_PROFILE = Object.freeze({
     carrierCohesion: V08_A19_CARRIER_COHESION_POLICY,
     queenCounter: V08_A19_QUEEN_COUNTER_POLICY,
     closingPick: V08_A19_CLOSING_PICK_POLICY,
+    splitScreen: V08_A19_SPLIT_SCREEN_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

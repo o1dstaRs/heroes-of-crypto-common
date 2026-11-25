@@ -1,5 +1,6 @@
 import {
     planTacticalStackSplits,
+    type ITacticalSplitOptions,
     type ITacticalSplitPlan,
     type ITacticalSplitUnit,
     type ITacticalSplitPlacementUnit,
@@ -16,8 +17,9 @@ export function planA19HealerSplits(
     units: readonly ITacticalSplitUnit[],
     maximumStacks: number,
     mode: A19HealerSplitMode,
+    options: ITacticalSplitOptions = {},
 ): A19SupportSplitPlan[] {
-    const incumbent = planTacticalStackSplits(units, maximumStacks);
+    const incumbent = planTacticalStackSplits(units, maximumStacks, options);
     const living = units.filter((unit) => unit.amount > 0);
     const healers = living.filter((unit) => unit.identity === "Healer:2");
     const healer = healers[0];

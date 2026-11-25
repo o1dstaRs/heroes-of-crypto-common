@@ -1,4 +1,8 @@
-import { planTacticalStackSplits, type ITacticalSplitUnit } from "./tactical_split_placement";
+import {
+    planTacticalStackSplits,
+    type ITacticalSplitOptions,
+    type ITacticalSplitUnit,
+} from "./tactical_split_placement";
 import { planA19HealerSplits, type A19HealerSplitMode, type A19SupportSplitPlan } from "./healer_support_setup";
 import { planA19WanderingMageSplits } from "./wandering_mage_support";
 import { creatureIdForName, creatureInfo } from "./setup/creature_score";
@@ -42,9 +46,10 @@ export function chooseA19HealerSplitMode(
 export function planA19SupportSplits(
     units: readonly ITacticalSplitUnit[],
     maximumStacks: number,
+    options: ITacticalSplitOptions = {},
 ): A19SupportSplitPlan[] {
     const living = units.filter((unit) => unit.amount > 0);
-    const incumbent = planA19WanderingMageSplits(units, maximumStacks);
+    const incumbent = planA19WanderingMageSplits(units, maximumStacks, options);
     const healer = living.filter((unit) => unit.identity === "Healer:2");
     if (
         healer.length !== 1 ||
@@ -61,13 +66,13 @@ export function planA19SupportSplits(
     const mage = slots >= 2 ? incumbent.find((plan) => mageIds.has(plan.sourceUnitId)) : undefined;
     const healerSlots = slots - (mage ? 1 : 0);
     const mode = chooseA19HealerSplitMode(units, healerSlots);
-    const healers = planA19HealerSplits(units, maximumStacks, mode)
+    const healers = planA19HealerSplits(units, maximumStacks, mode, options)
         .filter((plan) => plan.sourceUnitId === healer[0].id)
         .slice(0, healerSlots);
     const selected: A19SupportSplitPlan[] = [...healers, ...(mage ? [mage] : [])];
     const selectedIds = new Set(selected.map((plan) => plan.sourceUnitId));
     return selected.concat(
-        planTacticalStackSplits(units, maximumStacks)
+        planTacticalStackSplits(units, maximumStacks, options)
             .filter((plan) => !selectedIds.has(plan.sourceUnitId))
             .slice(0, Math.max(0, slots - selected.length)),
     );

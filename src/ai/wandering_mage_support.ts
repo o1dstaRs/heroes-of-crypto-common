@@ -1,6 +1,7 @@
 /** User-adopted Mage support composition. Original research checkpoints remain immutable. */
 import {
     planTacticalStackSplits,
+    type ITacticalSplitOptions,
     type ITacticalSplitPlan,
     type ITacticalSplitUnit,
     type ITacticalSplitPlacementUnit,
@@ -23,8 +24,9 @@ export const A19_WANDERING_MAGE_SUPPORT_POLICY = Object.freeze({
 export function planA19WanderingMageSplits(
     units: readonly ITacticalSplitUnit[],
     maximumStacks: number,
+    options: ITacticalSplitOptions = {},
 ): ITacticalSplitPlan[] {
-    const incumbent = planTacticalStackSplits(units, maximumStacks);
+    const incumbent = planTacticalStackSplits(units, maximumStacks, options);
     const living = units.filter((unit) => unit.amount > 0);
     const mages = living.filter((unit) => unit.identity === "Wandering Mage:1");
     const mage = mages[0];

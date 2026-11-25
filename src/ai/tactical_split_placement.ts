@@ -33,6 +33,18 @@ export interface ITacticalSplitUnit {
     readonly supportSpellCount: number;
     readonly waterShieldUtilityCount: number;
     readonly rangedCoverCount: number;
+    /** Footprint cells (1 for 1x1, 2 for 1x2/2x1, 4 for 2x2); absent = from `small`. Read by screen splits only. */
+    readonly footprintCells?: number;
+}
+
+/**
+ * a19-split-screen-v1 (profile v35, `split_screen.ts`; the owner: "premium for some reason always decides to split ranges
+ * instead of melee ... wolf is much better to split to cover, as it is 1x2 unit"). With `screen`, 1x2/2x1 stacks are
+ * split sources, no shooter "cover" split is reserved, and every slot left after the aura/support/shield splits becomes
+ * a one-model screen split of the best cheap body (lowest level, rectangle first, melee before shooter, largest stack).
+ */
+export interface ITacticalSplitOptions {
+    readonly screen?: boolean;
 }
 
 export interface ITacticalSplitPlan {
@@ -80,6 +92,8 @@ export interface ITacticalSplitUnitSource {
     getAttackType(): number;
     getSteps(): number;
     getMaxHp(): number;
+    getFootprintWidth?(): number;
+    getFootprintHeight?(): number;
     getAbilities(): readonly { getAuraEffectName(): string | undefined; getName(): string }[];
     getSpells(): readonly {
         isRemaining(): boolean;
@@ -121,7 +135,10 @@ const compareCover = (left: ITacticalSplitUnit, right: ITacticalSplitUnit): numb
 export function planTacticalStackSplits(
     units: readonly ITacticalSplitUnit[],
     maximumStacks: number,
+    options: ITacticalSplitOptions = {},
 ): ITacticalSplitPlan[] {
+    const screen = options.screen === true;
+    const cellsOf = (unit: ITacticalSplitUnit): number => unit.footprintCells ?? (unit.small ? 1 : 4);
     const living = units.filter((unit) => unit.amount > 0);
     const normalizedMaximum = Math.floor(maximumStacks);
     // Do not fragment an under-filled draft merely because the base rules tolerate six stacks. Only consume
@@ -136,14 +153,16 @@ export function planTacticalStackSplits(
     for (const unit of living) {
         identityCounts.set(unit.identity, (identityCounts.get(unit.identity) ?? 0) + 1);
     }
-    const eligible = living.filter(
-        (unit) =>
-            unit.small &&
-            !unit.summoned &&
-            Number.isSafeInteger(unit.amount) &&
-            unit.amount > 1 &&
-            identityCounts.get(unit.identity) === 1,
-    );
+    const splittable = (unit: ITacticalSplitUnit): boolean =>
+        !unit.summoned &&
+        Number.isSafeInteger(unit.amount) &&
+        unit.amount > 1 &&
+        identityCounts.get(unit.identity) === 1;
+    const eligible = living.filter((unit) => unit.small && splittable(unit));
+    // a19-split-screen-v1: rectangles (1x2/2x1) are screen bodies only; aura/support/shield sources stay 1x1.
+    const screenEligible = screen
+        ? living.filter((unit) => (unit.small || cellsOf(unit) === 2) && splittable(unit))
+        : eligible;
     const splitSources = new Set<string>();
     const plans: ITacticalSplitPlan[] = [];
     const take = (unit: ITacticalSplitUnit, role: TacticalSplitRole): void => {
@@ -160,9 +179,11 @@ export function planTacticalStackSplits(
     const shield = eligible
         .filter((candidate) => candidate.waterShieldUtilityCount > 0 && candidate.auraUtilityCount === 0)
         .sort(compareShield)[0];
-    const cover = eligible
-        .filter((candidate) => candidate.rangedCoverCount > 0 && candidate.auraUtilityCount === 0)
-        .sort(compareCover)[0];
+    const cover = screen
+        ? undefined
+        : eligible
+              .filter((candidate) => candidate.rangedCoverCount > 0 && candidate.auraUtilityCount === 0)
+              .sort(compareCover)[0];
     const reservedUtility: Array<{ unit: ITacticalSplitUnit; role: TacticalSplitRole }> = [];
     for (const [unit, role] of [
         [support, "support"],
@@ -183,6 +204,24 @@ export function planTacticalStackSplits(
 
     for (const { unit, role } of reservedUtility) {
         if (!splitSources.has(unit.id)) take(unit, role);
+    }
+
+    if (screen) {
+        const ranged = (unit: ITacticalSplitUnit): boolean => unit.rangedCoverCount > 0;
+        const body = screenEligible
+            .filter((candidate) => !splitSources.has(candidate.id) && candidate.auraUtilityCount === 0)
+            .sort(
+                (left, right) =>
+                    left.level - right.level ||
+                    cellsOf(right) - cellsOf(left) ||
+                    Number(ranged(left)) - Number(ranged(right)) ||
+                    right.amount - left.amount ||
+                    compareStable(left, right),
+            )[0];
+        if (body) {
+            for (let child = 0; child < body.amount - 1 && slots > 0; child += 1) take(body, "bait");
+        }
+        return plans;
     }
 
     // If room remains, peel at most two cheap/mobile native melee bodies from the single best bait source.
@@ -241,6 +280,9 @@ export function tacticalSplitUnitFromUnit(unit: ITacticalSplitUnitSource): ITact
         supportSpellCount,
         waterShieldUtilityCount: abilities.filter((ability) => ability.getName() === "Water Shield").length,
         rangedCoverCount: Number(attackType === PBTypes.AttackVals.RANGE || attackType === PBTypes.AttackVals.MAGIC),
+        ...(unit.getFootprintWidth && unit.getFootprintHeight
+            ? { footprintCells: unit.getFootprintWidth() * unit.getFootprintHeight() }
+            : {}),
     };
 }
 

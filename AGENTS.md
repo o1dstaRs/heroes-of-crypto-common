@@ -9,18 +9,44 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## The owner's asks — November 25, 2026
+
+The owner asked for three behaviour fixes on November 24, 2026. Each had measured flat in development, so the owner
+chose to check each one first. One registered non-inferiority confirmation, OA, checked all three against one production
+control: the 95% lower bound may not fall below −2 points per game. The rules that passed were adopted on November
+25, 2026. Read `docs/owner_asks_adoption.md`. **The current default is profile v35.**
+
+- **v35, `a19-split-screen-v1`** ("wolf is much better to split to cover, as it is 1x2 unit"; owner decision "AI seats +
+  Premium, after a check"): the split plan reserves no shooter cover split, lets 1x2/2x1 stacks split, and spends every
+  slot left after the aura, support and shield splits on one-model screen splits of the cheapest body
+  (`src/ai/split_screen.ts`, `src/ai/tactical_split_placement.ts`); the server's split plan uses it on the default v0.8
+  planner (production bot seats and Premium "Arrange army") and the client's Premium projection follows (switch
+  `A19_SPLIT_SCREEN_<LEFT|RIGHT>`, on unless `0`). OA: +0.87 points (95% −0.15 to +1.88; mirror +1.54, owner-shaped
+  +0.20, the owner's 10 games +0.94).
+- **Not adopted: `a19-flyer-dive-guard-v1`** (the flyer-dive guard) failed OA gate FD1 (lower bound): −0.91 points (95%
+  −2.00 to +0.15; mirror −1.22, owner-shaped −0.92, the owner's 10 games +0.31). It stays recorded as failed.
+- **Not adopted: `a19-troll-gift-split-v1`** (the Troll gift split) failed OA gate TG2 (populations): +0.99 points (95%
+  −0.11 to +2.11; mirror +0.21, owner-shaped −2.58, the owner's 10 games −1.04, Troll bank mirror +2.53, Troll bank
+  owner-shaped +1.44). It stays recorded as failed.
+
+These are non-inferiority results, not strength gains, and not a win rate against people. The owner population is a
+floor: the AI plays the owner's seat, and it punishes lone arrivals less than the owner does. Keep
+`split_screen.test.ts` passing.
+
+Profile v34 is retained inside v35.
+
 ## Closing pick v2 — November 24, 2026
 
-Under the owner's standing instruction `a19-closing-pick-synergy-v1` is active: **the current default is profile v34**.
-Read `docs/closing_pick_adoption.md`. At the level-4 pick (the seat's last creature pick), while the counter draft's gate is
-shut but the seat sees at least one opposing creature, every offer is scored with the counter draft's matchup model plus a
-synergy bonus (`src/ai/setup/a19_closing_pick.ts`); the best replaces the earlier layers' choice when it is at least 0.05
-better. The server's draft decider applies it before the Queen counter (`queen ?? closing ?? counter ?? matchup`), and
-Premium draft advice follows it. Registered confirmation CPC: +5.99 points (95% +0.52 to +11.33) on the six human setups
-where it changes the pick (two of the six lose: the gain is an average); AI vs AI +7.23 per changed draft (95% +0.59 to
-+14.01; 5.65% of drafts change). Replicated on the real games' terrain (registered CPC-R; CPC's replay adapter had used
-sim stones on the two Block boards): +15.36 (95% +9.64 to +20.96). Keep `a19_closing_pick.test.ts` passing: it pins the
-measured picks of those six games.
+Under the owner's standing instruction `a19-closing-pick-synergy-v1` is active: at that date the default was profile
+v34. Read `docs/closing_pick_adoption.md`. At the level-4 pick (the seat's last creature pick), while the counter
+draft's gate is shut but the seat sees at least one opposing creature, every offer is scored with the counter draft's
+matchup model plus a synergy bonus (`src/ai/setup/a19_closing_pick.ts`); the best replaces the earlier layers' choice
+when it is at least 0.05 better. The server's draft decider applies it before the Queen counter
+(`queen ?? closing ?? counter ?? matchup`), and Premium draft advice follows it. Registered confirmation CPC: +5.99
+points (95% +0.52 to +11.33) on the six human setups where it changes the pick (two of the six lose: the gain is an
+average); AI vs AI +7.23 per changed draft (95% +0.59 to +14.01; 5.65% of drafts change). Replicated on the real games'
+terrain (registered CPC-R; CPC's replay adapter had used sim stones on the two Block boards): +15.36 (95% +9.64 to
++20.96). Keep `a19_closing_pick.test.ts` passing: it pins the measured picks of those six games.
 
 Profile v33 is retained inside v34.
 

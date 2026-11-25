@@ -1,0 +1,233 @@
+{
+ "gates": {
+  "FD1": false,
+  "FD2": true,
+  "FD3": true,
+  "FD4": true,
+  "FD5": true,
+  "SS1": true,
+  "SS2": true,
+  "SS3": true,
+  "SS4": true,
+  "SS5": true,
+  "TG1": true,
+  "TG2": false,
+  "TG3": true,
+  "TG4": true,
+  "TG5": true
+ },
+ "rules": {
+  "FD": {
+   "behaviour": {
+    "level4": {
+     "aliveAtEnd": {
+      "arm": 956,
+      "control": 982
+     },
+     "meanDeathLapOfDead": {
+      "arm": 3.2245692051139523,
+      "control": 3.1601804850535813
+     },
+     "stacks": {
+      "arm": 2755,
+      "control": 2755
+     }
+    },
+    "realMeleeFlyersLostByLap3": {
+     "arm": 1721,
+     "control": 1926
+    },
+    "vetoes": 6627
+   },
+   "estimate": -0.9074410163339383,
+   "gain": false,
+   "interval": [
+    -2.0028870443883076,
+    0.14678899082568808
+   ],
+   "parity": {
+    "checked": {
+     "ctl": 20,
+     "fd": 20
+    },
+    "mismatched": [],
+    "openingMismatchCount": 0,
+    "openingMismatches": []
+   },
+   "passed": false,
+   "policy": "a19-flyer-dive-guard-v1",
+   "populations": {
+    "mir": {
+     "better": 56,
+     "changed": 419,
+     "estimate": -1.2236286919831223,
+     "played": 1185,
+     "tasks": 1185,
+     "worse": 72
+    },
+    "own": {
+     "better": 46,
+     "changed": 498,
+     "estimate": -0.92,
+     "played": 1250,
+     "tasks": 1250,
+     "worse": 59
+    },
+    "owner": {
+     "better": 2,
+     "changed": 7,
+     "estimate": 0.3125,
+     "played": 320,
+     "tasks": 320,
+     "worse": 1
+    }
+   },
+   "qualityGames": {
+    "arm": 0,
+    "control": 0
+   },
+   "tasks": 2755
+  },
+  "SS": {
+   "behaviour": {
+    "rectangleSplits": {
+     "arm": 865,
+     "control": 0
+    },
+    "shooterSplits": {
+     "arm": 155,
+     "control": 738
+    }
+   },
+   "estimate": 0.8743331357439241,
+   "gain": false,
+   "interval": [
+    -0.14819205690574985,
+    1.882039122703023
+   ],
+   "parity": {
+    "checked": {
+     "ctl": 20,
+     "ss": 20
+    },
+    "mismatched": [],
+    "openingMismatchCount": 0,
+    "openingMismatches": []
+   },
+   "passed": true,
+   "policy": "a19-split-screen-v1",
+   "populations": {
+    "mir": {
+     "better": 96,
+     "changed": 519,
+     "estimate": 1.5389652914210872,
+     "played": 519,
+     "tasks": 1527,
+     "worse": 72
+    },
+    "own": {
+     "better": 78,
+     "changed": 578,
+     "estimate": 0.19646365422396855,
+     "played": 578,
+     "tasks": 1527,
+     "worse": 76
+    },
+    "owner": {
+     "better": 19,
+     "changed": 192,
+     "estimate": 0.9375,
+     "played": 192,
+     "tasks": 320,
+     "worse": 17
+    }
+   },
+   "qualityGames": {
+    "arm": 0,
+    "control": 0
+   },
+   "tasks": 3374
+  },
+  "TG": {
+   "behaviour": {
+    "armGiftsFromSplitShare": 0.7701271186440678,
+    "gifts": {
+     "arm": {
+      "largest": 217,
+      "lone": 0,
+      "split": 727
+     },
+     "control": {
+      "largest": 419,
+      "lone": 57,
+      "split": 528
+     }
+    }
+   },
+   "estimate": 0.9922822491730982,
+   "gain": false,
+   "interval": [
+    -0.11025358324145534,
+    2.1079258010118043
+   ],
+   "parity": {
+    "checked": {
+     "ctl": 20,
+     "tg": 20
+    },
+    "mismatched": [],
+    "openingMismatchCount": 0,
+    "openingMismatches": []
+   },
+   "passed": false,
+   "policy": "a19-troll-gift-split-v1",
+   "populations": {
+    "mir": {
+     "better": 6,
+     "changed": 60,
+     "estimate": 0.20833333333333334,
+     "played": 114,
+     "tasks": 240,
+     "worse": 6
+    },
+    "own": {
+     "better": 7,
+     "changed": 65,
+     "estimate": -2.5821596244131455,
+     "played": 138,
+     "tasks": 213,
+     "worse": 12
+    },
+    "owner": {
+     "better": 3,
+     "changed": 54,
+     "estimate": -1.0416666666666667,
+     "played": 96,
+     "tasks": 96,
+     "worse": 5
+    },
+    "tgmir": {
+     "better": 24,
+     "changed": 136,
+     "estimate": 2.5280898876404496,
+     "played": 290,
+     "tasks": 534,
+     "worse": 10
+    },
+    "tgown": {
+     "better": 36,
+     "changed": 255,
+     "estimate": 1.4363885088919288,
+     "played": 507,
+     "tasks": 731,
+     "worse": 23
+    }
+   },
+   "qualityGames": {
+    "arm": 0,
+    "control": 0
+   },
+   "tasks": 1814
+  }
+ }
+}

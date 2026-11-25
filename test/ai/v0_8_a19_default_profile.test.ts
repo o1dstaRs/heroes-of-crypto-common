@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v34",
+            schema: "hoc.v0_8_a19_production_profile.v35",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -262,6 +262,14 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "standing-instruction",
                 registrationSha256: "c994f2e56535f430cfd8fc1cdac01029e47e4f423c09ec9c3ba6aa505a00b38e",
                 qualification: "strength-confirmed",
+            },
+            // Profile v35: spare slots become one-model screen splits of the cheapest body, 1x2 included, no shooter cover (OA).
+            splitScreen: {
+                policyId: "a19-split-screen-v1",
+                adoptedAt: "2026-11-25",
+                adoption: "owner-request",
+                registrationSha256: "01fdd229c2e6ac7a8d4ea3d99f0dd13c20e60991dc8c71401fa63f24e86b89e4",
+                qualification: "non-inferiority-confirmed",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({
@@ -583,6 +591,8 @@ describe("v0.8+A19 production profile", () => {
             "carrier-cohesion",
             "queen-counter",
             "closing-pick",
+            "split-screen",
+            "tactical-split-placement",
         ]);
         for (const { source, sha256 } of V08_A19_SOURCE_LEDGER) {
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));
