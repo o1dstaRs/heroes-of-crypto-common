@@ -115,6 +115,7 @@ pub const V08_CASTABLE = [_]st.CastSpell{
     .fireforged_sword, .misfortune,  .smoke,             .wind_flow,   .resurrection,      .craft,
     .armor_rune,       .weapon_rune, .spiritual_armor,   .mass_heal,   .whirlpool,         .riot,
     .magic_mirror,     .mass_riot,   .mass_magic_mirror, .courage,     .helping_hand,      .empower,
+    .castling,
 };
 
 /// v08Scope's tables, which the scope manifest exports (scope.zig): the castables, the batch-6b cards and rows, the burning
@@ -126,7 +127,8 @@ pub const V08_SCOPE = scope.PolicyScope{
     .name = "v0.8",
     .castable = &V08_CASTABLE,
     // Batch 6b: src/v08 has no 6b support yet, so its cards (stolen ones too) and the rows that outlive their source.
-    .refused_abilities = st.AbilityId.BATCH6B_MASK,
+    // Castling is in src/v08 (3193517c: candidates, the caster router, the destination cells).
+    .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit(),
     .refused_buffs = &.{ .water_shield, .flesh_shield_aura },
     .refuse_fire_walls = true,
     .late = .{ .abilities = st.AbilityId.time_denial.bit() },
