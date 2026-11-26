@@ -1501,6 +1501,14 @@ fn occupyByHole(s: *State, cell: Cell) void {
     setOcc(s, cell, st.HOLE);
 }
 
+/// applyNarrowing's layer count for a narrowing lap count (0: no layer).
+fn narrowingLayers(f: *const st.Fight, encounter_current: bool, additional: i32) i32 {
+    if (f.lap > NUMBER_OF_LAPS_TILL_STOP_NARROWING) return 0;
+    const calculated = @divFloor(f.lap - @as(i32, if (encounter_current) 1 else 0), f.laps_till_narrowing) + additional;
+    if (calculated < 1) return 0;
+    return @min(calculated, MAX_HOLE_LAYERS);
+}
+
 fn applyNarrowing(s: *State, encounter_current: bool, events: *Events) void {
     const f = &s.fight;
     if (f.lap > NUMBER_OF_LAPS_TILL_STOP_NARROWING) return;
@@ -1608,7 +1616,12 @@ fn handleLapTransition(s: *State, o: *const Ordered, all_made: bool, damage_deal
         if (f.n_fire != 0) fireMinusAllLaps(f);
         // The lava dries once getLapsNarrowed() (this transition's lap, the additional laps before this
         // transition's increment) reaches the laps till narrowing. runMatch never passes centerAlreadyDried.
-        if (f.grid_type == st.GridType.LAVA_CENTER and terrain.lapsNarrowed(f) >= f.laps_till_narrowing) terrain.cleanupCenterObstacle(s);
+        if (f.grid_type == st.GridType.LAVA_CENTER) {
+            const n = terrain.lapsNarrowed(f);
+            // Server mode: a 0-damage lap's extra narrowing lap dries the lava where runMatch's count would not.
+            if (f.zero_lap_extra != 0 and !s.grid.terrain.cleaned_up_center and (n >= f.laps_till_narrowing) != (n - f.zero_lap_extra >= f.laps_till_narrowing)) s.server_unverified |= server.UNVERIFIED_ZERO_LAP;
+            if (n >= f.laps_till_narrowing) terrain.cleanupCenterObstacle(s);
+        }
     }
 
     var lr: UnitList = .{};
@@ -1623,12 +1636,17 @@ fn handleLapTransition(s: *State, o: *const Ordered, all_made: bool, damage_deal
         var encounter_current = false;
         const prev_lap = f.lap - 1;
         const prev_damage = prev_lap >= 0 and prev_lap < 128 and (f.damage_laps & (@as(u128, 1) << @intCast(prev_lap))) != 0;
+        var zero_now = false;
         if (!decreased and !prev_damage and !isNarrowingLap(f)) {
-            // A lap left unmarked by a 0-damage statistic: runMatch's holder marks it and adds no lap here.
-            if (prev_lap >= 0 and prev_lap < 128 and f.zero_laps & (@as(u128, 1) << @intCast(prev_lap)) != 0) s.server_unverified |= server.UNVERIFIED_ZERO_LAP;
+            // A lap left unmarked by a 0-damage statistic: runMatch's holder marks it, adds no lap here and narrows
+            // without the current encounter.
+            zero_now = prev_lap >= 0 and prev_lap < 128 and f.zero_laps & (@as(u128, 1) << @intCast(prev_lap)) != 0;
+            if (zero_now) f.zero_lap_extra += 1;
             f.additional_narrowing_laps += 1;
             encounter_current = true;
         }
+        // Server mode: flagged only where the extra laps change the layers this narrowing lays (applyNarrowing).
+        if (f.zero_lap_extra != 0 and narrowingLayers(f, encounter_current, f.additional_narrowing_laps) != narrowingLayers(f, encounter_current and !zero_now, f.additional_narrowing_laps - f.zero_lap_extra)) s.server_unverified |= server.UNVERIFIED_ZERO_LAP;
         applyNarrowing(s, encounter_current, events);
         f.steps_morale_multiplier += STEPS_MORALE_MULTIPLIER;
         refreshStackPowerForAllUnits(s);
@@ -2009,6 +2027,7 @@ fn activateNextUnit(s: *State, ui: u8) Activation {
     const u = &s.units[ui];
     u.moved_this_turn = false;
     u.moved_route_cells = 0;
+    s.fight.rc_alt_unit = -1;
     u.on_hourglass = false;
     // startTurn's timers are not modelled; stacksToAct refreshes the team counts.
     for ([_]u8{ Team.LEFT, Team.RIGHT }) |side| {
@@ -2252,6 +2271,7 @@ pub fn completeTurn(s: *State, ui: u8, hourglass: bool, skip: bool, events: *Eve
     refreshStackPowerForAllUnits(s);
     u.moved_this_turn = false;
     u.moved_route_cells = 0;
+    s.fight.rc_alt_unit = -1;
     events.push(.turn_completed, u.uid);
 }
 
@@ -2530,16 +2550,14 @@ fn walkFacts(s: *const State, u: *const Unit, route: []const Cell, lava: bool, a
 }
 
 /// Server mode: whether the server's route decides the move differently from the action's path. Both refused decide
-/// nothing; past legality only Crusade reads the travelled count, only Rapid Charge the route's length (the turn's
-/// stationary strike charges moved_route_cells: abilities.rapidCharge is 1 without the card), only Made of Fire the
-/// lava flag, and with burning cells any other cell can change the burn.
+/// nothing; past legality only Crusade reads the travelled count, only Made of Fire the lava flag, and with burning
+/// cells any other cell can change the burn. The route's length is read later, by Rapid Charge alone (Fight.rc_alt_*).
 fn walkDiffers(s: *const State, u: *const Unit, route: []const Cell, route_lava: bool, path: []const Cell, anchor: Cell) bool {
     const a = walkFacts(s, u, route, route_lava, anchor);
     const b = walkFacts(s, u, path, s.action_lava, anchor);
     if (!a.legal and !b.legal) return false;
     if (a.legal != b.legal) return true;
     if (a.travelled != b.travelled and u.ability(.crusade) != null) return true;
-    if (a.len != b.len and u.ability(.rapid_charge) != null) return true;
     if (s.artifacts and a.lava != b.lava) return true;
     return s.fight.n_fire != 0;
 }
@@ -2567,7 +2585,16 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell, e
             .runmatch => {},
             .rejected => return error.Rejected,
             .route => |r| {
-                if (!server.sameRoute(r.cells, path, anchor) and walkDiffers(s, u, r.cells, r.has_lava, path, anchor)) s.server_unverified |= server.UNVERIFIED_ROUTE;
+                s.fight.rc_alt_unit = -1;
+                if (!server.sameRoute(r.cells, path, anchor)) {
+                    if (walkDiffers(s, u, r.cells, r.has_lava, path, anchor)) {
+                        s.server_unverified |= server.UNVERIFIED_ROUTE;
+                    } else if (r.cells.len != path.len and u.ability(.rapid_charge) != null) {
+                        // moved_route_cells differs from runMatch's: only a stationary strike this turn reads it.
+                        s.fight.rc_alt_unit = ui;
+                        s.fight.rc_alt_len = @floatFromInt(path.len);
+                    }
+                }
                 route = r.cells;
                 route_lava = r.has_lava;
             },

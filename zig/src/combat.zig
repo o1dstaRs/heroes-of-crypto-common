@@ -427,13 +427,6 @@ fn approachDiffers(s: *const State, ai: u8, am: server.Approach, path: []const C
     return engine.groundRouteCrossesObstacle(s, u, r) != engine.groundRouteCrossesObstacle(s, u, path);
 }
 
-/// A moving strike without a route is refused (attack_not_available); one the server's refreshed map cannot reach, where
-/// runMatch would walk the action's path, is an unverified server path (server.UNVERIFIED_ROUTE).
-fn noRoute(s: *State, am: server.Approach) Reject {
-    if (am.unreached) s.server_unverified |= server.UNVERIFIED_ROUTE;
-    return error.Rejected;
-}
-
 fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, am: server.Approach, stationary: bool) Reject!void {
     const att = &s.units[ai];
     // A stationary strike passes the occupancy checks on the unit's own cells and setPosition writes the same value.
@@ -444,7 +437,7 @@ fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, am:
     const has_route = am.route != null;
     if (engine.isSmall(att)) {
         if (!engine.cellsFreeFor(s, ai, &.{from})) return error.Rejected;
-        if (!has_route) return noRoute(s, am);
+        if (!has_route) return error.Rejected;
         const pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
         if (!applyStrikeMoveModifiers(s, ai, route, am.has_lava)) return error.Rejected;
         if (!engine.occupyCell(s, ai, from)) return error.Rejected;
@@ -461,7 +454,7 @@ fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, am:
     };
     const cells = engine.cellsForPosition(pos[0], pos[1], att.fw, att.fh);
     if (!engine.cellsFreeFor(s, ai, cells.slice()) and !engine.cellsFreeFor(s, ai, from_cells)) return error.Rejected;
-    if (!has_route) return noRoute(s, am);
+    if (!has_route) return error.Rejected; // also one the server's refreshed map cannot reach (am.unreached)
     if (!applyStrikeMoveModifiers(s, ai, route, am.has_lava)) return error.Rejected;
     if (!engine.occupyCells(s, ai, cells.slice())) return error.Rejected;
     att.pos_x = pos[0];
@@ -532,6 +525,7 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     var ability_multiplier: f64 = 1;
     var rapid_cells: f64 = 1;
     if (stationary and att.moved_this_turn and att.moved_route_cells > 0) {
+        if (s.fight.rc_alt_unit == ai and s.fight.rc_alt_len != att.moved_route_cells) s.server_unverified |= server.UNVERIFIED_ROUTE;
         rapid_cells = att.moved_route_cells;
         ability_multiplier = abilities.rapidCharge(att, rapid_cells);
     } else if (am.defined) {
@@ -2623,6 +2617,7 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, am
     if (att.has(.lightning_spin)) {
         var rapid_cells: f64 = 1;
         if (stationary and att.moved_this_turn and att.moved_route_cells > 0) {
+            if (s.fight.rc_alt_unit == ai and s.fight.rc_alt_len != att.moved_route_cells) s.server_unverified |= server.UNVERIFIED_ROUTE;
             rapid_cells = att.moved_route_cells;
         } else if (am.defined) {
             rapid_cells = if (am.route) |r| @floatFromInt(r.len) else 1;

@@ -291,12 +291,12 @@ exact doubles.
   server-only paths no oracle cohort has shown deciding a value (a broken build matched every traced step and bank) are
   refused only where they decide something runMatch's path would not (State.server_unverified, `server.zig`), so that
   bank stays in TypeScript: "unsupported rollout: server mode reached a route ..." (a move's server route that changes
-  the walk's legality, length, travelled count, lava flag or, with burning cells, any cell; a path-bearing strike's
-  route that changes the approach; a strike the refreshed map cannot reach refused for want of that route; a path-less
-  approach the full map accepts), "... a lap ..." (a lap left unmarked by a 0-damage statistic that adds a narrowing
-  lap) and "... an obstacle strike ..." (its provider's approach differs from the action's path, or the refreshed map
-  cannot reach it). The refresh at moves and melee approaches and a stationary strike's one-cell charge decide values
-  in the cohorts and match there; at obstacle strikes the provider's calls match the server's call for call
+  the walk's legality, the travelled count with Crusade, the lava flag or, with burning cells, any cell; its length
+  where a Rapid Charge strike reads it; a path-bearing strike's route that changes the approach; a path-less approach
+  the full map accepts), "... a lap ..." (a lap left unmarked by a 0-damage statistic, where its extra narrowing lap
+  changes a narrowing's layers or the lava's drying) and "... an obstacle strike ..." (its provider's approach differs from the action's path, or the refreshed map
+  cannot reach it). The refresh at moves and melee approaches, a stationary strike's one-cell charge and a moving strike
+  the refreshed map cannot reach (refused) decide values in the cohorts or the bot seats' banks and match there; at obstacle strikes the provider's calls match the server's call for call
   (`rollout-trace` prints them as `kp` per step from `server.kp_log`, the oracle logs its provider the same way), the
   refresh changing stats there included. These are served. A cohort that shows a flagged path deciding a value (with Zig
   agreeing) lifts its flag.

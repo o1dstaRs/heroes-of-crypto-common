@@ -1458,6 +1458,13 @@ pub const Fight = struct {
     /// Server mode: laps that reached their transition with only a 0-damage statistic, which the server's holder leaves
     /// unmarked and runMatch's marks (engine.markDamageLap; read by the narrowing to see when that decides anything).
     zero_laps: u128 = 0,
+    /// Server mode: the extra narrowing laps those laps added (runMatch's holder marks them and adds none); the
+    /// narrowing and the lava drying compare their outcome with runMatch's count (server.UNVERIFIED_ZERO_LAP).
+    zero_lap_extra: i32 = 0,
+    /// Server mode: a Rapid Charge mover whose server route's length differs from the action's path (runMatch's
+    /// moved_route_cells) and that length; a stationary strike that charges it compares (server.UNVERIFIED_ROUTE).
+    rc_alt_unit: i16 = -1,
+    rc_alt_len: f64 = 0,
     team_units_alive: [3]i32 = .{ 0, 0, 0 },
     /// The removed units the turn sets still name whose slots went to summons (by uid; see UidSet), cleared with the
     /// sets at the lap flip. `made` / `hourglass_set` / `replied` hold the units in slots.

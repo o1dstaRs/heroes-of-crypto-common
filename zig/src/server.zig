@@ -19,18 +19,20 @@ const Cell = st.Cell;
 /// matches every traced step and bank), flagged in State.server_unverified only where they decide something runMatch's
 /// path would not. A rollout that reaches one is refused (rollout.Error.UnsupportedServer*), so its bank stays in
 /// TypeScript instead of serving an unverified value:
-/// - UNVERIFIED_ROUTE: a move's server route that changes what the walk reads off it (its legality, length, travelled
-///   count, the lava flag, or any cell on a board with burning cells), a path-bearing strike's route that changes what
-///   the approach reads (its length, travelled count, last cell, a ground crossing of "B", the lava flag), a strike the
-///   refreshed map cannot reach refused for want of that route, and a path-less approach the full map accepts;
-/// - UNVERIFIED_ZERO_LAP: a lap left unmarked by a 0-damage statistic (runMatch's holder marks it) that adds a
-///   narrowing lap;
+/// - UNVERIFIED_ROUTE: a move's server route that changes what the walk reads off it (its legality, the travelled
+///   count with Crusade, the lava flag, or any cell on a board with burning cells), the route's length read by a
+///   Rapid Charge strike (Fight.rc_alt_*), a path-bearing strike's route that changes what the approach reads (its
+///   length with Rapid Charge, the travelled count with Crusade, its last cell, a ground crossing of "B", the lava
+///   flag), and a path-less approach the full map accepts;
+/// - UNVERIFIED_ZERO_LAP: a lap left unmarked by a 0-damage statistic (runMatch's holder marks it), flagged where its
+///   extra narrowing lap changes the layers a narrowing lays or when the lava dries (Fight.zero_lap_extra);
 /// - UNVERIFIED_OBSTACLE: an obstacle strike whose provider approach differs from runMatch's, or that the refreshed map
 ///   cannot reach, refused for want of that route.
-/// The provider's refresh at moves and melee approaches and a stationary strike's one-cell charge decide values in the
-/// cohorts, and Zig matches them there; at obstacle strikes the provider's calls and their refresh match the server's
-/// call for call (kp_log against the oracle's provider log, the refresh changing stats there included). None of them is
-/// flagged.
+/// The provider's refresh at moves and melee approaches, a stationary strike's one-cell charge, and a moving strike the
+/// refreshed map cannot reach (refused, where runMatch walks the action's path) decide values in the cohorts and in the
+/// bot seats' own banks, and Zig matches them there; at obstacle strikes the provider's calls and their refresh match the
+/// server's call for call (kp_log against the oracle's provider log, the refresh changing stats there included). None
+/// of them is flagged.
 pub const UNVERIFIED_ROUTE: u8 = 1;
 pub const UNVERIFIED_ZERO_LAP: u8 = 2;
 pub const UNVERIFIED_OBSTACLE: u8 = 4;
@@ -230,7 +232,7 @@ pub const Approach = struct {
     route: ?[]const Cell = null,
     has_lava: bool = false,
     /// The server's refreshed map cannot reach a path-bearing strike's attack-from cell (runMatch walks the action's
-    /// path): flagged (UNVERIFIED_ROUTE / UNVERIFIED_OBSTACLE) only where the missing route refuses the strike.
+    /// path): the strike is refused (verified for melee strikes; UNVERIFIED_OBSTACLE where it refuses an obstacle strike).
     unreached: bool = false,
 
     /// runMatch (no provider): a path-bearing action carries its own path as the route; a path-less one has no map.
