@@ -48,8 +48,9 @@ const correctionEngages = (budget: INeuralBudget, version: string, offline: bool
 };
 
 /**
- * Whether attachA19NeuralCorrection's wrapper corrects `driver`'s choice for `version`: the wrapper's own gate. A native
- * rollout backend keeps such a driver's banks in TypeScript (native_rollouts.ts), so the two can never disagree.
+ * Whether attachA19NeuralCorrection's wrapper corrects `driver`'s choice for `version`: the wrapper's own gate. Its banks
+ * may play natively (native_rollouts.ts): the correction reads each bank's means and completed rollouts per candidate,
+ * which a native bank reports exactly as the TypeScript loop does.
  */
 export function a19NeuralCorrectionEngages(driver: SearchDriver, version: string): boolean {
     const offline = offlineOf.get(driver);
@@ -78,10 +79,6 @@ export function attachA19NeuralCorrection(
     };
     states.set(driver, state);
     offlineOf.set(driver, options.offline);
-    // Native rollout banks keep this driver's banks in TypeScript wherever the correction engages (native_rollouts.ts).
-    driver.vetoNativeRollouts("neural_on", (version) =>
-        correctionEngages(driver as unknown as INeuralBudget, version, options.offline),
-    );
     const ownChoose = Object.getOwnPropertyDescriptor(driver, "chooseDecision")?.value as
         SearchDriver["chooseDecision"] | undefined;
     const model = options.model ?? { predict: (observation) => getA19NeuralModel().predict(observation) };

@@ -34,14 +34,7 @@ interface ICorrectionDriver {
         turns?: number,
         ...args: unknown[]
     ): number[];
-    rollout(
-        unit: Unit,
-        candidate: IEnumeratedCandidate,
-        seed: number,
-        index: number,
-        mode: string,
-        ...args: unknown[]
-    ): number;
+    readonly lastBankFiniteRollouts: readonly number[] | undefined;
 }
 
 export const V09_A19_LIVE_INFERENCE_RESERVE_MS = 25;
@@ -127,29 +120,21 @@ export function withV09A19Correction<T>(
         throw new Error("Choose a registered correction action family");
     const model = options.model;
     const prototype = (options.driver ?? SearchDriver.prototype) as unknown as ICorrectionDriver;
-    const methodNames = ["chooseDecision", "shortlistCandidates", "scoreCandidates", "rollout"] as const;
+    // The rollout loop stays unhooked, so a native rollout bank (native_rollouts.ts) can play it: each bank reports its
+    // completed rollouts per candidate (SearchDriver.lastBankFiniteRollouts), as the TypeScript `rollout` returns them.
+    const methodNames = ["chooseDecision", "shortlistCandidates", "scoreCandidates"] as const;
     const descriptors = methodNames.map((name) => Object.getOwnPropertyDescriptor(prototype, name));
     const choose = prototype.chooseDecision,
         shortlist = prototype.shortlistCandidates,
-        score = prototype.scoreCandidates,
-        rollout = prototype.rollout;
+        score = prototype.scoreCandidates;
     let active:
         { driver: ICorrectionDriver; catalog: Map<string, IEnumeratedCandidate>; banks: ICorrectionBank[] } | undefined;
-    let bank: ICorrectionBank | undefined;
     try {
         prototype.shortlistCandidates = function (...args) {
             if (active?.driver === this)
                 for (const candidate of args[1])
                     active.catalog.set(v09CandidateSignature(candidate.actions), candidate);
             return shortlist.apply(this, args);
-        };
-        prototype.rollout = function (...args) {
-            const value = rollout.apply(this, args);
-            if (active?.driver === this && bank && args[4] === "turns" && Number.isFinite(value)) {
-                const key = v09CandidateSignature(args[1].actions);
-                bank.completed.set(key, (bank.completed.get(key) ?? 0) + 1);
-            }
-            return value;
         };
         prototype.scoreCandidates = function (...args) {
             if (
@@ -159,16 +144,15 @@ export function withV09A19Correction<T>(
                 (args[6] ?? this.horizon) !== 64
             )
                 return score.apply(this, args);
-            const previous = bank;
             const recorded: ICorrectionBank = { candidates: [...args[1]], means: [], completed: new Map() };
-            bank = recorded;
-            try {
-                recorded.means = score.apply(this, args);
-                active.banks.push(recorded);
-                return recorded.means;
-            } finally {
-                bank = previous;
-            }
+            recorded.means = score.apply(this, args);
+            const finite = this.lastBankFiniteRollouts;
+            recorded.candidates.forEach((candidate, index) => {
+                const key = v09CandidateSignature(candidate.actions);
+                recorded.completed.set(key, (recorded.completed.get(key) ?? 0) + (finite?.[index] ?? 0));
+            });
+            active.banks.push(recorded);
+            return recorded.means;
         };
         prototype.chooseDecision = function (...args) {
             const [unit, version, , context] = args;

@@ -340,6 +340,52 @@ test(
     120_000,
 );
 
+test(
+    "a TypeScript bank reports its finite rollout returns per candidate, the evidence the correction reads",
+    () =>
+        scope(() => {
+            const clock = spyOn(performance, "now").mockReturnValue(0);
+            const prototype = SearchDriver.prototype as any;
+            const rollout = prototype.rollout,
+                score = prototype.scoreCandidates;
+            let counted: Map<unknown, number> | undefined;
+            let banks = 0,
+                finite = 0,
+                mismatches = 0;
+            prototype.rollout = function (...args: unknown[]) {
+                const value = rollout.apply(this, args);
+                if (counted && Number.isFinite(value)) counted.set(args[1], (counted.get(args[1]) ?? 0) + 1);
+                return value;
+            };
+            prototype.scoreCandidates = function (...args: unknown[]) {
+                const outer = counted;
+                const bank = (counted = new Map());
+                try {
+                    const means = score.apply(this, args);
+                    const expected = (args[1] as unknown[]).map((candidate) => bank.get(candidate) ?? 0);
+                    // The search catches what a bank throws, so the comparison is counted here, not asserted.
+                    if (JSON.stringify(this.lastBankFiniteRollouts) !== JSON.stringify(expected)) mismatches += 1;
+                    banks += 1;
+                    finite += expected.reduce((n, count) => n + count, 0);
+                    return means;
+                } finally {
+                    counted = outer;
+                }
+            };
+            try {
+                play();
+            } finally {
+                prototype.rollout = rollout;
+                prototype.scoreCandidates = score;
+                clock.mockRestore();
+            }
+            expect(banks).toBeGreaterThan(0);
+            expect(finite).toBeGreaterThan(0);
+            expect(mismatches).toBe(0);
+        }),
+    120_000,
+);
+
 test("a partially installed driver scope restores methods when installation fails", () => {
     const driver = withSearchEnvironment(environment, () => new SearchDriver({} as any));
     const original = (SearchDriver.prototype as any).shortlistCandidates;

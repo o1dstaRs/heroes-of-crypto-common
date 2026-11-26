@@ -25,7 +25,8 @@
  * the loader accept its board, every team plays a policy the library implements (StrategyV0_8 under the A19 placement
  * layers, or StrategyV0_1), and the AI environment equals the A19 profile's (the library implements the production
  * values only). A bank is native when, in addition, the driver runs none of the research terms the library does not
- * (rollout cache, opponent model, research or per-team leaves, team scope, the neural correction).
+ * (rollout cache, opponent model, research or per-team leaves, team scope). The A19 neural correction reads a bank's
+ * completed rollouts per candidate (INativeBankResult.finiteRollouts, as SearchDriver.lastBankFiniteRollouts).
  */
 
 import type { IAIStrategy } from "../ai/ai_strategy";
@@ -695,6 +696,8 @@ export interface INativeBankInput {
 export interface INativeBankResult {
     means: number[];
     materials: number[];
+    /** per candidate, its played rollouts with a finite value (TypeScript's finite `rollout` returns) */
+    finiteRollouts: number[];
     turns: number;
     uuid: number;
     /** "done", "deadline" or "turn_budget" */
@@ -743,6 +746,7 @@ export function runNativeBank(
             : native.nowNs() + BigInt(Math.max(1, Math.floor((input.deadlineAt - performance.now()) * 1e6)));
     const means: number[] = [];
     const materials: number[] = [];
+    const finiteRollouts: number[] = [];
     const records: INativePairRecord[] = [];
     const requests: object[] = [];
     let turns = 0;
@@ -756,6 +760,7 @@ export function runNativeBank(
     const done = (stop: string): INativeBankResult => ({
         means,
         materials,
+        finiteRollouts,
         turns,
         uuid,
         stop,
@@ -814,6 +819,7 @@ export function runNativeBank(
             let completed = 0;
             let materialSum = 0;
             let materialCount = 0;
+            let finite = 0;
             let illegal = false;
             for (let r = 0; r < R; r += 1) {
                 const record = pairRecords[k * R + r];
@@ -824,6 +830,7 @@ export function runNativeBank(
                 if (record.flags === flags.skippedIllegal || record.flags === flags.skippedTail) break;
                 played = true;
                 const score = record.value;
+                if (Number.isFinite(score)) finite += 1;
                 if (input.captureMaterial && Number.isFinite(score)) {
                     materialSum += record.material;
                     materialCount += 1;
@@ -837,6 +844,7 @@ export function runNativeBank(
                 if (!Number.isFinite(score) || score > 1) leafOutsideUnitInterval = true;
             }
             means.push(illegal ? Number.NEGATIVE_INFINITY : sum / R);
+            finiteRollouts.push(finite);
             if (tails?.selectionBounds && !illegal && completed === R) {
                 tails.selectionBounds.recordFinished(candidateIndex, sum / R);
             }
