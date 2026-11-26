@@ -57,6 +57,10 @@ pub fn run(gpa: std.mem.Allocator, args: []const []const u8) !void {
         if (!try layers(gpa, args[1], top, hasFlag(args, "--passes"), argNumber(args, "--max-fail", 10))) std.process.exit(1);
         return;
     }
+    if (std.mem.eql(u8, args[0], "census-pins")) {
+        try censusPins(gpa, args[1]);
+        return;
+    }
     if (std.mem.eql(u8, args[0], "leaf")) {
         if (!try leafCheck(gpa, args[1], argNumber(args, "--max-fail", 10))) std.process.exit(1);
         return;
@@ -358,6 +362,99 @@ fn printList(label: []const u8, kinds: []const []const u8, targets: []const i16,
         std.debug.print("      [{d}] {s} target {d} ed {d} ek {d}\n", .{ i, k, targets[i], eds[i], eks[i] });
         printActions("   ", acts[i]);
     }
+}
+
+/// Research census (owner 2026-11-26, "griffin could've closed both ranges first turn"): at every decision of a melee
+/// unit, the enemy shooters with shots that a stand it can reach (its own body or a known route's end) would pin
+/// (adjacent), and whether the recorded decision pins one or two of them.
+fn censusPins(gpa: std.mem.Allocator, path: []const u8) !void {
+    const buf = try std.fs.cwd().readFileAlloc(gpa, path, 1 << 34);
+    defer gpa.free(buf);
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    var decisions: usize = 0;
+    var single: usize = 0;
+    var double: usize = 0;
+    var took_double: usize = 0;
+    var took_single_when_double: usize = 0;
+    var took_single: usize = 0;
+    var early_double: usize = 0;
+    var flyer_double: usize = 0;
+    var lines = rec.lines(buf);
+    while (lines.next()) |line| {
+        _ = arena_state.reset(.retain_capacity);
+        const arena = arena_state.allocator();
+        const game = rec.parseGame(arena, line, true) catch continue;
+        util.battle = util.Battle.fromInit(game.init);
+        var s = engine.initState(game.init, game.ids) catch continue;
+        util.battle.primeProfile(&s);
+        var events: engine.Events = .{};
+        for (game.steps) |step| {
+            if (step.action == .decide) {
+                const ui = step.action.decide.unit;
+                const u = &s.units[ui];
+                if (u.attack_type != st.AttackType.RANGE and !u.isDead()) {
+                    decisions += 1;
+                    var copy = s;
+                    var c: ai.Ctx = undefined;
+                    ai.initCtxInto(&c, &copy, ui);
+                    var shooters: [st.MAX_UNITS]u8 = undefined;
+                    var ns: usize = 0;
+                    for (copy.units[0..copy.n_units], 0..) |*e, i| {
+                        if (!e.in_holder or e.isDead() or e.team == u.team or !engine.isRangeCapable(e) or engine.getRangeShots(e) <= 0) continue;
+                        shooters[ns] = @intCast(i);
+                        ns += 1;
+                    }
+                    const pinsAt = struct {
+                        fn f(st_: *const st.State, uu: *const st.Unit, a: rec.Cell, sh: []const u8) usize {
+                            const body = ai.footprintForAnchor(uu, a);
+                            var k: usize = 0;
+                            for (sh) |si| {
+                                if (ai.adjacent(body.slice(), engine.unitCells(&st_.units[si]).slice())) k += 1;
+                            }
+                            return k;
+                        }
+                    }.f;
+                    var best: usize = 0;
+                    if (ns > 0) {
+                        best = pinsAt(&copy, u, engine.baseCell(u), shooters[0..ns]);
+                        const mp = c.actualPath();
+                        for (mp.known()) |*r| {
+                            if (!ai.canLandAt(&copy, ui, r.cell)) continue;
+                            best = @max(best, pinsAt(&copy, u, r.cell, shooters[0..ns]));
+                        }
+                    }
+                    // What the recorded decision does: the stand it ends on.
+                    var end = engine.baseCell(u);
+                    for (step.action.decide.out) |a| switch (a) {
+                        .move_unit => |m| if (m.path.len > 0) {
+                            end = m.path[m.path.len - 1];
+                        },
+                        .melee_attack => |m| end = m.attack_from,
+                        else => {},
+                    };
+                    const took = if (ns > 0) pinsAt(&copy, u, end, shooters[0..ns]) else 0;
+                    if (best >= 1) single += 1;
+                    if (best >= 2) {
+                        double += 1;
+                        if (s.fight.lap <= 2) early_double += 1;
+                        if (engine.canFly(u)) flyer_double += 1;
+                        if (took >= 2) took_double += 1 else if (took == 1) took_single_when_double += 1;
+                    }
+                    if (took >= 1) took_single += 1;
+                }
+                s.rng.state = step.r1;
+                continue;
+            }
+            s.rng.state = step.r0;
+            events.len = 0;
+            const ok = engine.apply(&s, step.action, &events);
+            var m: compare.Mismatch = .{};
+            if (ok != step.ok or s.rng.state != step.r1 or !compare.state(&s, game.ids, step.digest.?, &m)) break;
+        }
+    }
+    std.debug.print("census-pins: {d} melee decisions; a reachable pin {d} ({d}%), a reachable DOUBLE pin {d} ({d}%: laps 1-2 {d}, flyers {d});\n", .{ decisions, single, single * 100 / @max(1, decisions), double, double * 100 / @max(1, decisions), early_double, flyer_double });
+    std.debug.print("  when a double pin was reachable the decision took it {d}, pinned one {d}, none {d}; decisions ending on any pin {d}\n", .{ took_double, took_single_when_double, double - took_double - took_single_when_double, took_single });
 }
 
 fn num(v: std.json.Value) f64 {
