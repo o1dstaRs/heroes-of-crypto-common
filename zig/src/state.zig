@@ -433,7 +433,9 @@ pub fn SpellListN(comptime cap: u8) type {
 // =====================================================================================================================
 
 /// Active abilities per unit: three native ones plus what Predatory Assimilation steals (8 seen on one Queen).
-pub const MAX_ABILITIES = 10;
+/// 12: Predatory Assimilation thieves keep collecting cards; 11 reached 5 times in 200 production-like battles (10: 104,
+/// 9: 658; server-35's census, 2026-11-26), never 12. An overflow still refuses the rollout.
+pub const MAX_ABILITIES = 12;
 /// Abilities a unit can lose to Predatory Assimilation (props.stolen_abilities).
 pub const MAX_STOLEN = 6;
 pub const AbilityMask = u128;
