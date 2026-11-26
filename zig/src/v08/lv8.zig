@@ -15,6 +15,7 @@ const path = @import("../path.zig");
 const js = @import("../jsnum.zig");
 const AT = st.AttackType;
 const abilities = @import("../abilities.zig");
+const combat = @import("../combat.zig");
 const artifacts = @import("../artifacts.zig");
 const spells = @import("../spells.zig");
 
@@ -403,6 +404,100 @@ fn wanderingMageSmoke(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) voi
         if (cd.spell == smoke_raw) return take(out, &set, i);
     }
     util.copyDecision(out, in);
+}
+
+/// prioritizeV08BlacksmithCraft: a Blacksmith holding a usable Craft, outside the dominant finish and without a proven
+/// immediate kill, takes the Craft candidate (CRAFT catalog, the incumbent included) whose block reaches the most living
+/// allies, then the most recipient value (summed in id order), then the earliest; with at least two recipients, else
+/// the decision stands. V08_ROLE_RELEASE is unset.
+fn blacksmithCraft(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (util.creature(s, c.ui) != .blacksmith) return util.copyDecision(out, in);
+    const craft_raw: u8 = @intFromEnum(st.CastSpell.craft);
+    var usable = false;
+    for (u.spells[0..u.n_spells]) |*b| {
+        if (b.spell == craft_raw and spells.usable(u, b, &s.spell_cfg[b.spell])) {
+            usable = true;
+            break;
+        }
+    }
+    if (!usable) return util.copyDecision(out, in);
+    if (util.dominantFinishState(s, u.team).active or blacksmithGuaranteedKill(c, in)) return util.copyDecision(out, in);
+    var set: cand.Set = .{};
+    cand.enumerate(c, in, cand.CRAFT, &set);
+    var best: ?usize = null;
+    var best_count: usize = 0;
+    var best_value: f64 = 0;
+    for (set.slice(), 0..) |*cd, i| {
+        const anchor = craftAnchor(&cd.d, craft_raw) orelse continue;
+        var recipients: [st.MAX_UNITS]u8 = undefined;
+        const n = cand.craftRecipients(s, u.team, anchor, &recipients);
+        var value: f64 = 0;
+        for (recipients[0..n]) |r| value = @min(9007199254740991.0, value + craftRecipientValue(s, &s.units[r]));
+        if (best == null or n > best_count or (n == best_count and value > best_value)) {
+            best = i;
+            best_count = n;
+            best_value = value;
+        }
+    }
+    if (best) |i| {
+        if (best_count >= 2) return take(out, &set, i);
+    }
+    util.copyDecision(out, in);
+}
+
+/// craftAction: the decision's first Craft cast with a target cell.
+fn craftAnchor(d: *const ai.Decision, craft_raw: u8) ?rec.Cell {
+    for (d.slice()) |a| {
+        if (a == .cast_spell and a.cast_spell.spell == craft_raw and a.cast_spell.has_cell) return a.cast_spell.cell;
+    }
+    return null;
+}
+
+/// v08BlacksmithCraftRecipientValue: the stack's remaining output (one activation per remaining shot for a shooter,
+/// else one), 60% of it when Craft's double roll would duplicate an active double (Double Shot for a stack with shots,
+/// else Double Punch or its crafted copy), plus min(999, cumulative HP) / 1000 as a durability tie-break.
+fn craftRecipientValue(s: *const st.State, x: *const st.Unit) f64 {
+    _ = s;
+    const amount = finitePositive(x.amount_alive);
+    const per = amount * finitePositive(x.attack_damage_max);
+    const activations: f64 = if (engine.isRangeCapable(x)) @max(1, finitePositive(engine.getRangeShots(x))) else 1;
+    const output = per * activations;
+    const doubled = if (engine.getRangeShots(x) > 0)
+        combat.doubleShotAbility(x) != null
+    else
+        x.has(.double_punch) or x.has(.crafted_double_punch);
+    const marginal = output * @as(f64, if (doubled) 0.6 else 1);
+    const tie = @min(999, finitePositive(util.cumulativeHp(x))) / 1000;
+    return @min(9007199254740991.0, marginal + tie);
+}
+
+fn finitePositive(v: f64) f64 {
+    return if (std.math.isFinite(v)) @max(0, v) else 0;
+}
+
+/// isV08BlacksmithImmediateGuaranteedKill: a stationary strike from the base cell (no move in the decision) on a living
+/// enemy that cannot miss and whose minimum damage (the team's synergy power) covers the stack's health. Water Shield and
+/// Flesh Shield are not in scope.
+fn blacksmithGuaranteedKill(c: *const ai.Ctx, d: *const ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    if (util.has(d, .move_unit)) return false;
+    const base = engine.baseCell(u);
+    var target: ?u8 = null;
+    for (d.slice()) |a| {
+        if (a == .melee_attack and a.melee_attack.attacker == c.ui and a.melee_attack.attack_from.x == base.x and a.melee_attack.attack_from.y == base.y) {
+            target = a.melee_attack.target;
+            break;
+        }
+    }
+    const ti = target orelse return false;
+    const t = &s.units[ti];
+    if (!t.in_holder or t.isDead() or t.team == u.team) return false;
+    if (abilities.missChance(u, t) > 0) return false;
+    const minimum = combat.damageBoundSyn(u, t, u.attack_damage_min, false, 1, s.setup[u.team].ability_power);
+    return minimum >= util.cumulativeHp(t);
 }
 
 /// The power of the unit's first book spell `raw` (0 without it).
@@ -1468,9 +1563,10 @@ fn runPassInner(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decisio
         .vine => vineThrow(c, in, out),
         .healer => healerSustain(c, in, out),
         .smoke => wanderingMageSmoke(c, in, out),
-        // Identity in scope: Nightmare's Fire Wall and the Blacksmith need spells the port does not cast yet;
-        // ranked-replay tactics are an off-by-default research scope.
-        .nightmare, .blacksmith, .ranked_replay => util.copyDecision(out, in),
+        .blacksmith => blacksmithCraft(c, in, out),
+        // Identity in scope: Nightmare's Fire Wall needs a spell the port does not cast yet; ranked-replay tactics are an
+        // off-by-default research scope.
+        .nightmare, .ranked_replay => util.copyDecision(out, in),
         .cemetery => return cemetery(c, in, out),
         .ranged_positioning => return rangedPositioning(c, in, out),
     }

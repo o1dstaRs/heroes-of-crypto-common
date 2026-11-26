@@ -496,6 +496,40 @@ const Gen = struct {
     /// the overkill-capped damage it lands on enemies (projectSpellDamageAgainstUnit; a kill flags it); the best block
     /// (first on ties) is the candidate. With the Battle Mage's coverage, Hidden stacks are ignored and every distinct
     /// visible victim list adds its first block after it. Water Shield is not in scope.
+    /// addAlliesAreaCastCandidates (the Blacksmith's Craft): every 2x2 anchor short of the last row and column (x outer,
+    /// y inner) whose cells hold a living ally of the caster, the first anchor of each distinct recipient set only, with
+    /// no valuation.
+    fn addAlliesArea(self: *Gen, raw: u8) void {
+        const s = self.c.s;
+        const team = self.unit().team;
+        var sets: [256]st.UnitSet = undefined;
+        var n_sets: usize = 0;
+        var x: i32 = 0;
+        while (x < st.GRID - 1) : (x += 1) {
+            var y: i32 = 0;
+            while (y < st.GRID - 1) : (y += 1) {
+                const anchor = Cell{ .x = x, .y = y };
+                var recipients: [st.MAX_UNITS]u8 = undefined;
+                const n = craftRecipients(s, team, anchor, &recipients);
+                if (n == 0) continue;
+                var set: st.UnitSet = 0;
+                for (recipients[0..n]) |v| set |= engine.unitBit(v);
+                var dup = false;
+                for (sets[0..n_sets]) |have| {
+                    if (have == set) dup = true;
+                }
+                if (dup) continue;
+                if (n_sets == sets.len) {
+                    self.out.incomplete = true;
+                    return;
+                }
+                sets[n_sets] = set;
+                n_sets += 1;
+                self.pushSpell(raw, null, anchor, 0, 0);
+            }
+        }
+    }
+
     /// addSmokeCastCandidates: Smoke halves a shot whose ray crosses its 3x3 cloud. Nothing to do without a living enemy
     /// that can shoot. Anchors lie on each enemy shooter's segment (in holder order) to the rounded centroid of the base
     /// cells of our living stacks (the caster first), at 0.45, 0.5, 0.55 and 0.66 of the way, each probed with its
@@ -864,7 +898,8 @@ const Gen = struct {
                         self.addSmoke(b.spell);
                     } else if (spell == .meteorite or spell == .meteor_shower) self.addMeteors(spell, b.spell, cfg) else self.out.incomplete = true;
                 },
-                st.SpellTarget.RANDOM_CLOSE_TO_CASTER, st.SpellTarget.ALLIES_AREA, st.SpellTarget.ENEMY_WITHIN_MOVEMENT_RANGE => self.out.incomplete = true,
+                st.SpellTarget.ALLIES_AREA => self.addAlliesArea(b.spell),
+                st.SpellTarget.RANDOM_CLOSE_TO_CASTER, st.SpellTarget.ENEMY_WITHIN_MOVEMENT_RANGE => self.out.incomplete = true,
                 st.SpellTarget.ALL_ALLIES, st.SpellTarget.ALL_ENEMIES, st.SpellTarget.ALL_FLYING => {
                     if (spells.canMassCastSpell(s, self.c.ui, spell, cfg)) self.pushSpell(b.spell, null, null, 0, 0);
                 },
@@ -1776,6 +1811,34 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
     if (out.incomplete) util.unsupported = true;
 }
 
+/// v08BlacksmithCraftRecipientsAt: the living units of `team` on the Craft block at `anchor` (the anchor, +x, +y and
+/// +x+y; evaluateAffectedUnits' first-seen order, each once), sorted by id. Returns how many it wrote.
+pub fn craftRecipients(s: *const st.State, team: u8, anchor: Cell, out: *[st.MAX_UNITS]u8) usize {
+    const cells = [4]Cell{
+        anchor,
+        .{ .x = anchor.x + 1, .y = anchor.y },
+        .{ .x = anchor.x, .y = anchor.y + 1 },
+        .{ .x = anchor.x + 1, .y = anchor.y + 1 },
+    };
+    var list: Slots = .{};
+    affectedUnits(s, &cells, &list, false);
+    var n: usize = 0;
+    for (list.slice()) |v| {
+        const x = &s.units[v];
+        if (x.team != team or x.isDead()) continue;
+        out[n] = v;
+        n += 1;
+    }
+    std.sort.insertion(u8, out[0..n], s, struct {
+        fn lt(st_: *const st.State, a: u8, b: u8) bool {
+            return util.idLess(st_, a, b);
+        }
+    }.lt);
+    return n;
+}
+
+/// prioritizeV08BlacksmithCraft's catalog (maxMoveDestinations 1, maxMeleePairs 6, maxShotAims 4, maxAreaThrowCells 2).
+pub const CRAFT = Options{ .max_moves = 1, .max_melee = 6, .max_shots = 4, .max_throws = 2, .enrich = true };
 /// The boundary options (enumerateV08BoundaryCandidates without mountain strikes).
 pub const BOUNDARY = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .max_throws = 4, .enrich = true, .meteor_coverage = true };
 /// The boundary census without the Battle Mage's Meteorite coverage: repairV07ForbiddenTargetDecision's options and

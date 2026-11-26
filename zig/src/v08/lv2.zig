@@ -460,7 +460,12 @@ fn spellTurn(c: *ai.Ctx, out: *ai.Decision) bool {
                         v = a.max_hp - a.hp;
                     } else {
                         if (applied) |id| if (a.buffs.find(id) != null) continue;
-                        v = ai.threat(a); // meleeThreat (no Helping Hand in scope)
+                        // Helping Hand goes to the most numerous level-1 stack (amount x 10); another buff to the
+                        // biggest melee threat.
+                        if (spell == .helping_hand) {
+                            if (a.level != 1) continue;
+                            v = a.amount_alive * 10;
+                        } else v = ai.threat(a);
                     }
                     if (v > value) {
                         value = v;
