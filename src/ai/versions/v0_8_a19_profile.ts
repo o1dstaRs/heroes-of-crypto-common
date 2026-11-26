@@ -653,7 +653,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         // switches of profile v21 and the carrier cohesion rule of profile v32. Re-pinned for the native rollout
         // seam (HOC_NATIVE_ROLLOUTS) and its default with hook detection: the TypeScript loop is unchanged, a native
         // bank leaves the driver as it does, and bot seats pass no native harness (docs/native_rollouts.md).
-        sha256: "8c3ab7ce6fab23d688331a9dc691ee9180195e0df66d36d82ef3ce723ec5e8cb" as const,
+        // Re-pinned for 950aac89: both bank paths report each candidate's finite rollouts to the A19 neural
+        // correction (lastBankFiniteRollouts) in place of its rollout patch; decision traces identical 0 / 1 / shadow.
+        sha256: "adfdb134134e38aa50d985c5c3fa26f5fe45a7c41b0c3a34521a5c37549507fb" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
@@ -807,7 +809,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "neural-adapter" as const,
         source: "src/simulation/a19_neural.ts" as const,
         // Re-pinned for the exported gate (a19NeuralCorrectionEngages) and its native rollout veto; the gate is unchanged.
-        sha256: "b53660ef52adf25997627f63d871dc88dc210119b8998570b8cbf6d4da8fad5b" as const,
+        // Re-pinned for 950aac89: the veto is gone (native banks report the correction's finite rollouts).
+        sha256: "51fb37bac5096fc83679966436bd5fc18e14ce01566b7d5de6e3c23a23923cdf" as const,
     }),
     Object.freeze({
         role: "neural-model" as const,
@@ -817,7 +820,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "neural-correction" as const,
         source: "src/simulation/v0_9/a19_correction.ts" as const,
-        sha256: "e0d0368c74b05470aa2490af56706be0a157d0bc998fd9e1e18b4cca54b625b2" as const,
+        // Re-pinned for 950aac89: the finite-rollout counts come from each bank's report, not a SearchDriver.rollout
+        // patch; corrections identical (24 battles 0 vs 1, 12 battles HEAD / 0 / 1 / shadow).
+        sha256: "62c70037e7c4ce84d59238687d7b95538a293c5259cf810540d07419d2745c45" as const,
     }),
     Object.freeze({
         role: "neural-observation" as const,
