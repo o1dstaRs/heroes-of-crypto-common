@@ -41,7 +41,7 @@ pub fn usable(u: *const Unit, b: *const st.BookSpell, cfg: *const st.SpellConfig
 }
 
 /// elementalSpellMultiplier against `u` (only Earth Element is in scope: no Fire, Water or Wind Element creature).
-fn elementMultiplier(element: u8, u: *const Unit) f64 {
+pub fn elementMultiplier(element: u8, u: *const Unit) f64 {
     const earth = u.ability_mask & st.AbilityId.earth_element.bit() != 0 and u.has(.earth_element);
     return switch (element) {
         EL.AIR => if (earth) 1.5 else 1,
@@ -362,7 +362,7 @@ pub fn rawDamage(caster: *const Unit, spell: CS, cfg: *const st.SpellConfig) f64
 }
 
 /// Unit.getMagicDamageTakenMultiplier: Heavy Armor's magic side (no synergy term).
-fn magicDamageTakenMultiplier(u: *const Unit) f64 {
+pub fn magicDamageTakenMultiplier(u: *const Unit) f64 {
     if (u.ability_mask & st.AbilityId.heavy_armor.bit() == 0) return 1;
     const ha = u.ability(.heavy_armor) orelse return 1;
     return js.toFixed(((ha.power + engine.getLuck(u)) / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + 1, 2);
@@ -667,13 +667,15 @@ fn magicAttack(s: *State, ci: u8, target: ?u8, spell: CS, cfg: *const st.SpellCo
             if (t.hp > t.max_hp) t.hp = t.max_hp;
         }
     } else {
-        // applyBuff (no Tome of Amplification, no Helping Hand body): the row at the end of the list
+        // applyBuff (no Helping Hand body): the row at the end of the list, its power raised by the caster's Tome of
+        // Amplification (amplifyCastBuffForTarget: an ally's or the caster's own copy)
         const id = spell.applied() orelse {
             s.overflow = true;
             return error.Rejected;
         };
         const laps = cfg.laps + @as(f64, if (ci == ti) 1 else 0);
-        abilities.pushChecked(s, &t.buffs, .{ .id = id, .laps = laps, .power = cfg.power });
+        const power = if (s.artifacts and caster.team == t.team) artifacts.tomePower(caster, cfg, cfg.power) else cfg.power;
+        abilities.pushChecked(s, &t.buffs, .{ .id = id, .laps = laps, .power = power });
     }
     useSpell(caster, spell);
     engine.completeTurn(s, ci, false, false, events);

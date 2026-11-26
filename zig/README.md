@@ -22,7 +22,9 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   Wolves and Vine Throw, with the casters' spellbooks (Healer, Battle Mage, Satyr, Magic Dragon, Trent, and a Queen that
   stole one), the MAGIC attack type, the vines and the Wolves they summon; of wave 2 so far, the Wandering Mage's
   Fireball (Fire Strike's gate and trajectory, then the blast: the unit it burst on, then the living units on the impact
-  cell and its ring, allies too, the caster spared); a book holding any other spell is refused;
+  cell and its ring, allies too, the caster spared) and Fireforged Sword (the cast buff, and its FIRE burn of the hit's
+  damage after every damaging hit its holder lands, at the twelve sites of attack_handler.ts with their own kill and
+  morale rules); a book holding any other spell is refused;
 - the army setup `runMatch` applies before the fight: the augments (Armor, Might, Sniper, Movement, Placement; Empower
   is carried but read by nothing in scope), doctrines (their upgrade budget) and synergies (Life, Chaos, Might and
   Nature, both variants, levels 1 to 3), including the Chaos break-on-attack roll and the Break effect;

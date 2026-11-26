@@ -805,6 +805,12 @@ function setupState(fp: any): Record<string, unknown> {
 // `hoc-sim v08 leaf` reads).
 const LEAF_LOG = process.env.RECORD_LEAF === "1";
 const layersModule = LAYER_LOG ? await import("./v08/layers") : undefined;
+const FORCE_CASTS = (process.env.RECORD_FORCE_CASTS ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+let forcedCastCount = 0;
+const forceSpellHelper = FORCE_CASTS.length ? await import("../../src/spells/spell_helper") : undefined;
 const leafModule = LEAF_LOG ? (layersModule ?? (await import("./v08/layers"))) : undefined;
 
 function main(): void {
@@ -964,6 +970,80 @@ function main(): void {
             if (slot < RESUME.count) resumePoints[slot] = point();
         }
     };
+
+    // RECORD_FORCE_CASTS="Fireforged Sword,Misfortune": an engine-replay aid for spells the AI rarely casts. A unit whose
+    // turn it is, that has not moved and holds a listed spell usable, casts the first one the engine gate allows instead
+    // of the strategy's decision: a buff on an ally (sweepers first, then area, double and through shooters, then any
+    // shooter, others before the caster), anything else on an enemy that is not Hidden (Magic Reflection, Absorb
+    // Penalties and Luck Blessing holders first). Installed before the decision wrapper below captures decideTurn, so
+    // the recorded decision is the forced one; the .meta.json lists `forcedCasts`, and a native v0.8 check must skip
+    // these battles.
+    if (FORCE_CASTS.length && forceSpellHelper) {
+        const SH = forceSpellHelper;
+        const strategyDecide = strategyClass.prototype.decideTurn;
+        const SWEEPERS = [
+            "Lightning Spin",
+            "Fire Breath",
+            "Skewer Strike",
+            "Area Throw",
+            "Large Caliber",
+            "Through Shot",
+            "Chakram",
+            "Double Punch",
+            "Double Shot",
+            "Double Throw",
+        ];
+        strategyClass.prototype.decideTurn = function (this: unknown, unit: any, context: any) {
+            if (unit && !unit.hasMovedThisTurn()) {
+                const gs = context.grid.getSettings();
+                const matrix = context.grid.getMatrix();
+                const all = [...context.unitsHolder.getAllUnits().values()].filter((u: any) => !u.isDead());
+                for (const name of FORCE_CASTS) {
+                    const spell = unit.getSpells().find((s: any) => s.getName() === name);
+                    if (!spell || !SH.isSpellUsableByCaster(unit, spell)) continue;
+                    const ok = (t: any) =>
+                        SH.canCastSpell(
+                            false,
+                            gs,
+                            matrix,
+                            unit,
+                            t,
+                            spell,
+                            t.getBaseCell(),
+                            t.getMagicResist(),
+                            t.hasMindAttackResistance(),
+                            t.canBeHealed(),
+                            undefined,
+                        );
+                    let pool: any[];
+                    if (spell.isBuff()) {
+                        pool = all.filter((u: any) => u.getTeam() === unit.getTeam() && ok(u));
+                        const score = (u: any) =>
+                            (SWEEPERS.some((n) => u.hasAbilityActive(n)) ? 4 : 0) +
+                            (u.getAttackType() === 2 ? 2 : 0) +
+                            (u.getId() === unit.getId() ? 0 : 1);
+                        pool.sort((a: any, b: any) => score(b) - score(a));
+                    } else {
+                        pool = all.filter(
+                            (u: any) => u.getTeam() !== unit.getTeam() && !u.hasBuffActive("Hidden") && ok(u),
+                        );
+                        const score = (u: any) =>
+                            (u.hasAbilityActive("Magic Reflection") ? 4 : 0) +
+                            (u.getBuff("Absorb Penalties Aura") ? 2 : 0) +
+                            (u.hasBuffActive("Luck Blessing") ? 1 : 0);
+                        pool.sort((a: any, b: any) => score(b) - score(a));
+                    }
+                    if (pool.length) {
+                        forcedCastCount += 1;
+                        return [
+                            { type: "cast_spell", casterId: unit.getId(), spellName: name, targetId: pool[0].getId() },
+                        ];
+                    }
+                }
+            }
+            return strategyDecide.call(this, unit, context);
+        };
+    }
 
     // AI decisions: the unit, the random state around the call and the actions it returned. Engine calls made
     // inside a decision (none are expected for v0.1) are not recorded as steps.
@@ -1212,6 +1292,7 @@ function main(): void {
         ...(SPELL_KEEP ? { spells: [...SPELL_KEEP] } : {}),
         ...(STRIP.size ? { strip: [...STRIP] } : {}),
         ...(SPIT ? { spit: true } : {}),
+        ...(FORCE_CASTS.length ? { forcedCasts: FORCE_CASTS, forcedCastCount } : {}),
         ...(SETUP
             ? {
                   setup: {

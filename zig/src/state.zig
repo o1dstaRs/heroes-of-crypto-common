@@ -90,6 +90,8 @@ pub const SpellId = enum(u8) {
     vine_throw,
     /// The Satyr's stack blessing: a magic-damage bonus percentage on every ally.
     sylvan_focus_blessing,
+    /// The Wandering Mage's cast buff (wave 2): a FIRE burn of power% after every damaging hit its holder lands.
+    fireforged_sword,
     // batch 4
     /// The stacking Deep Wounds effect (Wolf, Tiger, Griffin, Manticore, Behemoth): a holder's strikes deal power% more.
     deep_wounds,
@@ -192,6 +194,7 @@ pub const SpellId = enum(u8) {
             .blessing => "Blessing",
             .vine_throw => "Vine Throw",
             .sylvan_focus_blessing => "Sylvan Focus Blessing",
+            .fireforged_sword => "Fireforged Sword",
             .deep_wounds => "Deep Wounds",
             .boar_saliva => "Boar Saliva",
             .terrifying_gaze => "Terrifying Gaze",
@@ -544,7 +547,7 @@ pub const AbilityId = enum(u8) {
             .forest_spellbook => spell == .summon_wolves,
             .basic_tome_of_battle_magic => spell == .fire_strike or spell == .meteorite,
             .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower,
-            .book_of_chaos => spell == .fireball,
+            .book_of_chaos => spell == .fireball or spell == .fireforged_sword,
             else => false,
         };
     }
@@ -616,6 +619,7 @@ pub const CastSpell = enum(u8) {
     wild_regeneration,
     // wave 2b: the Wandering Mage's Book of Chaos
     fireball,
+    fireforged_sword,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -631,6 +635,7 @@ pub const CastSpell = enum(u8) {
             .battle_roar => "Battle Roar",
             .wild_regeneration => "Wild Regeneration",
             .fireball => "Fireball",
+            .fireforged_sword => "Fireforged Sword",
         };
     }
 
@@ -648,6 +653,7 @@ pub const CastSpell = enum(u8) {
             .blessing => .blessing,
             .vine_throw => .vine_throw,
             .battle_roar => .battle_roar,
+            .fireforged_sword => .fireforged_sword,
             else => null,
         };
     }
@@ -1368,6 +1374,8 @@ pub const State = struct {
     /// The System "Made of Fire" spell (recorded `spellConfigs`): power and laps of the lava-route buff.
     mof_power: f64 = 10,
     mof_laps: f64 = 2,
+    /// Fireforged Sword: some unit carries the buff or holds the spell, so the hits collect their burn victims.
+    swords: bool = false,
     /// The Death "Quagmire" and "Gravebound" spells' powers (recorded `spellConfigs`; the riders set the laps).
     quagmire_power: f64 = 25,
     gravebound_power: f64 = 25,

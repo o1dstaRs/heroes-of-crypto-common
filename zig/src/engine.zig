@@ -2222,6 +2222,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.id == .lava_striders or b.id == .made_of_fire) fire = true;
             if (b.id == .made_of_fire) s.artifacts = true; // a copied buff outlives its army's rows
             if (b.id == .rime_charm or b.id == .gravechain) riders = true;
+            if (b.id == .fireforged_sword) s.swords = true;
             // Rime Charm inflicts Spit Ball's Quagmire: its holder turns the Spit Ball hooks on.
             if (b.id == .rime_charm) s.spit = true;
             if (b.id == .blessing or b.id == .battle_roar) s.spell_hooks = true;
@@ -2240,6 +2241,9 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         }
         // Spells move only with Predatory Assimilation, so the board's books cover every later holder.
         if (u.n_book != 0 or u.n_spells != 0) s.spell_hooks = true;
+        for (u.spells[0..u.n_spells]) |b| {
+            if (b.spell == @intFromEnum(st.CastSpell.fireforged_sword)) s.swords = true;
+        }
         if (u.effects.find(.poison) != null) poisons = true;
     }
     // Configs read without an ability naming them (record.ts: effectConfigs.Poison, spellConfigs).
