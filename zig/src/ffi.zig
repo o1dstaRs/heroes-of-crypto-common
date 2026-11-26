@@ -1081,14 +1081,18 @@ test "policy switches: production values pass, unread ones refuse, read ones app
     try std.testing.expect(try switchCase("{}", &rollout.V08_SCOPE, &out, &buf) == null);
     try std.testing.expect(std.meta.eql(out, v08util.Switches{}));
     try std.testing.expect(try switchCase("{\"decoy_aware\":true,\"role_release\":[],\"mage_damage_kill_priority\":false,\"engine_reachable_routes\":true}", &rollout.V08_SCOPE, &out, &buf) == null);
-    try ex("through_shot_line is not ported (only its production value)", (try switchCase("{\"through_shot_line\":false}", &rollout.V08_SCOPE, &out, &buf)).?);
+    try ex("abomination_guard is not ported (only its production value)", (try switchCase("{\"abomination_guard\":true}", &rollout.V08_SCOPE, &out, &buf)).?);
     out = .{};
     // decoy_aware and mage_damage_kill_priority are read (src/v08 cand.zig, lv8.zig), so their other values apply.
     try std.testing.expect(try switchCase("{\"decoy_aware\":false,\"mage_damage_kill_priority\":true}", &rollout.V08_SCOPE, &out, &buf) == null);
     try std.testing.expect(!out.decoy_aware and out.mage_damage_kill_priority and out.coherent_melee);
     out = .{};
-    try std.testing.expect(try switchCase("{\"coherent_melee\":false,\"wild_regen_gift\":false}", &rollout.V08_SCOPE, &out, &buf) == null);
-    try std.testing.expect(!out.coherent_melee and !out.wild_regen_gift and out.decoy_aware);
+    try std.testing.expect(try switchCase("{\"coherent_melee\":false,\"wild_regen_gift\":false,\"through_shot_line\":false}", &rollout.V08_SCOPE, &out, &buf) == null);
+    try std.testing.expect(!out.coherent_melee and !out.wild_regen_gift and !out.through_shot_line and out.decoy_aware);
+    out = .{};
+    try std.testing.expect(try switchCase("{\"role_release\":[\"healer_sustain\",\"wandering_mage_smoke\"],\"protector_release\":[\"angel\"]}", &rollout.V08_SCOPE, &out, &buf) == null);
+    try std.testing.expect(out.role_release.healer_sustain and out.role_release.wandering_mage_smoke and !out.role_release.blacksmith_craft);
+    try std.testing.expect(out.protector_release.angel and !out.protector_release.arachna_queen);
     out = .{};
     try ex("support_roles is not ported (only its production value)", (try switchCase("{\"support_roles\":false}", &rollout.V08_SCOPE, &out, &buf)).?);
     try ex("unknown switch nope for v0.8", (try switchCase("{\"nope\":true}", &rollout.V08_SCOPE, &out, &buf)).?);

@@ -379,6 +379,66 @@ describe("native rollout scope", () => {
         }
     });
 
+    test("the Through Shot line switch is one key for both seats: off, or green (LEFT) / red (RIGHT) only", () => {
+        const read = new Set(["through_shot_line"]);
+        const environment = profileEnvironment();
+        expect(nativeEnvironmentRefusal({ ...environment, V08_THROUGH_SHOT_LINE: "green" }, read)).toBeNull();
+        expect(nativeEnvironmentRefusal({ ...environment, V08_THROUGH_SHOT_LINE: "off" }, new Set())).toBe(
+            "env:V08_THROUGH_SHOT_LINE",
+        );
+        const previous = process.env.V08_THROUGH_SHOT_LINE;
+        const teams = { "1": { version: "v0.8" as const }, "2": { version: "v0.8" as const } };
+        const line = () => {
+            const policies = nativeRequestPolicies(teams, read) as Record<string, { switches?: object }>;
+            return [policies["1"].switches, policies["2"].switches];
+        };
+        try {
+            delete process.env.V08_THROUGH_SHOT_LINE;
+            expect(line()).toEqual([{ through_shot_line: true }, { through_shot_line: true }]);
+            process.env.V08_THROUGH_SHOT_LINE = "off";
+            expect(line()).toEqual([{ through_shot_line: false }, { through_shot_line: false }]);
+            // team 1 is RIGHT (red), team 2 LEFT (green)
+            process.env.V08_THROUGH_SHOT_LINE = "green";
+            expect(line()).toEqual([{ through_shot_line: false }, { through_shot_line: true }]);
+            process.env.V08_THROUGH_SHOT_LINE = "red";
+            expect(line()).toEqual([{ through_shot_line: true }, { through_shot_line: false }]);
+        } finally {
+            if (previous === undefined) delete process.env.V08_THROUGH_SHOT_LINE;
+            else process.env.V08_THROUGH_SHOT_LINE = previous;
+        }
+    });
+
+    test("the release sets go per seat as lists of names; their keys leave the check only when read", () => {
+        const read = new Set(["role_release", "protector_release"]);
+        const environment = profileEnvironment();
+        const released = {
+            ...environment,
+            V08_ROLE_RELEASE_LEFT: "healer_sustain",
+            V08_PROTECTOR_RELEASE_RIGHT: "angel",
+        };
+        expect(nativeEnvironmentRefusal(released, read)).toBeNull();
+        expect(nativeEnvironmentRefusal(released, new Set())).toMatch(
+            /^env:V08_(ROLE|PROTECTOR)_RELEASE_(LEFT|RIGHT)$/,
+        );
+        const saved = [process.env.V08_ROLE_RELEASE_LEFT, process.env.V08_PROTECTOR_RELEASE_RIGHT];
+        try {
+            process.env.V08_ROLE_RELEASE_LEFT = "wandering_mage_smoke, healer_sustain";
+            process.env.V08_PROTECTOR_RELEASE_RIGHT = "angel";
+            const policies = nativeRequestPolicies({ "1": { version: "v0.8" }, "2": { version: "v0.8" } }, read);
+            // team 1 is RIGHT, team 2 LEFT; names in V08_RELEASABLE_ROLES / V08_BACKLINE_PROTECTOR_KINDS order
+            expect(policies["1"].switches).toEqual({ role_release: [], protector_release: ["angel"] });
+            expect(policies["2"].switches).toEqual({
+                role_release: ["healer_sustain", "wandering_mage_smoke"],
+                protector_release: [],
+            });
+        } finally {
+            if (saved[0] === undefined) delete process.env.V08_ROLE_RELEASE_LEFT;
+            else process.env.V08_ROLE_RELEASE_LEFT = saved[0];
+            if (saved[1] === undefined) delete process.env.V08_PROTECTOR_RELEASE_RIGHT;
+            else process.env.V08_PROTECTOR_RELEASE_RIGHT = saved[1];
+        }
+    });
+
     test("only StrategyV0_8 (under the A19 placement layers) and StrategyV0_1 have a library policy", () => {
         const v08 = nativeTeamPolicy(createAIStrategy("v0.8"));
         expect(typeof v08).toBe("object");

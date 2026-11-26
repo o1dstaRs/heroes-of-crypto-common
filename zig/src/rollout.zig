@@ -166,7 +166,7 @@ pub const SWITCH_NAMES = blk: {
 
 /// The switches src/v08 reads. A request may set any other only to its production value (the policy plays that one);
 /// a switch joins this list in the commit that ports its reads.
-pub const SWITCHES_READ = [_][]const u8{ "decoy_aware", "mage_damage_kill_priority", "coherent_melee", "wild_regen_gift" };
+pub const SWITCHES_READ = [_][]const u8{ "decoy_aware", "mage_damage_kill_priority", "coherent_melee", "wild_regen_gift", "through_shot_line", "role_release", "protector_release" };
 
 fn v08Castable(spell: u8) bool {
     for (V08_SCOPE.castable.?) |c| {

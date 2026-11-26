@@ -32,8 +32,15 @@ import type { IAIStrategy } from "../ai/ai_strategy";
 import { A19_COHERENT_MELEE_APPROACH_ENV, a19CoherentMeleeApproachEnabled } from "../ai/coherent_melee_approach";
 import { A19_DECOY_AWARE_ENV, a19DecoyAwareEnabled } from "../ai/decoy_aware";
 import { seatEnvName } from "../ai/seat_env";
+import { V08_THROUGH_SHOT_LINE_ENV, throughShotLineEnabled } from "../ai/through_shot_line";
 import { StrategyV0_1 } from "../ai/versions/v0_1";
 import { StrategyV0_8 } from "../ai/versions/v0_8";
+import {
+    V08_BACKLINE_PROTECTOR_KINDS,
+    V08_PROTECTOR_RELEASE_ENV,
+    v08ProtectorReleasedForTeam,
+} from "../ai/versions/v0_8_backline_protector";
+import { V08_RELEASABLE_ROLES, V08_ROLE_RELEASE_ENV, v08RoleReleasedForTeam } from "../ai/versions/v0_8_role_release";
 import { V08_MAGE_DAMAGE_KILL_PRIORITY_ENV } from "../ai/versions/v0_8_support_roles";
 import { A19_WILD_REGEN_GIFT_ENV, a19WildRegenGiftEnabled } from "../ai/wild_regeneration_gift";
 import { V08_A13_VALUE_LEAF } from "../ai/versions/v0_8_a13_profile";
@@ -44,6 +51,7 @@ import { V08A19F184LowerHumanPlacementStrategy } from "../ai/versions/v0_8_a19_f
 import { V08A19RankedPlacementStrategy } from "../ai/versions/v0_8_a19_ranked_placement";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { FightStateManager } from "../fights/fight_state_manager";
+import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { captureDeterministicRandomState, restoreDeterministicRandomState } from "../utils/lib";
 import type { INativeHarness } from "./lookahead";
 import type { SearchSelectionBounds } from "./search_selection_bounds";
@@ -471,7 +479,10 @@ export function nativeLeafKind(learnedV2: ILeafWeights | null, learned: ILeafWei
 const NATIVE_SWITCHES: Readonly<
     Record<
         string,
-        { keys: readonly string[]; value: (team: number, env: Readonly<Record<string, string | undefined>>) => boolean }
+        {
+            keys: readonly string[];
+            value: (team: number, env: Readonly<Record<string, string | undefined>>) => boolean | readonly string[];
+        }
     >
 > = {
     // candidates.ts's a19-decoy-aware filter (on unless A19_DECOY_AWARE_<SIDE>=0)
@@ -494,6 +505,22 @@ const NATIVE_SWITCHES: Readonly<
         keys: [`${A19_WILD_REGEN_GIFT_ENV}_LEFT`, `${A19_WILD_REGEN_GIFT_ENV}_RIGHT`],
         value: (team) => a19WildRegenGiftEnabled(team),
     },
+    // v0_8.ts's splash pass: the Through Shot line policy. One key for both seats: unset on, off, or green (LEFT) / red
+    // (RIGHT) for that seat only.
+    through_shot_line: {
+        keys: [V08_THROUGH_SHOT_LINE_ENV],
+        value: (team) => throughShotLineEnabled({ getTeam: () => team as TeamType }),
+    },
+    // the v0.8 role routers (v0_8_role_release.ts): a listed role's router passes the decision through for that seat
+    role_release: {
+        keys: [`${V08_ROLE_RELEASE_ENV}_LEFT`, `${V08_ROLE_RELEASE_ENV}_RIGHT`],
+        value: (team) => V08_RELEASABLE_ROLES.filter((role) => v08RoleReleasedForTeam(role, team)),
+    },
+    // the backline protector kinds with no protector intent for that seat (v0_8_backline_protector.ts)
+    protector_release: {
+        keys: [`${V08_PROTECTOR_RELEASE_ENV}_LEFT`, `${V08_PROTECTOR_RELEASE_ENV}_RIGHT`],
+        value: (team) => V08_BACKLINE_PROTECTOR_KINDS.filter((kind) => v08ProtectorReleasedForTeam(kind, team)),
+    },
 };
 
 /** The request's policies with each v0.8 team's read switches (a v0.1 team is sent as it is). */
@@ -501,15 +528,18 @@ export function nativeRequestPolicies(
     policies: Record<string, { version: NativePolicyVersion }>,
     read: ReadonlySet<string> | undefined,
     env: Readonly<Record<string, string | undefined>> = process.env,
-): Record<string, { version: NativePolicyVersion; switches?: Record<string, boolean> }> {
+): Record<string, { version: NativePolicyVersion; switches?: Record<string, boolean | readonly string[]> }> {
     if (!read?.size) return policies;
-    const out: Record<string, { version: NativePolicyVersion; switches?: Record<string, boolean> }> = {};
+    const out: Record<
+        string,
+        { version: NativePolicyVersion; switches?: Record<string, boolean | readonly string[]> }
+    > = {};
     for (const [team, policy] of Object.entries(policies)) {
         if (policy.version !== "v0.8") {
             out[team] = policy;
             continue;
         }
-        const switches: Record<string, boolean> = {};
+        const switches: Record<string, boolean | readonly string[]> = {};
         for (const name of read) switches[name] = NATIVE_SWITCHES[name].value(Number(team), env);
         out[team] = { ...policy, switches };
     }

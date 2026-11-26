@@ -56,9 +56,14 @@ export const V08_ABOMINATION_GUARD_ENV = "V08_ABOMINATION_GUARD";
  */
 export const V08_PROTECTOR_RELEASE_ENV = "V08_PROTECTOR_RELEASE";
 
-const PROTECTOR_KINDS: readonly V08BacklineProtectorKind[] = ["abomination", "angel", "arachna_queen"];
+export const V08_BACKLINE_PROTECTOR_KINDS: readonly V08BacklineProtectorKind[] = [
+    "abomination",
+    "angel",
+    "arachna_queen",
+];
 
-const protectorReleasedForTeam = (kind: V08BacklineProtectorKind, team: number): boolean => {
+/** Whether V08_PROTECTOR_RELEASE_<SIDE> lists `kind` for `team` (the native rollout adapter reads it too). */
+export const v08ProtectorReleasedForTeam = (kind: V08BacklineProtectorKind, team: number): boolean => {
     assertNoLegacySeatEnv(V08_PROTECTOR_RELEASE_ENV);
     const raw = process.env[seatEnvName(V08_PROTECTOR_RELEASE_ENV, team)];
     if (!raw) return false;
@@ -66,7 +71,9 @@ const protectorReleasedForTeam = (kind: V08BacklineProtectorKind, team: number):
         .split(",")
         .map((token) => token.trim())
         .filter(Boolean);
-    const unknown = released.filter((token) => !PROTECTOR_KINDS.includes(token as V08BacklineProtectorKind));
+    const unknown = released.filter(
+        (token) => !V08_BACKLINE_PROTECTOR_KINDS.includes(token as V08BacklineProtectorKind),
+    );
     if (unknown.length) {
         throw new Error(`${V08_PROTECTOR_RELEASE_ENV} lists unknown protector kinds: ${unknown.join(", ")}`);
     }
@@ -145,7 +152,7 @@ export function buildV08BacklineProtectorIntent(
     const kind = v08BacklineProtectorKind(unit);
     if (!kind || (kind === "arachna_queen" && unit.isSummoned())) return undefined;
     if (kind === "abomination" && abominationReleasedForTeam(unit.getTeam())) return undefined;
-    if (protectorReleasedForTeam(kind, unit.getTeam())) return undefined;
+    if (v08ProtectorReleasedForTeam(kind, unit.getTeam())) return undefined;
     const wards = sortedWards(unit, context);
     if (!wards.length) return undefined;
     if (kind === "angel" && (wards.length < 2 || !liveEnemyShooters(unit, context).length)) return undefined;

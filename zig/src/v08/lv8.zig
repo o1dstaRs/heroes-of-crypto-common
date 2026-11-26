@@ -222,13 +222,14 @@ fn forbiddenTarget(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
     return true;
 }
 
-/// prioritizeV08SplashRangedDecision: a splash shooter (Area Throw, Large Caliber) or a Through Shot unit
-/// (V08_THROUGH_SHOT_LINE unset: on) whose decision shoots or throws takes the shot or area throw with the most priced
+/// prioritizeV08SplashRangedDecision: a splash shooter (Area Throw, Large Caliber) or a Through Shot unit whose team
+/// takes the line policy (util.Switches.through_shot_line: V08_THROUGH_SHOT_LINE unset on, off, or one seat green / red)
+/// whose decision shoots or throws takes the shot or area throw with the most priced
 /// damage over its whole uncapped catalog (free Through Shot lines included), when that beats the priced incumbent.
 /// An army holding Last Fuse runs it too (the blast prices single impacts).
 fn splashRanged(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const u = c.unit();
-    const through = u.has(.through_shot);
+    const through = u.has(.through_shot) and util.battle.switches[u.team].through_shot_line;
     // Area Throw, Large Caliber, a Through Shot line, or an army holding Last Fuse (its blast prices single impacts).
     if (!(u.has(.area_throw) or u.has(.large_caliber) or through or u.buffs.find(.last_fuse) != null)) return util.copyDecision(out, in);
     if (!util.has(in, .range_attack) and !util.has(in, .area_throw_attack)) return util.copyDecision(out, in);
@@ -409,10 +410,12 @@ fn incumbentGuaranteedKill(c: *const ai.Ctx, set: *const cand.Set) bool {
 
 /// prioritizeV08WanderingMageSmoke: a Wandering Mage outside the dominant finish takes the first Smoke candidate
 /// (SUPPORT candidates; addSmoke only offers a cloud that prevents more enemy than friendly ranged damage) unless the
-/// decision is a guaranteed kill. V08_ROLE_RELEASE is unset.
+/// decision is a guaranteed kill. Released (V08_ROLE_RELEASE_<SIDE> lists wandering_mage_smoke), the decision passes
+/// unchanged.
 fn wanderingMageSmoke(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const s = c.s;
-    if (util.creature(s, c.ui) != .wandering_mage or util.dominantFinishState(s, c.unit().team).active) return util.copyDecision(out, in);
+    const team = c.unit().team;
+    if (util.creature(s, c.ui) != .wandering_mage or util.battle.switches[team].role_release.wandering_mage_smoke or util.dominantFinishState(s, team).active) return util.copyDecision(out, in);
     var set: cand.Set = .{};
     cand.enumerate(c, in, cand.SUPPORT, &set);
     if (incumbentGuaranteedKill(c, &set)) return util.copyDecision(out, in);
@@ -445,11 +448,11 @@ fn nightmareFireWall(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void
 /// prioritizeV08BlacksmithCraft: a Blacksmith holding a usable Craft, outside the dominant finish and without a proven
 /// immediate kill, takes the Craft candidate (CRAFT catalog, the incumbent included) whose block reaches the most living
 /// allies, then the most recipient value (summed in id order), then the earliest; with at least two recipients, else
-/// the decision stands. V08_ROLE_RELEASE is unset.
+/// the decision stands. Released (V08_ROLE_RELEASE_<SIDE> lists blacksmith_craft), the decision passes unchanged.
 fn blacksmithCraft(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
-    if (util.creature(s, c.ui) != .blacksmith) return util.copyDecision(out, in);
+    if (util.creature(s, c.ui) != .blacksmith or util.battle.switches[u.team].role_release.blacksmith_craft) return util.copyDecision(out, in);
     const craft_raw: u8 = @intFromEnum(st.CastSpell.craft);
     var usable = false;
     for (u.spells[0..u.n_spells]) |*b| {
@@ -552,11 +555,11 @@ fn bookSpellPower(s: *const st.State, u: *const st.Unit, raw: u8) ?*const st.Spe
 /// (no Holy Cross; it is disabled); Mass Heal by massHealValue; a Blessing by the target's best direct attack (its own
 /// candidates from an empty incumbent, the most expected damage first) x (max - min) / (max + min) x min(2, the spell's
 /// laps) turns (a shot or a throw capped by its shots unless Endless Quiver), skipping a target that is Blessed or
-/// Stunned. V08_ROLE_RELEASE is unset.
+/// Stunned. Released (V08_ROLE_RELEASE_<SIDE> lists healer_sustain), the decision passes unchanged.
 fn healerSustain(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
-    if (util.creature(s, c.ui) != .healer) return util.copyDecision(out, in);
+    if (util.creature(s, c.ui) != .healer or util.battle.switches[u.team].role_release.healer_sustain) return util.copyDecision(out, in);
     var set: cand.Set = .{};
     cand.enumerate(c, in, cand.SUPPORT, &set);
     if (incumbentGuaranteedKill(c, &set)) return util.copyDecision(out, in);
@@ -991,6 +994,10 @@ fn protectorIntent(s: *const st.State, pi: u8) ?Intent {
     const p = &s.units[pi];
     // A summoned Queen (an Infest reward) stays offensive.
     if (kind == .arachna_queen and p.summoned) return null;
+    // V08_PROTECTOR_RELEASE_<SIDE> (util.Switches.protector_release): a listed kind has no intent for that seat. Its
+    // abomination member changes nothing while the Abomination is released anyway (above).
+    const release = util.battle.switches[p.team].protector_release;
+    if ((kind == .angel and release.angel) or (kind == .arachna_queen and release.arachna_queen)) return null;
     var intent = Intent{ .kind = kind, .ward = 0 };
     var best: ?u8 = null;
     var count: usize = 0;
