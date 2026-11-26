@@ -17,6 +17,7 @@
         "src",
         "zig/ffi/bridge.ts",
         "zig/ffi/precheck.ts",
+        "zig/parity/digest.ts",
         "zig/parity/state_export.ts"
     ],
     "scripts": {

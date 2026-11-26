@@ -60,11 +60,19 @@ export type NativePolicyVersion = "v0.1" | "v0.8";
 
 const logged = new Set<string>();
 /** One line per process and key. */
-export function nativeRolloutLog(key: string, message: string): void {
+export function nativeRolloutLog(key: string, message: string, level: "error" | "info" = "error"): void {
     if (logged.has(key)) return;
     logged.add(key);
-    console.error(`[native-rollouts] ${message}`);
+    (level === "info" ? console.info : console.error)(`[native-rollouts] ${message}`);
 }
+
+/**
+ * How a load notice is logged: an error when HOC_NATIVE_ROLLOUTS asked for native rollouts, information when the default
+ * merely found no current library (an installed package, a dirty tree, another runtime). Tools that count console.error
+ * as a failure, such as the ranked research adapter, see nothing when the default declines.
+ */
+const loadNoticeLevel = (): "error" | "info" =>
+    (process.env[NATIVE_ROLLOUTS_ENV] ?? "").trim() === "" ? "info" : "error";
 
 /**
  * `HOC_NATIVE_ROLLOUTS`: unset (the default) or `1` native banks where in scope, `0` TypeScript only, `shadow` TypeScript
@@ -220,14 +228,18 @@ export function getNativeRolloutBackend(): INativeRolloutBackend | null {
     backend = null;
     const load = (import.meta as unknown as { require?: (specifier: string) => unknown }).require;
     if (typeof load !== "function") {
-        nativeRolloutLog("runtime", "native rollouts need Bun's import.meta.require; every bank stays in TypeScript");
+        nativeRolloutLog(
+            "runtime",
+            "native rollouts need Bun's import.meta.require; every bank stays in TypeScript",
+            loadNoticeLevel(),
+        );
         return backend;
     }
     try {
         // The one-time load (the bridge, its self-test, the manifests and their pre-checks) only reads, like a root step.
         backend = rootStepWithoutSideEffects("backend load", () => loadNativeRolloutBackend(load));
     } catch (error) {
-        nativeRolloutLog("load-error", `native rollouts off: ${(error as Error).message}`);
+        nativeRolloutLog("load-error", `native rollouts off: ${(error as Error).message}`, loadNoticeLevel());
         backend = null;
     }
     return backend;
@@ -241,6 +253,7 @@ function loadNativeRolloutBackend(load: (specifier: string) => unknown): INative
             nativeRolloutLog(
                 "default",
                 `native rollouts off by default: ${tree.reason} (HOC_NATIVE_ROLLOUTS=1 forces them)`,
+                "info",
             );
             return null;
         }
@@ -249,7 +262,7 @@ function loadNativeRolloutBackend(load: (specifier: string) => unknown): INative
     const bridge = load("../../zig/ffi/bridge.ts") as IBridgeModule;
     const engine = bridge.loadHocEngine({
         commonSha,
-        log: (message) => nativeRolloutLog("load", message),
+        log: (message) => nativeRolloutLog("load", message, loadNoticeLevel()),
     });
     if (!engine) return null;
     const { compileHocPrecheck } = load("../../zig/ffi/precheck.ts") as {

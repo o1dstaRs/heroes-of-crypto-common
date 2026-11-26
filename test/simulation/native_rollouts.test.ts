@@ -30,6 +30,7 @@ import {
     nativeExportSideEffects,
     nativeLeafKind,
     nativeDefaultTree,
+    nativeRolloutLog,
     nativeRolloutModeFromEnv,
     nativeShadowRateFromEnv,
     nativeTeamPolicy,
@@ -117,6 +118,22 @@ const bankInput = (overrides: Partial<INativeBankInput> = {}): INativeBankInput 
 });
 
 describe("native rollout switch", () => {
+    test("a notice the default logs goes to console.info, so tools that count console.error see nothing", () => {
+        const info = console.info;
+        const error = console.error;
+        const seen: string[] = [];
+        console.info = (...args: unknown[]) => void seen.push(`info ${args.join(" ")}`);
+        console.error = (...args: unknown[]) => void seen.push(`error ${args.join(" ")}`);
+        try {
+            nativeRolloutLog("test-info-notice", "declined", "info");
+            nativeRolloutLog("test-error-notice", "failed");
+            nativeRolloutLog("test-error-notice", "failed again");
+        } finally {
+            console.info = info;
+            console.error = error;
+        }
+        expect(seen).toEqual(["info [native-rollouts] declined", "error [native-rollouts] failed"]);
+    });
     test("HOC_NATIVE_ROLLOUTS parses to off, on or shadow (unset is on), anything else stays off", () => {
         expect(nativeRolloutModeFromEnv(undefined)).toBe("on");
         expect(nativeRolloutModeFromEnv(" ")).toBe("on");
