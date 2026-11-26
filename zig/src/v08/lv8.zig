@@ -945,6 +945,34 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) bool {
     return true;
 }
 
+/// prioritizeV08CemeteryObstacleAttack: with a standing scattered stone and no committed attack, strike or cast, the
+/// best direct attack, else a stone strike, else the decision.
+pub fn cemetery(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
+    const t = &c.s.grid.terrain;
+    var protected = false;
+    for (in.slice()) |a| switch (a) {
+        .melee_attack, .range_attack, .obstacle_attack => protected = true,
+        else => {},
+    };
+    if (t.n_layout == 0 or t.standing == 0 or protected) {
+        util.copyDecision(out, in);
+        return true;
+    }
+    var set: cand.Set = .{};
+    cand.enumerate(c, in, cand.BOUNDARY_MOUNTAINS, &set);
+    if (set.incomplete) return false;
+    if (selectDirectCombat(&set)) |i| {
+        take(out, &set, i);
+        return true;
+    }
+    for (set.slice(), 0..) |*cd, i| if (cd.kind == .mine) {
+        take(out, &set, i);
+        return true;
+    };
+    util.copyDecision(out, in);
+    return true;
+}
+
 /// Runs one ported pass on `in`; false when the pass is not ported yet.
 pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision) bool {
     switch (pass) {
@@ -959,11 +987,7 @@ pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision
         // the Healer and the Blacksmith need abilities or spells the engine does not carry yet; ranked-replay tactics
         // are an off-by-default research scope.
         .forbidden_target, .splash, .damage_spell, .vine, .smoke, .nightmare, .healer, .blacksmith, .ranked_replay => util.copyDecision(out, in),
-        // Cemetery strikes a standing scattered stone: identity without one (mountain candidates not ported yet).
-        .cemetery => {
-            if (c.s.grid.terrain.n_layout > 0 and c.s.grid.terrain.standing != 0) return false;
-            util.copyDecision(out, in);
-        },
+        .cemetery => return cemetery(c, in, out),
         .ranged_positioning => return rangedPositioning(c, in, out),
     }
     return true;

@@ -13,6 +13,7 @@ const path = @import("../path.zig");
 const ai = @import("../ai.zig");
 const util = @import("util.zig");
 const abilities = @import("../abilities.zig");
+const terrain = @import("../terrain.zig");
 
 const Cell = rec.Cell;
 const AT = st.AttackType;
@@ -50,6 +51,8 @@ pub const Options = struct {
     max_shots: usize = 0,
     enrich: bool = false,
     coverage: bool = false,
+    /// includeMountainAttacks: one strike on a standing scattered stone (the classic centre mountain is not ported).
+    mountains: bool = false,
 };
 
 pub const MAX = 64;
@@ -95,7 +98,8 @@ pub fn sigEqual(a: []const rec.Action, b: []const rec.Action) bool {
             },
             .obstacle_attack => |o| {
                 const p = y.obstacle_attack;
-                if (o.target_x != p.target_x or o.target_y != p.target_y or !sameCell(o.attack_from, p.attack_from)) return false;
+                if (o.target_x != p.target_x or o.target_y != p.target_y or o.has_from != p.has_from) return false;
+                if (o.has_from and !sameCell(o.attack_from, p.attack_from)) return false;
             },
             else => {},
         }
@@ -200,6 +204,97 @@ const Gen = struct {
         const cells = body.slice();
         @memcpy(d.targets[0..cells.len], cells);
         d.push(.{ .move_unit = .{ .unit = self.c.ui, .path = d.path[0..len], .target_cells = d.targets[0..cells.len], .has_lava = r.has_lava } });
+    }
+
+    // ---- scattered stones (addMountainAttack, scattered branch) ----
+
+    fn addMountainAttack(self: *Gen) void {
+        if (!self.opt.mountains) return;
+        const s = self.c.s;
+        const u = self.unit();
+        if (u.isDead()) return;
+        if (s.grid.terrain.n_layout == 0) {
+            if (s.fight.grid_type == st.GridType.BLOCK_CENTER) self.out.incomplete = true; // the classic mountain
+            return;
+        }
+        var stones: terrain.CenterCells = .{};
+        terrain.centerCells(s, &stones);
+        const standing = stones.slice();
+        if (standing.len == 0) return;
+        if (u.target >= 0 and u.target < s.n_units and !s.units[@intCast(u.target)].isDead()) return;
+        const base = engine.baseCell(u);
+        if (engine.canLandRangeAttack(s, u) and (u.attack_type_selected == AT.RANGE or engine.possibleIncludes(u, AT.RANGE))) {
+            // A shooter strikes the nearest stone (Manhattan, first in layout order on ties) from where it stands.
+            var target = standing[0];
+            var best: i32 = std.math.maxInt(i32);
+            for (standing) |cell| {
+                const d: i32 = @intCast(@abs(cell.x - base.x) + @abs(cell.y - base.y));
+                if (d < best) {
+                    best = d;
+                    target = cell;
+                }
+            }
+            var cand: Candidate = .{ .kind = .mine, .tcell = target, .stand = base };
+            if (u.attack_type_selected != AT.RANGE) cand.d.push(.{ .select_attack_type = .{ .unit = self.c.ui, .attack_type = AT.RANGE } });
+            const pos = engine.positionForCell(@floatFromInt(target.x), @floatFromInt(target.y));
+            cand.d.push(.{ .obstacle_attack = .{ .attacker = self.c.ui, .target_x = pos[0], .target_y = pos[1], .attack_from = .{ .x = 0, .y = 0 }, .path = &.{}, .has_from = false } });
+            self.push(&cand);
+            return;
+        }
+        if (u.attack_type_selected == AT.RANGE or !self.canMelee()) return;
+        // mountainMeleeStrike: the stationary strike if a stone touches the body, else the cheapest reachable stand
+        // touching one (weight, stand x, y, stone x, y; one route per cell in scope).
+        var sorted: [st.MAX_STONES]Cell = undefined;
+        @memcpy(sorted[0..standing.len], standing);
+        std.sort.insertion(Cell, sorted[0..standing.len], {}, struct {
+            fn lt(_: void, a: Cell, b: Cell) bool {
+                return a.x < b.x or (a.x == b.x and a.y < b.y);
+            }
+        }.lt);
+        const targets = sorted[0..standing.len];
+        const Strike = struct { from: Cell, target: Cell, route: ?u16, weight: f64 };
+        var best: ?Strike = null;
+        if (self.stoneNextTo(targets, base)) |t| {
+            if (ai.canLandAt(s, self.c.ui, base)) best = .{ .from = base, .target = t, .route = null, .weight = 0 };
+        }
+        const mp = self.movePath();
+        if (best == null) {
+            if (mp) |m| {
+                for (m.known(), 0..) |*r, ri| {
+                    if (sameCell(r.cell, base) or !std.math.isFinite(r.weight) or !ai.canLandAt(s, self.c.ui, r.cell)) continue;
+                    const t = self.stoneNextTo(targets, r.cell) orelse continue;
+                    const cand_ = Strike{ .from = r.cell, .target = t, .route = @intCast(ri), .weight = r.weight };
+                    if (best) |b| {
+                        const better = if (cand_.weight != b.weight) cand_.weight < b.weight else if (cand_.from.x != b.from.x) cand_.from.x < b.from.x else if (cand_.from.y != b.from.y) cand_.from.y < b.from.y else if (cand_.target.x != b.target.x) cand_.target.x < b.target.x else cand_.target.y < b.target.y;
+                        if (better) best = cand_;
+                    } else best = cand_;
+                }
+            }
+        }
+        const strike = best orelse return;
+        var cand: Candidate = .{ .kind = .mine, .tcell = strike.target, .stand = strike.from };
+        const pos = engine.positionForCell(@floatFromInt(strike.target.x), @floatFromInt(strike.target.y));
+        var route_cells: []const Cell = &.{};
+        var lava = false;
+        if (strike.route) |ri| {
+            const r = &mp.?.known()[ri];
+            const len = mp.?.routeCells(r, &cand.d.path);
+            route_cells = cand.d.path[0..len];
+            lava = r.has_lava;
+        }
+        cand.d.push(.{ .obstacle_attack = .{ .attacker = self.c.ui, .target_x = pos[0], .target_y = pos[1], .attack_from = strike.from, .path = route_cells, .has_lava = lava } });
+        self.push(&cand);
+    }
+
+    /// The first stone (in x, y order) touching the body at `stand` (legacy footprint order).
+    fn stoneNextTo(self: *const Gen, targets: []const Cell, stand: Cell) ?Cell {
+        const body = self.bodyAt(stand);
+        for (body.slice()) |fc| {
+            for (targets) |t| {
+                if (@abs(fc.x - t.x) <= 1 and @abs(fc.y - t.y) <= 1) return t;
+            }
+        }
+        return null;
     }
 
     // ---- moves ----
@@ -588,6 +683,7 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
     g.addWait();
     g.addDefend();
     g.addMelee();
+    g.addMountainAttack();
     g.addShots();
     g.addMoves();
     // a19-decoy-aware-v1 (on unless A19_DECOY_AWARE_<SIDE>=0): no challenger strikes a one-model decoy while another
@@ -613,5 +709,7 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
 
 /// The boundary options (enumerateV08BoundaryCandidates without mountain strikes).
 pub const BOUNDARY = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true };
+/// enumerateV08BoundaryCandidates with mountain strikes (the cemetery pass).
+pub const BOUNDARY_MOUNTAINS = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true, .mountains = true };
 /// prioritizeV08A13FinishDecision's options.
 pub const FINISH = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true, .coverage = true };

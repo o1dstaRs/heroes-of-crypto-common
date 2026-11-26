@@ -357,6 +357,7 @@ pub fn copyDecision(dst: *ai.Decision, src: *const ai.Decision) void {
             m.target_cells = rebase(m.target_cells, &src.targets, &dst.targets);
         },
         .melee_attack => |*m| m.path = rebase(m.path, &src.path, &dst.path),
+        .obstacle_attack => |*o| o.path = rebase(o.path, &src.path, &dst.path),
         else => {},
     };
 }
