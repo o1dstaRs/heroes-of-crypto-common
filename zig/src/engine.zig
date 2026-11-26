@@ -441,6 +441,8 @@ pub inline fn opposite(team: u8) u8 {
 /// Dismorale.
 pub fn changeMorale(u: *Unit, amount: f64, increase: bool) void {
     if (amount <= 0 or moraleLocked(u) or hasMoraleBuff(u) or hasDismorale(u) or hasDebuff(u, .sadness)) return;
+    // Courage freezes base morale while the row lasts (increaseMorale / decreaseMorale: hasBuffActive("Courage")).
+    if (u.buffs.len != 0 and u.buffs.find(.courage) != null) return;
     var m = if (increase) u.init.morale + amount else u.init.morale - amount;
     if (m > MORALE_MAX) m = MORALE_MAX;
     if (m < -MORALE_MAX) m = -MORALE_MAX;
@@ -616,13 +618,23 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     if (moraleLocked(u)) {
         u.morale = 0;
     } else {
-        if (spit and u.debuffs.find(.sadness) != null) u.morale = -MORALE_MAX;
+        // Sadness pins -20 and Courage +20; both together lock 0, which no Morale or Dismorale row overrides.
+        const sad = spit and u.debuffs.find(.sadness) != null;
+        const courage = u.buffs.len != 0 and u.buffs.find(.courage) != null;
+        const locked = sad and courage;
+        if (locked) {
+            u.morale = 0;
+        } else if (sad) {
+            u.morale = -MORALE_MAX;
+        } else if (courage) {
+            u.morale = MORALE_MAX;
+        }
         if (hasMoraleBuff(u)) {
             u.attack_multiplier = 1.25;
-            u.morale = MORALE_MAX;
+            if (!locked) u.morale = MORALE_MAX;
         } else if (hasDismorale(u)) {
             u.attack_multiplier = 0.8;
-            u.morale = -MORALE_MAX;
+            if (!locked) u.morale = -MORALE_MAX;
         }
     }
     if (u.morale > MORALE_MAX) u.morale = MORALE_MAX;

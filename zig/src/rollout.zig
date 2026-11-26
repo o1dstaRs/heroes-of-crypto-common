@@ -131,7 +131,7 @@ pub const V08_SCOPE = scope.PolicyScope{
     .refuse_smoke = true,
     .late = .{
         .abilities = st.AbilityId.crafted_double_punch.bit() | st.AbilityId.crafted_double_shot.bit() | st.AbilityId.crafted_frozen_sword.bit() | st.AbilityId.crafted_frozen_bow.bit(),
-        .buffs = &.{ .fireforged_sword, .armor_rune, .weapon_rune, .riot, .mass_riot, .magic_mirror, .mass_magic_mirror },
+        .buffs = &.{ .fireforged_sword, .armor_rune, .weapon_rune, .riot, .mass_riot, .magic_mirror, .mass_magic_mirror, .courage },
         .debuffs = &.{ .misfortune, .whirlpool },
         .effects = &.{.freeze},
     },

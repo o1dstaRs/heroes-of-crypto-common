@@ -46,7 +46,8 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   holder skips its next activation and cannot move but still replies); the Ogre Mage's Riot / Mass Riot (attack_mod =
   base attack x power / 100, Riot first) and Magic Mirror / Mass Magic Mirror (the holder's mirror share
   max(buff power, Magic Reflection) in spell rebounds and every mirror roll; a Fireforged Sword burn reflects the buff
-  share onto its wielder); batch 6a's
+  share onto its wielder); the Satyr's Courage (morale pinned at +20, 0 with Sadness and then locked against Morale and
+  Dismorale, and frozen: no morale change reaches the holder while the row lasts); batch 6a's
   castables, the Valkyrie's Wind Flow (a
   mass buff on every flyer) and the Angel's Resurrection (on a wounded ally stack); a book holding any other spell is
   refused;
@@ -1592,7 +1593,7 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 - the abilities of every creature outside batches 1 to 5 and 6a and the wave-1 casters (batch 6b: Harpy, Mermaid,
   Efreet, Black Dragon, Abomination, Thunderbird), the spells outside wave 1, the Book of Chaos, the Blacksmith's book and
   batch 6a's castables
-  (Courage, Helping Hand, Castling and the rest: a book holding one is refused by
+  (Helping Hand, Castling and the rest: a book holding one is refused by
   name), the disabled Broken Aegis (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and
   mirror rolls of debuff spells); the revealed-ranged delivery layer of
   production's augment plan (it needs the live draft); WATER_CENTER (never played); on the maps, Fire Breath through

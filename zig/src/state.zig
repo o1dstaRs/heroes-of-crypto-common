@@ -107,6 +107,8 @@ pub const SpellId = enum(u8) {
     mass_riot,
     magic_mirror,
     mass_magic_mirror,
+    /// The Satyr's MIND buff (wave 2): morale pinned at +20 (0 with Sadness) and frozen.
+    courage,
     /// The Blacksmith's runes (wave 2): never-ticking buff rows (laps 15) whose first stored property is the stacked
     /// bonus N, added flat to armor_mod / attack_mod.
     armor_rune,
@@ -246,6 +248,7 @@ pub const SpellId = enum(u8) {
             .mass_riot => "Mass Riot",
             .magic_mirror => "Magic Mirror",
             .mass_magic_mirror => "Mass Magic Mirror",
+            .courage => "Courage",
             .armor_rune => "Armor Rune",
             .weapon_rune => "Weapon Rune",
             .freeze => "Freeze",
@@ -671,7 +674,7 @@ pub const AbilityId = enum(u8) {
     pub fn ownsSpell(self: AbilityId, spell: CastSpell) bool {
         return switch (self) {
             .book_of_healing => spell == .heal or spell == .blessing or spell == .spiritual_armor or spell == .mass_heal,
-            .forest_spellbook => spell == .summon_wolves,
+            .forest_spellbook => spell == .summon_wolves or spell == .courage,
             .basic_tome_of_battle_magic => spell == .fire_strike or spell == .meteorite,
             .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower or spell == .whirlpool,
             .book_of_chaos => spell == .fireball or spell == .fireforged_sword or spell == .misfortune or spell == .smoke,
@@ -778,6 +781,8 @@ pub const CastSpell = enum(u8) {
     magic_mirror,
     mass_riot,
     mass_magic_mirror,
+    // wave 2a: the Satyr's Forest Spellbook
+    courage,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -808,6 +813,7 @@ pub const CastSpell = enum(u8) {
             .magic_mirror => "Magic Mirror",
             .mass_riot => "Mass Riot",
             .mass_magic_mirror => "Mass Magic Mirror",
+            .courage => "Courage",
         };
     }
 
@@ -836,6 +842,7 @@ pub const CastSpell = enum(u8) {
             .magic_mirror => .magic_mirror,
             .mass_riot => .mass_riot,
             .mass_magic_mirror => .mass_magic_mirror,
+            .courage => .courage,
             else => null,
         };
     }
