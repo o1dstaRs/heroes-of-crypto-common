@@ -10,6 +10,7 @@ const ai = @import("../ai.zig");
 const util = @import("util.zig");
 const cand = @import("cand.zig");
 const fuse = @import("fuse.zig");
+const firewall = @import("fire.zig");
 const engine = @import("../engine.zig");
 const path = @import("../path.zig");
 const js = @import("../jsnum.zig");
@@ -402,6 +403,25 @@ fn wanderingMageSmoke(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) voi
     const smoke_raw: i16 = @intFromEnum(st.CastSpell.smoke);
     for (set.slice(), 0..) |*cd, i| {
         if (cd.spell == smoke_raw) return take(out, &set, i);
+    }
+    util.copyDecision(out, in);
+}
+
+/// prioritizeV08NightmareFireWall: a Nightmare whose decision is an advance or a passive turn (no wait, cast, strike, shot
+/// or area throw in it), outside the dominant finish, takes the first Fire Wall candidate of the support catalog.
+fn nightmareFireWall(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    const s = c.s;
+    if (util.creature(s, c.ui) != .nightmare) return util.copyDecision(out, in);
+    for (in.slice()) |a| switch (a) {
+        .wait_turn, .cast_spell, .melee_attack, .range_attack, .area_throw_attack => return util.copyDecision(out, in),
+        else => {},
+    };
+    if (util.dominantFinishState(s, c.unit().team).active) return util.copyDecision(out, in);
+    var set: cand.Set = .{};
+    cand.enumerate(c, in, cand.SUPPORT, &set);
+    const fire_wall: i16 = @intFromEnum(st.CastSpell.fire_wall);
+    for (set.slice(), 0..) |*cd, i| {
+        if (cd.spell == fire_wall) return take(out, &set, i);
     }
     util.copyDecision(out, in);
 }
@@ -1508,7 +1528,11 @@ pub fn coherentMelee(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool
     const base = engine.baseCell(u);
     var d: ai.Decision = .{};
     if (ai.sameCell(base, hit.attack_from)) {
-        // The strike is from the current cell: drop the stale move.
+        // The strike is from the current cell: drop the stale move (unless Cowardice bars the strike: keep the move).
+        if (engine.cowardly(s, u) and util.cumulativeHp(u) < util.cumulativeHp(t)) {
+            out.n = @intCast(mi + 1);
+            return true;
+        }
         for (acts, 0..) |a, i| {
             if (i == mi) continue;
             d.push(if (i == si) stationary else a);
@@ -1538,6 +1562,8 @@ pub fn coherentMelee(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool
             d.push(.{ .move_unit = .{ .unit = m.unit, .path = d.path[0..len], .target_cells = d.targets[0..body.len], .has_lava = r.has_lava } });
         } else d.push(if (i == si) stationary else a);
     }
+    // repairUnavailableMovePrefixedAttack on the aligned approach (a Fire Wall walk, or Cowardice at the projected hp).
+    firewall.repairMovePrefixedAttack(s, c.ui, &d);
     util.copyDecision(out, &d);
     return true;
 }
@@ -1613,9 +1639,9 @@ fn runPassInner(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decisio
         .healer => healerSustain(c, in, out),
         .smoke => wanderingMageSmoke(c, in, out),
         .blacksmith => blacksmithCraft(c, in, out),
-        // Identity in scope: Nightmare's Fire Wall needs a spell the port does not cast yet; ranked-replay tactics are an
-        // off-by-default research scope.
-        .nightmare, .ranked_replay => util.copyDecision(out, in),
+        .nightmare => nightmareFireWall(c, in, out),
+        // Identity: ranked-replay tactics are an off-by-default research scope.
+        .ranked_replay => util.copyDecision(out, in),
         .cemetery => return cemetery(c, in, out),
         .ranged_positioning => return rangedPositioning(c, in, out),
     }

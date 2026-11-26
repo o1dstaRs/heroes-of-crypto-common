@@ -427,14 +427,8 @@ pub fn hasUnactedTeammate(s: *const State, ui: u8) bool {
 
 /// canWaitOnHourglass: whether the engine accepts a wait (hourglass) for this unit now. No Time Denial in scope.
 pub fn canHourglass(s: *const State, ui: u8) bool {
-    const u = &s.units[ui];
-    if (u.team != st.Team.LEFT and u.team != st.Team.RIGHT) return false;
-    if (u.moved_this_turn) return false;
-    if (!hasUnactedTeammate(s, ui)) return false;
-    if (u.on_hourglass) return false;
-    if (s.fight.hourglass_q.includes(ui)) return false;
-    if (madeTurn(s, ui)) return false;
-    return s.fight.hourglass_set & engine.unitBit(ui) == 0;
+    // canWaitOnHourglass (src/engine/hourglass.ts), Time Denial included: the engine's own predicate.
+    return engine.canWaitOnHourglass(s, ui);
 }
 
 /// isAoEUnit (v0_4.ts): by name (AOE_NAMES), or by an active AoE ability (Skewer Strike, which the Queen can steal;

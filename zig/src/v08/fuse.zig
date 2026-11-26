@@ -320,7 +320,7 @@ fn canProjectMeleeResponse(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShap
 
 /// estimateLastFuseMeleeDamage: a supported direct strike of a Last Fuse army priced with the corpse's blast at the
 /// strike's fatal chance; null (search decides) for a striker with a Fireforged Sword or a secondary rider (Fire Shield
-/// is not in the engine), a move while an aura is on the board (Fire Walls are not in scope), an unsupported primary sequence,
+/// is not in the engine), a move while a Fire Wall burns or an aura is on the board, an unsupported primary sequence,
 /// a fatal strike whose answer the estimate cannot project, or a blast that destroys a self-resurrecting stack. An
 /// absorbed strike buys nothing.
 pub fn lastFuseMelee(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape, from: Cell) ?FuseEstimate {
@@ -329,7 +329,9 @@ pub fn lastFuseMelee(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape, fro
     if (u.buffs.find(.last_fuse) == null or t.isDead() or t.team == u.team) return null;
     if (u.buffs.find(.fireforged_sword) != null or secondaryRider(u)) return null;
     if (shape.moved) {
-        for (s.holderOrder()) |i| if (s.units[i].auraCount() != 0) return null; // getAuraEffects(): none while Broken
+        // decisionFireWalls(context).size() > 0, or any unit projecting an aura (getAuraEffects(): none while Broken).
+        if (s.fight.n_fire != 0) return null;
+        for (s.holderOrder()) |i| if (s.units[i].auraCount() != 0) return null;
     }
     const resurrects = engine.canSelfResurrect(t);
     if (resurrects and s.setup[u.team].break_chance > 0) return null;

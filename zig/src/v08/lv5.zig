@@ -17,6 +17,7 @@ const engine = @import("../engine.zig");
 const pathing = @import("../path.zig");
 const ai = @import("../ai.zig");
 const util = @import("util.zig");
+const firewall = @import("fire.zig");
 const policy = @import("policy.zig");
 const weights = @import("weights.zig");
 const lv4 = @import("lv4.zig");
@@ -146,40 +147,10 @@ fn excludeHiddenAttack(c: *ai.Ctx, out: *ai.Decision) void {
     util.setEndTurn(out, c.ui);
 }
 
-/// repairUnavailableMovePrefixedAttack (no Fire Wall in scope): a move followed by the unit's melee on a stack with
-/// more cumulative HP while the unit carries Cowardice keeps only the actions up to the move.
+/// repairUnavailableMovePrefixedAttack, v0.5's last step: firewall.repairMovePrefixedAttack (the projected walk: Fire Wall
+/// burns and Made of Fire's max hp, then Cowardice at the projected hp).
 fn repairMovePrefixedAttack(c: *ai.Ctx, out: *ai.Decision) void {
-    const s = c.s;
-    const u = c.unit();
-    var move_idx: ?usize = null;
-    for (out.slice(), 0..) |a, i| {
-        if (a == .move_unit and a.move_unit.unit == c.ui) {
-            move_idx = i;
-            break;
-        }
-    }
-    const mi = move_idx orelse return;
-    var dependent = false;
-    for (out.slice()[mi + 1 ..]) |a| switch (a) {
-        .melee_attack => |m| if (m.attacker == c.ui) {
-            dependent = true;
-        },
-        .range_attack => |r| if (r.attacker == c.ui) {
-            dependent = true;
-        },
-        else => {},
-    };
-    if (!dependent or !engine.cowardly(s, u)) return;
-    const hp = util.cumulativeHp(u);
-    var blocked = false;
-    for (out.slice()[mi + 1 ..]) |a| switch (a) {
-        .melee_attack => |m| if (m.attacker == c.ui) {
-            const t = &s.units[m.target];
-            if (t.in_holder and !t.isDead() and hp < util.cumulativeHp(t)) blocked = true;
-        },
-        else => {},
-    };
-    if (blocked) out.n = @intCast(mi + 1);
+    firewall.repairMovePrefixedAttack(c.s, c.ui, out);
 }
 
 /// Slots with a sort key, ordered by the key descending, stably (JavaScript's sort with `(p, q) => key(q) - key(p)`).
@@ -488,14 +459,18 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
             Consider.f(&best, e, base, null, scorer.score(e, ec.slice(), base, mine.slice()));
         }
     }
-    // Move-and-strike, when the unit can move (no Fire Wall, so moving cannot kill the actor).
+    // Move-and-strike, when the unit can move. With a Fire Wall on the board (or a dead stack) a move the projected walk
+    // would end the actor's turn with is skipped (actorCannotDieWhileMoving, projectPostMoveActorAvailability).
     const mp = c.actualPath();
     var buf: [64]Cell = undefined;
     const routes = if (u.canMove()) mp.known() else mp.known()[0..0];
+    const actor_safe = s.fight.n_fire == 0 and u.amount_alive > 0;
     for (routes) |*r| {
-        if (mp.routeCells(r, &buf) == 0) continue;
+        const len = mp.routeCells(r, &buf);
+        if (len == 0) continue;
         const fp = ai.footprintForAnchor(u, r.cell);
         if (!engine.cellsFreeFor(s, c.ui, fp.slice())) continue;
+        if (!actor_safe and !ai.sameCell(r.cell, base) and !firewall.projectPostMove(s, c.ui, buf[0..len], fp.slice(), r.has_lava).available) continue;
         for (enemies[0..n_enemies], enemy_cells[0..n_enemies]) |e, *ec| {
             if (util.footprintsNear(fp.slice(), ec.slice())) {
                 Consider.f(&best, e, r.cell, r, scorer.score(e, ec.slice(), r.cell, fp.slice()));

@@ -13,6 +13,7 @@ const path = @import("../path.zig");
 const ai = @import("../ai.zig");
 const util = @import("util.zig");
 const fuse = @import("fuse.zig");
+const firewall = @import("fire.zig");
 const abilities = @import("../abilities.zig");
 const artifacts = @import("../artifacts.zig");
 const terrain = @import("../terrain.zig");
@@ -145,6 +146,9 @@ pub fn sigEqual(a: []const rec.Action, b: []const rec.Action) bool {
                 if (c.spell != o.spell or c.has_target != o.has_target or c.has_cell != o.has_cell) return false;
                 if (c.has_target and c.target != o.target) return false;
                 if (c.has_cell and !sameCell(c.cell, o.cell)) return false;
+                // Fire Wall rotations at one anchor are distinct actions (normalizeFireWallOrientation); other spells
+                // ignore the orientation.
+                if (c.spell == @intFromEnum(st.CastSpell.fire_wall) and c.orientation % 4 != o.orientation % 4) return false;
             },
             else => {},
         }
@@ -530,6 +534,101 @@ const Gen = struct {
         }
     }
 
+    /// addFireWallCastCandidates: a wall worth casting is one an enemy must walk into. For each living, visible enemy
+    /// (holder order) at least one cell from the rounded centroid of our living base cells (the caster first), anchors at
+    /// 0.25, 0.35 and 0.5 of its approach score threat (max(1, alive) x max(1, max damage)) / frac, each at its first
+    /// legal orientation, closest to perpendicular first (index order on ties); strict improvement keeps the first best.
+    /// When no sample is legal, a full-grid fallback scores every cell by threat / (1 + its distance to the nearest
+    /// sample), plan by plan. A wall is legal when no living unit stands under it and at least one cell lights; it is
+    /// offered unvalued at its orientation.
+    fn addFireWall(self: *Gen, raw: u8) void {
+        const s = self.c.s;
+        const team = self.unit().team;
+        const opp = engine.opposite(team);
+        var sum_x: f64 = 0;
+        var sum_y: f64 = 0;
+        var na: f64 = 0;
+        for ([_]bool{ true, false }) |caster_pass| {
+            for (s.holderOrder()) |k| {
+                if ((k == self.c.ui) != caster_pass or !util.livingOf(s, k, team)) continue;
+                const b = engine.baseCell(&s.units[k]);
+                sum_x += @floatFromInt(b.x);
+                sum_y += @floatFromInt(b.y);
+                na += 1;
+            }
+        }
+        if (na == 0) return;
+        const ax = js.round(sum_x / na);
+        const ay = js.round(sum_y / na);
+        const Plan = struct { threat: f64, orient: [4]u8, samples: [3]Cell };
+        var plans: [st.MAX_UNITS]Plan = undefined;
+        var np: usize = 0;
+        var best: ?struct { cell: Cell, orientation: u8, score: f64 } = null;
+        const fracs = [3]f64{ 0.25, 0.35, 0.5 };
+        for (s.holderOrder()) |k| {
+            if (!util.livingOf(s, k, opp) or s.units[k].isHidden()) continue;
+            const e = &s.units[k];
+            const ec = engine.baseCell(e);
+            const dx = ax - @as(f64, @floatFromInt(ec.x));
+            const dy = ay - @as(f64, @floatFromInt(ec.y));
+            const approach = hypotInt(dx, dy);
+            if (approach < 1) continue;
+            const threat = @max(1, e.amount_alive) * @max(1, e.attack_damage_max);
+            var plan = Plan{ .threat = threat, .orient = .{ 0, 1, 2, 3 }, .samples = undefined };
+            var alignment: [4]f64 = undefined;
+            for (0..4) |o| {
+                const step = fireWallStep(@intCast(o));
+                const wx: f64 = @floatFromInt(step[0]);
+                const wy: f64 = @floatFromInt(step[1]);
+                alignment[o] = @abs((wx * dx + wy * dy) / (hypotInt(wx, wy) * approach));
+            }
+            std.sort.insertion(u8, &plan.orient, &alignment, struct {
+                fn lt(al: *const [4]f64, a: u8, b: u8) bool {
+                    return al[a] < al[b] or (al[a] == al[b] and a < b);
+                }
+            }.lt);
+            for (fracs, 0..) |frac, i| {
+                plan.samples[i] = .{
+                    .x = @intFromFloat(js.round(@as(f64, @floatFromInt(ec.x)) + dx * frac)),
+                    .y = @intFromFloat(js.round(@as(f64, @floatFromInt(ec.y)) + dy * frac)),
+                };
+            }
+            plans[np] = plan;
+            np += 1;
+            for (plan.samples, fracs) |anchor, frac| {
+                const score = threat / @max(frac, 0.01);
+                for (plan.orient) |o| {
+                    if (!legalFireWall(s, anchor, o)) continue;
+                    if (best == null or score > best.?.score) best = .{ .cell = anchor, .orientation = o, .score = score };
+                    break;
+                }
+            }
+        }
+        if (best == null) {
+            for (plans[0..np]) |*plan| {
+                var x: i32 = 0;
+                while (x < st.GRID) : (x += 1) {
+                    var y: i32 = 0;
+                    while (y < st.GRID) : (y += 1) {
+                        var distance = std.math.inf(f64);
+                        for (plan.samples) |sm| distance = @min(distance, hypotInt(@floatFromInt(x - sm.x), @floatFromInt(y - sm.y)));
+                        const score = plan.threat / (1 + distance);
+                        for (plan.orient) |o| {
+                            if (!legalFireWall(s, .{ .x = x, .y = y }, o)) continue;
+                            if (best == null or score > best.?.score) best = .{ .cell = .{ .x = x, .y = y }, .orientation = o, .score = score };
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (best) |b| {
+            var cand = Candidate{ .kind = .spell, .spell = raw, .tcell = b.cell };
+            cand.d.push(.{ .cast_spell = .{ .caster = self.c.ui, .spell = raw, .cell = b.cell, .has_cell = true, .orientation = b.orientation } });
+            self.push(&cand);
+        }
+    }
+
     /// addSmokeCastCandidates: Smoke halves a shot whose ray crosses its 3x3 cloud. Nothing to do without a living enemy
     /// that can shoot. Anchors lie on each enemy shooter's segment (in holder order) to the rounded centroid of the base
     /// cells of our living stacks (the caster first), at 0.45, 0.5, 0.55 and 0.66 of the way, each probed with its
@@ -610,6 +709,42 @@ const Gen = struct {
         if (best) |c| {
             if (best_score > 0) self.pushSpell(raw, null, c, best_score, 0);
         }
+    }
+
+    /// Math.hypot(x, y) for integer-valued x and y: Bun's hypot equals sqrt(x * x + y * y) on every integer pair of the board
+    /// (checked over [-40, 40]^2), and every caller passes integers.
+    inline fn hypotInt(x: f64, y: f64) f64 {
+        return @sqrt(x * x + y * y);
+    }
+
+    /// FireWallOrientation's step (ORIENTATION_STEPS): horizontal, diagonal down, vertical, diagonal up.
+    fn fireWallStep(orientation: u8) [2]i32 {
+        return switch (orientation % 4) {
+            0 => .{ 1, 0 },
+            1 => .{ 1, -1 },
+            2 => .{ 0, 1 },
+            else => .{ 1, 1 },
+        };
+    }
+
+    /// addFireWallCastCandidates' isLegalWall over fireWallCells (the anchor third of four, -2..+1 along the step): a cell
+    /// lights when it is on the board and empty or lava (isFireWallableCell); a living unit under any cell refuses the wall
+    /// (a gap the enemy walks round); a stone, a hole, a barrel or the edge just stays unlit. At least one cell must light.
+    fn legalFireWall(s: *const st.State, anchor: Cell, orientation: u8) bool {
+        const step = fireWallStep(orientation);
+        var lit: usize = 0;
+        var i: i32 = -2;
+        while (i < 2) : (i += 1) {
+            const c = Cell{ .x = anchor.x + step[0] * i, .y = anchor.y + step[1] * i };
+            if (!engine.cellWithinGrid(c)) continue;
+            const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
+            if (o == st.EMPTY or o == st.LAVA) {
+                lit += 1;
+                continue;
+            }
+            if (st.isUnitCode(o) and s.units[o - 1].in_holder) return false;
+        }
+        return lit > 0;
     }
 
     /// isRangeCapable() && getRangeShots() > 0
@@ -896,6 +1031,8 @@ const Gen = struct {
                 st.SpellTarget.FREE_CELL => {
                     if (spell == .smoke) {
                         self.addSmoke(b.spell);
+                    } else if (spell == .fire_wall) {
+                        self.addFireWall(b.spell);
                     } else if (spell == .meteorite or spell == .meteor_shower) self.addMeteors(spell, b.spell, cfg) else self.out.incomplete = true;
                 },
                 st.SpellTarget.ALLIES_AREA => self.addAlliesArea(b.spell),
@@ -1643,12 +1780,29 @@ const Gen = struct {
         for (targets[0..nt]) |ti| {
             if (ai.adjacent(engine.unitCells(&s.units[ti]).slice(), mine.slice())) add(self, &damage, &pairs, &np, ti, base, null);
         }
-        // Move-and-strike: every reachable stand whose footprint touches a target.
+        // Move-and-strike: every reachable stand whose footprint touches a target. meleeCumulativeHpAfterMove: with a Fire
+        // Wall on the board, or Cowardice on a lava route (Made of Fire's max hp), a moving stand takes the projected walk's
+        // hp (a walk that ends the actor's turn drops the stand) and Cowardice is checked at it.
+        const coward = engine.cowardly(s, u);
+        const current = util.cumulativeHp(u);
         if (self.movePath()) |mp| {
             for (mp.known(), 0..) |*r, ri| {
                 if (!ai.canLandAt(s, self.c.ui, r.cell)) continue;
                 const body = ai.footprintForAnchor(u, r.cell);
+                var post_hp = current;
+                if (!ai.sameCell(r.cell, base)) {
+                    if (s.fight.n_fire == 0 and (!coward or !r.has_lava)) {
+                        if (!(u.amount_alive > 0)) continue;
+                    } else {
+                        var route_buf: [64]Cell = undefined;
+                        const len = mp.routeCells(r, &route_buf);
+                        const projected = firewall.projectPostMove(s, self.c.ui, route_buf[0..len], body.slice(), r.has_lava);
+                        if (!projected.available) continue;
+                        post_hp = firewall.stackHp(projected);
+                    }
+                }
                 for (targets[0..nt]) |ti| {
+                    if (coward and post_hp < util.cumulativeHp(&s.units[ti])) continue;
                     if (ai.adjacent(body.slice(), engine.unitCells(&s.units[ti]).slice())) add(self, &damage, &pairs, &np, ti, r.cell, @intCast(ri));
                 }
             }
