@@ -27,6 +27,7 @@ import {
     type INativePairRecord,
     type INativeRolloutBackend,
     nativeEnvironmentRefusal,
+    nativeRequestPolicies,
     nativeExportSideEffects,
     nativeLeafKind,
     nativeDefaultTree,
@@ -292,6 +293,38 @@ describe("native rollout scope", () => {
             expect(nativeEnvironmentRefusal({ ...environment, [`${mode}_VERSIONS`]: "v0.8" })).toBe(
                 `env:${mode}_VERSIONS`,
             );
+        }
+    });
+
+    test("a switch the library reads goes to it per team; its environment keys leave the check", () => {
+        const environment = profileEnvironment();
+        const read = new Set(["decoy_aware", "mage_damage_kill_priority"]);
+        const ablated = { ...environment, A19_DECOY_AWARE_LEFT: "0", V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT: "1" };
+        expect(nativeEnvironmentRefusal(ablated, read)).toBeNull();
+        // with no read switches (an older library) the same keys refuse
+        expect(nativeEnvironmentRefusal(ablated, new Set())).toBe("env:V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT");
+        // a switch the library does not read keeps refusing
+        expect(nativeEnvironmentRefusal({ ...environment, A19_COHERENT_MELEE_APPROACH_LEFT: "0" }, read)).toBe(
+            "env:A19_COHERENT_MELEE_APPROACH_LEFT",
+        );
+        const previous = process.env.A19_DECOY_AWARE_RIGHT;
+        process.env.A19_DECOY_AWARE_RIGHT = "0";
+        try {
+            const policies = nativeRequestPolicies({ "1": { version: "v0.8" }, "2": { version: "v0.1" } }, read, {
+                V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT: "1",
+            });
+            // team 1 is RIGHT: its decoy filter is off, its mage kill priority on; the v0.1 team goes as it was
+            expect(policies["1"]).toEqual({
+                version: "v0.8",
+                switches: { decoy_aware: false, mage_damage_kill_priority: true },
+            });
+            expect(policies["2"]).toEqual({ version: "v0.1" });
+            expect(nativeRequestPolicies({ "1": { version: "v0.8" } }, new Set())).toEqual({
+                "1": { version: "v0.8" },
+            });
+        } finally {
+            if (previous === undefined) delete process.env.A19_DECOY_AWARE_RIGHT;
+            else process.env.A19_DECOY_AWARE_RIGHT = previous;
         }
     });
 

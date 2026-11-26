@@ -30,8 +30,11 @@
  */
 
 import type { IAIStrategy } from "../ai/ai_strategy";
+import { A19_DECOY_AWARE_ENV, a19DecoyAwareEnabled } from "../ai/decoy_aware";
+import { seatEnvName } from "../ai/seat_env";
 import { StrategyV0_1 } from "../ai/versions/v0_1";
 import { StrategyV0_8 } from "../ai/versions/v0_8";
+import { V08_MAGE_DAMAGE_KILL_PRIORITY_ENV } from "../ai/versions/v0_8_support_roles";
 import { V08_A13_VALUE_LEAF } from "../ai/versions/v0_8_a13_profile";
 import { buildV08A19SearchEnvironment } from "../ai/versions/v0_8_a19_profile";
 import { V08A19BoarBattleMageFlankPlacementStrategy } from "../ai/versions/v0_8_a19_boar_battle_mage_flank_placement";
@@ -230,6 +233,11 @@ export interface INativeRolloutBackend {
     nowNs(): bigint;
     refusal(policy: NativePolicyVersion, battle: Omit<INativeExportBattle, "attackHandler">): string | null;
     exportState(battle: INativeExportBattle, harness: INativeExportHarness): string;
+    /**
+     * The v0.8 switches the library reads (its scope manifest's switchesRead) that the adapter computes
+     * (NATIVE_SWITCHES): sent per team, and their environment keys leave the environment check. Absent: none.
+     */
+    readonly switchesRead?: ReadonlySet<string>;
 }
 
 interface IBridgeModule {
@@ -310,12 +318,17 @@ function loadNativeRolloutBackend(load: (specifier: string) => unknown): INative
     const { battleDigest } = load("../../zig/parity/digest.ts") as {
         battleDigest(battle: INativeExportBattle, options: Record<string, boolean>): { fight: unknown };
     };
+    const v08Manifest = engine.scopeManifest("v0.8");
     const prechecks: Record<NativePolicyVersion, INativePrecheck> = {
         "v0.1": compileHocPrecheck(engine.scopeManifest("v0.1")),
-        "v0.8": compileHocPrecheck(engine.scopeManifest("v0.8")),
+        "v0.8": compileHocPrecheck(v08Manifest),
     };
+    const read = (v08Manifest as { scope?: { policies?: Record<string, { switchesRead?: string[] }> } }).scope
+        ?.policies?.["v0.8"]?.switchesRead;
+    const switchesRead = new Set((read ?? []).filter((name) => name in NATIVE_SWITCHES));
     return Object.freeze({
         engine,
+        switchesRead,
         flags: Object.freeze({
             played: bridge.HOC_PAIR_PLAYED,
             skippedIllegal: bridge.HOC_PAIR_SKIPPED_ILLEGAL,
@@ -434,6 +447,51 @@ export function nativeLeafKind(learnedV2: ILeafWeights | null, learned: ILeafWei
     if (learnedV2) return sameLeaf(learnedV2, V08_A13_VALUE_LEAF) ? "v2" : "leaf:v2_weights";
     if (learned) return sameLeaf(learned, DEFAULT_V07_VALUE_WEIGHTS) ? "v1" : "leaf:v1_weights";
     return "material";
+}
+
+/**
+ * The adapter's side of the library's per-team switch table (zig/src/v08/util.zig Switches): for each switch src/v08
+ * can read, the environment keys it stands for and its value for a team, computed with the TypeScript readers
+ * themselves. The library's manifest names the switches it reads (INativeRolloutBackend.switchesRead). Those are sent
+ * per v0.8 team (nativeRequestPolicies), and their keys leave the environment check. A key whose switch the library
+ * does not read keeps refusing the root.
+ */
+const NATIVE_SWITCHES: Readonly<
+    Record<
+        string,
+        { keys: readonly string[]; value: (team: number, env: Readonly<Record<string, string | undefined>>) => boolean }
+    >
+> = {
+    // candidates.ts's a19-decoy-aware filter (on unless A19_DECOY_AWARE_<SIDE>=0)
+    decoy_aware: {
+        keys: [`${A19_DECOY_AWARE_ENV}_LEFT`, `${A19_DECOY_AWARE_ENV}_RIGHT`],
+        value: (team) => a19DecoyAwareEnabled(team),
+    },
+    // v0_8_support_roles.ts incumbentGuaranteedKill's damageSpell (V08_MAGE_DAMAGE_KILL_PRIORITY_<SIDE>=1)
+    mage_damage_kill_priority: {
+        keys: [`${V08_MAGE_DAMAGE_KILL_PRIORITY_ENV}_LEFT`, `${V08_MAGE_DAMAGE_KILL_PRIORITY_ENV}_RIGHT`],
+        value: (team, env) => env[seatEnvName(V08_MAGE_DAMAGE_KILL_PRIORITY_ENV, team)] === "1",
+    },
+};
+
+/** The request's policies with each v0.8 team's read switches (a v0.1 team is sent as it is). */
+export function nativeRequestPolicies(
+    policies: Record<string, { version: NativePolicyVersion }>,
+    read: ReadonlySet<string> | undefined,
+    env: Readonly<Record<string, string | undefined>> = process.env,
+): Record<string, { version: NativePolicyVersion; switches?: Record<string, boolean> }> {
+    if (!read?.size) return policies;
+    const out: Record<string, { version: NativePolicyVersion; switches?: Record<string, boolean> }> = {};
+    for (const [team, policy] of Object.entries(policies)) {
+        if (policy.version !== "v0.8") {
+            out[team] = policy;
+            continue;
+        }
+        const switches: Record<string, boolean> = {};
+        for (const name of read) switches[name] = NATIVE_SWITCHES[name].value(Number(team), env);
+        out[team] = { ...policy, switches };
+    }
+    return out;
 }
 
 /** The AI policy's environment namespaces (and its one AI_ switch: a broad AI_ prefix catches unrelated tooling). */
@@ -569,13 +627,18 @@ function a19PolicyEnvironment(): Readonly<Record<string, string | undefined>> {
  */
 export function nativeEnvironmentRefusal(
     env: Readonly<Record<string, string | undefined>> = process.env,
+    read: ReadonlySet<string> | undefined = backend?.switchesRead,
 ): string | null {
     const expected = a19PolicyEnvironment();
+    // The keys of the switches the library reads go to it as switches (nativeRequestPolicies).
+    const switched = new Set([...(read ?? [])].flatMap((name) => NATIVE_SWITCHES[name]?.keys ?? []));
     for (const [key, value] of Object.entries(expected)) {
+        if (switched.has(key)) continue;
         if (!samePolicyMeaning(key, env[key], value)) return `env:${key}`;
     }
     for (const key of Object.keys(env)) {
         if (env[key] === undefined || !AI_POLICY_ENV.test(key) || AI_POLICY_ENV_IGNORED.has(key)) continue;
+        if (switched.has(key)) continue;
         if (!(key in expected) && !samePolicyMeaning(key, env[key], undefined)) return `env:${key}`;
     }
     return null;
@@ -734,7 +797,7 @@ export function runNativeBank(
         chance: input.chance,
         horizon: { mode: input.horizonMode, turns: input.turnHorizon },
         leaf: input.leaf,
-        policies: input.policies,
+        policies: nativeRequestPolicies(input.policies, native.switchesRead),
         soleAbominationDefend: input.soleAbominationDefend,
         summonIds: input.harness.summonIds,
         // Named only when the harness names it, so a "match" harness sends the request it always sent.
