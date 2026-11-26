@@ -4,10 +4,11 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
 
-    // The common commit the artifacts are built from (`-Dcommon-sha=$(git rev-parse HEAD)`): hoc_build_info reports
-    // it, and the bridge refuses a library built from another revision than the TypeScript it runs beside.
+    // The common commit the artifacts are built from: hoc_build_info reports it, and the bridge refuses a library built
+    // from another revision than the TypeScript it runs beside (src/simulation/native_rollouts.ts checks it by default).
+    // `-Dcommon-sha` names it; otherwise `git rev-parse HEAD`, with "-dirty" for local changes under zig/, or "unknown".
     const options = b.addOptions();
-    options.addOption([]const u8, "common_sha", b.option([]const u8, "common-sha", "Common commit embedded in hoc_build_info (default \"unknown\")") orelse "unknown");
+    options.addOption([]const u8, "common_sha", b.option([]const u8, "common-sha", "Common commit embedded in hoc_build_info (default: git HEAD, \"-dirty\" with local changes under zig/)") orelse gitCommonSha(b));
 
     // libc: the learned leaves' sigmoid calls the C library's `exp` (src/v08/util.zig, src/rollout.zig), as Bun's
     // Math.exp does. On Linux build for the system glibc (x86_64-linux-gnu, dynamic), not static musl: musl's exp can
@@ -46,4 +47,18 @@ pub fn build(b: *std.Build) void {
     test_mod.addOptions("build_options", options);
     const tests = b.addTest(.{ .root_module = test_mod });
     b.step("test", "Run unit tests").dependOn(&b.addRunArtifact(tests).step);
+}
+
+/// The common commit this zig/ tree is at (`git rev-parse HEAD`), with "-dirty" when zig/ has local changes to tracked
+/// files; "unknown" without git.
+fn gitCommonSha(b: *std.Build) []const u8 {
+    const root = b.build_root.path orelse ".";
+    const head = std.process.Child.run(.{ .allocator = b.allocator, .argv = &.{ "git", "-C", root, "rev-parse", "HEAD" } }) catch return "unknown";
+    if (head.term != .Exited or head.term.Exited != 0) return "unknown";
+    const sha = std.mem.trim(u8, head.stdout, " \n\r\t");
+    if (sha.len != 40) return "unknown";
+    const status = std.process.Child.run(.{ .allocator = b.allocator, .argv = &.{ "git", "-C", root, "status", "--porcelain", "--untracked-files=no", "--", "." } }) catch return "unknown";
+    if (status.term != .Exited or status.term.Exited != 0) return "unknown";
+    if (std.mem.trim(u8, status.stdout, " \n\r\t").len != 0) return b.fmt("{s}-dirty", .{sha});
+    return sha;
 }

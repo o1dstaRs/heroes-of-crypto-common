@@ -651,8 +651,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         source: "src/simulation/search_driver.ts" as const,
         // Carries the neutral cemetery barrel deliberation switch that profile v14 turns on, the keep-attack
         // switches of profile v21 and the carrier cohesion rule of profile v32. Re-pinned for the native rollout
-        // seam (HOC_NATIVE_ROLLOUTS, off by default: the TypeScript loop is unchanged; docs/native_rollouts.md).
-        sha256: "d7e5844d4e41375e681d26bcb6bc9521fcae3403d83dcda0958f3154c3e04a0b" as const,
+        // seam (HOC_NATIVE_ROLLOUTS) and its default with hook detection: the TypeScript loop is unchanged, a native
+        // bank leaves the driver as it does, and bot seats pass no native harness (docs/native_rollouts.md).
+        sha256: "8c3ab7ce6fab23d688331a9dc691ee9180195e0df66d36d82ef3ce723ec5e8cb" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,

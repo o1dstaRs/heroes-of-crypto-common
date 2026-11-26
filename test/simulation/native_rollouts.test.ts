@@ -29,6 +29,7 @@ import {
     nativeEnvironmentRefusal,
     nativeExportSideEffects,
     nativeLeafKind,
+    nativeDefaultTree,
     nativeRolloutModeFromEnv,
     nativeShadowRateFromEnv,
     nativeTeamPolicy,
@@ -116,9 +117,11 @@ const bankInput = (overrides: Partial<INativeBankInput> = {}): INativeBankInput 
 });
 
 describe("native rollout switch", () => {
-    test("HOC_NATIVE_ROLLOUTS parses to off, on or shadow, anything else stays off", () => {
-        expect(nativeRolloutModeFromEnv(undefined)).toBe("off");
+    test("HOC_NATIVE_ROLLOUTS parses to off, on or shadow (unset is on), anything else stays off", () => {
+        expect(nativeRolloutModeFromEnv(undefined)).toBe("on");
+        expect(nativeRolloutModeFromEnv(" ")).toBe("on");
         expect(nativeRolloutModeFromEnv("0")).toBe("off");
+        expect(nativeRolloutModeFromEnv("off")).toBe("off");
         expect(nativeRolloutModeFromEnv(" 1 ")).toBe("on");
         expect(nativeRolloutModeFromEnv("ON")).toBe("on");
         expect(nativeRolloutModeFromEnv("shadow")).toBe("shadow");
@@ -129,17 +132,35 @@ describe("native rollout switch", () => {
         expect(nativeShadowRateFromEnv("x")).toBe(1);
     });
 
-    test("a driver built without the switch keeps every bank in TypeScript", async () => {
+    test("a driver built without the switch plays native banks; with 0 every bank stays in TypeScript", async () => {
         const previous = process.env.HOC_NATIVE_ROLLOUTS;
-        delete process.env.HOC_NATIVE_ROLLOUTS;
         try {
             const { SearchDriver } = await import("../../src/simulation/search_driver");
+            delete process.env.HOC_NATIVE_ROLLOUTS;
+            expect(new SearchDriver({} as never, {}).nativeRolloutStatistics.mode).toBe("on");
+            process.env.HOC_NATIVE_ROLLOUTS = "0";
             const driver = new SearchDriver({} as never, {});
             expect(driver.nativeRolloutStatistics.mode).toBe("off");
             expect(driver.nativeRolloutStatistics.banks).toBe(0);
         } finally {
-            if (previous !== undefined) process.env.HOC_NATIVE_ROLLOUTS = previous;
+            if (previous === undefined) delete process.env.HOC_NATIVE_ROLLOUTS;
+            else process.env.HOC_NATIVE_ROLLOUTS = previous;
         }
+    });
+
+    test("the default needs a library built from this tree's own clean commit", () => {
+        const sha = "0123456789abcdef0123456789abcdef01234567";
+        const tree = (head: string | null, status: string | null) => (args: string[]) =>
+            args[0] === "rev-parse" ? head : status;
+        expect(nativeDefaultTree(tree(sha, ""))).toEqual({ sha });
+        expect(nativeDefaultTree(tree(sha, " M src/ai/versions/v0_5.ts"))).toEqual({
+            reason: "the TypeScript tree has local changes under src/ or zig/",
+        });
+        expect(nativeDefaultTree(tree(null, ""))).toEqual({ reason: "the TypeScript tree is not a git checkout" });
+        expect(nativeDefaultTree(tree("not-a-sha", ""))).toEqual({
+            reason: "the TypeScript tree is not a git checkout",
+        });
+        expect(nativeDefaultTree(tree(sha, null))).toEqual({ reason: "git status failed" });
     });
 });
 
@@ -534,10 +555,13 @@ describe("native root export", () => {
     test("the backend's one-time load (bridge, self-test, manifests, pre-checks) leaves the random state alone", () => {
         const saved = captureDeterministicRandomState();
         const sentinels = process.env.HOC_NATIVE_SENTINELS;
+        const mode = process.env.HOC_NATIVE_ROLLOUTS;
         try {
             restoreDeterministicRandomState({ source: makeRng(5), uuidSequence: 70 });
-            // throw: a load with a side effect would fail, and the backend would stay off.
+            // throw: a load with a side effect would fail, and the backend would stay off. Forced (1): the default's
+            // commit guard would keep a working tree with local changes off.
             process.env.HOC_NATIVE_SENTINELS = "throw";
+            process.env.HOC_NATIVE_ROLLOUTS = "1";
             setNativeRolloutBackendForTests(undefined);
             let loaded: unknown;
             const use = randomUse(() => {
@@ -554,6 +578,8 @@ describe("native root export", () => {
             setNativeRolloutBackendForTests(undefined);
             if (sentinels === undefined) delete process.env.HOC_NATIVE_SENTINELS;
             else process.env.HOC_NATIVE_SENTINELS = sentinels;
+            if (mode === undefined) delete process.env.HOC_NATIVE_ROLLOUTS;
+            else process.env.HOC_NATIVE_ROLLOUTS = mode;
             restoreDeterministicRandomState(saved);
         }
     });

@@ -66,18 +66,56 @@ export function nativeRolloutLog(key: string, message: string): void {
     console.error(`[native-rollouts] ${message}`);
 }
 
+/**
+ * `HOC_NATIVE_ROLLOUTS`: unset (the default) or `1` native banks where in scope, `0` TypeScript only, `shadow` TypeScript
+ * decides and sampled banks are replayed natively. Unset, the backend also requires a current library
+ * (nativeDefaultTree: built from this tree's commit, no local changes under src/ or zig/).
+ */
 export function nativeRolloutModeFromEnv(
     value: string | undefined = process.env[NATIVE_ROLLOUTS_ENV],
 ): NativeRolloutMode {
     const normalized = (value ?? "").trim().toLowerCase();
-    if (normalized === "" || normalized === "0" || normalized === "off") return "off";
-    if (normalized === "1" || normalized === "on") return "on";
+    if (normalized === "0" || normalized === "off") return "off";
+    if (normalized === "" || normalized === "1" || normalized === "on") return "on";
     if (normalized === "shadow") return "shadow";
     nativeRolloutLog(
         `mode:${normalized}`,
         `${NATIVE_ROLLOUTS_ENV}=${value} is not 0, 1 or shadow; native rollouts stay off`,
     );
     return "off";
+}
+
+/**
+ * The default's guard (HOC_NATIVE_ROLLOUTS unset, HOC_SIM_COMMON_SHA unset): the commit the library must report, which is
+ * this TypeScript tree's own (zig build embeds `git rev-parse HEAD`, with "-dirty" for local changes under zig/), and
+ * only while the tree has no local changes under src/ or zig/: a research arm that edits the TypeScript search or
+ * policy keeps TypeScript rollouts unless it forces native ones (1). `git` runs a git command in the common root and
+ * returns its trimmed output, or null when it fails.
+ */
+export function nativeDefaultTree(git: (args: string[]) => string | null): { sha: string } | { reason: string } {
+    const sha = git(["rev-parse", "HEAD"]);
+    if (sha === null || !/^[0-9a-f]{40}$/.test(sha)) return { reason: "the TypeScript tree is not a git checkout" };
+    const changes = git(["status", "--porcelain", "--untracked-files=no", "--", "src", "zig"]);
+    if (changes === null) return { reason: "git status failed" };
+    if (changes !== "") return { reason: "the TypeScript tree has local changes under src/ or zig/" };
+    return { sha };
+}
+
+/** git in the common root through Bun.spawnSync (no module import, so browser bundles never see it). */
+function commonRootGit(args: string[]): string | null {
+    const spawnSync = (
+        globalThis as {
+            Bun?: { spawnSync(cmd: string[], opts: object): { exitCode: number | null; stdout: Uint8Array } };
+        }
+    ).Bun?.spawnSync;
+    if (typeof spawnSync !== "function") return null;
+    try {
+        const root = decodeURIComponent(new URL("../..", import.meta.url).pathname);
+        const run = spawnSync(["git", "-C", root, ...args], { stdout: "pipe", stderr: "pipe" });
+        return run.exitCode === 0 ? new TextDecoder().decode(run.stdout).trim() : null;
+    } catch {
+        return null;
+    }
 }
 
 export function nativeShadowRateFromEnv(value: string | undefined = process.env[NATIVE_SHADOW_RATE_ENV]): number {
@@ -196,9 +234,21 @@ export function getNativeRolloutBackend(): INativeRolloutBackend | null {
 }
 
 function loadNativeRolloutBackend(load: (specifier: string) => unknown): INativeRolloutBackend | null {
+    let commonSha = process.env[NATIVE_COMMON_SHA_ENV] || undefined;
+    if (commonSha === undefined && (process.env[NATIVE_ROLLOUTS_ENV] ?? "").trim() === "") {
+        const tree = nativeDefaultTree(commonRootGit);
+        if ("reason" in tree) {
+            nativeRolloutLog(
+                "default",
+                `native rollouts off by default: ${tree.reason} (HOC_NATIVE_ROLLOUTS=1 forces them)`,
+            );
+            return null;
+        }
+        commonSha = tree.sha;
+    }
     const bridge = load("../../zig/ffi/bridge.ts") as IBridgeModule;
     const engine = bridge.loadHocEngine({
-        commonSha: process.env[NATIVE_COMMON_SHA_ENV] || undefined,
+        commonSha,
         log: (message) => nativeRolloutLog("load", message),
     });
     if (!engine) return null;
@@ -273,6 +323,35 @@ export interface INativeTeamPolicy {
  * chain of the A19 placement layers, or exactly StrategyV0_1 (withAreaThrow's routing proxy is transparent; its
  * routers stay off in the A19 environment, which nativeEnvironmentRefusal requires). Every other strategy refuses.
  */
+/**
+ * The rollout policies' decideTurn chain as loaded (StrategyV0_8 and its v0.7 ... v0.1 supers, StrategyV0_1). A tool that
+ * wraps one of them (a layer log, an audit, a research arm written in code) watches or changes TypeScript rollouts, so
+ * while it is installed every bank stays in TypeScript (nativePolicyHook).
+ */
+const LOADED_DECIDE_TURNS: ReadonlyMap<object, unknown> = (() => {
+    const loaded = new Map<object, unknown>();
+    for (const root of [StrategyV0_8.prototype, StrategyV0_1.prototype]) {
+        let prototype: object | null = root;
+        while (prototype && prototype !== Object.prototype) {
+            if (Object.prototype.hasOwnProperty.call(prototype, "decideTurn")) {
+                loaded.set(prototype, (prototype as { decideTurn: unknown }).decideTurn);
+            }
+            prototype = Object.getPrototypeOf(prototype) as object | null;
+        }
+    }
+    return loaded;
+})();
+
+/** "hooked:<Class>.decideTurn" when a rollout policy's decideTurn is no longer the one loaded, else undefined. */
+export function nativePolicyHook(): string | undefined {
+    for (const [prototype, loaded] of LOADED_DECIDE_TURNS) {
+        if ((prototype as { decideTurn: unknown }).decideTurn !== loaded) {
+            return `hooked:${(prototype as { constructor: { name: string } }).constructor.name}.decideTurn`;
+        }
+    }
+    return undefined;
+}
+
 export function nativeTeamPolicy(strategy: IAIStrategy): INativeTeamPolicy | string {
     let current: unknown = strategy;
     for (let hop = 0; hop < 8 && current; hop += 1) {

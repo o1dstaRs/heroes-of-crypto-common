@@ -2,23 +2,27 @@
 
 `HOC_NATIVE_ROLLOUTS` lets `SearchDriver.scoreCandidates` play its rollout banks in libhocsim (the Zig engine and the
 v0.8 policy port under `zig/`, ABI 3, `zig/BRIDGE.md`) instead of TypeScript. A native bank leaves the driver exactly as
-the TypeScript loop leaves it, so searched decisions are identical; only the time changes. The switch is off by
-default, and with it off nothing in the search changes (the TypeScript loop is the same code).
+the TypeScript loop leaves it, so searched decisions are identical; only the time changes. The switch is on by default
+where the library is current: built from this tree's own commit (`zig build` embeds `git rev-parse HEAD`, "-dirty" with
+local changes under zig/) while the tree has no local changes under src/ or zig/. Otherwise, and with `0`, every bank
+runs in TypeScript (the TypeScript loop is the same code). A research arm that edits the TypeScript search or policy
+therefore keeps TypeScript rollouts unless it forces native ones with `1`; an arm that changes an AI switch stays in
+TypeScript anyway (below).
 
 The adapter is `src/simulation/native_rollouts.ts` with its seam in `src/simulation/search_driver.ts`
 (`scoreCandidatesWithNative`); the integration design is the coordinator's `design.md` (sections 2 to 7).
 
 ## Switches
 
-| Variable                     | Meaning                                                                                                                                                                       |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `HOC_NATIVE_ROLLOUTS`        | read when a driver is built: `0` (default) TypeScript only; `1` native banks where in scope; `shadow` TypeScript decides and sampled banks are replayed natively and compared |
-| `HOC_SIM_LIB`                | the library (default `zig/zig-out/lib/libhocsim.{dylib,so}`)                                                                                                                  |
-| `HOC_SIM_COMMON_SHA`         | the common commit the library must be built from (`-Dcommon-sha`); unset: not checked                                                                                         |
-| `HOC_NATIVE_SHADOW_RATE`     | shadow sampling, a fraction of banks (default 1, every bank)                                                                                                                  |
-| `HOC_NATIVE_SHADOW_DUMP_DIR` | shadow mismatches: the root's export and the bank's requests (20 per process at most), for `hoc-sim rollout-trace`                                                            |
-| `HOC_NATIVE_FIXTURE_DIR`     | shadow mode writes the library's self-test fixture (`zig/src/selftest`) from the first root whose two H64 banks matched                                                       |
-| `HOC_NATIVE_SENTINELS`       | `count` or `throw`: reads a native bank does not reproduce (a draw from the stream a TypeScript bank leaves installed, the active unit between banks)                         |
+| Variable                     | Meaning                                                                                                                                                                                                                                                              |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOC_NATIVE_ROLLOUTS`        | read when a driver is built: unset (default) native banks where in scope and the library is current (above); `1` native banks where in scope, no commit check; `0` TypeScript only; `shadow` TypeScript decides and sampled banks are replayed natively and compared |
+| `HOC_SIM_LIB`                | the library (default `zig/zig-out/lib/libhocsim.{dylib,so}`)                                                                                                                                                                                                         |
+| `HOC_SIM_COMMON_SHA`         | the common commit the library must be built from (`-Dcommon-sha`); unset: the tree's own clean commit when `HOC_NATIVE_ROLLOUTS` is unset, not checked otherwise                                                                                                     |
+| `HOC_NATIVE_SHADOW_RATE`     | shadow sampling, a fraction of banks (default 1, every bank)                                                                                                                                                                                                         |
+| `HOC_NATIVE_SHADOW_DUMP_DIR` | shadow mismatches: the root's export and the bank's requests (20 per process at most), for `hoc-sim rollout-trace`                                                                                                                                                   |
+| `HOC_NATIVE_FIXTURE_DIR`     | shadow mode writes the library's self-test fixture (`zig/src/selftest`) from the first root whose two H64 banks matched                                                                                                                                              |
+| `HOC_NATIVE_SENTINELS`       | `count` or `throw`: reads a native bank does not reproduce (a draw from the stream a TypeScript bank leaves installed, the active unit between banks)                                                                                                                |
 
 The library is loaded once per process on first use through `zig/ffi/bridge.ts`'s fail-safe loader (self-test included,
 about 150 ms). A missing library, another ABI or commit, a failed self-test, or a runtime without Bun's
@@ -41,7 +45,9 @@ Per root (one `chooseSearchDecision`; refusals are counted by reason in `nativeR
 
 Per bank (counted in `fallback`): no rollout cache, opponent model, research or per-team leaf, team scope or observe-only
 mode, a leaf the library plays (the A13 v2 weights, the v0.7 v1 weights, or material), a harness that tells how summons
-are named (`ILookaheadDeps.nativeHarness`), and no veto: the A19 neural correction vetoes the banks of any decision it
+are named (`ILookaheadDeps.nativeHarness`), no hook (a tool that wraps the driver's rollout loop, `rollout`,
+`scoreCandidatesInTypeScript` or `simPlayTurn`, or a rollout policy's `decideTurn` chain, such as a sample recorder,
+an audit or a layer log, reads TypeScript rollouts: `hooked:<method>`), and no veto: the A19 neural correction vetoes the banks of any decision it
 would correct (`a19NeuralCorrectionEngages`), since it was measured on TypeScript rollouts.
 
 A request the library refuses ("unsupported request") marks the root; a rollout it cannot play refuses that bank only;

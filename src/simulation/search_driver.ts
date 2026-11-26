@@ -128,10 +128,11 @@ import {
     nativeEnvironmentRefusal,
     nativeFixtureExpected,
     nativeLeafKind,
+    nativePolicyHook,
     nativeReason,
-    NativeRootScope,
     type NativeRolloutMode,
     nativeRolloutModeFromEnv,
+    NativeRootScope,
     nativeSentinelsThrow,
     nativeShadowRateFromEnv,
     nativeTeamPolicy,
@@ -6063,7 +6064,11 @@ export class SearchDriver {
         if (this.teamScope !== null || this.observeOnly) return "team_scope";
         if (!this.deps.nativeHarness) return "no_native_harness";
         for (const veto of this.nativeVetoes) if (veto.engages(root.version)) return veto.reason;
-        return undefined;
+        // A tool that wraps the rollout loop or the rollout policy (sample recorders, audits, layer logs) reads
+        // TypeScript rollouts, which a native bank never runs.
+        const driver = this as unknown as Record<string, unknown>;
+        for (const [name, loaded] of LOADED_ROLLOUT_LOOP) if (driver[name] !== loaded) return `hooked:${name}`;
+        return nativePolicyHook();
     }
     /**
      * The root's board, loaded once for every bank of this search: both teams' rollout policies, the AI environment, the
@@ -6695,6 +6700,13 @@ export class SearchDriver {
         );
     }
 }
+
+/** The rollout loop's own methods as loaded (SearchDriver.nativeBankRefusal compares a driver's with them). */
+const LOADED_ROLLOUT_LOOP: ReadonlyMap<string, unknown> = new Map(
+    ["rollout", "scoreCandidatesInTypeScript", "simPlayTurn"]
+        .filter((name) => name in SearchDriver.prototype)
+        .map((name) => [name, (SearchDriver.prototype as unknown as Record<string, unknown>)[name]]),
+);
 
 const otherTeam = (team: TeamType): TeamType =>
     team === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
