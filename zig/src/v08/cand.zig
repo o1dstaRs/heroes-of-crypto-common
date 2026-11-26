@@ -13,6 +13,7 @@ const path = @import("../path.zig");
 const ai = @import("../ai.zig");
 const util = @import("util.zig");
 const abilities = @import("../abilities.zig");
+const artifacts = @import("../artifacts.zig");
 const terrain = @import("../terrain.zig");
 const spells = @import("../spells.zig");
 const js = @import("../jsnum.zig");
@@ -64,6 +65,11 @@ pub const Options = struct {
     /// Port-only: the incumbent and the shots, nothing else (the shots of an uncapped list, in order: a shot's signature
     /// is shared by no other class, and the decoy filter drops only melee).
     shots_only: bool = false,
+    /// Port-only (v0.8's splash pass): the incumbent, then of the shots and area throws only the one with the highest
+    /// finite expected damage so far (selectV08SplashRangedCandidate's argmax, first on ties), without storing the
+    /// uncapped list a ring of throw cells or the free Through Shot lines can push past MAX. Only a shot or a throw can
+    /// be a twin of a ranged incumbent, so its enrichment is the full list's, and a dropped duplicate cannot win.
+    ranged_best: bool = false,
     /// preserveMeteoriteTargetCoverage (battleMageTargetsEnabled, on for a Battle Mage): a Battle Mage's Meteorite keeps
     /// every distinct visible impact after the best one.
     meteor_coverage: bool = false,
@@ -218,6 +224,15 @@ const Gen = struct {
                 self.enrich(cand);
                 return;
             }
+        }
+        if (self.opt.ranged_best and self.out.n > 0) {
+            if (cand.kind != .shot and cand.kind != .throw) return;
+            if (!std.math.isFinite(cand.ed)) return;
+            if (self.out.n >= 2 and !(cand.ed > self.out.items[1].ed)) return;
+            self.out.items[1] = cand.*;
+            util.copyDecision(&self.out.items[1].d, &cand.d);
+            self.out.n = 2;
+            return;
         }
         if (self.out.n >= MAX) {
             self.out.incomplete = true;
@@ -783,9 +798,9 @@ const Gen = struct {
     }
 
     /// prepareRangeCandidateDamage: the attacker-only terms of every aim of one decision (the team's synergy power;
-    /// Through Shot's, else a splash's ability multiplier; the second volley's multiplier; whether ordinary arrows
-    /// spend only on a hit; Deep Wounds per landed hit). Paralysis, Giant's Maul, Broken Aegis, the Dual Strike Charm
-    /// and Quiver of Echoes are not in scope.
+    /// Through Shot's, else a splash's ability multiplier; the second volley's multiplier with the Dual Strike Charm;
+    /// a physical AOE's Giant's Maul; Quiver of Echoes' bonus volley chance; whether ordinary arrows spend only on a
+    /// hit; Deep Wounds per landed hit). Paralysis and Broken Aegis are not in the engine (no live pool holds them).
     const Prepared = struct {
         syn: f64,
         physical_aoe: bool,
@@ -794,6 +809,10 @@ const Gen = struct {
         second: f64,
         on_hit_only: bool,
         wounds_per_hit: f64,
+        /// Giant's Maul's power on a physical AOE, else null.
+        maul: ?f64,
+        /// getBonusRangedAttackChance / 100.
+        echo: f64,
     };
 
     fn prepareShot(self: *const Gen, shots: u8, aoe: bool) Prepared {
@@ -804,16 +823,20 @@ const Gen = struct {
         const special = through_ab orelse aoe_ab;
         var second: f64 = 0;
         if (shots > 1) {
-            if (combat.doubleShotAbility(u)) |ds| second = if (aoe_ab != null) 1 else abilities.abilityMultiplierSyn(u, ds, syn);
+            // An area second volley repeats the first at full power; each takes the Dual Strike Charm on top.
+            if (combat.doubleShotAbility(u)) |ds| second = artifacts.dualStrike(u, if (aoe_ab != null) 1 else abilities.abilityMultiplierSyn(u, ds, syn));
         }
+        const physical_aoe = special != null;
         return .{
             .syn = syn,
-            .physical_aoe = special != null,
+            .physical_aoe = physical_aoe,
             .through = through_ab != null,
             .shared = if (special) |a| abilities.abilityMultiplierSyn(u, a, syn) else 1,
             .second = second,
             .on_hit_only = special == null and !u.has(.chakram),
             .wounds_per_hit = woundsPerHit(u, syn),
+            .maul = if (physical_aoe) (if (u.buffs.get(.giants_maul)) |gm| gm.power else null) else null,
+            .echo = artifacts.echoChance(self.c.s, u) / 100,
         };
     }
 
@@ -850,11 +873,15 @@ const Gen = struct {
         aoe_mult: f64,
 
         /// applyEngineVolleyModifiers: the shared and volley multipliers with the target's Deep Wounds after
-        /// `landed` prior hits, under one floor, then a physical AOE's victim multiplier (Mechanism).
+        /// `landed` prior hits, under one floor, then a physical AOE's Giant's Maul and victim multiplier (status
+        /// resist, Mechanism), each floored.
         fn apply(self: *const Mods, raw: f64, volley: f64, landed: f64) f64 {
             const wounds = js.toFixed(self.wounds + self.prep.wounds_per_hit * landed, 1);
             var adjusted = @floor(raw * self.prep.shared * volley * (1 + wounds / 100));
-            if (self.prep.physical_aoe) adjusted = @floor(adjusted * self.aoe_mult);
+            if (self.prep.physical_aoe) {
+                if (self.prep.maul) |power| adjusted = @floor(adjusted * (1 + power / 100));
+                adjusted = @floor(adjusted * self.aoe_mult);
+            }
             return adjusted;
         }
         fn mean(self: *const Mods, second_volley: bool, landed: f64) f64 {
@@ -864,15 +891,15 @@ const Gen = struct {
     };
 
     /// estimateShieldedRangedDamage: the volley outcomes in order (a miss, then a hit), an absorbing shield taking the
-    /// first positive hit, a hit spending an arrow (an ordinary miss only when arrows spend on any shot), and Deep Wounds
-    /// repricing later hits; no Echo in scope.
+    /// first positive hit, a hit spending an arrow (an ordinary miss only when arrows spend on any shot), Deep Wounds
+    /// repricing later hits, and Quiver of Echoes' bonus volley (the first volley again, at its chance).
     fn shieldedDamage(u: *const st.Unit, hp: f64, hit: f64, first: f64, second: f64, prep: *const Prepared, shield: bool, mods: ?*const Mods) f64 {
         const State = struct { damage: f64, shield: bool, spent: f64, p: f64, landed: f64 };
         var states: [32]State = undefined;
         var n: usize = 1;
         states[0] = .{ .damage = 0, .shield = shield, .spent = 0, .p = 1, .landed = 0 };
         const Volley = struct {
-            fn run(st_: *[32]State, n_: *usize, uu: *const st.Unit, hp_: f64, hit_: f64, base: f64, second_volley: bool, spends: bool, on_hit_only: bool, m: ?*const Mods) void {
+            fn run(st_: *[32]State, n_: *usize, uu: *const st.Unit, hp_: f64, hit_: f64, base: f64, second_volley: bool, chance: f64, spends: bool, on_hit_only: bool, m: ?*const Mods) void {
                 var next: [32]State = undefined;
                 var k: usize = 0;
                 for (st_[0..n_.*]) |state| {
@@ -881,9 +908,14 @@ const Gen = struct {
                         k += 1;
                         continue;
                     }
+                    if (chance < 1) {
+                        next[k] = state;
+                        next[k].p = state.p * (1 - chance);
+                        k += 1;
+                    }
                     const damage = if (m) |mm| mm.mean(second_volley, state.landed) else base;
                     for ([_]bool{ false, true }) |h| {
-                        const w = state.p * 1 * (if (h) hit_ else 1 - hit_);
+                        const w = state.p * chance * (if (h) hit_ else 1 - hit_);
                         if (w <= 0) continue;
                         const positive = h and damage > 0;
                         next[k] = .{
@@ -900,8 +932,9 @@ const Gen = struct {
                 n_.* = k;
             }
         };
-        Volley.run(&states, &n, u, hp, hit, first, false, true, prep.on_hit_only, mods);
-        if (prep.second > 0) Volley.run(&states, &n, u, hp, hit, second, true, !prep.through, prep.on_hit_only, mods);
+        Volley.run(&states, &n, u, hp, hit, first, false, 1, true, prep.on_hit_only, mods);
+        if (prep.second > 0) Volley.run(&states, &n, u, hp, hit, second, true, 1, !prep.through, prep.on_hit_only, mods);
+        if (prep.echo > 0) Volley.run(&states, &n, u, hp, hit, first, false, prep.echo, true, prep.on_hit_only, mods);
         var sum: f64 = 0;
         for (states[0..n]) |state| sum += state.p * state.damage;
         return sum;
@@ -919,6 +952,8 @@ const Gen = struct {
         const ammo_any = true; // shotsAfter does not read the ammunition target (Dense Flesh is not in scope)
         _ = ammo_any;
         const second_mul: f64 = if (shotsAfter(u, 1) > 0) prep.second else 0;
+        const spent_volleys: f64 = if (prep.through or second_mul == 0) 1 else 2;
+        const bonus_available = shotsAfter(u, spent_volleys) > 0;
         const groups: usize = if (prep.through) g.n else @min(1, g.n);
         var value: f64 = 0;
         var kill: u8 = 0;
@@ -948,7 +983,8 @@ const Gen = struct {
                 hit * miss * @min(first_c, hp) + miss * hit * @min(second_c, hp) + hit * hit * @min(first_c + second_c, hp)
             else
                 hit * @min(first_c, hp);
-            if (prep.on_hit_only and prep.second > 0) {
+            if (prep.on_hit_only and (prep.second > 0 or prep.echo > 0)) {
+                // Ordinary missed arrows spend nothing: each outcome keeps its own budget for a second shot or Echo.
                 effective = 0;
                 for ([_][3]f64{ .{ 0, miss, 0 }, .{ first_c, hit, 1 } }) |o1| {
                     if (o1[1] == 0) continue;
@@ -957,7 +993,18 @@ const Gen = struct {
                     for (seconds) |o2| {
                         if (o2[1] == 0) continue;
                         const native = @min(o1[0] + o2[0], hp);
-                        effective += o1[1] * o2[1] * (native + 0);
+                        const echo_damage = if (prep.echo > 0 and shotsAfter(u, o2[2]) > 0)
+                            prep.echo * hit * (@min(o1[0] + o2[0] + first_c, hp) - native)
+                        else
+                            0;
+                        effective += o1[1] * o2[1] * (native + echo_damage);
+                    }
+                }
+            } else if (prep.echo > 0 and bonus_available) {
+                for ([_][2]f64{ .{ 0, miss }, .{ first_c, hit } }) |o1| {
+                    const seconds: []const [2]f64 = if (second_mul > 0) &[_][2]f64{ .{ 0, miss }, .{ second_c, hit } } else &[_][2]f64{.{ 0, 1 }};
+                    for (seconds) |o2| {
+                        effective += o1[1] * o2[1] * prep.echo * hit * (@min(o1[0] + o2[0] + first_c, hp) - @min(o1[0] + o2[0], hp));
                     }
                 }
             }
@@ -1411,6 +1458,12 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
     }
     if (opt.shots_only) {
         g.addShots();
+        if (out.incomplete) util.unsupported = true;
+        return;
+    }
+    if (opt.ranged_best) {
+        g.addShots();
+        g.addAreaThrows();
         if (out.incomplete) util.unsupported = true;
         return;
     }

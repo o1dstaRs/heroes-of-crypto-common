@@ -229,7 +229,10 @@ fn splashRanged(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     if (!(u.has(.area_throw) or u.has(.large_caliber) or through)) return util.copyDecision(out, in);
     if (!util.has(in, .range_attack) and !util.has(in, .area_throw_attack)) return util.copyDecision(out, in);
     var set: cand.Set = .{};
-    cand.enumerate(c, in, .{ .max_moves = 1, .max_melee = 1, .enrich = true, .through_free_aim = through }, &set);
+    // enumerateCandidates({maxMoveDestinations: 1, maxMeleePairs: 1, enrichIncumbentMetadata, throughShotFreeAim}): only
+    // its shots and area throws are read (and only they can be twins of the ranged incumbent), so the port keeps the
+    // incumbent and the best of them (cand.Options.ranged_best).
+    cand.enumerate(c, in, .{ .ranged_best = true, .enrich = true, .through_free_aim = through }, &set);
     const inc = &set.items[0];
     if (inc.target < 0 or !std.math.isFinite(inc.ed)) return util.copyDecision(out, in);
     var best: ?usize = null;
