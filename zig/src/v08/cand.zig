@@ -466,6 +466,191 @@ const Gen = struct {
     /// the overkill-capped damage it lands on enemies (projectSpellDamageAgainstUnit; a kill flags it); the best block
     /// (first on ties) is the candidate. With the Battle Mage's coverage, Hidden stacks are ignored and every distinct
     /// visible victim list adds its first block after it. Water Shield is not in scope.
+    /// addSmokeCastCandidates: Smoke halves a shot whose ray crosses its 3x3 cloud. Nothing to do without a living enemy
+    /// that can shoot. Anchors lie on each enemy shooter's segment (in holder order) to the rounded centroid of the base
+    /// cells of our living stacks (the caster first), at 0.45, 0.5, 0.55 and 0.66 of the way, each probed with its
+    /// neighbours (0, -1, 1 per axis; every cell once). A cloud whose nine cells are all smokeable scores the enemy damage
+    /// it prevents minus the friendly damage it prevents: per shooter, max(0, its best stationary shot before - after),
+    /// so a cloud the shooter can bypass by retargeting earns nothing. The best cloud (the first on ties) is offered when
+    /// it scores above 0, valued at its score.
+    fn addSmoke(self: *Gen, raw: u8) void {
+        const s = self.c.s;
+        const team = self.unit().team;
+        const opp = engine.opposite(team);
+        // The enemy shooters, then the allied ones.
+        var shooters: [st.MAX_UNITS]u8 = undefined;
+        var n_enemy: usize = 0;
+        for (s.holderOrder()) |k| {
+            if (!util.livingOf(s, k, opp)) continue;
+            if (canShootNow(&s.units[k])) {
+                shooters[n_enemy] = k;
+                n_enemy += 1;
+            }
+        }
+        if (n_enemy == 0) return;
+        var allies: [st.MAX_UNITS]u8 = undefined;
+        allies[0] = self.c.ui;
+        var na: usize = 1;
+        for (s.holderOrder()) |k| {
+            if (k == self.c.ui or !util.livingOf(s, k, team)) continue;
+            allies[na] = k;
+            na += 1;
+        }
+        var sum_x: f64 = 0;
+        var sum_y: f64 = 0;
+        for (allies[0..na]) |k| {
+            const b = engine.baseCell(&s.units[k]);
+            sum_x += @floatFromInt(b.x);
+            sum_y += @floatFromInt(b.y);
+        }
+        const count: f64 = @floatFromInt(na);
+        const ax = js.round(sum_x / count);
+        const ay = js.round(sum_y / count);
+        var n = n_enemy;
+        for (allies[0..na]) |k| {
+            if (canShootNow(&s.units[k])) {
+                shooters[n] = k;
+                n += 1;
+            }
+        }
+        var before: [st.MAX_UNITS]f64 = undefined;
+        for (shooters[0..n], 0..) |k, i| before[i] = self.shooterBest(k);
+        var seen: [st.GRID + 2][st.GRID + 2]bool = .{.{false} ** (st.GRID + 2)} ** (st.GRID + 2);
+        var best: ?Cell = null;
+        var best_score: f64 = 0;
+        for (shooters[0..n_enemy]) |k| {
+            const ec = engine.baseCell(&s.units[k]);
+            const ex: f64 = @floatFromInt(ec.x);
+            const ey: f64 = @floatFromInt(ec.y);
+            for ([_]f64{ 0.45, 0.5, 0.55, 0.66 }) |frac| {
+                const anchor_x: i32 = @intFromFloat(js.round(ex + (ax - ex) * frac));
+                const anchor_y: i32 = @intFromFloat(js.round(ey + (ay - ey) * frac));
+                for ([_]i32{ 0, -1, 1 }) |ox| for ([_]i32{ 0, -1, 1 }) |oy| {
+                    const c = Cell{ .x = anchor_x + ox, .y = anchor_y + oy };
+                    // Anchors lie between two board cells, so a probe is at most one cell off the board.
+                    if (c.x < -1 or c.y < -1 or c.x > st.GRID or c.y > st.GRID) continue;
+                    const sx: usize = @intCast(c.x + 1);
+                    const sy: usize = @intCast(c.y + 1);
+                    if (seen[sx][sy]) continue;
+                    seen[sx][sy] = true;
+                    var cloud: [9]Cell = undefined;
+                    if (!smokeableCloud(s, c, &cloud)) continue;
+                    const score = self.cloudScore(&cloud, shooters[0..n], n_enemy, before[0..n]);
+                    if (best == null or score > best_score) {
+                        best = c;
+                        best_score = score;
+                    }
+                };
+            }
+        }
+        if (best) |c| {
+            if (best_score > 0) self.pushSpell(raw, null, c, best_score, 0);
+        }
+    }
+
+    /// isRangeCapable() && getRangeShots() > 0
+    fn canShootNow(x: *const st.Unit) bool {
+        return engine.isRangeCapable(x) and engine.getRangeShots(x) > 0;
+    }
+
+    /// cellTargetedSpellBlockCells("Smoke", c) (the 3x3 centred on `c`) when every cell passes isSmokeableCell: on the
+    /// board and empty or lava (smokeCast's own test).
+    fn smokeableCloud(s: *const st.State, c: Cell, out: *[9]Cell) bool {
+        var i: usize = 0;
+        for ([_]i32{ -1, 0, 1 }) |dx| for ([_]i32{ -1, 0, 1 }) |dy| {
+            const x = Cell{ .x = c.x + dx, .y = c.y + dy };
+            if (!engine.cellWithinGrid(x)) return false;
+            const o = s.grid.board[@intCast(x.x)][@intCast(x.y)];
+            if (o != st.EMPTY and o != st.LAVA) return false;
+            out[i] = x;
+            i += 1;
+        };
+        return true;
+    }
+
+    /// preventedDamage(enemy shooters, cloud) - preventedDamage(allied shooters, cloud): the cloud is laid on the board's
+    /// smoke for the evaluation (a hypothetical supplements the live smoke) and lifted again exactly.
+    fn cloudScore(self: *const Gen, cloud: *const [9]Cell, shooters: []const u8, n_enemy: usize, before: []const f64) f64 {
+        const f = &self.c.s.fight;
+        const saved_cells = f.smoke_cells;
+        const saved_n = f.n_smoke;
+        defer {
+            f.smoke_cells = saved_cells;
+            f.n_smoke = saved_n;
+        }
+        for (cloud) |x| {
+            if (f.hasSmoke(x.x, x.y)) continue;
+            if (f.n_smoke < st.MAX_SMOKE) {
+                f.smoke[f.n_smoke] = .{ .x = @intCast(x.x), .y = @intCast(x.y), .laps = 1 };
+                f.n_smoke += 1;
+            }
+            f.smoke_cells[@intCast(x.x)] |= @as(u16, 1) << @intCast(x.y);
+        }
+        var enemy: f64 = 0;
+        var friendly: f64 = 0;
+        for (shooters, 0..) |k, i| {
+            if (before[i] <= 0) continue;
+            const prevented = @max(0, before[i] - self.shooterBest(k));
+            if (i < n_enemy) enemy += prevented else friendly += prevented;
+        }
+        return enemy - friendly;
+    }
+
+    /// findBestLegalStationaryRangeAttack(shooter)?.expectedDamage ?? 0, in a generator for the shooter.
+    fn shooterBest(self: *const Gen, k: u8) f64 {
+        var tc: ai.Ctx = undefined;
+        ai.initCtxInto(&tc, self.c.s, k);
+        const g = Gen{ .c = &tc, .opt = self.opt, .out = self.out };
+        return g.bestStationaryShot();
+    }
+
+    /// findBestLegalStationaryRangeAttack: the largest positive value (evaluatePreparedRangeCandidateDamage, stationary)
+    /// over addShots' aims (every visible edge of every enemy cell; not the free Through Shot lines), under the board's
+    /// smoke as it is now; 0 when no shot scores. addShots' line deduping changes no maximum.
+    fn bestStationaryShot(self: *const Gen) f64 {
+        const s = self.c.s;
+        const u = self.unit();
+        if (!engine.canLandRangeAttack(s, u)) return 0;
+        if (u.attack_type_selected != AT.RANGE and !engine.possibleIncludes(u, AT.RANGE)) return 0;
+        const team = u.team;
+        const opp = engine.opposite(team);
+        const from = [2]f64{ u.pos_x, u.pos_y };
+        const small = engine.isSmall(u);
+        const aoe = combat.isSplashShooter(u);
+        const through = u.has(.through_shot);
+        const shots: u8 = if (combat.doubleShotAbility(u) != null) 2 else 1;
+        const prep = self.prepareShot(shots, aoe);
+        const forced: i32 = if (u.target >= 0 and u.target < s.n_units and !s.units[@intCast(u.target)].isDead()) @as(i32, u.target) else -1;
+        var best: f64 = 0;
+        var g: combat.Groups = undefined;
+        for (s.holderOrder()) |i_slot| {
+            const e = &s.units[i_slot];
+            if (!util.livingOf(s, i_slot, opp)) continue;
+            if (e.isHidden() or u.cannotAttack(e.uid)) continue;
+            const to = [2]f64{ e.pos_x, e.pos_y };
+            const e_small = engine.isSmall(e);
+            const cells = engine.unitCells(e);
+            for (cells.slice()) |cell| {
+                for ([_]u8{ 0, 1, 2, 3 }) |side| {
+                    if (!combat.sideObservableEx(s, cell, side, team, through, aoe)) continue;
+                    if (!through and !util.sideSelectableEx(s, cell, side, from, to, small, e_small, team, through, aoe)) continue;
+                    const aim = combat.sideCenter(cell, side, from[0], from[1]);
+                    combat.evaluateGroups(&g, s, self.c.ui, from[0], from[1], aim[0], aim[1], through, aoe);
+                    if (g.n == 0) continue;
+                    const primary = g.first(0);
+                    const pu = &s.units[primary];
+                    if (pu.isDead() or pu.team != opp or pu.isHidden() or u.cannotAttack(pu.uid)) continue;
+                    if (forced >= 0 and forced != @as(i32, primary)) continue;
+                    if (!through and engine.cowardBarred(s, u, pu)) continue;
+                    if (!through and !aoe and primary != i_slot) continue;
+                    const value = self.shotValue(&prep, &g, primary).ed;
+                    if (value > 0 and value > best) best = value;
+                }
+            }
+        }
+        return best;
+    }
+
     fn addMeteors(self: *Gen, spell: spells.CS, raw: u8, cfg: *const st.SpellConfig) void {
         const s = self.c.s;
         const u = self.unit();
@@ -645,7 +830,9 @@ const Gen = struct {
             }
             switch (cfg.target) {
                 st.SpellTarget.FREE_CELL => {
-                    if (spell == .meteorite or spell == .meteor_shower) self.addMeteors(spell, b.spell, cfg) else self.out.incomplete = true;
+                    if (spell == .smoke) {
+                        self.addSmoke(b.spell);
+                    } else if (spell == .meteorite or spell == .meteor_shower) self.addMeteors(spell, b.spell, cfg) else self.out.incomplete = true;
                 },
                 st.SpellTarget.RANDOM_CLOSE_TO_CASTER, st.SpellTarget.ALLIES_AREA, st.SpellTarget.ENEMY_WITHIN_MOVEMENT_RANGE => self.out.incomplete = true,
                 st.SpellTarget.ALL_ALLIES, st.SpellTarget.ALL_ENEMIES, st.SpellTarget.ALL_FLYING => {

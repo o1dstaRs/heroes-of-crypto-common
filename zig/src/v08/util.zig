@@ -52,6 +52,7 @@ pub const Creature = enum(u8) {
     troll,
     tsar_cannon,
     unicorn,
+    wandering_mage,
     wolf,
     zena,
 
@@ -83,6 +84,7 @@ pub const Creature = enum(u8) {
             44 => .arachna_queen,
             47 => .dryad,
             48 => .blacksmith,
+            49 => .wandering_mage,
             50 => .zena,
             54 => .monk,
             55 => .battle_mage,
@@ -94,16 +96,17 @@ pub const Creature = enum(u8) {
 
     pub fn fromName(n: []const u8) Creature {
         const table = [_]struct { []const u8, Creature }{
-            .{ "Abomination", .abomination },   .{ "Angel", .angel },                 .{ "Arachna Queen", .arachna_queen },
-            .{ "Arbalester", .arbalester },     .{ "Battle Mage", .battle_mage },     .{ "Beholder", .beholder },
-            .{ "Behemoth", .behemoth },         .{ "Blacksmith", .blacksmith },       .{ "Centaur", .centaur },
-            .{ "Dryad", .dryad },               .{ "Frenzied Boar", .frenzied_boar }, .{ "Goblin Knight", .goblin_knight },
-            .{ "Griffin", .griffin },           .{ "Harpy", .harpy },                 .{ "Healer", .healer },
-            .{ "Magic Dragon", .magic_dragon }, .{ "Monk", .monk },                   .{ "Nightmare", .nightmare },
-            .{ "Ogre Mage", .ogre_mage },       .{ "Satyr", .satyr },                 .{ "Troll", .troll },
-            .{ "Wolf", .wolf },                 .{ "Zena", .zena },                   .{ "Black Dragon", .black_dragon },
-            .{ "Cyclops", .cyclops },           .{ "Gargantuan", .gargantuan },       .{ "Pikeman", .pikeman },
-            .{ "Tsar Cannon", .tsar_cannon },   .{ "Scavenger", .scavenger },         .{ "Unicorn", .unicorn },
+            .{ "Abomination", .abomination },       .{ "Angel", .angel },                 .{ "Arachna Queen", .arachna_queen },
+            .{ "Arbalester", .arbalester },         .{ "Battle Mage", .battle_mage },     .{ "Beholder", .beholder },
+            .{ "Behemoth", .behemoth },             .{ "Blacksmith", .blacksmith },       .{ "Centaur", .centaur },
+            .{ "Dryad", .dryad },                   .{ "Frenzied Boar", .frenzied_boar }, .{ "Goblin Knight", .goblin_knight },
+            .{ "Griffin", .griffin },               .{ "Harpy", .harpy },                 .{ "Healer", .healer },
+            .{ "Magic Dragon", .magic_dragon },     .{ "Monk", .monk },                   .{ "Nightmare", .nightmare },
+            .{ "Ogre Mage", .ogre_mage },           .{ "Satyr", .satyr },                 .{ "Troll", .troll },
+            .{ "Wolf", .wolf },                     .{ "Zena", .zena },                   .{ "Black Dragon", .black_dragon },
+            .{ "Cyclops", .cyclops },               .{ "Gargantuan", .gargantuan },       .{ "Pikeman", .pikeman },
+            .{ "Tsar Cannon", .tsar_cannon },       .{ "Scavenger", .scavenger },         .{ "Unicorn", .unicorn },
+            .{ "Wandering Mage", .wandering_mage },
         };
         for (table) |e| if (std.mem.eql(u8, n, e[0])) return e[1];
         return .other;

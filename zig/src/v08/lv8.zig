@@ -389,6 +389,22 @@ fn incumbentGuaranteedKill(c: *const ai.Ctx, set: *const cand.Set) bool {
     return true;
 }
 
+/// prioritizeV08WanderingMageSmoke: a Wandering Mage outside the dominant finish takes the first Smoke candidate
+/// (SUPPORT candidates; addSmoke only offers a cloud that prevents more enemy than friendly ranged damage) unless the
+/// decision is a guaranteed kill. V08_ROLE_RELEASE is unset.
+fn wanderingMageSmoke(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    const s = c.s;
+    if (util.creature(s, c.ui) != .wandering_mage or util.dominantFinishState(s, c.unit().team).active) return util.copyDecision(out, in);
+    var set: cand.Set = .{};
+    cand.enumerate(c, in, cand.SUPPORT, &set);
+    if (incumbentGuaranteedKill(c, &set)) return util.copyDecision(out, in);
+    const smoke_raw: i16 = @intFromEnum(st.CastSpell.smoke);
+    for (set.slice(), 0..) |*cd, i| {
+        if (cd.spell == smoke_raw) return take(out, &set, i);
+    }
+    util.copyDecision(out, in);
+}
+
 /// The power of the unit's first book spell `raw` (0 without it).
 fn bookSpellPower(s: *const st.State, u: *const st.Unit, raw: u8) ?*const st.SpellConfig {
     for (u.spells[0..u.n_spells]) |b| {
@@ -1449,9 +1465,10 @@ fn runPassInner(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decisio
         .damage_spell => damageSpell(c, in, out),
         .vine => vineThrow(c, in, out),
         .healer => healerSustain(c, in, out),
-        // Identity in scope: splash shooters, Smoke, Nightmare's Fire Wall and the Blacksmith need abilities or spells
-        // the engine does not carry yet; ranked-replay tactics are an off-by-default research scope.
-        .smoke, .nightmare, .blacksmith, .ranked_replay => util.copyDecision(out, in),
+        .smoke => wanderingMageSmoke(c, in, out),
+        // Identity in scope: Nightmare's Fire Wall and the Blacksmith need spells the port does not cast yet;
+        // ranked-replay tactics are an off-by-default research scope.
+        .nightmare, .blacksmith, .ranked_replay => util.copyDecision(out, in),
         .cemetery => return cemetery(c, in, out),
         .ranged_positioning => return rangedPositioning(c, in, out),
     }
