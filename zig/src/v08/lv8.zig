@@ -9,6 +9,7 @@ const st = @import("../state.zig");
 const ai = @import("../ai.zig");
 const util = @import("util.zig");
 const cand = @import("cand.zig");
+const engine = @import("../engine.zig");
 
 /// The recorder's pass names, in decideTurn's order (zig/parity/v08/layers.ts).
 pub const Pass = enum {
@@ -323,6 +324,181 @@ pub fn finish(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
     return true;
 }
 
+// ---- backline protector and ward (v0_8_backline_protector.ts) ----
+
+const Protector = enum { abomination, angel, arachna_queen };
+
+fn protectorKind(ui: u8) ?Protector {
+    return switch (util.creature(ui)) {
+        .abomination => .abomination,
+        .angel => .angel,
+        .arachna_queen => .arachna_queen,
+        else => null,
+    };
+}
+
+/// isV08BacklineProtectionBeneficiary: living ranged output (spell output is out of scope).
+fn isBeneficiary(u: *const st.Unit) bool {
+    return !u.isDead() and engine.isRangeCapable(u) and engine.getRangeShots(u) > 0;
+}
+
+/// v08BacklineWardValue: remaining maximum ranged output (no spells in scope).
+fn wardValue(u: *const st.Unit) f64 {
+    const amount = @max(1, @max(0, u.amount_alive));
+    const per = @max(1, @max(0, u.attack_damage_max) * amount);
+    const ranged = if (engine.isRangeCapable(u)) @max(0, engine.getRangeShots(u)) * per else 0;
+    return @min(9007199254740991.0, ranged);
+}
+
+/// v08BacklineProtectorCoverageRange: Angel's screen 2; Abomination's and Queen's aura range, 1 without the aura in
+/// scope; no synergy aura range in scope.
+fn coverageRange(pi: u8) i32 {
+    return if (protectorKind(pi) == .angel) 2 else 1;
+}
+
+fn footprintDistance(a: []const rec.Cell, b: []const rec.Cell) i32 {
+    var best: i32 = std.math.maxInt(i32);
+    for (a) |x| for (b) |y| {
+        best = @min(best, @max(@abs(x.x - y.x), @abs(x.y - y.y)));
+    };
+    return best;
+}
+
+/// The ward the protector `pi` is assigned to (buildV08BacklineProtectorIntent), or null. Abomination is released by
+/// default (V08_ABOMINATION_GUARD unset); no summons in scope.
+fn protectorWard(s: *const st.State, pi: u8) ?u8 {
+    const kind = protectorKind(pi) orelse return null;
+    if (kind == .abomination) return null;
+    const p = &s.units[pi];
+    var best: ?u8 = null;
+    var count: usize = 0;
+    for (s.units[0..s.n_units], 0..) |*w, i| {
+        if (!w.in_holder or i == pi or w.team != p.team or !isBeneficiary(w)) continue;
+        count += 1;
+        const wi: u8 = @intCast(i);
+        if (best) |b| {
+            const vb = wardValue(&s.units[b]);
+            const vw = wardValue(w);
+            if (vw > vb or (vw == vb and util.idRank(wi) < util.idRank(b))) best = wi;
+        } else best = wi;
+    }
+    const ward = best orelse return null;
+    if (kind == .angel) {
+        if (count < 2) return null;
+        var shooter = false;
+        for (s.units[0..s.n_units]) |*e| {
+            if (e.in_holder and !e.isDead() and e.team != p.team and engine.isRangeCapable(e) and engine.getRangeShots(e) > 0) shooter = true;
+        }
+        if (!shooter) return null;
+    }
+    if (util.dominantFinishState(s, p.team).active) return null;
+    if (kind == .arachna_queen) {
+        var flyer = false;
+        for (s.units[0..s.n_units]) |*e| {
+            if (e.in_holder and !e.isDead() and e.team != p.team and engine.canFly(e)) flyer = true;
+        }
+        if (!flyer) return null;
+    }
+    return ward;
+}
+
+/// buildV08BacklineWardIntent: the protector (Abomination first, then by id) whose assigned ward is this unit.
+fn wardProtector(s: *const st.State, ui: u8) ?u8 {
+    const u = &s.units[ui];
+    if (!isBeneficiary(u)) return null;
+    var order: [st.MAX_UNITS]u8 = undefined;
+    var n: usize = 0;
+    for (s.units[0..s.n_units], 0..) |*p, i| {
+        if (!p.in_holder or i == ui or p.isDead() or p.team != u.team or protectorKind(@intCast(i)) == null) continue;
+        order[n] = @intCast(i);
+        n += 1;
+    }
+    std.sort.insertion(u8, order[0..n], {}, struct {
+        fn lt(_: void, a: u8, b: u8) bool {
+            const aa = protectorKind(a) == .abomination;
+            const bb = protectorKind(b) == .abomination;
+            if (aa != bb) return aa;
+            return util.idRank(a) < util.idRank(b);
+        }
+    }.lt);
+    for (order[0..n]) |pi| {
+        if (protectorWard(s, pi) == ui) return pi;
+    }
+    return null;
+}
+
+/// decisionDestinationCells: the body where the decision leaves the unit (no Castling in scope).
+fn destinationCells(s: *const st.State, ui: u8, actions: []const rec.Action, buf: *engine.Cells) []const rec.Cell {
+    const u = &s.units[ui];
+    var i = actions.len;
+    while (i > 0) {
+        i -= 1;
+        switch (actions[i]) {
+            .obstacle_attack => |o| if (o.has_from) {
+                buf.* = ai.footprintForAnchor(u, o.attack_from);
+                return buf.slice();
+            },
+            else => {},
+        }
+    }
+    i = actions.len;
+    while (i > 0) {
+        i -= 1;
+        if (actions[i] == .melee_attack) {
+            buf.* = ai.footprintForAnchor(u, actions[i].melee_attack.attack_from);
+            return buf.slice();
+        }
+    }
+    i = actions.len;
+    while (i > 0) {
+        i -= 1;
+        if (actions[i] == .move_unit) {
+            const m = actions[i].move_unit;
+            if (m.target_cells.len > 0) return m.target_cells;
+            if (m.path.len > 0) {
+                buf.* = ai.footprintForAnchor(u, m.path[m.path.len - 1]);
+                return buf.slice();
+            }
+            break;
+        }
+    }
+    buf.* = engine.unitCells(u);
+    return buf.slice();
+}
+
+/// preservesV08BacklineWardIntent: inside the protector's range stays inside it; outside, never farther.
+fn preservesWard(s: *const st.State, ui: u8, pi: u8, actions: []const rec.Action) bool {
+    var buf: engine.Cells = .{};
+    const dest = destinationCells(s, ui, actions, &buf);
+    const pcells = engine.unitCells(&s.units[pi]);
+    const range = coverageRange(pi);
+    const current = footprintDistance(pcells.slice(), engine.unitCells(&s.units[ui]).slice());
+    const after = footprintDistance(pcells.slice(), dest);
+    return if (current <= range) after <= range else after <= current;
+}
+
+/// repairV08BacklineWardDecision: a productive ward keeps inside its protector's screen; when the decision would
+/// leave it, a preserving attack, else a wait, a defend, a move, or ending the turn.
+pub fn backlineWard(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    const s = c.s;
+    const pi = wardProtector(s, c.ui) orelse return util.copyDecision(out, in);
+    if (preservesWard(s, c.ui, pi, in.slice())) return util.copyDecision(out, in);
+    var all: cand.Set = .{};
+    cand.enumerate(c, in, cand.BOUNDARY, &all);
+    var kept: cand.Set = .{};
+    for (all.slice()) |*cd| {
+        if (!preservesWard(s, c.ui, pi, cd.d.slice())) continue;
+        kept.items[kept.n] = cd.*;
+        util.copyDecision(&kept.items[kept.n].d, &cd.d);
+        kept.n += 1;
+    }
+    if (selectDirectCombat(&kept)) |i| return take(out, &kept, i);
+    for ([_]cand.Kind{ .wait, .defend, .move }) |k| {
+        for (kept.slice(), 0..) |*cd, i| if (cd.kind == k) return take(out, &kept, i);
+    }
+    util.setEndTurn(out, c.ui);
+}
+
 /// Runs one ported pass on `in`; false when the pass is not ported yet.
 pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision) bool {
     switch (pass) {
@@ -330,6 +506,7 @@ pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision
         .defend_to_wait => defendToWait(c.s, c.ui, in, out),
         .prioritize => prioritize(c, in, out),
         .finish => return finish(c, in, out),
+        .backline_ward => backlineWard(c, in, out),
         else => return false,
     }
     return true;

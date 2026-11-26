@@ -77,6 +77,8 @@ pub const Battle = struct {
     /// MELEE_MAGIC stacks per team at the start; two or more make v0.7's meleeMagicAnchor army (no Resurrection or
     /// Wind Flow in scope), which keeps v0.6's decisions without the wait scorer.
     melee_magic: [3]u8 = .{ 0, 0, 0 },
+    /// Each unit's place in its ids' localeCompare order (UUIDs: the same as byte order), for the TS id tie-breaks.
+    id_rank: [st.MAX_UNITS]u16 = .{0} ** st.MAX_UNITS,
 
     /// The profile from the fight's start state (every holder unit).
     pub fn primeProfile(self: *Battle, s: *const State) void {
@@ -89,9 +91,22 @@ pub const Battle = struct {
     /// From a recording's `init` (units in holder order, as engine.initState reads them).
     pub fn fromInit(init: std.json.Value) Battle {
         var b: Battle = .{};
-        for (rec.get(init, "units").array.items, 0..) |u, i| {
+        const units = rec.get(init, "units").array.items;
+        for (units, 0..) |u, i| {
             if (i >= st.MAX_UNITS) break;
             b.creature[i] = Creature.fromName(rec.get(u, "name").string);
+        }
+        for (units, 0..) |u, i| {
+            if (i >= st.MAX_UNITS) break;
+            const id = rec.get(u, "id");
+            if (id != .string) continue;
+            var rank: u16 = 0;
+            for (units, 0..) |o, j| {
+                if (j >= st.MAX_UNITS or j == i) continue;
+                const other = rec.get(o, "id");
+                if (other == .string and std.mem.order(u8, other.string, id.string) == .lt) rank += 1;
+            }
+            b.id_rank[i] = rank;
         }
         return b;
     }
@@ -99,6 +114,10 @@ pub const Battle = struct {
 
 /// The battle being decided (set by whoever runs the policy, before the first decision).
 pub threadlocal var battle: Battle = .{};
+
+pub inline fn idRank(ui: u8) u16 {
+    return battle.id_rank[ui];
+}
 
 pub inline fn creature(ui: u8) Creature {
     return battle.creature[ui];
