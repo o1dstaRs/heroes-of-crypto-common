@@ -37,7 +37,7 @@ fn shouldCohere(c: *const ai.Ctx) bool {
     const s = c.s;
     const opp = engine.opposite(c.unit().team);
     for (0..s.n_units) |i| {
-        if (util.livingOf(s, i, opp) and util.isAoEUnit(@intCast(i))) return false;
+        if (util.livingOf(s, i, opp) and util.isAoEUnit(s, @intCast(i))) return false;
     }
     return true;
 }

@@ -166,7 +166,7 @@ const SPIT_BALL_DEBUFFS: f64 = 5;
 
 /// StrategyV0_3.shotTargetBonus: the Beholder's debuff-spreading bias.
 fn shotTargetBonus(c: *const ai.Ctx, ei: u8, base: f64) f64 {
-    if (util.creature(c.ui) != .beholder) return 0; // or "Spit Ball": abilities out of scope
+    if (util.creature(c.s, c.ui) != .beholder) return 0; // or "Spit Ball": abilities out of scope
     const s = c.s;
     const e = &s.units[ei];
     const targets_range = e.attack_type == AT.RANGE;

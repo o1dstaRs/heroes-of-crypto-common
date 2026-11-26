@@ -381,8 +381,8 @@ pub fn finish(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
 
 const Protector = enum { abomination, angel, arachna_queen };
 
-fn protectorKind(ui: u8) ?Protector {
-    return switch (util.creature(ui)) {
+fn protectorKind(s: *const st.State, ui: u8) ?Protector {
+    return switch (util.creature(s, ui)) {
         .abomination => .abomination,
         .angel => .angel,
         .arachna_queen => .arachna_queen,
@@ -407,8 +407,8 @@ fn wardValue(u: *const st.Unit) f64 {
 /// scope; plus the team's synergy aura range (getAdditionalAuraRangePerTeam), floored, at least 0.
 fn coverageRange(s: *const st.State, pi: u8) i32 {
     // getAuraEffect("Web")?.getRange() ?? 1 for the Queen (batch 3 carries her Web aura); Flesh Shield is not in scope.
-    var base: f64 = if (protectorKind(pi) == .angel) 2 else 1;
-    if (protectorKind(pi) == .arachna_queen) {
+    var base: f64 = if (protectorKind(s, pi) == .angel) 2 else 1;
+    if (protectorKind(s, pi) == .arachna_queen) {
         const u = &s.units[pi];
         for (u.auras[0..u.n_auras]) |d| {
             if (s.aura_defs[d].power_type == st.PowerType.DISABLE_FLY_MOVEMENT) base = s.aura_defs[d].range;
@@ -437,7 +437,7 @@ const Intent = struct {
 };
 
 /// The ward the protector `pi` is assigned to (buildV08BacklineProtectorIntent), or null. Abomination is released by
-/// default (V08_ABOMINATION_GUARD unset); no summons in scope.
+/// default (V08_ABOMINATION_GUARD unset).
 fn protectorWard(s: *const st.State, pi: u8) ?u8 {
     const intent = protectorIntent(s, pi) orelse return null;
     return intent.ward;
@@ -447,16 +447,18 @@ fn protectorWard(s: *const st.State, pi: u8) ?u8 {
 /// valuable, then by id). Angel needs two wards facing a live shooter; Queen needs a live enemy flyer; the finish
 /// window releases every role.
 fn protectorIntent(s: *const st.State, pi: u8) ?Intent {
-    const kind = protectorKind(pi) orelse return null;
+    const kind = protectorKind(s, pi) orelse return null;
     if (kind == .abomination) return null;
     const p = &s.units[pi];
+    // A summoned Queen (an Infest reward) stays offensive.
+    if (kind == .arachna_queen and p.summoned) return null;
     var intent = Intent{ .kind = kind, .ward = 0 };
     var best: ?u8 = null;
     var count: usize = 0;
     for (s.holderOrder()) |i_slot| {
         const i: usize = i_slot;
         const w = &s.units[i_slot];
-        if (!w.in_holder or i == pi or w.team != p.team or !isBeneficiary(w)) continue;
+        if (!w.in_holder or i == pi or w.team != p.team or w.summoned or !isBeneficiary(w)) continue;
         count += 1;
         const wi: u8 = @intCast(i);
         intent.wards[intent.nw] = wi;
@@ -464,7 +466,7 @@ fn protectorIntent(s: *const st.State, pi: u8) ?Intent {
         if (best) |b| {
             const vb = wardValue(&s.units[b]);
             const vw = wardValue(w);
-            if (vw > vb or (vw == vb and util.idRank(wi) < util.idRank(b))) best = wi;
+            if (vw > vb or (vw == vb and util.idLess(s, wi, b))) best = wi;
         } else best = wi;
     }
     const ward = best orelse return null;
@@ -679,22 +681,22 @@ pub fn backlineProtector(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) 
 /// buildV08BacklineWardIntent: the protector (Abomination first, then by id) whose assigned ward is this unit.
 fn wardProtector(s: *const st.State, ui: u8) ?u8 {
     const u = &s.units[ui];
-    if (!isBeneficiary(u)) return null;
+    if (u.summoned or !isBeneficiary(u)) return null;
     var order: [st.MAX_UNITS]u8 = undefined;
     var n: usize = 0;
     for (s.holderOrder()) |i_slot| {
         const i: usize = i_slot;
         const p = &s.units[i_slot];
-        if (!p.in_holder or i == ui or p.isDead() or p.team != u.team or protectorKind(@intCast(i)) == null) continue;
+        if (!p.in_holder or i == ui or p.isDead() or p.team != u.team or p.summoned or protectorKind(s, @intCast(i)) == null) continue;
         order[n] = @intCast(i);
         n += 1;
     }
-    std.sort.insertion(u8, order[0..n], {}, struct {
-        fn lt(_: void, a: u8, b: u8) bool {
-            const aa = protectorKind(a) == .abomination;
-            const bb = protectorKind(b) == .abomination;
+    std.sort.insertion(u8, order[0..n], s, struct {
+        fn lt(st_: *const st.State, a: u8, b: u8) bool {
+            const aa = protectorKind(st_, a) == .abomination;
+            const bb = protectorKind(st_, b) == .abomination;
             if (aa != bb) return aa;
-            return util.idRank(a) < util.idRank(b);
+            return util.idLess(st_, a, b);
         }
     }.lt);
     for (order[0..n]) |pi| {
@@ -906,6 +908,9 @@ fn pinnedRetreat(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const u = c.unit();
     util.copyDecision(out, in);
     if (u.attack_type != AT.RANGE or engine.getRangeShots(u) <= 0) return;
+    // A web-locked shooter cannot move, and a Handyman shooter melees without penalty. The Range Null Field and
+    // Rangebane suppressions are not in scope.
+    if (!u.canMove() or u.has(.handyman)) return;
     if (!pinnedAt(s, u, u.pos_x, u.pos_y)) return;
     var melee: ?rec.Action = null;
     for (in.slice()) |a| switch (a) {

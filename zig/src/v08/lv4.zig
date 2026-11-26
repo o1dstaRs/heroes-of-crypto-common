@@ -341,7 +341,7 @@ fn hydraSpinReposition(c: *ai.Ctx, out: *ai.Decision) void {
 fn preferLowLevelMelee(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
-    if (util.creature(c.ui) != .goblin_knight or u.target >= 0) return;
+    if (util.creature(c.s, c.ui) != .goblin_knight or u.target >= 0) return;
     const i = firstMelee(out) orelse return;
     const strike = out.actions[i].melee_attack;
     const base = engine.baseCell(u);
@@ -517,7 +517,7 @@ fn waitForMassBuff(c: *ai.Ctx, out: *ai.Decision) void {
         const a = &s.units[i_slot];
         if (!util.livingOf(s, i, team)) continue;
         if (a.attack_type == AT.RANGE) ranged += 1;
-        switch (util.creature(@intCast(i))) {
+        switch (util.creature(s, @intCast(i))) {
             .behemoth => behemoth = true,
             .ogre_mage => ogre = true,
             else => {},
@@ -525,7 +525,7 @@ fn waitForMassBuff(c: *ai.Ctx, out: *ai.Decision) void {
     }
     const roar_pending = ranged < 3 and behemoth; // no Battle Roar buff in scope
     const riot_pending = ogre; // no Mass Riot / Riot buff in scope
-    const me = util.creature(c.ui);
+    const me = util.creature(c.s, c.ui);
     const wait = (roar_pending and me != .behemoth) or (riot_pending and me != .ogre_mage);
     if (wait and util.canHourglass(s, c.ui)) util.setWait(out, c.ui);
 }
@@ -573,7 +573,7 @@ fn v04FrontMove(c: *ai.Ctx, d: *const ai.Decision) Front {
     if (util.teamRangedOutput(s, u.team) > util.teamRangedOutput(s, opp)) {
         return if (util.canHourglass(s, c.ui)) .wait else .keep;
     }
-    switch (util.creature(c.ui)) {
+    switch (util.creature(c.s, c.ui)) {
         .unicorn, .scavenger => {},
         else => return .keep,
     }

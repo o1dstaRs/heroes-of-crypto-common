@@ -53,6 +53,43 @@ pub const Creature = enum(u8) {
     wolf,
     zena,
 
+    /// From PBTypes.CreatureVals (Unit.creature_id).
+    pub fn fromId(id: u16) Creature {
+        return switch (id) {
+            2 => .scavenger,
+            4 => .troll,
+            6 => .beholder,
+            7 => .goblin_knight,
+            9 => .black_dragon,
+            11 => .centaur,
+            14 => .harpy,
+            17 => .cyclops,
+            18 => .ogre_mage,
+            20 => .behemoth,
+            21 => .wolf,
+            26 => .satyr,
+            28 => .unicorn,
+            29 => .gargantuan,
+            33 => .arbalester,
+            35 => .pikeman,
+            36 => .healer,
+            37 => .griffin,
+            39 => .tsar_cannon,
+            40 => .angel,
+            41 => .abomination,
+            43 => .frenzied_boar,
+            44 => .arachna_queen,
+            47 => .dryad,
+            48 => .blacksmith,
+            50 => .zena,
+            54 => .monk,
+            55 => .battle_mage,
+            56 => .nightmare,
+            57 => .magic_dragon,
+            else => .other,
+        };
+    }
+
     pub fn fromName(n: []const u8) Creature {
         const table = [_]struct { []const u8, Creature }{
             .{ "Abomination", .abomination },   .{ "Angel", .angel },                 .{ "Arachna Queen", .arachna_queen },
@@ -154,12 +191,20 @@ pub const Battle = struct {
 /// The battle being decided (set by whoever runs the policy, before the first decision).
 pub threadlocal var battle: Battle = .{};
 
-pub inline fn idRank(ui: u8) u16 {
-    return battle.id_rank[ui];
+/// localeCompare(a's id, b's id) < 0: the 16-byte UUIDs in byte order when both ids are canonical (a summon's slot is
+/// a reused one, so its start-state rank would be another unit's), else the start-state rank.
+pub fn idLess(s: *const State, a: u8, b: u8) bool {
+    const ua = &s.units[a];
+    const ub = &s.units[b];
+    if (ua.uuid_ok and ub.uuid_ok) return std.mem.order(u8, &ua.uuid, &ub.uuid) == .lt;
+    return battle.id_rank[a] < battle.id_rank[b];
 }
 
-pub inline fn creature(ui: u8) Creature {
-    return battle.creature[ui];
+/// The unit's creature: its own creature id (recorded `creatureId`, summons included), else the start-state table
+/// (recordings that predate it). Slots are reused by summons, so the table alone can name a removed unit.
+pub inline fn creature(s: *const State, ui: u8) Creature {
+    const id = s.units[ui].creature_id;
+    return if (id != 0) Creature.fromId(id) else battle.creature[ui];
 }
 
 // =====================================================================================================================
@@ -345,11 +390,12 @@ pub fn canHourglass(s: *const State, ui: u8) bool {
     return s.fight.hourglass_set & engine.unitBit(ui) == 0;
 }
 
-/// isAoEUnit (v0_4.ts): by name, or by an AoE ability (abilities out of scope).
-pub fn isAoEUnit(ui: u8) bool {
-    return switch (creature(ui)) {
+/// isAoEUnit (v0_4.ts): by name (AOE_NAMES), or by an active AoE ability (Skewer Strike, which the Queen can steal;
+/// Area Throw, Fire Breath, Through Shot and Large Caliber are not in scope).
+pub fn isAoEUnit(s: *const State, ui: u8) bool {
+    return switch (creature(s, ui)) {
         .black_dragon, .pikeman, .gargantuan, .cyclops, .tsar_cannon => true,
-        else => false,
+        else => s.units[ui].has(.skewer_strike),
     };
 }
 
@@ -384,9 +430,10 @@ pub const FinishState = struct { own_hp: f64, enemy_hp: f64, dominant: bool, urg
 pub fn dominantFinishState(s: *const State, team: u8) FinishState {
     var own: f64 = 0;
     var enemy: f64 = 0;
+    // Summons are excluded from the material comparison, so a generated stack cannot arm the early finish.
     for (s.holderOrder()) |u_slot| {
         const u = &s.units[u_slot];
-        if (!u.in_holder or u.isDead()) continue;
+        if (!u.in_holder or u.isDead() or u.summoned) continue;
         const hp = nonnegativeFinite(cumulativeHp(u));
         if (u.team == team) own += hp else enemy += hp;
     }
