@@ -6,6 +6,7 @@
 const std = @import("std");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
+const abilities = @import("abilities.zig");
 const artifacts = @import("artifacts.zig");
 const js = @import("jsnum.zig");
 const engine = @import("engine.zig");
@@ -236,10 +237,25 @@ pub fn canSelectMeleeTarget(s: *const State, ui: u8, t: u8) bool {
     return !engine.cowardBarred(s, &s.units[ui], target);
 }
 
-/// isLegalMeleeTargetAtHp (v0_1.ts): canSelectMeleeTarget's checks on a holder unit (the forced target read the same
+/// isLegalMeleeTarget (v0_1.ts): canSelectMeleeTarget's checks on a holder unit (the forced target read the same
 /// way: present and alive), and not the gazer that frightened the unit (cannotAttackUnitId).
 pub fn isLegalMeleeTarget(s: *const State, ui: u8, t: u8) bool {
     return s.units[t].in_holder and !s.forbids(&s.units[ui], s.units[t].uid) and canSelectMeleeTarget(s, ui, t);
+}
+
+/// isLegalMeleeTargetAtHp (v0_1.ts): isLegalMeleeTarget with the Cowardice gate read at `attacker_hp`, the attacker's
+/// cumulative hp after its move (projectPostMoveActorAvailability); at engine.cumulativeHp of the attacker the two agree.
+pub fn isLegalMeleeTargetAtHp(s: *const State, ui: u8, t: u8, attacker_hp: f64) bool {
+    const u = &s.units[ui];
+    const target = &s.units[t];
+    if (!target.in_holder or s.forbids(u, target.uid)) return false;
+    if (target.isDead() or target.team == u.team) return false;
+    if (s.disguise and target.isHidden()) return false;
+    if (combat.forcedTarget(s, u)) |f| {
+        if (f != t) return false;
+    }
+    // engine.cowardBarred at the projected hp.
+    return !(s.spit and u.debuffs.len != 0 and u.debuffs.find(.cowardice) != null and attacker_hp < engine.cumulativeHp(target));
 }
 
 /// isLineBlockedByFriendlyUnit: walk the line on accumulated f64 steps; the first friendly that is not the
@@ -1091,12 +1107,13 @@ pub fn hasResponded(s: *const State, t: u8) bool {
     return s.units[t].responded or s.fight.replied & engine.unitBit(t) != 0;
 }
 
-/// preferRespondedMeleeTarget
-pub fn preferRespondedTarget(s: *const State, ui: u8, current_id: u8, from_cells: []const Cell) ?u8 {
+/// preferRespondedMeleeTarget, its legality read at `attacker_hp` (attackerCumulativeHp: the unit's own cumulative hp,
+/// or completeMoveWithAdjacentMelee's projected post-move hp).
+pub fn preferRespondedTarget(s: *const State, ui: u8, current_id: u8, from_cells: []const Cell, attacker_hp: f64) ?u8 {
     var candidates: engine.UnitList = .{};
     for (s.holderOrder()) |i| {
         const t = &s.units[i];
-        if (t.team == s.units[ui].team or !isLegalMeleeTarget(s, ui, i)) continue;
+        if (t.team == s.units[ui].team or !isLegalMeleeTargetAtHp(s, ui, i, attacker_hp)) continue;
         const tc = engine.unitCells(t);
         if (adjacent(from_cells, tc.slice())) candidates.push(i);
     }
@@ -1140,6 +1157,88 @@ pub fn isLegalMoveRoute(c: *Ctx, target: Cell, mp: *const MovePath, r: *const Ro
     return c.actualPath().get(pathing.key(target.x, target.y)) != null;
 }
 
+/// projectPostMoveActorAvailability (src/engine/post_move_actor_availability.ts), as completeMoveWithAdjacentMelee reads
+/// it for its own route.
+pub const PostMove = struct {
+    /// availableAfterMove: the stack has a creature left (a self-revive counts).
+    available: bool,
+    /// The flames killed the stack and canSelfResurrect raised it.
+    resurrected: bool,
+    /// postMoveCumulativeHp: (alive - 1) x max hp + max(0, hp) of the projected stack, 0 when none is left.
+    cumulative_hp: f64,
+};
+
+/// projectPostMoveActorAvailability(unit, fireWalls, move, route) for a move along `route` (the knownPaths route, its
+/// origin included) onto `landing`, on a copy of the stack's hp, max hp, alive and died: the route modifiers run when the
+/// route travels a cell (Made of Fire's max hp boost on a lava route for a lava walker without the buff), then every
+/// burning cell the body enters (fireWallCellsForTraversal with the resolved route: a flyer only where it lands) costs
+/// fireWallBurnDamage of the projected cumulative max hp at that cell's share (a 0 burn stops it; an intact Water Shield
+/// on an unbroken holder absorbs the first, as willWaterShieldAbsorb() with no attacker and no element), through
+/// projectStackDamage until the stack dies; a dead stack that canSelfResurrect revives min(died, max(1, floor(died /
+/// 2))). Read-only; no draw.
+pub fn projectPostMove(s: *const State, ui: u8, route: []const Cell, landing: []const Cell, has_lava: bool) PostMove {
+    const u = &s.units[ui];
+    var hp = u.hp;
+    var max_hp = u.max_hp;
+    var alive = u.amount_alive;
+    var died = u.amount_died;
+    // routeModifierPath: travelledMovePath(base, route), the route minus its origin.
+    const travels = route.len > 1 or (route.len == 1 and !sameCell(route[0], engine.baseCell(u)));
+    if (travels and has_lava and artifacts.canTraverseLava(s, u) and (u.buffs.len == 0 or u.buffs.find(.made_of_fire) == null)) {
+        max_hp = @max(@ceil(max_hp + max_hp / s.mof_power), max_hp); // madeOfFireBoostedMaxHp
+    }
+    if (s.fight.n_fire != 0) {
+        var burning: engine.Swept = .{};
+        const start = engine.unitCells(u);
+        engine.burningCellsEntered(s, ui, start.slice(), route, landing, false, &burning);
+        if (burning.len != 0) {
+            const f = engine.fireBurnFactors(u);
+            var shield = abilities.waterShieldAbsorbs(s, u, null, st.Element.UNSET);
+            for (burning.slice()) |cell| {
+                const requested = engine.fireBurnDamage(alive * max_hp, s.fight.firePct(cell.x, cell.y), f.elem, f.mr, f.heavy);
+                if (requested <= 0) break;
+                if (shield) {
+                    shield = false;
+                    continue;
+                }
+                // projectStackDamage
+                if (requested < hp) {
+                    hp -= requested;
+                    continue;
+                }
+                const front = hp;
+                died += 1;
+                alive -= 1;
+                const remaining = requested - front;
+                hp = max_hp;
+                const additional = @floor(remaining / max_hp);
+                if (additional >= alive) {
+                    died += alive;
+                    alive = 0;
+                    break;
+                }
+                died += additional;
+                alive -= additional;
+                hp -= @rem(remaining, max_hp);
+            }
+        }
+    }
+    var resurrected = false;
+    if (alive <= 0 and engine.canSelfResurrect(u)) {
+        const revived = @min(died, @max(1, @floor(died / 2)));
+        if (revived > 0) {
+            alive += revived;
+            died -= revived;
+            resurrected = true;
+        }
+    }
+    return .{
+        .available = alive > 0,
+        .resurrected = resurrected,
+        .cumulative_hp = if (alive <= 0) 0 else (alive - 1) * max_hp + @max(0, hp),
+    };
+}
+
 /// completeMoveWithAdjacentMelee
 pub fn completeMoveWithMelee(c: *Ctx, mp: *const MovePath, r: *const Route, preferred: ?u8, out: *Decision) void {
     const s = c.s;
@@ -1150,10 +1249,15 @@ pub fn completeMoveWithMelee(c: *Ctx, mp: *const MovePath, r: *const Route, pref
     const move = rec.Action{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..targets.len], .has_lava = r.has_lava } };
     if (u.has(.no_melee)) return out.push(move);
 
+    // A stack the walk's Fire Wall cells kill (or that only a self-revive brings back) strikes nothing after it.
+    const projection = projectPostMove(s, c.ui, out.path[0..len], out.targets[0..targets.len], r.has_lava);
+    if (!projection.available or projection.resurrected) return out.push(move);
+    const post_hp = projection.cumulative_hp;
+
     var adjacent_enemies: engine.UnitList = .{};
     for (s.holderOrder()) |i| {
         const e = &s.units[i];
-        if (e.team == u.team or !isLegalMeleeTarget(s, c.ui, i)) continue;
+        if (e.team == u.team or !isLegalMeleeTargetAtHp(s, c.ui, i, post_hp)) continue;
         const ec = engine.unitCells(e);
         if (adjacent(targets.slice(), ec.slice())) adjacent_enemies.push(i);
     }
@@ -1164,7 +1268,7 @@ pub fn completeMoveWithMelee(c: *Ctx, mp: *const MovePath, r: *const Route, pref
         };
     }
     if (target == null and adjacent_enemies.len > 0) target = adjacent_enemies.items[0];
-    const resolved = if (target) |t| preferRespondedTarget(s, c.ui, t, targets.slice()) else null;
+    const resolved = if (target) |t| preferRespondedTarget(s, c.ui, t, targets.slice(), post_hp) else null;
     const victim = resolved orelse {
         out.push(move);
         return;
@@ -1395,7 +1499,7 @@ pub fn decideWith(c: *Ctx, out: *Decision) void {
             const from = a.move orelse engine.baseCell(u);
             const target0 = occupant(s, tc) orelse return fallbackTurn(c, out);
             const from_cells = footprintForAnchor(u, from);
-            const target = if (c.prefer_responded) (preferRespondedTarget(s, ui, target0, from_cells.slice()) orelse return fallbackTurn(c, out)) else target0;
+            const target = if (c.prefer_responded) (preferRespondedTarget(s, ui, target0, from_cells.slice(), engine.cumulativeHp(u)) orelse return fallbackTurn(c, out)) else target0;
             const t = &s.units[target];
             if (!isLegalMeleeTarget(s, ui, target)) return fallbackTurn(c, out);
             const tcells = engine.unitCells(t);
@@ -1580,4 +1684,41 @@ pub fn continueMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *cons
         }
     }
     return .elimination;
+}
+
+test "projectPostMove: a walk's Fire Wall cells, by the body's swept footprint (seed 13890016, step 108)" {
+    // A one-creature 2x2 Arachna Queen (124 of 200 hp) walks (9,1) (10,1) (11,1) (11,2) past a 25% wall on x = 11: its body
+    // enters (11,0), (11,1) and (11,2), 50 hp each, so the third kills it and completeMoveWithAdjacentMelee strikes nothing.
+    var s = std.mem.zeroes(State);
+    s.n_units = 1;
+    const u = &s.units[0];
+    u.fw = 2;
+    u.fh = 2;
+    u.movement_type = st.Movement.WALK;
+    u.amount_alive = 1;
+    u.hp = 124;
+    u.max_hp = 200;
+    const body = engine.cellsForAnchor(.{ .x = 9, .y = 1 }, 2, 2);
+    const pos = engine.positionForCells(body.slice()).?;
+    u.pos_x = pos[0];
+    u.pos_y = pos[1];
+    for (0..4) |y| engine.addFire(&s, .{ .x = 11, .y = @intCast(y) }, 1, 250);
+    const route = [_]Cell{ .{ .x = 9, .y = 1 }, .{ .x = 10, .y = 1 }, .{ .x = 11, .y = 1 }, .{ .x = 11, .y = 2 } };
+    const landing = footprintForAnchor(u, .{ .x = 11, .y = 2 });
+    var p = projectPostMove(&s, 0, &route, landing.slice(), false);
+    try std.testing.expect(!p.available);
+    try std.testing.expectEqual(@as(f64, 0), p.cumulative_hp);
+    // At full health it survives the three cells with 50 hp; a flyer burns only on the two wall cells it lands on.
+    u.hp = 200;
+    p = projectPostMove(&s, 0, &route, landing.slice(), false);
+    try std.testing.expect(p.available and !p.resurrected);
+    try std.testing.expectEqual(@as(f64, 50), p.cumulative_hp);
+    u.movement_type = st.Movement.FLY;
+    p = projectPostMove(&s, 0, &route, landing.slice(), false);
+    try std.testing.expectEqual(@as(f64, 100), p.cumulative_hp);
+    // No burning cell: the stack as it stands.
+    s.fight.n_fire = 0;
+    s.fight.fire_cells = .{0} ** st.GRID;
+    p = projectPostMove(&s, 0, &route, landing.slice(), false);
+    try std.testing.expectEqual(engine.cumulativeHp(u), p.cumulative_hp);
 }

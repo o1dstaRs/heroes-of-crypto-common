@@ -4,6 +4,7 @@ test {
     _ = @import("cmath.zig");
     _ = @import("jsnum.zig");
     _ = @import("uuid.zig");
+    _ = @import("ai.zig");
     _ = @import("abilities.zig");
     _ = @import("spells.zig");
     _ = @import("path.zig");

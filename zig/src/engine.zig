@@ -1908,17 +1908,27 @@ pub fn fireBurnDamage(cum: f64, pct: f64, elem: f64, mr: f64, heavy: f64) f64 {
     return @max(1, @floor(burn * (1 - mr / 100)));
 }
 
+/// fireWallBurnTargetOf (post_move_actor_availability.ts) as fireBurnDamage's factors: the fire element multiplier (an
+/// Ember Covenant ring counts as Fire Element: 0), the clamped magic resist and Heavy Armor's magic damage multiplier.
+pub const FireBurnFactors = struct { elem: f64, mr: f64, heavy: f64 };
+
+pub fn fireBurnFactors(u: *const Unit) FireBurnFactors {
+    return .{
+        .elem = if (u.buffs.len != 0 and u.buffs.find(.ember_covenant_blessing) != null) 0 else spells.elementMultiplier(st.Element.FIRE, u),
+        .mr = @max(0, @min(100, getMagicResist(u))),
+        .heavy = spells.magicDamageTakenMultiplier(u),
+    };
+}
+
 /// burnUnitOnFireWallCells: each burning cell entered (in order) sears the stack for fireWallBurnDamage at that cell's
 /// share, re-derived from the stack each time (no break roll); a 0 burn or a death stops it. The element (Ember Covenant
 /// counts as Fire Element), magic resist and Heavy Armor are read once.
 pub fn burnOnFire(s: *State, ui: u8, burning: []const Cell) void {
     if (burning.len == 0) return;
     const u = &s.units[ui];
-    const elem: f64 = if (u.buffs.len != 0 and u.buffs.find(.ember_covenant_blessing) != null) 0 else spells.elementMultiplier(st.Element.FIRE, u);
-    const mr = @max(0, @min(100, getMagicResist(u)));
-    const heavy = spells.magicDamageTakenMultiplier(u);
+    const f = fireBurnFactors(u);
     for (burning) |c| {
-        const dmg = fireBurnDamage(u.amount_alive * u.max_hp, s.fight.firePct(c.x, c.y), elem, mr, heavy);
+        const dmg = fireBurnDamage(u.amount_alive * u.max_hp, s.fight.firePct(c.x, c.y), f.elem, f.mr, f.heavy);
         if (dmg <= 0) break;
         _ = applyDamageElement(s, ui, dmg, 0, false, st.Element.UNSET);
         if (u.isDead()) break;
