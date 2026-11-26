@@ -856,7 +856,7 @@ fn takeAdjacentAttack(c: *ai.Ctx, out: *ai.Decision) void {
         lava = out.actions[i].move_unit.has_lava;
         pure_move = path.len > 0;
     }
-    const idle_end = mi == null and util.has(out, .end_turn) and !u.isSkipping(); // isSkippingThisTurn
+    const idle_end = mi == null and util.has(out, .end_turn) and !(u.isSkipping() or u.whirlpooled()); // isSkippingThisTurn
     if (!pure_move and !idle_end) return;
     const base = engine.baseCell(u);
     const dest = if (pure_move) path[path.len - 1] else base;
