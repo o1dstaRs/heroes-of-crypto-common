@@ -681,6 +681,50 @@ pub fn auraCoverageScore(s: *const State, ui: u8, from: Cell, weight: AuraWeight
     return score;
 }
 
+/// getRandomGridCellAroundPosition (src/grid/grid_math.ts), the summon cell an AI decide step draws: the free cell ahead of
+/// `pos` for the team (y + 1 for LEFT, y - 1 for RIGHT), then one getRandomInt(0, 2) picking which diagonal is tried
+/// first. As TypeScript, both diagonals are proposed once the tried one is free (the other is not checked) and the first
+/// proposed cell inside the grid is returned without a second check. With nothing proposed, the eight neighbours are
+/// shuffled (Fisher-Yates) and the first free cell inside the grid wins. The matrix is the decision's (0 is free, and
+/// off the board reads as 0).
+pub fn randomGridCellAroundPosition(c: *ai.Ctx, team: u8, px: f64, py: f64) ?Cell {
+    const cell = engine.cellForPosition(px, py);
+    const m = &c.m;
+    var proposed: [8]Cell = undefined;
+    var n: usize = 0;
+    if (team == st.Team.LEFT or team == st.Team.RIGHT) {
+        const dy: i32 = if (team == st.Team.LEFT) 1 else -1;
+        if (pathing.at(m, cell.x, cell.y + dy) == 0) {
+            proposed[n] = .{ .x = cell.x, .y = cell.y + dy };
+            n += 1;
+        }
+        if (c.s.rng.int(0, 2) != 0) {
+            if (pathing.at(m, cell.x + 1, cell.y + dy) == 0) {
+                proposed[n] = .{ .x = cell.x + 1, .y = cell.y + dy };
+                proposed[n + 1] = .{ .x = cell.x - 1, .y = cell.y + dy };
+                n += 2;
+            }
+        } else if (pathing.at(m, cell.x - 1, cell.y + dy) == 0) {
+            proposed[n] = .{ .x = cell.x - 1, .y = cell.y + dy };
+            proposed[n + 1] = .{ .x = cell.x + 1, .y = cell.y + dy };
+            n += 2;
+        }
+    }
+    for (proposed[0..n]) |pc| if (engine.cellWithinGrid(pc)) return pc;
+    if (n == 0) {
+        const x = cell.x;
+        const y = cell.y;
+        proposed = .{
+            .{ .x = x + 1, .y = y + 1 }, .{ .x = x - 1, .y = y - 1 }, .{ .x = x - 1, .y = y + 1 }, .{ .x = x + 1, .y = y - 1 },
+            .{ .x = x + 1, .y = y },     .{ .x = x, .y = y + 1 },     .{ .x = x - 1, .y = y },     .{ .x = x, .y = y - 1 },
+        };
+        n = 8;
+        c.s.rng.shuffle(Cell, proposed[0..8]);
+    }
+    for (proposed[0..n]) |pc| if (pathing.at(m, pc.x, pc.y) == 0 and engine.cellWithinGrid(pc)) return pc;
+    return null;
+}
+
 pub const AuraPlan = struct { best: Cell, best_score: f64, current: f64, coverable: f64, threats: u32 };
 
 /// countMeleeThreatsToCell: living enemy-coded cells among the eight neighbours of `cell` in the decision matrix.

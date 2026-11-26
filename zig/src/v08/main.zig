@@ -218,6 +218,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
     var engine_stops: usize = 0;
     var decisions: usize = 0;
     var decisions_ok: usize = 0;
+    var refused: usize = 0;
     var fails: usize = 0;
 
     var lines = rec.lines(buf);
@@ -266,10 +267,17 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
                     var collector = Collector{ .arena = da };
                     policy.hook = .{ .ctx = &collector, .f = Collector.add };
                     var out: ai.Decision = .{};
-                    policy.decideTo(&copy, ui, &out, top);
+                    const accepted = policy.decideTo(&copy, ui, &out, top);
                     policy.hook = null;
                     decisions += 1;
                     var all_ok = true;
+                    // A refused decision logs no layers, so nothing below would compare: count it as a failure.
+                    if (!accepted) {
+                        all_ok = false;
+                        refused += 1;
+                        fails += 1;
+                        if (fails <= max_fail) std.debug.print("seed {d} step {d} unit {d}: refused (decideV08 false)\n", .{ game.seed, i, step.action.decide.unit });
+                    }
                     for (logged, 0..) |l, li| {
                         // The k-th logged layer of this name against the k-th Zig layer of the same name.
                         var k: usize = 0;
@@ -361,7 +369,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
             }
         }
     }
-    std.debug.print("layers: {d} games ({d} stopped early at an engine divergence, {d} not parsed), {d}/{d} decisions with every compared layer identical\n", .{ games, engine_stops, unparsed, decisions_ok, decisions });
+    std.debug.print("layers: {d} games ({d} stopped early at an engine divergence, {d} not parsed), {d}/{d} decisions with every compared layer identical, {d} refused\n", .{ games, engine_stops, unparsed, decisions_ok, decisions, refused });
     var it = stats.iterator();
     while (it.next()) |e| {
         std.debug.print("  {s}: {d}/{d}\n", .{ e.key_ptr.*, e.value_ptr.matched, e.value_ptr.compared });

@@ -61,8 +61,8 @@ pub fn decideV08(s: *st.State, ui: u8, out: *ai.Decision) bool {
     return lv8.decide(&c, out);
 }
 
-/// Runs the chain up to `top` for unit `ui`.
-pub fn decideTo(s: *st.State, ui: u8, out: *ai.Decision, top: Level) void {
+/// Runs the chain up to `top` for unit `ui`; false when the v0.8 top refuses the board (a pass or term not ported).
+pub fn decideTo(s: *st.State, ui: u8, out: *ai.Decision, top: Level) bool {
     var c: ai.Ctx = undefined;
     ai.initCtxInto(&c, s, ui);
     out.* = .{};
@@ -74,6 +74,7 @@ pub fn decideTo(s: *st.State, ui: u8, out: *ai.Decision, top: Level) void {
         .v05 => lv5.decide(&c, out),
         .v06 => lv6.decide(&c, out),
         .v07 => lv7.decide(&c, out),
-        .v08 => _ = lv8.decide(&c, out),
+        .v08 => return lv8.decide(&c, out),
     }
+    return true;
 }
