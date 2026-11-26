@@ -12,6 +12,8 @@ const policy = @import("policy.zig");
 const weights = @import("weights.zig");
 const lv5 = @import("lv5.zig");
 const cand = @import("cand.zig");
+const engine = @import("../engine.zig");
+const spells = @import("../spells.zig");
 
 const AT = st.AttackType;
 
@@ -29,9 +31,10 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
 /// routeCasterDecision as v0.8 bakes it (routeUniversalCasterWithPolicy with V08_CASTER_ROUTER_POLICY: Resurrection,
 /// Wind Flow, Castling and Summon Wolves; Resurrection does not pre-empt a committed turn). A MAGIC caster replaces a
 /// turn that does not commit (summonWolvesMayReplace: a cast other than Summon Wolves, or no wait, defend, attack or
-/// cast) with the first Summon Wolves candidate of its uncapped list, read for spells only. A MELEE_MAGIC caster's
-/// routed spells (Resurrection, Wind Flow, Castling) are not in scope, so its decision stands.
+/// cast) with the first Summon Wolves candidate of its uncapped list, read for spells only. A MELEE_MAGIC caster: see
+/// routeMeleeMagicCaster.
 fn routeCaster(c: *ai.Ctx, out: *ai.Decision) void {
+    if (c.unit().attack_type == AT.MELEE_MAGIC) return routeMeleeMagicCaster(c, out);
     if (c.unit().attack_type != AT.MAGIC) return;
     const summon: u8 = @intFromEnum(st.CastSpell.summon_wolves);
     var cast: ?u8 = null;
@@ -50,6 +53,77 @@ fn routeCaster(c: *ai.Ctx, out: *ai.Decision) void {
     for (set.slice()) |*k| {
         if (k.kind == .spell and k.spell == summon) return util.copyDecision(out, &k.d);
     }
+}
+
+/// incumbentCommitsTurn (and incumbentCommitsTurnAgainstResurrection without the widened wait): a wait, defend,
+/// attack, throw, obstacle strike or cast.
+fn commitsTurn(out: *const ai.Decision) bool {
+    for (out.slice()) |a| switch (a) {
+        .wait_turn, .defend_turn, .melee_attack, .range_attack, .area_throw_attack, .obstacle_attack, .cast_spell => return true,
+        else => {},
+    };
+    return false;
+}
+
+/// The MELEE_MAGIC branch of routeUniversalCasterWithPolicy, over the spell candidates of the unit's list in order: on a
+/// turn that does not commit, the Resurrection with the largest positive surplus (resurrectionRecovery minus the
+/// caster's own revive reserve when the cast burns its shared charge, first on ties), else the first Wind Flow when the
+/// enemy flyers it would slow outweigh the allied ones (shouldCastWindFlow). Castling's boards are not in scope (the
+/// rollout scope refuses its book).
+fn routeMeleeMagicCaster(c: *ai.Ctx, out: *ai.Decision) void {
+    if (commitsTurn(out)) return;
+    const s = c.s;
+    const u = c.unit();
+    var set: cand.Set = .{};
+    cand.enumerate(c, out, .{ .spells_only = true }, &set);
+    const res: u8 = @intFromEnum(st.CastSpell.resurrection);
+    // ownsResurrectionCharge: the Resurrection card in the unit's abilities (Break does not matter) and a charge left.
+    var burns = false;
+    if (u.ability_mask & st.AbilityId.resurrection.bit() != 0) {
+        for (u.spells[0..u.n_spells]) |b| if (b.spell == res and b.amount > 0) {
+            burns = true;
+        };
+    }
+    var best: ?usize = null;
+    var best_surplus: f64 = 0;
+    for (set.slice(), 0..) |*k, i| {
+        if (k.kind != .spell or k.spell != res or k.target < 0) continue;
+        const t = &s.units[@intCast(k.target)];
+        // resurrectionPassiveReserve at full weight
+        const reserve = @floor((u.amount_alive + u.amount_died) / 2) * u.max_hp;
+        const cost: f64 = if (burns) @ceil(reserve * 1) else 0;
+        // resurrectionRecovery (no Holy Cross in the live pools): the power cap against the missing health
+        const power = @floor((u.amount_alive * u.max_hp) * (1 * spells.moraleMultiplier(.resurrection, u.attack_multiplier)));
+        const missing = t.amount_died * t.max_hp + @max(0, t.max_hp - t.hp);
+        const surplus = @min(power, missing) - cost;
+        if (surplus > best_surplus) {
+            best = i;
+            best_surplus = surplus;
+        }
+    }
+    if (best) |i| return util.copyDecision(out, &set.items[i].d);
+    const wind: u8 = @intFromEnum(st.CastSpell.wind_flow);
+    for (set.slice()) |*k| {
+        if (k.kind != .spell or k.spell != wind) continue;
+        if (shouldCastWindFlow(s, u.team)) util.copyDecision(out, &k.d);
+        return;
+    }
+}
+
+/// shouldCastWindFlow: the flying pressure (stacks x max damage x steps, each at least 1) of the enemies Wind Flow would
+/// slow (alive, flying, magic resist below 100, not already under Wind Flow) exceeds the allied pressure (the caster
+/// included).
+fn shouldCastWindFlow(s: *const st.State, team: u8) bool {
+    var enemy: f64 = 0;
+    var allied: f64 = 0;
+    for (s.holderOrder()) |i| {
+        const o = &s.units[i];
+        if (!o.in_holder or o.isDead() or !engine.canFly(o) or engine.getMagicResist(o) == 100) continue;
+        if (o.buffs.len != 0 and o.buffs.find(.wind_flow) != null) continue;
+        const pressure = @max(1, o.amount_alive) * @max(1, o.attack_damage_max) * @max(1, engine.getSteps(o));
+        if (o.team == team) allied += pressure else enemy += pressure;
+    }
+    return enemy > allied;
 }
 
 /// StrategyV0_7.finalizeDecision: a cast is kept (the caster routing already compared it with combat), and so is the

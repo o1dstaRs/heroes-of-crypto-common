@@ -171,9 +171,10 @@ const Slots = struct {
     }
 };
 
-/// evaluateAffectedUnits(cells, rangedAreaAttack = false): the holder units standing on the cells, each once, at its
-/// first cell in `cells` order.
-fn affectedUnits(s: *const st.State, cells: []const Cell, out: *Slots) void {
+/// evaluateAffectedUnits(cells, rangedAreaAttack): the holder units standing on the cells, each once, at its first
+/// cell in `cells` order. A ranged area attack (Area Throw, Large Caliber; spells pass false) that catches an Arrows
+/// Wingshield owner hits only the owners: they soak it and nobody beside them is splashed.
+fn affectedUnits(s: *const st.State, cells: []const Cell, out: *Slots, ranged_area: bool) void {
     var seen: [st.MAX_UNITS]bool = .{false} ** st.MAX_UNITS;
     for (cells) |cell| {
         if (!engine.cellWithinGrid(cell)) continue;
@@ -184,6 +185,10 @@ fn affectedUnits(s: *const st.State, cells: []const Cell, out: *Slots) void {
         seen[v] = true;
         out.push(v);
     }
+    if (!ranged_area) return;
+    var bearers: Slots = .{};
+    for (out.slice()) |v| if (combat.wingshieldOwner(&s.units[v])) bearers.push(v);
+    if (bearers.len != 0) out.* = bearers;
 }
 
 // ---- generator ---------------------------------------------------------------------------------------------------
@@ -427,7 +432,7 @@ const Gen = struct {
         var ring: spells.Cells = .{};
         spells.cellsAroundFootprint(body.slice(), &ring);
         var caught: Slots = .{};
-        affectedUnits(s, ring.slice(), &caught);
+        affectedUnits(s, ring.slice(), &caught, false);
         var any = false;
         var out: Damage = .{ .value = 0, .kill = 0 };
         for (caught.slice()) |v| {
@@ -482,7 +487,7 @@ const Gen = struct {
                 };
                 if (!inside) continue;
                 var caught: Slots = .{};
-                affectedUnits(s, cells.slice(), &caught);
+                affectedUnits(s, cells.slice(), &caught, false);
                 var impact = Impact{ .cell = anchor, .value = 0, .kill = 0 };
                 for (caught.slice()) |v| {
                     const t = &s.units[v];
@@ -810,7 +815,7 @@ const Gen = struct {
     /// prepareRangeCandidateDamage: the attacker-only terms of every aim of one decision (the team's synergy power;
     /// Through Shot's, else a splash's ability multiplier; the second volley's multiplier with the Dual Strike Charm;
     /// a physical AOE's Giant's Maul; Quiver of Echoes' bonus volley chance; whether ordinary arrows spend only on a
-    /// hit; Deep Wounds per landed hit). Paralysis and Broken Aegis are not in the engine (no live pool holds them).
+    /// hit; Deep Wounds per landed hit; Paralysis' cut in the shared multiplier). Broken Aegis is not in the engine.
     const Prepared = struct {
         syn: f64,
         physical_aoe: bool,
@@ -841,7 +846,8 @@ const Gen = struct {
             .syn = syn,
             .physical_aoe = physical_aoe,
             .through = through_ab != null,
-            .shared = if (special) |a| abilities.abilityMultiplierSyn(u, a, syn) else 1,
+            // the special ability's multiplier, then a Paralysis effect's cut ((100 - power) / 100)
+            .shared = (if (special) |a| abilities.abilityMultiplierSyn(u, a, syn) else 1) * (abilities.paralysisFactor(u) orelse 1),
             .second = second,
             .on_hit_only = special == null and !u.has(.chakram),
             .wounds_per_hit = woundsPerHit(u, syn),
@@ -1224,7 +1230,7 @@ const Gen = struct {
             spells.cellsAroundCell(target, &ring);
             ring.push(target);
             var list: Slots = .{};
-            affectedUnits(s, ring.slice(), &list);
+            affectedUnits(s, ring.slice(), &list, true);
             if (list.len == 0) continue;
             const primary = list.items[0];
             if (u.cannotAttack(s.units[primary].uid) or (forced >= 0 and forced != @as(i32, primary))) continue;

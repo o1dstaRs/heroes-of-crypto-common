@@ -7,8 +7,8 @@
 //! (auraFlyerSupport), the charge hourglass (hourglassByPolicy), the blocked-move guard (dropBlockedMove) and the free
 //! adjacent attack (takeAdjacentAttack), with the healer policy, the No Melee retreat, the Hidden-target guard and the
 //! Cowardice move-prefix repair. Identity in scope, so not ported: meleeAuraSupport (V05_AURASUPPORT off) and the Fire
-//! Wall half of repairUnavailableMovePrefixedAttack (wave 2). Zero-weight or always-zero score terms (War Anger, target caster, Rapid Charge (weight 0),
-//! bait, Armageddon) add exactly 0.
+//! Wall half of repairUnavailableMovePrefixedAttack (wave 2). Zero-weight or always-zero score terms (Rapid Charge (weight 0), bait,
+//! Armageddon) add exactly 0; War Anger (batch 6a) scores the enemies within the aura's base range of the stand.
 
 const std = @import("std");
 const rec = @import("../recording.zig");
@@ -394,6 +394,27 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         v4from: Cell,
         ui: u8,
         atk_mul: f64,
+        /// The unit's War Anger aura range (AuraEffect.getRange: the base range, no augment), 0 without it.
+        war_anger_range: f64,
+
+        /// warAngerCount: the living enemies with a cell within the War Anger range (Chebyshev) of the stand footprint.
+        fn warAnger(self: *const @This(), fp: []const Cell) f64 {
+            if (self.war_anger_range <= 0) return 0;
+            var n: f64 = 0;
+            for (self.s.holderOrder()) |i| {
+                const e = &self.s.units[i];
+                if (!e.in_holder or e.isDead() or e.team != self.opp) continue;
+                const ec = engine.unitCells(e);
+                near: for (ec.slice()) |x| for (fp) |y| {
+                    const d = @max(@abs(@as(f64, @floatFromInt(x.x)) - @as(f64, @floatFromInt(y.x))), @abs(@as(f64, @floatFromInt(x.y)) - @as(f64, @floatFromInt(y.y))));
+                    if (d <= self.war_anger_range) {
+                        n += 1;
+                        break :near;
+                    }
+                };
+            }
+            return n;
+        }
 
         fn score(self: *const @This(), target: u8, target_cells: []const Cell, cell: Cell, fp: []const Cell) f64 {
             const t = &self.s.units[target];
@@ -434,11 +455,17 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
             const target_caster: f64 = if (t.canCastSpells()) 1 else 0;
             return W[14] * dmg + W[15] * kill + W[16] * retal_free + W[17] * threat + W[18] * stand_threat +
                 W[19] * incumbent + W[20] * counter + W[21] * focus_fire + W[22] * stand_support +
-                W[23] * target_wounded + W[25] * counter * self.fm + W[50] * punish + W[51] * target_caster +
+                W[23] * target_wounded + W[25] * counter * self.fm + W[49] * self.warAnger(fp) + W[50] * punish + W[51] * target_caster +
                 W[57] * target_ranged + DULLING_OWN_SWING_SCORE * dulling;
         }
     };
-    const scorer = Scorer{ .s = s, .u = u, .m = &c.m, .opp = opp, .allies = allies[0..n_allies], .my_hp = my_hp, .fm = fm, .v4target = v4target, .v4from = v4from, .ui = c.ui, .atk_mul = util.meleeAttacks(u) };
+    var war_anger_range: f64 = 0;
+    if (s.war_anger_def != st.NO_AURA) {
+        for (u.auras[0..u.n_auras]) |d| {
+            if (d == s.war_anger_def) war_anger_range = s.aura_defs[d].range;
+        }
+    }
+    const scorer = Scorer{ .s = s, .u = u, .m = &c.m, .opp = opp, .allies = allies[0..n_allies], .my_hp = my_hp, .fm = fm, .v4target = v4target, .v4from = v4from, .ui = c.ui, .atk_mul = util.meleeAttacks(u), .war_anger_range = war_anger_range };
 
     const Best = struct { target: u8, cell: Cell, route: ?*const pathing.Route, score: f64 };
     var best: ?Best = null;
@@ -828,7 +855,7 @@ fn takeAdjacentAttack(c: *ai.Ctx, out: *ai.Decision) void {
         lava = out.actions[i].move_unit.has_lava;
         pure_move = path.len > 0;
     }
-    const idle_end = mi == null and util.has(out, .end_turn) and !u.isStunned(); // isSkippingThisTurn (Stun)
+    const idle_end = mi == null and util.has(out, .end_turn) and !u.isSkipping(); // isSkippingThisTurn
     if (!pure_move and !idle_end) return;
     const base = engine.baseCell(u);
     const dest = if (pure_move) path[path.len - 1] else base;

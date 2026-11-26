@@ -435,7 +435,8 @@ fn healerSustain(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
         if (cd.spell != bless_raw or cd.target < 0) continue;
         const ti: u8 = @intCast(cd.target);
         const t = &s.units[ti];
-        if (t.buffs.find(.blessing) != null or t.isStunned()) continue; // Blindness is not in scope
+        // a Stun or Blindness effect (support roles read those two, not Freeze)
+        if (t.buffs.find(.blessing) != null or t.isStunned() or (t.effects.len != 0 and t.effects.find(.blindness) != null)) continue;
         const mn = t.attack_damage_min;
         const mx = t.attack_damage_max;
         if (mx <= mn or mx + mn <= 0) continue;

@@ -114,8 +114,9 @@ pub const Creature = enum(u8) {
 /// immutable initial-army profile per team (primeArmyProfile at placement: the stacks a team starts the fight with).
 pub const Battle = struct {
     creature: [st.MAX_UNITS]Creature = .{.other} ** st.MAX_UNITS,
-    /// MELEE_MAGIC stacks per team at the start; two or more make v0.7's meleeMagicAnchor army (no Resurrection or
-    /// Wind Flow in scope), which keeps v0.6's decisions without the wait scorer.
+    /// MELEE_MAGIC stacks per team at the start; two or more make v0.7's meleeMagicAnchor army, which keeps v0.6's
+    /// decisions without the wait scorer. A team holding a salvage spell (Resurrection, Wind Flow: SALVAGE_SPELLS) is
+    /// never an anchor, so its count is 0.
     melee_magic: [3]u8 = .{ 0, 0, 0 },
     /// isAuraSaturatedArmy per team at the start: every stack emits an aura of range above 0. v0.7 then plays a
     /// standalone StrategyV0_4 anchor (not ported), so decideV08 refuses those seats. The rollout bridge must set it
@@ -133,11 +134,15 @@ pub const Battle = struct {
         self.melee_magic = .{ 0, 0, 0 };
         var stacks: [3]u8 = .{ 0, 0, 0 };
         var emitters: [3]u8 = .{ 0, 0, 0 };
+        var salvage: [3]bool = .{ false, false, false };
         for (s.holderOrder()) |u_slot| {
             const u = &s.units[u_slot];
             if (!u.in_holder or u.team >= 3) continue;
             if (u.attack_type == AT.MELEE_MAGIC) self.melee_magic[u.team] += 1;
             stacks[u.team] += 1;
+            for (u.spells[0..u.n_spells]) |b| {
+                if (b.spell == @intFromEnum(st.CastSpell.resurrection) or b.spell == @intFromEnum(st.CastSpell.wind_flow)) salvage[u.team] = true;
+            }
             for (u.auras[0..u.n_auras]) |d| {
                 if (s.aura_defs[d].range > 0) {
                     emitters[u.team] += 1;
@@ -145,7 +150,11 @@ pub const Battle = struct {
                 }
             }
         }
-        for (0..3) |t| self.aura_saturated[t] = stacks[t] > 0 and emitters[t] == stacks[t];
+        for (0..3) |t| {
+            self.aura_saturated[t] = stacks[t] > 0 and emitters[t] == stacks[t];
+            // isMeleeMagicAnchorArmy: dense melee magic and no salvage spell in the army.
+            if (salvage[t]) self.melee_magic[t] = 0;
+        }
     }
 
     /// From a recording's `init` (units in holder order, as engine.initState reads them).
@@ -240,13 +249,14 @@ pub fn cumulativeHp(u: *const Unit) f64 {
 
 /// canUnitRespondToMelee (src/handlers/melee_response.ts), as the engine's combat.zig canRespondToMelee: nobody answers
 /// a Shadow Touch or Lightning Spin attacker, a No Melee target never answers, nor a Cowardice-barred one (less
-/// cumulative HP than its attacker), a Stun blocks the reply, an Aggr'd target answers only its forced attacker, a unit
+/// cumulative HP than its attacker), a Stun, Blindness or Freeze blocks the reply (isSkipping, as the engine reads it),
+/// an Aggr'd target answers only its forced attacker, a unit
 /// frightened by Terrifying Gaze never answers its gazer, and the reply is spent once.
 pub fn canRespondToMelee(s: *const State, att: u8, ti: u8) bool {
     const tgt = &s.units[ti];
     if (abilities.skipsResponse(&s.units[att])) return false;
     if (tgt.has(.no_melee) or engine.cowardBarred(s, tgt, &s.units[att])) return false;
-    if (tgt.isStunned()) return false;
+    if (tgt.isSkipping()) return false;
     if (tgt.target >= 0 and tgt.target != @as(i8, @intCast(att))) return false;
     if (s.forbids(tgt, s.units[att].uid)) return false;
     return !tgt.responded and s.fight.replied & engine.unitBit(ti) == 0;
@@ -268,8 +278,13 @@ pub inline fn damageMax(att: *const Unit, tgt: *const Unit, is_range: bool, divi
 }
 
 pub inline fn canRespondMelee(u: *const Unit) bool {
-    // Unit.canRespond(MELEE): a Stun blocks it, and an unbroken No Melee (Blindness and Freeze are not in scope).
-    return !u.isStunned() and !u.has(.no_melee);
+    // Unit.canRespond(MELEE): a Stun, Blindness or Freeze effect blocks it, and so does an unbroken No Melee.
+    return !respondBlocked(u) and !u.has(.no_melee);
+}
+
+/// Unit.canRespond's effect veto: a Stun, Blindness or Freeze effect (the effect list only: no Whirlpool).
+pub inline fn respondBlocked(u: *const Unit) bool {
+    return u.effects.len != 0 and (u.effects.find(.stun) != null or u.effects.find(.blindness) != null or u.effects.find(.freeze) != null);
 }
 
 /// Unit.getAbilityPower(name): the ability's power, 0 without it or while Broken.
