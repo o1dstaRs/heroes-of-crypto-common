@@ -16,14 +16,15 @@ pub const NO_UID: u8 = 0xff;
 pub const GRID = 16;
 /// Buffs a unit can carry in scope: Morale, Luck Blessing, Sylvan Focus, Arcane Ward, Warding Mane, Sharpened Weapons
 /// (melee or magic units) or Rallying Volley (shooters), Ember Covenant, four aura rows (Disguise among them), the five
-/// augments, a cast Blessing, Battle Roar and the Hidden marker (19), with one to spare. A push past a capacity sets
-/// State.overflow (the checks report it).
-pub const MAX_SPELLS = 20;
+/// augments, a cast Blessing, Battle Roar and the Hidden marker (19), plus a Tier-1 and a Tier-2 artifact row (21),
+/// with one to spare. A push past a capacity sets State.overflow (the checks report it).
+pub const MAX_SPELLS = 22;
 /// Debuffs: Dismorale, Dulling Defense, Miner, the Web Aura and Range Null Field Aura rows, the Vine Throw snare, the
 /// Visible marker and Spit Ball's seven, which a Magic Reflection mirror can duplicate on the shooter (19 in scope; 9 seen
-/// on one unit). Effects: Stun, Break, Poison, Aggr, Shatter Armor, Pegasus Light, Deep Wounds, Boar Saliva, Terrifying
-/// Gaze, one to spare.
-pub const MAX_DEBUFFS = 20;
+/// on one unit), two dual-artifact markers and Gravechain's Gravebound (22; Rime Charm's Quagmire is Spit Ball's).
+/// Effects: Stun, Break, Poison, Aggr, Shatter Armor, Pegasus Light, Deep Wounds, Boar Saliva, Terrifying Gaze, one to
+/// spare.
+pub const MAX_DEBUFFS = 23;
 pub const MAX_EFFECTS = 10;
 
 pub const Team = struct {
@@ -122,6 +123,44 @@ pub const SpellId = enum(u8) {
     rangebane,
     /// MIND: no strike, response or switch onto an enemy with more cumulative hp.
     cowardice,
+    // artifacts (artifacts.zig): the buff rows UnitsHolder.applyArtifacts puts on every beneficiary, and the dual
+    // artifacts' power-0 marker debuffs of the same name. Keep them contiguous: isArtifact is a range check.
+    veteran_helm,
+    keen_blade,
+    iron_plate,
+    swift_boots,
+    winged_boots,
+    cursed_ward,
+    hunters_longbow,
+    warlords_edge,
+    titan_plate,
+    clover_of_fortune,
+    crown_of_command,
+    pendant_of_vitality,
+    berserkers_bond,
+    amulet_of_resolve,
+    dual_strike_charm,
+    mages_ring,
+    tome_of_amplification,
+    giants_maul,
+    farsight_quiver,
+    archmages_ring,
+    lava_striders,
+    wounding_charm,
+    last_fuse,
+    rime_charm,
+    gravechain,
+    aegis_of_the_arcane,
+    // not artifact rows (outside the isArtifact range): the System "Made of Fire" buff a lava route gives a unit
+    // that can traverse lava (Lava Striders; Borrowed Grace may copy it), and Gravechain's Death debuff Gravebound
+    // (steps x 0.75, and a flying creature is grounded). Rime Charm applies Spit Ball's Quagmire.
+    made_of_fire,
+    gravebound,
+
+    /// An artifact buff row or marker debuff (UnitsHolder.applyArtifacts).
+    pub inline fn isArtifact(self: SpellId) bool {
+        return @intFromEnum(self) >= @intFromEnum(SpellId.veteran_helm) and @intFromEnum(self) <= @intFromEnum(SpellId.aegis_of_the_arcane);
+    }
 
     pub fn name(self: SpellId) []const u8 {
         return switch (self) {
@@ -168,6 +207,34 @@ pub const SpellId = enum(u8) {
             .weakness => "Weakness",
             .rangebane => "Rangebane",
             .cowardice => "Cowardice",
+            .veteran_helm => "Veteran Helm",
+            .keen_blade => "Keen Blade",
+            .iron_plate => "Iron Plate",
+            .swift_boots => "Swift Boots",
+            .winged_boots => "Winged Boots",
+            .cursed_ward => "Cursed Ward",
+            .hunters_longbow => "Hunters Longbow",
+            .warlords_edge => "Warlords Edge",
+            .titan_plate => "Titan Plate",
+            .clover_of_fortune => "Clover of Fortune",
+            .crown_of_command => "Crown of Command",
+            .pendant_of_vitality => "Pendant of Vitality",
+            .berserkers_bond => "Berserkers Bond",
+            .amulet_of_resolve => "Amulet of Resolve",
+            .dual_strike_charm => "Dual Strike Charm",
+            .mages_ring => "Mages Ring",
+            .tome_of_amplification => "Tome of Amplification",
+            .giants_maul => "Giants Maul",
+            .farsight_quiver => "Farsight Quiver",
+            .archmages_ring => "Archmages Ring",
+            .lava_striders => "Lava Striders",
+            .wounding_charm => "Wounding Charm",
+            .last_fuse => "Last Fuse",
+            .rime_charm => "Rime Charm",
+            .gravechain => "Gravechain",
+            .gravebound => "Gravebound",
+            .made_of_fire => "Made of Fire",
+            .aegis_of_the_arcane => "Aegis of the Arcane",
         };
     }
 
@@ -797,6 +864,19 @@ pub const TeamSetup = struct {
     aura_range: f64 = 0,
     /// getBreakChancePerTeam (Chaos, BREAK_ON_ATTACK): the striker's chance to Break the unit it hits.
     break_chance: f64 = 0,
+    /// FightProperties.getArtifactTier1 / getArtifactTier2 (Tier1Artifact / Tier2Artifact ids, 0 = none).
+    artifact_t1: u8 = 0,
+    artifact_t2: u8 = 0,
+    /// getAugmentPlacementLevel (PlacementAugment LEVEL_1..3 = 0..2): the barrels' zone size (3, 4 or 6).
+    placement: u8 = 0,
+};
+
+/// ILastFuseSource with the fatal damage (Unit.lastFuseFatalHit): `team` 0 = no source (nothing explodes).
+pub const FuseHit = struct {
+    damage: f64 = 0,
+    team: u8 = 0,
+    stack_power: f64 = 0,
+    percent: f64 = 0,
 };
 
 pub const Unit = struct {
@@ -912,6 +992,13 @@ pub const Unit = struct {
     forbidden: u8 = NO_UID,
     /// Unit.maxRangeShots: the constructor's range_shots (the creature config), hidden; Limited Supply's cap reads it.
     max_range_shots: f64 = 0,
+    /// Artifacts: Warlord's Edge's warlordsEdgeAttackBase and warlordsEdgeAppliedAttackBonus (rewritten by every
+    /// refresh, 0 without the buff; read by the damage band, artifacts.warlordsEdgeRate).
+    we_base: f64 = 0,
+    we_bonus: f64 = 0,
+    /// Artifacts: Unit.lastFuseFatalHit, written by the killing hit when the striker's army holds Last Fuse, read by
+    /// the same step's death cleanup (never set at a step boundary).
+    fuse: FuseHit = .{},
 
     pub fn isDead(self: *const Unit) bool {
         return self.amount_alive <= 0;
@@ -1145,7 +1232,15 @@ pub const Terrain = struct {
     right_cleared: bool = false,
     /// cleanedUpCenter: the lava has dried.
     cleaned_up_center: bool = false,
+    /// Artifacts (Barrel Barricade): Grid.artifactBarrels (team, index, the layout slot it was appended to), in Map
+    /// insertion order, deleted with the stone; and artifactBarrelLayoutActive (set by the first placement).
+    barrels: [4]Barrel = undefined,
+    n_barrels: u8 = 0,
+    layout_active: bool = false,
 };
+
+/// One artifact barrel (Grid.ArtifactBarrel): a standing scattered stone of the layout, owned by a team.
+pub const Barrel = struct { team: u8, index: u8, slot: u8 };
 
 pub const Grid = struct {
     /// boardCoord[x][y]: EMPTY, HOLE, BLOCK, LAVA, or unit index + 1.
@@ -1259,6 +1354,17 @@ pub const State = struct {
     shot_hooks: bool = false,
     /// Spit Ball's debuff configs (getSpellConfig of Death / Order, recorded `spellConfigs`), by SpellId.SPIT_BALL index.
     spit_cfg: [7]SpitConfig = .{SpitConfig{}} ** 7,
+    /// Artifacts: some unit carries an artifact row, so adjustBaseStats scans for them (artifacts.zig).
+    artifacts: bool = false,
+    /// The System "Made of Fire" spell (recorded `spellConfigs`): power and laps of the lava-route buff.
+    mof_power: f64 = 10,
+    mof_laps: f64 = 2,
+    /// The Death "Quagmire" and "Gravebound" spells' powers (recorded `spellConfigs`; the riders set the laps).
+    quagmire_power: f64 = 25,
+    gravebound_power: f64 = 25,
+    /// The hasLavaCell of the action being applied (move_unit, a path-bearing melee or obstacle strike), set by
+    /// engine.applyAction for the route modifiers (applyLavaWaterModifier).
+    action_lava: bool = false,
 
     /// cannotAttackUnitId on battles where a gaze can land (Unit.forbidden is never set otherwise).
     pub inline fn forbids(self: *const State, u: *const Unit, target_uid: u8) bool {

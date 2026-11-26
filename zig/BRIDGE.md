@@ -116,11 +116,13 @@ is loaded and counts every summon).
 
 Refused as an unsupported state (the loader names what it found): summoned units other than the creatures Infest and
 Summon Wolves raise, and non-creature units; a spell outside wave 1 (by name, in the raw entries or the Spell objects),
-more spell entries or spells than the book holds (16/6); artifact-granted abilities; Helping Hand;
-ranked `*_authoritative` stats; a spent Water Shield; Last Fuse; Warlord's Edge or a War Anger attack increase; an
+more spell entries or spells than the book holds (16/6); an artifact-granted ability other than the Wounding Charm's
+card; Helping Hand; ranked `*_authoritative` stats; a spent Water Shield; a pending Last Fuse record; a War Anger
+attack increase; an
 unported ability, aura, buff, debuff or effect; effect stacks other than Poison's; more buffs, debuffs, effects, active
-or stolen abilities than the lists hold (20/8/10/10/6); WATER_CENTER or a water cell; artifact barrels; artifacts;
-legacy-axis seats; smoke clouds or fire walls; more than 96 vines; a unit on lava or terrain the board lost; more than
+or stolen abilities than the lists hold (22/23/10/10/6); WATER_CENTER or a water cell; an artifact
+the port does not play (artifacts.supportedT1/T2, or its buff name); legacy-axis seats; smoke clouds or fire walls; more
+than 96 vines; a unit on lava that cannot traverse it, or terrain the board lost; more than
 32 units in the holder or 255 ids; units out of holder order. Malformed input (a missing field, a wrong type, an id no
 list knows, vines without the Vine Throw config) is reported as a malformed state.
 

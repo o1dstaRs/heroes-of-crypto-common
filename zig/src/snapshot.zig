@@ -19,6 +19,7 @@ const std = @import("std");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
 const engine = @import("engine.zig");
+const artifacts = @import("artifacts.zig");
 const terrain = @import("terrain.zig");
 const uuid = @import("uuid.zig");
 const Rng = @import("rng.zig").Rng;
@@ -82,6 +83,12 @@ fn has(v: Value, key: []const u8) bool {
 /// `undefined` (tagged) or a missing key.
 fn isUndefined(v: Value) bool {
     return v == .null or (v == .object and v.object.get("$undefined") != null);
+}
+
+/// A number field that may be absent (an exporter that predates it, or `undefined`): 0 then.
+fn optionalNumber(v: Value, why: *Why, what: []const u8) Error!f64 {
+    if (isUndefined(v)) return 0;
+    return number(v, why, what);
 }
 
 fn number(v: Value, why: *Why, what: []const u8) Error!f64 {
@@ -406,7 +413,14 @@ fn checkUnitScope(uv: Value, fields: Value, props: Value, why: *Why) Error!void 
     }
     const unit_type = get(uv, "unitType");
     if (unit_type != .integer or unit_type.integer != 1) return why.unsupported("unit type is not a creature", .{});
-    try requireEmpty(get(props, "artifact_granted_abilities"), why, "artifact-granted abilities");
+    // The Wounding Charm lends "Deep Wounds Level 1" (the only artifact-granted card): the card itself is in the
+    // ability lists; the record only matters to a re-apply, which runMatch and rollouts never do.
+    const granted = get(props, "artifact_granted_abilities");
+    if (!isUndefined(granted)) {
+        for (try items(granted, why, "artifact_granted_abilities")) |g| {
+            if (!std.mem.eql(u8, try string(g, why, "artifact_granted_abilities"), "Deep Wounds Level 1")) return why.unsupported("artifact-granted ability", .{});
+        }
+    }
     try requireEmpty(get(props, "helping_hand_caster_id"), why, "Helping Hand caster");
     try requireEmpty(get(props, "helping_hand_penalty_id"), why, "Helping Hand penalty");
     if (props == .object) {
@@ -423,8 +437,6 @@ fn checkUnitScope(uv: Value, fields: Value, props: Value, why: *Why) Error!void 
     try requireEmpty(get(fields, "waterShieldSpent"), why, "Water Shield spent");
     try requireEmpty(get(fields, "lastFuseFatalHit"), why, "Last Fuse");
     try requireEmpty(get(fields, "currentAttackModIncrease"), why, "attack mod increase");
-    try requireEmpty(get(fields, "warlordsEdgeAttackBase"), why, "Warlord's Edge");
-    try requireEmpty(get(fields, "warlordsEdgeAppliedAttackBonus"), why, "Warlord's Edge");
 }
 
 /// The unit's spellbook: the raw entries (props.spells "<Faction>:<Name>", one per charge) and the parsed Spell objects
@@ -547,7 +559,7 @@ fn loadLists(u: *Unit, fields: Value, props: Value, why: *Why) Error!void {
     const objects = try items(get(fields, "buffs"), why, "buffs");
     for (objects, 0..) |o, i| {
         const b = &u.buffs.items[i];
-        if (!b.id.isAugment() and b.laps != st.LAPS_AURA) continue;
+        if (!b.id.isAugment() and b.laps != st.LAPS_AURA and !artifacts.storesProperties(b.id)) continue;
         b.src_x = try storedProperty(get(o, "firstSpellProperty"), why);
         b.src_y = try storedProperty(get(o, "secondSpellProperty"), why);
     }
@@ -634,6 +646,8 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
         .responded = try boolean(get(fields, "responded"), why, "responded"),
         .on_hourglass = try boolean(get(fields, "onHourglass"), why, "onHourglass"),
         .moved_this_turn = try boolean(get(fields, "movedThisTurn"), why, "movedThisTurn"),
+        .we_base = try optionalNumber(get(fields, "warlordsEdgeAttackBase"), why, "warlordsEdgeAttackBase"),
+        .we_bonus = try optionalNumber(get(fields, "warlordsEdgeAppliedAttackBonus"), why, "warlordsEdgeAppliedAttackBonus"),
         .buffs = .{},
         .debuffs = .{},
         .effects = .{},
@@ -728,8 +742,6 @@ fn loadGrid(s: *State, grid: Value, fight: Value, ids: []const []const u8, why: 
     const gt = try integer(get(fight, "gridType"), why, "gridType");
     if (gt != try integer(get(grid, "gridType"), why, "grid.gridType")) return why.malformed("grid and fight grid types differ", .{});
     if (gt != GT.NORMAL and gt != GT.LAVA_CENTER and gt != GT.BLOCK_CENTER) return why.unsupported("grid type {d}", .{gt});
-    try requireEmpty(get(grid, "artifactBarrels"), why, "artifact barrels");
-    try requireEmpty(get(grid, "artifactBarrelLayoutActive"), why, "artifact barrel layout");
     s.fight = .{};
     s.fight.grid_type = @intCast(gt);
 
@@ -758,6 +770,25 @@ fn loadGrid(s: *State, grid: Value, fight: Value, ids: []const []const u8, why: 
     t.left_cleared = try boolean(get(grid, "leftMountainCleared"), why, "leftMountainCleared");
     t.right_cleared = try boolean(get(grid, "rightMountainCleared"), why, "rightMountainCleared");
     t.cleaned_up_center = try boolean(get(grid, "cleanedUpCenter"), why, "cleanedUpCenter");
+    // Barrel Barricade: artifactBarrels (Map "team:index" -> {team, index, cell}, in insertion order), each a layout
+    // cell; artifactBarrelLayoutActive.
+    const active = get(grid, "artifactBarrelLayoutActive");
+    t.layout_active = !isUndefined(active) and try boolean(active, why, "artifactBarrelLayoutActive");
+    const barrels = get(grid, "artifactBarrels");
+    if (!isUndefined(barrels)) {
+        for (try mapEntries(barrels, why, "artifactBarrels")) |e| {
+            const b = e.array.items[1];
+            const cell = try cellOf(get(b, "cell"), why, "barrel cell");
+            var slot: ?u8 = null;
+            for (t.layout[0..t.n_layout], 0..) |l, i| {
+                if (l.x == cell.x and l.y == cell.y) slot = @intCast(i);
+            }
+            if (slot == null) return why.malformed("barrel outside the layout", .{});
+            if (t.n_barrels >= t.barrels.len) return why.unsupported("more than {d} barrels", .{t.barrels.len});
+            t.barrels[t.n_barrels] = .{ .team = try intAs(u8, get(b, "team"), why, "barrel team"), .index = try intAs(u8, get(b, "index"), why, "barrel index"), .slot = slot.? };
+            t.n_barrels += 1;
+        }
+    }
 
     // The terrain cells terrain.load would stamp: lava (undried LAVA_CENTER), the uncleared classic mountains and the
     // standing stones (BLOCK_CENTER).
@@ -774,9 +805,10 @@ fn loadGrid(s: *State, grid: Value, fight: Value, ids: []const []const u8, why: 
         if (!t.right_cleared) for (terrain.CLASSIC_RIGHT_X) |x| for (terrain.CLASSIC_Y) |y| {
             expect[@intCast(x)][@intCast(y)] = st.BLOCK;
         };
-        for (t.layout[0..t.n_layout], 0..) |l, i| {
-            if (t.standing & (@as(u16, 1) << @intCast(i)) != 0) expect[@intCast(l.x)][@intCast(l.y)] = st.BLOCK;
-        }
+    }
+    // Standing layout cells are stones on every map (Barrel Barricade's barrels stand off BLOCK_CENTER too).
+    for (t.layout[0..t.n_layout], 0..) |l, i| {
+        if (t.standing & (@as(u16, 1) << @intCast(i)) != 0) expect[@intCast(l.x)][@intCast(l.y)] = st.BLOCK;
     }
 
     // Board: boardCoord[x][y] holds "", a unit id, "H" (a hole), "B" or "L"; every terrain cell must be where the
@@ -804,7 +836,10 @@ fn loadGrid(s: *State, grid: Value, fight: Value, ids: []const []const u8, why: 
                 break :blk ui + 1;
             };
             const e = expect[x][y];
-            if ((v == st.BLOCK or v == st.LAVA or e != st.EMPTY) and v != e) {
+            // Lava Striders: a unit that can traverse lava stands on the square, and a death there leaves ground
+            // (grid.cleanupAll writes no "L" back).
+            const lava_ok = e == st.LAVA and (v == st.EMPTY or (st.isUnitCode(v) and artifacts.canTraverseLava(s, &s.units[v - 1])));
+            if (!lava_ok and (v == st.BLOCK or v == st.LAVA or e != st.EMPTY) and v != e) {
                 return why.unsupported("terrain cell ({d},{d}) is {s}", .{ x, y, if (code.len == 0) "empty" else code });
             }
             s.grid.board[x][y] = v;
@@ -916,8 +951,17 @@ fn loadFight(s: *State, fight: Value, root: Value, ids: []const []const u8, why:
         }
         if (f.n_vines != 0 and !s.spell_cfg[@intFromEnum(st.CastSpell.vine_throw)].loaded) return why.malformed("vines without the Vine Throw config", .{});
     }
-    for ([_][]const u8{ "artifactTier1PerTeam", "artifactTier2PerTeam" }) |key| {
-        for (try mapEntries(get(fight, key), why, key)) |e| try requireEmpty(e.array.items[1], why, "artifacts");
+    // The teams' artifacts (Map team -> id): ids the port plays (artifacts.supportedT1/T2) or refused by number.
+    for ([_][]const u8{ "artifactTier1PerTeam", "artifactTier2PerTeam" }, 0..) |key, tier| {
+        for (try mapEntries(get(fight, key), why, key)) |e| {
+            const team = try integer(e.array.items[0], why, "artifact team");
+            const id = try integer(e.array.items[1], why, "artifact id");
+            const ok = if (tier == 0) artifacts.supportedT1(id) else artifacts.supportedT2(id);
+            if (!ok) return why.unsupported("Tier-{d} artifact {d}", .{ tier + 1, id });
+            if (team != st.Team.LEFT and team != st.Team.RIGHT) return why.malformed("artifact team {d}", .{team});
+            const row = &s.setup[@intCast(team)];
+            if (tier == 0) row.artifact_t1 = @intCast(id) else row.artifact_t2 = @intCast(id);
+        }
     }
 
     f.up_next = try queueOf(s, get(fight, "upNextQueue"), ids, why, "upNextQueue");

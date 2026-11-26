@@ -15,7 +15,9 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
 - every creature's stats, sizes (1x1, 2x1, 2x2), walking and flying, melee and ranged;
 - the abilities of the creatures ported so far (batches 1 to 5, below), including the units Infest and Summon Wolves
   summon and the abilities Predatory Assimilation and the Wild Regeneration gift move between units; every other
-  creature's abilities stripped; no artifacts;
+  creature's abilities stripped;
+- the artifacts ported so far (below; `src/artifacts.zig`): 27 of the 28 in the live pools, played as runMatch applies
+  them (once, at setup); a team holding Quiver of Echoes (or the disabled Broken Aegis or Holy Cross) is refused;
 - the wave-1 spells (below): Heal, Blessing, Lightning Strike, Fire Strike, Meteor Shower, Meteorite, Ring of Fire, Summon
   Wolves and Vine Throw, with the casters' spellbooks (Healer, Battle Mage, Satyr, Magic Dragon, Trent, and a Queen that
   stole one), the MAGIC attack type, the vines and the Wolves they summon; a book holding any other spell is refused;
@@ -506,6 +508,45 @@ The framework the maps added (all exact in both modes, see the coverage below):
   and the regroup, its `decideTurn` branch (no attack-type prefix, no route legality check), `isLineBlockedByObstacle`
   in `findRangeAttackAction`, and `move_unit.has_lava` from the route.
 - **Recording**: `Unit.creature_id` (`creatureId`, PBTypes.CreatureVals; 0 for older recordings).
+
+### Artifacts
+
+`src/artifacts.zig`, exact in both modes (`RECORD_ARTIFACTS`; `pool:<t1 ids>/<t2 ids>` draws each team's pair from the
+given lists). runMatch's `applyArtifacts` puts one buff row per artifact on every beneficiary at setup (dual artifacts
+also a power-0 marker debuff of the same name) and never again, so the recorded start state carries the rows and the
+port only reads them; the live server re-applies on summons, which the port does not model. Each row is a `SpellId` in
+one contiguous block (`isArtifact`), its power, laps 15, and the stored properties "first;second" in `src_x / src_y`
+(loaded, digested and compared like the augments' rows; Keen Blade's 0.7 is only read as the power). Every artifact
+row is a marker for Borrowed Grace and Absolving Arrow (`isMarkerSpell`). A battle without artifacts takes one branch
+per hook (`State.artifacts`).
+
+| Artifacts | What the port does |
+| --- | --- |
+| Veteran Helm, Keen Blade, Iron Plate, Swift Boots, Winged Boots, Cursed Ward, Hunter's Longbow, Warlord's Edge, Titan Plate, Clover of Fortune, Crown of Command, Pendant of Vitality, Berserker's Bond, Aegis of the Arcane | the `adjustBaseStats` terms at their TypeScript points (HP, luck, morale, armor flats and shares, the magic-resist fold, steps, attack); Warlord's Edge keeps `we_base / we_bonus` (exported) and re-prices the damage band when the strike type differs from the refresh's selection (`combat.damageBound`) |
+| Amulet of Resolve | the status and mind resist (Stun, Aggr, Terrifying Gaze, and a Boar Saliva save drawn before the already-salivated check) and the physical-AOE multiplier of spin, skewer and the AOE tail |
+| Giant's Maul | the striker's +40 % on every physical-AOE sub-hit, before the victim's status resist |
+| Dual Strike Charm | the second punch's multiplier (the marker sits on Double Punch holders at setup) |
+| Farsight Quiver | no range falloff (the engine's divisor and v0.1's target scan) |
+| Mage's Ring, Archmage's Ring | the caster's magic damage bonus (additive with Empower and Sylvan Focus) |
+| Tome of Amplification | a non-heal cast buff's power `Number((p * 1.35).toFixed(4))` on each ally (Battle Roar in scope) |
+| Wounding Charm | the lent "Deep Wounds Level 1" card (batch 4's Deep Wounds) and the ranged Deep Wounds riders it makes live |
+| Last Fuse | the killing hit's record (`Unit.fuse`: combat.hit, spell kills) and the corpse's blast in the death cleanup, before the Infest spawn, then the depth-first chain |
+| Rime Charm | the striker's landed-hit rider (`getRandomInt(0, 100)` against `clamp(power + luck)`, a full-resist target skipped, an existing Quagmire kept after the draw): Spit Ball's Quagmire (laps from the second stored property, + 1 on the active unit) at every melee, shot, counter-shot, second-shot, Through Shot and splash site; its holder turns the Spit Ball hooks on |
+| Gravechain | the army's -1 step, and the landed-hit rider: the chance once per call, the links (the target and its living teammates touching it, three hops, getCells order, each cell's ring), one attempted set per exchange (melee spin, skewer and blow share one; a splash or Through Shot volley one), Gravebound (steps x 0.75 after Quagmire, a flyer grounded in `canFly`) |
+| Barrel Barricade | two barrels per owning team at start_fight (LEFT first, before the fight starts): its Placement augment's zone sorted by (on a friendly shooter's file in front of it, screen rank, inward edge, x, y), the pair rule; each a standing scattered stone appended to the layout on any map, so the stone gates (`hasScatteredMountains`, `centerCells`, `groundRouteCrossesObstacle`, the loader's standing cells) open on NORMAL and LAVA_CENTER too; per-team records deleted with the stone |
+| Lava Striders | walking and standing on the undried lava square (`canTraverseLava`: the pather's `made_of_fire`, occupancy, the restore of a vacated centre cell, v0.1's landing check) and Made of Fire after a lava route (laps 3) with its immediate boost, the `+init/power` refresh terms and the ability-formula terms |
+
+Lessons (for the three left and for the server path):
+
+- A death on lava leaves `""` in boardCoord (cleanupAll restores nothing), but `getOccupantNumeric` takes the centre
+  obstacle from the map, so the matrix (and the AI) still reads lava there: `path.buildMatrix` does the same.
+- A summon can be created and destroyed in one step (an Infest spawn a Last Fuse chain kills): the recorder takes
+  summon ids as the holder receives them, not only from the after-step scan.
+- Rime Charm's "Quagmire" is Spit Ball's debuff (batch 5); Gravechain's "Gravebound" grounds flyers (`canFly`) and joins
+  the steps multiplier after Quagmire; both are riders with draws at every melee, ranged, sub-hit and tail site, in the
+  references' orders (Rime and Gravechain before Aggr on a second punch, after it on the first blow).
+- `rollout.v08Scope` refuses a v0.8 seat on a board with any artifact row until src/v08 is checked on artifacts (lv8's
+  explicit-rate damage bound needs `artifacts.warlordsEdgeRate`).
 
 ### Augments, synergies and Break
 
@@ -1319,20 +1360,19 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 
 - the abilities of every creature outside batches 1 to 5 and the wave-1 casters, the spells outside wave 1 (Spiritual
   Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Fireball, Smoke, Craft, Wind Flow, Resurrection, Castling, the
-  runes and the rest: a book holding one is refused by name) and artifacts (and so Broken Aegis's +20 break chance and
-  self-miss, resurrection, the magic-resist and mirror rolls of debuff spells, Crafted Double Shot, Farsight Quiver,
-  Quiver of Echoes, Amulet of Resolve's mind and status resistance); the revealed-ranged delivery layer of production's
-  augment plan (it needs the live draft); WATER_CENTER (never played); on the maps, Quiver of Echoes' extra obstacle
-  shot, Fire Breath through stones, artifact barrels, and `forceStalledLap` / the recovery net (never reached: 0
-  rejected engine calls in every map recording). The ported code leaves out what no battle in scope can reach: Made of
-  Fire, Paralysis, Water Shield and Water Element, Flesh Shield, Dense Flesh (`spendShotsAgainst` spends one arrow), the
-  Dual Strike Charm, the aura power types outside the six in scope, the Wind Element (Thunderbird is not ported), the
-  Castling hook's getMovePath (it draws nothing), runs of more stunned activations than the advance attempts allow
-  (`forceStalledLap`, never seen), the mass casts other than Battle Roar's ALL_ALLIES buff (Mass Heal, the flyer and
-  enemy casts), Holy Cross (a gift the caster keeps), the mind-resist saves of Boar Saliva, Terrifying Gaze, Petrifying
-  Gaze and Spit Ball (Amulet of Resolve); the recovery net is ported only for mindless units (runMatch's retry, never
-  reached). Ported but never reached: the ranged Deep Wounds riders (a Queen holding both a stolen Deep Wounds and a
-  stolen Endless Quiver shoots with them).
+  runes and the rest: a book holding one is refused by name), the artifact Quiver of Echoes, the disabled Broken Aegis
+  (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and mirror rolls of debuff
+  spells), Crafted Double Shot; the revealed-ranged delivery layer of production's augment plan (it needs the live
+  draft); WATER_CENTER (never played); on the maps, Quiver of Echoes' extra obstacle shot, Fire Breath through stones,
+  and `forceStalledLap` / the recovery net (never reached: 0 rejected engine calls in every map recording). The ported
+  code leaves out what no battle in scope can reach: the Made of Fire ability (no creature in scope holds it; the
+  Lava Striders buff is ported), Paralysis, Water Shield and Water Element, Flesh Shield, Dense Flesh
+  (`spendShotsAgainst` spends one arrow), the aura power types outside the six in scope, the Wind Element (Thunderbird
+  is not ported), the Castling hook's getMovePath (it draws nothing), runs of more stunned activations than the advance
+  attempts allow (`forceStalledLap`, never seen), the mass casts other than Battle Roar's ALL_ALLIES buff (Mass Heal,
+  the flyer and enemy casts), Holy Cross (a gift the caster keeps); the recovery net is ported only for mindless units
+  (runMatch's retry, never reached). The ranged Deep Wounds riders are reached through Wounding Charm's granted card
+  (and a Queen holding both a stolen Deep Wounds and a stolen Endless Quiver).
 - the AI versions the research uses (v0.8 with the a19 search). The production rollout policy is the v0.8 chain, about
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and

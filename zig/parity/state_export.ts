@@ -280,11 +280,22 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
     let spellSummons = false;
     let disguise = false;
     let spitBall = false;
+    // Artifacts: a Lava Striders army's lava routes apply the System "Made of Fire" buff (its config travels here).
+    let madeOfFire = false;
+    // Rime Charm and Gravechain apply the Death "Quagmire" and "Gravebound" debuffs.
+    let riders = false;
     for (const unit of unitsHolder.getAllUnits().values()) {
         const props = unit.getUnitProperties();
         addProps(props);
         if ((props.abilities ?? []).includes("Disguise Aura")) disguise = true;
         if ((props.abilities ?? []).includes("Spit Ball")) spitBall = true;
+        if ((props.applied_buffs ?? []).some((name: string) => name === "Lava Striders" || name === "Made of Fire"))
+            madeOfFire = true;
+        if (
+            (props.applied_buffs ?? []).some((name: string) => name === "Rime Charm" || name === "Gravechain") ||
+            (props.applied_debuffs ?? []).some((name: string) => name === "Quagmire" || name === "Gravebound")
+        )
+            riders = true;
         if ((props.abilities ?? []).includes("Infest")) summons = true;
         if ((props.spells ?? []).some((entry: string) => entry.includes(":Summon "))) spellSummons = true;
         if (unit.summoned && SPELL_SUMMON_CREATURES.includes(unit.getName())) spellSummons = true;
@@ -335,6 +346,9 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
         for (const [faction, name] of SPIT_BALL_DEBUFFS)
             spellConfigs[name] = plainConfig(getSpellConfig(faction, name));
     }
+    if (madeOfFire) spellConfigs["Made of Fire"] = plainConfig(getSpellConfig("System", "Made of Fire"));
+    if (riders)
+        for (const name of ["Quagmire", "Gravebound"]) spellConfigs[name] = plainConfig(getSpellConfig("Death", name));
     return {
         abilityConfigs,
         effectConfigs,

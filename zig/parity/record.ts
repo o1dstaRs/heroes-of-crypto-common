@@ -245,7 +245,8 @@ function gridTypeFor(seed: number): number {
 //   RECORD_PLACEMENT_TIMING=setup-before-placement   production's zone timing (Placement widens the zone first)
 //   RECORD_FACTION="Chaos|"           one-faction rosters, so synergies reach level 2 or 3 (see rosterFor above)
 //   RECORD_ARTIFACTS=random|"t1:t2"|"t1:t2|t1:t2"   Tier-1/Tier-2 ids (random = the live pools plus 0), for the
-//                                     artifact batch (the Zig loader refuses artifact buffs)
+//                                     artifact batch (the Zig loader refuses the artifacts it does not play)
+//   RECORD_ARTIFACTS="pool:1,3,4/2,5,0"   per team, a uniform pick from each list (the ported artifacts, 0 = none)
 //   RECORD_TRACE_DRAWS=1              every engine/decide step gets `ds`, the getRandomInt caller of each raw draw
 //                                     (applyDamage's break roll also names the hit that called it), and
 //                                     <out>.sites.json tallies them
@@ -381,6 +382,13 @@ function artifactsFor(seed: number, teamIndex: number): [number, number] | undef
         const rng = makeRng((Math.imul(seed, 0x2c1b3c6d) ^ (teamIndex * 0x297a2d39)) >>> 0);
         const t1 = [0, ...TIER1_ARTIFACT_LIST.map((a: any) => a.id)];
         const t2 = [0, ...TIER2_ARTIFACT_LIST.map((a: any) => a.id)];
+        return [t1[Math.floor(rng() * t1.length)], t2[Math.floor(rng() * t2.length)]];
+    }
+    if (ARTIFACT_MODE.startsWith("pool:")) {
+        const rng = makeRng((Math.imul(seed, 0x2c1b3c6d) ^ (teamIndex * 0x297a2d39)) >>> 0);
+        const [t1s, t2s] = ARTIFACT_MODE.slice("pool:".length).split("/");
+        const t1 = (t1s || "0").split(",").map(Number);
+        const t2 = (t2s || "0").split(",").map(Number);
         return [t1[Math.floor(rng() * t1.length)], t2[Math.floor(rng() * t2.length)]];
     }
     const [green, red] = ARTIFACT_MODE.split("|");
@@ -696,6 +704,24 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
     if (spitBall) {
         for (const [faction, name] of SPIT_BALL_DEBUFFS) {
             spellConfigs[name] = JSON.parse(JSON.stringify(getSpellConfig(faction, name)));
+        }
+    }
+    // Artifacts: Rime Charm and Gravechain apply the Death "Quagmire" and "Gravebound" debuffs.
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        const names = u.getUnitProperties().applied_buffs as string[];
+        if (names.includes("Rime Charm") || names.includes("Gravechain")) {
+            for (const name of ["Quagmire", "Gravebound"]) {
+                spellConfigs[name] = JSON.parse(JSON.stringify(getSpellConfig("Death", name)));
+            }
+            break;
+        }
+    }
+    // Artifacts: a Lava Striders army's lava routes apply the System "Made of Fire" buff.
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        const names = u.getUnitProperties().applied_buffs as string[];
+        if (names.includes("Lava Striders") || names.includes("Made of Fire")) {
+            spellConfigs["Made of Fire"] = JSON.parse(JSON.stringify(getSpellConfig("System", "Made of Fire")));
+            break;
         }
     }
     const templates = canSummon(ctx)
@@ -1091,6 +1117,25 @@ function main(): void {
                 if (canSummon(ctx)) {
                     summonTracking = true;
                     for (const id of ctx.unitsHolder.getAllUnits().keys()) seenIds.add(id);
+                    // Summons in creation order, as the holder receives them: a summon can also leave within the
+                    // step that made it (an Infest spawn a Last Fuse chain blast kills), so the after-step holder scan
+                    // (noteSummons) alone would miss its id.
+                    // (Non-enumerable, so the state export's field coverage check does not see it.)
+                    const holder = ctx.unitsHolder as any;
+                    const addUnit = holder.addUnit.bind(holder);
+                    Object.defineProperty(holder, "addUnit", {
+                        configurable: true,
+                        enumerable: false,
+                        writable: true,
+                        value: (unit: any): void => {
+                            addUnit(unit);
+                            const id = unit.getId();
+                            if (summonTracking && !seenIds.has(id)) {
+                                seenIds.add(id);
+                                summonIds.push(id);
+                            }
+                        },
+                    });
                     const engineContext = context as any;
                     const createSummonedUnit = engineContext.createSummonedUnit;
                     engineContext.createSummonedUnit = (opts: unknown) => {

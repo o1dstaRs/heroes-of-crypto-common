@@ -27,14 +27,17 @@ pub const HOLE: i8 = -2;
 pub const LAVA: i8 = -3;
 pub const WATER: i8 = -4;
 
-/// Grid.getOccupantNumeric: a unit's team wins over terrain (no unit ever stands on terrain in scope).
+/// Grid.getOccupantNumeric: a unit's team wins over terrain (a Lava Striders unit may stand on lava). An empty cell of
+/// the undried lava square reads lava: the matrix takes the centre obstacle from the map, not from boardCoord, so a
+/// death on lava (which leaves "" in boardCoord) still shows lava here.
 pub fn buildMatrix(s: *const st.State) Matrix {
     var m: Matrix = undefined;
+    const lava_live = s.fight.grid_type == st.GridType.LAVA_CENTER and !s.grid.terrain.cleaned_up_center;
     for (0..st.GRID) |x| {
         for (0..st.GRID) |y| {
             const o = s.grid.board[x][y];
             m[x][y] = switch (o) {
-                st.EMPTY => 0,
+                st.EMPTY => if (lava_live and x >= 6 and x < 10 and y >= 6 and y < 10) LAVA else 0,
                 st.HOLE => HOLE,
                 st.BLOCK => BLOCK,
                 st.LAVA => LAVA,
@@ -152,6 +155,9 @@ pub const Params = struct {
     vines: ?*const [st.GRID]u16 = null,
     /// hasAbilityActive("In Its Own World"): the vine strider's free second pass.
     vine_stride: bool = false,
+    /// isMadeOfFire = unit.canTraverseLava() (a Lava Striders army, artifacts.zig): a walker's body may stand on lava,
+    /// a walker route that touches lava carries hasLavaCell, and the closest-move pass takes lava cells.
+    made_of_fire: bool = false,
 };
 
 /// VINE_CROSS_PENALTY (src/spells/vines.ts)
@@ -177,8 +183,13 @@ pub fn getMovePath(m: *const Matrix, p: Params, out: *MovePath) void {
 
 /// The body test of calculateMovePath for one footprint cell value: a walker is stopped by anything non-zero, a flyer
 /// by anything it cannot fly over (lava and water it can).
-inline fn blocksBody(comptime fly: bool, el: i8) bool {
-    return if (fly) el != 0 and el != LAVA and el != WATER else el != 0;
+inline fn blocksBody(comptime fly: bool, el: i8, made_of_fire: bool) bool {
+    return if (fly) el != 0 and el != LAVA and el != WATER else el != 0 and !(made_of_fire and el == LAVA);
+}
+
+/// The closest-move pass's free test for one cell: empty, or lava for a unit made of fire.
+inline fn freeForClosest(el: i8, made_of_fire: bool) bool {
+    return el == 0 or (made_of_fire and el == LAVA);
 }
 
 /// Which walk calculateMovePath runs: no vines on the board, the first pass with vines (a walker's toll, none for a
@@ -275,18 +286,18 @@ fn Geometry(comptime fly: bool) type {
             const initial_cells = &self.initial;
             if (self.small) {
                 const el = at(self.m, n.x, n.y);
-                if (fly) crosses.* = el == LAVA;
-                return blocksBody(fly, el) and !initial_cells.has(key(n.x, n.y));
+                if (fly or self.p.made_of_fire) crosses.* = el == LAVA;
+                return blocksBody(fly, el, self.p.made_of_fire) and !initial_cells.has(key(n.x, n.y));
             }
             if (self.legacy) {
                 const cells = [4][2]i32{ .{ n.x, n.y }, .{ n.x - 1, n.y }, .{ n.x - 1, n.y - 1 }, .{ n.x, n.y - 1 } };
-                if (fly) {
+                if (fly or self.p.made_of_fire) {
                     for (cells) |c| {
                         if (at(self.m, c[0], c[1]) == LAVA) crosses.* = true;
                     }
                 }
                 for (cells) |c| {
-                    if (blocksBody(fly, at(self.m, c[0], c[1])) and !initial_cells.has(key(c[0], c[1]))) return true;
+                    if (blocksBody(fly, at(self.m, c[0], c[1]), self.p.made_of_fire) and !initial_cells.has(key(c[0], c[1]))) return true;
                 }
                 return false;
             }
@@ -294,8 +305,8 @@ fn Geometry(comptime fly: bool) type {
                 const fx = n.x - self.off_x[i];
                 const fy = n.y - self.off_y[i];
                 const el = at(self.m, fx, fy);
-                if (fly and el == LAVA) crosses.* = true;
-                if (blocksBody(fly, el) and !initial_cells.has(key(fx, fy))) return true;
+                if ((fly or self.p.made_of_fire) and el == LAVA) crosses.* = true;
+                if (blocksBody(fly, el, self.p.made_of_fire) and !initial_cells.has(key(fx, fy))) return true;
             }
             return false;
         }
@@ -366,10 +377,13 @@ fn Geometry(comptime fly: bool) type {
                 if (!c[0]) continue;
                 const cell = Cell{ .x = start.x + c[1], .y = start.y + c[2] };
                 const k = key(cell.x, cell.y);
-                const entry = Route{ .cell = cell, .parent = 0, .weight = 1, .remaining = 0, .first_aggr_met = false };
+                var entry = Route{ .cell = cell, .parent = 0, .weight = 1, .remaining = 0, .first_aggr_met = false };
+                const mof = self.p.made_of_fire;
                 if (self.small) {
-                    if (at(m, cell.x, cell.y) != 0 or allowed.has(k)) continue;
+                    const me1 = at(m, cell.x, cell.y);
+                    if (!freeForClosest(me1, mof) or allowed.has(k)) continue;
                     allowed.put(k);
+                    entry.has_lava = me1 == LAVA;
                     set(ctx, k, entry);
                 } else if (!self.legacy) {
                     var edge_blocked = false;
@@ -377,10 +391,12 @@ fn Geometry(comptime fly: bool) type {
                         const cx = cell.x - self.off_x[i];
                         const cy = cell.y - self.off_y[i];
                         if (self.covers(start, cx, cy)) continue;
-                        if (allowed.has(key(cx, cy)) or at(m, cx, cy) != 0) {
+                        const el = at(m, cx, cy);
+                        if (allowed.has(key(cx, cy)) or !freeForClosest(el, mof)) {
                             edge_blocked = true;
                             break;
                         }
+                        if (el == LAVA) entry.has_lava = true;
                     }
                     if (!edge_blocked) {
                         for (0..self.n_off) |i| {
@@ -405,9 +421,12 @@ fn Geometry(comptime fly: bool) type {
                     }
                     const k1 = key(e[0][0], e[0][1]);
                     const k2 = key(e[1][0], e[1][1]);
-                    if (!allowed.has(k1) and at(m, e[0][0], e[0][1]) == 0 and !allowed.has(k2) and at(m, e[1][0], e[1][1]) == 0) {
+                    const me1 = at(m, e[0][0], e[0][1]);
+                    const me2 = at(m, e[1][0], e[1][1]);
+                    if (!allowed.has(k1) and freeForClosest(me1, mof) and !allowed.has(k2) and freeForClosest(me2, mof)) {
                         allowed.put(k1);
                         allowed.put(k2);
+                        entry.has_lava = me1 == LAVA or me2 == LAVA;
                         set(ctx, k, entry);
                     }
                 }
@@ -522,18 +541,18 @@ fn search(comptime fly: bool, comptime pass: Pass, m: *const Matrix, p: Params, 
         fn blocked(self: @This(), n: Cell, initial_cells: *const Bits, crosses: *bool) bool {
             if (self.small) {
                 const el = at(self.m, n.x, n.y);
-                if (fly) crosses.* = el == LAVA;
-                return blocksBody(fly, el) and !initial_cells.has(key(n.x, n.y));
+                if (fly or self.p.made_of_fire) crosses.* = el == LAVA;
+                return blocksBody(fly, el, self.p.made_of_fire) and !initial_cells.has(key(n.x, n.y));
             }
             if (self.legacy) {
                 const cells = [4][2]i32{ .{ n.x, n.y }, .{ n.x - 1, n.y }, .{ n.x - 1, n.y - 1 }, .{ n.x, n.y - 1 } };
-                if (fly) {
+                if (fly or self.p.made_of_fire) {
                     for (cells) |c| {
                         if (at(self.m, c[0], c[1]) == LAVA) crosses.* = true;
                     }
                 }
                 for (cells) |c| {
-                    if (blocksBody(fly, at(self.m, c[0], c[1])) and !initial_cells.has(key(c[0], c[1]))) return true;
+                    if (blocksBody(fly, at(self.m, c[0], c[1]), self.p.made_of_fire) and !initial_cells.has(key(c[0], c[1]))) return true;
                 }
                 return false;
             }
@@ -541,8 +560,8 @@ fn search(comptime fly: bool, comptime pass: Pass, m: *const Matrix, p: Params, 
                 const fx = n.x - self.off_x[i];
                 const fy = n.y - self.off_y[i];
                 const el = at(self.m, fx, fy);
-                if (fly and el == LAVA) crosses.* = true;
-                if (blocksBody(fly, el) and !initial_cells.has(key(fx, fy))) return true;
+                if ((fly or self.p.made_of_fire) and el == LAVA) crosses.* = true;
+                if (blocksBody(fly, el, self.p.made_of_fire) and !initial_cells.has(key(fx, fy))) return true;
             }
             return false;
         }
@@ -621,7 +640,7 @@ fn search(comptime fly: bool, comptime pass: Pass, m: *const Matrix, p: Params, 
                 .weight = parent.weight + cost,
                 .remaining = remaining - cost,
                 .first_aggr_met = parent.first_aggr_met,
-                .has_lava = fly and (parent.has_lava or crosses),
+                .has_lava = (fly or p.made_of_fire) and (parent.has_lava or crosses),
             };
             const ci = out.append(child);
             out.by_key[kn] = @intCast(ci);
@@ -804,7 +823,7 @@ fn strideSearch(comptime fly: bool, m: *const Matrix, p: Params, vines: *const [
                 .weight = parent.weight + cost,
                 .remaining = next,
                 .first_aggr_met = parent.first_aggr_met,
-                .has_lava = fly and (parent.has_lava or crosses),
+                .has_lava = (fly or p.made_of_fire) and (parent.has_lava or crosses),
             };
             const ci = sc.push(child) orelse break;
             if (visited.has(kn)) {

@@ -11,6 +11,7 @@ const engine = @import("engine.zig");
 const abilities = @import("abilities.zig");
 const terrain = @import("terrain.zig");
 const spells = @import("spells.zig");
+const artifacts = @import("artifacts.zig");
 
 const Cell = st.Cell;
 const State = st.State;
@@ -28,9 +29,14 @@ inline fn breakChance(s: *const State, striker_i: u8) f64 {
     return s.setup[s.units[striker_i].team].break_chance;
 }
 
-/// `victim.applyDamage(damage, getBreakChancePerTeam(striker team), sceneLog, extendBreak)`.
+/// `victim.applyDamage(damage, getBreakChancePerTeam(striker team), sceneLog, extendBreak, striker)`: a killing hit
+/// records the striker's Last Fuse source (artifacts.recordFatal).
 inline fn hit(s: *State, striker_i: u8, victim_i: u8, damage: f64, extend: bool) f64 {
-    return engine.applyDamageBreak(s, victim_i, damage, breakChance(s, striker_i), extend);
+    if (!s.artifacts) return engine.applyDamageBreak(s, victim_i, damage, breakChance(s, striker_i), extend);
+    const was_alive = !s.units[victim_i].isDead();
+    const dealt = engine.applyDamageBreak(s, victim_i, damage, breakChance(s, striker_i), extend);
+    if (was_alive and s.units[victim_i].isDead()) artifacts.recordFatal(s, victim_i, dealt, striker_i);
+    return dealt;
 }
 
 /// Unit.calculateAttackDamageMin/Max with the attacker's own team ability power (every engine call site).
@@ -39,9 +45,10 @@ pub fn damageBound(att: *const Unit, tgt: *const Unit, dmg: f64, is_range: bool,
 }
 
 /// Unit.calculateAttackDamageMin/Max with an explicit synergy power, which getEnemyArmor hands to Piercing Spear's
-/// multiplier: an active Piercing Spear scales the target's armor by (1 - multiplier), unfloored.
+/// multiplier: an active Piercing Spear scales the target's armor by (1 - multiplier), unfloored. Warlord's Edge
+/// re-prices the attack rate (artifacts.warlordsEdgeRate).
 pub fn damageBoundSyn(att: *const Unit, tgt: *const Unit, dmg: f64, is_range: bool, divisor_in: f64, syn: f64) f64 {
-    const rate = engine.getAttack(att);
+    const rate = if (att.we_base != 0) artifacts.warlordsEdgeRate(att, engine.getAttack(att), is_range) else engine.getAttack(att);
     var armor = if (is_range) engine.getRangeArmor(tgt) else engine.getArmor(tgt);
     if (att.ability_mask & st.AbilityId.piercing_spear.bit() != 0) armor = piercedArmor(att, armor, syn);
     const divisor = if (divisor_in <= 0) 1 else divisor_in;
@@ -178,21 +185,33 @@ const Attribution = struct {
     area: st.UnitSet = 0,
 };
 
-/// GameActionEngine.cleanupDeadUnits: each dead unit of `died` (in order) leaves the holder, then the corpse of a
-/// direct kill by an Infest holder raises a summon (engine.spawnInfested).
+/// GameActionEngine.cleanupDeadUnits: each dead unit of `died` (in order) leaves the holder, a Last Fuse corpse blasts its
+/// neighbours, the corpse of a direct kill by an Infest holder raises a summon (engine.spawnInfested), then the blast's
+/// kills chain.
 fn cleanupDeadUnits(s: *State, died: *const Died, events: *Events, attribution: ?*const Attribution) void {
     for (died.items[0..died.len]) |ui| {
         const u = &s.units[ui];
         if (!u.in_holder or !u.isDead()) continue;
         const corpse = engine.unitCells(u);
         const level = u.level;
+        const anchor = engine.baseCell(u);
+        const fw = u.fw;
+        const fh = u.fh;
+        const team = u.team;
+        const fuse = u.fuse;
+        u.fuse = .{};
         engine.deleteUnit(s, ui);
         events.push(.unit_destroyed, u.uid);
-        const a = attribution orelse continue;
-        const killer: ?*const engine.Killer = if (ui == a.v1) &a.k1 else if (ui == a.v2) &a.k2 else if (a.area & engine.unitBit(ui) != 0) &a.k1 else null;
-        if (killer) |k| {
-            if (k.infest) engine.spawnInfested(s, k, level, corpse.slice());
+        // Last Fuse: the corpse's blast, then the Infest spawn, then the blast kills' chain.
+        var chain: artifacts.Chain = .{};
+        if (s.artifacts) artifacts.explode(s, anchor, fw, fh, team, fuse, &chain);
+        if (attribution) |a| {
+            const killer: ?*const engine.Killer = if (ui == a.v1) &a.k1 else if (ui == a.v2) &a.k2 else if (a.area & engine.unitBit(ui) != 0) &a.k1 else null;
+            if (killer) |k| {
+                if (k.infest) engine.spawnInfested(s, k, level, corpse.slice());
+            }
         }
+        if (chain.len != 0) artifacts.detonateChain(s, chain.items[0..chain.len], events);
     }
 }
 
@@ -205,9 +224,18 @@ pub fn cleanupSpellDeaths(s: *State, died: *const Died, killed: *const Died, kil
         if (!u.in_holder or !u.isDead()) continue;
         const corpse = engine.unitCells(u);
         const level = u.level;
+        const anchor = engine.baseCell(u);
+        const fw = u.fw;
+        const fh = u.fh;
+        const team = u.team;
+        const fuse = u.fuse;
+        u.fuse = .{};
         engine.deleteUnit(s, ui);
         events.push(.unit_destroyed, u.uid);
+        var chain: artifacts.Chain = .{};
+        if (s.artifacts) artifacts.explode(s, anchor, fw, fh, team, fuse, &chain);
         if (killer.infest and killed.includes(ui)) engine.spawnInfested(s, killer, level, corpse.slice());
+        if (chain.len != 0) artifacts.detonateChain(s, chain.items[0..chain.len], events);
     }
 }
 
@@ -243,7 +271,9 @@ fn applyStrikeMoveModifiers(s: *State, ui: u8, path: []const Cell) bool {
     const last = travelled[travelled.len - 1];
     const to = engine.positionForCell(@floatFromInt(last.x), @floatFromInt(last.y));
     engine.applyDistanceMorale(s, ui, .{ u.pos_x, u.pos_y }, to);
-    return true; // applyTravelledDistanceModifier (Crusade) and applyLavaWaterModifier: no-ops in scope
+    // applyTravelledDistanceModifier (no Crusade in scope), then applyLavaWaterModifier (Made of Fire on a lava route).
+    if (s.artifacts) artifacts.lavaRoute(s, ui, s.action_lava);
+    return true;
 }
 
 /// handleMeleeAttack's movement prefix: a stationary strike, or (with a client `path`) the walk to `from`. A refusal
@@ -330,11 +360,13 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     const damage_from_attack = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.MELEE, 1, ability_multiplier)) +
         abilities.penetratingBite(att, tgt); // M2: drawn even when a spin replaces the blow
 
-    const spin_attack = lightningSpin(s, ai, from, true, ai, rapid_cells, &died);
+    // Gravechain: one attempted set for the attack's spin, skewer and blow (gravechainAttackTargets).
+    var gc_attack: st.UidSet = .{};
+    const spin_attack = lightningSpin(s, ai, from, true, ai, rapid_cells, &died, &gc_attack);
     // The same radial impact knocks down every scattered stone in the spin's ring.
     if (spin_attack) spinStones(s, ai, from);
     if (att.has(.skewer_strike)) {
-        skewerStrike(s, ai, ti, from, true, &died, &decrease, &attacker_plus);
+        skewerStrike(s, ai, ti, from, true, &died, &decrease, &attacker_plus, ai, &gc_attack);
         // Past a small target the skewer runs on into a stone standing behind it (skewerStrikeObstacleCell).
         if (engine.isSmall(tgt) and terrain.hasScatteredMountains(s)) {
             if (pierceCellBehind(att, from, engine.baseCell(tgt))) |behind| {
@@ -357,7 +389,7 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
         _ = hit(s, ai, ti, damage_from_attack, false); // attack_handler.ts:3214
         s.damage_lap = s.fight.lap;
         if (!absorbed) {
-            meleeRiders(s, ai, ti, damage_from_attack, true);
+            meleeRiders(s, ai, ti, damage_from_attack, true, &gc_attack);
             attacker_plus += abilities.pegasusLightMorale(tgt);
         }
     }
@@ -384,7 +416,10 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
             s.damage_lap = s.fight.lap;
         }
         // No Pegasus Light morale read and no Predatory Assimilation poison after a second punch's riders.
-        if (!punch.missed and !absorbed) meleeRiders(s, ai, ti, punch.damage, false);
+        if (!punch.missed and !absorbed) {
+            var gc_punch: st.UidSet = .{}; // the second punch rolls Gravechain with a fresh set
+            meleeRiders(s, ai, ti, punch.damage, false, &gc_punch);
+        }
         if (!spin_response and att.isDead() and !died.includes(ai)) {
             died.push(ai);
             target_plus += engine.MORALE_CHANGE_FOR_KILL;
@@ -433,11 +468,19 @@ pub fn forcedTarget(s: *const State, u: *const Unit) ?u8 {
 /// The on-hit riders of a landed, unabsorbed melee blow or second punch from `from_i` (the active unit) on `to_i`, in
 /// handleMeleeAttack's order: Miner, Stun, Dulling Defense, Petrifying Gaze, Boar Saliva, Aggr, Terrifying Gaze (its
 /// roll the blow's last), Deep Wounds, Pegasus Light, Shatter Armor, Venom Cloud poison, and on the blow
-/// (`assimilation_poison`) Predatory Assimilation's poison.
-fn meleeRiders(s: *State, from_i: u8, to_i: u8, damage: f64, assimilation_poison: bool) void {
+/// (`assimilation_poison`) Predatory Assimilation's poison. Rime Charm and Gravechain (`gc`, the exchange's attempted
+/// set) roll right after Stun on a second punch and last on the blow.
+fn meleeRiders(s: *State, from_i: u8, to_i: u8, damage: f64, assimilation_poison: bool, gc: *st.UidSet) void {
     if (s.units[from_i].ability_mask != 0) {
         abilities.miner(s, from_i, to_i);
         abilities.stun(s, from_i, to_i, from_i);
+    }
+    // A second punch rolls Rime Charm and Gravechain right after Stun (before Aggr); the blow rolls them last.
+    if (!assimilation_poison) {
+        artifacts.rimeCharm(s, from_i, to_i, from_i);
+        artifacts.gravechain(s, from_i, to_i, from_i, gc);
+    }
+    if (s.units[from_i].ability_mask != 0) {
         abilities.dullingDefense(&s.units[from_i], &s.units[to_i]);
         abilities.petrifyingGaze(s, from_i, to_i, damage, 1);
         abilities.boarSaliva(s, from_i, to_i, from_i);
@@ -449,6 +492,10 @@ fn meleeRiders(s: *State, from_i: u8, to_i: u8, damage: f64, assimilation_poison
     }
     abilities.poisonAura(s, from_i, to_i, damage);
     if (assimilation_poison and s.units[from_i].ability_mask != 0) abilities.assimilationPoison(s, from_i, to_i, damage);
+    if (assimilation_poison) {
+        artifacts.rimeCharm(s, from_i, to_i, from_i);
+        artifacts.gravechain(s, from_i, to_i, from_i, gc);
+    }
 }
 
 /// canUnitRespondToMelee (src/handlers/melee_response.ts): an Aggr'd target answers only its forced attacker (the raw
@@ -476,8 +523,10 @@ fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell, died: *Died, decrease: *
     if (tgt.isDead() or !canRespondToMelee(s, att, ai, ti)) return .{};
     const missed = missRoll(s, tgt, att); // M3
     const tgt_base = engine.baseCell(tgt);
-    if (tgt.ability_mask & st.AbilityId.skewer_strike.bit() != 0) skewerStrike(s, ti, ai, tgt_base, false, died, decrease, target_plus);
-    const spin = lightningSpin(s, ti, tgt_base, false, ai, 1, died);
+    // Gravechain: one attempted set for the response's skewer, spin and blow (gravechainResponseTargets).
+    var gc_response: st.UidSet = .{};
+    if (tgt.ability_mask & st.AbilityId.skewer_strike.bit() != 0) skewerStrike(s, ti, ai, tgt_base, false, died, decrease, target_plus, ai, &gc_response);
+    const spin = lightningSpin(s, ti, tgt_base, false, ai, 1, died, &gc_response);
     if (!missed and !spin and !att.isDead()) {
         const ability_multiplier = abilities.positionMultiplierOn(tgt, tgt_base, from, att.fw, att.fh, s.fight.side_oriented);
         const damage_from_response = luckyStrike(s, tgt, calculateAttackDamage(s, tgt, att, AT.MELEE, 1, ability_multiplier)) +
@@ -504,6 +553,8 @@ fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell, died: *Died, decrease: *
                 abilities.assimilationPoison(s, ti, ai, damage_from_response);
                 abilities.pegasusLight(s, ti, ai, ai);
             }
+            artifacts.rimeCharm(s, ti, ai, ai);
+            artifacts.gravechain(s, ti, ai, ai, &gc_response);
         }
     }
     spendReply(s, ti);
@@ -520,7 +571,8 @@ fn doublePunch(s: *State, ai: u8, ti: u8) Punch {
     if (att.isDead() or att.isStunned() or tgt.isDead()) return .{}; // a stunned puncher (isSkippingThisTurn) stops
     if (att.target >= 0 and att.target != @as(i8, @intCast(ti))) return .{};
     if (missRoll(s, att, tgt)) return .{ .applied = true, .missed = true };
-    const ability_multiplier = abilities.abilityMultiplier(att, a);
+    // withDualStrikeCharm: the Dual Strike Charm's +power % on the second punch only.
+    const ability_multiplier = if (s.artifacts) artifacts.dualStrike(att, abilities.abilityMultiplier(att, a)) else abilities.abilityMultiplier(att, a);
     const damage = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.MELEE, 1, ability_multiplier)) +
         abilities.penetratingBite(att, tgt);
     return .{ .applied = true, .damage = damage, .morale = abilities.pegasusLightMorale(tgt) };
@@ -561,7 +613,7 @@ pub fn enemiesAround(s: *const State, ui: u8, first: Cell, out: *engine.UnitList
 /// responding) takes a sub-hit in ring order, each with its own miss roll and, when not missed, damage roll; the
 /// spin's kill and Pegasus Light morale and its same-name morale losses apply at once. Returns whether it landed
 /// (whenever the unit has the ability).
-fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: u8, rapid_cells: f64, died: *Died) bool {
+fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: u8, rapid_cells: f64, died: *Died, gc: *st.UidSet) bool {
     const from = &s.units[from_i];
     const a = from.ability(.lightning_spin) orelse return false; // none while Broken
     var around: engine.UnitList = undefined;
@@ -591,17 +643,22 @@ fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: 
         }
         var damage = luckyStrike(s, from, calculateAttackDamage(s, from, enemy, AT.MELEE, 1, ability_multiplier)) +
             abilities.penetratingBite(from, enemy);
-        damage = @floor(damage * physicalAoeMultiplier(enemy));
+        // Giant's Maul (the striker's), then getPhysicalAoeDamageMultiplier (the victim's Amulet of Resolve, Mechanism).
+        if (s.artifacts) damage = artifacts.giantsMaul(from, damage);
+        damage = @floor(damage * physicalAoeMultiplier(s, enemy));
         const absorbed = damage > 0 and abilities.absorbs(s, enemy);
         const dealt = hit(s, from_i, ei, damage, false); // lightning_spin_ability.ts:239
         abilities.poisonAura(s, from_i, ei, dealt);
         s.damage_lap = s.fight.lap;
         if (!absorbed) morale += abilities.pegasusLightMorale(enemy);
+        // Gravechain rolls off every unabsorbed sub-hit, a killing one included, before the death check.
+        if (!absorbed) artifacts.gravechain(s, from_i, ei, active_i, gc);
         if (enemy.isDead()) {
             dead.push(ei);
         } else if (!absorbed) {
             abilities.miner(s, from_i, ei);
             abilities.stun(s, from_i, ei, active_i);
+            artifacts.rimeCharm(s, from_i, ei, active_i);
             abilities.dullingDefense(from, enemy);
             abilities.petrifyingGaze(s, from_i, ei, damage, 1);
             abilities.boarSaliva(s, from_i, ei, active_i);
@@ -627,7 +684,7 @@ fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: 
 /// past a 1x1 target, the enemy on the cell straight behind it (pierceSweepCells: as seen from `from_cell`, the
 /// striker's anchor, or for a large striker from its body cell closest to the target) takes a hit with its own miss
 /// and damage rolls (no Lucky Strike, no response). Kills and morale go to the caller's bookkeeping.
-fn skewerStrike(s: *State, from_i: u8, to_i: u8, from_cell: Cell, is_attack: bool, died: *Died, decrease: *MoraleDecrease, plus: *f64) void {
+fn skewerStrike(s: *State, from_i: u8, to_i: u8, from_cell: Cell, is_attack: bool, died: *Died, decrease: *MoraleDecrease, plus: *f64, active_i: u8, gc: *st.UidSet) void {
     const from = &s.units[from_i];
     if (!from.has(.skewer_strike)) return;
     const to = &s.units[to_i];
@@ -641,26 +698,31 @@ fn skewerStrike(s: *State, from_i: u8, to_i: u8, from_cell: Cell, is_attack: boo
     const vi: u8 = o - 1;
     const next = &s.units[vi];
     if (!next.in_holder or vi == from_i or vi == to_i or next.team == from.team) return;
-    strikeSkewerTarget(s, from_i, vi, is_attack, died, decrease, plus);
+    strikeSkewerTarget(s, from_i, vi, is_attack, died, decrease, plus, active_i, gc);
 }
 
 /// strikeSkewerTargets for one chosen victim: its miss roll and damage roll (no Lucky Strike, no response), the
 /// riders of a landed unabsorbed hit, and the kill's bookkeeping in the caller's lists.
-fn strikeSkewerTarget(s: *State, from_i: u8, vi: u8, is_attack: bool, died: *Died, decrease: *MoraleDecrease, plus: *f64) void {
+fn strikeSkewerTarget(s: *State, from_i: u8, vi: u8, is_attack: bool, died: *Died, decrease: *MoraleDecrease, plus: *f64, active_i: u8, gc: *st.UidSet) void {
     const from = &s.units[from_i];
     const a = from.ability(.skewer_strike) orelse return;
     const next = &s.units[vi];
     if (next.isDead()) return;
     if (missRoll(s, from, next)) return; // S1
     var damage = calculateAttackDamage(s, from, next, AT.MELEE, 1, abilities.abilityMultiplier(from, a)); // S2
-    damage = @floor(damage * physicalAoeMultiplier(next));
+    // Giant's Maul (the striker's), then getPhysicalAoeDamageMultiplier (the victim's Amulet of Resolve, Mechanism).
+    if (s.artifacts) damage = artifacts.giantsMaul(from, damage);
+    damage = @floor(damage * physicalAoeMultiplier(s, next));
     const absorbed = damage > 0 and abilities.absorbs(s, next);
     const dealt = hit(s, from_i, vi, damage, false); // skewer_strike_ability.ts:210
     s.damage_lap = s.fight.lap;
+    // Gravechain rolls off an unabsorbed skewer hit (the active unit's set), a killing one included.
+    if (!absorbed) artifacts.gravechain(s, from_i, vi, active_i, gc);
     if (!next.isDead() and !absorbed) {
         abilities.poisonAura(s, from_i, vi, dealt);
         abilities.miner(s, from_i, vi);
         abilities.stun(s, from_i, vi, from_i);
+        artifacts.rimeCharm(s, from_i, vi, null); // the skewer passes no active unit: never extended
         abilities.dullingDefense(from, next);
         abilities.petrifyingGaze(s, from_i, vi, damage, 1);
         abilities.boarSaliva(s, from_i, vi, from_i);
@@ -779,12 +841,13 @@ fn shotCellDistance(ax: f64, ay: f64, w: u8, h: u8, tx: f64, ty: f64) f64 {
     return @max(0, js.round(@max(dx, dy) / engine.CELL));
 }
 
-/// AttackHandler.getRangeAttackDivisor (an active Sniper skips the bands; no Farsight Quiver in scope).
+/// AttackHandler.getRangeAttackDivisor (an active Sniper or Farsight Quiver skips the bands).
 fn rangeDivisor(att: *const Unit, hx: f64, hy: f64, ax: f64, ay: f64) f64 {
     if (att.ability_mask & st.AbilityId.sniper.bit() != 0 and att.has(.sniper)) return 1;
     var divisor: f64 = 1;
     const band = if (att.shot_distance > 0 and std.math.isFinite(att.shot_distance)) @floor(att.shot_distance) else 0;
-    if (band > 0) {
+    // Farsight Quiver (the shooter's marker buff) skips the falloff bands.
+    if (band > 0 and !artifacts.farsight(att)) {
         var away = shotCellDistance(ax, ay, att.fw, att.fh, hx, hy);
         while (away > band) {
             away -= band;
@@ -972,10 +1035,10 @@ pub fn doubleShotAbility(u: *const Unit) ?*const st.Ability {
     return u.ability(.double_shot) orelse u.ability(.double_throw);
 }
 
-/// Unit.getPhysicalAoeDamageMultiplier: 1 - (status resist (no Amulet of Resolve in scope) - 50 on an active Mechanism)
-/// / 100.
-pub inline fn physicalAoeMultiplier(u: *const Unit) f64 {
-    return if (u.ability_mask & st.AbilityId.mechanism.bit() != 0 and u.has(.mechanism)) 1.5 else 1;
+/// Unit.getPhysicalAoeDamageMultiplier: max(0, 1 - (status resist (Amulet of Resolve) - 50 on an active Mechanism) / 100).
+pub inline fn physicalAoeMultiplier(s: *const State, u: *const Unit) f64 {
+    const mechanism: f64 = if (u.ability_mask & st.AbilityId.mechanism.bit() != 0 and u.has(.mechanism)) 50 else 0;
+    return @max(0, 1 - (artifacts.statusResist(s, u) - mechanism) / 100);
 }
 
 /// getCellsAroundCell (grid_math.ts): the ring around a cell, on the board, in the legacy corner order.
@@ -1309,7 +1372,8 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
         if (!suppress_double) {
             if (doubleShotAbility(att)) |ds| {
                 if (!att.isDead() and !att.isStunned()) {
-                    const m = abilities.abilityMultiplier(att, ds);
+                    // Dual Strike Charm amplifies the second volley (before the > 0 test).
+                    const m = artifacts.dualStrikeIn(s, att, abilities.abilityMultiplier(att, ds));
                     if (m > 0) _ = throughShot(s, ai, g, false, m, died);
                 }
             }
@@ -1403,11 +1467,17 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
             _ = hit(s, ai, target_ui, damage_from_attack, false); // attack_handler.ts:1886
             s.damage_lap = s.fight.lap;
             if (!absorbed) attacker_plus += abilities.pegasusLightMorale(tgt);
+            // Gravechain off the landed shot (attack_handler.ts:1923; a fresh set; the target may have died).
+            if (!absorbed) {
+                var gc: st.UidSet = .{};
+                artifacts.gravechain(s, ai, target_ui, ai, &gc);
+            }
         }
         if (!tgt.isDead() and !missed and !absorbed) {
             if (!tail_landed) {
                 abilities.deepWounds(s, ai, target_ui, ai);
                 abilities.stun(s, ai, target_ui, ai);
+                artifacts.rimeCharm(s, ai, target_ui, ai); // attack_handler.ts:1978
                 abilities.petrifyingGaze(s, ai, target_ui, gaze_attack, divisor);
                 abilities.spitBall(s, ai, target_ui, ai);
             }
@@ -1424,6 +1494,11 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
     if (rv) |r| {
         const victim = &s.units[r];
         var victim_dead = false;
+        // Gravechain off a landed single counter-shot (attack_handler.ts:2041; a fresh set; the shooter is active).
+        if (!resp_tail and !response_missed and !response_absorbed) {
+            var gc: st.UidSet = .{};
+            artifacts.gravechain(s, target_ui, r, ai, &gc);
+        }
         if (resp_tail) {
             if (victim.isDead() and r == ai) {
                 died.push(r);
@@ -1433,6 +1508,7 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
             if (!victim.isDead() and !response_missed and !response_absorbed) {
                 abilities.deepWounds(s, target_ui, r, ai);
                 abilities.stun(s, target_ui, r, ai);
+                artifacts.rimeCharm(s, target_ui, r, ai);
                 abilities.petrifyingGaze(s, target_ui, r, gaze_resp, resp_div);
                 abilities.spitBall(s, target_ui, r, ai);
                 abilities.borrowedGrace(s, target_ui, r, ai); // a Monk shooting back copies just the same
@@ -1497,9 +1573,15 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
     var second: Second = .{};
     if (!suppress_double) second = doubleShot(s, ai, target_ui, g.group(group), divisor, is_aoe, died);
     if (!second.tail) {
+        // Gravechain off the second arrow (attack_handler.ts:2302; a fresh set; the target may have died).
+        if (second.applied and !second.absorbed) {
+            var gc: st.UidSet = .{};
+            artifacts.gravechain(s, ai, target_ui, ai, &gc);
+        }
         if (!tgt.isDead() and second.applied and !second.absorbed) {
             abilities.deepWounds(s, ai, target_ui, ai);
             abilities.stun(s, ai, target_ui, ai);
+            artifacts.rimeCharm(s, ai, target_ui, ai);
             abilities.petrifyingGaze(s, ai, target_ui, second.damage, divisor);
             abilities.spitBall(s, ai, target_ui, ai);
             abilities.poisonAura(s, ai, target_ui, second.damage);
@@ -1543,12 +1625,16 @@ fn doubleShot(s: *State, ai: u8, target_ui: u8, grp: []const u8, divisor: f64, i
     }
     if (missRoll(s, att, to)) return .{}; // double_shot_ability.ts:122: a missed second shot spends no arrow
     if (aoeAbility(att) != null) {
+        // Dual Strike Charm: every caught unit's factor (double_shot_ability.ts:159).
+        const charm = artifacts.dualStrikeIn(s, att, 1);
         var flight: Flight = .{};
-        for (grp) |v| flight.add(v, 1, .roll);
+        for (grp) |v| flight.add(v, charm, .roll);
         _ = luckyStrike(s, att, aoeTail(s, ai, &flight, divisor, ai, died));
         return .{ .applied = true, .tail = true };
     }
-    const dmg = luckyStrike(s, att, calculateAttackDamage(s, att, to, AT.RANGE, divisor, abilities.abilityMultiplier(att, a)));
+    // Dual Strike Charm on the second arrow's multiplier (double_shot_ability.ts:234).
+    const m = artifacts.dualStrikeIn(s, att, abilities.abilityMultiplier(att, a));
+    const dmg = luckyStrike(s, att, calculateAttackDamage(s, att, to, AT.RANGE, divisor, m));
     const absorbed = dmg > 0 and abilities.absorbs(s, to);
     _ = hit(s, ai, to_ui, dmg, false);
     s.damage_lap = s.fight.lap;
@@ -1585,7 +1671,9 @@ fn throughShot(s: *State, ai: u8, g: *const Groups, decrease_shots: bool, factor
         if (missRoll(s, att, cu)) continue; // through_shot_ability.ts:124
         const multiplier = abilities.abilityMultiplier(att, a) * factor;
         var dmg = luckyStrike(s, att, attackDamage(s, att, cu, AT.RANGE, divisor, multiplier, false));
-        dmg = @floor(dmg * physicalAoeMultiplier(cu));
+        // Giant's Maul (the shooter's), then getPhysicalAoeDamageMultiplier (the victim's Amulet of Resolve, Mechanism).
+        if (s.artifacts) dmg = artifacts.giantsMaul(att, dmg);
+        dmg = @floor(dmg * physicalAoeMultiplier(s, cu));
         const was_absorbed = dmg > 0 and abilities.absorbs(s, cu);
         if (was_absorbed) absorbed |= engine.unitBit(c);
         const dealt = hit(s, ai, c, dmg, false); // through_shot_ability.ts:210
@@ -1596,8 +1684,10 @@ fn throughShot(s: *State, ai: u8, g: *const Groups, decrease_shots: bool, factor
         n_damaged += 1;
         if (!cu.isDead() and !was_absorbed) abilities.petrifyingGaze(s, ai, c, dmg, divisor);
     }
+    var gc: st.UidSet = .{}; // one Gravechain set per volley (through_shot_ability.ts:268)
     for (damaged[0..n_damaged]) |c| {
         const cu = &s.units[c];
+        if (absorbed & engine.unitBit(c) == 0) artifacts.gravechain(s, ai, c, ai, &gc);
         if (cu.isDead()) {
             if (!died.includes(c)) {
                 died.push(c);
@@ -1607,6 +1697,7 @@ fn throughShot(s: *State, ai: u8, g: *const Groups, decrease_shots: bool, factor
         } else if (absorbed & engine.unitBit(c) == 0) {
             abilities.deepWounds(s, ai, c, ai);
             abilities.stun(s, ai, c, ai);
+            artifacts.rimeCharm(s, ai, c, ai);
             abilities.spitBall(s, ai, c, ai);
             abilities.borrowedGrace(s, ai, c, ai);
         }
@@ -1859,7 +1950,9 @@ fn aoeTail(s: *State, thrower_i: u8, flight: *const Flight, divisor: f64, active
         const ability_multiplier = abilities.abilityMultiplier(thrower, a);
         var damage = luckyStrike(s, thrower, attackDamage(s, thrower, u, AT.RANGE, divisor, ability_multiplier, false));
         if (flight.factors[k] != 1) damage = @floor(damage * flight.factors[k]);
-        damage = @floor(damage * physicalAoeMultiplier(u));
+        // Giant's Maul (the striker's), then getPhysicalAoeDamageMultiplier (the victim's Amulet of Resolve, Mechanism).
+        if (s.artifacts) damage = artifacts.giantsMaul(thrower, damage);
+        damage = @floor(damage * physicalAoeMultiplier(s, u));
         const absorbed = damage > 0 and abilities.absorbs(s, u);
         if (!absorbed) landed[k] = true;
         const dealt = hit(s, thrower_i, v, damage, false); // aoe_range_ability.ts:230
@@ -1869,8 +1962,10 @@ fn aoeTail(s: *State, thrower_i: u8, flight: *const Flight, divisor: f64, active
         max_damage = @max(max_damage, damage);
         if (!u.isDead() and !absorbed) abilities.petrifyingGaze(s, thrower_i, v, damage, divisor);
     }
+    var gc_tail: st.UidSet = .{}; // one Gravechain set per AOE call
     for (flight.slots[0..flight.len], 0..) |v, k| {
         const u = &s.units[v];
+        if (landed[k]) artifacts.gravechain(s, thrower_i, v, active_i, &gc_tail);
         if (u.isDead()) {
             if (!was_dead.includes(v)) {
                 if (!tail_died.includes(v)) {
@@ -1885,6 +1980,7 @@ fn aoeTail(s: *State, thrower_i: u8, flight: *const Flight, divisor: f64, active
         if (!landed[k]) continue;
         abilities.deepWounds(s, thrower_i, v, active_i);
         abilities.stun(s, thrower_i, v, active_i);
+        artifacts.rimeCharm(s, thrower_i, v, active_i);
         abilities.spitBall(s, thrower_i, v, active_i);
         abilities.borrowedGrace(s, thrower_i, v, active_i);
     }
@@ -2001,7 +2097,8 @@ fn pierceStoneBehind(s: *State, ai: u8, from: Cell, target: Cell, died: *Died) v
     if (!v.in_holder or v.isDead() or v.team == att.team) return;
     var decrease: MoraleDecrease = .{};
     var plus: f64 = 0;
-    strikeSkewerTarget(s, ai, vi, true, died, &decrease, &plus);
+    var gc_pierce: st.UidSet = .{};
+    strikeSkewerTarget(s, ai, vi, true, died, &decrease, &plus, ai, &gc_pierce);
     if (!att.isDead()) engine.changeMorale(att, plus, true);
     decrease.apply(s);
 }
@@ -2108,7 +2205,8 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, pa
         } else if (has_route) {
             rapid_cells = @floatFromInt(path.len);
         }
-        _ = lightningSpin(s, ai, from, true, ai, rapid_cells, died);
+        var gc_spin: st.UidSet = .{}; // an obstacle strike's spin rolls Gravechain with a fresh set
+        _ = lightningSpin(s, ai, from, true, ai, rapid_cells, died, &gc_spin);
         spinStones(s, ai, from);
     }
     // Kills off an obstacle strike feed Devour Essence the way a unit strike's do.

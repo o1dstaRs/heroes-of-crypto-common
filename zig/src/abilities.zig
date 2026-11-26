@@ -9,6 +9,7 @@
 
 const std = @import("std");
 const st = @import("state.zig");
+const artifacts = @import("artifacts.zig");
 const js = @import("jsnum.zig");
 const engine = @import("engine.zig");
 const spells = @import("spells.zig");
@@ -36,7 +37,7 @@ pub fn abilityMultiplierSyn(u: *const Unit, a: *const Ability, syn: f64) f64 {
     var coeff: f64 = 1;
     switch (a.power_type) {
         PT.TOTAL_DAMAGE_PERCENTAGE, PT.MAGIC_DAMAGE, PT.KILL_RANDOM_AMOUNT, PT.IGNORE_ARMOR, PT.MAGIC_RESIST_50, PT.MAGIC_RESIST_25, PT.ABSORB_DEBUFF, PT.BOOST_HEALTH => {
-            var combined = a.power + engine.getLuck(u) + 0 + syn;
+            var combined = a.power + engine.getLuck(u) + artifacts.fireTerm(artifacts.madeOfFire(u), a.power) + syn;
             if (combined < 0) combined = 1;
             if (a.stack_powered) {
                 coeff *= (combined / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u);
@@ -46,7 +47,7 @@ pub fn abilityMultiplierSyn(u: *const Unit, a: *const Ability, syn: f64) f64 {
         },
         PT.ADDITIONAL_DAMAGE_PERCENTAGE, PT.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE, PT.ADDITIONAL_RANGE_ARMOR_PERCENTAGE => {
             const own = if (a.stack_powered) (a.power / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) else a.power / 100;
-            coeff += own + (engine.getLuck(u) + syn) / 100 + @as(f64, 0) / 100;
+            coeff += own + (engine.getLuck(u) + syn) / 100 + artifacts.fireTerm(artifacts.madeOfFire(u), a.power) / 100;
         },
         else => {},
     }
@@ -56,7 +57,7 @@ pub fn abilityMultiplierSyn(u: *const Unit, a: *const Ability, syn: f64) f64 {
 
 /// Unit.calculateAbilityApplyChance
 pub fn applyChance(u: *const Unit, a: *const Ability) f64 {
-    const combined = engine.getLuck(u) + u.syn_power + ((a.power + 0) / MAX_UNIT_STACK_POWER) * engine.getStackPower(u);
+    const combined = engine.getLuck(u) + u.syn_power + ((a.power + artifacts.fireTerm(artifacts.madeOfFire(u), a.power)) / MAX_UNIT_STACK_POWER) * engine.getStackPower(u);
     return if (combined < 0) 0 else combined;
 }
 
@@ -68,9 +69,9 @@ pub fn abilityCount(u: *const Unit, a: *const Ability) f64 {
     const luck = engine.getLuck(u);
     const sp = engine.getStackPower(u);
     if (a.power_type != PT.GAIN_ATTACK_AND_ARMOR_EACH_STEP) {
-        return (a.power / MAX_UNIT_STACK_POWER) * sp + luck / 10 + u.syn_power / 10 + @as(f64, 0) / 10;
+        return (a.power / MAX_UNIT_STACK_POWER) * sp + luck / 10 + u.syn_power / 10 + artifacts.fireTerm(artifacts.madeOfFire(u), a.power) / 10;
     }
-    return js.toFixed((a.power / MAX_UNIT_STACK_POWER) * sp + ((luck + 0 + u.syn_power) / 100) * a.power, 1);
+    return js.toFixed((a.power / MAX_UNIT_STACK_POWER) * sp + ((luck + artifacts.fireTerm(artifacts.madeOfFire(u), a.power) + u.syn_power) / 100) * a.power, 1);
 }
 
 /// Unit.canSkipResponse: an ability that is never answered (Shadow Touch, Lightning Spin), unless Broken.
@@ -234,7 +235,8 @@ fn stackBlessingPower(u: *const Unit, a: *const Ability) f64 {
 
 /// Unit.calculateSharpenedWeaponsBlessingPower
 fn sharpenedWeaponsPower(u: *const Unit, a: *const Ability) f64 {
-    return js.toFixed((a.power / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + engine.getLuck(u) + u.syn_power + 0, 2);
+    const fire: f64 = if (artifacts.madeOfFire(u)) |p| (a.power * p) / 100 else 0;
+    return js.toFixed((a.power / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + engine.getLuck(u) + u.syn_power + fire, 2);
 }
 
 inline fn onGrid(u: *const Unit) bool {
@@ -388,7 +390,7 @@ pub fn auraPower(u: *const Unit, def: *const st.AuraDef) f64 {
         PT.ABSORB_DEBUFF => blk: {
             var coeff: f64 = 1;
             coeff += (def.power / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + (engine.getLuck(u) + u.syn_power) / 100 +
-                @as(f64, 0) / 100; // Made of Fire: not in scope
+                artifacts.fireTerm(artifacts.madeOfFire(u), def.power) / 100;
             break :blk js.toFixed(coeff * 100, 2) - 100;
         },
         else => unreachable, // refused at load
@@ -558,8 +560,8 @@ pub fn aggr(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     if (to.isDead()) return;
     const from = &s.units[from_i];
     const a = from.ability(.aggr) orelse return;
-    // MIND: 1 - getMindResist() / 100, and getMindResist is the Amulet of Resolve (not in scope).
-    if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < applyChance(from, a) * 1)) return;
+    // MIND: 1 - getMindResist() / 100 (the target's Amulet of Resolve).
+    if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < applyChance(from, a) * artifacts.mindCoeff(s, a.ty, to))) return;
     if (to.effects.find(.aggr) != null) return;
     const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
     // Aggr is a MIND effect: hasMindAttackResistance (Madness or Mechanism) resists it after the roll.
@@ -569,7 +571,7 @@ pub fn aggr(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
 }
 
 /// processStunAbility(from, target, currentActiveUnit): calculateStunApplyChance (x1.5 for the STATUS card on a
-/// Mechanism target; no status resist in scope) clamped to [0, 100]; the roll is drawn even when the target is already
+/// Mechanism target; x (1 - status resist / 100), Amulet of Resolve's) clamped to [0, 100]; the roll is drawn even when the target is already
 /// stunned (then nothing changes). The stun lasts a lap longer on the active unit. `from` may be dead (its blow still
 /// lands).
 pub fn stun(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
@@ -578,7 +580,7 @@ pub fn stun(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     const from = &s.units[from_i];
     const a = from.ability(.stun) orelse return;
     const amplifier: f64 = if (a.ty == st.AbilityKind.STATUS and to.has(.mechanism)) 1.5 else 1;
-    const chance = @max(0, @min(100, applyChance(from, a) * amplifier * (1 - @as(f64, 0) / 100)));
+    const chance = @max(0, @min(100, applyChance(from, a) * amplifier * (1 - artifacts.statusResist(s, to) / 100)));
     if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < chance)) return; // stun_ability.ts:58
     if (to.isStunned()) return;
     const laps: f64 = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
@@ -599,7 +601,7 @@ pub fn deepWounds(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     var held = false;
     inline for (st.AbilityId.DEEP_WOUNDS) |id| {
         if (from.ability(id)) |a| {
-            stacked += (a.power / MAX_UNIT_STACK_POWER) * engine.getStackPower(from) + 0;
+            stacked += (a.power / MAX_UNIT_STACK_POWER) * engine.getStackPower(from) + artifacts.fireTerm(artifacts.madeOfFire(from), a.power);
             if (!held) laps = a.effect_laps;
             held = true;
         }
@@ -634,6 +636,9 @@ pub fn boarSaliva(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     if (to.isDead()) return;
     const from = &s.units[from_i];
     const a = from.ability(.boar_saliva) orelse return;
+    // The target's MIND resist (Amulet of Resolve) gives it a save, drawn before the already-salivated check.
+    const mind = artifacts.mindCoeff(s, a.ty, to);
+    if (mind < 1 and @as(f64, @floatFromInt(s.rng.int(0, 100))) >= mind * 100) return;
     if (to.effects.find(.boar_saliva) != null) return;
     var combined = @as(f64, a.effect_power) + engine.getLuck(from) + from.syn_power;
     if (combined < 0) combined = 1;
@@ -653,7 +658,7 @@ pub fn terrifyingGaze(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     if (to.isDead()) return;
     const from = &s.units[from_i];
     const a = from.ability(.terrifying_gaze) orelse return;
-    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) >= applyChance(from, a) * 1) return; // terrifying_gaze_ability.ts:45
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) >= applyChance(from, a) * artifacts.mindCoeff(s, a.ty, to)) return; // terrifying_gaze_ability.ts:45
     if (to.effects.find(.terrifying_gaze) != null) {
         to.forbidden = from.uid;
         return;
@@ -949,7 +954,7 @@ pub fn addAbility(s: *State, u: *Unit, a: Ability) bool {
 /// isEquipmentOrMarkerSpellName for the names in scope: augments, Morale/Dismorale and the army blessings (the stack
 /// blessings included).
 pub fn isMarkerSpell(id: st.SpellId) bool {
-    return id.isAugment() or switch (id) {
+    return id.isAugment() or id.isArtifact() or switch (id) {
         .morale, .dismorale, .luck_blessing, .sylvan_focus_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .ember_covenant_blessing, .hidden, .visible, .warding_mane_blessing => true,
         else => false,
     };
@@ -973,11 +978,12 @@ pub fn borrowedGrace(s: *State, thief_i: u8, target_i: u8, active_i: u8) void {
         n += 1;
     }
     if (n == 0) return;
-    // borrowedGraceChance (no Made of Fire in scope)
+    // borrowedGraceChance: the thief's Made of Fire power raises the base chance.
     const sp = @max(1, @min(MAX_UNIT_STACK_POWER, engine.getStackPower(thief)));
     const per_stack = (a.power - 20) / (MAX_UNIT_STACK_POWER - 1);
     const base = 20 + per_stack * (sp - 1);
-    const chance = js.toFixed(@max(0, @min(100, base * (1 + @as(f64, 0) / 100) + engine.getLuck(thief) + thief.syn_power)), 2);
+    const fire = artifacts.madeOfFire(thief) orelse 0;
+    const chance = js.toFixed(@max(0, @min(100, base * (1 + fire / 100) + engine.getLuck(thief) + thief.syn_power)), 2);
     if (@as(f64, @floatFromInt(s.rng.int(0, 10_000))) / 100 >= chance) return; // borrowed_grace_ability.ts:110
     const pick = candidates[@intCast(s.rng.int(0, @intCast(n)))];
     const id = target.buffs.items[pick].id;
@@ -1187,14 +1193,17 @@ noinline fn gazeRolls(s: *State, from_i: u8, to_i: u8, damage: f64, divisor: f64
     if (amount < to.amount_alive) {
         const level: f64 = @floatFromInt(to.level);
         const base = @min(35, js.round(pmax * 0.25) + 4 * (level - 1));
-        const chance = @max(0, js.round(base * petrifyRangeFactor(divisor) * (1 - @as(f64, 0) / 100)));
+        const mind_resist: f64 = if (a.ty == st.AbilityKind.MIND) artifacts.statusResist(s, to) else 0;
+        const chance = @max(0, js.round(base * petrifyRangeFactor(divisor) * (1 - mind_resist / 100)));
         if (@as(f64, @floatFromInt(s.rng.int(0, 100))) < chance) { // petrifying_gaze_ability.ts:100
             dmg += to.hp;
             proc = true;
         }
     } else amount = to.amount_alive;
     if (amount != 0 or proc) {
-        _ = engine.applyDamageBreak(s, to_i, dmg, 0, false);
+        // applyDamage(damage, 0, ..., lastFuseSourceFor(gazer)): a killing petrify records the gazer's Last Fuse.
+        const dealt = engine.applyDamageBreak(s, to_i, dmg, 0, false);
+        if (s.artifacts and to.isDead()) artifacts.recordFatal(s, to_i, dealt, from_i);
         s.damage_lap = s.fight.lap;
     }
 }

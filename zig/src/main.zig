@@ -242,11 +242,6 @@ fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
             for (vines_v.array.items) |c| vine_cells[@intCast(rec.int(c.array.items[0]))] |= @as(u16, 1) << @intCast(rec.int(c.array.items[1]));
         }
         const cell = rec.get(v, "cell").array.items;
-        if (rec.get(v, "fire") == .bool and rec.get(v, "fire").bool) {
-            fails += 1;
-            if (fails <= max_fail) std.debug.print("call {d}: made of fire (not ported)\n", .{calls});
-            continue;
-        }
         pathing.getMovePath(&m, .{
             .start = .{ .x = @intCast(rec.int(cell[0])), .y = @intCast(rec.int(cell[1])) },
             .max_steps = rec.num(rec.get(v, "maxSteps")),
@@ -256,6 +251,8 @@ fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
             .h = @intCast(rec.int(rec.get(v, "h"))),
             .vines = if (vines_v == .array) &vine_cells else null,
             .vine_stride = rec.get(v, "vine") == .bool and rec.get(v, "vine").bool,
+            // isMadeOfFire: canTraverseLava() (Lava Striders)
+            .made_of_fire = rec.get(v, "fire") == .bool and rec.get(v, "fire").bool,
         }, &mp);
         if (mp.overflow) {
             fails += 1;

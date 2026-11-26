@@ -6,6 +6,7 @@
 const std = @import("std");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
+const artifacts = @import("artifacts.zig");
 const js = @import("jsnum.zig");
 const engine = @import("engine.zig");
 const combat = @import("combat.zig");
@@ -105,6 +106,7 @@ pub const Ctx = struct {
             // The fight's vines, and hasAbilityActive("In Its Own World") (every AI getMovePath passes it).
             .vines = if (self.s.fight.n_vines != 0) &self.s.fight.vine_cells else null,
             .vine_stride = u.ability_mask & st.AbilityId.in_its_own_world.bit() != 0 and u.has(.in_its_own_world),
+            .made_of_fire = artifacts.canTraverseLava(self.s, u),
         };
     }
 
@@ -161,7 +163,7 @@ pub fn canLandAt(s: *const State, ui: u8, a: Cell) bool {
             const c = Cell{ .x = a.x - dx, .y = a.y - dy };
             if (!engine.cellWithinGrid(c)) return false;
             const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
-            if (o != st.EMPTY and o != ui + 1) return false;
+            if (o != st.EMPTY and o != ui + 1 and !(o == st.LAVA and artifacts.canTraverseLava(s, u))) return false;
         }
     }
     return true;
@@ -314,7 +316,9 @@ pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
     const shot_distance = u.shot_distance;
     if (shot_distance <= 0 and !sniper) return null;
     const band = if (std.math.isFinite(shot_distance) and shot_distance > 0) @floor(shot_distance) else 0;
-    const max_range = if (sniper) INF else band * 4;
+    // ignoresDistancePenalty: an active Sniper or Farsight Quiver lifts the range cut-off and the falloff score.
+    const ignores = sniper or artifacts.farsight(u);
+    const max_range = if (ignores) INF else band * 4;
     var best: ?Cell = null;
     var best_score: f64 = -1;
     var y: i32 = 0;
@@ -324,7 +328,7 @@ pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
             if (mat(&c.m, x, y) != enemy) continue;
             const t = Cell{ .x = x, .y = y };
             const d: f64 = @floatFromInt(@max(@abs(t.x - unit_cell.x), @abs(t.y - unit_cell.y)));
-            if (!sniper and d > max_range) continue;
+            if (!ignores and d > max_range) continue;
             if (!aoe and lineBlockedByObstacle(&c.m, unit_cell, t)) continue;
             if (!aoe and !through and lineBlockedByFriendly(&c.m, unit_cell, t, u.team, body.slice())) continue;
             // A Hidden enemy can never be the shot's primary target.
@@ -334,7 +338,7 @@ pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
                 }
             }
             var divisor: f64 = 1;
-            if (!sniper and band > 0) {
+            if (!ignores and band > 0) {
                 var dd = d;
                 while (dd > band) {
                     dd -= band;

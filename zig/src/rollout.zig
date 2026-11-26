@@ -77,6 +77,9 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
             if (d.id.isSpitBall()) return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, d.id.name() }) catch "batch 5";
         }
     }
+    // Artifacts: the engine plays the stat artifacts (artifacts.zig), but src/v08 is not checked on them yet (lv8's
+    // explicit-rate damage bound has no Warlord's Edge re-price), so a v0.8 seat stays out of scope with any row.
+    if (s.artifacts) return "artifact rows (src/v08 not checked on artifacts)";
     return null;
 }
 

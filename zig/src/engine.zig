@@ -13,6 +13,7 @@ const abilities = @import("abilities.zig");
 const terrain = @import("terrain.zig");
 const pathing = @import("path.zig");
 const spells = @import("spells.zig");
+const artifacts = @import("artifacts.zig");
 const Rng = @import("rng.zig").Rng;
 
 const Cell = st.Cell;
@@ -223,16 +224,29 @@ fn stampAggrRing(s: *State, team: u8, footprint: []const Cell, d: i16) void {
     }
 }
 
+/// A cell a unit may take: empty, or lava for a unit that can traverse it (canOccupyLava = canTraverseLava()).
+inline fn takeable(s: *const State, u: *const Unit, o: u8) bool {
+    return o == st.EMPTY or (o == st.LAVA and artifacts.canTraverseLava(s, u));
+}
+
+/// What a vacated cell becomes: lava again for a centre cell of an undried LAVA_CENTER map (grid.ts occupyCell /
+/// occupyCells), else empty. cleanupAll (a death) never restores it.
+inline fn vacated(s: *const State, c: Cell) u8 {
+    const t = &s.grid.terrain;
+    if (s.fight.grid_type == st.GridType.LAVA_CENTER and !t.cleaned_up_center and c.x >= 6 and c.x < 10 and c.y >= 6 and c.y < 10) return st.LAVA;
+    return st.EMPTY;
+}
+
 /// occupyCell (1x1 movers).
 pub fn occupyCell(s: *State, ui: u8, cell: Cell) bool {
     if (!cellWithinGrid(cell)) return false;
-    if (occ(s, cell) != st.EMPTY) return false;
     const u = &s.units[ui];
+    if (!takeable(s, u, occ(s, cell))) return false;
     if (u.n_reg != 0 and u.n_reg != 1) return false;
     if (u.n_reg != 0) {
         const oc = u.reg[0];
         if (occ(s, oc) == ui + 1) {
-            setOcc(s, oc, st.EMPTY);
+            setOcc(s, oc, vacated(s, oc));
             stampAggrRing(s, u.team, &.{oc}, -1);
         }
     }
@@ -259,16 +273,16 @@ pub fn occupyCells(s: *State, ui: u8, cells: []const Cell) bool {
     for (cells) |c| {
         if (!cellWithinGrid(c)) return false;
         const o = occ(s, c);
-        if (o != st.EMPTY and o != ui + 1) return false;
+        if (!takeable(s, u, o) and o != ui + 1) return false;
     }
     if (u.n_reg != 0) {
         const legacy = cells.len == 1 or cells.len == 4;
         if (if (legacy) u.n_reg != 4 else u.n_reg != cells.len) return false;
-        const vacated = dedupCells(u.reg[0..u.n_reg]);
-        for (vacated.slice()) |oc| {
-            if (occ(s, oc) == ui + 1) setOcc(s, oc, st.EMPTY);
+        const left = dedupCells(u.reg[0..u.n_reg]);
+        for (left.slice()) |oc| {
+            if (occ(s, oc) == ui + 1) setOcc(s, oc, vacated(s, oc));
         }
-        stampAggrRing(s, u.team, vacated.slice(), -1);
+        stampAggrRing(s, u.team, left.slice(), -1);
     }
     const now = dedupCells(cells);
     for (now.slice()) |c| setOcc(s, c, ui + 1);
@@ -290,10 +304,11 @@ fn cleanupAll(s: *State, ui: u8) void {
 /// areAllCellsEmpty(cells, id) || canOccupyCells(cells, false, false, id): on board and empty or own.
 pub fn cellsFreeFor(s: *const State, ui: u8, cells: []const Cell) bool {
     if (cells.len == 0) return false;
+    const u = &s.units[ui];
     for (cells) |c| {
         if (!cellWithinGrid(c)) return false;
         const o = occ(s, c);
-        if (o != st.EMPTY and o != ui + 1) return false;
+        if (!takeable(s, u, o) and o != ui + 1) return false;
     }
     return true;
 }
@@ -399,8 +414,9 @@ pub inline fn getStackPower(u: *const Unit) f64 {
     return if (u.stack_power > 5) 5 else if (u.stack_power < 1) 1 else js.round(u.stack_power);
 }
 
+/// Unit.canFly: a flying creature that is not grounded (isGrounded: Gravebound, from Gravechain; no Hamstrung in scope).
 pub inline fn canFly(u: *const Unit) bool {
-    return u.movement_type == st.Movement.FLY;
+    return u.movement_type == st.Movement.FLY and !(u.debuffs.len != 0 and u.debuffs.find(.gravebound) != null);
 }
 
 pub inline fn hasMoraleBuff(u: *const Unit) bool {
@@ -528,12 +544,24 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     // resetForbiddenTarget unless the Terrifying Gaze status is still applied (the gazer's death never clears it)
     if (s.gaze and u.forbidden != st.NO_UID and u.effects.find(.terrifying_gaze) == null and u.debuffs.find(.terrifying_gaze) == null) u.forbidden = st.NO_UID;
 
+    // Made of Fire (a lava route with Lava Striders): the +init/power terms at the top of each stat's chain.
+    const mof: ?f64 = if (s.artifacts) artifacts.madeOfFire(u) else null;
+    // Artifact rows (statBuffs' first row of each name), read below at their TypeScript points; a battle without
+    // artifacts reads the empty set and pays one branch per hook.
+    var art_rows: artifacts.Rows = undefined;
+    const art: *const artifacts.Rows = if (s.artifacts) blk: {
+        art_rows = artifacts.rows(u);
+        break :blk &art_rows;
+    } else &artifacts.none;
+
     // HP
     if (shot_hooks or (s.unit_hooks and u.has(.unyielding_power))) {
-        hpHooks(s, f, u, lap_adjusted);
+        hpHooks(s, f, u, lap_adjusted, art, mof);
     } else {
         const was_full = u.hp >= u.max_hp;
-        u.max_hp = u.init.max_hp;
+        u.max_hp = if (mof) |fp| @ceil(u.init.max_hp + u.init.max_hp / fp) else u.init.max_hp;
+        // Pendant of Vitality: +% max hp (a full unit is refilled to the new, fractional, max).
+        if (s.artifacts) artifacts.pendantHp(u, art);
         if (was_full or u.max_hp < u.hp) u.hp = u.max_hp;
     }
 
@@ -550,7 +578,9 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
         u.luck_per_turn = luck;
     }
     if (!f.started) u.luck_per_turn = 0;
-    u.luck_mod = u.luck_per_turn + syn.luck + 0 + (u.buffs.power(.luck_blessing) orelse 0);
+    // Artifact luck: Cursed Ward's power, then Clover of Fortune's.
+    const artifact_luck: f64 = if (s.artifacts) artifacts.luck(art) else 0;
+    u.luck_mod = u.luck_per_turn + syn.luck + artifact_luck + (u.buffs.power(.luck_blessing) orelse 0);
     if (u.luck_mod + u.luck > LUCK_MAX) {
         u.luck_mod = LUCK_MAX - u.luck;
     } else if (u.luck_mod + u.luck < -LUCK_MAX) {
@@ -561,6 +591,8 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     // to -20, which a Morale buff overrides)
     u.attack_multiplier = 1;
     u.morale = if (syn.morale > 0) u.init.morale + syn.morale else u.init.morale;
+    // Cursed Ward's morale penalty (second stored property) and Crown of Command's morale (first), before the locks.
+    if (s.artifacts) artifacts.morale(u, art);
     if (moraleLocked(u)) {
         u.morale = 0;
     } else {
@@ -578,10 +610,12 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
 
     // ARMOR
     const pegasus_might = if (s.stat_hooks and s.auras) abilities.appliedAuraPower(u, .pegasus_might_aura) else null;
-    u.base_armor = js.roundUnitStat(u.init.base_armor + 0, 2);
+    u.base_armor = js.roundUnitStat((if (mof != null) u.init.base_armor + u.init.base_armor / 10 else u.init.base_armor) + 0, 2);
     if (pegasus_might) |pm| u.base_armor += pm;
     const armor_augment = augmentBuff(s, u, .armor_augment);
     if (armor_augment) |aa| u.base_armor += js.roundUnitStat((u.base_armor / 100) * aa.power, 2);
+    // Titan Plate captures its share after the Armor Augment, before the flats; it is added to armor_mod below.
+    const titan_bonus: f64 = if (s.artifacts) artifacts.armorFlats(u, art) else 0;
     // Weakening Beam's multiplier comes first: the f64 product is (100 - p) / 100 * (1 + Heavy Armor's share).
     var base_armor_multiplier: f64 = 1;
     if (spit) {
@@ -589,7 +623,7 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     }
     if (u.ability(.heavy_armor)) |ha| {
         base_armor_multiplier = base_armor_multiplier *
-            (1 + ((ha.power + getLuck(u) + syn.ability_power + 0) / 100 / abilities.MAX_UNIT_STACK_POWER) * getStackPower(u));
+            (1 + ((ha.power + getLuck(u) + syn.ability_power + artifacts.fireTerm(mof, ha.power)) / 100 / abilities.MAX_UNIT_STACK_POWER) * getStackPower(u));
     }
     u.base_armor = js.roundUnitStat(u.base_armor * base_armor_multiplier, 2);
     const shatter = u.effects.power(.shatter_armor) orelse 0;
@@ -600,9 +634,11 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
         const armor_mod_multiplier = syn.fly_armor / 100;
         u.armor_mod = js.roundUnitStat(@max(u.base_armor - shatter, 1) * armor_mod_multiplier - shatter, 2);
     }
+    // Veteran Helm: a share of the final base armor (no outer rounding); then Titan Plate's captured share (rounded).
+    if (s.artifacts) artifacts.armorMod(u, art, titan_bonus);
 
     // MAGIC RESIST
-    u.magic_resist = u.init.magic_resist;
+    u.magic_resist = if (mof) |fp| u.init.magic_resist + u.init.magic_resist / fp else u.init.magic_resist;
     if (armor_augment) |aa| u.magic_resist = js.roundUnitStat(u.magic_resist + aa.power, 2); // flat magic armor
     u.magic_resist_mod = 0;
     const p = (if (u.magic_resist_mod != 0) u.magic_resist_mod else u.magic_resist) / 100;
@@ -618,22 +654,26 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
         if (u.buffs.get(.warding_mane_blessing)) |wm| no_resist = no_resist * (1 - @max(0, wm.power) / 100);
         if (u.buffs.get(.arcane_ward_blessing)) |aw| no_resist = no_resist * (1 - @max(0, aw.power) / 100);
     }
+    // Aegis of the Arcane: one more independent roll, folded last.
+    if (s.artifacts) no_resist = artifacts.aegis(art, no_resist);
     u.magic_resist = js.roundUnitStat((1 - no_resist) * 100, 2);
 
     // SHOTS: Limited Supply's cap and Endless Quiver's mod.
     if (shot_hooks) shotHooks(u);
 
     // INITIATIVE
-    u.initiative = u.init.initiative;
+    u.initiative = if (mof) |fp| u.init.initiative + u.init.initiative / fp else u.init.initiative;
 
     // STEPS
     u.steps_mod = js.roundUnitStat(f.steps_morale_multiplier * getMorale(u), 1) + syn.movement_steps;
-    u.steps = u.init.steps;
+    u.steps = if (mof) |fp| u.init.steps + u.init.steps / fp else u.init.steps;
     // Sky Runner: calculateAbilityCount's ADDITIONAL_STEPS share (this refresh's luck), before the Movement augment.
     if (s.unit_hooks) {
         if (u.ability(.sky_runner)) |sr| u.steps += abilities.abilityCount(u, sr);
     }
     if (augmentBuff(s, u, .movement_augment)) |ma| u.steps += ma.power;
+    // Swift Boots: a share of the running steps (Movement Augment included); Winged Boots' and Crown's flat steps.
+    if (s.artifacts) artifacts.steps(u, art);
     if (s.spell_hooks) {
         // Battle Roar: the cast's power in steps_mod (the first buff of the name).
         if (u.buffs.len != 0) {
@@ -644,17 +684,21 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
             if (u.debuffs.get(.vine_throw)) |vt| u.steps = @max(1, u.steps - vt.power);
         }
     }
-    // Quagmire (the first debuff of the name): steps and steps_mod x (100 - power) / 100.
+    // Quagmire (Spit Ball's, or Rime Charm's), then Gravebound (Gravechain's), each the first debuff of the name, on one
+    // multiplier: steps and steps_mod x (100 - power) / 100.
     var steps_multiplier: f64 = 1;
     if (spit) {
         if (u.debuffs.get(.quagmire)) |q| steps_multiplier *= (100 - q.power) / 100;
+    }
+    if (s.artifacts and u.debuffs.len != 0) {
+        if (u.debuffs.get(.gravebound)) |g| steps_multiplier *= (100 - g.power) / 100;
     }
     u.steps = js.roundUnitStat(u.steps * steps_multiplier, 1);
     u.steps_mod = js.roundUnitStat(u.steps_mod * steps_multiplier, 1);
 
     // ATTACK
-    u.base_attack = u.init.base_attack;
-    u.shot_distance = u.init.shot_distance;
+    u.base_attack = if (mof) |fp| u.init.base_attack + u.init.base_attack / fp else u.init.base_attack;
+    u.shot_distance = if (mof) |fp| u.init.shot_distance + u.init.shot_distance / fp else u.init.shot_distance;
     // A stolen Endless Quiver makes a natively melee unit a shooter: Medusa's distance (STOLEN_ENDLESS_QUIVER_SHOT_DISTANCE).
     if (shot_hooks and u.init.shot_distance <= 0 and u.has(.endless_quiver)) u.shot_distance = 6.5;
     u.attack_damage_min = u.init.attack_damage_min;
@@ -679,6 +723,7 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
             }
         }
     }
+    const we_bonus: f64 = if (s.artifacts) artifacts.attackArtifacts(u, art) else 0;
     u.attack_mod = u.init.attack_mod;
     // Weakness (the first debuff of the name): power% of the running base attack, before Sharpened Weapons' multiplier.
     if (spit) {
@@ -686,7 +731,7 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     }
     // Blind Fury: the share of the stack already lost, of the INITIAL base attack.
     if (u.has(.blind_fury)) u.attack_mod += (1 - u.amount_alive / (u.amount_alive + u.amount_died)) * u.init.base_attack;
-    u.attack_mod = js.roundUnitStat(u.attack_mod + 0, 2);
+    u.attack_mod = js.roundUnitStat(u.attack_mod + we_bonus, 2);
     u.base_attack = js.roundUnitStat(u.base_attack * base_attack_multiplier, 2);
     u.shot_distance = js.roundUnitStat(u.shot_distance, 2);
     u.range_armor = js.roundUnitStat(u.base_armor * 1, 2);
@@ -695,15 +740,16 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
 }
 
 /// adjustBaseStats' HP block with the unit hooks (hasAbilityActive, read once: Break-aware): refreshAndGetAdjustedMaxHp's
-/// max hp (initial, + 5 per lap under Unyielding Power), Boost Health's boost (`round(max + max * multiplier)`, the
-/// multiplier read with the luck left by the previous refresh; a top creature at exactly the reset maximum is refilled to
-/// the boosted one, the free heal), then on Unyielding Power's lap's first refresh after the start +5 hp, +1 initial step
-/// and +2 initial base attack (first read after this block, by the STEPS and ATTACK copies), then the full-hp refill or
-/// the cap.
-noinline fn hpHooks(s: *const State, f: *const st.Fight, u: *Unit, lap_adjusted: bool) void {
+/// max hp (initial, Made of Fire's ceil(initial + initial / power) on a lava-route unit, + 5 per lap under Unyielding
+/// Power), Boost Health's boost (`round(max + max * multiplier)`, the multiplier read with the luck left by the previous
+/// refresh; a top creature at exactly the reset maximum is refilled to the boosted one, the free heal), Pendant of
+/// Vitality's share, then on Unyielding Power's lap's first refresh after the start +5 hp, +1 initial step and +2
+/// initial base attack (first read after this block, by the STEPS and ATTACK copies), then the full-hp refill or the cap.
+noinline fn hpHooks(s: *const State, f: *const st.Fight, u: *Unit, lap_adjusted: bool, art: *const artifacts.Rows, mof: ?f64) void {
     const was_full = u.hp >= u.max_hp;
     const up = s.unit_hooks and u.has(.unyielding_power);
-    u.max_hp = if (up) u.init.max_hp + @as(f64, @floatFromInt(f.lap)) * 5 else u.init.max_hp;
+    const base = if (mof) |fp| @ceil(u.init.max_hp + u.init.max_hp / fp) else u.init.max_hp;
+    u.max_hp = if (up) base + @as(f64, @floatFromInt(f.lap)) * 5 else base;
     if (s.shot_hooks) {
         if (u.ability(.boost_health)) |bh| {
             const m = abilities.abilityMultiplier(u, bh);
@@ -712,8 +758,9 @@ noinline fn hpHooks(s: *const State, f: *const st.Fight, u: *Unit, lap_adjusted:
             if (reset_full) u.hp = u.max_hp;
         }
     }
-    // max_hp is refreshAndGetAdjustedMaxHp's result here (+ baseStatsDiff.hp, 0 in scope): the seam for the max-hp
-    // artifacts (Pendant of Vitality), before Unyielding Power's +5 and the refill.
+    // max_hp is refreshAndGetAdjustedMaxHp's result here (+ baseStatsDiff.hp, 0 in scope): Pendant of Vitality's share,
+    // before Unyielding Power's +5 and the refill.
+    artifacts.pendantHp(u, art);
     if (up and f.started and !lap_adjusted) {
         u.hp += 5;
         u.init.steps += 1;
@@ -1691,6 +1738,8 @@ fn startFight(s: *State) bool {
     increaseUnitsSupplyIfNeededPerTeam(s, Team.LEFT);
     increaseUnitsSupplyIfNeededPerTeam(s, Team.RIGHT);
     _ = haveDistancesDecreased(s);
+    // Barrel Barricade: each owning team's two barrels (LEFT first), before fightProperties.startFight.
+    if (s.artifacts or s.setup[Team.LEFT].artifact_t1 == 11 or s.setup[Team.RIGHT].artifact_t1 == 11) artifacts.placeBarrels(s);
     s.fight.started = true;
     s.fight.team_units_alive[Team.LEFT] = left;
     s.fight.team_units_alive[Team.RIGHT] = right;
@@ -1794,7 +1843,8 @@ fn sameCellSet(a: []const Cell, b: []const Cell) bool {
 /// GameActionEngine.groundRouteCrossesObstacle: a walker's footprint at some anchor of the route stands on "B" (lava
 /// is not a ground obstacle here; flyers are exempt).
 pub fn groundRouteCrossesObstacle(s: *const State, u: *const Unit, route: []const Cell) bool {
-    if (canFly(u) or s.fight.grid_type != st.GridType.BLOCK_CENTER) return false;
+    // TypeScript tests "B" on every map (artifact barrels stand off BLOCK_CENTER too).
+    if (canFly(u) or (s.fight.grid_type != st.GridType.BLOCK_CENTER and !terrain.hasScatteredMountains(s))) return false;
     for (route) |anchor| {
         const fp = cellsForAnchor(anchor, u.fw, u.fh);
         for (fp.slice()) |c| {
@@ -1846,8 +1896,10 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) R
     const from = [2]f64{ u.pos_x, u.pos_y };
     const to = positionForCells(target_cells) orelse return error.Rejected;
     _ = finishDirectedMove(s, ui, target_cells, to, null) orelse return error.Rejected;
-    // applyRouteMoveModifiers: getTravelledRoute strips nothing here; the route is non-empty.
+    // applyRouteMoveModifiers: getTravelledRoute strips nothing here; the route is non-empty. Then the travelled-
+    // distance modifier (no Crusade in scope) and applyLavaWaterModifier (Made of Fire on a lava route).
     applyDistanceMorale(s, ui, from, to);
+    if (s.artifacts) artifacts.lavaRoute(s, ui, s.action_lava);
     snareOnVineArrival(s, ui, target_cells);
     u.moved_this_turn = true;
     u.moved_route_cells = @floatFromInt(path.len); // setMovedRouteCellsThisTurn(action.path.length)
@@ -1895,7 +1947,7 @@ fn loadBuffSources(unit: std.json.Value, list: *st.SpellList) !void {
     if (srcs.array.items.len != list.len) return error.BuffSourcesMismatch;
     for (srcs.array.items, 0..) |e, i| {
         const b = &list.items[i];
-        if (!b.id.isAugment() and b.laps != st.LAPS_AURA) continue;
+        if (!b.id.isAugment() and b.laps != st.LAPS_AURA and !artifacts.storesProperties(b.id)) continue;
         var parts = std.mem.splitScalar(u8, e.string, ';');
         b.src_x = try storedProperty(parts.next() orelse "");
         b.src_y = try storedProperty(parts.next() orelse "");
@@ -1931,6 +1983,17 @@ pub fn loadTeamSetup(init: std.json.Value, team: u8) st.TeamSetup {
         .supply = rec.num(rec.get(row, "supply")),
         .aura_range = rec.num(rec.get(row, "auraRange")),
         .break_chance = rec.num(rec.get(row, "breakChance")),
+        .artifact_t1 = artifactId(rec.get(row, "artifactT1")),
+        .artifact_t2 = artifactId(rec.get(row, "artifactT2")),
+        .placement = artifactId(rec.get(rec.get(row, "augments"), "Placement")),
+    };
+}
+
+/// A recorded team artifact id (`init.setup.perTeam[team].artifactT1/T2`; 0 when absent).
+fn artifactId(v: std.json.Value) u8 {
+    return switch (v) {
+        .integer => |i| if (i >= 0 and i < 256) @intCast(i) else 0,
+        else => 0,
     };
 }
 
@@ -2080,6 +2143,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     s.auras = false;
     s.stat_hooks = false;
     s.augments = false;
+    s.artifacts = false;
     s.spell_hooks = false;
     s.null_field = false;
     s.disguise = false;
@@ -2092,6 +2156,8 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     var poisons = false;
     var covenant = false;
     var breaks = false;
+    var fire = false;
+    var riders = false;
     // A unit can swap Disguise markers: it holds the card (natively or stolen later) or carries the aura row.
     var swaps = false;
     for (s.setup) |row| {
@@ -2152,12 +2218,20 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.laps == st.LAPS_AURA) s.auras = true;
             if (b.id == .ember_covenant_blessing) covenant = true;
             if (b.id.isAugment()) s.augments = true;
+            if (b.id.isArtifact()) s.artifacts = true;
+            if (b.id == .lava_striders or b.id == .made_of_fire) fire = true;
+            if (b.id == .made_of_fire) s.artifacts = true; // a copied buff outlives its army's rows
+            if (b.id == .rime_charm or b.id == .gravechain) riders = true;
+            // Rime Charm inflicts Spit Ball's Quagmire: its holder turns the Spit Ball hooks on.
+            if (b.id == .rime_charm) s.spit = true;
             if (b.id == .blessing or b.id == .battle_roar) s.spell_hooks = true;
             if (b.id == .warding_mane_blessing) s.blessings = true;
             if (b.id == .hidden) s.disguise = true;
             if (b.id == .disguise_aura) swaps = true;
         }
         for (u.debuffs.items[0..u.debuffs.len]) |b| {
+            // Gravechain's Gravebound outlives its holder's rows (Rime Charm's Quagmire is Spit Ball's, below).
+            if (b.id == .gravebound) s.artifacts = true;
             if (b.laps == st.LAPS_AURA) s.auras = true;
             if (b.id.isSpitBall()) s.spit = true;
             if (b.id == .vine_throw) s.spell_hooks = true;
@@ -2217,6 +2291,26 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         s.hidden_power = rec.num(rec.get(hcfg, "power"));
         s.visible_laps = rec.num(rec.get(vcfg, "laps"));
         s.visible_power = rec.num(rec.get(vcfg, "power"));
+    }
+    // Rime Charm / Gravechain rows: the Death "Quagmire" and "Gravebound" debuffs' powers they apply (recorded
+    // `spellConfigs`; a debuff already on a unit carries its own).
+    s.quagmire_power = 25;
+    s.gravebound_power = 25;
+    if (riders) {
+        const q = rec.get(rec.get(init, "spellConfigs"), "Quagmire");
+        const g = rec.get(rec.get(init, "spellConfigs"), "Gravebound");
+        if (q == .null or g == .null) return error.MissingSpellConfig;
+        s.quagmire_power = rec.num(rec.get(q, "power"));
+        s.gravebound_power = rec.num(rec.get(g, "power"));
+    }
+    // Lava Striders: the System "Made of Fire" buff its lava routes apply (recorded `spellConfigs`).
+    s.mof_power = 10;
+    s.mof_laps = 2;
+    if (fire) {
+        const cfg = rec.get(rec.get(init, "spellConfigs"), "Made of Fire");
+        if (cfg == .null) return error.MissingSpellConfig;
+        s.mof_power = rec.num(rec.get(cfg, "power"));
+        s.mof_laps = rec.num(rec.get(cfg, "laps"));
     }
     s.ember_seeded = false;
     s.ember_teams = 0;
@@ -2819,6 +2913,13 @@ pub fn actionToUids(s: *const State, a: rec.Action) rec.Action {
 /// Applies one top-level engine call (units as slots), then updates the harness's active unit from the events
 /// (runMatch.applyEvents; events name uids). Returns whether the TypeScript engine accepts the call.
 pub fn apply(s: *State, action: rec.Action, events: *Events) bool {
+    // The action's hasLavaCell, read by the route modifiers (applyLavaWaterModifier).
+    s.action_lava = switch (action) {
+        .move_unit => |a| a.has_lava,
+        .melee_attack => |a| a.has_lava,
+        .obstacle_attack => |a| a.has_lava,
+        else => false,
+    };
     const ok: bool = switch (action) {
         .start_fight => startFight(s),
         .advance => |a| blk: {

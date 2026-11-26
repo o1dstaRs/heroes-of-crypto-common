@@ -4,6 +4,7 @@ const std = @import("std");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
 const engine = @import("engine.zig");
+const artifacts = @import("artifacts.zig");
 const ai = @import("ai.zig");
 const terrain = @import("terrain.zig");
 const uuid = @import("uuid.zig");
@@ -81,7 +82,7 @@ fn sourcesMatch(list: *const st.SpellList, srcs: []const u8) bool {
     while (it.next()) |entry| : (i += 1) {
         if (i >= list.len) return false;
         const b = list.items[i];
-        if (b.laps != st.LAPS_AURA and !b.id.isAugment()) continue;
+        if (b.laps != st.LAPS_AURA and !b.id.isAugment() and !artifacts.storesProperties(b.id)) continue;
         var parts = std.mem.splitScalar(u8, entry, ';');
         const xs = parts.next() orelse return false;
         const ys = parts.next() orelse return false;

@@ -13,6 +13,7 @@
 
 const std = @import("std");
 const st = @import("state.zig");
+const artifacts = @import("artifacts.zig");
 const js = @import("jsnum.zig");
 const engine = @import("engine.zig");
 const combat = @import("combat.zig");
@@ -340,6 +341,8 @@ fn magicDamageBonus(u: *const Unit) f64 {
     if (u.buffs.power(.sylvan_focus_blessing)) |p| {
         if (std.math.isFinite(p) and p > 0) total += p;
     }
+    // Mage's Ring, then Archmage's Ring (the caster's own rows).
+    total += artifacts.ringsBonus(u);
     return total;
 }
 
@@ -425,7 +428,9 @@ fn applyVictims(s: *State, ci: u8, element: u8, victims: *const Victims, died: *
     for (victims.items[0..victims.len]) |v| {
         const u = &s.units[v.slot];
         if (u.isDead()) continue;
-        _ = engine.applyDamageElement(s, v.slot, v.damage, 0, false, element);
+        const applied = engine.applyDamageElement(s, v.slot, v.damage, 0, false, element);
+        // A spell kill records the caster's Last Fuse source (the rebound onto the caster is same-team: none).
+        if (s.artifacts and u.isDead()) artifacts.recordFatal(s, v.slot, applied, ci);
         if (!v.rebounded) s.damage_lap = s.fight.lap;
         if (u.isDead()) {
             died.push(v.slot);
@@ -711,8 +716,9 @@ fn massCastSpell(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, event
         if (u.team != team) continue;
         if (engine.getMagicResist(u) == 100) continue;
         if (alreadyAppliedBuff(u, spell, cfg)) continue;
-        // applyBuff(amplifyCastBuffForTarget(...)): no Tome of Amplification in scope
-        abilities.pushChecked(s, &u.buffs, .{ .id = id, .laps = cfg.laps + @as(f64, if (i == ci) 1 else 0), .power = power });
+        // applyBuff(amplifyCastBuffForTarget(...)): the caster's Tome of Amplification raises the ally's copy.
+        const amplified = if (s.artifacts) artifacts.tomePower(caster, cfg, power) else power;
+        abilities.pushChecked(s, &u.buffs, .{ .id = id, .laps = cfg.laps + @as(f64, if (i == ci) 1 else 0), .power = amplified });
     }
     useSpell(caster, spell);
     engine.completeTurn(s, ci, false, false, events);

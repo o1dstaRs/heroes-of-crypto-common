@@ -33,9 +33,9 @@ pub fn isScatteredMountainCell(s: *const State, c: Cell) bool {
     return false;
 }
 
-/// Grid.hasScatteredMountains (no artifact barrels in scope).
+/// Grid.hasScatteredMountains: a layout, or artifact barrels placed (artifactBarrelLayoutActive) on any map.
 pub inline fn hasScatteredMountains(s: *const State) bool {
-    return s.grid.terrain.n_layout > 0;
+    return s.grid.terrain.n_layout > 0 or s.grid.terrain.layout_active;
 }
 
 /// Grid.hasClassicMountains
@@ -63,6 +63,14 @@ pub fn clearScatteredMountainAt(s: *State, c: Cell) bool {
         if (t.standing & bit == 0) return false;
         t.standing &= ~bit;
         if (at(s, c.x, c.y) == st.BLOCK) mark(s, c.x, c.y, st.EMPTY);
+        // A barrel's record goes with its stone (grid.ts clearScatteredMountainAt).
+        var k: usize = 0;
+        while (k < t.n_barrels) : (k += 1) {
+            if (t.barrels[k].slot != i) continue;
+            std.mem.copyForwards(st.Barrel, t.barrels[k .. t.n_barrels - 1], t.barrels[k + 1 .. t.n_barrels]);
+            t.n_barrels -= 1;
+            break;
+        }
         return true;
     }
     return false;
@@ -117,11 +125,18 @@ pub const CenterCells = struct {
 };
 
 /// Grid.getCenterCells on BLOCK_CENTER (excludeInner has no effect there): the standing stones in layout order, then
-/// each uncleared classic side, x outer. Off BLOCK_CENTER the only caller (the obstacle strike) is refused first.
+/// each uncleared classic side, x outer. Off BLOCK_CENTER: the standing layout when barrels made one
+/// (hasScatteredMountains), else nothing (the obstacle strike, the only caller, is refused first).
 pub fn centerCells(s: *const State, out: *CenterCells) void {
     out.* = .{};
-    if (s.fight.grid_type != GT.BLOCK_CENTER) return;
     const t = &s.grid.terrain;
+    if (s.fight.grid_type != GT.BLOCK_CENTER) {
+        if (!hasScatteredMountains(s)) return;
+        for (t.layout[0..t.n_layout], 0..) |l, i| {
+            if (t.standing & (@as(u16, 1) << @intCast(i)) != 0) out.push(l);
+        }
+        return;
+    }
     for (t.layout[0..t.n_layout], 0..) |l, i| {
         if (t.standing & (@as(u16, 1) << @intCast(i)) != 0) out.push(l);
     }
@@ -206,10 +221,29 @@ pub fn load(init: std.json.Value, s: *State) !void {
     if (gt == GT.BLOCK_CENTER) {
         if (!t.left_cleared) for (CLASSIC_LEFT_X) |x| for (CLASSIC_Y) |y| mark(s, x, y, st.BLOCK);
         if (!t.right_cleared) for (CLASSIC_RIGHT_X) |x| for (CLASSIC_Y) |y| mark(s, x, y, st.BLOCK);
-        for (t.layout[0..t.n_layout], 0..) |l, i| {
-            if (t.standing & (@as(u16, 1) << @intCast(i)) != 0) mark(s, l.x, l.y, st.BLOCK);
-        }
     }
+    // Standing layout cells are stones on every map (artifact barrels stand on NORMAL and LAVA_CENTER too).
+    for (t.layout[0..t.n_layout], 0..) |l, i| {
+        if (t.standing & (@as(u16, 1) << @intCast(i)) != 0) mark(s, l.x, l.y, st.BLOCK);
+    }
+}
+
+/// Grid.placeArtifactBarrel: the team's barrel `index` becomes a standing layout stone at `cell` (appended after the
+/// seeded stones), "B" on the board, recorded in Map order.
+pub fn addBarrel(s: *State, team: u8, index: u8, cell: Cell) void {
+    const t = &s.grid.terrain;
+    if (t.n_layout >= st.MAX_STONES or t.n_barrels >= t.barrels.len) {
+        s.overflow = true;
+        return;
+    }
+    const slot = t.n_layout;
+    t.layout[slot] = cell;
+    t.n_layout += 1;
+    t.standing |= @as(u16, 1) << @intCast(slot);
+    mark(s, cell.x, cell.y, st.BLOCK);
+    t.barrels[t.n_barrels] = .{ .team = team, .index = index, .slot = slot };
+    t.n_barrels += 1;
+    t.layout_active = true;
 }
 
 /// The recorded digest's `fight.terrain`, when present.

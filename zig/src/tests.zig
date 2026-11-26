@@ -9,4 +9,5 @@ test {
     _ = @import("snapshot.zig");
     _ = @import("rollout.zig");
     _ = @import("ffi.zig");
+    _ = @import("artifacts.zig");
 }
