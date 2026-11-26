@@ -624,6 +624,7 @@ pub fn castSpell(s: *State, ci: u8, spell_raw: u8, target: ?u8, cell: ?Cell, eve
         else => {},
     } else switch (spell) {
         .meteorite, .meteor_shower => return meteor(s, ci, spell, cfg, cell, events),
+        .smoke => return smokeCast(s, ci, spell, cfg, cell, events),
         else => {},
     }
     return magicAttack(s, ci, ti, spell, cfg, events);
@@ -854,6 +855,25 @@ fn ringOfFire(s: *State, ci: u8, ti: u8, spell: CS, cfg: *const st.SpellConfig, 
         caught.push(x);
     }
     damageTail(s, ci, spell, cfg, caught.slice(), events);
+}
+
+/// smokeCast: the 3x3 centred on `targetCell` (x-major) must all be smokeable (on the board; empty or lava: not a unit,
+/// a stone, a barrel or a hole), else the cast is refused with no charge spent; every cell then takes laps + 1 (a
+/// re-smoked cell restarts in place); the charge; completeTurn. No draw, no range, no line of sight.
+fn smokeCast(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, target_cell: ?Cell, events: *Events) Reject!void {
+    const c = target_cell orelse return error.Rejected;
+    var cells: Cells = .{};
+    for ([_]i32{ -1, 0, 1 }) |dx| {
+        for ([_]i32{ -1, 0, 1 }) |dy| cells.push(.{ .x = c.x + dx, .y = c.y + dy });
+    }
+    for (cells.slice()) |x| {
+        if (!engine.cellWithinGrid(x)) return error.Rejected;
+        const o = boardAt(s, x);
+        if (o != st.EMPTY and o != st.LAVA) return error.Rejected;
+    }
+    for (cells.slice()) |x| engine.addSmoke(s, x, cfg.laps + 1);
+    useSpell(&s.units[ci], spell);
+    engine.completeTurn(s, ci, false, false, events);
 }
 
 /// meteorShowerCast / meteoriteCast: the block at `targetCell` (Meteor Shower's 3x3 centred on it, Meteorite's 2x2 from

@@ -80,6 +80,8 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
     // Artifacts: the engine plays the stat artifacts (artifacts.zig), but src/v08 is not checked on them yet (lv8's
     // explicit-rate damage bound has no Warlord's Edge re-price), so a v0.8 seat stays out of scope with any row.
     if (s.artifacts) return "artifact rows (src/v08 not checked on artifacts)";
+    // Smoke halves shots through it; src/v08 does not read the store yet.
+    if (s.fight.n_smoke != 0) return "smoke clouds on the board";
     return null;
 }
 

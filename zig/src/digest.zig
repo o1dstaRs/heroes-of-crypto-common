@@ -253,6 +253,11 @@ pub fn write(w: *Writer, s: *const State, ids: []const []const u8) Writer.Error!
         if (i > 0) try w.writeByte(',');
         try w.print("[{d},{d},{d},{d}]", .{ v.x, v.y, v.laps, v.team });
     }
+    try w.writeAll("],\"smoke\":[");
+    for (f.smoke[0..f.n_smoke], 0..) |c, i| {
+        if (i > 0) try w.writeByte(',');
+        try w.print("[{d},{d},{d}]", .{ c.x, c.y, c.laps });
+    }
     const t = &s.grid.terrain;
     try w.print("],\"terrain\":{{\"hitsL\":{d},\"hitsR\":{d},\"leftCleared\":{d},\"rightCleared\":{d},\"cleanedUpCenter\":{d},\"standing\":[", .{
         f.hits_left, f.hits_right, @intFromBool(t.left_cleared), @intFromBool(t.right_cleared), @intFromBool(t.cleaned_up_center),

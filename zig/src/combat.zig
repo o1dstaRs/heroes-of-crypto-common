@@ -378,6 +378,7 @@ fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, pat
         if (!engine.occupyCell(s, ai, from)) return error.Rejected;
         att.pos_x = pos[0];
         att.pos_y = pos[1];
+        if (s.fight.n_smoke != 0) engine.dispelSmoke(s, ai, &.{from}); // attack_handler.ts:2607
         return;
     }
     // getPositionForFootprintAnchor, then that position's footprint cells
@@ -393,6 +394,7 @@ fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, pat
     if (!engine.occupyCells(s, ai, cells.slice())) return error.Rejected;
     att.pos_x = pos[0];
     att.pos_y = pos[1];
+    if (s.fight.n_smoke != 0) engine.dispelSmoke(s, ai, cells.slice()); // attack_handler.ts:2607
 }
 
 pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, events: *Events) Reject!void {
@@ -981,8 +983,10 @@ pub fn evaluateRangeFlags(s: *const State, from_ui: u8, fx: f64, fy: f64, tx_in:
     const end = if (through) projectLineToFieldEdge(fx, fy, tx_in, ty_in) else [2]f64{ tx_in, ty_in };
     var ray: Ray = undefined;
     traceRayInto(&ray, fx, fy, end[0], end[1]);
+    var smoked = false; // pathCrossedSmoke: sticky for the rest of the ray
     for (ray.items[0..ray.len]) |h| {
         if (!engine.cellWithinGrid(h.cell)) continue;
+        if (!smoked and s.fight.hasSmoke(h.cell.x, h.cell.y)) smoked = true;
         const o = s.grid.board[@intCast(h.cell.x)][@intCast(h.cell.y)];
         if (o == st.BLOCK and !splash) break; // the ray stops at the first mountain or stone (attackObstacle)
         if (!st.isUnitCode(o)) continue; // empty, a hole, or lava (an affectedCells entry no one reads in scope)
@@ -997,7 +1001,8 @@ pub fn evaluateRangeFlags(s: *const State, from_ui: u8, fx: f64, fy: f64, tx_in:
         if (!u.in_holder or u.isDead()) continue;
         if (u.team == from.team) continue;
         hits.units[hits.len] = ui;
-        hits.divisors[hits.len] = rangeDivisor(from, h.x, h.y, fx, fy);
+        const divisor = rangeDivisor(from, h.x, h.y, fx, fy);
+        hits.divisors[hits.len] = if (smoked) @min(8, divisor * 2) else divisor;
         hits.len += 1;
     }
     return hits;
@@ -1180,8 +1185,10 @@ pub fn evaluateGroups(g: *Groups, s: *const State, from_ui: u8, fx: f64, fy: f64
     traceRayInto(&ray, fx, fy, end[0], end[1]);
     const rings = isSplashShooter(from);
     var primaries: st.UnitSet = 0;
+    var smoked = false; // pathCrossedSmoke: sticky for the rest of the ray, read before the stone break
     for (ray.items[0..ray.len]) |h| {
         if (!engine.cellWithinGrid(h.cell)) continue;
+        if (!smoked and s.fight.hasSmoke(h.cell.x, h.cell.y)) smoked = true;
         const o = s.grid.board[@intCast(h.cell.x)][@intCast(h.cell.y)];
         if (o == st.BLOCK and !splash) {
             g.obstacle = .{ h.x, h.y };
@@ -1215,7 +1222,9 @@ pub fn evaluateGroups(g: *Groups, s: *const State, from_ui: u8, fx: f64, fy: f64
             g.cells[g.n_cells] = h.cell;
             g.n_cells += 1;
         }
-        g.divisors[g.n] = rangeDivisor(from, h.x, h.y, fx, fy);
+        // A ray that crossed smoke at or before this group halves its damage: the divisor doubles, capped at 8.
+        const divisor = rangeDivisor(from, h.x, h.y, fx, fy);
+        g.divisors[g.n] = if (smoked) @min(8, divisor * 2) else divisor;
         g.entry[g.n] = h.cell;
         g.n += 1;
         g.start[g.n] = g.n_members;
@@ -2382,6 +2391,7 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, pa
         }
         att.pos_x = pos[0];
         att.pos_y = pos[1];
+        if (s.fight.n_smoke != 0) engine.dispelSmoke(s, ai, &.{from}); // attack_handler.ts:4072
     } else {
         const anchor_pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
         const pos = [2]f64{
@@ -2396,6 +2406,7 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, pa
         }
         att.pos_x = pos[0];
         att.pos_y = pos[1];
+        if (s.fight.n_smoke != 0) engine.dispelSmoke(s, ai, cells.slice()); // attack_handler.ts:4189
     }
     terrain.spendObstacleHit(s, target, is_right);
     pierceStoneBehind(s, ai, from, target, died);

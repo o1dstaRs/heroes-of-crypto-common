@@ -26,7 +26,11 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   damage after every damaging hit its holder lands, at the twelve sites of attack_handler.ts with their own kill and
   morale rules) and Misfortune (the first debuff spell: handleMagicAttack's magic-resist save, the Absorb Penalties
   redirect and the always-drawn mirror roll; the holder's luck pinned at -10, or 0 when luck-buffed, with no lap roll
-  and Luck Shield held); a book holding any other spell is refused;
+  and Luck Shield held) and Smoke (a neutral store of smoked cells: the 3x3 or nothing, laps + 1, re-smoked in place,
+  ticked at the lap flip before the vines, dispelled by every arrival on its cells; a shot whose ray crossed smoke at or
+  before a group doubles that group's divisor, capped at 8, counter-shots, Through Shot and splash groups included, never
+  the Area Throw at a cell; the digest's `fight.smoke`), which completes the Book of Chaos; a book holding any other
+  spell is refused;
 - the army setup `runMatch` applies before the fight: the augments (Armor, Might, Sniper, Movement, Placement; Empower
   is carried but read by nothing in scope), doctrines (their upgrade budget) and synergies (Life, Chaos, Might and
   Nature, both variants, levels 1 to 3), including the Chaos break-on-attack roll and the Break effect;
@@ -111,6 +115,7 @@ Wave-1 spells (`spells.zig`), exact in both modes:
 | Satyr (L2, MAGIC) | Forest Spellbook, Sylvan Focus Blessing | Summon Wolves x2 (Courage and Helping Hand are wave 2) |
 | Magic Dragon (L4, MELEE_MAGIC) | Tome of Elements, Magic Reflection | Lightning Strike x4, Ring of Fire x2, Meteor Shower x1 (Whirlpool is wave 2) |
 | Trent (L2) | Vine Throw (castable) | Vine Throw x1 |
+| Wandering Mage (L1, MELEE) | Book of Chaos | Smoke x1, Misfortune x1, Fireforged Sword x2, Fireball x1 (wave 2, the whole book) |
 | Wolf (summoned) | its creature's cards when "Wolf" is kept (Double Punch, Deep Wounds Level 1; batch 4), else stripped | none |
 
 The framework later batches build on:
@@ -1366,7 +1371,7 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 ## Not covered yet
 
 - the abilities of every creature outside batches 1 to 5 and the wave-1 casters, the spells outside wave 1 (Spiritual
-  Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Smoke, Craft, Wind Flow, Resurrection, Castling, the
+  Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Craft, Wind Flow, Resurrection, Castling, the
   runes and the rest: a book holding one is refused by name), the disabled Broken Aegis
   (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and mirror rolls of debuff
   spells), Crafted Double Shot; the revealed-ranged delivery layer of production's augment plan (it needs the live

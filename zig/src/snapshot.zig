@@ -6,8 +6,8 @@
 //! arrows, turn flags, position, grid registration; summoned units too), the grid (board, aggression boards, terrain
 //! and stones), the fight (laps, queues, sets, flags, hit counters), the units holder (distances, Ember Covenant),
 //! the AI target memory, the damage-statistic laps, the summon templates and the summon id parts (the harness's
-//! battle seed and summon counter), the spellbooks and the vines. Anything non-empty the port does not model (smoke, fire
-//! walls, artifact barrels, artifacts, spells outside wave 1, unported abilities, buffs or effects, ranked authoritative
+//! battle seed and summon counter), the spellbooks, the vines and the smoke clouds. Anything non-empty the port does not
+//! model (fire walls, unported artifacts or spells, unported abilities, buffs or effects, ranked authoritative
 //! stats, ...) is refused as an
 //! unsupported state, naming what it found: the loader is fail-closed, like the export's coverage check on the
 //! TypeScript side.
@@ -929,7 +929,24 @@ fn loadFight(s: *State, fight: Value, root: Value, ids: []const []const u8, why:
     f.hits_left = try intAs(i32, get(fight, "obstacleHitsLeftLeft"), why, "obstacleHitsLeftLeft");
     f.hits_right = try intAs(i32, get(fight, "obstacleHitsLeftRight"), why, "obstacleHitsLeftRight");
     try requireEmpty(get(fight, "legacyAxisPolicyTeams"), why, "legacy-axis policy teams");
-    try requireEmpty(get(get(fight, "smokeClouds"), "clouds"), why, "smoke clouds");
+    // Smoke: Map entries [key, {cell, lapsRemaining}] in insertion order.
+    const clouds = get(get(fight, "smokeClouds"), "clouds");
+    if (!isUndefined(clouds)) {
+        for (try mapEntries(clouds, why, "smoke clouds")) |e| {
+            const v = e.array.items[1];
+            const c = try cellOf(get(v, "cell"), why, "smoke cell");
+            if (!engine.cellWithinGrid(c)) return why.malformed("smoke off the board", .{});
+            if (f.n_smoke >= st.MAX_SMOKE) return why.unsupported("more than {d} smoked cells", .{st.MAX_SMOKE});
+            if (f.hasSmoke(c.x, c.y)) return why.malformed("two clouds on ({d},{d})", .{ c.x, c.y });
+            f.smoke[f.n_smoke] = .{
+                .x = @intCast(c.x),
+                .y = @intCast(c.y),
+                .laps = try intAs(i16, get(v, "lapsRemaining"), why, "lapsRemaining"),
+            };
+            f.n_smoke += 1;
+            f.smoke_cells[@intCast(c.x)] |= @as(u16, 1) << @intCast(c.y);
+        }
+    }
     try requireEmpty(get(get(fight, "fireWalls"), "walls"), why, "fire walls");
     // Vines: Map entries [key, {cell, lapsRemaining, team}] in insertion order.
     const vines = get(get(fight, "vines"), "vines");

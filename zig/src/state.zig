@@ -550,7 +550,7 @@ pub const AbilityId = enum(u8) {
             .forest_spellbook => spell == .summon_wolves,
             .basic_tome_of_battle_magic => spell == .fire_strike or spell == .meteorite,
             .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower,
-            .book_of_chaos => spell == .fireball or spell == .fireforged_sword or spell == .misfortune,
+            .book_of_chaos => spell == .fireball or spell == .fireforged_sword or spell == .misfortune or spell == .smoke,
             else => false,
         };
     }
@@ -624,6 +624,7 @@ pub const CastSpell = enum(u8) {
     fireball,
     fireforged_sword,
     misfortune,
+    smoke,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -641,6 +642,7 @@ pub const CastSpell = enum(u8) {
             .fireball => "Fireball",
             .fireforged_sword => "Fireforged Sword",
             .misfortune => "Misfortune",
+            .smoke => "Smoke",
         };
     }
 
@@ -776,6 +778,16 @@ pub const Vine = struct {
 
 /// FightProperties.vines: one entry per cell in Map insertion order (a re-throw replaces the entry in place).
 pub const MAX_VINES = 96;
+
+/// One smoked cell (src/spells/smoke_clouds.ts SmokeCloud): laps remaining. The cloud is neutral (no team).
+pub const Smoke = struct {
+    x: u8,
+    y: u8,
+    laps: i16,
+};
+
+/// FightProperties.smokeClouds: one entry per cell in Map insertion order (a re-smoke resets the laps in place).
+pub const MAX_SMOKE = 96;
 
 pub const MAX_AURA_DEFS = 6;
 /// Aura effects one unit emits: its own, plus the ones it stole (a Queen: Web and two stolen ones seen).
@@ -1195,6 +1207,10 @@ pub const Fight = struct {
     vines: [MAX_VINES]Vine = undefined,
     n_vines: u8 = 0,
     vine_cells: [GRID]u16 = .{0} ** GRID,
+    /// FightProperties.smokeClouds (Smoke): the smoked cells in Map order, and a bit per cell (bit y of smoke_cells[x]).
+    smoke: [MAX_SMOKE]Smoke = undefined,
+    n_smoke: u8 = 0,
+    smoke_cells: [GRID]u16 = .{0} ** GRID,
 
     /// getAlreadyMadeTurnSize: the units in `made` plus the removed ones it still names.
     pub fn madeCount(self: *const Fight) u32 {
@@ -1205,6 +1221,12 @@ pub const Fight = struct {
     pub inline fn hasVine(self: *const Fight, x: i32, y: i32) bool {
         if (self.n_vines == 0 or x < 0 or y < 0 or x >= GRID or y >= GRID) return false;
         return self.vine_cells[@intCast(x)] & (@as(u16, 1) << @intCast(y)) != 0;
+    }
+
+    /// SmokeClouds.has(cell)
+    pub inline fn hasSmoke(self: *const Fight, x: i32, y: i32) bool {
+        if (self.n_smoke == 0 or x < 0 or y < 0 or x >= GRID or y >= GRID) return false;
+        return self.smoke_cells[@intCast(x)] & (@as(u16, 1) << @intCast(y)) != 0;
     }
 
     /// Vines.teamAt(cell)

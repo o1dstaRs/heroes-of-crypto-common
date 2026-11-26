@@ -1189,6 +1189,8 @@ fn finishDirectedMove(s: *State, ui: u8, target: []const Cell, new_pos: ?[2]f64,
     const u = &s.units[ui];
     const ok = if (isSmall(u)) occupyCell(s, ui, anchorForCells(target)) else occupyCells(s, ui, target);
     if (!ok) return null;
+    // dispelSmokeOnOccupiedCells on the arrival footprint (a move or a narrowing shove), before setPosition.
+    if (s.fight.n_smoke != 0) dispelSmoke(s, ui, target);
     var pos = new_pos;
     if (pos == null) {
         if (dir) |d| pos = switch (d) {
@@ -1367,7 +1369,8 @@ fn handleLapTransition(s: *State, o: *const Ordered, all_made: bool, damage_deal
     if (damage_dealt and f.lap >= 0 and f.lap < 128) f.damage_laps |= @as(u128, 1) << @intCast(f.lap);
     if (f.first_turn_made) {
         flipLap(f);
-        // Vines.minusAllLaps, after the (absent) smoke clouds: each vine loses a lap and goes at 0.
+        // SmokeClouds.minusAllLaps, then Vines.minusAllLaps: each entry loses a lap and goes at 0.
+        if (f.n_smoke != 0) smokeMinusAllLaps(f);
         if (f.n_vines != 0) vinesMinusAllLaps(f);
         // The lava dries once getLapsNarrowed() (this transition's lap, the additional laps before this
         // transition's increment) reaches the laps till narrowing. runMatch never passes centerAlreadyDried.
@@ -1424,6 +1427,60 @@ fn vinesMinusAllLaps(f: *st.Fight) void {
         w += 1;
     }
     f.n_vines = @intCast(w);
+}
+
+/// SmokeClouds.minusAllLaps: in Map order, laps-- (never below 0), an entry at 0 is deleted (the rest keep their order).
+fn smokeMinusAllLaps(f: *st.Fight) void {
+    var w: usize = 0;
+    for (f.smoke[0..f.n_smoke]) |c_in| {
+        var c = c_in;
+        if (c.laps > 0) c.laps -= 1;
+        if (c.laps <= 0) {
+            f.smoke_cells[c.x] &= ~(@as(u16, 1) << @intCast(c.y));
+            continue;
+        }
+        f.smoke[w] = c;
+        w += 1;
+    }
+    f.n_smoke = @intCast(w);
+}
+
+/// SmokeClouds.add (Map.set): a smoked cell takes the new laps in place, a new one is appended.
+pub fn addSmoke(s: *State, c: Cell, laps: f64) void {
+    const f = &s.fight;
+    const l: i16 = @intFromFloat(laps);
+    if (f.hasSmoke(c.x, c.y)) {
+        for (f.smoke[0..f.n_smoke]) |*e| {
+            if (e.x == c.x and e.y == c.y) {
+                e.laps = l;
+                return;
+            }
+        }
+    }
+    if (f.n_smoke >= st.MAX_SMOKE) {
+        s.overflow = true;
+        return;
+    }
+    f.smoke[f.n_smoke] = .{ .x = @intCast(c.x), .y = @intCast(c.y), .laps = l };
+    f.n_smoke += 1;
+    f.smoke_cells[@intCast(c.x)] |= @as(u16, 1) << @intCast(c.y);
+}
+
+/// dispelSmokeOnOccupiedCells: the clouds on those of `cells` that `ui` is registered on go (the rest keep their order).
+pub fn dispelSmoke(s: *State, ui: u8, cells: []const Cell) void {
+    const f = &s.fight;
+    for (cells) |c| {
+        if (f.n_smoke == 0) return;
+        if (!cellWithinGrid(c) or occ(s, c) != ui + 1 or !f.hasSmoke(c.x, c.y)) continue;
+        var w: usize = 0;
+        for (f.smoke[0..f.n_smoke]) |e| {
+            if (e.x == c.x and e.y == c.y) continue;
+            f.smoke[w] = e;
+            w += 1;
+        }
+        f.n_smoke = @intCast(w);
+        f.smoke_cells[@intCast(c.x)] &= ~(@as(u16, 1) << @intCast(c.y));
+    }
 }
 
 /// Vines.add (Map.set): a vined cell is replaced in place (laps and team reset, its position kept), a new one appended.
@@ -2831,6 +2888,8 @@ pub fn addSummon(s: *State, template: Unit, which: usize, summoner: *const Kille
     for (nu.auras[0..nu.n_auras]) |*d| d.* = auraDefFor(s, d.*);
     s.units[slot] = nu;
     _ = occupyCells(s, slot, cells);
+    // A new summoned body (Summon Wolves, an Infest spawn) clears the smoke under it.
+    if (s.fight.n_smoke != 0) dispelSmoke(s, slot, cells);
     s.holder[s.n_holder] = slot;
     s.n_holder += 1;
     // A slot carries no AI target memory from a previous occupant (TypeScript's memory names the dead id).

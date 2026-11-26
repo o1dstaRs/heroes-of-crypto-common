@@ -174,6 +174,14 @@ export function vinesDigest(fp: any): number[][] {
     return [...map.values()].map((v: any) => [v.cell.x, v.cell.y, v.getLapsRemaining(), v.team]);
 }
 
+/** The smoke store (FightProperties.smokeClouds) in Map order: [x, y, lapsRemaining]. */
+export function smokeDigest(fp: any): number[][] {
+    const store = fp.getSmokeClouds?.();
+    const map: Map<number, any> | undefined = store?.clouds;
+    if (!map) return [];
+    return [...map.values()].map((c: any) => [c.cell.x, c.cell.y, c.getLapsRemaining()]);
+}
+
 export function fightDigest(fp: any): Record<string, unknown> {
     const sorted = (s: Set<string>): string[] => [...s].sort();
     return {
@@ -224,5 +232,6 @@ export function battleDigest(
     const fight: Record<string, unknown> = { ...fightDigest(ctx.fightProperties), emberTeams };
     if (opts.terrain) fight.terrain = terrainDigest(ctx.grid, ctx.fightProperties);
     if (opts.spells) fight.vines = vinesDigest(ctx.fightProperties);
+    if (opts.spells) fight.smoke = smokeDigest(ctx.fightProperties);
     return { units, fight };
 }
