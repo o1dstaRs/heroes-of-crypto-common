@@ -3,7 +3,7 @@ import { planTacticalStackSplits, type ITacticalSplitUnit } from "../ai/tactical
 import { PBTypes } from "../generated/protobuf/v1/types";
 import checkpoint from "./checkpoints/wandering_mage_20261108/checkpoint.json";
 import { SearchDriver } from "./search_driver";
-import { fingerprintV09 } from "./v0_9/protocol";
+import { canonicalJsonSha256 } from "./canonical_json";
 import { planWanderingMageResearchSplits, protectWanderingMageResearchPlacement } from "./wandering_mage_research";
 
 export const LOCKED_WANDERING_MAGE_ID = "wandering-mage-candidates-20261108";
@@ -19,7 +19,7 @@ export function lockedWanderingMageCheckpoint() {
     const { sha256, ...body } = checkpoint;
     if (
         sha256 !== LOCKED_WANDERING_MAGE_SHA256 ||
-        fingerprintV09(body) !== sha256 ||
+        canonicalJsonSha256(body) !== sha256 ||
         body.id !== LOCKED_WANDERING_MAGE_ID ||
         body.productionActivation !== false ||
         body.originalProgressionGatesPassed !== false ||

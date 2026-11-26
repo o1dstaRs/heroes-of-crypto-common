@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 
 import evidence from "../../docs/evidence/satyr_contact_20261108.json";
 import { lockedSatyrContactCheckpoint } from "../../src/simulation/satyr_contact_checkpoint";
-import { fingerprintV09 } from "../../src/simulation/v0_9/protocol";
+import { canonicalJsonSha256 } from "../../src/simulation/canonical_json";
 
 describe("user-locked Satyr contact research checkpoint", () => {
     test("preserves the exact measured policy and original failed gate", () => {
@@ -21,7 +21,7 @@ describe("user-locked Satyr contact research checkpoint", () => {
     test("reconstructs every arm from all 72 independent boards and retains consumed seeds", () => {
         const checkpoint = lockedSatyrContactCheckpoint();
         const { sha256, ...body } = evidence;
-        expect(fingerprintV09(body)).toBe(sha256);
+        expect(canonicalJsonSha256(body)).toBe(sha256);
         expect(sha256).toBe(checkpoint.evidenceSha256);
         expect(evidence.boards).toHaveLength(72);
         expect(new Set(evidence.consumedSeedChannels).size).toBe(150);

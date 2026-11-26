@@ -22,7 +22,7 @@ const AUGMENT_CAPS = {
 
 describe("full-ranked AI profiles", () => {
     test("binds every registered AI version exactly once", () => {
-        expect(AI_VERSIONS).toHaveLength(12);
+        expect(AI_VERSIONS).toHaveLength(11);
         expect(RANKED_AI_PROFILES.map((profile) => profile.version)).toEqual([...AI_VERSIONS]);
         expect(LATEST_AI_VERSION).toBe(AI_VERSIONS.at(-1));
         expect(new Set(AI_VERSIONS).size).toBe(AI_VERSIONS.length);

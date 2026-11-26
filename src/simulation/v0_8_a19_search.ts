@@ -11,7 +11,6 @@
 
 import { buildV08A19SearchEnvironment, V08_A19_PRODUCTION_VERSION } from "../ai/versions/v0_8_a19_profile";
 import type { ILookaheadDeps } from "./lookahead";
-import { attachA19NeuralCorrection } from "./a19_neural";
 import { attachA19SupportDecision } from "./a19_support";
 import {
     SearchDriver,
@@ -49,13 +48,23 @@ export function shouldUseDefaultV08A19Search(match: ISearchMatchInfo): boolean {
     return SEARCH_MODE_ENVIRONMENT_KEYS.every((key) => process.env[key] === undefined);
 }
 
-/** Construct the exact bounded A19 SearchDriver rebound to the stable production version v0.8. */
+const A19_SEARCH_DRIVERS = new WeakSet<object>();
+
+/** Whether `driver` is an A19 search driver of createV08A19SearchDriver (its support step times the decision). */
+export const isV08A19SearchDriver = (driver: object | undefined): boolean =>
+    driver !== undefined && A19_SEARCH_DRIVERS.has(driver);
+
+/**
+ * Construct the exact bounded A19 SearchDriver rebound to the stable production version v0.8. The A19 neural
+ * primary-tie correction (adopted 2026-11-01) was removed on 2026-11-26 by owner decision: bot seats (deep fit) and
+ * Premium never ran it, its one live use was the browser sandbox, and the sandbox and offline stock-driver play now
+ * take the native choice. This is a removal, not a strength claim.
+ */
 export function createV08A19SearchDriver(
     deps: ILookaheadDeps,
     match: ISearchMatchInfo,
     passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver,
     options: {
-        neuralCorrection?: boolean;
         /** Budget keys merged over the sealed environment (the deep-fit driver's deep search). */
         budgetOverrides?: Readonly<Record<string, string>>;
         /** The Satyr support step's deadline from the start of the decision. */
@@ -65,8 +74,6 @@ export function createV08A19SearchDriver(
     const environment = options.budgetOverrides
         ? Object.freeze({ ...buildV08A19SearchEnvironment(), ...options.budgetOverrides })
         : buildV08A19SearchEnvironment();
-    const neural = environment.SEARCH_A19_NEURAL_TIES;
-    if (neural !== "0" && neural !== "1") throw new Error("SEARCH_A19_NEURAL_TIES must be 0 or 1");
     const support = environment.SEARCH_A19_SATYR_CONTACT_SUPPORT;
     if (support !== "0" && support !== "1") throw new Error("SEARCH_A19_SATYR_CONTACT_SUPPORT must be 0 or 1");
     // The overlay is what the browser can actually see. The process.env scope stays so Node, which has no
@@ -74,18 +81,17 @@ export function createV08A19SearchDriver(
     return withSearchEnvironment(environment, () =>
         withScopedAIEnvironment(environment, () => {
             const driver = new SearchDriver(deps, match, undefined, passiveProductiveProbeObserver);
-            const corrected =
-                neural === "1" && options.neuralCorrection !== false
-                    ? attachA19NeuralCorrection(driver, { offline: match.offlineDeterministicWork === true })
+            const built =
+                support === "1"
+                    ? attachA19SupportDecision(
+                          driver,
+                          deps,
+                          match.offlineDeterministicWork === true,
+                          options.supportDeadlineMs,
+                      )
                     : driver;
-            return support === "1"
-                ? attachA19SupportDecision(
-                      corrected,
-                      deps,
-                      match.offlineDeterministicWork === true,
-                      options.supportDeadlineMs,
-                  )
-                : corrected;
+            A19_SEARCH_DRIVERS.add(built);
+            return built;
         }),
     );
 }

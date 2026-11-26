@@ -27,7 +27,6 @@ import { BATTLE_MAGE_TARGET_POLICY } from "../battle_mage_targets";
 
 import { StrategyV0_8 } from "./v0_8";
 import { V08_A19_SCORED_ARBITRATION_POLICY } from "./v0_8_a19_scored_arbitration";
-import { A19_NEURAL_POLICY } from "./v0_8_a19_neural_policy";
 import {
     buildV08A13SearchEnvironment,
     V08_A13_GENOME,
@@ -70,8 +69,11 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *   - complementary R2 adopted by explicit user instruction on 2026-10-25: 37.86% less offline fight time,
  *     48.91% score against R4 over 6,000 games (95% interval 47.33–50.50%). The user accepted the remaining
  *     strength uncertainty; this does not establish the earlier 48% non-inferiority floor or live latency.
- *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01.
- *     Both fitted probability heads share the native-start allowance; late or faulty inference retains R2.
+ *   - two-fit neural primary-tie correction adopted by explicit user instruction on 2026-11-01; REMOVED on
+ *     2026-11-26 by owner decision ("yeah lets do it so it is all clean", and "Remove it" for its one live use, the
+ *     browser sandbox). Bot seats (deep fit, stock 2,500 / 3,750 ms) and Premium never ran it; the sandbox and offline
+ *     stock-driver play (the 1,000 / 1,500 ms budget, e.g. the a19-work meta profile) now take the native choice.
+ *     Outputs recorded before the removal with that budget used the correction. A removal, not a strength claim.
  *   - neutral cemetery barrel deliberation (profile v14) adopted by explicit user instruction on 2026-11-19:
  *     a scripted strike on a standing neutral barrel is searched against the other legal actions instead of
  *     being returned unsearched. +3.58 score points against v13 on the registered held-out Cemetery bank
@@ -242,7 +244,6 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "1",
     // Hydra's capped catalog prices the complete radial impact, shared shields and Devour recovery.
     SEARCH_A19_LIGHTNING_SPIN_COVERAGE: "1",
-    SEARCH_A19_NEURAL_TIES: "1",
     SEARCH_A19_WANDERING_MAGE_SUPPORT: "1",
     SEARCH_A19_SATYR_CONTACT_SUPPORT: "1",
     // Owner-requested fix (profile v21, ai/keep_attack.ts): a melee unit's native attack is only replaced by another
@@ -276,8 +277,10 @@ export const V08_A19_GENOME = Object.freeze({
     }),
 });
 export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8078c75f34a4030ad5c767c" as const;
+// The sealed environment's fingerprint. 2026-11-26: SEARCH_A19_NEURAL_TIES left the environment with the A19 neural
+// correction (owner decision); before that the fingerprint was 429c490e0b611975db37f33c7111c7553b2f8d72c108e03f56f70df01636fb2e.
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "429c490e0b611975db37f33c7111c7553b2f8d72c108e03f56f70df01636fb2e" as const;
+    "8154731e8a7cc1ba4d156eee0affd83dd49624215018ddee3c03a41a13f60aa4" as const;
 
 /**
  * User-adopted neutral cemetery barrel deliberation. The switch lives in `SearchDriver`; this record keeps the
@@ -655,7 +658,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         // bank leaves the driver as it does, and bot seats pass no native harness (docs/native_rollouts.md).
         // Re-pinned for 950aac89: both bank paths report each candidate's finite rollouts to the A19 neural
         // correction (lastBankFiniteRollouts) in place of its rollout patch; decision traces identical 0 / 1 / shadow.
-        sha256: "adfdb134134e38aa50d985c5c3fa26f5fe45a7c41b0c3a34521a5c37549507fb" as const,
+        // Re-pinned 2026-11-26: v0.9 and the A19 neural correction removed by owner decision ("yeah lets do it so it
+        // is all clean"; "Remove it" for the sandbox correction). Bot seats and Premium decisions are unchanged.
+        sha256: "f8136ee979ee8566d3c1de05f40dee65eaeafa199bf545e81c3425b71a7446d2" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
@@ -786,63 +791,25 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "ai-registry-promotion" as const,
         source: "src/ai/index.ts" as const,
-        sha256: "69d86f5c7c6a7514612e4c16df0d2d40b789c98ae0ced434c162c01905d00f6b" as const,
+        // Re-pinned 2026-11-26: v0.9 and the A19 neural correction removed by owner decision ("yeah lets do it so it
+        // is all clean"; "Remove it" for the sandbox correction). Bot seats and Premium decisions are unchanged.
+        sha256: "8ec0e30ad352b16c5cc3de0ccac0fbbd3601bce235ac101254d3340591ddbcef" as const,
     }),
     Object.freeze({
         role: "default-search-factory" as const,
         source: "src/simulation/v0_8_a19_search.ts" as const,
-        sha256: "fb987a575e796ca47d7c65a4955abfa1e7df4bcd5c4dd7c8bb8eee9ec22d419e" as const,
+        // Re-pinned 2026-11-26: v0.9 and the A19 neural correction removed by owner decision ("yeah lets do it so it
+        // is all clean"; "Remove it" for the sandbox correction). Bot seats and Premium decisions are unchanged.
+        sha256: "fbf2bb5c300af51859c47d0f8d8a838eca3de2217b2c4016ee1f8fa366c95690" as const,
     }),
     Object.freeze({
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
         // Offline formation collection is opt-in; omitted callers preserve default routing. Re-pinned for the
         // native rollout harness facts and the opt-in searched-seat driver hook (docs/native_rollouts.md).
-        sha256: "293f92c19d35c20eb1d81aa22576322837bcc0f1fcf8133ec5933eb9aa2f5de9" as const,
-    }),
-    Object.freeze({
-        role: "neural-policy" as const,
-        source: "src/ai/versions/v0_8_a19_neural_policy.ts" as const,
-        sha256: "69312ffe37e2970365ca412425dd2091966d31fc6b55e86d0bdb01c7c02852e0" as const,
-    }),
-    Object.freeze({
-        role: "neural-adapter" as const,
-        source: "src/simulation/a19_neural.ts" as const,
-        // Re-pinned for the exported gate (a19NeuralCorrectionEngages) and its native rollout veto; the gate is unchanged.
-        // Re-pinned for 950aac89: the veto is gone (native banks report the correction's finite rollouts).
-        sha256: "51fb37bac5096fc83679966436bd5fc18e14ce01566b7d5de6e3c23a23923cdf" as const,
-    }),
-    Object.freeze({
-        role: "neural-model" as const,
-        source: "src/simulation/a19_neural_model.ts" as const,
-        sha256: "fa0f7ea4277099ebe4de6d51bffdcba886b3e2eca3853fd39b067904ca268f3b" as const,
-    }),
-    Object.freeze({
-        role: "neural-correction" as const,
-        source: "src/simulation/v0_9/a19_correction.ts" as const,
-        // Re-pinned for 950aac89: the finite-rollout counts come from each bank's report, not a SearchDriver.rollout
-        // patch; corrections identical (24 battles 0 vs 1, 12 battles HEAD / 0 / 1 / shadow).
-        sha256: "62c70037e7c4ce84d59238687d7b95538a293c5259cf810540d07419d2745c45" as const,
-    }),
-    Object.freeze({
-        role: "neural-observation" as const,
-        source: "src/simulation/v0_9/a19_observation.ts" as const,
-        sha256: "8dd195a919cac26cd6db4336711121b0828aebe88e080404876d0322c1b4f780" as const,
-    }),
-    Object.freeze({
-        role: "neural-inference" as const,
-        source: "src/simulation/v0_9/a19_inference.ts" as const,
-        sha256: "58e622d890ca8f171979906ccb909902dff1da7609cbe132739d5ad31c33b383" as const,
-    }),
-    Object.freeze({
-        role: "neural-batch256-weights" as const,
-        source: "src/ai/models/a19/batch256.json" as const,
-        sha256: "63c07debd0e08debe24482a8cd9d6046e09d0f7fd73292c65b80dbca7f4e1ef3" as const,
-    }),
-    Object.freeze({
-        role: "neural-lr0003-weights" as const,
-        source: "src/ai/models/a19/lr0003.json" as const,
-        sha256: "c0be648360497095958f85af2068fcbf7d79176526feb270935770e6f0c30507" as const,
+        // Re-pinned 2026-11-26: v0.9 and the A19 neural correction removed by owner decision ("yeah lets do it so it
+        // is all clean"; "Remove it" for the sandbox correction). Bot seats and Premium decisions are unchanged.
+        sha256: "851f018e9129614b71c550f58d9bf783580f6dc51a33b396cb254871567b617c" as const,
     }),
     Object.freeze({
         role: "final-placement-adapter" as const,
@@ -917,7 +884,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "deep-fit" as const,
         source: "src/simulation/v0_8_a19_deep_fit.ts" as const,
-        sha256: "4ec72ae84e513c49b0e888a4c7440e0442d2925b00451503274aafcbdb092a9c" as const,
+        // Re-pinned 2026-11-26: v0.9 and the A19 neural correction removed by owner decision ("yeah lets do it so it
+        // is all clean"; "Remove it" for the sandbox correction). Bot seats and Premium decisions are unchanged.
+        sha256: "c97f364c99e346ffddb2ec0365b69db044a283b9275e9d3abd575bfec2c33fff" as const,
     }),
     Object.freeze({
         role: "wild-regen-gift" as const,
@@ -1003,7 +972,6 @@ export const V08_A19_PROFILE = Object.freeze({
     degradedBudget: V08_A19_DEGRADED_BUDGET,
     policy: V08_A19_POLICY,
     placementPolicy: V08_A19_PLACEMENT_POLICY,
-    neuralPolicy: A19_NEURAL_POLICY,
     authoritativeFinalPlacement: A19_LEARNED_FINAL_PLACEMENT_POLICY,
     terrainPlacement: A19_TERRAIN_PLACEMENT_POLICY,
     authoritativeRevealedRangedDelivery: A19_REVEALED_RANGED_POLICY,

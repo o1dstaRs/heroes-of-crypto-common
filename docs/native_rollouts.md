@@ -47,10 +47,8 @@ Per bank (counted in `fallback`): no rollout cache, opponent model, research or 
 mode, a leaf the library plays (the A13 v2 weights, the v0.7 v1 weights, or material), a harness that tells how summons
 are named (`ILookaheadDeps.nativeHarness`), no hook (a tool that wraps the driver's rollout loop, `rollout`,
 `scoreCandidatesInTypeScript` or `simPlayTurn`, or a rollout policy's `decideTurn` chain, such as a sample recorder,
-an audit or a layer log, reads TypeScript rollouts: `hooked:<method>`), and no veto (`SearchDriver.vetoNativeRollouts`).
-The A19 neural correction no longer vetoes its banks (2026-11-26): it reads each bank's means and, per candidate, the
-rollouts that completed with a finite value (`SearchDriver.lastBankFiniteRollouts`), which a native bank reports from its
-pair records exactly as the TypeScript loop counts its `rollout` returns.
+an audit or a layer log, reads TypeScript rollouts: `hooked:<method>`). The A19 neural correction, which once vetoed
+its banks and later read their per-candidate completed rollouts, was removed on 2026-11-26 with its veto and that report.
 
 A request the library refuses ("unsupported request") marks the root; a rollout it cannot play refuses that bank only;
 either way the bank runs in TypeScript from the untouched state.

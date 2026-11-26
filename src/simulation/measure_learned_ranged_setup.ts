@@ -9,7 +9,7 @@ import { lockedLearnedRangedSetupModel } from "./learned_ranged_setup_checkpoint
 import { selectLearnedRangedSetup } from "./learned_ranged_setup_research";
 import { permuteRankedDraftSeed } from "./ranked_draft_eval";
 import { runSituationalRangedCounter, type RangedCounterCondition } from "./ranged_counter_situational_research";
-import { v09DoctrineBoard } from "./v0_9/a19_doctrine_population";
+import { v09DoctrineBoard } from "./doctrine_draft/a19_doctrine_population";
 
 export const LEARNED_SETUP_CONDITIONS = ["current", "free", "situational", "learned"] as const;
 export type LearnedSetupCondition = (typeof LEARNED_SETUP_CONDITIONS)[number];

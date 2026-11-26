@@ -15,7 +15,6 @@ import { getCellsAroundFootprint } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
-import { getA19NeuralState } from "../../src/simulation/a19_neural";
 import { makeRng } from "../../src/simulation/army";
 import { withScopedAIEnvironment } from "../../src/simulation/v0_8_a13_search";
 import { createV08A19SearchDriver } from "../../src/simulation/v0_8_a19_search";
@@ -184,7 +183,6 @@ describe("Satyr reinforces existing wolves without requiring a new spawn cell", 
                 const incumbent = getAIStrategy("v0.8").decideTurn(f.satyr, f.context);
                 const before = f.spell.getAmount();
                 const decision = driver.chooseDecision(f.satyr, "v0.8", incumbent, f.context);
-                expect(getA19NeuralState(driver)?.decisions).toBeGreaterThan(0);
                 expect(f.wolf.getAmountAlive()).toBe(3);
                 expect(
                     f.satyr

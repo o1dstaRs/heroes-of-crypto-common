@@ -1,5 +1,20 @@
 # Agent guidance
 
+## v0.9 and the A19 neural correction removed — owner, November 26, 2026
+
+Owner decision: "yeah lets do it so it is all clean", and "Remove it" for the neural correction's one live use (the
+browser sandbox). The v0.9 AI (`src/simulation/v0_9` training, teacher, qualification, fusion, scale checkpoints,
+v0.9 seats, `src/ai/versions/v0_9*.ts`, the v0.9 strategy registration), the A19 neural primary-tie correction
+(`a19_neural*.ts`, its observation/inference/correction modules and weights, `SEARCH_A19_NEURAL_TIES`, the
+`neuralCorrection` option) and the meta profiles `v09-native` / `v09-draft-a19-work` are gone. Bot seats (deep fit)
+and Premium never ran the correction and are decision-identical; the sandbox and offline stock-driver play (e.g. the
+`a19-work` meta profile, whose earlier outputs used the correction) now take the native choice. This is a removal,
+not a strength claim. The locked doctrine draft stays, byte for byte: model and evidence in
+`src/ai/setup/doctrine_draft/doctrine_draft_v3_20261104/`, the model code in `src/ai/setup/doctrine_draft/`, the
+checkpoint loader, research choices and doctrine population in `src/simulation/doctrine_draft/`. Three re-export
+files remain at `src/simulation/v0_9/` only because sealed research helpers pin their own source hashes. Sections
+below that mention v0.9 or the neural pair are historical.
+
 ## Pre-fight goals — owner, November 21, 2026
 
 Before changing anything a default AI seat does before the fight, read the server's
@@ -1247,8 +1262,9 @@ never select a replacement model after opening its fresh bank.
 
 The user explicitly activated the improved model as the default draft for v0.9 seats. The immutable
 `doctrine-draft-v3-20261104` checkpoint, weights, seed registration, evaluation evidence and decision
-regressions live in `src/simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/`. Use
-`lockedDoctrineDraftModel()` from `src/simulation/v0_9/doctrine_draft_checkpoint.ts` to load it.
+regressions live in `src/ai/setup/doctrine_draft/doctrine_draft_v3_20261104/` (moved from `src/simulation/v0_9/`
+on 2026-11-26, bytes unchanged). Use `lockedDoctrineDraftModel()` from
+`src/simulation/doctrine_draft/doctrine_draft_checkpoint.ts` to load it.
 Use `createLockedDoctrineDraftResearchChoices()` from that module to reproduce its draft behavior;
 create one instance per draft seat/game and retain it through collision retries.
 Its initial development gain was 2.28 match-score percentage points over the original policy

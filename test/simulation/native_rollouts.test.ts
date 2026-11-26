@@ -367,8 +367,6 @@ describe("native bank bookkeeping", () => {
         ]);
         const result = runNativeBank(native, { free: () => undefined }, bankInput());
         expect(result.means).toEqual([0.5, Number.NEGATIVE_INFINITY]);
-        // the A19 neural correction's completed rollouts: played with a finite value, as TypeScript's `rollout` returns
-        expect(result.finiteRollouts).toEqual([2, 0]);
         expect(result.stop).toBe("done");
         expect(result.turns).toBe(7);
         expect(result.uuid).toBe(8);
@@ -416,14 +414,6 @@ describe("native bank bookkeeping", () => {
         expect(result.materials).toEqual([0.5, Number.NEGATIVE_INFINITY]);
     });
 
-    test("finite rollouts count only played pairs with a finite value", () => {
-        const { native } = scriptedBackend([
-            { records: [pair(Number.NaN), pair(0.5), pair(Number.POSITIVE_INFINITY), pair(0.25)] },
-        ]);
-        const result = runNativeBank(native, { free: () => undefined }, bankInput());
-        expect(result.finiteRollouts).toEqual([1, 1]);
-    });
-
     test("bounded tails (offline): one call per candidate with the best finished mean as its reference", () => {
         const { native, requests } = scriptedBackend([
             { records: [pair(0.6), pair(0.8)] },
@@ -439,7 +429,6 @@ describe("native bank bookkeeping", () => {
         expect((requests[1].bank as { tailBound: { reference: number } }).tailBound.reference).toBeCloseTo(0.7, 12);
         // a candidate the tail bound stopped keeps TypeScript's partial mean (sum / R)
         expect(result.means).toEqual([0.7, 0.05]);
-        expect(result.finiteRollouts).toEqual([2, 1]);
         expect(requests[1].uuidSequence).toBe(8);
     });
 

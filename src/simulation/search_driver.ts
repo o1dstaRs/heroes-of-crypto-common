@@ -1614,22 +1614,9 @@ export class SearchDriver {
     private nativeRoot: NativeRootScope | undefined;
     /** Shadow mode: TypeScript's rollouts of the bank being compared. */
     private nativeShadowRollouts: INativeShadowRollout[] | undefined;
-    private readonly nativeVetoes: { reason: string; engages: (version: string) => boolean }[] = [];
-    private bankFiniteRollouts: readonly number[] | undefined;
     /** Native rollout banks of this driver (HOC_NATIVE_ROLLOUTS): native and TypeScript banks, fallbacks, shadow checks. */
     public get nativeRolloutStatistics(): Readonly<INativeRolloutStatistics> {
         return this.nativeStats;
-    }
-    /**
-     * The bank scoreCandidates last returned, per candidate: the rollouts it played (not read from a rollout cache) whose
-     * value is finite. A TypeScript and a native bank report the same counts (the A19 neural correction reads them).
-     */
-    public get lastBankFiniteRollouts(): readonly number[] | undefined {
-        return this.bankFiniteRollouts;
-    }
-    /** Keep a decision's banks in TypeScript while `engages(version)` holds (a research term the library does not play). */
-    public vetoNativeRollouts(reason: string, engages: (version: string) => boolean): void {
-        this.nativeVetoes.push({ reason, engages });
     }
     public constructor(
         deps: ILookaheadDeps,
@@ -5719,7 +5706,6 @@ export class SearchDriver {
         boundHopelessTails: boolean | ISearchSelectionBoundPlan = false,
         rolloutCache?: SearchRolloutCache,
     ): number[] {
-        this.bankFiniteRollouts = undefined;
         if (this.nativeMode !== "off") {
             return this.scoreCandidatesWithNative(
                 unit,
@@ -5789,7 +5775,6 @@ export class SearchDriver {
                 : this.hopelessTailMargin()
             : 0;
         const materials: number[] = [];
-        const finiteRollouts = candidates.map(() => 0);
         const actingTeam = captureMaterial ? unit.getTeam() : undefined;
         for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
             const cand = candidates[candidateIndex];
@@ -5879,7 +5864,6 @@ export class SearchDriver {
                     }
                     if (cleanupErrors.length) throw new SearchRollbackError(cleanupErrors);
                 }
-                if (Number.isFinite(score)) finiteRollouts[candidateIndex] += 1;
                 if (rolloutCache) {
                     let row = rolloutCache.get(cand);
                     if (!row) rolloutCache.set(cand, (row = new Map()));
@@ -5919,7 +5903,6 @@ export class SearchDriver {
         }
         if (captureMaterial)
             this.a19MaterialEvidence = { unitId: unit.getId(), candidates, means, materials, rolloutCount };
-        this.bankFiniteRollouts = finiteRollouts;
         return means;
     }
     /**
@@ -6063,7 +6046,6 @@ export class SearchDriver {
                 rolloutCount,
             };
         }
-        this.bankFiniteRollouts = result.finiteRollouts;
         return result.means;
     }
     /** Driver-level reasons a bank stays in TypeScript: research terms the library does not play. */
@@ -6076,7 +6058,6 @@ export class SearchDriver {
         if (leaf.startsWith("leaf:")) return leaf;
         if (this.teamScope !== null || this.observeOnly) return "team_scope";
         if (!this.deps.nativeHarness) return "no_native_harness";
-        for (const veto of this.nativeVetoes) if (veto.engages(root.version)) return veto.reason;
         // A tool that wraps the rollout loop or the rollout policy (sample recorders, audits, layer logs) reads
         // TypeScript rollouts, which a native bank never runs.
         const driver = this as unknown as Record<string, unknown>;

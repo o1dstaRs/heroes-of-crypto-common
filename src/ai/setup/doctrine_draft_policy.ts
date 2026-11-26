@@ -1,6 +1,6 @@
 import { Doctrine } from "../../doctrines/doctrine_properties";
 import type { IDraftScoutingContext } from "../../picks/draft_visibility";
-import savedModel from "../../simulation/v0_9/checkpoints/doctrine_draft_v3_20261104/model.json";
+import savedModel from "./doctrine_draft/doctrine_draft_v3_20261104/model.json";
 import {
     doctrineDraftFeatures,
     predictDoctrineDraftGain,
@@ -8,7 +8,7 @@ import {
     type IDoctrineDraftChoice,
     type IDoctrineDraftModel,
     type ScoutingDoctrine,
-} from "../../simulation/v0_9/doctrine_draft_model";
+} from "./doctrine_draft/doctrine_draft_model";
 import type { ArtifactFitVersion } from "./artifact_fit";
 
 export const V09_DEFAULT_DRAFT_MODEL_ID = "doctrine-draft-v3-20261104";

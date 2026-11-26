@@ -23,7 +23,6 @@ it("resolves rectangular y=16 anchors with the same legal fallback as ordinary p
                 games: 576,
                 baseSeed: 3161604032,
                 collectEvidence: true,
-                lockedV09Draft: true,
                 studyProfile: "premium-ranked-v4",
             },
             pair,

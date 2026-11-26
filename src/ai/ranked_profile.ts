@@ -41,7 +41,6 @@ import { StrategyV0_7 } from "./versions/v0_7";
 import { StrategyV0_7S } from "./versions/v0_7s";
 import { StrategyV0_8S } from "./versions/v0_8s";
 import { createV08A19Strategy } from "./versions/v0_8_a19_profile";
-import { StrategyV0_9 } from "./versions/v0_9";
 
 export interface IRankedAISetupPolicy extends IResolvedSetupPolicy {
     /** Stable setup-policy identity for persisted seats, telemetry and future per-strength tuning. */
@@ -332,7 +331,6 @@ export const RANKED_AI_PROFILES: readonly Readonly<IRankedAIProfile>[] = Object.
     rankedProfile("v0.6", () => new StrategyV0_6()),
     rankedProfile("v0.7s", () => new StrategyV0_7S()),
     rankedProfile("v0.7", () => new StrategyV0_7()),
-    rankedProfile("v0.9", () => new StrategyV0_9()),
     rankedProfile("v0.8s", () => new StrategyV0_8S()),
     rankedProfile("v0.8", () => createV08A19Strategy()),
 ]);

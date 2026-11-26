@@ -20,11 +20,7 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "./ai_meta_cohorts_core";
-import {
-    AI_META_NATIVE_V09_STRATEGY_PROFILE,
-    createAiMetaMatchStrategyOverrides,
-    type AiMetaStrategyProfileId,
-} from "./ai_meta_strategy_profile";
+import { createAiMetaMatchStrategyOverrides, type AiMetaStrategyProfileId } from "./ai_meta_strategy_profile";
 import { materializeReplayAbSplits } from "./ranked_replay_tactics_ab_core";
 import { deterministicSimulationId, hashSimulationParts } from "./army";
 import { sampleMetaFormation, type IMetaFormationDecision } from "./ai_meta_formation_learning";
@@ -121,12 +117,10 @@ export function playMetaPair(
 ): IAiMetaPairRecord {
     if (Boolean(options.authoritativeRanked) !== Boolean(adapter))
         throw new Error("Authoritative collection requires its native adapter");
-    if ((strategyProfileId === AI_META_NATIVE_V09_STRATEGY_PROFILE) !== Boolean(options.nativeV09))
-        throw new Error("Native v0.9 combat and draft profile must be selected together");
     if (options.collectEvidence && !offlineDeterministicWork) {
         throw new Error("AI meta evidence requires a19-work: recording must not change a wall-clock search budget");
     }
-    if (searchDriver && (!offlineDeterministicWork || options.nativeV09 || adapter))
+    if (searchDriver && (!offlineDeterministicWork || adapter))
         throw new Error(`${searchDriver} plays offline deterministic work on the A19 fight path only`);
     // runMatch is synchronous and workers have isolated environments. Restore even on an engine failure.
     const previousNoActions = process.env.SIM_NO_ACTIONS;
@@ -281,7 +275,7 @@ function playMetaPairInner(
     // The bot seat's driver carries its own budget and the server's environment (a19_bot_seat_search.ts).
     const searchBudget = searchDriver
         ? { searchOfflineDeterministicWork: true, searchDriverFactory: createA19BotSeatSearchDriverFactory() }
-        : offlineDeterministicWork && !options.nativeV09
+        : offlineDeterministicWork
           ? {
                 searchOfflineDeterministicWork: true,
                 researchA19BaseSearchEnvironment: AI_META_OFFLINE_SEARCH_ENVIRONMENT,

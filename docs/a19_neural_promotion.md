@@ -1,5 +1,9 @@
 # A19 neural ensemble: user adoption
 
+> Removed on 2026-11-26 by owner decision with the v0.9 AI: the correction and its weights are no longer in common.
+> Bot seats and Premium never ran it; the sandbox and offline stock-driver play take the native choice. This
+> document is historical.
+
 On November 1, 2026, the user explicitly requested: “Lock it in, route so it is default model for AI right now.” The two-fit primary-tie correction is adopted through the shared default A19 factory and the authoritative ranked bot factory. The wire version remains `v0.8`; the server revision is `a19-neural-ensemble-r2-v1`.
 
 The complete rule is fixed: run ordinary complementary H64/R2, then consider only fully evaluated exact primary maxima. Equally mix the two fitted policy distributions over the original complete entering catalog. Replace stock only when the log-probability gain reaches one. There are no unit, map, artifact, last-charge or learned-veto filters, and no additional rollouts.

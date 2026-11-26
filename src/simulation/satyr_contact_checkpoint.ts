@@ -1,6 +1,6 @@
 /** User-locked research reference; importing it never changes the live strategy. */
 import checkpoint from "./checkpoints/satyr_contact_20261108/checkpoint.json";
-import { fingerprintV09 } from "./v0_9/protocol";
+import { canonicalJsonSha256 } from "./canonical_json";
 
 export const LOCKED_SATYR_CONTACT_ID = "satyr-contact-support-20261108";
 export const LOCKED_SATYR_CONTACT_SHA256 = "58a8da8d47be38cf2c024d6b8071a7acf8a226f6bced94ae027dfbb8f8bcfead";
@@ -10,7 +10,7 @@ export function lockedSatyrContactCheckpoint() {
     const { sha256, ...body } = checkpoint;
     if (
         sha256 !== LOCKED_SATYR_CONTACT_SHA256 ||
-        fingerprintV09(body) !== sha256 ||
+        canonicalJsonSha256(body) !== sha256 ||
         body.id !== LOCKED_SATYR_CONTACT_ID ||
         body.status !== "user-accepted-research-checkpoint" ||
         body.originalProgressionGatePassed !== false ||

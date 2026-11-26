@@ -7,15 +7,15 @@ describe("AI meta CLI output contract", () => {
         expect(() =>
             aiMetaOutputContract("ranked-current-a19-work", { AI_META_STUDY_PROFILE: "premium-ranked-v4" }),
         ).toThrow("separate");
-        expect(() =>
-            aiMetaOutputContract("v09-draft-a19-work", { AI_META_STUDY_PROFILE: "premium-ranked-current-v1" }),
-        ).toThrow("separate");
+        expect(() => aiMetaOutputContract("a19-work", { AI_META_STUDY_PROFILE: "premium-ranked-current-v1" })).toThrow(
+            "separate",
+        );
         expect(() => aiMetaOutputContract("ranked-current-a19-work", { AI_META_OUTPUT_MODE: "legacy-oracle" })).toThrow(
             "requires Premium",
         );
     });
     it("captures the full Premium study by default for both deterministic A19 profiles", () => {
-        for (const profile of ["a19-work", "v09-draft-a19-work"])
+        for (const profile of ["a19-work", "a19-bot-seat"])
             expect(aiMetaOutputContract(profile, {})).toEqual({
                 mode: "premium",
                 studyProfile: "premium-ranked-v4",
@@ -38,6 +38,7 @@ describe("AI meta CLI output contract", () => {
         expect(aiMetaOutputContract("a19-bot-seat", {}).collectEvidence).toBe(true);
         expect(() => aiMetaOutputContract("a19", {})).toThrow("Automatic Premium snapshots require");
         expect(() => aiMetaOutputContract("v09-native", {})).toThrow("Automatic Premium snapshots require");
+        expect(() => aiMetaOutputContract("v09-draft-a19-work", {})).toThrow("Automatic Premium snapshots require");
         expect(() => aiMetaOutputContract("a19-work", { AI_META_COLLECT_EVIDENCE: "0" })).toThrow("capture");
         expect(() =>
             aiMetaOutputContract("a19-work", {

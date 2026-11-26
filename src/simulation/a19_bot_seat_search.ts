@@ -19,10 +19,10 @@ import { withScopedAIEnvironment } from "./v0_8_a13_search";
  * the production bot-seat driver; sealed and frozen studies keep their recorded driver). It is the server's
  * createBotSeatSearchDriver with deepFit (heroes-of-crypto-server src/api/game/v1/bot_search.ts): the deep-fit driver
  * (V08_A19_DEEP_FIT: stock search at 2,500 / 3,750 ms, deep search where it fits 4,000 rollout turns) inside the
- * server's bot-search environment, scoped around its construction and every decision as the server scopes it. The
- * neural correction is attached as the server attaches it and never engages on that budget (a19_neural.ts), so the
- * seat plays neural off, as live bot seats do since profile v30. Offline deterministic work (operation-bounded): the
- * deep-fit driver's think deadline does not apply, every search runs to its rollout-turn budget.
+ * server's bot-search environment, scoped around its construction and every decision as the server scopes it. No
+ * neural correction (bot seats never ran it on this budget; it was removed from common on 2026-11-26). Offline
+ * deterministic work (operation-bounded): the deep-fit driver's think deadline does not apply, every search runs to
+ * its rollout-turn budget.
  */
 export const A19_BOT_SEAT_SEARCH_DRIVER_ID = "a19-bot-seat-deep-fit-v1" as const;
 export type A19BotSeatSearchDriverId = typeof A19_BOT_SEAT_SEARCH_DRIVER_ID;
@@ -53,7 +53,7 @@ export const A19_BOT_SEAT_SEARCH_DRIVER = Object.freeze({
     deepBudget: V08_A19_DEEP_FIT.deepBudget,
     waitBudget: V08_A19_DEEP_FIT.waitBudget,
     rolloutTurnBudget: V08_A19_DEEP_FIT.rolloutTurnBudget,
-    neural: "off: attached as on the server, never engages on the 2,500 / 3,750 ms stock budget",
+    neural: "off: bot seats never ran the correction on this budget (removed 2026-11-26)",
     work: "offline-deterministic-work",
     environment: "server bot-search environment (A19 profile + material ties, certified tight bounds, uniform)",
 });

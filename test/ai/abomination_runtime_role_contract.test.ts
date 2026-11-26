@@ -16,7 +16,6 @@ import {
 } from "../../src/ai/versions/v0_8_backline_protector";
 import { V08_URGENT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import { StrategyV0_8S } from "../../src/ai/versions/v0_8s";
-import { StrategyV0_9, buildV09HardGuardSummary, v09CandidatePassesHardGuards } from "../../src/ai/versions/v0_9";
 import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import type { GameAction } from "../../src/engine/actions";
@@ -161,7 +160,6 @@ const localAttackCandidate = (protector: Unit, enemy: Unit): IEnumeratedCandidat
 const strategyFactories: readonly [string, () => IAIStrategy][] = [
     ["v0.8", () => new StrategyV0_8()],
     ["v0.8s", () => new StrategyV0_8S()],
-    ["v0.9 anchor", () => new StrategyV0_9()],
 ];
 
 // These cases pin Abomination's guard-duty contract, which is off by default since 2026-09-14 and restored per seat
@@ -266,22 +264,6 @@ describe("Abomination runtime role contract", () => {
             expect(isV08BacklineProtectorDecisionAllowed(local.protector, local.context, localCandidate.actions)).toBe(
                 false,
             );
-            const freshResponseSummary = buildV09HardGuardSummary(
-                [localCandidate, rushCandidate],
-                local.protector,
-                local.context,
-            );
-            expect(
-                v09CandidatePassesHardGuards(
-                    0,
-                    localCandidate,
-                    [localCandidate, rushCandidate],
-                    local.protector,
-                    local.context,
-                    freshResponseSummary,
-                ),
-            ).toBe(false);
-
             local.enemy.setResponded(true);
             expect(prioritizeV08BacklineProtector(local.protector, local.context, localCandidate.actions, false)).toBe(
                 localCandidate.actions,
@@ -292,15 +274,6 @@ describe("Abomination runtime role contract", () => {
             expect(isV08BacklineProtectorDecisionAllowed(local.protector, local.context, farAttack)).toBe(false);
             expect(
                 preservesV08BacklineProtectorIntent(localIntent, local.protector, local.context, rushCandidate.actions),
-            ).toBe(false);
-
-            const candidates = [localCandidate, rushCandidate];
-            const summary = buildV09HardGuardSummary(candidates, local.protector, local.context);
-            expect(
-                v09CandidatePassesHardGuards(0, localCandidate, candidates, local.protector, local.context, summary),
-            ).toBe(true);
-            expect(
-                v09CandidatePassesHardGuards(1, rushCandidate, candidates, local.protector, local.context, summary),
             ).toBe(false);
         },
     );
@@ -313,12 +286,6 @@ describe("Abomination runtime role contract", () => {
                 prioritizeV08BacklineProtector(fixture.protector, fixture.context, advance.actions, false),
                 label,
             ).toBe(advance.actions);
-            const summary = buildV09HardGuardSummary([advance], fixture.protector, fixture.context);
-            expect(summary.backlineProtectorIntent, label).toBeUndefined();
-            expect(
-                v09CandidatePassesHardGuards(0, advance, [advance], fixture.protector, fixture.context, summary),
-                label,
-            ).toBe(true);
         };
 
         assertReleased(board(), "no ward");

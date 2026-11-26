@@ -15,7 +15,6 @@ import { validateAiMetaEvidence } from "../../src/simulation/ai_meta_evidence";
 import {
     PREMIUM_META_POLICY_LEARNING_STUDY,
     PREMIUM_META_POLICY_LEARNING_SCHEMA,
-    PREMIUM_META_FULL_AUGMENTS_STUDY,
 } from "../../src/simulation/ai_meta_study";
 import { premiumLearningDecisions } from "../../src/simulation/premium_learning_decisions";
 import { resolveAiMetaFightProfile, runAiMetaWorkerPool } from "../../src/simulation/measure_ai_meta_cohorts";
@@ -31,7 +30,6 @@ const options = {
     games: 6,
     baseSeed: 3092307116,
     collectEvidence: true,
-    lockedV09Draft: true,
     studyProfile: PREMIUM_META_POLICY_LEARNING_STUDY,
 };
 const source = "a".repeat(64);
@@ -50,7 +48,7 @@ const formation = (): IMetaFormationInput => ({
 });
 
 describe("prospective Premium learning capture", () => {
-    it("explores all legal hybrid draft offers, preserves hidden-pick collisions and keeps old collections deterministic", () => {
+    it("explores all legal hybrid draft offers and preserves hidden-pick collisions", () => {
         let alternatives = 0;
         let collisions = 0;
         for (let pair = 0; pair < 54; pair++) {
@@ -65,15 +63,6 @@ describe("prospective Premium learning capture", () => {
                 );
                 collisions += Number(decision.status === "collision");
             }
-            const legacy = prepareMetaPair(
-                { ...options, games: 108, studyProfile: PREMIUM_META_FULL_AUGMENTS_STUDY },
-                pair,
-            );
-            expect(
-                legacy
-                    .evidence!.rankedDraft!.decisions.filter((d) => d.action.type !== "select_doctrine")
-                    .every((d) => d.behaviorProbability === 1),
-            ).toBe(true);
         }
         expect(alternatives).toBeGreaterThan(30);
         expect(collisions).toBeGreaterThan(0);
@@ -115,7 +104,7 @@ beforeAll(async () => {
     await runAiMetaWorkerPool(
         options,
         1,
-        resolveAiMetaFightProfile("v09-draft-a19-work"),
+        resolveAiMetaFightProfile("a19-work"),
         (record) => {
             captured = record;
         },

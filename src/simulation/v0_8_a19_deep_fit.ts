@@ -110,14 +110,11 @@ export class V08A19DeepFitSearchDriver {
 export function createV08A19DeepFitSearchDriver(
     deps: ILookaheadDeps,
     match: ISearchMatchInfo,
-    options: { neuralCorrection?: boolean } = {},
 ): V08A19DeepFitSearchDriver {
     const stock = createV08A19SearchDriver(deps, match, undefined, {
-        ...options,
         budgetOverrides: { ...V08_A19_DEEP_FIT.stockBudget, ...V08_A19_DEEP_FIT.waitBudget },
     });
     const deep = createV08A19SearchDriver(deps, match, undefined, {
-        ...options,
         budgetOverrides: {
             ...V08_A19_DEEP_FIT.deepBudget,
             SEARCH_DECISION_DEADLINE_MS: String(V08_A19_DEEP_FIT.thinkMs),

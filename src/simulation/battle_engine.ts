@@ -95,8 +95,12 @@ import {
     type SearchScoredDecisionObserver,
 } from "./search_driver";
 import { createV08A13SearchDriver, shouldUseDefaultV08A13Search, withScopedAIEnvironment } from "./v0_8_a13_search";
-import { createV08A19SearchDriver, shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
-import { requiresA19NativeDecisionStart } from "./a19_neural";
+import {
+    createV08A19SearchDriver,
+    isV08A19SearchDriver,
+    shouldUseDefaultV08A19Search,
+    V08_A19_SEARCH_OVERRIDE_ENV,
+} from "./v0_8_a19_search";
 import { footprintCellsForAnchor, footprintLabel } from "./footprint";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { observeCommittedHealth, type IPremiumHealthObservation } from "./ai_meta_health_ledger";
@@ -237,21 +241,6 @@ export interface IDecisionObservation {
      * supplied actions through this match's real GameActionEngine, then restores the exact decision epoch.
      */
     probeActions?: (actions: readonly GameAction[]) => IDecisionActionProbeResult;
-}
-
-/**
- * Exact deployable-path timing for one v0.9 decision. `totalMicros` starts immediately before
- * `decideTurn` and stops only after the authoritative common-engine dry run has been fully rolled back.
- */
-export interface IV09ServerPreflightTimingObservation {
-    readonly unitId: string;
-    readonly team: TeamType;
-    readonly lap: number;
-    readonly strategyVersion: "v0.9";
-    readonly decisionMicros: number;
-    readonly preflightMicros: number;
-    readonly totalMicros: number;
-    readonly failure: string | null;
 }
 
 /** Result of applying one action from the strategy's chosen decision. */
@@ -428,13 +417,7 @@ export interface IMatchConfig {
      */
     turnActivationObserver?: (events: readonly GameEvent[]) => void;
     /**
-     * Qualification-only production parity seam. Native v0.9 turns are timed through `decideTurn` plus the
-     * same snapshot/apply/rollback transaction the server runs before publishing any live action. Mindless
-     * units and every other strategy version are excluded; ordinary live application still follows.
-     */
-    v09ServerPreflightObserver?: (observation: IV09ServerPreflightTimingObservation) => void;
-    /**
-     * Offline v0.9 teacher seam. When supplied, the match uses an explicitly configured SearchDriver and emits
+     * Offline teacher seam. When supplied, the match uses an explicitly configured SearchDriver and emits
      * scored candidates only after rollback; ordinary matches and the selected production v0.8 factory are unchanged.
      */
     searchScoredDecisionObserver?: SearchScoredDecisionObserver;
@@ -450,7 +433,7 @@ export interface IMatchConfig {
      */
     searchShadowOnly?: boolean;
     searchV08A13TrajectoryTeams?: readonly TeamType[];
-    /** Offline-only strategy injection used by v0.9 DAgger actors; ordinary/versioned matches never set these. */
+    /** Offline-only strategy injection for research seats; ordinary/versioned matches never set these. */
     greenStrategyOverride?: IAIStrategy;
     redStrategyOverride?: IAIStrategy;
 }
@@ -1583,38 +1566,16 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             searchApplies || envOverrideSearchApplies || trajectorySearchApplies || lookaheadApplies
                 ? captureAITargetMemory(unitsHolder)
                 : undefined;
-        const v09ServerPreflightStartedAt =
-            config.v09ServerPreflightObserver && strategy.version === "v0.9" ? performance.now() : undefined;
+        // An A19 seat's support step times itself from the decision's start, as the server's decision context does.
         if (
             config.researchCaptureDecisionStart ||
-            (searchApplies && requiresA19NativeDecisionStart(search)) ||
-            (envOverrideSearchApplies && requiresA19NativeDecisionStart(searchEnvOverrideSearch!))
+            (searchApplies && isV08A19SearchDriver(search)) ||
+            (envOverrideSearchApplies && isV08A19SearchDriver(searchEnvOverrideSearch!))
         )
             decisionContext.decisionStartedAtMs = performance.now();
         const decided0 = strategy.decideTurn(unit, decisionContext);
-        let v09ServerPreflightObservation: IV09ServerPreflightTimingObservation | undefined;
-        if (v09ServerPreflightStartedAt !== undefined) {
-            if (searchApplies || envOverrideSearchApplies || trajectorySearchApplies || lookaheadApplies) {
-                throw new Error("v0.9 server preflight timing requires a native policy decision without search");
-            }
-            const decisionCompletedAt = performance.now();
-            const preflight = preflightDecisionActions(decided0, actingUnitId);
-            v09ServerPreflightObservation = {
-                unitId: actingUnitId,
-                team: unit.getTeam(),
-                lap: fightProperties.getCurrentLap(),
-                strategyVersion: "v0.9",
-                decisionMicros: Math.max(0, Math.round((decisionCompletedAt - v09ServerPreflightStartedAt) * 1000)),
-                preflightMicros: preflight.preflightMicros,
-                totalMicros: Math.max(0, Math.round((performance.now() - v09ServerPreflightStartedAt) * 1000)),
-                failure: preflight.failure,
-            };
-        }
         const targetMemoryAfterIncumbent =
             config.searchShadowOnly && searchApplies ? captureAITargetMemory(unitsHolder) : undefined;
-        if (v09ServerPreflightObservation) {
-            config.v09ServerPreflightObserver!(v09ServerPreflightObservation);
-        }
         // Lookahead only re-decides for the v0.5 side, so a v0.5-vs-v0.4 run measures exactly whether
         // adding search to v0.5 beats its own single-decision baseline (the opponent replies with its own
         // policy inside the simulation, but plays its real turns un-searched). Default OFF -> decided0.
@@ -1628,7 +1589,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 ? lookahead.chooseDecision(unit, decided0)
                 : decided0;
         if (config.searchShadowOnly && shadowDecision !== decided0) {
-            throw new Error("offline v0.9 teacher SearchDriver escaped SEARCH_OBSERVE_ONLY shadow mode");
+            throw new Error("offline teacher SearchDriver escaped SEARCH_OBSERVE_ONLY shadow mode");
         }
         if (targetMemoryAfterIncumbent) {
             restoreAITargetMemory(unitsHolder, targetMemoryAfterIncumbent);

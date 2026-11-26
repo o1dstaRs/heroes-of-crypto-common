@@ -14,7 +14,7 @@ import { gzipSync } from "node:zlib";
 import type { IDecisionContext } from "../ai/ai_strategy";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../ai/candidates";
 import { throughShotLineEnabled } from "../ai/through_shot_line";
-import { v09CandidateSignature } from "../ai/versions/v0_9";
+import { candidateSignature } from "../ai/candidate_signature";
 import type { GameAction } from "../engine/actions";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import type { Unit } from "../units/unit";
@@ -180,7 +180,7 @@ let currentSeed = 0;
 let profileChecked = false;
 
 const mean = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
-const signature = (candidate: Pick<Candidate, "actions">) => v09CandidateSignature(candidate.actions);
+const signature = (candidate: Pick<Candidate, "actions">) => candidateSignature(candidate.actions);
 const completed = (samples: readonly ISample[]) => samples.length > 0 && samples.every((sample) => sample.terminal);
 
 function installAudit(): void {
@@ -320,7 +320,7 @@ function auditPosition(
     const auxiliary = deps.captureAuxiliaryState?.();
     const active = deps.getActiveUnitId();
     try {
-        const baselineSignature = v09CandidateSignature(baseline);
+        const baselineSignature = candidateSignature(baseline);
         const production = new Set(frame.full.keys());
         const shortlisted = new Set(frame.shortlist.keys());
         production.add(baselineSignature);

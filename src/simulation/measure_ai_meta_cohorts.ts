@@ -33,12 +33,6 @@ import { createGzip, type Gzip } from "node:zlib";
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { V08_A13_PROFILE } from "../ai/versions/v0_8_a13_profile";
 import { buildV08A19SearchEnvironment, V08_A19_PROFILE } from "../ai/versions/v0_8_a19_profile";
-import { V09_MODEL_ID, V09_MODEL_PROMOTED, V09_MODEL_SHA256 } from "../ai/versions/v0_9_artifact";
-import {
-    V09_DEFAULT_DRAFT_BASE_POLICY_SPEC,
-    V09_DEFAULT_DRAFT_MODEL_ID,
-    V09_DEFAULT_DRAFT_MODEL_SHA256,
-} from "../ai/setup/doctrine_draft_policy";
 import {
     AI_META_COHORT_DESCRIPTIONS,
     AI_META_COHORTS,
@@ -70,11 +64,7 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "./ai_meta_cohorts_core";
-import {
-    AI_META_NATIVE_V09_STRATEGY_PROFILE,
-    AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
-    type AiMetaStrategyProfileId,
-} from "./ai_meta_strategy_profile";
+import { AI_META_REGISTERED_VERSION_STRATEGY_PROFILE, type AiMetaStrategyProfileId } from "./ai_meta_strategy_profile";
 import {
     AI_META_UNIT_INTERACTION_SCHEMA,
     AiMetaUnitInteractionCollector,
@@ -806,8 +796,7 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
-export type AiMetaFightProfileId =
-    "a13" | "a19" | "a19-work" | "a19-bot-seat" | "v09-native" | "v09-draft-a19-work" | "ranked-current-a19-work";
+export type AiMetaFightProfileId = "a13" | "a19" | "a19-work" | "a19-bot-seat" | "ranked-current-a19-work";
 
 /**
  * The profile an invocation that names none plays (owner, 2026-11-26: newly sealed research plans default to the
@@ -822,8 +811,6 @@ export interface IAiMetaFightProfile {
     workerEnvironment: Readonly<Record<string, string>>;
     strategyProfileId: AiMetaStrategyProfileId;
     fightVersion?: string;
-    nativeV09?: boolean;
-    lockedV09Draft?: boolean;
     authoritativeRanked?: boolean;
     /** Finite search operation budgets decide every move instead of wall-clock deadlines (host-independent). */
     offlineDeterministicWork?: boolean;
@@ -859,50 +846,6 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             HOC_A19_CONTEXT_POLICY: "on",
         }),
         strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
-        offlineDeterministicWork: true,
-    }),
-    "v09-draft-a19-work": Object.freeze({
-        id: "v09-draft-a19-work",
-        title: "Heroes of Crypto — Locked v0.9 Draft + A19 Combat Meta Cohorts",
-        fightVersion: "v0.8",
-        lockedV09Draft: true,
-        provenance: Object.freeze({
-            ...V08_A19_PROFILE,
-            name: "v0.9-draft+v0.8-a19-work",
-            draftModelId: V09_DEFAULT_DRAFT_MODEL_ID,
-            draftModelSha256: V09_DEFAULT_DRAFT_MODEL_SHA256,
-            draftBase: V09_DEFAULT_DRAFT_BASE_POLICY_SPEC,
-            draftArtifactFitVersion: 6,
-            searchBudget: "offline-deterministic-work",
-            offlineSearchEnvironment: AI_META_OFFLINE_SEARCH_ENVIRONMENT,
-            workerOverride: "V08_A19_SEARCH=1; searchOfflineDeterministicWork=true",
-        }),
-        workerEnvironment: definedEnvironment({ ...buildV08A19SearchEnvironment(), V08_A19_SEARCH: "1" }),
-        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
-        offlineDeterministicWork: true,
-    }),
-    "v09-native": Object.freeze({
-        id: "v09-native",
-        title: "Heroes of Crypto — Native v0.9 AI Meta Balance Cohorts",
-        fightVersion: "v0.9",
-        nativeV09: true,
-        provenance: Object.freeze({
-            name: "v0.9-native",
-            schema: "hoc.native-v0_9-meta.v1",
-            productionVersion: "v0.9",
-            combatModelId: V09_MODEL_ID,
-            combatModelSha256: V09_MODEL_SHA256,
-            combatModelPromoted: V09_MODEL_PROMOTED,
-            draftModelId: V09_DEFAULT_DRAFT_MODEL_ID,
-            draftModelSha256: V09_DEFAULT_DRAFT_MODEL_SHA256,
-            draftBase: V09_DEFAULT_DRAFT_BASE_POLICY_SPEC,
-            liveSetupReference: "artifact-fit-v6:v07-nonfight-4eda84635fe7",
-            draftArtifactFitVersion: 6,
-            searchBudget: "native-no-search",
-            workerOverride: "none; native v0.9 on both seats",
-        }),
-        workerEnvironment: Object.freeze({}),
-        strategyProfileId: AI_META_NATIVE_V09_STRATEGY_PROFILE,
         offlineDeterministicWork: true,
     }),
     a13: Object.freeze({
@@ -969,6 +912,9 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
         offlineDeterministicWork: true,
         searchDriver: A19_BOT_SEAT_SEARCH_DRIVER.id,
     }),
+    // a19-work keeps its name and budget. Its outputs from before 2026-11-26 played the A19 neural primary-tie
+    // correction, which engaged on this 1,000 / 1,500 ms offline stock budget; it was removed that day by owner
+    // decision, so later outputs play the native choice (its recorded searchRules no longer carry SEARCH_A19_NEURAL_TIES).
     "a19-work": Object.freeze({
         id: "a19-work",
         title: "Heroes of Crypto — v0.8+a19 Full-Search AI Meta Balance Cohorts",
@@ -1138,8 +1084,6 @@ export async function runAiMetaWorkerPool(
                 workerData: {
                     options: {
                         ...options,
-                        nativeV09: fightProfile.nativeV09 ?? options.nativeV09,
-                        lockedV09Draft: fightProfile.lockedV09Draft ?? options.lockedV09Draft,
                         authoritativeRanked: fightProfile.authoritativeRanked ?? options.authoritativeRanked,
                     },
                     strategyProfileId: fightProfile.strategyProfileId,
@@ -1392,7 +1336,7 @@ function writeSummary(
                 draftExplorationRate:
                     aiMetaStudyFromEnvironment() &&
                     (aiMetaStudyFromEnvironment() === PREMIUM_META_POLICY_LEARNING_STUDY ||
-                        (!fightProfile.nativeV09 && !fightProfile.lockedV09Draft && !fightProfile.authoritativeRanked))
+                        !fightProfile.authoritativeRanked)
                         ? 0.2
                         : 0,
                 ...(aiMetaStudyFromEnvironment() === PREMIUM_META_POLICY_LEARNING_STUDY
@@ -1422,9 +1366,6 @@ function writeSummary(
                 spec: aiMetaStudyFromEnvironment() ? PREMIUM_META_DRAFT_SPEC : AI_META_RANKED_DRAFT_POLICY_SPEC,
                 sequence: "live-ranked-pick-v1",
                 visibility: "own prior picks plus legitimately revealed opponent identities",
-                ...(fightProfile.nativeV09 || fightProfile.lockedV09Draft
-                    ? { modelId: V09_DEFAULT_DRAFT_MODEL_ID, sequentialBundles: true }
-                    : {}),
             },
             explorationRate: AI_META_EXPLORATION_RATE,
             evidenceCollection:
@@ -1613,10 +1554,10 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "[fight-profile=a19-bot-seat|a13|a19|a19-work|v09-native|v09-draft-a19-work|ranked-current-a19-work] [pair-start=0] [pair-count=all]. " +
+    "[fight-profile=a19-bot-seat|a13|a19|a19-work|ranked-current-a19-work] [pair-start=0] [pair-count=all]. " +
     "An empty or omitted fight profile plays a19-bot-seat (the production bot seat's deep-fit search, neural off, " +
     "offline deterministic work); a named profile keeps its own driver. " +
-    "Defaults to premium-ranked-v4 learning capture and an audited premium.sqlite (a19-work or v09-draft-a19-work). " +
+    "Defaults to premium-ranked-v4 learning capture and an audited premium.sqlite (a19-bot-seat or a19-work). " +
     "Outcome-only research requires AI_META_OUTPUT_MODE=legacy-oracle explicitly. " +
     "Sharded drivers set AI_META_SHARD=1 and finalize the merged study with ai_meta_outputs.ts.";
 

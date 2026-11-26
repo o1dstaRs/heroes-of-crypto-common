@@ -6,7 +6,6 @@ import { selectV08A19MaterialCandidateIndex } from "../../src/ai/versions/v0_8_a
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PathHelper } from "../../src/grid/path_helper";
 import { applyNightmareWallOpportunityGate } from "../../src/simulation/nightmare_wall_selection_evidence_research";
-import { selectV09A19Correction } from "../../src/simulation/v0_9/a19_correction";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
 function candidates() {
@@ -38,7 +37,7 @@ function candidates() {
 }
 
 describe("Nightmare selection evidence adapter", () => {
-    test("masks the cached array used by real material and neural selectors, retaining raw forecasts", () => {
+    test("masks the cached array used by the real material selector, retaining raw forecasts", () => {
         const catalog = candidates();
         const returnedMeans = [0.5, 0.5];
         const materialEvidence = { means: returnedMeans, materials: [0.3, 0.9] };
@@ -66,17 +65,6 @@ describe("Nightmare selection evidence adapter", () => {
             "ties",
         );
         expect(selected).toBe(0);
-        expect(
-            selectV09A19Correction({
-                candidates: catalog,
-                means: returnedMeans,
-                completed: [2, 2],
-                selected,
-                policy: [0, 100],
-                minimumLogitGain: 0.1,
-                actionFamily: "all",
-            }),
-        ).toBe(0);
     });
     test("retains a fully scored wall that exceeds the registered margin", () => {
         const catalog = candidates();

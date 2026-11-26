@@ -6,7 +6,7 @@ import evidence from "../../docs/evidence/wandering_mage_20261108.json";
 import { planTacticalStackSplits, type ITacticalSplitUnit } from "../../src/ai/tactical_split_placement";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { SearchDriver } from "../../src/simulation/search_driver";
-import { fingerprintV09 } from "../../src/simulation/v0_9/protocol";
+import { canonicalJsonSha256 } from "../../src/simulation/canonical_json";
 import {
     createLockedWanderingMageResearchStrategy,
     lockedWanderingMageCheckpoint,
@@ -15,7 +15,7 @@ import {
 
 test("saved Mage checkpoint pins the measured source and every study, including failed alternatives", () => {
     const checkpoint = lockedWanderingMageCheckpoint();
-    expect(fingerprintV09(evidence)).toBe(checkpoint.evidenceFingerprint);
+    expect(canonicalJsonSha256(evidence)).toBe(checkpoint.evidenceFingerprint);
     expect(
         createHash("sha256")
             .update(readFileSync(resolve(import.meta.dir, "../..", checkpoint.policySource)))

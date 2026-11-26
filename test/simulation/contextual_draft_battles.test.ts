@@ -13,7 +13,7 @@ import {
     permuteRankedDraftSeed,
 } from "../../src/simulation/ranked_draft_eval";
 import { V09_DEFAULT_DRAFT_BASE_POLICY_SPEC } from "../../src/ai/setup/doctrine_draft_policy";
-import { createLockedDoctrineDraftResearchChoices } from "../../src/simulation/v0_9/doctrine_draft_checkpoint";
+import { createLockedDoctrineDraftResearchChoices } from "../../src/simulation/doctrine_draft/doctrine_draft_checkpoint";
 import { synergyVariantsForSeed } from "../../src/synergies/synergy_properties";
 
 const zero: IContextualDraftModel = {
