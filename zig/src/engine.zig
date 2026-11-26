@@ -414,9 +414,15 @@ pub inline fn getStackPower(u: *const Unit) f64 {
     return if (u.stack_power > 5) 5 else if (u.stack_power < 1) 1 else js.round(u.stack_power);
 }
 
-/// Unit.canFly: a flying creature that is not grounded (isGrounded: Gravebound, from Gravechain; no Hamstrung in scope).
+/// Unit.canFly: a flying creature that is not grounded.
 pub inline fn canFly(u: *const Unit) bool {
-    return u.movement_type == st.Movement.FLY and !(u.debuffs.len != 0 and u.debuffs.find(.gravebound) != null);
+    return u.movement_type == st.Movement.FLY and !grounded(u);
+}
+
+/// Unit.isGrounded's status test (GROUNDING_DEBUFFS = ["Gravebound", "Hamstrung"], unit.ts: Gravechain's debuff and the
+/// Dryad's; hasStatusApplied reads the debuff list). The caller has checked isFlyingCreature.
+pub inline fn grounded(u: *const Unit) bool {
+    return u.debuffs.len != 0 and (u.debuffs.find(.gravebound) != null or u.debuffs.find(.hamstrung) != null);
 }
 
 pub inline fn hasMoraleBuff(u: *const Unit) bool {
@@ -515,20 +521,21 @@ pub fn applyDamageElement(s: *State, ui: u8, minus_hp: f64, chance: f64, extend:
 // Stat refresh (UnitsHolder.refreshStackPowerForAllUnits, Unit.adjustBaseStats)
 // =====================================================================================================================
 
-/// The first buff of an augment name (adjustBaseStats' statBuffs.get), only on battles that carry augments.
+/// The first buff of an augment name (adjustBaseStats' statBuffs.get: a revive's orphan rows have no object), only on
+/// battles that carry augments.
 inline fn augmentBuff(s: *const State, u: *const Unit, id: st.SpellId) ?*const st.AppliedSpell {
     if (!s.augments) return null;
-    return u.buffs.get(id);
+    return u.augment(id);
 }
 
 /// Unit.adjustBaseStats, with the team's synergy values (refreshStackPowerForAllUnits' per-team modifiers) and the
 /// augment buffs. Might and Sniper read the attack type selected now: selection changes do not refresh.
 pub fn adjustBaseStats(s: *State, u: *Unit) void {
-    if (s.spit or s.shot_hooks) adjustBaseStatsWith(s, u, true) else adjustBaseStatsWith(s, u, false);
+    if (s.spit or s.shot_hooks or s.b6_hooks) adjustBaseStatsWith(s, u, true) else adjustBaseStatsWith(s, u, false);
 }
 
-/// adjustBaseStats, instantiated without batch 5's hooks for boards where nothing can trigger them: their code in the one
-/// shared body cost the ability-free refresh 3% (register pressure, not the tests).
+/// adjustBaseStats, instantiated without batch 5's and batch 6a's hooks for boards where nothing can trigger them: their
+/// code in the one shared body cost the ability-free refresh 3% (register pressure, not the tests).
 fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     const f = &s.fight;
     const syn = &s.setup[u.team];
@@ -538,6 +545,11 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     // Ball hook needs a debuff on the unit, and nothing here changes the list.
     const spit = batch5 and s.spit and u.debuffs.len != 0;
     const shot_hooks = batch5 and s.shot_hooks;
+    // Batch 6a's rows (the four blessings, Wind Flow, the Guiding Winds row) and Hamstrung, read once each (statBuffs.get:
+    // the first row of the name; getDebuff for Hamstrung).
+    const b6 = batch5 and s.b6_hooks;
+    const host: ?f64 = if (b6 and u.buffs.len != 0) u.buffs.power(.angelic_host_blessing) else null;
+    const wind: ?f64 = if (b6 and u.buffs.len != 0) u.buffs.power(.wind_flow) else null;
 
     // resetTarget unless the Aggr status is still applied
     if (s.stat_hooks and u.target >= 0 and u.effects.find(.aggr) == null and u.debuffs.find(.aggr) == null) u.target = -1;
@@ -620,6 +632,7 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     const pegasus_might = if (s.stat_hooks and s.auras) abilities.appliedAuraPower(u, .pegasus_might_aura) else null;
     u.base_armor = js.roundUnitStat((if (mof != null) u.init.base_armor + u.init.base_armor / 10 else u.init.base_armor) + 0, 2);
     if (pegasus_might) |pm| u.base_armor += pm;
+    if (wind) |wf| u.base_armor += wf;
     const armor_augment = augmentBuff(s, u, .armor_augment);
     if (armor_augment) |aa| u.base_armor += js.roundUnitStat((u.base_armor / 100) * aa.power, 2);
     // Titan Plate captures its share after the Armor Augment, before the flats; it is added to armor_mod below.
@@ -644,6 +657,8 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     }
     // Veteran Helm: a share of the final base armor (no outer rounding); then Titan Plate's captured share (rounded).
     if (s.artifacts) artifacts.armorMod(u, art, titan_bonus);
+    // Angelic Host's power (rounded), after the artifacts' armor_mod terms.
+    if (host) |ah| u.armor_mod = js.roundUnitStat(u.armor_mod + ah, 2);
 
     // MAGIC RESIST
     u.magic_resist = if (mof) |fp| u.init.magic_resist + u.init.magic_resist / fp else u.init.magic_resist;
@@ -679,6 +694,10 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     if (s.unit_hooks) {
         if (u.ability(.sky_runner)) |sr| u.steps += abilities.abilityCount(u, sr);
     }
+    // Wolf Trail: its power in steps_mod, before Battle Roar's (the addition order is the float order).
+    if (b6 and u.buffs.len != 0) {
+        if (u.buffs.power(.wolf_trail_blessing)) |wt| u.steps_mod += wt;
+    }
     if (augmentBuff(s, u, .movement_augment)) |ma| u.steps += ma.power;
     // Swift Boots: a share of the running steps (Movement Augment included); Winged Boots' and Crown's flat steps.
     if (s.artifacts) artifacts.steps(u, art);
@@ -687,13 +706,15 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
         if (u.buffs.len != 0) {
             if (u.buffs.get(.battle_roar)) |br| u.steps_mod += br.power;
         }
+        // Wind Flow: the slow (at most the config's power: Tome of Amplification strengthens only the armor), floored at 1.
+        if (wind) |wf| u.steps = @max(1, u.steps - @min(wf, windFlowPower(s)));
         // Vine Throw: the snare cuts the base steps (the first debuff of the name), floored at 1.
         if (u.debuffs.len != 0) {
             if (u.debuffs.get(.vine_throw)) |vt| u.steps = @max(1, u.steps - vt.power);
         }
     }
-    // Quagmire (Spit Ball's, or Rime Charm's), then Gravebound (Gravechain's), each the first debuff of the name, on one
-    // multiplier: steps and steps_mod x (100 - power) / 100.
+    // Quagmire (Spit Ball's, or Rime Charm's), then Gravebound (Gravechain's), then Hamstrung (the Dryad's), each the
+    // first debuff of the name, on one multiplier: steps and steps_mod x (100 - power) / 100.
     var steps_multiplier: f64 = 1;
     if (spit) {
         if (u.debuffs.get(.quagmire)) |q| steps_multiplier *= (100 - q.power) / 100;
@@ -701,8 +722,12 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     if (s.artifacts and u.debuffs.len != 0) {
         if (u.debuffs.get(.gravebound)) |g| steps_multiplier *= (100 - g.power) / 100;
     }
+    if (b6 and s.hamstring and u.debuffs.len != 0) {
+        if (u.debuffs.get(.hamstrung)) |h| steps_multiplier *= (100 - h.power) / 100;
+    }
     u.steps = js.roundUnitStat(u.steps * steps_multiplier, 1);
     u.steps_mod = js.roundUnitStat(u.steps_mod * steps_multiplier, 1);
+    if (b6) b6Steps(u, host, steps_multiplier);
 
     // ATTACK
     u.base_attack = if (mof) |fp| u.init.base_attack + u.init.base_attack / fp else u.init.base_attack;
@@ -722,14 +747,19 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     if (pegasus_might) |pm| u.base_attack += pm;
     if (s.augments) {
         if (u.attack_type_selected != AT.RANGE) {
-            if (u.buffs.get(.might_augment)) |ma| u.base_attack += js.roundUnitStat((u.base_attack / 100) * ma.power, 2);
-        } else if (u.buffs.get(.sniper_augment)) |sa| {
+            if (u.augment(.might_augment)) |ma| u.base_attack += js.roundUnitStat((u.base_attack / 100) * ma.power, 2);
+        } else if (u.augment(.sniper_augment)) |sa| {
             // getBuffProperties: the stored first/second properties (base attack %, shot distance %).
             if (sa.src_x >= 0 and sa.src_y >= 0) {
                 u.base_attack += js.roundUnitStat((u.base_attack / 100) * @as(f64, @floatFromInt(sa.src_x)), 2);
                 u.shot_distance += js.roundUnitStat((u.shot_distance / 100) * @as(f64, @floatFromInt(sa.src_y)), 2);
             }
         }
+    }
+    // Guiding Winds (the receiver's last aura row of the name): power% of the INITIAL distance while RANGE is selected,
+    // before the attack artifacts.
+    if (b6 and s.auras and u.attack_type_selected == AT.RANGE) {
+        if (abilities.appliedAuraPower(u, .guiding_winds_aura)) |gw| u.shot_distance += js.roundUnitStat((u.init.shot_distance / 100) * gw, 2);
     }
     const we_bonus: f64 = if (s.artifacts) artifacts.attackArtifacts(u, art) else 0;
     u.attack_mod = u.init.attack_mod;
@@ -740,11 +770,37 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     // Blind Fury: the share of the stack already lost, of the INITIAL base attack.
     if (u.has(.blind_fury)) u.attack_mod += (1 - u.amount_alive / (u.amount_alive + u.amount_died)) * u.init.base_attack;
     u.attack_mod = js.roundUnitStat(u.attack_mod + we_bonus, 2);
+    if (host) |ah| u.attack_mod = js.roundUnitStat(u.attack_mod + ah, 2);
     u.base_attack = js.roundUnitStat(u.base_attack * base_attack_multiplier, 2);
     u.shot_distance = js.roundUnitStat(u.shot_distance, 2);
-    u.range_armor = js.roundUnitStat(u.base_armor * 1, 2);
+    // Arrows Wingshield: the range-armor multiplier 1 x (1 + max(0, power) / 100).
+    var range_armor_multiplier: f64 = 1;
+    if (b6 and u.buffs.len != 0) {
+        if (u.buffs.power(.arrows_wingshield_blessing)) |aw| range_armor_multiplier = range_armor_multiplier * (1 + @max(0, aw) / 100);
+    }
+    u.range_armor = js.roundUnitStat(u.base_armor * range_armor_multiplier, 2);
 
     if (f.started and !lap_adjusted) u.adjusted_laps |= lap_bit;
+}
+
+/// adjustBaseStats' steps_mod terms after the slow's rounding: Angelic Host's power (unslowed), then Tie up the Horses on
+/// a unit that cannot fly (slowed, toFixed(4)).
+noinline fn b6Steps(u: *Unit, host: ?f64, steps_multiplier: f64) void {
+    if (host) |ah| u.steps_mod = js.roundUnitStat(u.steps_mod + ah, 2);
+    if (u.buffs.len != 0 and !canFly(u)) {
+        if (u.buffs.power(.tie_up_the_horses_blessing)) |tie| u.steps_mod = artifacts.toFixed4(u.steps_mod + tie * steps_multiplier);
+    }
+}
+
+/// getSpellConfig("System", "Wind Flow").power (recorded `spellConfigs`); a carrier without the config is a capacity of
+/// the port (the slow cannot be followed).
+fn windFlowPower(s: *State) f64 {
+    const cfg = &s.spell_cfg[@intFromEnum(st.CastSpell.wind_flow)];
+    if (!cfg.loaded) {
+        s.overflow = true;
+        return 0;
+    }
+    return cfg.power;
 }
 
 /// adjustBaseStats' HP block with the unit hooks (hasAbilityActive, read once: Break-aware): refreshAndGetAdjustedMaxHp's
@@ -810,8 +866,8 @@ fn setStackPowers(s: *State) void {
 }
 
 /// UnitsHolder.refreshStackPowerForAllUnits (no Water Shield in scope): stack powers, the aura refresh (reading the new
-/// stack power and the luck left by the previous refresh), the blessings, then every unit's stats, each followed by the
-/// Disguise swap. getUnitAuraAttackMod is 0 (no War Anger).
+/// stack power and the luck left by the previous refresh), the blessings, then every unit's stats, each followed by
+/// increaseAttackMod(getUnitAuraAttackMod) (War Anger) and the Disguise swap.
 pub fn refreshStackPowerForAllUnits(s: *State) void {
     setStackPowers(s);
     if (s.auras) abilities.refreshAuras(s);
@@ -820,8 +876,112 @@ pub fn refreshStackPowerForAllUnits(s: *State) void {
         const u = &s.units[i];
         if (!cellWithinGrid(baseCell(u))) continue;
         adjustBaseStats(s, u);
+        if (s.war_anger) increaseAttackMod(u, warAngerMod(s, i));
     }
     if (s.disguise) disguisePass(s);
+}
+
+/// UnitsHolder.getUnitAuraAttackMod(unit) (the unit's cells now): a unit holding the War Anger AuraEffect and not Broken
+/// gains getBaseAttack() * ((power * enemies) / 100), the power its AuraEffect holds (Unit.war_anger_power) and the
+/// enemies the distinct holder units of the other team (dead ones too) standing in the clipped Chebyshev ball of the
+/// aura's range plus the team's aura range around any body cell; 0 otherwise.
+pub fn warAngerMod(s: *const State, ui: u8) f64 {
+    const u = &s.units[ui];
+    const def = s.war_anger_def;
+    if (def == st.NO_AURA or u.n_auras == 0 or u.isBroken()) return 0;
+    var holds = false;
+    for (u.auras[0..u.n_auras]) |d| {
+        if (d == def) holds = true;
+    }
+    if (!holds) return 0;
+    const n = enemiesWithin(s, ui, s.aura_defs[def].range + s.setup[u.team].aura_range);
+    return u.base_attack * ((u.war_anger_power * @as(f64, @floatFromInt(n))) / 100);
+}
+
+/// Unit.increaseAttackMod: a positive increase lands on attack_mod (toFixed(2)) and is remembered unrounded; otherwise
+/// the remembered increase is 0.
+pub inline fn increaseAttackMod(u: *Unit, by: f64) void {
+    if (by > 0) {
+        u.attack_mod = js.toFixed(u.attack_mod + by, 2);
+        u.attack_mod_increase = by;
+    } else u.attack_mod_increase = 0;
+}
+
+/// countEnemiesWithinRange(unit, unit.getCells(), range): the distinct enemy holder units occupying the clipped
+/// Chebyshev ball of `range` around any body cell.
+fn enemiesWithin(s: *const State, ui: u8, range: f64) u32 {
+    if (!(range >= 0)) return 0;
+    const r: i32 = @intFromFloat(@min(range, st.GRID));
+    const u = &s.units[ui];
+    const body = unitCells(u);
+    var seen: st.UnitSet = 0;
+    for (body.slice()) |c| {
+        if (!cellWithinGrid(c)) continue;
+        var x = @max(0, c.x - r);
+        while (x <= @min(st.GRID - 1, c.x + r)) : (x += 1) {
+            var y = @max(0, c.y - r);
+            while (y <= @min(st.GRID - 1, c.y + r)) : (y += 1) {
+                const o = s.grid.board[@intCast(x)][@intCast(y)];
+                if (!st.isUnitCode(o)) continue;
+                const e = &s.units[o - 1];
+                if (e.in_holder and e.team != u.team) seen |= unitBit(o - 1);
+            }
+        }
+    }
+    return @popCount(seen);
+}
+
+/// Unit.applyTravelledDistanceModifier (Crusade, Break-aware): calculateAbilityCount (this refresh's stack power, the luck
+/// now, the team's ability power) per travelled cell on the INITIAL base attack and armor, toFixed(2), capped at 50. The
+/// next stat refresh reads it.
+pub fn crusade(u: *Unit, cells: usize) void {
+    const a = u.ability(.crusade) orelse return;
+    const add = abilities.abilityCount(u, a) * @as(f64, @floatFromInt(cells));
+    u.init.base_attack = @min(50, js.toFixed(u.init.base_attack + add, 2));
+    u.init.base_armor = @min(50, js.toFixed(u.init.base_armor + add, 2));
+}
+
+/// canSelfResurrect: an active Resurrection card (Break-aware) and a parsed Resurrection with a charge.
+pub fn canSelfResurrect(u: *const Unit) bool {
+    if (!u.has(.resurrection)) return false;
+    for (u.spells[0..u.n_spells]) |b| {
+        if (b.spell == @intFromEnum(st.CastSpell.resurrection) and b.amount > 0) return true;
+    }
+    return false;
+}
+
+/// UnitsHolder.deleteUnitById(id, true)'s revive: a dead holder that canSelfResurrect gets min(died, max(1, floor(died /
+/// 2))) creatures back (hp stays its full max), loses every effect, debuff and buff object (the augment display rows stay
+/// as orphans, the stat refresh no longer reads them), its Aggr target, and the Resurrection card with its charge (the
+/// book re-parsed). It keeps its slot, uid, cells, place in the holder and turn state. Returns whether it revived (then
+/// the caller emits no unit_destroyed and raises no Infest summon).
+pub fn tryRevive(s: *State, ui: u8) bool {
+    if (!s.resurrection) return false;
+    const u = &s.units[ui];
+    if (u.ability_mask & st.AbilityId.resurrection.bit() == 0 or !canSelfResurrect(u)) return false;
+    const died = u.amount_died;
+    const count = @min(died, @max(1, @floor(died / 2)));
+    // reviveAfterDeath
+    if (!u.isDead() or !(count > 0)) return false;
+    const revived = @min(u.amount_died, @floor(count));
+    if (revived <= 0) return false;
+    u.amount_alive += revived;
+    u.amount_died -= revived;
+    u.fuse = .{}; // lastFuseFatalHit = undefined
+    // deleteAllEffects, deleteAllBuffs (the " Augment" display rows stay, objects none), deleteAllDebuffs
+    u.effects.len = 0;
+    u.debuffs.len = 0;
+    var w: u8 = 0;
+    for (u.buffs.items[0..u.buffs.len]) |b| {
+        if (!b.id.isAugment()) continue;
+        u.buffs.items[w] = b;
+        w += 1;
+    }
+    u.buffs.len = w;
+    u.aug_orphans = w;
+    u.target = -1; // resetTarget: initialUnitProperties.target is "" in scope
+    _ = abilities.deleteAbility(s, u, .resurrection);
+    return true;
 }
 
 /// The Disguise swaps of refreshStackPowerForAllUnits' stat loop: the swap after each unit's stats touches only that
@@ -1333,6 +1493,8 @@ fn applyArmageddon(s: *State, units: []const u8, events: *Events) void {
         _ = applyDamage(s, ui, armageddonDamage(u, wave));
         events.push(.armageddon_applied, u.uid);
         if (u.isDead()) {
+            // deleteUnitById(id, wave === 1): the first wave lets a Resurrection holder revive in place.
+            if (wave == 1 and tryRevive(s, ui)) continue;
             deleteUnit(s, ui);
             events.push(.unit_destroyed, u.uid);
         }
@@ -1624,7 +1786,7 @@ fn activateNextUnit(s: *State, ui: u8) Activation {
     }
     refreshPossibleAttackTypes(u, canLandRangeAttack(s, u));
     s.fight.first_turn_made = true;
-    return if (u.isStunned()) .skipped else .ready;
+    return if (u.isSkipping()) .skipped else .ready;
 }
 
 /// One list's pass of Unit.minusLap: each entry loses a lap (sentinel counts excepted) and is deleted at 0.
@@ -1719,6 +1881,19 @@ pub fn completeTurn(s: *State, ui: u8, hourglass: bool, skip: bool, events: *Eve
     u.moved_this_turn = false;
     u.moved_route_cells = 0;
     events.push(.turn_completed, u.uid);
+}
+
+/// forceStalledLap (src/simulation/turn_recovery.ts), between engine calls when an advance() used up its attempts with
+/// no unit activated: every living holder unit is marked as having made its turn (addAlreadyMadeTurn: no events, no
+/// morale, no lap tick, no draw), so the next advance flips the lap. Returns whether any unit was marked.
+pub fn forceStalledLap(s: *State) bool {
+    var forced = false;
+    for (s.holderOrder()) |i| {
+        if (s.units[i].isDead()) continue;
+        s.fight.made |= unitBit(i);
+        forced = true;
+    }
+    return forced;
 }
 
 fn advance(s: *State, damage_dealt: bool, events: *Events) void {
@@ -1967,9 +2142,10 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) R
     const from = [2]f64{ u.pos_x, u.pos_y };
     const to = positionForCells(target_cells) orelse return error.Rejected;
     _ = finishDirectedMove(s, ui, target_cells, to, null) orelse return error.Rejected;
-    // applyRouteMoveModifiers: getTravelledRoute strips nothing here; the route is non-empty. Then the travelled-
-    // distance modifier (no Crusade in scope) and applyLavaWaterModifier (Made of Fire on a lava route).
+    // applyRouteMoveModifiers: getTravelledRoute strips nothing here; the route is non-empty. Distance morale, Crusade
+    // over the travelled route (the path minus its origin), then applyLavaWaterModifier (Made of Fire on a lava route).
     applyDistanceMorale(s, ui, from, to);
+    if (s.crusade) crusade(u, travelled.len);
     if (s.artifacts) artifacts.lavaRoute(s, ui, s.action_lava);
     snareOnVineArrival(s, ui, target_cells);
     u.moved_this_turn = true;
@@ -2175,6 +2351,8 @@ fn internAura(init: std.json.Value, s: *State, name: []const u8) !u8 {
     };
     switch (def.power_type) {
         st.PowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR, st.PowerType.POISON_ON_HIT, st.PowerType.ABSORB_DEBUFF, st.PowerType.DISABLE_FLY_MOVEMENT => {},
+        // batch 6a: War Anger (the Valkyrie's debuff aura) and Guiding Winds (the Dryad's buff aura)
+        st.PowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE, st.PowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE => {},
         // power 0 (calculateAuraPower is never called): the Range Null Field and Disguise
         st.PowerType.DISABLE_RANGE_ATTACK, st.PowerType.UNTARGETABLE => if (def.power != 0) {
             unsupported_name = name;
@@ -2223,6 +2401,14 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     s.spit = false;
     s.shot_hooks = false;
     s.spit_cfg = .{st.SpitConfig{}} ** 7;
+    s.b6_hooks = false;
+    s.war_anger = false;
+    s.hamstring = false;
+    s.crusade = false;
+    s.resurrection = false;
+    s.war_anger_def = st.NO_AURA;
+    s.hamstrung_laps = 3;
+    s.hamstrung_power = 30;
     var spit_holder = false;
     var poisons = false;
     var covenant = false;
@@ -2235,7 +2421,11 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         if (row.break_chance > 0) breaks = true;
     }
     const AB = st.AbilityId;
-    const blessing_mask = AB.luck_blessing.bit() | AB.sharpened_weapons_blessing.bit() | AB.arcane_ward_blessing.bit() | AB.rallying_volley_blessing.bit() | AB.sylvan_focus_blessing.bit() | AB.warding_mane_blessing.bit();
+    const blessing_mask = AB.luck_blessing.bit() | AB.sharpened_weapons_blessing.bit() | AB.arcane_ward_blessing.bit() | AB.rallying_volley_blessing.bit() | AB.sylvan_focus_blessing.bit() | AB.warding_mane_blessing.bit() |
+        AB.arrows_wingshield_blessing.bit() | AB.angelic_host_blessing.bit() | AB.tie_up_the_horses_blessing.bit() | AB.wolf_trail_blessing.bit();
+    // The batch-6a cards whose rows adjustBaseStats reads (the blessings, Wind Flow, Guiding Winds, Hamstring).
+    const b6_mask = AB.arrows_wingshield_blessing.bit() | AB.angelic_host_blessing.bit() | AB.tie_up_the_horses_blessing.bit() | AB.wolf_trail_blessing.bit() |
+        AB.wind_flow.bit() | AB.guiding_winds_aura.bit() | AB.hamstring.bit();
     var templates: [st.N_SUMMONS]?*const Unit = .{null} ** st.N_SUMMONS;
     if (s.summons) |sm| {
         for (0..st.N_SUMMONS) |k| {
@@ -2268,6 +2458,13 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         // Battle Roar's row is read where Blessing's is (the castable card holds a charge, the loop below sees it).
         if (mask & AB.battle_roar.bit() != 0) s.spell_hooks = true;
         if (mask & AB.spit_ball.bit() != 0) spit_holder = true;
+        if (mask & b6_mask != 0) s.b6_hooks = true;
+        if (mask & AB.war_anger_aura.bit() != 0) s.war_anger = true;
+        if (mask & AB.hamstring.bit() != 0) s.hamstring = true;
+        if (mask & AB.crusade.bit() != 0) s.crusade = true;
+        if (mask & AB.resurrection.bit() != 0) s.resurrection = true;
+        // Wind Flow's row is read where Battle Roar's is.
+        if (mask & AB.wind_flow.bit() != 0) s.spell_hooks = true;
         if (mask & (AB.limited_supply.bit() | AB.endless_quiver.bit() | AB.boost_health.bit()) != 0 or u.range_shots_mod != 0) s.shot_hooks = true;
         if (u.effects.find(.break_) != null) breaks = true;
         // A template's aura links hold SpellId values (loadSummons): only the battle's units index aura_defs.
@@ -2300,6 +2497,8 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.id == .warding_mane_blessing) s.blessings = true;
             if (b.id == .hidden) s.disguise = true;
             if (b.id == .disguise_aura) swaps = true;
+            if (b.id.isBatch6Stat()) s.b6_hooks = true;
+            if (b.id == .wind_flow) s.spell_hooks = true;
         }
         for (u.debuffs.items[0..u.debuffs.len]) |b| {
             // Gravechain's Gravebound outlives its holder's rows (Rime Charm's Quagmire is Spit Ball's, below).
@@ -2309,6 +2508,10 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.id == .vine_throw) s.spell_hooks = true;
             if (b.id == .range_null_field_aura) s.null_field = true;
             if (b.id == .visible) s.disguise = true;
+            if (b.id == .hamstrung) {
+                s.hamstring = true;
+                s.b6_hooks = true;
+            }
         }
         // Spells move only with Predatory Assimilation, so the board's books cover every later holder.
         if (u.n_book != 0 or u.n_spells != 0) s.spell_hooks = true;
@@ -2332,6 +2535,22 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
                 .loaded = true,
             };
         }
+    }
+    // Hamstrung (spells.json Death, recorded in spellConfigs when a unit holds Hamstring): the debuff Hamstring lands.
+    if (s.hamstring) {
+        const cfg = rec.get(rec.get(init, "spellConfigs"), "Hamstrung");
+        if (cfg != .null) {
+            s.hamstrung_laps = rec.num(rec.get(cfg, "laps"));
+            s.hamstrung_power = rec.num(rec.get(cfg, "power"));
+        } else {
+            for (all[0..n_all]) |u| {
+                if (u.ability_mask & AB.hamstring.bit() != 0) return error.MissingSpellConfig;
+            }
+        }
+    }
+    // The War Anger aura def (its range; the holder's attack mod reads the power its AuraEffect holds).
+    for (s.aura_defs[0..s.n_aura_defs], 0..) |d, k| {
+        if (d.buff == .war_anger_aura) s.war_anger_def = @intCast(k);
     }
     s.poison_laps = st.NUMBER_OF_LAPS_TOTAL;
     if (poisons) {
@@ -2402,6 +2621,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
 inline fn blessingRow(id: st.SpellId) bool {
     return switch (id) {
         .luck_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .sylvan_focus_blessing => true,
+        .arrows_wingshield_blessing, .angelic_host_blessing, .tie_up_the_horses_blessing, .wolf_trail_blessing => true,
         else => false,
     };
 }

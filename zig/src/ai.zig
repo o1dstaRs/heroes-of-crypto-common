@@ -1222,6 +1222,61 @@ pub fn fallbackTurn(c: *Ctx, out: *Decision) void {
     completeMoveWithMelee(c, mp, b, null, out);
 }
 
+/// advanceTowardEnemyAction (src/simulation/turn_recovery.ts), the recovery net's move: for a unit that can move and has
+/// a living enemy, getMovePath with the unit's own footprint, steps, flight, lava traversal and vine stride, then among
+/// the destinations (knownPaths order) other than its base cell where it can land, the first with the smallest
+/// Manhattan distance to an enemy's base cell; written as one move_unit into `out` (its path and targets live there).
+/// False when there is no such move. No draw (getMovePath draws nothing in scope).
+pub noinline fn advanceTowardEnemy(s: *State, ui: u8, out: *Decision) bool {
+    out.n = 0;
+    const u = &s.units[ui];
+    if (!u.canMove()) return false;
+    const enemy_team = if (u.team == Team.LEFT) Team.RIGHT else Team.LEFT;
+    var enemies: engine.UnitList = .{};
+    for (s.holderOrder()) |i| {
+        const e = &s.units[i];
+        if (e.team == enemy_team and !e.isDead()) enemies.push(i);
+    }
+    if (enemies.len == 0) return false;
+    const m = pathing.buildMatrix(s);
+    var mp: MovePath = undefined;
+    pathing.getMovePath(&m, .{
+        .start = engine.baseCell(u),
+        .max_steps = engine.getSteps(u),
+        .aggr = &s.grid.aggr[enemy_team],
+        .can_fly = engine.canFly(u),
+        .w = u.fw,
+        .h = u.fh,
+        .vines = if (s.fight.n_vines != 0) &s.fight.vine_cells else null,
+        .vine_stride = u.ability_mask & st.AbilityId.in_its_own_world.bit() != 0 and u.has(.in_its_own_world),
+        .made_of_fire = artifacts.canTraverseLava(s, u),
+    }, &mp);
+    if (mp.overflow) s.overflow = true;
+    if (mp.size() == 0) return false;
+    const base = engine.baseCell(u);
+    var best: ?*const Route = null;
+    var best_score: i32 = std.math.maxInt(i32);
+    for (mp.known()) |*r| {
+        if (sameCell(r.cell, base)) continue;
+        if (!canLandAt(s, ui, r.cell)) continue;
+        var score: i32 = std.math.maxInt(i32);
+        for (enemies.slice()) |e| {
+            const ec = engine.baseCell(&s.units[e]);
+            score = @min(score, @as(i32, @intCast(@abs(r.cell.x - ec.x) + @abs(r.cell.y - ec.y))));
+        }
+        if (score < best_score) {
+            best_score = score;
+            best = r;
+        }
+    }
+    const b = best orelse return false;
+    const targets = footprintForAnchor(u, b.cell);
+    for (targets.slice(), 0..) |t, i| out.targets[i] = t;
+    const len = mp.routeCells(b, &out.path);
+    out.push(.{ .move_unit = .{ .unit = ui, .path = out.path[0..len], .target_cells = out.targets[0..targets.len], .has_lava = b.has_lava } });
+    return true;
+}
+
 /// isRangeShotLandable: the aim edge and the ray with the shooter's Through Shot and Large Caliber / Area Throw flags,
 /// the ray's first hit a live legal enemy (Hidden only on a single-group ray; the live forced target), and a Cowardly
 /// shooter (not a Through Shot) no weaker than it.
@@ -1391,10 +1446,12 @@ pub fn decideWith(c: *Ctx, out: *Decision) void {
 
 pub const StepKind = enum { apply, advance, decide };
 
-/// Called after every engine call and decision, in recording order.
+/// Called after every engine call and decision, in recording order; `stall` (optional) when the loop ran forceStalledLap
+/// (between engine calls: the next advance follows it).
 pub const Observer = struct {
     ctx: *anyopaque,
     step: *const fn (ctx: *anyopaque, kind: StepKind, action: rec.Action, r0: u32, s: *const State, ok: bool, events: []const rec.Event) bool,
+    stall: ?*const fn (ctx: *anyopaque, s: *const State) void = null,
 };
 
 pub const EndReason = enum { elimination, turn_cap, stuck, observer_stop, unsupported };
@@ -1440,22 +1497,40 @@ fn decideStep(s: *State, ui: u8, decide: *const fn (*State, u8, *Decision) void,
 
 /// The runMatchInner loop after start_fight, from any point it reaches: a fight start, or a battle loaded mid-fight
 /// (snapshot.zig) at a decision boundary (`State.active` set, its decision not taken) or with no active unit.
+/// runMatch's advance(): at most holder + 2 advanceAfterNoActiveUnit calls until a unit is active, the fight ends, or a
+/// call changes nothing. True when the observer stopped the loop.
+fn advanceAttempts(s: *State, obs: ?Observer, events: *engine.Events) bool {
+    const attempts = @as(usize, s.n_holder) + 2;
+    var i: usize = 0;
+    while (i < attempts and !s.fight.finished and s.active < 0) : (i += 1) {
+        const r = call(s, .{ .advance = .{ .damage_dealt_this_lap = s.damage_lap == s.fight.lap } }, .advance, obs, events);
+        if (r.stop) return true;
+        if (s.fight.finished or s.active >= 0) break;
+        if (events.len == 0 and s.fight.up_next.len == 0) break;
+    }
+    return false;
+}
+
 pub fn continueMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *const fn (*State, u8, *Decision) void) EndReason {
     var events: engine.Events = .{};
     var decision: Decision = .{};
     while (!s.fight.finished) {
         if (s.fight.lap > max_laps) return .turn_cap;
         if (s.active < 0) {
-            const attempts = @as(usize, s.n_holder) + 2;
-            var i: usize = 0;
-            while (i < attempts and !s.fight.finished and s.active < 0) : (i += 1) {
-                const r = call(s, .{ .advance = .{ .damage_dealt_this_lap = s.damage_lap == s.fight.lap } }, .advance, obs, &events);
-                if (r.stop) return .observer_stop;
-                if (s.fight.finished or s.active >= 0) break;
-                if (events.len == 0 and s.fight.up_next.len == 0) break;
-            }
+            if (advanceAttempts(s, obs, &events)) return .observer_stop;
             if (s.fight.finished) break;
-            if (s.active < 0) return .stuck; // forceStalledLap is not ported (never seen)
+            if (s.active < 0) {
+                // The queue stalled with the fight live (a run of skipped activations): forceStalledLap marks every
+                // living unit as having made its turn, and a fresh advance() flips the lap.
+                if (engine.forceStalledLap(s)) {
+                    if (obs) |o| {
+                        if (o.stall) |f| f(o.ctx, s);
+                    }
+                    if (advanceAttempts(s, obs, &events)) return .observer_stop;
+                }
+                if (s.fight.finished) break;
+                if (s.active < 0) return .stuck;
+            }
             continue;
         }
         const ui: u8 = @intCast(s.active);
@@ -1475,13 +1550,25 @@ pub fn continueMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *cons
         }
         if (!s.fight.finished and s.active == ui and !did_something) {
             // The recovery net: a mindless unit decides once more with its pinned policy and applies what it can
-            // (runMatch's "v0.1_retry"); the generic advance / defend net for the others is not ported.
-            if (!mindless) return .unsupported;
-            if (decideStep(s, ui, decide, &decision, obs)) return .observer_stop;
-            for (decision.slice()) |a| {
-                if (s.fight.finished or s.active != ui) break;
-                const r = call(s, a, .apply, obs, &events);
-                if (r.stop) return .observer_stop;
+            // (runMatch's "v0.1_retry"); any other unit takes advanceTowardEnemyAction, else defends.
+            if (mindless) {
+                if (decideStep(s, ui, decide, &decision, obs)) return .observer_stop;
+                for (decision.slice()) |a| {
+                    if (s.fight.finished or s.active != ui) break;
+                    const r = call(s, a, .apply, obs, &events);
+                    if (r.stop) return .observer_stop;
+                }
+            } else {
+                var advanced = false;
+                if (advanceTowardEnemy(s, ui, &decision)) {
+                    const r = call(s, decision.actions[0], .apply, obs, &events);
+                    if (r.stop) return .observer_stop;
+                    advanced = r.ok;
+                }
+                if (!advanced and !s.fight.finished and s.active == ui) {
+                    const r = call(s, .{ .defend_turn = .{ .unit = ui } }, .apply, obs, &events);
+                    if (r.stop) return .observer_stop;
+                }
             }
         }
         if (!s.fight.finished and s.active == ui) {

@@ -74,11 +74,12 @@ fn spellsMatch(list: []const st.AppliedSpell, names: []const u8, laps: []const u
 
 /// Compares the "x;y,;,..." column (each buff's first and second spell property) with the aura rows' source cells
 /// and the augments' stored properties (Sniper "27;70", the others ";"). Other rows are skipped: a team blessing
-/// stores its power there (`applyBuff(buff, power)`), compared as its power.
-fn sourcesMatch(list: *const st.SpellList, srcs: []const u8) bool {
+/// stores its power there (`applyBuff(buff, power)`), compared as its power. TypeScript reads the column off the buff
+/// objects, so a revive's orphan augment rows (`skip`: the list's leading rows without an object) are not in it.
+fn sourcesMatch(list: *const st.SpellList, skip: u8, srcs: []const u8) bool {
     var it = std.mem.splitScalar(u8, srcs, ',');
-    var i: usize = 0;
-    if (srcs.len == 0) return list.len == 0;
+    var i: usize = skip;
+    if (srcs.len == 0) return list.len == skip;
     while (it.next()) |entry| : (i += 1) {
         if (i >= list.len) return false;
         const b = list.items[i];
@@ -304,7 +305,7 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
             return false;
         }
         if (column(row, 46)) |srcs| {
-            if (!sourcesMatch(&u.buffs, srcs)) {
+            if (!sourcesMatch(&u.buffs, u.aug_orphans, srcs)) {
                 m.set("unit {d} buffs_sources: ts '{s}'", .{ idx, srcs });
                 return false;
             }
@@ -541,6 +542,19 @@ pub const NativeCheck = struct {
     failed: ?[]const u8 = null,
     mismatch: Mismatch = .{},
     zig_action: rec.Action = .start_fight,
+    /// The uids Zig's forceStalledLap just marked (holder order), checked against the next recorded step's `stall`.
+    stalled: [st.MAX_UNITS]u8 = undefined,
+    n_stalled: u8 = 0,
+
+    pub fn stall(ctx: *anyopaque, s: *const st.State) void {
+        const self: *NativeCheck = @ptrCast(@alignCast(ctx));
+        self.n_stalled = 0;
+        for (s.holderOrder()) |i| {
+            if (s.units[i].isDead()) continue;
+            self.stalled[self.n_stalled] = s.units[i].uid;
+            self.n_stalled += 1;
+        }
+    }
 
     pub fn step(ctx: *anyopaque, kind: ai.StepKind, action: rec.Action, r0: u32, s: *const st.State, ok: bool, events: []const rec.Event) bool {
         const self: *NativeCheck = @ptrCast(@alignCast(ctx));
@@ -550,6 +564,13 @@ pub const NativeCheck = struct {
             return false;
         }
         const want = self.game.steps[self.next];
+        // forceStalledLap: Zig's marks (since the previous step) must be the recording's.
+        const stalled = self.stalled[0..self.n_stalled];
+        self.n_stalled = 0;
+        if (!std.mem.eql(u8, stalled, want.stall)) {
+            self.failed = "forceStalledLap differs";
+            return false;
+        }
         const want_kind: ai.StepKind = switch (want.action) {
             .advance => .advance,
             .decide => .decide,

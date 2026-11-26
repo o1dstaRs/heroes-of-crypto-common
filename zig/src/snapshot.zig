@@ -436,7 +436,6 @@ fn checkUnitScope(uv: Value, fields: Value, props: Value, why: *Why) Error!void 
     }
     try requireEmpty(get(fields, "waterShieldSpent"), why, "Water Shield spent");
     try requireEmpty(get(fields, "lastFuseFatalHit"), why, "Last Fuse");
-    try requireEmpty(get(fields, "currentAttackModIncrease"), why, "attack mod increase");
 }
 
 /// The unit's spellbook: the raw entries (props.spells "<Faction>:<Name>", one per charge) and the parsed Spell objects
@@ -518,10 +517,21 @@ fn loadLists(u: *Unit, fields: Value, props: Value, why: *Why) Error!void {
         .{ "debuffs", u.debuffs.items[0..u.debuffs.len] },
         .{ "effects", u.effects.items[0..u.effects.len] },
     };
+    u.aug_orphans = 0;
     for (lists, 0..) |l, li| {
         const objects = try items(get(fields, l[0]), why, l[0]);
-        if (objects.len != l[1].len) return why.unsupported("{s}: {d} objects for {d} applied names", .{ l[0], objects.len, l[1].len });
-        for (objects, l[1], 0..) |o, a, k| {
+        // A Resurrection revive (deleteAllBuffs) keeps the augment display rows without their objects: a leading run of
+        // augment names with no object is the unit's orphan rows; the rest match the objects one to one.
+        var skip: usize = 0;
+        if (li == 0 and objects.len < l[1].len) {
+            skip = l[1].len - objects.len;
+            for (l[1][0..skip]) |a| {
+                if (!a.id.isAugment()) return why.unsupported("buffs: {d} objects for {d} applied names", .{ objects.len, l[1].len });
+            }
+            u.aug_orphans = @intCast(skip);
+        }
+        if (objects.len != l[1].len - skip) return why.unsupported("{s}: {d} objects for {d} applied names", .{ l[0], objects.len, l[1].len });
+        for (objects, l[1][skip..], skip..) |o, a, k| {
             // AppliedSpell {name, power, lapsRemaining}; Effect {effectProperties: {name, laps, power, stacks}}.
             const ep = get(o, "effectProperties");
             const props_obj = if (ep == .object) ep else o;
@@ -558,7 +568,7 @@ fn loadLists(u: *Unit, fields: Value, props: Value, why: *Why) Error!void {
     // engine.loadBuffSources.
     const objects = try items(get(fields, "buffs"), why, "buffs");
     for (objects, 0..) |o, i| {
-        const b = &u.buffs.items[i];
+        const b = &u.buffs.items[u.aug_orphans + i];
         if (!b.id.isAugment() and b.laps != st.LAPS_AURA and !artifacts.storesProperties(b.id)) continue;
         b.src_x = try storedProperty(get(o, "firstSpellProperty"), why);
         b.src_y = try storedProperty(get(o, "secondSpellProperty"), why);
@@ -693,6 +703,10 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
     u.syn_power = s.setup[u.team].ability_power;
     // Unit.maxRangeShots (the constructor's range_shots, Limited Supply's base): hidden, exported as a unit field.
     u.max_range_shots = try field(fields, "maxRangeShots", why);
+    // War Anger's hidden state: currentAttackModIncrease (what the last increaseAttackMod added; 0 or undefined for
+    // a non-holder).
+    const inc = get(fields, "currentAttackModIncrease");
+    u.attack_mod_increase = if (isUndefined(inc)) 0 else try number(inc, why, "currentAttackModIncrease");
     const rv = get(props, "rallying_volley_granted");
     u.rallying_volley_granted = if (isUndefined(rv)) 0 else try number(rv, why, "rallying_volley_granted");
     const web = get(props, "web_movement_locked");
@@ -715,7 +729,13 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
         else => why.malformed("auras: {s}", .{@errorName(err)}),
     };
     const aura_names = get(props, "aura_effects");
-    try checkNames(try items(get(fields, "auraEffects"), why, "auraEffects"), if (aura_names == .array) aura_names.array.items else &.{}, "auraEffectProperties", why);
+    const aura_objects = try items(get(fields, "auraEffects"), why, "auraEffects");
+    try checkNames(aura_objects, if (aura_names == .array) aura_names.array.items else &.{}, "auraEffectProperties", why);
+    // The power the War Anger AuraEffect holds now (the last aura refresh that iterated it), read by the attack mod.
+    for (aura_objects) |o| {
+        const ap = get(o, "auraEffectProperties");
+        if (std.mem.eql(u8, try string(get(ap, "name"), why, "auraEffectProperties"), "War Anger")) u.war_anger_power = try number(get(ap, "power"), why, "War Anger power");
+    }
 
     const target = get(props, "target");
     if (target == .string and target.string.len > 0) u.target = @intCast(try requireSlot(s, ids, target.string, why, "target"));

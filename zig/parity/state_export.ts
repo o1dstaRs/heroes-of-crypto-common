@@ -284,6 +284,10 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
     let madeOfFire = false;
     // Rime Charm and Gravechain apply the Death "Quagmire" and "Gravebound" debuffs.
     let riders = false;
+    // Batch 6a: Hamstring applies the Death "Hamstrung" debuff; a Wind Flow carrier's stat refresh reads the System
+    // "Wind Flow" config (the caster's Spell object may be spent or gone).
+    let hamstring = false;
+    let windFlow = false;
     for (const unit of unitsHolder.getAllUnits().values()) {
         const props = unit.getUnitProperties();
         addProps(props);
@@ -296,6 +300,8 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
             (props.applied_debuffs ?? []).some((name: string) => name === "Quagmire" || name === "Gravebound")
         )
             riders = true;
+        if ((props.abilities ?? []).includes("Hamstring")) hamstring = true;
+        if ((props.applied_buffs ?? []).includes("Wind Flow")) windFlow = true;
         if ((props.abilities ?? []).includes("Infest")) summons = true;
         if ((props.spells ?? []).some((entry: string) => entry.includes(":Summon "))) spellSummons = true;
         if (unit.summoned && SPELL_SUMMON_CREATURES.includes(unit.getName())) spellSummons = true;
@@ -347,6 +353,8 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
             spellConfigs[name] = plainConfig(getSpellConfig(faction, name));
     }
     if (madeOfFire) spellConfigs["Made of Fire"] = plainConfig(getSpellConfig("System", "Made of Fire"));
+    if (hamstring) spellConfigs.Hamstrung = plainConfig(getSpellConfig("Death", "Hamstrung"));
+    if (windFlow) spellConfigs["Wind Flow"] = plainConfig(getSpellConfig("System", "Wind Flow"));
     if (riders)
         for (const name of ["Quagmire", "Gravebound"]) spellConfigs[name] = plainConfig(getSpellConfig("Death", name));
     return {

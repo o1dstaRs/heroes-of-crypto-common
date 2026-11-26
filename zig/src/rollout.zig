@@ -11,8 +11,9 @@
 //! N unit turns; lap: until the lap flips, at most 64; reply: until the opponent has played once, at most 12; leaf:
 //! none), and score the leaf as P(win) for the acting team (`material`, `v1` or `v2`, with `exactTerminal`). Summons
 //! keep counting across the rollouts of one call (TypeScript restores neither runMatch's createSummonedUnit counter nor
-//! lib.ts deterministicUuidSequence per rollout). Not ported (the call fails rather than guess): the research logit
-//! adjustments, the recovery net (advanceTowardEnemyAction), forceStalledLap and an opponent model. See zig/BRIDGE.md.
+//! lib.ts deterministicUuidSequence per rollout). A policy turn that lands nothing takes the recovery net
+//! (advanceTowardEnemyAction, else defend), and a stalled queue forceStalledLap. Not ported (the call fails rather than
+//! guess): the research logit adjustments and an opponent model. See zig/BRIDGE.md.
 
 const std = @import("std");
 const rec = @import("recording.zig");
@@ -54,14 +55,14 @@ pub fn policyFor(version: []const u8) ?DecideFn {
     return null;
 }
 
-/// The boards the v0.8 port covers. Null when `s` is one, else what puts it outside. No batch-5 card or debuff and no
-/// spell outside the list can appear inside a rollout from such a root (steals, Infest and summons only move or raise
-/// cards of batches 1-4), so checking the root covers every state of the call.
+/// The boards the v0.8 port covers. Null when `s` is one, else what puts it outside. No batch-6a card or row and no spell
+/// outside the list can appear inside a rollout from such a root (steals, Infest and summons only move or raise cards
+/// already on the board), so checking the root covers every state of the call.
 pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 {
     _ = ident; // the src/v08 gap checks that named creatures are gone (common 6e6aff54, d5fddea9)
-    // src/v08 covers the abilities of batches 1-4 (common 4f5152ba, 2346a159), the wave-1 casts and the batch-4
-    // castables (bcf722a4, 66e72e9e), vines included. A board where a unit holds any other spell stays out of scope, and
-    // so does batch 5 (no src/v08 reader yet).
+    // src/v08 covers the abilities of batches 1-5 (common 4f5152ba, 2346a159, 0809cc1d, dbbcb452), the wave-1 casts and
+    // the batch-4 castables (bcf722a4, 66e72e9e), vines included. A board where a unit holds any other spell stays out of
+    // scope.
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
         for (u.book[0..u.n_book]) |e| {
@@ -70,18 +71,25 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
         for (u.spells[0..u.n_spells]) |b| {
             if (!v08Castable(b.spell)) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
         }
-        // Batch 5 is not in src/v08 yet: the shooters' and throwers' cards (a stolen Endless Quiver included) and Spit
-        // Ball's debuffs.
-        if (u.ability_mask & st.AbilityId.BATCH5_MASK != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-5 ability", .{i}) catch "batch 5";
-        for (u.debuffs.items[0..u.debuffs.len]) |d| {
-            if (d.id.isSpitBall()) return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, d.id.name() }) catch "batch 5";
-        }
+        // Batch 6a is not in src/v08 yet: its cards (stolen ones too), its rows (a Hamstrung flyer, Blindness,
+        // Paralysis, Wind Flow and the blessings outlive their source) and a revive's orphan augment rows.
+        if (u.ability_mask & st.AbilityId.BATCH6A_MASK != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-6a ability", .{i}) catch "batch 6a";
+        if (u.aug_orphans != 0) return std.fmt.bufPrint(buf, "slot {d} was revived", .{i}) catch "batch 6a";
+        if (batch6aRow(u)) |id| return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 6a";
     }
     // Artifacts: the engine plays the stat artifacts (artifacts.zig), but src/v08 is not checked on them yet (lv8's
     // explicit-rate damage bound has no Warlord's Edge re-price), so a v0.8 seat stays out of scope with any row.
     if (s.artifacts) return "artifact rows (src/v08 not checked on artifacts)";
     // Smoke halves shots through it; src/v08 does not read the store yet.
     if (s.fight.n_smoke != 0) return "smoke clouds on the board";
+    return null;
+}
+
+/// A batch-6a row on the unit (a debuff, an effect or a buff), if any.
+fn batch6aRow(u: *const st.Unit) ?st.SpellId {
+    for (u.debuffs.items[0..u.debuffs.len]) |d| if (d.id == .hamstrung or d.id == .war_anger_aura) return d.id;
+    for (u.effects.items[0..u.effects.len]) |e| if (e.id == .blindness or e.id == .paralysis) return e.id;
+    for (u.buffs.items[0..u.buffs.len]) |b| if (b.id.isBatch6Stat()) return b.id;
     return null;
 }
 
@@ -179,6 +187,11 @@ pub const Request = struct {
     /// the A19 profile): the acting team's last stack, an Abomination facing a lone enemy Abomination it outlasts under
     /// Armageddon, defends instead of asking its policy. Needs `identity`.
     sole_abomination_defend: bool = false,
+    /// A test hook for the recovery net (`testDropDecisions` k, 0 = off): a policy decision whose index n in its rollout
+    /// (0, 1, ... over the policy calls, the sole-Abomination defend not counted) has Math.imul(n + 1, 0x85ebca6b) >>> 0
+    /// divisible by k is computed and then replaced by nothing, so recoverNoopTurn plays that turn. A TypeScript oracle
+    /// wraps the rollout policy's decideTurn the same way.
+    drop_decisions: u32 = 0,
     /// Required by the v0.8 policy, the antithetic stream and the sole-Abomination rule.
     identity: ?*const Identity = null,
     /// v0.7's immutable army profile (StrategyV0_7.primeArmyProfile at placement): MELEE_MAGIC stacks per team at the
@@ -225,10 +238,6 @@ pub const Control = struct {
 };
 
 pub const Error = error{
-    /// A unit's policy landed nothing: the recovery net (advanceTowardEnemyAction, then defend) is not ported.
-    UnsupportedRecovery,
-    /// The turn queue stalled with living units: forceStalledLap is not ported.
-    UnsupportedStall,
     /// A unit without a registered policy had to play, or its policy reached a pass the port lacks.
     UnsupportedPolicy,
     /// A capacity of the port was exceeded (State.overflow: unit slots, ids, list lengths, a summon without its id
@@ -422,15 +431,25 @@ const Sim = struct {
 const Session = struct {
     tables: Tables = .{},
     chance: ActorChance = .{},
+    /// The policy calls of this rollout (Request.drop_decisions).
+    decisions: u32 = 0,
 };
 
 inline fn productive(a: rec.Action) bool {
     return a != .select_attack_type;
 }
 
-/// SearchDriver.advanceQueue, then simAdvance's forceStalledLap branch (refused: not ported, unless no unit lives,
-/// where forceStalledLap returns false and the rollout ends at the leaf).
+/// SearchDriver.simAdvance: advanceQueue, then when no unit is active and the fight is live, forceStalledLap (every
+/// living unit marked as having made its turn) and advanceQueue again (the lap flips). With no living unit nothing is
+/// marked and the rollout ends at the leaf.
 fn simAdvance(s: *State, sim: *Sim) Error!void {
+    advanceQueue(s, sim);
+    if (!sim.finished and s.active < 0 and engine.forceStalledLap(s)) advanceQueue(s, sim);
+}
+
+/// SearchDriver.advanceQueue: at most holder + 2 advanceAfterNoActiveUnit calls until a unit is active, the fight ends,
+/// or a call changes nothing.
+fn advanceQueue(s: *State, sim: *Sim) void {
     const attempts = @as(usize, s.n_holder) + 2;
     var i: usize = 0;
     while (i < attempts and !sim.finished and s.active < 0) : (i += 1) {
@@ -438,10 +457,6 @@ fn simAdvance(s: *State, sim: *Sim) Error!void {
         if (sim.finished) return;
         if (s.active >= 0) return;
         if (sim.events.len == 0 and s.fight.up_next.len == 0) break;
-    }
-    if (sim.finished or s.active >= 0) return;
-    for (s.holderOrder()) |slot| {
-        if (!s.units[slot].isDead()) return error.UnsupportedStall;
     }
 }
 
@@ -510,6 +525,10 @@ fn simPlayTurn(s: *State, ui: u8, req: *const Request, sim: *Sim, ses: *Session,
         const decide = unitPolicy(s, ui, req) orelse return error.UnsupportedPolicy;
         if (decide == v08policy.decideV08) ses.tables.sync(s);
         if (!decide(s, ui, &decision)) return error.UnsupportedPolicy;
+        if (req.drop_decisions != 0) {
+            ses.decisions += 1;
+            if ((ses.decisions *% 0x85ebca6b) % req.drop_decisions == 0) decision.n = 0;
+        }
     }
     if (trace) |t| t.f(t.ctx, .decide, s, .{ .decide = .{ .unit = ui, .out = decision.slice() } }, true);
     var did = false;
@@ -517,10 +536,19 @@ fn simPlayTurn(s: *State, ui: u8, req: *const Request, sim: *Sim, ses: *Session,
         if (sim.finished) break;
         if (sim.apply(s, a) and productive(a)) did = true;
     }
-    if (!sim.finished and s.active == ui and !did) return error.UnsupportedRecovery;
+    if (!sim.finished and s.active == ui and !did) recoverNoopTurn(s, ui, sim);
     if (!sim.finished and s.active == ui) {
         if (!sim.apply(s, .{ .end_turn = .{ .unit = ui, .reason = .manual } })) s.active = -1;
     }
+}
+
+/// SearchDriver.recoverNoopTurn, for every unit (the mindless one too: no retry here): advanceTowardEnemyAction when it
+/// lands, else defend_turn.
+fn recoverNoopTurn(s: *State, ui: u8, sim: *Sim) void {
+    var decision: ai.Decision = .{};
+    var advanced = false;
+    if (ai.advanceTowardEnemy(s, ui, &decision) and !sim.finished and s.active == ui) advanced = sim.apply(s, decision.actions[0]);
+    if (!advanced and !sim.finished and s.active == ui) _ = sim.apply(s, .{ .defend_turn = .{ .unit = ui } });
 }
 
 extern "c" fn exp(x: f64) f64;
@@ -592,6 +620,7 @@ fn rolloutIn(s: *State, req: *const Request, cand: *const Candidate, r: u32, ctl
     s.rng = Rng.init(plainSeed(req.seed_base, r));
     if (req.chance == .antithetic) ses.chance.begin(s, req.identity.?, toUint32(req.seed_base), r);
     ses.tables.reset();
+    ses.decisions = 0;
     var sim: Sim = .{};
     const actor = req.actor;
     s.active = @intCast(actor);

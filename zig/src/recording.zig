@@ -57,6 +57,9 @@ pub const Step = struct {
     /// A decide step of a mindless ("AI Driven") unit recorded under another RECORD_VERSION (`v: "v0.1"`): runMatch
     /// decided it with StrategyV0_1 whatever the seat's version.
     mindless: bool = false,
+    /// `stall`: the uids runMatch's forceStalledLap marked as having made their turn just before this step (between
+    /// engine calls, so a replay applies them first).
+    stall: []const u8 = &.{},
 };
 
 pub const Game = struct {
@@ -290,7 +293,15 @@ pub fn parseGameValue(arena: std.mem.Allocator, root: std.json.Value, keep_diges
             for (out_raw, 0..) |o, j| out[j] = try parseAction(arena, ids, "apply", o);
             action.decide.out = out;
         }
+        const stall_raw = get(s, "stall");
+        var stall: []const u8 = &.{};
+        if (stall_raw == .array) {
+            const list = try arena.alloc(u8, stall_raw.array.items.len);
+            for (stall_raw.array.items, 0..) |x, j| list[j] = try unitArg(ids, x);
+            stall = list;
+        }
         steps[i] = .{
+            .stall = stall,
             .action = action,
             .r0 = @intCast(int(get(s, "r0"))),
             .r1 = @intCast(int(get(s, "r1"))),

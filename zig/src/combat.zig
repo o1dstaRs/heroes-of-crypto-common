@@ -165,7 +165,6 @@ pub const Died = struct {
     }
 };
 
-/// processOneInTheFieldAbility: the reply is spent.
 // =====================================================================================================================
 // Fireforged Sword (abilities/fireforged_sword_ability.ts): the Wandering Mage's buff burns after its holder's hits
 // =====================================================================================================================
@@ -251,7 +250,9 @@ fn swordOnVictims(s: *State, from_i: u8, hits: *const SwordHits, died: *Died, de
     return plus;
 }
 
+/// processOneInTheFieldAbility: the reply is spent unless the unit holds One in the Field (Break-aware, read now).
 inline fn spendReply(s: *State, ui: u8) void {
+    if (s.units[ui].ability_mask & st.AbilityId.one_in_the_field.bit() != 0 and s.units[ui].has(.one_in_the_field)) return;
     s.fight.replied |= engine.unitBit(ui);
     s.units[ui].responded = true;
 }
@@ -277,6 +278,8 @@ fn cleanupDeadUnits(s: *State, died: *const Died, events: *Events, attribution: 
     for (died.items[0..died.len]) |ui| {
         const u = &s.units[ui];
         if (!u.in_holder or !u.isDead()) continue;
+        // deleteUnitById(id, true): a Resurrection holder revives in place (no unit_destroyed, blast or Infest summon).
+        if (engine.tryRevive(s, ui)) continue;
         const corpse = engine.unitCells(u);
         const level = u.level;
         const anchor = engine.baseCell(u);
@@ -307,6 +310,8 @@ pub fn cleanupSpellDeaths(s: *State, died: *const Died, killed: *const Died, kil
     for (died.items[0..died.len]) |ui| {
         const u = &s.units[ui];
         if (!u.in_holder or !u.isDead()) continue;
+        // deleteUnitById(id, true): a Resurrection holder revives in place (no unit_destroyed, blast or Infest summon).
+        if (engine.tryRevive(s, ui)) continue;
         const corpse = engine.unitCells(u);
         const level = u.level;
         const anchor = engine.baseCell(u);
@@ -356,7 +361,9 @@ fn applyStrikeMoveModifiers(s: *State, ui: u8, path: []const Cell) bool {
     const last = travelled[travelled.len - 1];
     const to = engine.positionForCell(@floatFromInt(last.x), @floatFromInt(last.y));
     engine.applyDistanceMorale(s, ui, .{ u.pos_x, u.pos_y }, to);
-    // applyTravelledDistanceModifier (no Crusade in scope), then applyLavaWaterModifier (Made of Fire on a lava route).
+    // applyTravelledDistanceModifier (Crusade over the travelled route), then applyLavaWaterModifier (Made of Fire on a
+    // lava route).
+    if (s.crusade) engine.crusade(u, travelled.len);
     if (s.artifacts) artifacts.lavaRoute(s, ui, s.action_lava);
     return true;
 }
@@ -367,7 +374,7 @@ fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, pat
     const att = &s.units[ai];
     // A stationary strike passes the occupancy checks on the unit's own cells and setPosition writes the same value.
     if (stationary) return;
-    // canMove(): only the Web lock in scope (attack_not_available).
+    // canMove(): the Web lock or Paralysis (attack_not_available).
     if (!att.canMove()) return error.Rejected;
     const has_route = path.len != 0; // currentActiveKnownPaths.get(attackFrom key)?.length
     if (engine.isSmall(att)) {
@@ -435,6 +442,8 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
         rapid_cells = @floatFromInt(path.len);
         ability_multiplier = abilities.rapidCharge(att, rapid_cells);
     }
+    // Paralysis (the attacker's) cuts after Rapid Charge, before Backstab.
+    if (abilities.paralysisFactor(att)) |pf| ability_multiplier *= pf;
     ability_multiplier *= abilities.positionMultiplierOn(att, from, engine.baseCell(tgt), tgt.fw, tgt.fh, s.fight.side_oriented);
 
     var died: Died = .{};
@@ -443,7 +452,11 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     var target_plus: f64 = 0;
 
     const missed = missRoll(s, att, tgt); // M1
-    att.attack_mod = @max(0, att.attack_mod); // cleanupAttackModIncrease (+ getUnitAuraAttackMod = 0)
+    // cleanupAttackModIncrease, then increaseAttackMod(getUnitAuraAttackMod) around the body after the move prefix.
+    if (s.war_anger) {
+        att.attack_mod = @max(0, att.attack_mod - att.attack_mod_increase);
+        engine.increaseAttackMod(att, engine.warAngerMod(s, ai));
+    } else att.attack_mod = @max(0, att.attack_mod);
     const damage_from_attack = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.MELEE, 1, ability_multiplier)) +
         abilities.penetratingBite(att, tgt); // M2: drawn even when a spin replaces the blow
 
@@ -585,7 +598,10 @@ fn meleeRiders(s: *State, from_i: u8, to_i: u8, damage: f64, assimilation_poison
         abilities.terrifyingGaze(s, from_i, to_i, from_i);
         abilities.deepWounds(s, from_i, to_i, from_i);
         abilities.pegasusLight(s, from_i, to_i, from_i);
+        abilities.paralysis(s, from_i, to_i, from_i);
         abilities.shatterArmor(s, from_i, to_i, from_i);
+        // Hamstring rides the blow only (not the second punch).
+        if (assimilation_poison) abilities.hamstring(s, from_i, to_i, from_i);
     }
     abilities.poisonAura(s, from_i, to_i, damage);
     if (assimilation_poison and s.units[from_i].ability_mask != 0) abilities.assimilationPoison(s, from_i, to_i, damage);
@@ -593,6 +609,8 @@ fn meleeRiders(s: *State, from_i: u8, to_i: u8, damage: f64, assimilation_poison
         artifacts.rimeCharm(s, from_i, to_i, from_i);
         artifacts.gravechain(s, from_i, to_i, from_i, gc);
     }
+    // Blindness is the last rider of the blow and of the second punch.
+    if (s.units[from_i].ability_mask != 0) abilities.blindness(s, from_i, to_i, from_i);
 }
 
 /// canUnitRespondToMelee (src/handlers/melee_response.ts): an Aggr'd target answers only its forced attacker (the raw
@@ -602,7 +620,7 @@ fn canRespondToMelee(s: *const State, att: *const Unit, ai: u8, ti: u8) bool {
     const tgt = &s.units[ti];
     if (abilities.skipsResponse(att)) return false;
     if (tgt.has(.no_melee) or engine.cowardBarred(s, tgt, att)) return false;
-    if (tgt.isStunned()) return false; // canRespond: a Stun blocks the reply without spending it
+    if (tgt.isSkipping()) return false; // canRespond: a Stun or Blindness blocks the reply without spending it
     if (tgt.target >= 0 and tgt.target != @as(i8, @intCast(ai))) return false;
     if (s.forbids(tgt, att.uid)) return false; // a frightened unit never answers its gazer (nothing spent)
     return !tgt.responded and s.fight.replied & engine.unitBit(ti) == 0;
@@ -629,7 +647,9 @@ fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell, died: *Died, decrease: *
     // The responder's Fireforged Sword over its own sweeps (attack_handler.ts:2964).
     if (sweep) |w| target_plus.* += swordOnVictims(s, ti, w, died, decrease);
     if (!missed and !spin and !att.isDead()) {
-        const ability_multiplier = abilities.positionMultiplierOn(tgt, tgt_base, from, att.fw, att.fh, s.fight.side_oriented);
+        var ability_multiplier = abilities.positionMultiplierOn(tgt, tgt_base, from, att.fw, att.fh, s.fight.side_oriented);
+        // Paralysis (the responder's) after Backstab.
+        if (abilities.paralysisFactor(tgt)) |pf| ability_multiplier *= pf;
         const damage_from_response = luckyStrike(s, tgt, calculateAttackDamage(s, tgt, att, AT.MELEE, 1, ability_multiplier)) +
             abilities.penetratingBite(tgt, att); // M4
         const absorbed = damage_from_response > 0 and abilities.absorbs(s, att);
@@ -655,9 +675,11 @@ fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell, died: *Died, decrease: *
             if (tgt.ability_mask != 0) {
                 abilities.assimilationPoison(s, ti, ai, damage_from_response);
                 abilities.pegasusLight(s, ti, ai, ai);
+                abilities.paralysis(s, ti, ai, ai);
             }
             artifacts.rimeCharm(s, ti, ai, ai);
             artifacts.gravechain(s, ti, ai, ai, &gc_response);
+            if (tgt.ability_mask != 0) abilities.blindness(s, ti, ai, ai);
         }
     }
     spendReply(s, ti);
@@ -671,11 +693,13 @@ fn doublePunch(s: *State, ai: u8, ti: u8) Punch {
     const att = &s.units[ai];
     const tgt = &s.units[ti];
     const a = att.ability(.double_punch) orelse return .{};
-    if (att.isDead() or att.isStunned() or tgt.isDead()) return .{}; // a stunned puncher (isSkippingThisTurn) stops
+    if (att.isDead() or att.isSkipping() or tgt.isDead()) return .{}; // a stunned or blinded puncher (isSkippingThisTurn) stops
     if (att.target >= 0 and att.target != @as(i8, @intCast(ti))) return .{};
     if (missRoll(s, att, tgt)) return .{ .applied = true, .missed = true };
     // withDualStrikeCharm: the Dual Strike Charm's +power % on the second punch only.
-    const ability_multiplier = if (s.artifacts) artifacts.dualStrike(att, abilities.abilityMultiplier(att, a)) else abilities.abilityMultiplier(att, a);
+    var ability_multiplier = if (s.artifacts) artifacts.dualStrike(att, abilities.abilityMultiplier(att, a)) else abilities.abilityMultiplier(att, a);
+    // Paralysis (the puncher's: a response may just have landed it) after the Dual Strike Charm.
+    if (abilities.paralysisFactor(att)) |pf| ability_multiplier *= pf;
     const damage = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.MELEE, 1, ability_multiplier)) +
         abilities.penetratingBite(att, tgt);
     return .{ .applied = true, .damage = damage, .morale = abilities.pegasusLightMorale(tgt) };
@@ -738,6 +762,8 @@ fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: 
         if (engine.cowardBarred(s, from, enemy)) continue;
         if (missed) continue;
         var ability_multiplier = abilities.abilityMultiplier(from, a) * common;
+        // Paralysis (the spinner's), before the Deep Wounds fold.
+        if (abilities.paralysisFactor(from)) |pf| ability_multiplier *= pf;
         // Deep Wounds is folded in here AND in the damage chain: the spin squares it.
         if (enemy.effects.len != 0) {
             if (enemy.effects.get(.deep_wounds)) |dw| {
@@ -769,7 +795,8 @@ fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: 
             abilities.aggr(s, from_i, ei, active_i);
             abilities.deepWounds(s, from_i, ei, active_i);
             abilities.pegasusLight(s, from_i, ei, active_i);
-            if (is_attack) abilities.shatterArmor(s, from_i, ei, active_i);
+            abilities.paralysis(s, from_i, ei, active_i);
+            if (is_attack) abilities.shatterArmor(s, from_i, ei, active_i) else abilities.blindness(s, from_i, ei, active_i);
             if (enemy.isDead()) dead.push(ei); // a Petrifying Gaze kill
         }
     }
@@ -834,7 +861,8 @@ fn strikeSkewerTarget(s: *State, from_i: u8, vi: u8, is_attack: bool, died: *Die
         abilities.aggr(s, from_i, vi, from_i); // A3
         abilities.deepWounds(s, from_i, vi, from_i);
         abilities.pegasusLight(s, from_i, vi, from_i);
-        if (is_attack) abilities.shatterArmor(s, from_i, vi, from_i);
+        abilities.paralysis(s, from_i, vi, from_i); // the skewer's own damage is never cut
+        if (is_attack) abilities.shatterArmor(s, from_i, vi, from_i) else abilities.blindness(s, from_i, vi, from_i);
     }
     if (next.isDead()) {
         died.push(vi);
@@ -1004,6 +1032,7 @@ pub fn evaluateRangeFlags(s: *const State, from_ui: u8, fx: f64, fy: f64, tx_in:
         const divisor = rangeDivisor(from, h.x, h.y, fx, fy);
         hits.divisors[hits.len] = if (smoked) @min(8, divisor * 2) else divisor;
         hits.len += 1;
+        if (through and wingshieldOwner(u)) break; // a Through Shot's ray ends with an Arrows Wingshield owner
     }
     return hits;
 }
@@ -1203,7 +1232,13 @@ pub fn evaluateGroups(g: *Groups, s: *const State, from_ui: u8, fx: f64, fy: f64
         const begin = g.n_members;
         g.members[g.n_members] = ui;
         g.n_members += 1;
-        if (rings) {
+        // An Arrows Wingshield owner takes the shot alone: no splash ring (its blast is its own cell), and a Through
+        // Shot's ray ends with it.
+        const owner = wingshieldOwner(u);
+        if (rings and owner) {
+            g.cells[g.n_cells] = h.cell;
+            g.n_cells += 1;
+        } else if (rings) {
             const ring = cellsAroundCell(h.cell);
             for (ring.slice()) |c| {
                 const ro = s.grid.board[@intCast(c.x)][@intCast(c.y)];
@@ -1228,7 +1263,14 @@ pub fn evaluateGroups(g: *Groups, s: *const State, from_ui: u8, fx: f64, fy: f64
         g.entry[g.n] = h.cell;
         g.n += 1;
         g.start[g.n] = g.n_members;
+        if (through and owner) break;
     }
+}
+
+/// hasAbilityActive("Arrows Wingshield Blessing") on a victim (Break-aware): immune to being shot through, and it does
+/// not propagate ranged area damage (Through Shot, the splashes, the area throw, the Chakram).
+pub inline fn wingshieldOwner(u: *const Unit) bool {
+    return u.ability_mask & st.AbilityId.arrows_wingshield_blessing.bit() != 0 and u.has(.arrows_wingshield_blessing);
 }
 
 /// Grid.clearScatteredMountainsInCells over a splash ray's blast cells.
@@ -1382,9 +1424,11 @@ fn areaStrikeAtCell(s: *State, ai: u8, aimed: Cell, events: *Events) Reject!void
     for (ring.slice(), 0..) |c, k| cells[k] = c;
     cells[ring.len] = target;
     const n_cells: usize = ring.len + 1;
-    // evaluateAffectedUnits: each unit once, in cell order, alive or not.
+    // evaluateAffectedUnits: each unit once, in cell order, alive or not; when Arrows Wingshield owners stand in the 3x3
+    // (a ranged area attack), only they are caught.
     var list: [9]u8 = undefined;
     var n: usize = 0;
+    var owners: usize = 0;
     for (cells[0..n_cells]) |c| {
         const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
         if (!st.isUnitCode(o)) continue;
@@ -1392,6 +1436,16 @@ fn areaStrikeAtCell(s: *State, ai: u8, aimed: Cell, events: *Events) Reject!void
         if (std.mem.indexOfScalar(u8, list[0..n], ui) != null) continue;
         list[n] = ui;
         n += 1;
+        if (wingshieldOwner(&s.units[ui])) owners += 1;
+    }
+    if (owners != 0) {
+        var w: usize = 0;
+        for (list[0..n]) |ui| {
+            if (!wingshieldOwner(&s.units[ui])) continue;
+            list[w] = ui;
+            w += 1;
+        }
+        n = w;
     }
     const divisor = rangeDivisor(att, pos[0], pos[1], att.pos_x, att.pos_y);
     var g: Groups = undefined;
@@ -1495,7 +1549,7 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
         // A Double Shot holder fires the volley again (no arrow), at the Double Shot multiplier.
         if (!suppress_double) {
             if (doubleShotAbility(att)) |ds| {
-                if (!att.isDead() and !att.isStunned()) {
+                if (!att.isDead() and !att.isSkipping()) {
                     // Dual Strike Charm amplifies the second volley (before the > 0 test).
                     const m = artifacts.dualStrikeIn(s, att, abilities.abilityMultiplier(att, ds));
                     if (m > 0) _ = throughShot(s, ai, g, false, m, died, through_list);
@@ -1519,7 +1573,7 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
         // canRespond(RANGE): no Stun, no active Through Shot; an Aggr'd target answers only its forced attacker (the raw
         // target id); a Cowardly one not a stronger victim.
         const aggr_ok = tgt.target < 0 or tgt.target == @as(i8, @intCast(ai));
-        if (!abilities.skipsResponse(att) and s.fight.replied & engine.unitBit(target_ui) == 0 and !tgt.isStunned() and
+        if (!abilities.skipsResponse(att) and s.fight.replied & engine.unitBit(target_ui) == 0 and !tgt.isSkipping() and
             !tgt.has(.through_shot) and engine.canLandRangeAttack(s, tgt) and !engine.cowardBarred(s, tgt, &s.units[r]) and aggr_ok and
             !s.forbids(tgt, att.uid))
         {
@@ -1548,7 +1602,7 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
         // Fireforged Sword over the volley's landed hits (attack_handler.ts:1498): +4 per kill.
         if (volley) |w| attacker_plus += swordOnVictims(s, ai, w, died, &decrease);
     } else if (!missed) {
-        damage_from_attack = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.RANGE, divisor, 1));
+        damage_from_attack = luckyStrike(s, att, calculateAttackDamage(s, att, tgt, AT.RANGE, divisor, abilities.paralysisFactor(att) orelse 1));
         attack_damage_applied = false;
     }
     const gaze_attack = damage_from_attack;
@@ -1579,7 +1633,7 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
             // The responder's Fireforged Sword over its counter-volley (attack_handler.ts:1687).
             if (counter) |w| target_plus += swordOnVictims(s, target_ui, w, died, &decrease);
         } else if (!response_missed) {
-            const dmg = luckyStrike(s, tgt, calculateAttackDamage(s, tgt, victim, AT.RANGE, resp_div, 1));
+            const dmg = luckyStrike(s, tgt, calculateAttackDamage(s, tgt, victim, AT.RANGE, resp_div, abilities.paralysisFactor(tgt) orelse 1));
             gaze_resp = dmg;
             response_absorbed = dmg > 0 and abilities.absorbs(s, victim);
             // attack_handler.ts:1763: extended only when the counter-shot hits the shooter whose turn it is.
@@ -1623,6 +1677,8 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
                 abilities.petrifyingGaze(s, ai, target_ui, gaze_attack, divisor);
                 abilities.spitBall(s, ai, target_ui, ai);
             }
+            // Hamstring rides the primary shot (a landed splash too), never the counter-shot or a second arrow.
+            abilities.hamstring(s, ai, target_ui, ai);
             abilities.poisonAura(s, ai, target_ui, damage_from_attack);
             abilities.assimilationPoison(s, ai, target_ui, damage_from_attack);
             if (!tail_landed) abilities.borrowedGrace(s, ai, target_ui, ai);
@@ -1743,15 +1799,15 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
     return true;
 }
 
-/// handleRangeAttack's Quiver of Echoes after a completed shot: a living shooter that is not stunned and still has arrows,
-/// facing a surviving target group (each group's living members: group 0 as the Chakram grew it), draws getRandomInt(0,
-/// 100); under `chance` (read before the shot) one more ordinary volley flies at the surviving groups with their
-/// original divisors, the same aim and AOE flag, no counter-shot and no Double Shot (resolveShot: its own rolls, riders,
-/// arrow and refresh). A volley that does not complete keeps the draw and changes nothing. Its deaths join `died` after
+/// handleRangeAttack's Quiver of Echoes after a completed shot: a living shooter that is not skipping (Stun, Blindness)
+/// and still has arrows, facing a surviving target group (each group's living members: group 0 as the Chakram grew it),
+/// draws getRandomInt(0, 100); under `chance` (read before the shot) one more ordinary volley flies at the surviving
+/// groups with their original divisors, the same aim and AOE flag, no counter-shot and no Double Shot (resolveShot: its
+/// own rolls, riders, arrow and refresh). A volley that does not complete keeps the draw and changes nothing. Its deaths join `died` after
 /// the shot's, each once.
 fn echo(s: *State, ai: u8, g: *const Groups, out: *const Outcome, to: [2]f64, is_aoe: bool, chance: f64, died: *Died) void {
     const att = &s.units[ai];
-    if (att.isDead() or att.isStunned() or engine.getRangeShots(att) <= 0) return;
+    if (att.isDead() or att.isSkipping() or engine.getRangeShots(att) <= 0) return; // isSkippingThisTurn
     var live: Groups = undefined;
     live.reset();
     for (0..g.n) |k| {
@@ -1799,7 +1855,7 @@ fn doubleShot(s: *State, ai: u8, target_ui: u8, grp: []const u8, divisor: f64, i
         }
     }
     const to = &s.units[to_ui];
-    if (att.isDead() or to.isDead() or att.isStunned() or engine.getRangeShots(att) <= 0) return .{};
+    if (att.isDead() or to.isDead() or att.isSkipping() or engine.getRangeShots(att) <= 0) return .{};
     if ((!is_aoe or has_chakram) and att.target >= 0 and att.target != @as(i8, @intCast(to_ui))) return .{};
     if (has_chakram) {
         s.overflow = true; // a second Chakram flight (Crafted Double Shot, or a thief holding both): not ported
@@ -1815,7 +1871,8 @@ fn doubleShot(s: *State, ai: u8, target_ui: u8, grp: []const u8, divisor: f64, i
         return .{ .applied = true, .tail = true };
     }
     // Dual Strike Charm on the second arrow's multiplier (double_shot_ability.ts:234).
-    const m = artifacts.dualStrikeIn(s, att, abilities.abilityMultiplier(att, a));
+    var m = artifacts.dualStrikeIn(s, att, abilities.abilityMultiplier(att, a));
+    if (abilities.paralysisFactor(att)) |pf| m *= pf; // Paralysis after the Dual Strike Charm
     const dmg = luckyStrike(s, att, calculateAttackDamage(s, att, to, AT.RANGE, divisor, m));
     const absorbed = dmg > 0 and abilities.absorbs(s, to);
     _ = hit(s, ai, to_ui, dmg, false);
@@ -1831,7 +1888,7 @@ fn doubleShot(s: *State, ai: u8, target_ui: u8, grp: []const u8, divisor: f64, i
 fn throughShot(s: *State, ai: u8, g: *const Groups, decrease_shots: bool, factor: f64, died: *Died, hits: ?*SwordHits) bool {
     const att = &s.units[ai];
     const a = att.ability(.through_shot) orelse return false;
-    if (att.isDead() or att.isStunned() or engine.getRangeShots(att) <= 0) return false;
+    if (att.isDead() or att.isSkipping() or engine.getRangeShots(att) <= 0) return false;
     var any_live = false;
     for (g.members[0..g.n_members]) |m| {
         if (!s.units[m].isDead()) any_live = true;
@@ -1850,22 +1907,27 @@ fn throughShot(s: *State, ai: u8, g: *const Groups, decrease_shots: bool, factor
         if (cu.isDead()) continue;
         const divisor = g.divisors[k];
         if (divisor == 0) continue;
-        if (missRoll(s, att, cu)) continue; // through_shot_ability.ts:124
-        const multiplier = abilities.abilityMultiplier(att, a) * factor;
-        var dmg = luckyStrike(s, att, attackDamage(s, att, cu, AT.RANGE, divisor, multiplier, false));
-        // Giant's Maul (the shooter's), then getPhysicalAoeDamageMultiplier (the victim's Amulet of Resolve, Mechanism).
-        if (s.artifacts) dmg = artifacts.giantsMaul(att, dmg);
-        dmg = @floor(dmg * physicalAoeMultiplier(s, cu));
-        const was_absorbed = dmg > 0 and abilities.absorbs(s, cu);
-        if (was_absorbed) absorbed |= engine.unitBit(c);
-        const dealt = hit(s, ai, c, dmg, false); // through_shot_ability.ts:210
-        if (hits) |w| w.push(c, dealt, dmg, was_absorbed);
-        abilities.poisonAura(s, ai, c, dealt);
-        s.damage_lap = s.fight.lap;
-        if (!was_absorbed) engine.changeMorale(att, abilities.pegasusLightMorale(cu), true);
-        damaged[n_damaged] = c;
-        n_damaged += 1;
-        if (!cu.isDead() and !was_absorbed) abilities.petrifyingGaze(s, ai, c, dmg, divisor);
+        if (!missRoll(s, att, cu)) { // through_shot_ability.ts:124
+            var multiplier = abilities.abilityMultiplier(att, a) * factor;
+            // Paralysis (the shooter's) after the volley factor.
+            if (abilities.paralysisFactor(att)) |pf| multiplier *= pf;
+            var dmg = luckyStrike(s, att, attackDamage(s, att, cu, AT.RANGE, divisor, multiplier, false));
+            // Giant's Maul (the shooter's), then getPhysicalAoeDamageMultiplier (the victim's Amulet of Resolve, Mechanism).
+            if (s.artifacts) dmg = artifacts.giantsMaul(att, dmg);
+            dmg = @floor(dmg * physicalAoeMultiplier(s, cu));
+            const was_absorbed = dmg > 0 and abilities.absorbs(s, cu);
+            if (was_absorbed) absorbed |= engine.unitBit(c);
+            const dealt = hit(s, ai, c, dmg, false); // through_shot_ability.ts:210
+            if (hits) |w| w.push(c, dealt, dmg, was_absorbed);
+            abilities.poisonAura(s, ai, c, dealt);
+            s.damage_lap = s.fight.lap;
+            if (!was_absorbed) engine.changeMorale(att, abilities.pegasusLightMorale(cu), true);
+            damaged[n_damaged] = c;
+            n_damaged += 1;
+            if (!cu.isDead() and !was_absorbed) abilities.petrifyingGaze(s, ai, c, dmg, divisor);
+        }
+        // An Arrows Wingshield owner stops the bolt, hit or missed (through_shot_ability.ts:263).
+        if (wingshieldOwner(cu)) break;
     }
     var gc: st.UidSet = .{}; // one Gravechain set per volley (through_shot_ability.ts:268)
     for (damaged[0..n_damaged]) |c| {
@@ -2056,7 +2118,8 @@ fn idLess(s: *State, a: *const Unit, b: *const Unit) bool {
 /// half damage and ends the flight. Pure geometry: no roll.
 fn planChakram(s: *State, thrower_i: u8, primary_i: u8, out: *Flight) void {
     const thrower = &s.units[thrower_i];
-    if (thrower.ability(.chakram) == null or s.units[primary_i].isDead()) return;
+    // An Arrows Wingshield owner hit as the primary relays nothing (chakram_ability.ts:333).
+    if (thrower.ability(.chakram) == null or s.units[primary_i].isDead() or wingshieldOwner(&s.units[primary_i])) return;
     var visited: st.UnitSet = engine.unitBit(primary_i);
     var last = primary_i;
     var heading = direction(engine.baseCell(thrower), engine.baseCell(&s.units[primary_i]));
@@ -2090,6 +2153,8 @@ fn planChakram(s: *State, thrower_i: u8, primary_i: u8, out: *Flight) void {
             }
         }
         const n = next orelse break;
+        // The clockwise winner is an owner: the disc drops there, no hit, and the flight ends (chakram_ability.ts:404).
+        if (wingshieldOwner(&s.units[n])) break;
         visited |= engine.unitBit(n);
         const wide = next_sep - 1 != 1;
         out.add(n, if (wide) 0.5 else 1, .roll);
@@ -2130,7 +2195,8 @@ fn aoeTail(s: *State, thrower_i: u8, flight: *const Flight, divisor: f64, active
             .miss => true,
         };
         if (missed) continue;
-        const ability_multiplier = abilities.abilityMultiplier(thrower, a);
+        var ability_multiplier = abilities.abilityMultiplier(thrower, a);
+        if (abilities.paralysisFactor(thrower)) |pf| ability_multiplier *= pf; // aoe_range_ability.ts:151
         var damage = luckyStrike(s, thrower, attackDamage(s, thrower, u, AT.RANGE, divisor, ability_multiplier, false));
         if (flight.factors[k] != 1) damage = @floor(damage * flight.factors[k]);
         // Giant's Maul (the striker's), then getPhysicalAoeDamageMultiplier (the victim's Amulet of Resolve, Mechanism).

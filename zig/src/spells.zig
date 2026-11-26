@@ -83,7 +83,9 @@ pub fn canCastSpell(s: *const State, ci: u8, ti: u8, spell: CS, cfg: *const st.S
     if (!found) return false;
     const self_cast = ci == ti or (caster.name_id == t.name_id and caster.team == t.team);
     const mr = engine.getMagicResist(t);
-    if (cfg.power_type == SP.RESURRECT) return false; // not in scope
+    // Resurrection: an ally that lost creatures (hp full or not) and can be raised (no active Mechanism); no resist,
+    // conflict or element test.
+    if (cfg.power_type == SP.RESURRECT) return caster.team == t.team and t.amount_died > 0 and !t.has(.mechanism) and (cfg.self_cast or !self_cast);
     if (cfg.power_type == SP.HEAL) {
         if (cfg.is_giftable) {
             // The gift: an ally of at most the gift level that does not hold the ability active (Break-aware).
@@ -325,7 +327,7 @@ pub fn lineOfSightClear(s: *const State, ci: u8, ti: u8, spell: CS) bool {
 /// MORALE_SCALED_SPELLS (spell_damage.ts) among the ported ones: isOffensiveSpellMultiplier's set.
 pub inline fn moraleScaled(spell: CS) bool {
     return switch (spell) {
-        .lightning_strike, .ring_of_fire, .meteor_shower, .meteorite, .fire_strike, .heal, .fireball => true,
+        .lightning_strike, .ring_of_fire, .meteor_shower, .meteorite, .fire_strike, .heal, .fireball, .resurrection => true,
         else => false,
     };
 }
@@ -340,7 +342,8 @@ pub inline fn moraleMultiplier(spell: CS, attack_multiplier: f64) f64 {
 /// or arcane rings in scope).
 fn magicDamageBonus(u: *const Unit) f64 {
     var total: f64 = 0;
-    if (u.buffs.power(.empower_augment)) |p| {
+    if (u.augment(.empower_augment)) |e| {
+        const p = e.power;
         if (std.math.isFinite(p) and p > 0) total += p;
     }
     if (u.buffs.power(.sylvan_focus_blessing)) |p| {
@@ -611,6 +614,7 @@ pub fn castSpell(s: *State, ci: u8, spell_raw: u8, target: ?u8, cell: ?Cell, eve
     }
     if (ti == null and spell == .summon_wolves and cfg.target == ST.RANDOM_CLOSE_TO_CASTER) return summonSpell(s, ci, spell, cfg, cell, events);
     if (ti == null and cfg.target == ST.ALL_ALLIES and cfg.power_type != SP.HEAL) return massCastSpell(s, ci, spell, cfg, events);
+    if (ti == null and cfg.target == ST.ALL_FLYING) return massCastOnFlyers(s, ci, spell, cfg, events);
     if (ti == null and (cfg.target == ST.ALL_FLYING or cfg.target == ST.ALL_ALLIES or cfg.target == ST.ALL_ENEMIES or cfg.target == ST.ALLIES_AREA)) {
         s.overflow = true; // the other mass casts (flyers, enemies, Mass Heal) and craftCast: wave 2
         return error.Rejected;
@@ -641,8 +645,19 @@ fn magicAttack(s: *State, ci: u8, target: ?u8, spell: CS, cfg: *const st.SpellCo
     const caster = &s.units[ci];
     const t = &s.units[ti];
     if (cfg.power_type == SP.RESURRECT) {
-        s.overflow = true; // Resurrection: Angel's, batch 6
-        return error.Rejected;
+        // floor(caster.getCumulativeMaxHp() * RESURRECTION_POWER_FACTOR * holyCross (no Holy Cross in scope) * morale)
+        const power = @floor(caster.amount_alive * caster.max_hp * 1.5 * 1 * moraleMultiplier(spell, caster.attack_multiplier));
+        _ = applyResurrection(t, power);
+        engine.refreshStackPowerForAllUnits(s); // the mid-cast refresh, before completeTurn's
+        useSpell(caster, spell);
+        // useSpell: a spent Resurrection deletes its card (its charges, the re-parsed book): a second cast is not found.
+        var remaining = false;
+        for (caster.spells[0..caster.n_spells]) |b| {
+            if (b.spell == @intFromEnum(CS.resurrection) and b.amount > 0) remaining = true;
+        }
+        if (!remaining) _ = abilities.deleteAbility(s, caster, .resurrection);
+        engine.completeTurn(s, ci, false, false, events);
+        return;
     }
     if (!cfg.is_buff) {
         debuffBranch(s, ci, ti, spell, cfg);
@@ -715,9 +730,51 @@ fn debuffBranch(s: *State, ci: u8, ti: u8, spell: CS, cfg: *const st.SpellConfig
     }
 }
 
-/// SpellHelper.canMassCastSpell for an ALL_ALLIES non-HEAL spell: some unit of the caster's team (holder order) with
-/// magic resist other than 100 that carries no buff of the spell's name or a conflicting one.
+/// Unit.applyResurrection(power): the front creature heals first; the rest of the budget raises ceil(rest / max hp)
+/// creatures (at most the dead ones), the last raised the wounded front (a whole budget left over is wasted). Returns
+/// the creatures raised.
+fn applyResurrection(t: *Unit, power_in: f64) f64 {
+    var power = power_in;
+    const hp_diff = t.max_hp - t.hp;
+    if (hp_diff >= power) {
+        t.hp += power;
+        return 0;
+    }
+    t.hp = t.max_hp;
+    power -= hp_diff;
+    const projected = @ceil(power / t.max_hp);
+    const actual = @min(t.amount_died, projected);
+    if (projected > actual) {
+        t.hp = t.max_hp;
+    } else {
+        const rest = @rem(power, t.max_hp);
+        t.hp = if (rest == 0) t.max_hp else rest;
+    }
+    const died = t.amount_died - actual;
+    t.amount_alive += actual;
+    t.amount_died = if (died < 0) 0 else died;
+    return actual;
+}
+
+/// canMassCastSpell's ALL_FLYING test for one team (holder order): a unit that can fly, with magic resist other than
+/// 100, carrying no buff of the spell's name or a conflicting one.
+fn flyerCastable(s: *const State, team: u8, spell: CS, cfg: *const st.SpellConfig) bool {
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.team != team or !engine.canFly(u) or engine.getMagicResist(u) == 100) continue;
+        if (!alreadyAppliedBuff(u, spell, cfg)) return true;
+    }
+    return false;
+}
+
+/// SpellHelper.canMassCastSpell for an ALL_ALLIES non-HEAL spell (some unit of the caster's team, holder order, with
+/// magic resist other than 100 that carries no buff of the spell's name or a conflicting one) or an ALL_FLYING one (the
+/// same over the units that can fly, the caster's team first, then the other).
 pub fn canMassCastSpell(s: *const State, ci: u8, spell: CS, cfg: *const st.SpellConfig) bool {
+    if (cfg.target == ST.ALL_FLYING) {
+        const team = s.units[ci].team;
+        return flyerCastable(s, team, spell, cfg) or flyerCastable(s, engine.opposite(team), spell, cfg);
+    }
     if (cfg.target != ST.ALL_ALLIES or cfg.power_type == SP.HEAL) return false;
     const team = s.units[ci].team;
     for (s.holderOrder()) |i| {
@@ -761,6 +818,33 @@ fn massCastSpell(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, event
         // applyBuff(amplifyCastBuffForTarget(...)): the caster's Tome of Amplification raises the ally's copy.
         const amplified = if (s.artifacts) artifacts.tomePower(caster, cfg, power) else power;
         abilities.pushChecked(s, &u.buffs, .{ .id = id, .laps = cfg.laps + @as(f64, if (i == ci) 1 else 0), .power = amplified });
+    }
+    useSpell(caster, spell);
+    engine.completeTurn(s, ci, false, false, events);
+}
+
+/// GameActionEngine.massCastSpell -> massCastOnFlyers for an ALL_FLYING spell (Wind Flow): canMassCastSpell, then the
+/// caster's team and then the other (holder order each, the caster included): every unit that can fly (a grounded flyer
+/// cannot), with magic resist other than 100 and not carrying it yet, gets the buff appended (laps + 1 on the caster; the
+/// caster's Tome of Amplification raises its allies' power only); then the charge and completeTurn. No draw.
+fn massCastOnFlyers(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, events: *Events) Reject!void {
+    if (!canMassCastSpell(s, ci, spell, cfg)) return error.Rejected; // spell_not_available
+    const id = spell.applied() orelse {
+        s.overflow = true; // a mass buff without a row in scope
+        return error.Rejected;
+    };
+    const caster = &s.units[ci];
+    const team = caster.team;
+    for ([_]u8{ team, engine.opposite(team) }) |side| {
+        for (s.holderOrder()) |i| {
+            const u = &s.units[i];
+            if (u.team != side) continue;
+            if (engine.getMagicResist(u) == 100 or !engine.canFly(u)) continue;
+            if (alreadyAppliedBuff(u, spell, cfg)) continue;
+            // applyBuff(amplifyCastBuffForTarget(...)): the Tome amplifies only the caster's team.
+            const power = if (s.artifacts and side == team) artifacts.tomePower(caster, cfg, cfg.power) else cfg.power;
+            abilities.pushChecked(s, &u.buffs, .{ .id = id, .laps = cfg.laps + @as(f64, if (i == ci) 1 else 0), .power = power });
+        }
     }
     useSpell(caster, spell);
     engine.completeTurn(s, ci, false, false, events);

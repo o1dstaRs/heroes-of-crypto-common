@@ -45,6 +45,14 @@ fn reportUnparseable(err: anyerror) void {
     std.debug.print("seed {d}: recording not supported at step {d} ({s})\n", .{ rec.parse_seed, rec.parse_step, @errorName(err) });
 }
 
+/// The recording's forceStalledLap marks before a step (runMatch ran it between engine calls): those units have made
+/// their turn.
+fn applyStall(s: *st.State, uids: []const u8) void {
+    for (uids) |uid| {
+        if (s.slotOf(uid)) |slot| s.fight.made |= engine.unitBit(slot);
+    }
+}
+
 fn parity(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
     const buf = try readAll(gpa, path);
     defer gpa.free(buf);
@@ -87,6 +95,7 @@ fn parity(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
             }
             s.rng.state = step.r0;
             events.len = 0;
+            applyStall(&s, step.stall);
             const ok = engine.apply(&s, engine.actionToSlots(&s, step.action), &events);
             var m: compare.Mismatch = .{};
             var why: ?[]const u8 = null;
@@ -303,6 +312,20 @@ fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
     return ok_calls == calls;
 }
 
+/// `native --drop k` (record.ts RECORD_DROP_DECISIONS=k): the decide calls whose (seed, call index) hash is 0 mod k land
+/// nothing, so the recovery net plays those turns.
+var drop_k: u32 = 0;
+var drop_seed: u32 = 0;
+var drop_index: u32 = 0;
+
+fn dropDecide(s: *st.State, ui: u8, out: *ai.Decision) void {
+    ai.decideTurn(s, ui, out);
+    const index = drop_index;
+    drop_index += 1;
+    const h = (drop_seed *% 0x9e3779b1) ^ ((index + 1) *% 0x85ebca6b);
+    if (h % drop_k == 0) out.n = 0;
+}
+
 /// Plays every recorded battle natively (Zig AI + engine) and checks each step against the recording.
 fn native(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
     const buf = try readAll(gpa, file);
@@ -331,7 +354,9 @@ fn native(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
         };
         s.rng.state = game.steps[0].r0;
         var check = compare.NativeCheck{ .game = &game, .ids = game.ids };
-        const end = ai.playMatch(&s, 60, .{ .ctx = &check, .step = compare.NativeCheck.step });
+        drop_seed = @truncate(@as(u64, @bitCast(game.seed)));
+        drop_index = 0;
+        const end = ai.playMatchWith(&s, 60, .{ .ctx = &check, .step = compare.NativeCheck.step, .stall = compare.NativeCheck.stall }, if (drop_k != 0) dropDecide else ai.decideTurn);
         if (check.failed == null and check.next != game.steps.len) check.failed = "zig stopped early";
         steps_ok += check.next;
         if (check.failed) |why| {
@@ -365,7 +390,7 @@ fn resumeOne(game: *const rec.Game, start: *const st.State, k: usize, native_mod
     tally.steps_total += game.steps.len - k;
     if (native_mode) {
         var check = compare.NativeCheck{ .game = game, .ids = game.ids, .next = k };
-        const end = ai.continueMatchWith(&s, 60, .{ .ctx = &check, .step = compare.NativeCheck.step }, ai.decideTurn);
+        const end = ai.continueMatchWith(&s, 60, .{ .ctx = &check, .step = compare.NativeCheck.step, .stall = compare.NativeCheck.stall }, ai.decideTurn);
         if (check.failed == null and check.next != game.steps.len) check.failed = "zig stopped early";
         tally.steps_ok += check.next - k;
         if (check.failed) |why| {
@@ -389,6 +414,7 @@ fn resumeOne(game: *const rec.Game, start: *const st.State, k: usize, native_mod
         }
         s.rng.state = step.r0;
         events.len = 0;
+        applyStall(&s, step.stall);
         const ok = engine.apply(&s, engine.actionToSlots(&s, step.action), &events);
         var m: compare.Mismatch = .{};
         var why: ?[]const u8 = null;
@@ -804,6 +830,7 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, cmd, "v08")) {
         try @import("v08/main.zig").run(gpa, args[2..]);
     } else if (std.mem.eql(u8, cmd, "native")) {
+        drop_k = @intCast(argValue(args, "--drop", 0));
         if (!try native(gpa, path_arg, argValue(args, "--max-fail", 10))) std.process.exit(1);
     } else if (std.mem.eql(u8, cmd, "resume")) {
         if (!try resumeCheck(gpa, path_arg, argValue(args, "--max-fail", 10))) std.process.exit(1);

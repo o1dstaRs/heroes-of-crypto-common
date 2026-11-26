@@ -62,7 +62,7 @@ export function hocNowNs(): bigint {
 
 /** rollout.PlayResult */
 export interface IHocPlayResult {
-    /** 0 elimination, 1 turn cap, 2 stuck, 3 observer stop, 4 unsupported (recovery net not ported) */
+    /** 0 elimination, 1 turn cap, 2 stuck, 3 observer stop, 4 unsupported (no longer produced: the recovery net is ported) */
     end: number;
     /** fight_finished's team (2 = LEFT/green, 1 = RIGHT/red, 0 = none), -1 when the fight did not finish */
     winner: number;

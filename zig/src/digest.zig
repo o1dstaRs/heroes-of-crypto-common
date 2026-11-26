@@ -164,7 +164,8 @@ pub fn write(w: *Writer, s: *const State, ids: []const []const u8) Writer.Error!
         try w.writeByte(',');
         try num(w, u.magic_resist);
         try w.writeAll(",\"");
-        for (buffs, 0..) |b, i| {
+        // buffs_sources reads the buff objects: a revive's orphan augment rows have none.
+        for (buffs[u.aug_orphans..], 0..) |b, i| {
             if (i > 0) try w.writeByte(',');
             if (b.src_x >= 0) try w.print("{d}", .{b.src_x});
             try w.writeByte(';');

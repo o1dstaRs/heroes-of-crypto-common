@@ -13,9 +13,9 @@ plain or actor-antithetic chance stream and the material, v1 or v2 leaf.
 Zig plays whole battles that match the TypeScript `runMatch` step for step, for battles with:
 
 - every creature's stats, sizes (1x1, 2x1, 2x2), walking and flying, melee and ranged;
-- the abilities of the creatures ported so far (batches 1 to 5, below), including the units Infest and Summon Wolves
-  summon and the abilities Predatory Assimilation and the Wild Regeneration gift move between units; every other
-  creature's abilities stripped;
+- the abilities of the creatures ported so far (batches 1 to 5 and 6a, below), including the units Infest and Summon
+  Wolves summon, the abilities Predatory Assimilation and the Wild Regeneration gift move between units, and the
+  Angel's revive in place; every other creature's abilities stripped;
 - the artifacts (below; `src/artifacts.zig`): all 28 in the live pools, played as runMatch applies them (once, at
   setup); a team holding the disabled Broken Aegis or Holy Cross is refused;
 - the wave-1 spells (below): Heal, Blessing, Lightning Strike, Fire Strike, Meteor Shower, Meteorite, Ring of Fire, Summon
@@ -29,8 +29,9 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   and Luck Shield held) and Smoke (a neutral store of smoked cells: the 3x3 or nothing, laps + 1, re-smoked in place,
   ticked at the lap flip before the vines, dispelled by every arrival on its cells; a shot whose ray crossed smoke at or
   before a group doubles that group's divisor, capped at 8, counter-shots, Through Shot and splash groups included, never
-  the Area Throw at a cell; the digest's `fight.smoke`), which completes the Book of Chaos; a book holding any other
-  spell is refused;
+  the Area Throw at a cell; the digest's `fight.smoke`), which completes the Book of Chaos; batch 6a's castables, the Valkyrie's Wind Flow (a
+  mass buff on every flyer) and the Angel's Resurrection (on a wounded ally stack); a book holding any other spell is
+  refused;
 - the army setup `runMatch` applies before the fight: the augments (Armor, Might, Sniper, Movement, Placement; Empower
   is carried but read by nothing in scope), doctrines (their upgrade budget) and synergies (Life, Chaos, Might and
   Nature, both variants, levels 1 to 3), including the Chaos break-on-attack roll and the Break effect;
@@ -44,7 +45,7 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
 The engine also replays (`hoc-sim parity`) the actions later AI versions emit on these boards: move-then-strike
 (`melee_attack` with a `path`), `wait_turn`, `defend_turn`, aimed shots, refused `select_attack_type`, ranged
 obstacle shots (`obstacle_attack` without `attackFrom`, which v0.8 sends), the wave-1 casts (`cast_spell`), batch 4's
-casts (Battle Roar, the Wild Regeneration gift) and batch 5's two action shapes (`area_throw_attack`, and the free-aim
+casts (Battle Roar, the Wild Regeneration gift), batch 6a's (Wind Flow, Resurrection) and batch 5's two action shapes (`area_throw_attack`, and the free-aim
 Through Shot: `range_attack` with `targetPosition` and no target id).
 
 Ported:
@@ -60,9 +61,11 @@ Ported:
 - **AI and match loop** (`ai.zig`): `StrategyV0_1.decideTurn`, `findTarget`, `doFindTarget`'s two passes, the melee
   target layers, target memory, the safer-move search, shooter line checks, `preferBackstabAttackCell`, the mountain
   strategy (`evaluateMountainStrategy`, `findMountainMeleeStrike`, `teamRangedFirepower`, `isLineBlockedByObstacle`),
-  and the `runMatchInner` loop for v0.1 seats. The recovery net and `forceStalledLap` are not ported (never reached in the
-  recordings or in a 2,000-battle probe of the TypeScript code); a battle that would need them stops with
-  `unsupported` or `stuck`, which the parity check reports.
+  and the `runMatchInner` loop for v0.1 seats, with its recovery net (a turn whose decision lands nothing: the
+  mindless unit's retry, else `advanceTowardEnemyAction`, else `defend_turn`; `ai.advanceTowardEnemy`) and
+  `forceStalledLap` (a lap whose advance attempts find no unit to activate: every living holder unit is marked as having
+  made its turn, then the advance runs again; `engine.forceStalledLap`). Both are rare in recorded play (the net is
+  checked with `RECORD_DROP_DECISIONS`, below; a stall needs a run of skipped activations, mostly Blindness and Stun).
 
 ### Abilities
 
@@ -396,6 +399,72 @@ Added by batch 5 (the shooters and throwers; references in the session's `scratc
 - **State**: debuffs hold 20 (`AppliedSpell.lag` sits in the row's padding: still 24 bytes), `Unit.max_range_shots`. A
   state is 70,688 bytes (Unit 2,080; 60,784 and 1,776 before).
 
+### Batch 6a
+
+Exact in both modes (coverage under "How parity is checked"):
+
+| Creature | Abilities |
+| --- | --- |
+| Dryad (L1, RANGE) | Guiding Winds Aura, Hamstring |
+| Wolf Rider (L1) | Wolf Trail Blessing, Rapid Charge |
+| Valkyrie (L2, MELEE_MAGIC) | War Anger Aura, Wind Flow (a castable mass buff: one charge) |
+| Unicorn (L3) | One in the Field, Blindness |
+| Mantis (L3) | Paralysis |
+| Angel (L4, MELEE_MAGIC) | Resurrection (the revive at death, and a castable charge), Arrows Wingshield Blessing, Angelic Host Blessing |
+| Champion (L4) | Tie up the Horses Blessing, Crusade, Rapid Charge |
+
+- **Resurrection** (`engine.tryRevive`, gated by `State.resurrection`): deleteUnitById(id, true) at every death site
+  (`combat.cleanupDeadUnits` and `cleanupSpellDeaths` before the Last Fuse capture, the delete, `unit_destroyed`, the
+  blast and the Infest spawn; Last Fuse's chain; Armageddon's first wave only): a holder with dead creatures gets
+  `min(died, max(1, floor(died / 2)))` back, its effects and debuffs cleared, its buffs cut to the augment display
+  rows (deleteAllBuffs keeps " Augment" display rows and drops their objects: `Unit.aug_orphans` counts them, the
+  augment lookups `Unit.augment` and the stored-properties digest skip them), its Last Fuse record and target cleared,
+  and the card deleted. Devour Essence skips a corpse that can still revive. The cast (`spells.zig` RESURRECT): an ally
+  stack with dead creatures, power `floor(alive * max_hp * 1.5 * morale)` raised by `applyResurrection`, then the stat
+  refresh, the charge and the card deleted at 0.
+- **Wind Flow** (`spells.massCastOnFlyers`, `canMassCastSpell` with `ALL_FLYING`): own team then the other in holder
+  order, every flyer (`canFly`, magic resist below 100, not already carrying it), Tome of Amplification only on the own
+  team, the caster's laps + 1; every carrier adds the row's power to base armor (after Pegasus Might, before the Armor
+  augment) and loses `min(power, System Wind Flow)` steps, floored at 1, between Battle Roar and Vine Throw (the System
+  config travels in `spellConfigs`; the Tome strengthens only the armor).
+- **Blessings** (`abilities.refreshBlessings`, census bits `ANGELIC_HOST`, `ARROWS`, `TIE_UP`, `WOLF_TRAIL`): re-granted
+  in TypeScript's order (Sylvan, Tie up the Horses to walkers, Wolf Trail, Angelic Host to flyers, Arcane Ward, Warding
+  Mane, Arrows Wingshield, Sharpened Weapons, Rallying Volley). Tie up's positive power triggers the Luck Blessing early
+  pass on its own (its power reads luck). Angelic Host adds armor_mod (after the artifacts) and `roundUnitStat` steps for
+  flyers, Tie up `toFixed(4)` steps for walkers, Wolf Trail steps_mod after Sky Runner, Arrows Wingshield multiplies
+  range armor `round(base_armor * (1 + max(0, power) / 100), 2)`. All four are markers for Borrowed Grace.
+- **Arrows Wingshield owners** (`combat.wingshieldOwner`: carries the blessing) stop propagation: the Chakram's primary
+  and bounces, the splash ring (only the entry cell is hit), the Through Shot ray (`evaluateGroups`,
+  `evaluateRangeFlags`) and its damage loop (hit or missed), and an area throw's 3x3 list keeps only the owners when it
+  holds one.
+- **War Anger** (`engine.warAngerMod`, `State.war_anger`): each emitter's power is stored at the aura refresh
+  (`Unit.war_anger_power`), the holder's attack_mod rises by `base_attack * power * n / 100` for the distinct enemy
+  units within the aura's range plus the synergy range (`Unit.attack_mod_increase`, currentAttackModIncrease) after
+  every `adjustBaseStats` of the stack-power refresh, and the strike recounts it after its miss roll. The aura row is a
+  debuff on the enemies it reaches (ADDITIONAL_MELEE_DAMAGE_PERCENTAGE shares Absorb Penalties' power formula).
+- **Guiding Winds** (ADDITIONAL_SHOT_DISTANCE_PERCENTAGE 65): ranged allies only, `clamp(power / MAX * stack power +
+  luck, 0, 35)` percent of the initial shot distance after the Sniper block, before the attack artifacts.
+- **Hamstring** (`abilities.hamstring`, the Dryad's landed-shot rider after the primary's riders, before the poison
+  aura): the Absorb Penalties redirect, flyers only, the chance roll, the magic-resist save, the Hamstrung debuff (laps
+  from its `spellConfigs` entry, + 1 on the active unit) and the mirror roll; Hamstrung grounds the flyer (`canFly`, with
+  Gravebound) and scales steps after Gravebound.
+- **Blindness** and **Paralysis** (`abilities.blindness`, `paralysis`, effects): MIND / STATUS chances (Amulet of
+  Resolve, Mechanism's x1.5, `mindResistant`), laps extended on the active unit. Blindness joins Stun in
+  `Unit.isSkipping` (isSkippingThisTurn: the activation skip, the melee response and counter-shot gates, the second
+  punch, the second shot, Through Shot, the double volley, Quiver of Echoes); Paralysis stops `canMove` and cuts the
+  holder's damage (`paralysisFactor`) at the blow, the response, the second punch, the spin, the shot, the counter-shot,
+  the AOE tail, Through Shot and the second shot (not the skewer).
+- **One in the Field** (`combat.spendReply`): the reply is not spent while the card is active. **Crusade**
+  (`engine.crusade`): `abilityCount * cells` moved onto the initial base attack and armor (toFixed(2), at most 50) in
+  `moveUnit` and the strike's move, before the lava route.
+- **forceStalledLap and the recovery net** (`engine.forceStalledLap`, `ai.continueMatchWith`, `ai.advanceTowardEnemy`;
+  `rollout.simAdvance`, `rollout.recoverNoopTurn`): above. The recorder marks a stall as `stall: [ids]` on the next
+  step (`rec.Step.stall`); replay applies the marks, `native` checks them (`NativeCheck.stall`).
+- **State**: buffs 24, debuffs 25, effects 12 per unit; `Unit.war_anger_power`, `attack_mod_increase`, `aug_orphans`;
+  `State.b6_hooks` (the comptime `adjustBaseStats` instance also runs for it), `war_anger`, `hamstring`, `crusade`,
+  `resurrection`, `war_anger_def`, `hamstrung_laps`, `hamstrung_power`. A state is 81,152 bytes (Unit 2,400; 75,872
+  and 2,240 before).
+
 ### Spells (wave 1)
 
 The framework the spells added (all exact in both modes, coverage below; references in the session's
@@ -544,7 +613,7 @@ per hook (`State.artifacts`).
 | Last Fuse | the killing hit's record (`Unit.fuse`: combat.hit, spell kills) and the corpse's blast in the death cleanup, before the Infest spawn, then the depth-first chain |
 | Rime Charm | the striker's landed-hit rider (`getRandomInt(0, 100)` against `clamp(power + luck)`, a full-resist target skipped, an existing Quagmire kept after the draw): Spit Ball's Quagmire (laps from the second stored property, + 1 on the active unit) at every melee, shot, counter-shot, second-shot, Through Shot and splash site; its holder turns the Spit Ball hooks on |
 | Gravechain | the army's -1 step, and the landed-hit rider: the chance once per call, the links (the target and its living teammates touching it, three hops, getCells order, each cell's ring), one attempted set per exchange (melee spin, skewer and blow share one; a splash or Through Shot volley one), Gravebound (steps x 0.75 after Quagmire, a flyer grounded in `canFly`) |
-| Quiver of Echoes | the chance (a native shooter's row: `clamp(power + luck)`, read before the shot); after a completed shot by a living, unstunned shooter with arrows left, one `getRandomInt(0, 100)` when a target group survives, and under the chance one more ordinary volley (`resolveShot` on the surviving groups, their original divisors, no counter-shot, no Double Shot, one arrow; group 0 as a Chakram grew it, `Outcome.head`), its deaths after the shot's; on `range_attack` and `areaStrikeAtCell`; the obstacle shot's extra hit on the next standing stone (classic: the aimed mountain while its side has hits) |
+| Quiver of Echoes | the chance (a native shooter's row: `clamp(power + luck)`, read before the shot); after a completed shot by a living shooter that is not skipping (`isSkippingThisTurn`: Stun, Blindness) with arrows left, one `getRandomInt(0, 100)` when a target group survives, and under the chance one more ordinary volley (`resolveShot` on the surviving groups, their original divisors, no counter-shot, no Double Shot, one arrow; group 0 as a Chakram grew it, `Outcome.head`), its deaths after the shot's; on `range_attack` and `areaStrikeAtCell`; the obstacle shot's extra hit on the next standing stone (classic: the aimed mountain while its side has hits) |
 | Barrel Barricade | two barrels per owning team at start_fight (LEFT first, before the fight starts): its Placement augment's zone sorted by (on a friendly shooter's file in front of it, screen rank, inward edge, x, y), the pair rule; each a standing scattered stone appended to the layout on any map, so the stone gates (`hasScatteredMountains`, `centerCells`, `groundRouteCrossesObstacle`, the loader's standing cells) open on NORMAL and LAVA_CENTER too; per-team records deleted with the stone |
 | Lava Striders | walking and standing on the undried lava square (`canTraverseLava`: the pather's `made_of_fire`, occupancy, the restore of a vacated centre cell, v0.1's landing check) and Made of Fire after a lava route (laps 3) with its immediate boost, the `+init/power` refresh terms and the ability-formula terms |
 
@@ -820,6 +889,57 @@ The framework the army setup added (exact in both modes, coverage below):
     White Tiger (Disguise, Visible) from a cell the Hydra does not stand on, the engine refuses it and the rollout stops
     ("a policy turn landed nothing"), while TypeScript's v0.4 keeps v0.1's strike.
 
+- Batch-6a lessons (for batch 6b: Harpy, Mermaid, Efreet, Black Dragon, Abomination, Thunderbird):
+  - A rider has as many sites as the hit paths, and each path rolls its riders in its own order: Paralysis comes right
+    after Pegasus Light, Hamstring only on the blow and the landed shot, Blindness last (after Rime Charm and
+    Gravechain), and the spin and the skewer roll Shatter Armor on the attack but Blindness instead on the response.
+    Read `attack_handler.ts`, `lightning_spin_ability.ts` and `skewer_strike_ability.ts` side by side before placing a
+    new rider (Chain Lightning, Fire Breath, Fire Shield's reflection); Fireforged Sword's burn comes before the riders at
+    every site.
+  - `isSkippingThisTurn` is not `isStunned`: the activation skip, the response and counter-shot gates, the second punch,
+    the second shot, Through Shot, the double volley and Quiver of Echoes all read it (`Unit.isSkipping`). A new
+    skipping effect (Freeze) joins `Unit.isSkipping`, nothing else.
+  - A revive is a death that did not happen: every death site must ask `engine.tryRevive` before it records anything
+    (the Last Fuse capture, the delete, `unit_destroyed`, the blast, the Infest spawn, the chain, Armageddon's first
+    wave). Water Shield's absorbed hit and Flesh Shield's redirect change the damage before the death check, so they sit
+    in `combat.hit` / `engine.applyDamage`, not at the death sites.
+  - deleteAllBuffs keeps " Augment" display rows but drops their objects: a revived unit's augments still show but no
+    longer apply (`Unit.aug_orphans`); any later list surgery (Water Shield's spent row, Enchanted Skin) must keep the
+    orphan prefix in mind (`Unit.augment`, `digest.zig`'s stored properties, `snapshot.loadLists`).
+  - Stored per-emitter aura power (War Anger) and a per-refresh increase (currentAttackModIncrease) are hidden state:
+    the export carries them (`auraEffects`, `currentAttackModIncrease`) and the strike recounts them; Flesh Shield's
+    emitter power (`18 * stack power + luck`) is the same shape.
+  - Blessings follow `reapplyTeamBlessing`'s fixed order and their eligibility (walkers, flyers) is read at the census;
+    a blessing whose power reads luck triggers the early luck pass even without a Luck Blessing source.
+  - Arrows Wingshield is a propagation stop, not a damage term: every sweep that walks units (the Chakram, the splash
+    ring, Through Shot, the area throw's 3x3, and for batch 6b Chain Lightning's arcs and Fire Breath's band) must ask
+    TypeScript whether an owner stops it.
+  - Mass casts over a filtered team list (`ALL_FLYING`) visit the caster's team first, then the other, in holder order;
+    Tome of Amplification only for the caster's team. Castling's eager movement-range hook is still not ported.
+  - forceStalledLap appears as soon as a battery has many skipped activations (Blindness and Stun): keep the recorder's
+    `stall` marks and run a Unicorn or Squire battery for any change to the activation loop.
+  - Perf: batch 6a's stat hooks live in the same comptime instance as batch 5's (`State.b6_hooks` selects it), its rare
+    work in `noinline` helpers (`engine.b6Steps`, `abilities.captureBatch6`, `ai.advanceTowardEnemy`); whole battles
+    stayed level (the benchmark below).
+- Notes for the v0.8 owner (batch 6a in src/v08):
+  - `rollout.v08Scope` refuses a v0.8 seat while a holder unit holds a batch-6a card (a stolen one too), carries one of
+    its rows (Hamstrung, War Anger's aura row, Blindness, Paralysis, Wind Flow, the four blessings, the Guiding Winds row)
+    or was revived (`Unit.aug_orphans`); Wind Flow and Resurrection stay out of `rollout.V08_CASTABLE`. The batch-5 block
+    is gone (src/v08 covers batch 5: `0809cc1d`, `dbbcb452`, `d2c40d3f`, `6b661284`).
+  - The engine pieces are public: `engine.tryRevive`, `canSelfResurrect`, `warAngerMod`, `enemiesWithin`, `crusade`,
+    `forceStalledLap`, `Unit.isSkipping` / `canMove` / `augment`; `abilities.paralysisFactor`, `blindness`,
+    `paralysis`, `hamstring`; `combat.wingshieldOwner`; `spells.massCastOnFlyers` (through `castSpell`); `ai.advanceTowardEnemy`
+    (SearchDriver's and runMatch's recovery net).
+  - Where TypeScript's AI reads batch 6a (grep of `src/ai`): War Anger in `candidates.ts`, `melee_damage_estimate.ts`,
+    `ai.ts` and `v0_5.ts`; Paralysis in `candidates.ts`, `melee_damage_estimate.ts`, `rider_ev_router.ts`,
+    `lightning_spin_tactics.ts`, `last_fuse_estimate.ts`; Blindness in `v0_4.ts`, `v0_8_support_roles.ts`;
+    `isSkippingThisTurn` in `v0_5.ts`, `rider_ev_router.ts`; `canMove()` in most layers; Resurrection and Wind Flow
+    casts in `candidates.ts`, `caster_router.ts`, `v0_7.ts`; the blessings in `carrier_cohesion.ts` (and Wolf Trail in
+    `v0_5.ts`), Arrows Wingshield in `v0_8_backline_protector.ts`, Guiding Winds in `v0_8_placement_lift.ts`.
+  - The rollouts now run both recovery paths (`rollout.simAdvance`'s forceStalledLap, `recoverNoopTurn`), so "a policy
+    turn landed nothing" is no longer a refusal: a src/v08 decision the engine refuses is played out by the net, as
+    TypeScript does, and shows up only as a value difference.
+
 ## How parity is checked
 
 `parity/record.ts` runs real headless battles through `runMatch` and records every top-level engine call
@@ -974,6 +1094,30 @@ RECORD_GRID=mix RECORD_SIDE=1 RECORD_AUGMENTS=production RECORD_DOCTRINE=random 
 RECORD_KEEP_RATE=1 RECORD_KEEP_ABILITIES=Manticore RECORD_STRIP_ABILITIES="Deep Wounds Level 2" zig/parity/check.sh 50
 ```
 
+Batch-6a options (off unless a batch-6a creature is kept; then the default output above is unchanged otherwise):
+
+- Keeping any of Dryad, Valkyrie, Angel, Champion, Wolf Rider, Unicorn or Mantis turns on the batch-3 columns (War
+  Anger's aura rows are debuffs with a source cell). A kept Valkyrie or Angel counts as a kept spellbook (Wind Flow
+  and Resurrection hold a charge): the spellbook columns and `spellConfigs` follow (`RECORD_SPELLS="Resurrection,Wind
+  Flow"` keeps the charges when other casters are filtered). A unit holding Hamstring adds the `Hamstrung` config, a
+  Wind Flow carrier the System `Wind Flow` config (also in `state_export.ts`).
+- A forced stall (`FightProperties.addAlreadyMadeTurn` called by `forceStalledLap` at depth 0) is recorded as `stall:
+  [ids]` on the next step; `hoc-sim parity` and `resume` apply the marks, `native` checks them.
+- `RECORD_DROP_DECISIONS=k` (a test hook): every top-level decideTurn whose (seed, call index) hash is 0 mod k is
+  computed and then recorded as `out: []`, so runMatch's recovery net plays that turn; `hoc-sim native --drop k`
+  mirrors it (`resume`'s native mode does not, so it differs there by design). The rollout oracle's counterpart is
+  the request field `testDropDecisions` (`BRIDGE.md`).
+
+```bash
+# batch 6a kept at keep rate 1, production-like, with resume points; the recovery net with every fifth decision dropped
+RECORD_GRID=mix RECORD_SIDE=1 RECORD_AUGMENTS=production RECORD_DOCTRINE=random RECORD_SYNERGIES=1 \
+  RECORD_SYNERGY_VARIANTS=seed RECORD_DISTINCT_RED=1 RECORD_PLACEMENT_TIMING=setup-before-placement RECORD_RESUME=random:2 \
+  RECORD_AMOUNTS=expBudget RECORD_KEEP_RATE=1 RECORD_SPELLS="Resurrection,Wind Flow" \
+  RECORD_KEEP_ABILITIES="Dryad,Valkyrie,Angel,Champion,Wolf Rider,Unicorn,Mantis" zig/parity/check.sh 150
+RECORD_DROP_DECISIONS=5 RECORD_KEEP_ABILITIES="Berserker,Unicorn,Angel" bun zig/parity/record.ts 100 61900000 \
+  "$TMPDIR/drop.jsonl" && zig/zig-out/bin/hoc-sim native "$TMPDIR/drop.jsonl" --drop 5
+```
+
 `hoc-sim parity` and `native` report a game they cannot parse (an action or event outside the port) as "recording not
 supported" with its seed and step and go on, as they do for an unsupported start state.
 
@@ -996,6 +1140,49 @@ cd zig && zig build test         # unit tests (random stream, JS number rounding
 ```
 
 Run `check.sh` after changing any rules or v0.1 AI code the port covers, both with and without the batch kept.
+
+Batch 6a, checked on 2026-11-25 (every battle identical; every run on side-oriented production-mix maps with the
+production-like setup and `RECORD_AMOUNTS=expBudget`, most with `RECORD_RESUME=random:2` and traced draws; fresh seeds
+50000000-61999999 plus six stall seeds from earlier recordings, 18080754-18081812). The batteries ran on the same
+batch-6a rules over common `8a002e7f`, then `dbbcb452`, `6b661284` and `6d24d460` as the artifact, Fireball, Fireforged
+Sword, Smoke and Misfortune commits landed; the last battery ran on the final code (`6d24d460` plus this change):
+
+- native v0.1 and engine replay: 6,996 battles, 1,306,452 steps, and 11,952 resume points equal to their digests with
+  1,097,741 remaining steps identical (11,272 of them in native mode too; the 680 others are drop runs, below, whose
+  native resume cannot replay the drops): each creature alone at keep rate 1 (150 each, 51000000-51600000), the cards
+  isolated with `RECORD_STRIP_ABILITIES` (80 each, 52000000-53300000: Valkyrie without War Anger / without Wind Flow,
+  Dryad without Hamstring / without Guiding Winds, Angel without Resurrection / with only Resurrection / only Arrows
+  Wingshield / only Angelic Host, Unicorn without One in the Field / without Blindness, Champion without Crusade /
+  without Tie up / with only Tie up, Wolf Rider without Rapid Charge), the whole batch at keep rate 1 (1,620:
+  54000000-54030000, 56100000, 57000000, 59000000, 61000000), batch 6a with batches 1 to 5, the wave-1 casters and the
+  Wandering Mage at the default rate (1,600: 55000000-55030000, 57100000, 59100000, 61100000), Queen steals of
+  batch-6a cards (300: 56300000, 56310000; 26 stolen Resurrections over all runs), Angels and Unicorns beside Last Fuse,
+  Gravechain, Giant's Maul and Rime Charm holders and Queens (`RECORD_ARTIFACTS=pool:0,15,7/17,17,17,16,6`, 300:
+  56500000, 56510000), Wingshield owners beside Zena, Cyclops, Gargantuan, Tsar Cannon, Hydra and Pikeman (200,
+  58100000), the recovery net (`RECORD_DROP_DECISIONS` 5, 3 and 1 with `native --drop`, 760: 56000000, 56010000,
+  57200000, 58000000, 58010000, 60500000), and 40 battles with a Debug build (61900000);
+- engine replay of v0.8s battles: 720 battles, 170,635 steps, 1,440 resume replays identical, with 284 Wind Flow and 167
+  Resurrection casts accepted as recorded (beside 663 Fireballs, 494 Fireforged Swords, 82 Smokes and 6 Misfortunes,
+  `RECORD_FORCE_CASTS="Fireforged Sword"` in one run; 50200000, 57300000-57500000, 59200000, 61200000, 61300000);
+- reached (digest and trace tallies; the `cnt` counts are from an instrumented copy over part of the runs): 3,428
+  self-revives in v0.1 and 285 in v0.8s battles (8 inside a Last Fuse chain; Armageddon's first wave killed 81 stacks,
+  none an Angel holding its card), 18 forced stalls (43 units) in v0.1 and 4 in v0.8s battles, 5,037 Blindness, 5,991
+  Paralysis (1,166 damage cuts) and 1,619 Hamstrung landings (4,474 Hamstring calls, 1,152 chance rolls, 465 saves, 349
+  mirror rolls), 8,219 skipped activations, 4,311 replies One in the Field kept, 6,810 War Anger strike recounts over
+  175,489 positive refreshes, 176,153 Guiding Winds bonuses, 34,881 Tie up early luck passes without a Luck Blessing,
+  7,470 Crusade gains, 52,313 grounded-flyer reads, Wingshield stops (24 Chakram primaries, 1 bounce, 86 splash rings,
+  17 Through Shot rays, 15 loop breaks), 3 Devour Essence skips, and the recovery net 22,608 advances, 724 defends and
+  140 mindless retries; at most 9 buffs, 6 debuffs and 4 effects on one unit;
+- unchanged: classic `check.sh 300` (57600000, 61500000), production-like batches 1 to 5 kept (300 at 59300000 and 200 at
+  61400000, 2,000 resume points both modes), the wave-1 replay recipe 200/200 (59400000), `ffi/smoke.ts 12 61800000`,
+  `zig build test`, `zig build -Drelease=true`, `zig build lib`;
+- the rollout oracle (`BRIDGE.md`, most runs with a Debug library): v0.1 on batch-6a roots 20 battles, 53 roots, 50,880
+  values identical, 0 refused (58900000, 60000000, 61700000; the last two with `testDropDecisions`, 10,444 recovered
+  turns); v0.8 on the wave-1 casters with batches 1 to 4 and Trent at 0.6, 24 battles, 61 roots, 58,560 values
+  identical, 0 refused (58500000-58800000); v0.8 on batches 1 to 5 with the casters, 30 battles, 68 roots, 65,280 values
+  identical, 0 refused (59500000, 59600000, 60200000, 60300000, 61600000), and 6 more with `testDropDecisions` 4
+  (60100000: 16 roots, 15,360 values, 5,959 recovered turns); the former recovery-net refusal (seed 20200010, root 6)
+  compares identical.
 
 Batch 5, checked on 2026-11-25 against common `e786b46a` (every battle identical; every run on side-oriented
 production-mix maps with the production-like setup, `RECORD_AMOUNTS=expBudget`, `RECORD_RESUME=random:2` and traced
@@ -1365,30 +1552,34 @@ AI's layer loops. Filling the rays in place, a comptime instance of `adjustBaseS
 inline holder tests with out-of-line work recovered it (the batch-5 lessons above). A state is now 70,688 bytes (Unit
 2,080: debuffs 20).
 
+Batch 6a kept whole battles level: ten alternated pairs of `native-bench --reps 5` (load 7 to 9) gave medians of 289.8
+µs (origin/main `6b661284`) and 291.65 µs (this change) per battle, pairwise -0.4%, and eight pairs of the engine-only
+bench 583.5 and 589 ns per step, pairwise +0.1%, with the same run checksums. A state is now 81,152 bytes (Unit 2,400:
+buffs 24, debuffs 25, effects 12).
+
 Where Zig spends battle time (sampled, before the layer bitmap): `getMovePath` 31%, `doFindTarget` 14%, the melee
 target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the layers.
 
 ## Not covered yet
 
-- the abilities of every creature outside batches 1 to 5 and the wave-1 casters, the spells outside wave 1 (Spiritual
-  Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Craft, Wind Flow, Resurrection, Castling, the
-  runes and the rest: a book holding one is refused by name), the disabled Broken Aegis
-  (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and mirror rolls of debuff
-  spells), Crafted Double Shot; the revealed-ranged delivery layer of production's augment plan (it needs the live
-  draft); WATER_CENTER (never played); on the maps, Fire Breath through stones,
-  and `forceStalledLap` / the recovery net (never reached: 0 rejected engine calls in every map recording). The ported
-  code leaves out what no battle in scope can reach: the Made of Fire ability (no creature in scope holds it; the
-  Lava Striders buff is ported), Paralysis, Water Shield and Water Element, Flesh Shield, Dense Flesh
-  (`spendShotsAgainst` spends one arrow), the aura power types outside the six in scope, the Wind Element (Thunderbird
-  is not ported), the Castling hook's getMovePath (it draws nothing), runs of more stunned activations than the advance
-  attempts allow (`forceStalledLap`, never seen), the mass casts other than Battle Roar's ALL_ALLIES buff (Mass Heal,
-  the flyer and enemy casts), Holy Cross (a gift the caster keeps); the recovery net is ported only for mindless units
-  (runMatch's retry, never reached). The ranged Deep Wounds riders are reached through Wounding Charm's granted card
-  (and a Queen holding both a stolen Deep Wounds and a stolen Endless Quiver).
+- the abilities of every creature outside batches 1 to 5 and 6a and the wave-1 casters (batch 6b: Harpy, Mermaid,
+  Efreet, Black Dragon, Abomination, Thunderbird), the spells outside wave 1, the Book of Chaos and batch 6a's castables
+  (Spiritual Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Craft, Castling, the runes and the rest: a book holding
+  one is refused by name), the disabled Broken Aegis (its +20 break chance and self-miss) and Holy Cross (resurrection,
+  the magic-resist and mirror rolls of debuff spells), Crafted Double Shot; the revealed-ranged delivery layer of
+  production's augment plan (it needs the live draft); WATER_CENTER (never played); on the maps, Fire Breath through
+  stones. The ported code leaves out what no battle in scope can reach: the Made of Fire ability (no creature in scope
+  holds it; the Lava Striders buff is ported), Water Shield and Water Element, Flesh Shield, Dense Flesh
+  (`spendShotsAgainst` spends one arrow), the aura power types outside the eight in scope, the Wind Element (Thunderbird
+  is not ported), Freeze in `isSkipping` (no Freeze in scope), the Castling hook's getMovePath (it draws nothing), the
+  mass casts other than Battle Roar's ALL_ALLIES buff and Wind Flow's ALL_FLYING one (Mass Heal, the enemy casts), Holy
+  Cross (a gift the caster keeps, and its x1.5 on the Resurrection cast). An Angel revived by Armageddon's first wave is
+  ported (`engine.applyArmageddon`) but never reached in the batteries. The ranged Deep Wounds riders are reached
+  through Wounding Charm's granted card (and a Queen holding both a stolen Deep Wounds and a stolen Endless Quiver).
 - the AI versions the research uses (v0.8 with the a19 search). The production rollout policy is the v0.8 chain, about
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and
   `compare.NativeCheck`. The bridge's rollouts take each unit's decide function from `rollout.policies` (v0.1 and
-  v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers batches 1 to 4 and the wave-1 casts, so a
-  v0.8 request on a board with another spell or a batch-5 card or debuff is refused (the known gaps and what the
-  search still needs are in `BRIDGE.md`).
+  v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers batches 1 to 5 and the wave-1 casts, so a
+  v0.8 request on a board with another spell, an artifact row, smoke or a batch-6a card or row is refused (the known
+  gaps and what the search still needs are in `BRIDGE.md`).

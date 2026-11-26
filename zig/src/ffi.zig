@@ -486,6 +486,8 @@ fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []
         return null;
     }
     req.sole_abomination_defend = sole == .bool and sole.bool;
+    const drop = rec.get(v, "testDropDecisions");
+    if (drop == .integer and drop.integer > 0) req.drop_decisions = @intCast(@min(drop.integer, std.math.maxInt(u32)));
     const ids_v = rec.get(v, "summonIds");
     if (ids_v != .null) {
         const name = if (ids_v == .string) ids_v.string else "?";
@@ -616,8 +618,6 @@ export fn hoc_rollouts(eng: ?*Engine, handle: ?*const Handle, req_json: ?[*]cons
     const written = rollout.run(&h.state, &e.scratch, &req, out, &ctl) catch |err| {
         e.stats = .{ .turns = ctl.turns, .written = 0, .stop = @intFromEnum(ctl.stop), .summon_sequence = ctl.summon_sequence, .uuid_sequence = ctl.uuid_sequence };
         e.fail("unsupported rollout: {s}", .{switch (err) {
-            error.UnsupportedRecovery => "a policy turn landed nothing (the recovery net is not ported)",
-            error.UnsupportedStall => "the turn queue stalled (forceStalledLap is not ported)",
             error.UnsupportedPolicy => "a unit without a policy had to play, or its policy needs a pass the port lacks",
             error.UnsupportedCapacity => "a capacity of the port was exceeded (unit slots, ids, lists, chance keys, or a summon without its id parts)",
         }});

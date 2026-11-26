@@ -16,16 +16,19 @@ pub const NO_UID: u8 = 0xff;
 pub const GRID = 16;
 /// Buffs a unit can carry in scope: Morale, Luck Blessing, Sylvan Focus, Arcane Ward, Warding Mane, Sharpened Weapons
 /// (melee or magic units) or Rallying Volley (shooters), Ember Covenant, four aura rows (Disguise among them), the five
-/// augments, a cast Blessing, Battle Roar and the Hidden marker (19), plus a Tier-1 and a Tier-2 artifact row (21),
-/// with one to spare. A push past a capacity sets State.overflow (the checks report it).
-pub const MAX_SPELLS = 22;
+/// augments, a cast Blessing, Battle Roar and the Hidden marker (19), plus a Tier-1 and a Tier-2 artifact row (21);
+/// batch 6a adds a fifth aura row (Guiding Winds), Wind Flow and three census blessings (Tie up the Horses and Angelic
+/// Host exclude each other): 26 at worst (11 seen), so 24 rows; a push past a capacity sets State.overflow (the checks
+/// report it).
+pub const MAX_SPELLS = 24;
 /// Debuffs: Dismorale, Dulling Defense, Miner, the Web Aura and Range Null Field Aura rows, the Vine Throw snare, the
 /// Visible marker and Spit Ball's seven, which a Magic Reflection mirror can duplicate on the shooter (19 in scope; 9 seen
-/// on one unit), two dual-artifact markers and Gravechain's Gravebound (22; Rime Charm's Quagmire is Spit Ball's).
-/// Effects: Stun, Break, Poison, Aggr, Shatter Armor, Pegasus Light, Deep Wounds, Boar Saliva, Terrifying Gaze, one to
-/// spare.
-pub const MAX_DEBUFFS = 23;
-pub const MAX_EFFECTS = 10;
+/// on one unit), two dual-artifact markers and Gravechain's Gravebound (22; Rime Charm's Quagmire is Spit Ball's), and
+/// batch 6a's War Anger aura row and Hamstrung (a mirror can duplicate it too): 25.
+/// Effects: Stun, Break, Poison, Aggr, Shatter Armor, Pegasus Light, Deep Wounds, Boar Saliva, Terrifying Gaze,
+/// Blindness, Paralysis, one to spare.
+pub const MAX_DEBUFFS = 25;
+pub const MAX_EFFECTS = 12;
 
 pub const Team = struct {
     pub const NO_TEAM: u8 = 0;
@@ -162,6 +165,29 @@ pub const SpellId = enum(u8) {
     made_of_fire,
     gravebound,
 
+    // batch 6a
+    /// The Dryad's Hamstring debuff (spells.json Death "Hamstrung", recorded in `init.spellConfigs`): a flyer is grounded,
+    /// steps and steps_mod x (100 - power) / 100.
+    hamstrung,
+    /// The Valkyrie's debuff aura row on enemy melee and magic units (read by nothing).
+    war_anger_aura,
+    /// The Dryad's buff aura row on allied RANGE creatures: + power% of the initial shot distance while RANGE is selected.
+    guiding_winds_aura,
+    /// The Valkyrie's ALL_FLYING mass cast: + power base armor, - min(power, the config's) steps (floored at 1).
+    wind_flow,
+    /// The Angel's census blessings: range armor x (1 + power / 100) on every ally; + power armor_mod, attack_mod and
+    /// steps_mod on allies that can fly.
+    arrows_wingshield_blessing,
+    angelic_host_blessing,
+    /// The Champion's census blessing on allies that cannot fly: + power steps_mod (4 decimals, slowed).
+    tie_up_the_horses_blessing,
+    /// The Wolf Rider's census blessing: + power steps_mod on every ally.
+    wolf_trail_blessing,
+    /// The Unicorn's effect: the holder skips its activations, gives no response or counter-shot and no second punch.
+    blindness,
+    /// The Mantis's effect: the holder cannot move and deals (100 - power)% of its damage.
+    paralysis,
+
     /// An artifact buff row or marker debuff (UnitsHolder.applyArtifacts).
     pub inline fn isArtifact(self: SpellId) bool {
         return @intFromEnum(self) >= @intFromEnum(SpellId.veteran_helm) and @intFromEnum(self) <= @intFromEnum(SpellId.aegis_of_the_arcane);
@@ -243,6 +269,16 @@ pub const SpellId = enum(u8) {
             .gravebound => "Gravebound",
             .made_of_fire => "Made of Fire",
             .aegis_of_the_arcane => "Aegis of the Arcane",
+            .hamstrung => "Hamstrung",
+            .war_anger_aura => "War Anger Aura",
+            .guiding_winds_aura => "Guiding Winds Aura",
+            .wind_flow => "Wind Flow",
+            .arrows_wingshield_blessing => "Arrows Wingshield Blessing",
+            .angelic_host_blessing => "Angelic Host Blessing",
+            .tie_up_the_horses_blessing => "Tie up the Horses Blessing",
+            .wolf_trail_blessing => "Wolf Trail Blessing",
+            .blindness => "Blindness",
+            .paralysis => "Paralysis",
         };
     }
 
@@ -252,6 +288,14 @@ pub const SpellId = enum(u8) {
     /// One of Spit Ball's seven debuffs.
     pub inline fn isSpitBall(self: SpellId) bool {
         return @intFromEnum(self) >= @intFromEnum(SpellId.curse) and @intFromEnum(self) <= @intFromEnum(SpellId.cowardice);
+    }
+
+    /// A batch-6a buff row adjustBaseStats reads (the four blessings, Wind Flow, the Guiding Winds row).
+    pub inline fn isBatch6Stat(self: SpellId) bool {
+        return switch (self) {
+            .arrows_wingshield_blessing, .angelic_host_blessing, .tie_up_the_horses_blessing, .wolf_trail_blessing, .wind_flow, .guiding_winds_aura => true,
+            else => false,
+        };
     }
 
     /// An augment buff (UnitsHolder.applyAugments).
@@ -461,6 +505,32 @@ pub const AbilityId = enum(u8) {
     piercing_spear,
     /// Centaur: max hp x (1 + multiplier) at every refresh.
     boost_health,
+    // batch 6a
+    /// Dryad: a buff aura on allied RANGE creatures (their shot distance).
+    guiding_winds_aura,
+    /// Dryad: the Hamstrung rider of its shot and its melee blow (flyers only).
+    hamstring,
+    /// Valkyrie: a debuff aura on enemy melee units, and the holder's attack mod from the enemies around it.
+    war_anger_aura,
+    /// Valkyrie: castable, one ":Wind Flow" charge (the ALL_FLYING mass cast).
+    wind_flow,
+    /// Angel: castable, one ":Resurrection" charge shared by the on-death self-revive and the cast.
+    resurrection,
+    /// Angel: census blessings (range armor; flyers' attack, armor and steps).
+    arrows_wingshield_blessing,
+    angelic_host_blessing,
+    /// Champion: a census blessing on walkers (steps), luck-dependent and an early-luck-pass trigger.
+    tie_up_the_horses_blessing,
+    /// Champion: + count per travelled cell on the initial base attack and armor.
+    crusade,
+    /// Wolf Rider: a census blessing (steps).
+    wolf_trail_blessing,
+    /// Unicorn: the reply is never spent.
+    one_in_the_field,
+    /// Unicorn (MIND): the Blindness rider of its blow and response.
+    blindness,
+    /// Mantis (STATUS): the Paralysis rider of its blow and response.
+    paralysis,
 
     pub fn name(self: AbilityId) []const u8 {
         return switch (self) {
@@ -540,6 +610,19 @@ pub const AbilityId = enum(u8) {
             .area_throw => "Area Throw",
             .piercing_spear => "Piercing Spear",
             .boost_health => "Boost Health",
+            .guiding_winds_aura => "Guiding Winds Aura",
+            .hamstring => "Hamstring",
+            .war_anger_aura => "War Anger Aura",
+            .wind_flow => "Wind Flow",
+            .resurrection => "Resurrection",
+            .arrows_wingshield_blessing => "Arrows Wingshield Blessing",
+            .angelic_host_blessing => "Angelic Host Blessing",
+            .tie_up_the_horses_blessing => "Tie up the Horses Blessing",
+            .crusade => "Crusade",
+            .wolf_trail_blessing => "Wolf Trail Blessing",
+            .one_in_the_field => "One in the Field",
+            .blindness => "Blindness",
+            .paralysis => "Paralysis",
         };
     }
 
@@ -562,13 +645,15 @@ pub const AbilityId = enum(u8) {
         };
     }
 
-    /// The spell a castable ability carries (`can_be_cast`, makeAbility's System spell): Vine Throw, Battle Roar and
-    /// Wild Regeneration in scope.
+    /// The spell a castable ability carries (`can_be_cast`, makeAbility's System spell): Vine Throw, Battle Roar, Wild
+    /// Regeneration, Wind Flow and Resurrection in scope.
     pub inline fn castable(self: AbilityId) ?CastSpell {
         return switch (self) {
             .vine_throw => .vine_throw,
             .battle_roar => .battle_roar,
             .wild_regeneration => .wild_regeneration,
+            .wind_flow => .wind_flow,
+            .resurrection => .resurrection,
             else => null,
         };
     }
@@ -599,6 +684,13 @@ pub const AbilityId = enum(u8) {
         for ([_]AbilityId{ .sniper, .limited_supply, .double_shot, .endless_quiver, .petrifying_gaze, .spit_ball, .large_caliber, .mechanism, .no_melee, .through_shot, .double_throw, .area_throw, .piercing_spear, .boost_health }) |id| m |= id.bit();
         break :blk m;
     };
+
+    /// The batch-6a cards (Dryad, Valkyrie, Angel, Champion, Wolf Rider, Unicorn, Mantis; Rapid Charge is batch 1's).
+    pub const BATCH6A_MASK: AbilityMask = blk: {
+        var m: AbilityMask = 0;
+        for ([_]AbilityId{ .guiding_winds_aura, .hamstring, .war_anger_aura, .wind_flow, .resurrection, .arrows_wingshield_blessing, .angelic_host_blessing, .tie_up_the_horses_blessing, .crusade, .wolf_trail_blessing, .one_in_the_field, .blindness, .paralysis }) |id| m |= id.bit();
+        break :blk m;
+    };
 };
 
 // =====================================================================================================================
@@ -625,6 +717,9 @@ pub const CastSpell = enum(u8) {
     fireforged_sword,
     misfortune,
     smoke,
+    // batch 6a: castable abilities
+    wind_flow,
+    resurrection,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -643,6 +738,8 @@ pub const CastSpell = enum(u8) {
             .fireforged_sword => "Fireforged Sword",
             .misfortune => "Misfortune",
             .smoke => "Smoke",
+            .wind_flow => "Wind Flow",
+            .resurrection => "Resurrection",
         };
     }
 
@@ -662,6 +759,7 @@ pub const CastSpell = enum(u8) {
             .battle_roar => .battle_roar,
             .fireforged_sword => .fireforged_sword,
             .misfortune => .misfortune,
+            .wind_flow => .wind_flow,
             else => null,
         };
     }
@@ -832,6 +930,8 @@ pub const PowerType = struct {
     pub const DISABLE_RANGE_ATTACK: u8 = 17;
     /// The Disguise aura (White Tiger): it lands only on its holders and carries no power.
     pub const UNTARGETABLE: u8 = 46;
+    /// The Guiding Winds aura (Dryad): allied RANGE creatures shoot power% of their initial distance further.
+    pub const ADDITIONAL_SHOT_DISTANCE_PERCENTAGE: u8 = 65;
 };
 
 /// AbilityType values the ported processors branch on.
@@ -1032,6 +1132,15 @@ pub const Unit = struct {
     /// Artifacts: Unit.lastFuseFatalHit, written by the killing hit when the striker's army holds Last Fuse, read by
     /// the same step's death cleanup (never set at a step boundary).
     fuse: FuseHit = .{},
+    /// The power its War Anger AuraEffect holds (the last aura refresh that iterated it), hidden: getUnitAuraAttackMod
+    /// reads it at every refresh and at the strike.
+    war_anger_power: f64 = 0,
+    /// Unit.currentAttackModIncrease: the War Anger attack mod the last increaseAttackMod added (0 for a non-holder),
+    /// hidden; the strike's cleanupAttackModIncrease takes it back off before recounting.
+    attack_mod_increase: f64 = 0,
+    /// The leading buff rows that have no AppliedSpell object: a Resurrection revive (deleteAllBuffs) keeps the augment
+    /// display rows and drops every object, so the stat refresh no longer reads them while the digest still lists them.
+    aug_orphans: u8 = 0,
 
     pub fn isDead(self: *const Unit) bool {
         return self.amount_alive <= 0;
@@ -1078,14 +1187,26 @@ pub const Unit = struct {
         return self.n_auras;
     }
 
-    /// hasEffectActive("Stun"): isSkippingThisTurn (no Blindness, Freeze or Whirlpool in scope), and canRespond's veto.
+    /// hasEffectActive("Stun"): Stun's own "already stunned" test.
     pub inline fn isStunned(self: *const Unit) bool {
         return self.effects.len != 0 and self.effects.find(.stun) != null;
     }
 
-    /// canMove(): no Paralysis or Whirlpool in scope, so only the Web lock taken at activation.
+    /// isSkippingThisTurn and canRespond's effect veto: Stun or Blindness (no Freeze or Whirlpool in scope).
+    pub inline fn isSkipping(self: *const Unit) bool {
+        return self.effects.len != 0 and (self.effects.find(.stun) != null or self.effects.find(.blindness) != null);
+    }
+
+    /// canMove(): no Paralysis (read live) and no Web lock (taken at activation); no Whirlpool in scope.
     pub inline fn canMove(self: *const Unit) bool {
-        return !self.web_locked;
+        return !self.web_locked and !(self.effects.len != 0 and self.effects.find(.paralysis) != null);
+    }
+
+    /// The first buff of an augment name among the rows that still have an object (getBuff / statBuffs: a revive's
+    /// orphan display rows are skipped).
+    pub fn augment(self: *const Unit, id: SpellId) ?*const AppliedSpell {
+        for (self.buffs.items[self.aug_orphans..self.buffs.len]) |*b| if (b.id == id) return b;
+        return null;
     }
 
     /// cannotAttackUnitId(id): the raw forbidden id (no liveness check, not Break-aware).
@@ -1410,6 +1531,20 @@ pub const State = struct {
     /// The hasLavaCell of the action being applied (move_unit, a path-bearing melee or obstacle strike), set by
     /// engine.applyAction for the route modifiers (applyLavaWaterModifier).
     action_lava: bool = false,
+    /// Batch-6a gates (loadScopeFlags): some unit can hold or carries a batch-6a stat row (the blessings, the Guiding Winds
+    /// row, Wind Flow, Hamstrung: adjustBaseStats' hooks); some unit can hold War Anger (the attack-mod counts); some unit
+    /// can hold Hamstring or carries Hamstrung (the grounding and the steps factor); some unit can hold Crusade; some unit
+    /// can hold Resurrection (the revive at cleanup, Devour Essence's skip).
+    b6_hooks: bool = false,
+    war_anger: bool = false,
+    hamstring: bool = false,
+    crusade: bool = false,
+    resurrection: bool = false,
+    /// The War Anger aura def's index in aura_defs (NO_AURA when none).
+    war_anger_def: u8 = NO_AURA,
+    /// spells.json Death "Hamstrung" (laps, power), recorded in `spellConfigs` when a unit holds Hamstring.
+    hamstrung_laps: f64 = 3,
+    hamstrung_power: f64 = 30,
 
     /// cannotAttackUnitId on battles where a gaze can land (Unit.forbidden is never set otherwise).
     pub inline fn forbids(self: *const State, u: *const Unit, target_uid: u8) bool {

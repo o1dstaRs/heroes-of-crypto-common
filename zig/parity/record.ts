@@ -21,6 +21,7 @@ import { dirname } from "node:path";
 import creaturesJson from "../../src/configuration/creatures.json";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { TurnEngine } from "../../src/engine/turn_engine";
+import { FightProperties } from "../../src/fights/fight_properties";
 import { getAIStrategy } from "../../src/ai";
 import { captureAITargetMemory } from "../../src/ai/ai";
 import { StrategyV0_1 } from "../../src/ai/versions/v0_1";
@@ -109,6 +110,10 @@ const BATCH4_CREATURES = [
     "Troll",
 ];
 const BATCH4 = BATCH4_CREATURES.some((name) => KEEP.has(name));
+/** The batch-6a creatures: keeping any turns on the batch-3 columns; a castable card (Wind Flow, Resurrection) holds a
+ * charge, so it counts as a kept spellbook. */
+const BATCH6A_CREATURES = ["Dryad", "Valkyrie", "Angel", "Champion", "Wolf Rider", "Unicorn", "Mantis"];
+const BATCH6A = BATCH6A_CREATURES.some((name) => KEEP.has(name));
 /** A kept creature with a spellbook (or RECORD_SPELLS set): the spellbook digest columns and spell configs are written.
  * A kept batch-4 creature with a castable card (Behemoth's Battle Roar, Troll's Wild Regeneration) holds a charge too. */
 let keptSpellbook = false;
@@ -118,7 +123,7 @@ for (const [faction, creatures] of Object.entries(creaturesJson as Record<string
         if (KEEP.has(name)) {
             if (STRIP.size) creature.abilities = creature.abilities.filter((card: string) => !STRIP.has(card));
             if (
-                BATCH4_CREATURES.includes(name) &&
+                (BATCH4_CREATURES.includes(name) || BATCH6A_CREATURES.includes(name)) &&
                 creature.abilities.some((card: string) => getAbilityConfig(card)?.can_be_cast)
             ) {
                 keptSpellbook = true;
@@ -262,6 +267,12 @@ const DISTINCT_RED = process.env.RECORD_DISTINCT_RED === "1";
 const PLACEMENT_TIMING = (process.env.RECORD_PLACEMENT_TIMING ?? "").trim();
 const ARTIFACT_MODE = (process.env.RECORD_ARTIFACTS ?? "").trim();
 const TRACE = process.env.RECORD_TRACE_DRAWS === "1";
+// RECORD_DROP_DECISIONS=k (a test hook for runMatch's recovery net): every top-level decideTurn whose (seed, call index)
+// hash is 0 mod k is computed (its draws stand) and then replaced by [] (recorded as `out: []`), so runMatch's recovery
+// net (the mindless retry, or advanceTowardEnemyAction then defend) plays that turn. `hoc-sim native --drop k` mirrors it.
+const DROP = Number(process.env.RECORD_DROP_DECISIONS ?? 0);
+const dropped = (seed: number, index: number): boolean =>
+    DROP > 0 && ((Math.imul(seed, 0x9e3779b1) ^ Math.imul(index + 1, 0x85ebca6b)) >>> 0) % DROP === 0;
 if (PLACEMENT_TIMING && PLACEMENT_TIMING !== "setup-before-placement") {
     throw new Error(`RECORD_PLACEMENT_TIMING: expected setup-before-placement, got ${PLACEMENT_TIMING}`);
 }
@@ -499,7 +510,7 @@ const SPELLS = keptSpellbook || SPELL_KEEP !== undefined;
 // gazer's id or "") as the last unit column. A start state holding Disguise Aura gains the System "Hidden" and
 // "Visible" configs in `spellConfigs`. Under a RECORD_VERSION other than v0.1, a mindless unit's ("AI Driven")
 // decisions, which runMatch makes with StrategyV0_1, are recorded as decide steps marked `v: "v0.1"`.
-const BATCH3_COLUMNS = BATCH3 || SPELLS || BATCH4;
+const BATCH3_COLUMNS = BATCH3 || SPELLS || BATCH4 || BATCH6A;
 // ---- batch 5 ----
 // No new digest column. A start state holding a Spit Ball card gains the seven debuffs' configs in `spellConfigs` (they
 // are applied by an ability, so no book names them) and the .meta.json gains `spit`; a start-state unit holding Sniper
@@ -517,10 +528,16 @@ const holdsCard = (name: string): boolean =>
 const SPIT = holdsCard("Spit Ball");
 const SPELL_SUMMON_CREATURES = ["Wolf"];
 
-const DIGEST_FIELDS = digestFields(SETUP, BATCH3 || BATCH4, SPELLS, BATCH4);
+const DIGEST_FIELDS = digestFields(SETUP, BATCH3 || BATCH4 || BATCH6A, SPELLS, BATCH4);
 
 function digest(ctx: Ctx): { units: unknown[][]; fight: Record<string, unknown> } {
-    return battleDigest(ctx, { setup: SETUP, terrain: TERRAIN, batch3: BATCH3, spells: SPELLS, batch4: BATCH4 });
+    return battleDigest(ctx, {
+        setup: SETUP,
+        terrain: TERRAIN,
+        batch3: BATCH3 || BATCH6A,
+        spells: SPELLS,
+        batch4: BATCH4,
+    });
 }
 
 /** Whether a unit of the holder can ever cast a summon spell (Summon Wolves). */
@@ -706,6 +723,13 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
             spellConfigs[name] = JSON.parse(JSON.stringify(getSpellConfig(faction, name)));
         }
     }
+    // Batch 6a: Hamstring applies the Death "Hamstrung" debuff (no book names it).
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        if (u.getUnitProperties().abilities.includes("Hamstring")) {
+            spellConfigs.Hamstrung = JSON.parse(JSON.stringify(getSpellConfig("Death", "Hamstrung")));
+            break;
+        }
+    }
     // Artifacts: Rime Charm and Gravechain apply the Death "Quagmire" and "Gravebound" debuffs.
     for (const u of ctx.unitsHolder.getAllUnits().values()) {
         const names = u.getUnitProperties().applied_buffs as string[];
@@ -854,6 +878,16 @@ function main(): void {
     const siteLog: string[] = [];
     const siteTally = new Map<string, number>();
 
+    // runMatch's forceStalledLap (turn_recovery.ts) marks every living unit as having made its turn BETWEEN engine calls
+    // (completeTurn, the only other writer, runs inside one): the next recorded step carries `stall`, the ids in call
+    // order, which the engine replay applies first. Absent when it never fires (the recording is then unchanged).
+    let stallMarks: string[] = [];
+    const addAlreadyMadeTurn = FightProperties.prototype.addAlreadyMadeTurn;
+    FightProperties.prototype.addAlreadyMadeTurn = function (this: unknown, team: any, id: string, ...rest: any[]) {
+        if (recording && depth === 0 && ctx && this === ctx.fightProperties) stallMarks.push(id);
+        return (addAlreadyMadeTurn as any).call(this, team, id, ...rest);
+    };
+
     const wrap = (proto: any, method: string, kind: string): void => {
         const original = proto[method];
         proto[method] = function (this: unknown, arg: unknown) {
@@ -861,6 +895,7 @@ function main(): void {
             const r0 = rng.state;
             const d0 = rng.draws;
             const site0 = siteLog.length;
+            const stall = stallMarks.splice(0);
             depth += 1;
             const t0 = process.hrtime.bigint();
             let result: any;
@@ -874,6 +909,7 @@ function main(): void {
             steps.push({
                 k: kind,
                 a: arg ?? {},
+                ...(stall.length ? { stall } : {}),
                 r0,
                 r1: rng.state,
                 draws: rng.draws - d0,
@@ -949,6 +985,8 @@ function main(): void {
     let resumePoints: ResumePoint[] = [];
     let resumeRng: () => number = () => 0;
     let decisionIndex = 0;
+    let dropIndex = 0;
+    let dropSeed = 0;
     const keepResumePoint = (unit: any): void => {
         const index = decisionIndex;
         decisionIndex += 1;
@@ -1063,6 +1101,7 @@ function main(): void {
             const t0 = process.hrtime.bigint();
             try {
                 actions = v01DecideTurn.call(this, unit, context);
+                if (dropped(dropSeed, dropIndex++)) actions = [];
             } finally {
                 decideNanos += process.hrtime.bigint() - t0;
                 decisions += 1;
@@ -1099,6 +1138,7 @@ function main(): void {
         let candidates: unknown[] | undefined;
         try {
             actions = decideTurn.call(this, unit, context);
+            if (dropped(dropSeed, dropIndex++)) actions = [];
         } finally {
             if (layersModule) {
                 layers = layersModule.endDecision();
@@ -1143,6 +1183,7 @@ function main(): void {
         const greenSynergies = synergiesFor(roster, boardVariants);
         const redSynergies = synergiesFor(redRoster, boardVariants);
         siteLog.length = 0;
+        stallMarks = [];
         steps = [];
         resumePoints = [];
         summonTracking = false;
@@ -1151,6 +1192,8 @@ function main(): void {
         summonIds = [];
         seenIds.clear();
         decisionIndex = 0;
+        dropIndex = 0;
+        dropSeed = seed;
         if (RESUME) resumeRng = makeRng(Math.imul(seed ^ 0x2545f491, 0x9e3779b1) >>> 0);
         let init: Record<string, unknown> | undefined;
         const result = runMatch({

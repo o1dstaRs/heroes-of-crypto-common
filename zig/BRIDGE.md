@@ -114,13 +114,18 @@ nothing reads), Poison's stack count (it only feeds the description), `fight.id`
 summon takes the createSummonedUnit id unless a rollout request asks for `summonIds: "uuidSequence"`; the counter itself
 is loaded and counts every summon).
 
+Read for batch 6a: `currentAttackModIncrease` (War Anger's increase, undefined = 0), each War Anger emitter's power
+from `auraEffects` (`Unit.war_anger_power`), a revived unit's leading augment display rows without objects
+(`Unit.aug_orphans`: deleteAllBuffs keeps the rows and drops the objects; the stored properties are matched after
+them), and the `Hamstrung` and System `Wind Flow` configs in `spellConfigs` (`state_export.ts` adds them when a unit
+holds Hamstring or carries Wind Flow).
+
 Refused as an unsupported state (the loader names what it found): summoned units other than the creatures Infest and
-Summon Wolves raise, and non-creature units; a spell outside wave 1 (by name, in the raw entries or the Spell objects),
+Summon Wolves raise, and non-creature units; a spell outside the ported ones (by name, in the raw entries or the Spell objects),
 more spell entries or spells than the book holds (16/6); an artifact-granted ability other than the Wounding Charm's
-card; Helping Hand; ranked `*_authoritative` stats; a spent Water Shield; a pending Last Fuse record; a War Anger
-attack increase; an
-unported ability, aura, buff, debuff or effect; effect stacks other than Poison's; more buffs, debuffs, effects, active
-or stolen abilities than the lists hold (22/23/10/10/6); WATER_CENTER or a water cell; an artifact
+card; Helping Hand; ranked `*_authoritative` stats; a spent Water Shield; a pending Last Fuse record; an unported
+ability, aura, buff, debuff or effect; effect stacks other than Poison's; more buffs, debuffs, effects, active or
+stolen abilities than the lists hold (24/25/12/10/6); WATER_CENTER or a water cell; an artifact
 the port does not play (artifacts.supportedT1/T2, or its buff name); legacy-axis seats; smoke clouds or fire walls; more
 than 96 vines; a unit on lava that cannot traverse it, or terrain the board lost; more than
 32 units in the holder or 255 ids; units out of holder order. Malformed input (a missing field, a wrong type, an id no
@@ -149,7 +154,8 @@ struct RolloutStats { uint64_t turns; uint32_t written; int32_t stop;
                       uint64_t summon_sequence, uuid_sequence; };                   // 32 bytes
 ```
 
-- `end`: 0 elimination, 1 turn cap, 2 stuck, 3 observer stop, 4 unsupported (the recovery net). `winner`: the
+- `end`: 0 elimination, 1 turn cap, 2 stuck, 3 observer stop, 4 unsupported (kept for the ABI; no longer produced
+  since the recovery net and forceStalledLap are ported). `winner`: the
   fight_finished team (2 LEFT / green, 1 RIGHT / red, 0 none), -1 when unfinished. `stop`: 0 done, 1 deadline, 2 turn
   budget, 3 output full. `summon_sequence` / `uuid_sequence`: runMatch's createSummonedUnit counter and lib.ts
   deterministicUuidSequence after the call (aborted rollouts included), for the next request's start values.
@@ -235,16 +241,17 @@ calling thread at every call (`rollout.battleTable` over the root's slots, names
 slot). A team without a profile is passed as melee_magic 255 (v0.7's finalizeDecision then keeps v0.6's decision, the
 port's anchor-army path; nothing else reads the count).
 
-Scope of the v0.8 policy (`rollout.v08Scope`, checked on the root; no batch-5 card or debuff and no spell outside the
-list can appear inside a rollout from a root without one): src/v08 covers the abilities of batches 1 to 4 (common
-`4f5152ba`, `2346a159`), the wave-1 casts with the vines (`bcf722a4`, `66e72e9e`) and the batch-4 castables (Battle
-Roar, the Wild Regeneration gift), so a request with a v0.8 seat is refused when any holder unit holds a book entry or
-parsed spell outside the whitelist `rollout.V08_CASTABLE` (Heal, Blessing, Lightning Strike, Fire Strike, Meteor Shower,
-Meteorite, Summon Wolves, Vine Throw, Ring of Fire, Battle Roar, Wild Regeneration: a spell added to `st.CastSpell`
-later is refused until it joins the list), or when a unit holds a batch-5 card (Sniper, Limited Supply, Double Shot,
-Endless Quiver, Petrifying Gaze, Spit Ball, Large Caliber, Mechanism, No Melee, Through Shot, Double Throw, Area Throw,
-Piercing Spear, Boost Health; a stolen one too) or carries one of Spit Ball's debuffs, until src/v08 ports batch 5. The
-v0.1 policy takes every board the engine port loads, batch 5 included. Candidates may be any action the engine replays,
+Scope of the v0.8 policy (`rollout.v08Scope`, checked on the root; no batch-6a card or row and no spell outside the
+list can appear inside a rollout from a root without one): src/v08 covers the abilities of batches 1 to 5 (common
+`4f5152ba`, `2346a159`, `0809cc1d`, `dbbcb452`, `d2c40d3f`, `6b661284`), the wave-1 casts with the vines (`bcf722a4`,
+`66e72e9e`) and the batch-4 castables (Battle Roar, the Wild Regeneration gift), so a request with a v0.8 seat is
+refused when any holder unit holds a book entry or parsed spell outside the whitelist `rollout.V08_CASTABLE` (Heal,
+Blessing, Lightning Strike, Fire Strike, Meteor Shower, Meteorite, Summon Wolves, Vine Throw, Ring of Fire, Battle Roar,
+Wild Regeneration: a spell added to `st.CastSpell` later, Wind Flow and Resurrection included, is refused until it
+joins the list), when a unit holds a batch-6a card (a stolen one too), carries a batch-6a row (Hamstrung, War Anger's
+aura row, Blindness, Paralysis, Wind Flow, the four blessings, the Guiding Winds row) or was revived (orphan augment
+rows), when the board has smoke clouds, or when any artifact row exists. The v0.1 policy takes every board the engine
+port loads, batches 5 and 6a included. Candidates may be any action the engine replays,
 `area_throw_attack` and the free-aim `range_attack` included. The two refusals for
 src/v08 gaps (a removed unit in alreadyMadeTurn, an Angel or Queen with a synergy aura range) are gone: its owner fixed
 them (common `d5fddea9`, `6e6aff54`), and the holder-ordered copy the learned leaves were scored on went with them.
@@ -255,10 +262,15 @@ before each pair, action and turn, and before the leaf), when the rollout turns 
 does), or when `out_cap` is full. `hoc_rollout_stats` gives the turns played (aborted rollouts included, as
 `counters.rolloutTurnsTotal` counts them), the stop reason and the counters.
 
-Refused (the call fails, never guesses): the cases above, an action type outside the engine port, a rollout whose
-policy turn lands nothing (the recovery net, `advanceTowardEnemyAction`, is not ported), a v0.8 decision that needs a
-pass src/v08 lacks (`decideV08` returns false), a stalled queue with living units (`forceStalledLap`), and a capacity
-of the port (unit slots, ids, lists, 1,024 antithetic keys per rollout). Not modelled: an opponent model
+Refused (the call fails, never guesses): the cases above, an action type outside the engine port, a v0.8 decision
+that needs a pass src/v08 lacks (`decideV08` returns false), and a capacity of the port (unit slots, ids, lists, 1,024
+antithetic keys per rollout). A policy turn that lands nothing plays SearchDriver.recoverNoopTurn
+(`rollout.recoverNoopTurn`: `ai.advanceTowardEnemy`, the port of advanceTowardEnemyAction, when it lands, else
+`defend_turn`), and a queue with no unit to activate in a live fight runs forceStalledLap (`rollout.simAdvance`: every
+living holder unit marked as having made its turn, then the advance again), as TypeScript does. A test hook, the
+request field `testDropDecisions` (k), replaces the policy calls whose per-rollout index n has `Math.imul(n,
+0x85ebca6b) >>> 0` divisible by k with nothing after computing them, so a TypeScript oracle that wraps its policy the
+same way checks the net on thousands of turns. Not modelled: an opponent model
 (`SEARCH_OPP_MODEL`, empty in production) and the material sample of `scoreCandidates`.
 
 ### Traps for a caller
@@ -492,7 +504,6 @@ What remains before the server's bot seat can call it:
 
 - src/v08 coverage: the patches above, then the kept abilities (item 4), spells and artifacts; today a production
   board almost always carries abilities and is refused;
-- the recovery net and `forceStalledLap`, when a policy can land nothing;
 - research switches as request fields (per seat, with the scoped environment as a hashed config);
 - server-path parity, the final target: production rollouts run with the server's engine context, which re-checks
   move reachability with known paths after a stat refresh (`play_session.ts` `getCurrentActiveKnownPaths`, around line

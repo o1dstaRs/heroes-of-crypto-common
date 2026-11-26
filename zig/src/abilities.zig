@@ -21,6 +21,8 @@ const PT = st.PowerType;
 const AT = st.AttackType;
 
 pub const MAX_UNIT_STACK_POWER: f64 = 5;
+/// constants.ts GUIDING_WINDS_MAX_PERCENT
+pub const GUIDING_WINDS_MAX_PERCENT: f64 = 35;
 
 // =====================================================================================================================
 // Ability formulas (src/units/unit.ts)
@@ -188,6 +190,10 @@ const SHARPENED_WEAPONS_BLESSING_BIT: u32 = 32;
 const RALLYING_VOLLEY_BLESSING_BIT: u32 = 64;
 const LUCK_BLESSING_BIT: u32 = 128;
 const SYLVAN_FOCUS_BLESSING_BIT: u32 = 256;
+const ANGELIC_HOST_BLESSING_BIT: u32 = 1;
+const ARROWS_WINGSHIELD_BLESSING_BIT: u32 = 8;
+const TIE_UP_THE_HORSES_BLESSING_BIT: u32 = 512;
+const WOLF_TRAIL_BLESSING_BIT: u32 = 1024;
 
 inline fn blessingBit(id: st.SpellId) u32 {
     return switch (id) {
@@ -197,6 +203,10 @@ inline fn blessingBit(id: st.SpellId) u32 {
         .arcane_ward_blessing => ARCANE_WARD_BLESSING_BIT,
         .warding_mane_blessing => WARDING_MANE_BLESSING_BIT,
         .rallying_volley_blessing => RALLYING_VOLLEY_BLESSING_BIT,
+        .angelic_host_blessing => ANGELIC_HOST_BLESSING_BIT,
+        .arrows_wingshield_blessing => ARROWS_WINGSHIELD_BLESSING_BIT,
+        .tie_up_the_horses_blessing => TIE_UP_THE_HORSES_BLESSING_BIT,
+        .wolf_trail_blessing => WOLF_TRAIL_BLESSING_BIT,
         else => 0,
     };
 }
@@ -222,6 +232,11 @@ const Census = struct {
     arcane: TeamPowers = .{},
     mane: TeamPowers = .{},
     rally: TeamPowers = .{},
+    // batch 6a
+    tie: TeamPowers = .{},
+    wolf: TeamPowers = .{},
+    host: TeamPowers = .{},
+    arrows: TeamPowers = .{},
     /// Per unit index: the blessing bits it carries.
     carriers: [st.MAX_UNITS]u32 = undefined,
     carried: u32 = 0,
@@ -231,6 +246,20 @@ const Census = struct {
 fn stackBlessingPower(u: *const Unit, a: *const Ability) f64 {
     const sp = @max(0, @min(MAX_UNIT_STACK_POWER, engine.getStackPower(u)));
     return js.toFixed((a.power * sp) / MAX_UNIT_STACK_POWER, 2);
+}
+
+/// Unit.calculateStackBlessingPower for Tie up the Horses: the stack-scaled power x (1 + luck / 100), toFixed(4).
+fn tieUpPower(u: *const Unit, a: *const Ability) f64 {
+    const sp = @max(0, @min(MAX_UNIT_STACK_POWER, engine.getStackPower(u)));
+    const scaled = (a.power * sp) / MAX_UNIT_STACK_POWER;
+    return artifacts.toFixed4(scaled * (1 + engine.getLuck(u) / 100));
+}
+
+/// The strongest per team (`Math.max(prev ?? 0, power)`), a positive power only when `positive`.
+inline fn offerPower(t: *TeamPowers, team: u8, power: f64, positive: bool) void {
+    if (positive and power <= 0) return;
+    t.v[team] = js.max(if (t.set[team]) t.v[team] else 0, power);
+    t.set[team] = true;
 }
 
 /// Unit.calculateSharpenedWeaponsBlessingPower
@@ -298,13 +327,28 @@ fn captureCensus(s: *const State) Census {
             c.rally.v[team] = js.max(if (c.rally.set[team]) c.rally.v[team] else 0, a.power);
             c.rally.set[team] = true;
         }
+        if (u.ability_mask & BATCH6A_BLESSINGS != 0) captureBatch6(&c, u);
     }
     return c;
 }
 
-/// canReceiveSharpenedWeapons (melee or magic attackers) and canReceiveRallyingVolley (isRangeCapable, or an active
-/// Endless Quiver: a thief's refresh grants the row before its shot distance and mod exist).
-const Eligible = enum { all, melee_or_magic, ranged };
+const BATCH6A_BLESSINGS = st.AbilityId.tie_up_the_horses_blessing.bit() | st.AbilityId.wolf_trail_blessing.bit() |
+    st.AbilityId.angelic_host_blessing.bit() | st.AbilityId.arrows_wingshield_blessing.bit();
+
+/// captureBlessingCensus' batch-6a sources: the two stack blessings (positive powers: Tie up the Horses with its luck,
+/// toFixed(4); Wolf Trail toFixed(2)), Angelic Host's flat power and Arrows Wingshield's (warding-mane-shaped) power.
+noinline fn captureBatch6(c: *Census, u: *const Unit) void {
+    const team = u.team;
+    if (u.ability(.tie_up_the_horses_blessing)) |a| offerPower(&c.tie, team, tieUpPower(u, a), true);
+    if (u.ability(.wolf_trail_blessing)) |a| offerPower(&c.wolf, team, stackBlessingPower(u, a), true);
+    if (u.ability(.angelic_host_blessing)) |a| offerPower(&c.host, team, a.power, false);
+    if (u.ability(.arrows_wingshield_blessing)) |a| offerPower(&c.arrows, team, wardingManePower(u, a), false);
+}
+
+/// canReceiveSharpenedWeapons (melee or magic attackers), canReceiveRallyingVolley (isRangeCapable, or an active Endless
+/// Quiver: a thief's refresh grants the row before its shot distance and mod exist), Tie up the Horses' walkingOnly
+/// (`!canFly()`, a grounded flyer walks) and Angelic Host's `canFly()`.
+const Eligible = enum { all, melee_or_magic, ranged, walker, flyer };
 
 /// Unit.tryGrantRallyingVolleyShots: applyBuff("Rallying Volley Blessing") adds the arrows once per unit (no ranked
 /// authoritative shots in scope).
@@ -332,6 +376,8 @@ fn reapply(s: *State, c: *const Census, powers: *const TeamPowers, bit: u32, id:
             .all => {},
             .melee_or_magic => if (u.attack_type != AT.MELEE and u.attack_type != AT.MAGIC and u.attack_type != AT.MELEE_MAGIC) continue,
             .ranged => if (!engine.isRangeCapable(u) and !u.has(.endless_quiver)) continue,
+            .walker => if (engine.canFly(u)) continue,
+            .flyer => if (!engine.canFly(u)) continue,
         }
         if (id == .rallying_volley_blessing) grantRallyingVolleyShots(u, power);
         pushChecked(s, &u.buffs, .{ .id = id, .laps = st.NUMBER_OF_LAPS_TOTAL, .power = power });
@@ -360,8 +406,10 @@ pub inline fn replaceChecked(s: *State, list: anytype, a: st.AppliedSpell) void 
 pub fn refreshBlessings(s: *State) void {
     var c = captureCensus(s);
     const refresh_luck = c.luck.anyPositive() or c.carried & LUCK_BLESSING_BIT != 0;
-    if (refresh_luck) {
-        reapply(s, &c, &c.luck, LUCK_BLESSING_BIT, .luck_blessing, .all, false);
+    if (refresh_luck) reapply(s, &c, &c.luck, LUCK_BLESSING_BIT, .luck_blessing, .all, false);
+    // "Champion needs this lap's actual source luck even when no Leprechaun is present": a positive Tie up the Horses
+    // source opens the early pass on its own (no Luck reapply then).
+    if (refresh_luck or c.tie.anyPositive()) {
         for (s.holderOrder()) |i| {
             const u = &s.units[i];
             // getAuraEffects() is empty while Broken; the luck-dependent names are read off props.abilities.
@@ -371,10 +419,15 @@ pub fn refreshBlessings(s: *State) void {
         if (s.auras) refreshAuras(s);
         c = captureCensus(s);
     }
-    // The other STACK_BLESSINGS after Luck Blessing (Sylvan Focus; Tie up the Horses and Wolf Trail are not in scope).
+    // The other STACK_BLESSINGS after Luck Blessing (Sylvan Focus, Tie up the Horses, Wolf Trail), then Angelic Host,
+    // Arcane Ward, Warding Mane, Arrows Wingshield, Sharpened Weapons and Rallying Volley.
     reapply(s, &c, &c.sylvan, SYLVAN_FOCUS_BLESSING_BIT, .sylvan_focus_blessing, .all, false);
+    reapply(s, &c, &c.tie, TIE_UP_THE_HORSES_BLESSING_BIT, .tie_up_the_horses_blessing, .walker, false);
+    reapply(s, &c, &c.wolf, WOLF_TRAIL_BLESSING_BIT, .wolf_trail_blessing, .all, false);
+    reapply(s, &c, &c.host, ANGELIC_HOST_BLESSING_BIT, .angelic_host_blessing, .flyer, false);
     reapply(s, &c, &c.arcane, ARCANE_WARD_BLESSING_BIT, .arcane_ward_blessing, .all, false);
     reapply(s, &c, &c.mane, WARDING_MANE_BLESSING_BIT, .warding_mane_blessing, .all, false);
+    reapply(s, &c, &c.arrows, ARROWS_WINGSHIELD_BLESSING_BIT, .arrows_wingshield_blessing, .all, false);
     reapply(s, &c, &c.sharpened, SHARPENED_WEAPONS_BLESSING_BIT, .sharpened_weapons_blessing, .melee_or_magic, true);
     reapply(s, &c, &c.rally, RALLYING_VOLLEY_BLESSING_BIT, .rallying_volley_blessing, .ranged, false);
 }
@@ -387,7 +440,10 @@ pub fn refreshBlessings(s: *State) void {
 pub fn auraPower(u: *const Unit, def: *const st.AuraDef) f64 {
     return switch (def.power_type) {
         PT.ADDITIONAL_BASE_ATTACK_AND_ARMOR, PT.POISON_ON_HIT, PT.DISABLE_FLY_MOVEMENT, PT.DISABLE_RANGE_ATTACK, PT.UNTARGETABLE => def.power,
-        PT.ABSORB_DEBUFF => blk: {
+        // Guiding Winds: stack-powered plus the owner's luck (no ability power), held to 0..GUIDING_WINDS_MAX_PERCENT.
+        PT.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE => @max(0, @min(GUIDING_WINDS_MAX_PERCENT, (def.power / MAX_UNIT_STACK_POWER) * @max(0, @min(MAX_UNIT_STACK_POWER, engine.getStackPower(u))) + engine.getLuck(u))),
+        // War Anger shares Absorb Penalties' coefficient.
+        PT.ABSORB_DEBUFF, PT.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE => blk: {
             var coeff: f64 = 1;
             coeff += (def.power / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + (engine.getLuck(u) + u.syn_power) / 100 +
                 artifacts.fireTerm(artifacts.madeOfFire(u), def.power) / 100;
@@ -478,6 +534,8 @@ pub fn refreshAuras(s: *State) void {
         for (u.auras[0..u.auraCount()]) |d| {
             const def = &s.aura_defs[d];
             const power = if (def.power != 0) auraPower(u, def) else def.power;
+            // The AuraEffect keeps this power until the next refresh that iterates it: War Anger's attack mod reads it.
+            if (d == s.war_anger_def) u.war_anger_power = power;
             const range = def.range + s.setup[u.team].aura_range;
             if (range < 0) continue;
             const team = if (def.is_buff) u.team else engine.opposite(u.team);
@@ -512,6 +570,9 @@ pub fn refreshAuras(s: *State) void {
             if (def.power_type == PT.DISABLE_FLY_MOVEMENT and !engine.canFly(u)) continue;
             if (def.power_type == PT.DISABLE_RANGE_ATTACK and u.attack_type != AT.RANGE) continue;
             if (def.power_type == PT.UNTARGETABLE and !(holdsAura(u, e.def) and u.has(.disguise_aura))) continue;
+            // War Anger lands on melee and magic units, Guiding Winds on RANGE creatures (the base attack type).
+            if (def.power_type == PT.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE and u.attack_type == AT.RANGE) continue;
+            if (def.power_type == PT.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE and u.attack_type != AT.RANGE) continue;
             const row = st.AppliedSpell{
                 .id = def.buff,
                 .laps = st.LAPS_AURA,
@@ -585,6 +646,86 @@ pub fn stun(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     if (to.isStunned()) return;
     const laps: f64 = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
     replaceChecked(s, &to.effects, .{ .id = .stun, .laps = laps, .power = a.effect_power });
+}
+
+/// processBlindnessAbility(from, target, currentActiveUnit): on a living target, the holder's active Blindness rolls
+/// getRandomInt(0, 100) < applyChance x the MIND resist factor (drawn on a blinded, Madness or Mechanism target too); an
+/// un-blinded target that does not resist (Madness or Mechanism, after the roll) gets the effect (laps 2, 3 on the active
+/// unit) appended last. Inline holder test: every blow, response and second punch calls it.
+pub inline fn blindness(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    if (s.units[from_i].ability_mask & st.AbilityId.blindness.bit() != 0) blindnessHeld(s, from_i, to_i, active_i);
+}
+
+noinline fn blindnessHeld(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    const to = &s.units[to_i];
+    if (to.isDead()) return;
+    const from = &s.units[from_i];
+    const a = from.ability(.blindness) orelse return;
+    const chance = applyChance(from, a) * artifacts.mindCoeff(s, a.ty, to);
+    if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < chance)) return; // blindness_ability.ts:32
+    if (to.effects.find(.blindness) != null) return;
+    const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
+    if (a.ty == st.AbilityKind.MIND and mindResistant(to)) return;
+    replaceChecked(s, &to.effects, .{ .id = .blindness, .laps = laps, .power = a.effect_power });
+}
+
+/// processParalysisAbility(from, target, currentActiveUnit): on a living target, the holder's active Paralysis rolls
+/// getRandomInt(0, 100) < applyChance x 2 x the status resist factor (drawn on a paralysed target too); an unparalysed
+/// target gets the effect: power toFixed(((40 + luck + syn) / 100 / 5) * stack power * 100 * (1.5 on an active
+/// Mechanism), 2), laps 1 (2 on the active unit), appended last. STATUS: nothing resists it.
+pub inline fn paralysis(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    if (s.units[from_i].ability_mask & st.AbilityId.paralysis.bit() != 0) paralysisHeld(s, from_i, to_i, active_i);
+}
+
+noinline fn paralysisHeld(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    const to = &s.units[to_i];
+    if (to.isDead()) return;
+    const from = &s.units[from_i];
+    const a = from.ability(.paralysis) orelse return;
+    const chance = applyChance(from, a) * 2 * (1 - artifacts.statusResist(s, to) / 100);
+    if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < chance)) return; // paralysis_ability.ts:33
+    if (to.effects.find(.paralysis) != null) return;
+    const amp: f64 = if (a.ty == st.AbilityKind.STATUS and to.has(.mechanism)) 1.5 else 1;
+    // calculateEffectMultiplier(effect, syn) (no Made of Fire term on this card's holders in scope)
+    var combined = @as(f64, a.effect_power) + engine.getLuck(from) + from.syn_power;
+    if (combined < 0) combined = 1;
+    var coeff: f64 = 1;
+    coeff *= (combined / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(from);
+    const power = js.toFixed(coeff * 100 * amp, 2);
+    const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
+    replaceChecked(s, &to.effects, .{ .id = .paralysis, .laps = laps, .power = power });
+}
+
+/// The damage cut of a striker carrying Paralysis ((100 - power) / 100, the effect's power); null without it.
+pub inline fn paralysisFactor(u: *const Unit) ?f64 {
+    if (u.effects.len == 0) return null;
+    const p = u.effects.power(.paralysis) orelse return null;
+    return (100 - p) / 100;
+}
+
+/// processHamstringAbility(from, target, currentActiveUnit) on the holder's primary shot or melee blow: the Absorb
+/// Penalties redirect, then for a living flying creature without Hamstrung (a grounded one too) the chance roll
+/// getRandomInt(0, 100) < applyChance, the magic-resist save getRandomInt(0, 100) < floor(magic resist) (always drawn after
+/// the chance), the "Hamstrung" debuff appended (laps + 1 on the active unit), and the mirror roll (Magic Reflection's
+/// chance, always drawn after a landing) that appends a copy on the holder (no "already" check: it can duplicate).
+pub inline fn hamstring(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    if (s.units[from_i].ability_mask & st.AbilityId.hamstring.bit() != 0) hamstringHeld(s, from_i, to_i, active_i);
+}
+
+noinline fn hamstringHeld(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    const from = &s.units[from_i];
+    const a = from.ability(.hamstring) orelse return;
+    const t_i = absorptionTarget(s, to_i); // effect_helper.ts:370
+    const t = &s.units[t_i];
+    if (t.movement_type != st.Movement.FLY) return; // isFlyingCreature
+    if (t.isDead() or (t.debuffs.len != 0 and t.debuffs.find(.hamstrung) != null)) return;
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) >= applyChance(from, a)) return; // hamstring_ability.ts:59
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) < @floor(engine.getMagicResist(t))) return; // :68
+    pushChecked(s, &t.debuffs, .{ .id = .hamstrung, .laps = if (t_i == active_i) s.hamstrung_laps + 1 else s.hamstrung_laps, .power = s.hamstrung_power });
+    const mirror = @floor(@max(0, spells.mirroredShare(t)));
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) < mirror) { // spell_helper.ts:1232
+        pushChecked(s, &from.debuffs, .{ .id = .hamstrung, .laps = if (from_i == active_i) s.hamstrung_laps + 1 else s.hamstrung_laps, .power = s.hamstrung_power });
+    }
 }
 
 /// processDeepWoundsAbility(from, target, currentActiveUnit): the holder's active cards (Level 0 to 3, in that order,
@@ -705,7 +846,8 @@ pub fn assimilationPoison(s: *State, att_i: u8, tgt_i: u8, damage: f64) void {
 
 /// LUCK_DEPENDENT_BLESSINGS (units_holder.ts) among the ported abilities: the early luck pass reads card names.
 pub inline fn isLuckDependentCard(id: st.AbilityId) bool {
-    return id == .sharpened_weapons_blessing or id == .arcane_ward_blessing or id == .warding_mane_blessing;
+    return id == .sharpened_weapons_blessing or id == .arcane_ward_blessing or id == .warding_mane_blessing or
+        id == .tie_up_the_horses_blessing or id == .arrows_wingshield_blessing;
 }
 
 /// Unit.removeAbilityMechanics for an ability leaving the active list: its aura effect goes unless another active
@@ -833,6 +975,8 @@ fn grantStolen(s: *State, u: *Unit, a: Ability, entries: *const Entries) void {
         }
         u.auras[u.n_auras] = a.aura;
         u.n_auras += 1;
+        // A fresh AuraEffect holds its configured power until the next refresh.
+        if (a.aura == s.war_anger_def) u.war_anger_power = s.aura_defs[a.aura].power;
     }
 }
 
@@ -956,6 +1100,8 @@ pub fn addAbility(s: *State, u: *Unit, a: Ability) bool {
 pub fn isMarkerSpell(id: st.SpellId) bool {
     return id.isAugment() or id.isArtifact() or switch (id) {
         .morale, .dismorale, .luck_blessing, .sylvan_focus_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .ember_covenant_blessing, .hidden, .visible, .warding_mane_blessing => true,
+        // batch 6a: the stack blessings and the Angel's two (ENGINE_MARKER_SPELL_NAMES); Wind Flow is takeable
+        .tie_up_the_horses_blessing, .wolf_trail_blessing, .angelic_host_blessing, .arrows_wingshield_blessing => true,
         else => false,
     };
 }
@@ -1054,8 +1200,9 @@ pub fn devourEssence(s: *State, ui: u8, died: []const u8) void {
     var killed = false;
     for (died) |d| {
         const x = &s.units[d];
-        if (x.in_holder and x.team == engine.opposite(u.team)) {
-            killed = true; // canSelfResurrect: no Angel in scope
+        // A stack that will raise itself (canSelfResurrect, read before the cleanup) is no kill.
+        if (x.in_holder and x.team == engine.opposite(u.team) and !(s.resurrection and engine.canSelfResurrect(x))) {
+            killed = true;
             break;
         }
     }

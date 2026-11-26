@@ -396,6 +396,8 @@ pub fn detonateChain(s: *st.State, victims: []const u8, events: *engine.Events) 
     for (victims) |vi| {
         const v = &s.units[vi];
         if (!v.in_holder or !v.isDead()) continue;
+        // deleteUnitById(id, true): a Resurrection holder revives in place (no unit_destroyed, no blast).
+        if (engine.tryRevive(s, vi)) continue;
         const anchor = engine.baseCell(v);
         const fw = v.fw;
         const fh = v.fh;
