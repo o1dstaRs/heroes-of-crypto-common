@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 
 import { createAIStrategy } from "../../src/ai";
 import { StrategyV0_7 } from "../../src/ai/versions/v0_7";
@@ -31,7 +32,10 @@ import {
     nativeRolloutModeFromEnv,
     nativeShadowRateFromEnv,
     nativeTeamPolicy,
+    rootStepWithoutSideEffects,
     runNativeBank,
+    getNativeRolloutBackend,
+    setNativeRolloutBackendForTests,
 } from "../../src/simulation/native_rollouts";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
 import {
@@ -427,6 +431,133 @@ describe("native root export", () => {
         expect(checked).toBe(true);
     });
 
+    /** Counts the seeded source's draws and records the uuid sequence around `run` (the source stays the same). */
+    const randomUse = (run: () => void): { draws: number; uuidBefore: number; uuidAfter: number } => {
+        const before = captureDeterministicRandomState();
+        const source = before.source;
+        if (!source) throw new Error("expected a seeded source");
+        let draws = 0;
+        restoreDeterministicRandomState({
+            source: () => {
+                draws += 1;
+                return source();
+            },
+            uuidSequence: before.uuidSequence,
+        });
+        try {
+            run();
+        } finally {
+            const after = captureDeterministicRandomState();
+            restoreDeterministicRandomState({ source, uuidSequence: after.uuidSequence });
+        }
+        return { draws, uuidBefore: before.uuidSequence, uuidAfter: captureDeterministicRandomState().uuidSequence };
+    };
+
+    test("the pre-check's summon templates leave the random state as they found it", async () => {
+        // The pre-check lives beside the bridge, outside the type-checked tree, as the adapter loads it.
+        const precheckPath = "../../zig/ffi/precheck.ts";
+        const { compileHocPrecheck } = (await import(precheckPath)) as {
+            compileHocPrecheck(manifest: unknown, policy: string | null): unknown;
+        };
+        const capacities = Object.fromEntries(
+            [
+                "units",
+                "ids",
+                "abilities",
+                "stolen",
+                "buffs",
+                "debuffs",
+                "effects",
+                "spellEntries",
+                "spells",
+                "unitAuras",
+                "auraDefs",
+                "vines",
+                "smoke",
+                "fireWalls",
+                "stones",
+                "barrels",
+                "lap",
+                "possibleAttackTypes",
+                "storedProperty",
+            ].map((key) => [key, 64]),
+        );
+        const precheck = compileHocPrecheck(
+            {
+                scope: {
+                    loader: {
+                        abilities: [],
+                        auraEffects: [],
+                        applied: [],
+                        spells: [],
+                        spellEntryPrefixes: [],
+                        spellFactions: [],
+                        summons: [],
+                        unitTypes: [],
+                        teams: [],
+                        footprint: [2, 2],
+                        gridTypes: [],
+                        stackingEffect: "",
+                        storedPropertyBuffs: [],
+                        artifacts: { tier1: [], tier2: [] },
+                        artifactRows: { buffs: [], debuffs: [] },
+                        capacities,
+                        refuse: { unitPropsLimited: {}, unitFieldParts: [], fight: [], grid: [], artifactsPerTeam: [] },
+                    },
+                    policies: {},
+                },
+            },
+            null,
+        ) as { templateRefusal(creature: string, grid: unknown): string | null };
+        let checked = false;
+        runMatch({
+            greenVersion: "v0.1",
+            redVersion: "v0.1",
+            roster: [spec("Arachna Queen", 4, 1), spec("Satyr", 2, 4)],
+            redRoster: [spec("Peasant", 1, 20)],
+            seed: 11,
+            maxLaps: 1,
+            headlessEvents: true,
+            beforeFightStart: (context) => {
+                const use = randomUse(() => {
+                    for (const creature of ["Arachna Spider", "Arachna Queen", "Wolf"])
+                        precheck.templateRefusal(creature, context.grid);
+                });
+                expect(use.draws).toBe(0);
+                expect(use.uuidAfter).toBe(use.uuidBefore);
+                checked = true;
+            },
+        });
+        expect(checked).toBe(true);
+    });
+
+    test("the backend's one-time load (bridge, self-test, manifests, pre-checks) leaves the random state alone", () => {
+        const saved = captureDeterministicRandomState();
+        const sentinels = process.env.HOC_NATIVE_SENTINELS;
+        try {
+            restoreDeterministicRandomState({ source: makeRng(5), uuidSequence: 70 });
+            // throw: a load with a side effect would fail, and the backend would stay off.
+            process.env.HOC_NATIVE_SENTINELS = "throw";
+            setNativeRolloutBackendForTests(undefined);
+            let loaded: unknown;
+            const use = randomUse(() => {
+                loaded = getNativeRolloutBackend();
+            });
+            expect(use.draws).toBe(0);
+            expect(use.uuidAfter).toBe(use.uuidBefore);
+            // Where a library is built here (zig build lib), the whole load ran and must have succeeded.
+            const built = ["dylib", "so"].some((suffix) =>
+                existsSync(new URL(`../../zig/zig-out/lib/libhocsim.${suffix}`, import.meta.url)),
+            );
+            if (built && !process.env.HOC_SIM_LIB) expect(loaded).not.toBeNull();
+        } finally {
+            setNativeRolloutBackendForTests(undefined);
+            if (sentinels === undefined) delete process.env.HOC_NATIVE_SENTINELS;
+            else process.env.HOC_NATIVE_SENTINELS = sentinels;
+            restoreDeterministicRandomState(saved);
+        }
+    });
+
     test("the export check catches a draw, a uuid step or a board change under HOC_NATIVE_SENTINELS", () => {
         const saved = captureDeterministicRandomState();
         const sentinels = process.env.HOC_NATIVE_SENTINELS;
@@ -456,6 +587,11 @@ describe("native root export", () => {
             );
             const mutate = (): unknown => (board += 1);
             expect(() => exportWithoutSideEffects(mutate, digest, battle, harness)).toThrow("changed the board");
+
+            // Every root step is checked the same way; the message names the step.
+            expect(() => rootStepWithoutSideEffects("precheck", () => createSecureUuid())).toThrow(
+                "the precheck moved the uuid sequence",
+            );
 
             // "count" counts it and still returns the export.
             process.env.HOC_NATIVE_SENTINELS = "count";

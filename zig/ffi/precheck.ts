@@ -19,6 +19,7 @@
  */
 
 import { createCombatFactories, createUnitFromSpec } from "../../src/simulation/army";
+import { captureDeterministicRandomState, restoreDeterministicRandomState } from "../../src/utils/lib";
 import type { IHocScopeManifest } from "./bridge";
 
 export interface IHocPrecheckContext {
@@ -381,6 +382,9 @@ export class HocPrecheck {
         if (known !== undefined) return known;
         let verdict: string | null = null;
         const auras: string[] = [];
+        // The template is a throwaway unit, and building it takes a value of the deterministic UUID sequence: the search
+        // goes on from this state, and the server names its summons from that sequence (unit ids seed the rollouts).
+        const random = captureDeterministicRandomState();
         try {
             const { abilityFactory, effectFactory } = createCombatFactories();
             const unit: any = createUnitFromSpec(
@@ -417,6 +421,8 @@ export class HocPrecheck {
             }
         } catch (e) {
             verdict = `summon template ${creature}: ${(e as Error).message}`;
+        } finally {
+            restoreDeterministicRandomState(random);
         }
         this.templateVerdicts.set(creature, verdict);
         this.templateAuras.set(creature, auras);

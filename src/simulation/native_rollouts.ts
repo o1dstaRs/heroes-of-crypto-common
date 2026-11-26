@@ -186,51 +186,56 @@ export function getNativeRolloutBackend(): INativeRolloutBackend | null {
         return backend;
     }
     try {
-        const bridge = load("../../zig/ffi/bridge.ts") as IBridgeModule;
-        const engine = bridge.loadHocEngine({
-            commonSha: process.env[NATIVE_COMMON_SHA_ENV] || undefined,
-            log: (message) => nativeRolloutLog("load", message),
-        });
-        if (!engine) return backend;
-        const { compileHocPrecheck } = load("../../zig/ffi/precheck.ts") as {
-            compileHocPrecheck(manifest: unknown): INativePrecheck;
-        };
-        const { exportBattleState } = load("../../zig/parity/state_export.ts") as {
-            exportBattleState(battle: INativeExportBattle, harness: INativeExportHarness): unknown;
-        };
-        const { battleDigest } = load("../../zig/parity/digest.ts") as {
-            battleDigest(battle: INativeExportBattle, options: Record<string, boolean>): { fight: unknown };
-        };
-        const prechecks: Record<NativePolicyVersion, INativePrecheck> = {
-            "v0.1": compileHocPrecheck(engine.scopeManifest("v0.1")),
-            "v0.8": compileHocPrecheck(engine.scopeManifest("v0.8")),
-        };
-        backend = Object.freeze({
-            engine,
-            flags: Object.freeze({
-                played: bridge.HOC_PAIR_PLAYED,
-                skippedIllegal: bridge.HOC_PAIR_SKIPPED_ILLEGAL,
-                aborted: bridge.HOC_PAIR_ABORTED,
-                notReached: bridge.HOC_PAIR_NOT_REACHED,
-                skippedTail: bridge.HOC_PAIR_SKIPPED_TAIL,
-            }),
-            isRefusal: (error: unknown) => error instanceof bridge.HocError,
-            nowNs: () => bridge.hocNowNs(),
-            refusal: (policy: NativePolicyVersion, battle: Omit<INativeExportBattle, "attackHandler">) =>
-                prechecks[policy].refusal(battle),
-            exportState: (battle: INativeExportBattle, harness: INativeExportHarness) =>
-                exportWithoutSideEffects(
-                    exportBattleState,
-                    (board) => boardDigest(battleDigest, board),
-                    battle,
-                    harness,
-                ),
-        });
+        // The one-time load (the bridge, its self-test, the manifests and their pre-checks) only reads, like a root step.
+        backend = rootStepWithoutSideEffects("backend load", () => loadNativeRolloutBackend(load));
     } catch (error) {
         nativeRolloutLog("load-error", `native rollouts off: ${(error as Error).message}`);
         backend = null;
     }
     return backend;
+}
+
+function loadNativeRolloutBackend(load: (specifier: string) => unknown): INativeRolloutBackend | null {
+    const bridge = load("../../zig/ffi/bridge.ts") as IBridgeModule;
+    const engine = bridge.loadHocEngine({
+        commonSha: process.env[NATIVE_COMMON_SHA_ENV] || undefined,
+        log: (message) => nativeRolloutLog("load", message),
+    });
+    if (!engine) return null;
+    const { compileHocPrecheck } = load("../../zig/ffi/precheck.ts") as {
+        compileHocPrecheck(manifest: unknown): INativePrecheck;
+    };
+    const { exportBattleState } = load("../../zig/parity/state_export.ts") as {
+        exportBattleState(battle: INativeExportBattle, harness: INativeExportHarness): unknown;
+    };
+    const { battleDigest } = load("../../zig/parity/digest.ts") as {
+        battleDigest(battle: INativeExportBattle, options: Record<string, boolean>): { fight: unknown };
+    };
+    const prechecks: Record<NativePolicyVersion, INativePrecheck> = {
+        "v0.1": compileHocPrecheck(engine.scopeManifest("v0.1")),
+        "v0.8": compileHocPrecheck(engine.scopeManifest("v0.8")),
+    };
+    return Object.freeze({
+        engine,
+        flags: Object.freeze({
+            played: bridge.HOC_PAIR_PLAYED,
+            skippedIllegal: bridge.HOC_PAIR_SKIPPED_ILLEGAL,
+            aborted: bridge.HOC_PAIR_ABORTED,
+            notReached: bridge.HOC_PAIR_NOT_REACHED,
+            skippedTail: bridge.HOC_PAIR_SKIPPED_TAIL,
+        }),
+        isRefusal: (error: unknown) => error instanceof bridge.HocError,
+        nowNs: () => bridge.hocNowNs(),
+        refusal: (policy: NativePolicyVersion, battle: Omit<INativeExportBattle, "attackHandler">) =>
+            rootStepWithoutSideEffects(
+                "precheck",
+                () => prechecks[policy].refusal(battle),
+                (board) => boardDigest(battleDigest, board),
+                { ...battle, attackHandler: undefined },
+            ),
+        exportState: (battle: INativeExportBattle, harness: INativeExportHarness) =>
+            exportWithoutSideEffects(exportBattleState, (board) => boardDigest(battleDigest, board), battle, harness),
+    });
 }
 
 /** Tests: install a backend (or null for "no library"); undefined restores lazy loading. */
@@ -810,32 +815,36 @@ export function boardDigest(
 }
 
 /**
- * The root's export, which may only read: the TypeScript search goes on from the same state after it, so an export
- * that drew from the seeded source, moved the deterministic uuid sequence (the server names its summons from it, and
- * unit ids seed the rollouts) or changed the board would shift every later TypeScript rollout of the search. A failed
- * export leaves the random state as it found it. Under HOC_NATIVE_SENTINELS the export is checked: the seeded source's
- * draws (counted through a forwarding source), the uuid sequence, and the board's digest with FightStateManager's fight,
- * before and after; "throw" throws on a difference, "count" counts it (nativeExportSideEffects) and logs it once.
+ * A step of the native path that may only read: the root's pre-check and export, and the backend's one-time load (the
+ * bridge's self-test, the manifests' pre-checks). The TypeScript search goes on from the same state after each, so a
+ * step that drew from the seeded source, moved the deterministic uuid sequence (the server names its summons from it,
+ * and unit ids seed the rollouts) or changed the board would shift every later TypeScript rollout of the search, and a
+ * once-per-process step (a cached summon template) would make searches depend on the process's history. A failed step
+ * leaves the random state as it found it. Under HOC_NATIVE_SENTINELS each step is checked: the seeded source's draws
+ * (counted through a forwarding source), the uuid sequence, and the board's digest with FightStateManager's fight (when
+ * a board is given), before and after; "throw" throws on a difference, "count" counts it (nativeExportSideEffects) and
+ * logs it once.
  */
-export function exportWithoutSideEffects(
-    exportBattleState: (battle: INativeExportBattle, harness: INativeExportHarness) => unknown,
-    digest: (battle: INativeExportBattle) => string,
-    battle: INativeExportBattle,
-    harness: INativeExportHarness,
-): string {
+export function rootStepWithoutSideEffects<T>(
+    step: string,
+    run: () => T,
+    digest?: (battle: INativeExportBattle) => string,
+    battle?: INativeExportBattle,
+): T {
     const random = captureDeterministicRandomState();
     const sentinels = process.env[NATIVE_SENTINELS_ENV];
-    const run = (): string => {
+    const guarded = (): T => {
         try {
-            return JSON.stringify(exportBattleState(battle, harness));
+            return run();
         } catch (error) {
             restoreDeterministicRandomState(random);
             throw error;
         }
     };
-    if (!sentinels) return run();
+    if (!sentinels) return guarded();
     // The check never refuses a root itself: a board the digest cannot read is checked without it.
     const digestOrNull = (): string | null => {
+        if (!digest || !battle) return null;
         try {
             return digest(battle);
         } catch (error) {
@@ -855,7 +864,7 @@ export function exportWithoutSideEffects(
             uuidSequence: random.uuidSequence,
         });
     }
-    const json = run();
+    const result = guarded();
     const { uuidSequence } = captureDeterministicRandomState();
     restoreDeterministicRandomState({ source, uuidSequence });
     const moved: string[] = [];
@@ -865,11 +874,26 @@ export function exportWithoutSideEffects(
     if (before !== null && digestOrNull() !== before) moved.push("changed the board");
     if (moved.length) {
         exportSideEffects += 1;
-        const message = `the state export ${moved.join(", ")}`;
+        const message = `the ${step} ${moved.join(", ")}`;
         if (sentinels === "throw") throw new Error(`native rollouts: ${message}`);
-        nativeRolloutLog("export-side-effect", `${message} (HOC_NATIVE_SENTINELS counts every one)`);
+        nativeRolloutLog(`side-effect:${step}`, `${message} (HOC_NATIVE_SENTINELS counts every one)`);
     }
-    return json;
+    return result;
+}
+
+/** The root's export (exportBattleState as JSON), checked as rootStepWithoutSideEffects says. */
+export function exportWithoutSideEffects(
+    exportBattleState: (battle: INativeExportBattle, harness: INativeExportHarness) => unknown,
+    digest: (battle: INativeExportBattle) => string,
+    battle: INativeExportBattle,
+    harness: INativeExportHarness,
+): string {
+    return rootStepWithoutSideEffects(
+        "state export",
+        () => JSON.stringify(exportBattleState(battle, harness)),
+        digest,
+        battle,
+    );
 }
 
 const sentinelDeps = new WeakSet<object>();
