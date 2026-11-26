@@ -51,6 +51,16 @@ pub fn v01(c: *ai.Ctx, out: *ai.Decision) void {
     note("v0.1", out, c.s, rin);
 }
 
+/// The production v0.8 policy for native rollouts: decides unit `ui` on `s` with the whole chain and every v0.8 pass
+/// (production switches; util.battle must hold this battle's table). False when a pass this board needs is not
+/// ported, so the caller fails the call instead of guessing.
+pub fn decideV08(s: *st.State, ui: u8, out: *ai.Decision) bool {
+    var c: ai.Ctx = undefined;
+    ai.initCtxInto(&c, s, ui);
+    out.* = .{};
+    return lv8.decide(&c, out);
+}
+
 /// Runs the chain up to `top` for unit `ui`.
 pub fn decideTo(s: *st.State, ui: u8, out: *ai.Decision, top: Level) void {
     var c: ai.Ctx = undefined;

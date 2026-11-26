@@ -92,6 +92,25 @@ pub const Battle = struct {
     }
 
     /// From a recording's `init` (units in holder order, as engine.initState reads them).
+    /// The table for a battle resumed mid-fight (the rollout bridge): each slot's creature name and unit id, and v0.7's
+    /// per-team MELEE_MAGIC profile primed at the fight's start (the TS strategy keeps it from placement).
+    pub fn fromUnits(names: []const []const u8, ids: []const []const u8, melee_magic: [3]u8) Battle {
+        var b: Battle = .{ .melee_magic = melee_magic };
+        for (names, 0..) |n, i| {
+            if (i >= st.MAX_UNITS) break;
+            b.creature[i] = Creature.fromName(n);
+        }
+        for (ids, 0..) |id, i| {
+            if (i >= st.MAX_UNITS) break;
+            var rank: u16 = 0;
+            for (ids, 0..) |other, j| {
+                if (j != i and std.mem.order(u8, other, id) == .lt) rank += 1;
+            }
+            b.id_rank[i] = rank;
+        }
+        return b;
+    }
+
     pub fn fromInit(init: std.json.Value) Battle {
         var b: Battle = .{};
         const units = rec.get(init, "units").array.items;
