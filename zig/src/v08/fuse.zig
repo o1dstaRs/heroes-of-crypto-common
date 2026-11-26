@@ -75,7 +75,8 @@ pub const MeleeEstimate = struct { hit: f64, expected: f64, secure: bool, fatal:
 /// order, each entry's probability accumulated in roll order. Both outcome sequences (the ordinary roll and the lucky
 /// one) are non-decreasing in the roll, so each keeps its new keys sorted and a key is found by binary search.
 const Landed = struct {
-    const CAP = 2048;
+    /// TypeScript prices up to 10,000 rolls, each into an ordinary and a Lucky Strike outcome: every such band fits.
+    const CAP = 20_480;
     damage: [CAP]f64 = undefined,
     prob: [CAP]f64 = undefined,
     n: usize = 0,
@@ -118,6 +119,10 @@ const Landed = struct {
     }
 };
 
+/// primaryMelee's landed map: about 400 KB at Landed.CAP, so one per thread instead of a stack frame. primaryMelee resets
+/// it per call and reads it before returning.
+threadlocal var landed_scratch: Landed = .{};
+
 /// estimatePrimaryMeleeDamage for unit `ai_` striking `ti` from `from` with `shape`: null for an unsupported sequence
 /// (a lava move; Lightning Spin, Double Punch, Fire Breath, Skewer Strike or Chain Lightning on the striker)
 /// or a malformed band. The chain: Rapid Charge over the charge distance, Paralysis, then the position abilities
@@ -155,7 +160,10 @@ pub fn primaryMelee(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape, from
     const wounds = 1 + abilities.activeDeepWounds(u, t) / 100;
     // getElementalDamageMultiplier: the physical element pair (Fire on Water, Water on Fire, Wind on Earth, Earth on Wind).
     const elem = combat.physicalElement(u, t);
-    var landed: Landed = .{};
+    const landed = &landed_scratch;
+    landed.n = 0;
+    landed.nseq = .{ 0, 0 };
+    landed.full = false;
     const raw_end = if (hi == lo) lo + 1 else hi;
     var raw = lo;
     while (raw < raw_end) : (raw += 1) {
