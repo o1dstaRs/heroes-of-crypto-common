@@ -13,7 +13,7 @@ plain or actor-antithetic chance stream and the material, v1 or v2 leaf.
 Zig plays whole battles that match the TypeScript `runMatch` step for step, for battles with:
 
 - every creature's stats, sizes (1x1, 2x1, 2x2), walking and flying, melee and ranged;
-- the abilities of the creatures ported so far (batches 1 to 4, below), including the units Infest and Summon Wolves
+- the abilities of the creatures ported so far (batches 1 to 5, below), including the units Infest and Summon Wolves
   summon and the abilities Predatory Assimilation and the Wild Regeneration gift move between units; every other
   creature's abilities stripped; no artifacts;
 - the wave-1 spells (below): Heal, Blessing, Lightning Strike, Fire Strike, Meteor Shower, Meteorite, Ring of Fire, Summon
@@ -31,8 +31,9 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
 
 The engine also replays (`hoc-sim parity`) the actions later AI versions emit on these boards: move-then-strike
 (`melee_attack` with a `path`), `wait_turn`, `defend_turn`, aimed shots, refused `select_attack_type`, ranged
-obstacle shots (`obstacle_attack` without `attackFrom`, which v0.8 sends), the wave-1 casts (`cast_spell`) and batch 4's
-casts (Battle Roar, the Wild Regeneration gift).
+obstacle shots (`obstacle_attack` without `attackFrom`, which v0.8 sends), the wave-1 casts (`cast_spell`), batch 4's
+casts (Battle Roar, the Wild Regeneration gift) and batch 5's two action shapes (`area_throw_attack`, and the free-aim
+Through Shot: `range_attack` with `targetPosition` and no target id).
 
 Ported:
 
@@ -53,7 +54,7 @@ Ported:
 
 ### Abilities
 
-Batches 1 to 4, exact in both modes:
+Batches 1 to 5, exact in both modes:
 
 | Creature | Abilities |
 | --- | --- |
@@ -84,6 +85,14 @@ Batches 1 to 4, exact in both modes:
 | Griffin (L3) | Range Null Field Aura, Sky Runner, Deep Wounds Level 2 |
 | Frenzied Boar (L4) | AI Driven, Magic Shield, Boar Saliva |
 | Behemoth (L4) | Unyielding Power, Battle Roar (a castable mass buff), Deep Wounds Level 3 |
+| Arbalester (L1) | Sniper, Limited Supply |
+| Centaur (L1) | Handyman, Piercing Spear, Boost Health |
+| Elf (L2) | Double Shot |
+| Medusa (L2) | Endless Quiver, Petrifying Gaze |
+| Beholder (L2) | Spit Ball (Curse, Sadness, Quagmire, Weakening Beam, Weakness, Rangebane, Cowardice) |
+| Cyclops (L3) | Large Caliber |
+| Tsar Cannon (L4) | Mechanism, No Melee, Through Shot |
+| Gargantuan (L4) | Earth Element, Double Throw, Area Throw (and `area_throw_attack`) |
 
 Wave-1 spells (`spells.zig`), exact in both modes:
 
@@ -187,7 +196,7 @@ Added by batch 3:
   counting failed placements too). Chakram breaks bearing ties by id order, which is byte order of the UUIDs.
 - **Summons** (`engine.spawnInfested`, from `combat.cleanupDeadUnits`): the target of a melee strike killed by the
   attacker, or the attacker killed by the target (createDirectKillAttributions; obstacle strikes, narrowing,
-  Armageddon and poison never infest; no shooter can hold Infest), raises a Spider (level 1-3 corpse) or a Queen
+  Armageddon and poison never infest), raises a Spider (level 1-3 corpse) or a Queen
   (level 4) of one creature when the killer has Infest at cleanup (a dead killer too, a Broken one not): on the corpse
   cells when they form its footprint, else on the corpse's anchor; corpses in `died` order. The newcomer comes from the
   recorded template (`init.summonTemplates`, `State.summons`, interned per template text by `engine.loadSummons`), gets
@@ -299,6 +308,80 @@ Added by batch 4 (references in the session's `scratchpad/ref/batch4/`):
   `moraleMultiplier`, `rawDamage`, `damageAgainst`, `resolveVictims`, `cellsAroundFootprint`, `seatFree`,
   `canMassCastSpell` and the types in their signatures (`CS`, `Trajectory`, `Victim`, `Victims`, `Cells`) are public with
   stable signatures: the v0.8 port calls them.
+
+Added by batch 5 (the shooters and throwers; references in the session's `scratchpad/ref/batch5/`):
+
+- **Ids and masks**: fourteen `AbilityId`s (Sniper, Limited Supply, Double Shot, Endless Quiver, Petrifying Gaze, Spit
+  Ball, Large Caliber, Mechanism, No Melee, Through Shot, Double Throw, Area Throw, Piercing Spear, Boost Health;
+  `AbilityId.BATCH5_MASK`), so `AbilityMask` is a `u128`; Spit Ball's seven debuffs as `SpellId`s
+  (`SpellId.SPIT_BALL`, `isSpitBall`) with their configs in `State.spit_cfg` (`init.spellConfigs` / the export's
+  `configs.spellConfigs`: laps, power, MIND).
+- **Ray groups** (`combat.Groups`, `evaluateGroups`): getAffectedUnitsAndObstacles as the engine resolves it. A Through
+  Shot's ray runs on to the field edge (`projectLineToFieldEdge`, Math.min/max with their signed zeros), a splash ray
+  (an active Large Caliber or Area Throw, `isSplashShooter`) passes stones, and each enemy group of a splash shooter is
+  the enemy plus every living unit of either team on the ring around the cell the ray entered it (getCellsAroundCell
+  order, each body once), with the ring and entry cells as the blast whose stones fall after an accepted shot. The AI
+  and the v0.8 port read the primaries only (`evaluateRangeFlags`; `evaluateRange` is its plain case). Aim edges take
+  both flags (`sideObservableEx`: a splash shooter may aim at a side facing a stone, a Through Shot at any side not
+  facing one; `aimEdge` reads them off the shooter).
+- **The ranged action** (`combat.shoot` = GameActionEngine.rangeAttack, `resolveShot` = resolveRangeAttack): the free
+  aim (Through Shot only; a line that meets no enemy takes a ranged obstacle shot at the stone it met, else one arrow
+  into nothing), the Rangebane refusal, the Double Shot stone rule (scattered boards, not for a splash shooter: the
+  first two stones on the segment take the projectiles; two stones end the action with one arrow, one stone suppresses
+  the second shot), the counter-shot pre-check with the primary's own flags and blast, then resolveShot in TypeScript's
+  order: the Hidden and forced-target gates (an AOE throw only has to catch the provoker), Through Shot (`throughShot`,
+  before Absolving Arrow: no single miss roll and no counter-shot either way; a second piercing volley for a Double Shot
+  holder), the Cowardice gate, the miss roll, the response gate (`canRespond(RANGE)`: no Through Shot; Cowardice against
+  the victim), the AOE tail or the single roll, the counter-shot (a splash responder throws a whole tail over its return
+  group), the primary's riders (Deep Wounds, Stun, Petrifying Gaze, Spit Ball, the poisons, Borrowed Grace; after a
+  landed splash only the poisons), the counter-shot's riders and the death check after them, the switch over whole
+  groups, the second shot (`doubleShot`: Double Shot's single shot, or Double Throw's second tail at Area Throw's
+  multiplier) and finalizeRangeAttack (`Fin`: Predatory Assimilation's response steal, then the attacker's; also before
+  every early return). Kill attributions (`Attribution`: the primary by the shooter, the counter-shot's victim by the
+  primary, an area throw's enemies by the thrower) feed Infest at cleanup.
+- **The AOE tail** (`aoeTail`, `Flight`): Area Throw, else Large Caliber, else Chakram; per victim (dead ones listed and
+  skipped) a miss verdict rolled at its turn (`Pre.roll`) or pre-rolled (Chakram's flight, `chakramFlight`), the damage
+  roll at the ability's multiplier (Large Caliber stack-powered), the bounce factor, the physical-AOE multiplier, the
+  hit, poison, Pegasus Light and Petrifying Gaze; then kills (+4 each, allies too) and riders (Deep Wounds, Stun, Spit
+  Ball, Borrowed Grace), the thrower's morale and one arrow.
+- **`area_throw_attack`** (`combat.areaThrowAttack`, `areaStrikeAtCell`): the gates, the blast moved to the first enemy
+  the splash ray meets (projectAreaThrowTargetCell), the 3x3 list (ring order, the centre last; either team, the
+  thrower too), resolveShot as an AOE (no counter-shot, no primary block, no switch; Double Throw at the list's first
+  living unit), the stones in the 3x3, one arrow for a throw that caught no unit but broke a stone. A splash shooter's
+  ranged `obstacle_attack` on a stone is the same strike; a Double Shot holder's ranged obstacle shot breaks two
+  stones.
+- **Shot accounting**: `spendShotsAgainst` (an active Endless Quiver spends nothing) in the damage roll and the AOE
+  tail; the direct decrements (Through Shot, the free aim, the two-stone rule, a stones-only throw, obstacle shots) stay
+  unconditional. Limited Supply and Endless Quiver are `engine.shotHooks` (the SHOTS block: the cap off the hidden
+  `Unit.max_range_shots`, the 99 mod and its clearing), and a melee thief of the quiver shoots from 6.5; Rallying Volley
+  also reaches a holder of the quiver.
+- **Sniper**: `rangeDivisor` returns 1, the AI skips the bands and the range, and `finishDirectedMove` rewrites the
+  shot distance from the position the unit leaves (only a `move_unit` step shows it before the next refresh).
+- **Boost Health** (`engine.hpHooks`, shared with Unyielding Power): refreshAndGetAdjustedMaxHp's boost with its free
+  heal (a top creature at exactly the reset maximum is refilled), then the seam for max-hp artifacts, Unyielding
+  Power's +5 and the refill. **Piercing Spear** scales the target's armor in `combat.damageBoundSyn` (unfloored), with
+  an explicit synergy argument for AI estimates; `damageBound` passes the attacker's own.
+- **Mechanism**: `engine.moraleLocked` (Madness or Mechanism: morale 0, no lap roll, no morale change), MIND
+  resistance (`abilities.mindResistant`: Aggr, Boar Saliva, both Gazes, Spit Ball's MIND debuffs, MIND spells), no
+  poison, no heal (Heal's target gate, Devour Essence), x1.5 from the physical AOE paths (`physicalAoeMultiplier`:
+  Lightning Spin, Skewer Strike, Through Shot, the AOE tail) and on STATUS cards (Stun's chance, Shatter Armor's
+  amount). **No Melee**: no MELEE type (an empty list is `[NO_ATTACK]`), no melee strike or response.
+- **Petrifying Gaze** (`abilities.petrifyingGaze`): the coefficient and petrify rolls after every landed live hit (blow,
+  response, second punch, spin, skewer, shot, counter-shot, second shot, tail, Through Shot), with the shot's divisor.
+- **Spit Ball** (`abilities.spitBall(from, target, active)`): the Absorb Penalties redirect (now applied), then per
+  candidate debuff the chance roll, the magic-resist save and the mirror roll (Magic Reflection's chance); the stat
+  hooks (Curse pins the maximum to the minimum, Sadness morale -20 and no morale change, Quagmire's steps multiplier,
+  Weakening Beam's base-armor multiplier before Heavy Armor, Weakness on attack_mod) behind `State.spit`; Rangebane in
+  `canLandRangeAttack`; Cowardice (`engine.cowardBarred`, cumulative hp) in the melee strike, the melee response, the
+  shot, the counter-shot, the switch and Lightning Spin. A mirror can duplicate a debuff on the shooter: every live
+  object row of a name then ticks every display entry of it (`AppliedSpell.lag`, `engine.minusLapDuplicates`), the
+  digest prints the display laps.
+- **v0.1 AI**: `findRangeAttackAction` with the splash (`aoeSplashValue`), Through Shot (`enemiesBeyondInLine`), Sniper
+  and Double Shot branches and the Rangebane bail; No Melee in findTarget (the pick is still drawn), doFindTarget,
+  decideTurn and completeMoveWithAdjacentMelee; Cowardice in canSelectMeleeTarget (so findTarget's random pick) and
+  isLegalMeleeTargetAtHp; `rangeShotLandable` with both ray flags and the Cowardice test.
+- **State**: debuffs hold 20 (`AppliedSpell.lag` sits in the row's padding: still 24 bytes), `Unit.max_range_shots`. A
+  state is 70,688 bytes (Unit 2,080; 60,784 and 1,776 before).
 
 ### Spells (wave 1)
 
@@ -584,10 +667,9 @@ The framework the army setup added (exact in both modes, coverage below):
     `unit_hooks`, `null_field`, `disguise`) and rare work in `noinline` helpers. The first draft of batch 4 cost 2.8% of
     the engine replay with fewer retired instructions; gating and moving the hooks out of the loop recovered most of it.
 - Notes for the v0.8 owner (batch 4 in src/v08):
-  - `rollout.v08Scope` refuses a v0.8 seat when any holder unit holds a batch-4 card other than AI Driven or carries
-    batch-4 state (Deep Wounds, Boar Saliva, Terrifying Gaze effects; Disguise Aura, Hidden, Warding Mane, Battle Roar
-    buffs; Range Null Field, Visible debuffs; a forbidden target). AI Driven holders are dispatched to v0.1
-    (`rollout.isMindless`), and v0.8 rollouts with Berserkers are identical to TypeScript.
+  - `rollout.v08Scope` refused batch-4 cards and state until src/v08 ported them (`28e857dc`, `2346a159`); the refusal
+    is gone. AI Driven holders are dispatched to v0.1 (`rollout.isMindless`), and v0.8 rollouts with Berserkers are
+    identical to TypeScript.
   - v0.4's `trollWildRegen` tests `hasBuffActive("Wild Regeneration")` on allies (a name that is never a buff), so its
     "already gifted" check never fires; the a19 gift filter (`a19-wild-regen-gift-v1`) gives only to allies whose
     creatures have more max hp than the caster's. v0.2's `decideCreatureOpener` casts Battle Roar (lap-1 self-delay
@@ -620,6 +702,70 @@ The framework the army setup added (exact in both modes, coverage below):
   - Artifacts: Tome of Amplification raises a cast buff's power (amplifyCastBuffForTarget), Holy Cross multiplies Heal
     by 1.5, Mage's Ring / Archmage's Ring add to the magic-damage bonus, Aegis of the Arcane adds a magic-resist term,
     and their buff names become markers.
+
+- Batch-5 lessons (for batch 6: Dryad, Valkyrie, Angel, Champion, Wolf Rider, Unicorn, Mantis, Harpy, Mermaid, Efreet,
+  Black Dragon, Abomination, Thunderbird; and the artifacts):
+  - Every ranged hit is resolved by `combat.resolveShot` (the single shot and the counter-shot, the AOE tail, Through
+    Shot's pierced units, the second shot), so a new ranged rider has five sites: the primary block, the counter-shot
+    block, `doubleShot`, `throughShot` and the impact and rider loops of `aoeTail`. Each site rolls its riders in
+    TypeScript's order, the ranged Deep Wounds right before Stun. A rider landing a negative status goes through
+    `abilities.absorptionTarget` first (the Absorb Penalties redirect) and, for a MIND card, `abilities.mindResistant`
+    (Madness or Mechanism). Hamstring (Dryad), Blindness (Unicorn) and Paralysis (Mantis) are such riders, and Paralysis
+    also joins the response gate of `resolveShot` and `canRespondToMelee`.
+  - Mechanism's x1.5 reaches every STATUS card (`abilities.abilityMultiplierSyn`): Paralysis and Blindness are STATUS
+    cards, and Chain Lightning and Fire Breath are physical AOE paths (`combat.physicalAoeMultiplier`).
+  - Debuff lists now hold 20 rows: Spit Ball lays up to seven, and Magic Reflection's mirror can duplicate a name on the
+    shooter. A duplicate name ticks under `engine.minusLapDuplicates` with `AppliedSpell.lag` (the display list lags the
+    object list), the digest prints the display laps and the loader reads the lag off a mid-battle export. Any debuff a
+    mirror copies (the wave-2 debuff spells) can duplicate the same way.
+  - `spendShotsAgainst` is where Dense Flesh (Abomination: projectShotCost) belongs; the AOE tail spends against its
+    first victim. Flesh Shield orders and scales the AOE tail's victims.
+  - Made of Fire's max hp (`ceil(init + init / power)`) comes first in refreshAndGetAdjustedMaxHp, before Unyielding
+    Power's laps and Boost Health's boost: it belongs at the head of `engine.hpHooks`.
+  - Water Shield and Water Element, Fire Shield and Enchanted Skin change the damage a hit takes; every batch-5 hit
+    goes through `combat.hit` (the Gaze's petrify damage alone calls `engine.applyDamageBreak` with break chance 0, as
+    TypeScript does).
+  - Resurrection keeps the corpse (`deleteUnitById(id, true)`): `cleanupDeadUnits` runs delete, `unit_destroyed`, then
+    the Infest spawn, with the kill attributions captured before the first removal (`Attribution`, its `area` set for
+    an area throw's victims).
+  - The AbilityMask is a `u128`: ids 64 and up sit in the high word, so a test of two ids in different words reads both
+    (Madness 35 and Mechanism 68 in `engine.moraleLocked`). Batch 6 adds thirteen ids to the 75.
+  - The bridge accepts candidate actions from `ffi.SUPPORTED_ACTIONS`: a new action kind joins that list (batch 5's
+    `area_throw_attack` first went refused there, and the roots holding one were not compared).
+  - Perf: never default-initialize or return by value a struct of a kilobyte or more on a hot path (`combat.Groups`,
+    `combat.Ray`: fill them in place, `evaluateGroups(&g, ...)`, `traceRayInto`); a large default value is stored whole
+    and a returned one copied, and they cost 5% of the engine replay. Gated hooks in `adjustBaseStats` cost 3% even with
+    every flag false (register pressure, not the tests): the batch-5 hooks live in a comptime instance
+    (`adjustBaseStatsWith(.., true)`) that only boards with a holder run. A hook called from every hit site stays an
+    inline holder test with the work out of line (`abilities.petrifyingGaze`, `spitBall`, `engine.cowardBarred`): a
+    fatter inline helper stopped LLVM inlining `ai.canSelectMeleeTarget` into the AI's layer loops (2% of whole
+    battles).
+- Notes for the artifact port:
+  - Boost Health sits inside refreshAndGetAdjustedMaxHp (`engine.hpHooks`): the boost with its free heal, then a comment
+    marks the seam for the max-hp artifacts (Pendant of Vitality) right after the max-hp assignment, before Unyielding
+    Power's +5 and the refill.
+  - The ranged Deep Wounds riders are ported at the five ranged sites (before each Stun roll): a Queen that stole Deep
+    Wounds and Endless Quiver shoots with them, so the Wounding Charm only adds holders.
+  - Stones are read through the board (`st.BLOCK` cells) and the terrain helpers (`terrain.hasScatteredMountains`,
+    `clearScatteredMountainAt`), never the grid type: Barrel Barricade's barrels on NORMAL and LAVA take the Double Shot
+    two-stone rule, the splash rays and the area throw's stone clearing unchanged.
+- Notes for the v0.8 owner (batch 5 in src/v08):
+  - `rollout.v08Scope` refuses a v0.8 seat while a holder unit holds a batch-5 card (a stolen one too) or carries a Spit
+    Ball debuff, and every spell outside `rollout.V08_CASTABLE`.
+  - v0.8 emits two action shapes the engine replays: `area_throw_attack` (Gargantuan: `v0_8.ts`, `candidates.ts`,
+    `area_throw_router.ts`) and the free-aim Through Shot (`range_attack` with `targetPosition` and no target id);
+    TypeScript reads the shooters' cards in `candidates.ts`, `v0_2.ts`, `v0_8_ranged_positioning.ts`,
+    `v0_8_placement_lift.ts`, `v0_8_ranked_replay_tactics.ts`, No Melee and Cowardice in most layers (`v0_1.ts` to
+    `v0_5.ts`, `coherent_melee_approach.ts`, `v0_8_screen_hold.ts`), Rangebane in `candidates.ts` and
+    `v0_8_ranged_positioning.ts`, Endless Quiver in `predatory_assimilation_router.ts` and `v0_8_support_roles.ts`.
+  - The engine pieces they need are public: `combat.evaluateGroups` / `evaluateRangeFlags` (the ray groups with the
+    Through Shot and splash flags), `sideObservableEx`, `isSplashShooter`, `aoeAbility`, `doubleShotAbility`,
+    `physicalAoeMultiplier`, `projectLineToFieldEdge`, `freeAimAttack`, `areaThrowAttack`; `engine.rangebaned`,
+    `cowardly`, `cowardBarred`, `moraleLocked`, `cumulativeHp`; `abilities.mindResistant`, `absorptionTarget`.
+  - A v0.4-layer divergence on batch-4 boards (with HEAD's core too): seed 45840007, roots 13 and 29 of the oracle with
+    batches 1 to 4 minus Trent at 0.6; Zig's v0.4 replaces v0.1's melee strike on the adjacent Hydra with a strike on a
+    White Tiger (Disguise, Visible) from a cell the Hydra does not stand on, the engine refuses it and the rollout stops
+    ("a policy turn landed nothing"), while TypeScript's v0.4 keeps v0.1's strike.
 
 ## How parity is checked
 
@@ -797,6 +943,47 @@ cd zig && zig build test         # unit tests (random stream, JS number rounding
 ```
 
 Run `check.sh` after changing any rules or v0.1 AI code the port covers, both with and without the batch kept.
+
+Batch 5, checked on 2026-11-25 against common `e786b46a` (every battle identical; every run on side-oriented
+production-mix maps with the production-like setup, `RECORD_AMOUNTS=expBudget`, `RECORD_RESUME=random:2` and traced
+draws; the wave-1 and batch-4 `RECORD_SPELLS` lists wherever casters are kept):
+
+- native v0.1 and engine replay on the final code: 2,630 battles, 426,236 steps, and 5,260 resume points equal to their
+  digests with 431,733 remaining steps identical in both modes: each creature alone at keep rate 1 (50 each, seeds
+  42000000 + 100000 * k for Arbalester, Elf, Medusa, Beholder, Cyclops, Tsar Cannon, Gargantuan, Centaur), the cards
+  isolated with `RECORD_STRIP_ABILITIES` (40 each, 42800000-42890000: Medusa without Gaze / without Quiver, Arbalester
+  without Sniper / without Limited Supply, Tsar Cannon without Through Shot / with only Through Shot, Gargantuan without
+  Area Throw / without Double Throw, Centaur without Boost Health / without Piercing Spear), the whole batch at keep
+  rate 1 (150, 42900000), batch 5 with batches 1 to 4 and the wave-1 casters at the default rate (200, 43000000 and
+  43100000), Queen steals and quiver thieves (780: 43200000, 43300000, 44900000, 45000000, 45400000, 46100000),
+  range-heavy rosters (`ROSTER_RANGED_MIN=5` / `4`, 160, 43400000 and 43500000), the Beholder beside casters, auras and
+  Absorb Penalties (180, 43600000 and 44000000), the Tsar Cannon beside Pegasus Light, Hydra spins and Skewers (80,
+  43700000), stones (`RECORD_GRID=4`, 80, 43800000), synergy variants with Might and Chaos (120, 43900000 and
+  44100000), and 80 battles with a Debug build (45500000, 45600000); plus about 2,500 battles of the same scopes during
+  development (seeds 40000000-41999999);
+- engine replay of v0.8s battles (the Gargantuan's `area_throw_attack`, the Tsar Cannon's free aim, Spit Ball, stolen
+  quivers, stones): 500 battles, 77,177 steps, 1,000 resume replays identical (44300000-44800059 and a Debug build at
+  45700000), with 675 area throws and 76 free-aim shots, every one accepted as recorded;
+- reached in the v0.1 runs (digest and trace tallies): 36,099 shots, among them 6,731 by an active Sniper (1,805 shot
+  distances rewritten by a move), 3,589 Large Caliber and 2,060 Area Throw splashes (47,240 AOE miss rolls, 6,498 splash
+  hits), 1,833 Double Shot / Double Throw volleys (252 second hits), 1,839 Through Shots (802 pierced hits), 6,133
+  Endless Quiver shots (5,902 free), 2,499 Spit Balls (30,482 debuff chance rolls, 10,400 saves, 7,284 mirror rolls;
+  Curse 589, Sadness 558, Quagmire 550, Weakening Beam 581, Weakness 605, Rangebane 272, Cowardice 538 landed; 82 rows
+  with a duplicated name; 434 decisions under Cowardice, 174 under Rangebane), 19,280 Petrifying Gaze rolls (1,611 after
+  a melee strike), 2,668 Absorb Penalties redirects, 4,786 Limited Supply cuts, 4,683 Boost Health maximum changes (one
+  free heal), 65,811 Mechanism-locked rows and 900 decisions with `[NO_ATTACK]`, 982 melee and 2,872 ranged Piercing
+  Spear hits, 20 counter-shots by a Queen holding a stolen Endless Quiver, 19 ranged steal rolls (2 steals) and 6
+  Spiders raised from a ranged kill; at most 7 debuffs on one unit;
+- unchanged: the default recorder output byte-identical to HEAD's (the seven recipes of batch 4), classic `check.sh 300
+  45100000`, production-like batches 1 to 4 kept (300, 45200000, with 600 resume points), the wave-1 replay recipe
+  200/200 (45300000), `ffi/smoke.ts 12 45870000` and 30 battles each with batch 5 and batches 1-5 kept, `zig build
+  test`;
+- the rollout oracle (`BRIDGE.md`): v0.1 rollouts on batch-5 roots 274 roots, 263,040 values identical, 0 refused
+  (area throws among the candidates, 6,659 summons inside rollouts, uuid-sequence ids too); v0.8 with origin's src/v08
+  (`66e72e9e`) over this core: batches 1 to 3 minus Trent 75 roots, 72,000 values identical; batches 1 to 4 minus Trent
+  48 roots, 45,312 values identical, 0 refused roots (48 refused calls at two roots, the v0.4 gap in the v0.8 notes
+  above); the wave-1 casters with batches 1 to 4 and Trent 62 roots, 59,520 values identical, 0 refused; v0.8 on
+  batch-5 boards refused.
 
 Batch 4, checked on 2026-11-25 against common `6998c2dd` (every battle identical; every run on side-oriented
 production-mix maps with the production-like setup, `RECORD_AMOUNTS=expBudget` and `RECORD_RESUME=random:2`; the
@@ -1115,31 +1302,41 @@ replay with fewer instructions: Zig's auto layout reshuffled `Unit`, and the new
 loop; gating them behind `State` flags and moving Unyielding Power and the Disguise swaps into `noinline` helpers
 recovered most of it. A state is now 60,784 bytes (Unit 1,776: buffs 20, debuffs 8, effects 10).
 
+Batch 5 kept whole battles level: ten alternated pairs of `native-bench --reps 5` (load 6 to 10) gave medians of 264.6
+µs (old) and 265.65 µs (new) per battle, pairwise -0.3%, and eight pairs of the engine-only bench 554 and 561.5 ns per
+step, pairwise +2.6% (949.8 and 976.3 million instructions per engine pass), with the same run checksums. The first
+draft cost the engine replay 5.7% and whole battles 2.2%: the ray groups (`combat.Groups`, 1.2 KB) and the ray
+(`combat.Ray`, 1.5 KB) were default-initialized and returned by value on every shot, the batch-5 hooks in
+`adjustBaseStats` cost 3% with every flag false, and a fatter Cowardice helper kept `ai.canSelectMeleeTarget` out of the
+AI's layer loops. Filling the rays in place, a comptime instance of `adjustBaseStats` for boards without a holder, and
+inline holder tests with out-of-line work recovered it (the batch-5 lessons above). A state is now 70,688 bytes (Unit
+2,080: debuffs 20).
+
 Where Zig spends battle time (sampled, before the layer bitmap): `getMovePath` 31%, `doFindTarget` 14%, the melee
 target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the layers.
 
 ## Not covered yet
 
-- the abilities of every creature outside batches 1 to 4 and the wave-1 casters, the spells outside wave 1
-  (Spiritual Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Fireball, Smoke, Craft, Wind Flow, Resurrection,
-  Castling, the runes and the rest: a book holding one is refused by name) and artifacts (and so Broken Aegis's +20
-  break chance and self-miss, resurrection, the magic-resist and mirror rolls of debuff spells); the revealed-ranged
-  delivery layer of production's augment plan (it needs the live draft);
-  WATER_CENTER (never played); on the maps, Area Throw / Large Caliber on stones (`areaStrikeAtCell`), Quiver of
-  Echoes' extra obstacle shot, Fire Breath through stones, artifact barrels, and `forceStalledLap` / the recovery net
-  (never reached: 0 rejected engine calls in every map recording). The ported code leaves out what no battle in scope
-  can reach: Made of Fire, Mechanism, Paralysis, Water
-  Shield and Water Element, Flesh Shield, the Dual Strike Charm, the aura power types outside the six in scope, the
-  Wind Element (Thunderbird is not ported), Infest from a ranged kill (no shooter can hold it), the Castling hook's
-  getMovePath (it draws nothing), runs of more stunned activations than the advance attempts allow (`forceStalledLap`,
-  never seen), the mass casts other than Battle Roar's ALL_ALLIES buff (Mass Heal, the flyer and enemy casts), Holy
-  Cross (a gift the caster keeps), the mind-resist saves of Boar Saliva and Terrifying Gaze (Amulet of Resolve), Deep
-  Wounds on a shot (no shooter holds a card) and Rangebane; the recovery net is ported only for mindless units
-  (runMatch's retry, never reached);
+- the abilities of every creature outside batches 1 to 5 and the wave-1 casters, the spells outside wave 1 (Spiritual
+  Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Fireball, Smoke, Craft, Wind Flow, Resurrection, Castling, the
+  runes and the rest: a book holding one is refused by name) and artifacts (and so Broken Aegis's +20 break chance and
+  self-miss, resurrection, the magic-resist and mirror rolls of debuff spells, Crafted Double Shot, Farsight Quiver,
+  Quiver of Echoes, Amulet of Resolve's mind and status resistance); the revealed-ranged delivery layer of production's
+  augment plan (it needs the live draft); WATER_CENTER (never played); on the maps, Quiver of Echoes' extra obstacle
+  shot, Fire Breath through stones, artifact barrels, and `forceStalledLap` / the recovery net (never reached: 0
+  rejected engine calls in every map recording). The ported code leaves out what no battle in scope can reach: Made of
+  Fire, Paralysis, Water Shield and Water Element, Flesh Shield, Dense Flesh (`spendShotsAgainst` spends one arrow), the
+  Dual Strike Charm, the aura power types outside the six in scope, the Wind Element (Thunderbird is not ported), the
+  Castling hook's getMovePath (it draws nothing), runs of more stunned activations than the advance attempts allow
+  (`forceStalledLap`, never seen), the mass casts other than Battle Roar's ALL_ALLIES buff (Mass Heal, the flyer and
+  enemy casts), Holy Cross (a gift the caster keeps), the mind-resist saves of Boar Saliva, Terrifying Gaze, Petrifying
+  Gaze and Spit Ball (Amulet of Resolve); the recovery net is ported only for mindless units (runMatch's retry, never
+  reached). Ported but never reached: the ranged Deep Wounds riders (a Queen holding both a stolen Deep Wounds and a
+  stolen Endless Quiver shoots with them).
 - the AI versions the research uses (v0.8 with the a19 search). The production rollout policy is the v0.8 chain, about
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and
   `compare.NativeCheck`. The bridge's rollouts take each unit's decide function from `rollout.policies` (v0.1 and
-  v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers the abilities of batches 1 to 3, so a v0.8
-  request on a board with spells, vines or a batch-4 card other than AI Driven is refused (the known gaps and what the
+  v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers batches 1 to 4 and the wave-1 casts, so a
+  v0.8 request on a board with another spell or a batch-5 card or debuff is refused (the known gaps and what the
   search still needs are in `BRIDGE.md`).

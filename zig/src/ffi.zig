@@ -354,8 +354,8 @@ export fn hoc_play_v01(eng: ?*Engine, handle: ?*Handle, max_laps: i32, out: ?*ro
 // ---- hoc_rollouts --------------------------------------------------------------------------------------------------
 
 const SUPPORTED_ACTIONS = [_][]const u8{
-    "end_turn",   "wait_turn", "defend_turn", "select_attack_type", "move_unit", "melee_attack", "range_attack", "obstacle_attack",
-    "cast_spell",
+    "end_turn",   "wait_turn",         "defend_turn", "select_attack_type", "move_unit", "melee_attack", "range_attack", "obstacle_attack",
+    "cast_spell", "area_throw_attack",
 };
 
 fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []const u8) ?rollout.Request {
@@ -476,7 +476,7 @@ fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []
     if (req.policies[st.Team.LEFT] == rollout.policyFor("v0.8") or req.policies[st.Team.RIGHT] == rollout.policyFor("v0.8")) {
         var why_buf: [96]u8 = undefined;
         if (rollout.v08Scope(&h.state, &e.ident, &why_buf)) |why| {
-            e.fail("unsupported request: the v0.8 port covers boards without spells, vines or batch-4 abilities ({s})", .{why});
+            e.fail("unsupported request: the v0.8 port covers boards without batch-5 abilities or spells outside its list ({s})", .{why});
             return null;
         }
     }

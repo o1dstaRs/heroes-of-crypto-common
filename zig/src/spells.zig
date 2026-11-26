@@ -89,16 +89,16 @@ pub fn canCastSpell(s: *const State, ci: u8, ti: u8, spell: CS, cfg: *const st.S
             const id = spell.gifted() orelse return false;
             return !t.has(id) and caster.team == t.team and @as(f64, @floatFromInt(t.level)) <= cfg.max_gift_level and (cfg.self_cast or !self_cast);
         }
-        // !Mechanism: every unit in scope can be healed
-        return t.hp < t.max_hp and mr != 100 and caster.team == t.team and (cfg.self_cast or !self_cast);
+        // toUnitCanBeHealded: a Mechanism cannot be healed.
+        return !t.has(.mechanism) and t.hp < t.max_hp and mr != 100 and caster.team == t.team and (cfg.self_cast or !self_cast);
     }
     if (cfg.target == ST.ANY_ALLY) {
         if (mr == 100) return false;
         if (caster.team == t.team and (cfg.self_cast or !self_cast)) return notAlreadyApplied(t, spell, cfg);
     }
     if (cfg.target == ST.ANY_ENEMY) {
-        // hasMindAttackResistance: Madness (no Mechanism in scope); getTarget(): the raw Aggr lock
-        const mind = cfg.power_type == SP.MIND and t.has(.madness);
+        // hasMindAttackResistance: Madness or Mechanism; getTarget(): the raw Aggr lock
+        const mind = cfg.power_type == SP.MIND and engine.moraleLocked(t);
         const forced = caster.target >= 0 and caster.target != @as(i8, @intCast(ti));
         if (mr == 100 or mind or elementMultiplier(cfg.element, t) <= 0 or forced) return false;
         if (caster.team != t.team and !self_cast) return notAlreadyApplied(t, spell, cfg);
@@ -258,7 +258,8 @@ pub fn trajectory(s: *const State, ci: u8, ti: u8) ?Trajectory {
             if (!thrownSideObservable(s, cell, side, caster.team)) continue;
             const p = combat.sideCenter(cell, @intCast(side), fp[0], fp[1]);
             var t: Trajectory = .{ .obstruction = 0 };
-            const ray = combat.traceRay(fp[0], fp[1], p[0], p[1]);
+            var ray: combat.Ray = undefined;
+            combat.traceRayInto(&ray, fp[0], fp[1], p[0], p[1]);
             for (ray.items[0..ray.len]) |h| {
                 if (!engine.cellWithinGrid(h.cell)) continue;
                 const o = boardAt(s, h.cell);
@@ -376,7 +377,7 @@ pub fn damageAgainst(raw: f64, element: u8, u: *const Unit) f64 {
 
 /// mirroredDamageShare: the Magic Dragon's Magic Reflection, floor(power / 5 * stack power + luck) clamped to 0..100
 /// (no Magic Mirror buff in scope).
-fn mirroredShare(u: *const Unit) f64 {
+pub fn mirroredShare(u: *const Unit) f64 {
     if (u.ability_mask & st.AbilityId.magic_reflection.bit() == 0) return 0;
     const a = u.ability(.magic_reflection) orelse return 0;
     const sp = @max(0, @min(MAX_UNIT_STACK_POWER, engine.getStackPower(u)));
@@ -495,7 +496,7 @@ pub const Cells = struct {
 };
 
 /// getCellsAroundCell: the legacy 2x2 neighbourhoods of the cell's four corners, the cell itself left out.
-fn cellsAroundCell(c: Cell, out: *Cells) void {
+pub fn cellsAroundCell(c: Cell, out: *Cells) void {
     out.len = 0;
     const p = engine.positionForCell(@floatFromInt(c.x), @floatFromInt(c.y));
     const corners = [4][2]f64{

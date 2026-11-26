@@ -48,7 +48,7 @@ throws at export). Tags: `{$map: [[k, v]...]}`, `{$set: [...]}`, `{$denque: [...
 | `holder` | UnitsHolder's: distances, Ember Covenant, the aura refresh caches |
 | `aiTargetMemory` | `[[attackerId, targetId]...]` (ai.ts previousTargetsByBattle) |
 | `damageStatLaps` | the laps of the damage-statistic entries (runMatch's `damageDealtThisLap` reads them) |
-| `configs` | `{abilityConfigs, effectConfigs, auraEffectConfigs, spellConfigs, summonTemplates?}`: the configs of every ability and aura on the board, Poison, Break and the Ember Covenant spell, in the shape of a recording's start state (`spellConfigs` gains the System "Vine Throw" while vines stand; a book spell's config travels in its Spell object); with an Infest unit on the board, the summon templates (createUnitFromSpec's props of "Arachna Spider" and "Arachna Queen") and their abilities' and auras' configs; with a summon spell entry or a summoned Wolf, the "Wolf" template; with a Disguise Aura card, the System "Hidden" and "Visible" configs (the markers the stat refresh writes) |
+| `configs` | `{abilityConfigs, effectConfigs, auraEffectConfigs, spellConfigs, summonTemplates?}`: the configs of every ability and aura on the board, Poison, Break and the Ember Covenant spell, in the shape of a recording's start state (`spellConfigs` gains the System "Vine Throw" while vines stand; a book spell's config travels in its Spell object); with an Infest unit on the board, the summon templates (createUnitFromSpec's props of "Arachna Spider" and "Arachna Queen") and their abilities' and auras' configs; with a summon spell entry or a summoned Wolf, the "Wolf" template; with a Disguise Aura card, the System "Hidden" and "Visible" configs (the markers the stat refresh writes); with a Spit Ball card, the seven debuffs it applies (Curse, Sadness, Quagmire, Weakening Beam, Weakness of Death; Rangebane, Cowardice of Order) |
 | `setup` | `{lapsTillNarrowing, perTeam: {"2": {...}, "1": {...}}}`: getAdditionalAbilityPower / MovementSteps / FlyArmor / Morale / Luck / Supply / AuraRange PerTeam and getBreakChancePerTeam |
 | `harness` | optional `{rng, activeUnitId, uuidSequence, seed?, summonSequence?, armyProfile?}`: the mulberry32 state, runMatch's currentActiveUnitId ("" = none), lib.ts deterministicUuidSequence, the parts of a summon's id (the battle seed and runMatch's createSummonedUnit counter; without them a summon cannot be named, and the play-out reports the overflow), and v0.7's army profile per team (below) |
 
@@ -73,7 +73,8 @@ Read into the Zig `State` (`snapshot.zig`):
 | unit stats, `init` (BaseStats), team, faction, level, size, footprint, attack and movement types | `unitProperties`, `initialUnitProperties` (`footprint_width/height` must be 1 or 2) |
 | `attack_type_selected`, `possible` | `selectedAttackType` (must equal `attack_type_selected`), `possibleAttackTypes` |
 | `pos_x/pos_y`, `responded`, `on_hourglass`, `moved_this_turn`, `moved_route_cells`, `luck_per_turn`, `adjusted_laps` | `position`, the flags, `movedRouteCellsThisTurn`, `luckPerTurn`, `adjustedBaseStatsLaps` |
-| `buffs`, `debuffs`, `effects` (name, laps, power, order) | the props' `applied_*` arrays, cross-checked against the AppliedSpell / Effect objects |
+| `buffs`, `debuffs`, `effects` (name, laps, power, order) | the props' `applied_*` arrays, cross-checked against the AppliedSpell / Effect objects; a debuff row whose object laps differ from its display laps (a duplicate a Magic Reflection mirror appended) takes the object's laps and keeps the difference as `AppliedSpell.lag` |
+| `max_range_shots` | `maxRangeShots` (the constructor's range_shots: Limited Supply's base) |
 | buff and debuff `src_x/src_y` | `firstSpellProperty` / `secondSpellProperty` of aura rows (the Web Aura debuff row too) and augments |
 | `abilities` (the active list, in order), `ability_mask`, `Ability.aura`, `auras`, `State.aura_defs` | the Ability objects' names and `aura_effects` with `configs` (engine.loadUnitAbilities / loadAuras), checked against the AuraEffect objects |
 | `luck_dependent`, `stolen` | `props.abilities` (the card list: the early luck pass reads card names), `props.stolen_abilities` |
@@ -105,13 +106,13 @@ uid (`Fight.removed_*`); AI memory and distance entries of removed units are dro
 unit again). The handle keeps the id strings: requests and digests speak ids, and `hoc_play_v01` appends the ids of
 the units it summons (`rollout.SummonIds`).
 
-Ignored (read by nothing in scope, or a cache the port recomputes): `renderPosition`, `maxRangeShots` (Limited Supply),
-`unitIdToTeam`, `availableCenterStart/End`, `placementType`, the turn timers, the per-team augment, doctrine and synergy
-maps (their effect arrives through the buffs and `setup`), `teamsAuraEffects`, `auraRefreshFingerprint`,
-`auraRefreshKnownEmpty` (the port runs the full aura refresh every time), descriptions and textures,
-`bitter_experience_stacks` (a counter nothing reads), Poison's stack count (it only feeds the description), `fight.id`,
-`harness.uuidSequence` for naming (a summon takes the createSummonedUnit id unless a rollout request asks for
-`summonIds: "uuidSequence"`; the counter itself is loaded and counts every summon).
+Ignored (read by nothing in scope, or a cache the port recomputes): `renderPosition`, `unitIdToTeam`,
+`availableCenterStart/End`, `placementType`, the turn timers, the per-team augment, doctrine and synergy maps (their
+effect arrives through the buffs and `setup`), `teamsAuraEffects`, `auraRefreshFingerprint`, `auraRefreshKnownEmpty`
+(the port runs the full aura refresh every time), descriptions and textures, `bitter_experience_stacks` (a counter
+nothing reads), Poison's stack count (it only feeds the description), `fight.id`, `harness.uuidSequence` for naming (a
+summon takes the createSummonedUnit id unless a rollout request asks for `summonIds: "uuidSequence"`; the counter itself
+is loaded and counts every summon).
 
 Refused as an unsupported state (the loader names what it found): summoned units other than the creatures Infest and
 Summon Wolves raise, and non-creature units; a spell outside wave 1 (by name, in the raw entries or the Spell objects),
@@ -232,12 +233,17 @@ calling thread at every call (`rollout.battleTable` over the root's slots, names
 slot). A team without a profile is passed as melee_magic 255 (v0.7's finalizeDecision then keeps v0.6's decision, the
 port's anchor-army path; nothing else reads the count).
 
-Scope of the v0.8 policy (`rollout.v08Scope`, checked on the root; no ability can appear inside a rollout from a root
-without one): src/v08 covers the abilities of batches 1 to 3 (common `4f5152ba` on), so a request with a v0.8 seat is
-refused when any holder unit holds a spell entry, when a vine stands, or when a unit holds a batch-4 card other than
-AI Driven (whose holders play v0.1) or carries batch-4 state (Deep Wounds, Boar Saliva or Terrifying Gaze effects;
-Disguise Aura, Hidden, Warding Mane or Battle Roar buffs; Range Null Field or Visible debuffs; a forbidden target),
-until src/v08 ports batch 4. The two refusals for
+Scope of the v0.8 policy (`rollout.v08Scope`, checked on the root; no batch-5 card or debuff and no spell outside the
+list can appear inside a rollout from a root without one): src/v08 covers the abilities of batches 1 to 4 (common
+`4f5152ba`, `2346a159`), the wave-1 casts with the vines (`bcf722a4`, `66e72e9e`) and the batch-4 castables (Battle
+Roar, the Wild Regeneration gift), so a request with a v0.8 seat is refused when any holder unit holds a book entry or
+parsed spell outside the whitelist `rollout.V08_CASTABLE` (Heal, Blessing, Lightning Strike, Fire Strike, Meteor Shower,
+Meteorite, Summon Wolves, Vine Throw, Ring of Fire, Battle Roar, Wild Regeneration: a spell added to `st.CastSpell`
+later is refused until it joins the list), or when a unit holds a batch-5 card (Sniper, Limited Supply, Double Shot,
+Endless Quiver, Petrifying Gaze, Spit Ball, Large Caliber, Mechanism, No Melee, Through Shot, Double Throw, Area Throw,
+Piercing Spear, Boost Health; a stolen one too) or carries one of Spit Ball's debuffs, until src/v08 ports batch 5. The
+v0.1 policy takes every board the engine port loads, batch 5 included. Candidates may be any action the engine replays,
+`area_throw_attack` and the free-aim `range_attack` included. The two refusals for
 src/v08 gaps (a removed unit in alreadyMadeTurn, an Angel or Queen with a synergy aura range) are gone: its owner fixed
 them (common `d5fddea9`, `6e6aff54`), and the holder-ordered copy the learned leaves were scored on went with them.
 

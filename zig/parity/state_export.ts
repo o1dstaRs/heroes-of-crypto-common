@@ -240,6 +240,17 @@ export function armyProfileAtStart(unitsHolder: any): Record<string, { meleeMagi
 
 const plainConfig = (value: unknown): unknown => JSON.parse(JSON.stringify(value ?? null));
 
+/** Spit Ball's debuffs with their config factions (spit_ball_ability.ts POSSIBLE_DEBUFFS_TO_FACTIONS), in roll order. */
+export const SPIT_BALL_DEBUFFS: Array<[string, string]> = [
+    ["Death", "Curse"],
+    ["Death", "Sadness"],
+    ["Death", "Quagmire"],
+    ["Death", "Weakening Beam"],
+    ["Death", "Weakness"],
+    ["Order", "Rangebane"],
+    ["Order", "Cowardice"],
+];
+
 /** The creatures Infest raises, and the one Summon Wolves raises. */
 const SUMMON_CREATURES = ["Arachna Spider", "Arachna Queen"];
 const SPELL_SUMMON_CREATURES = ["Wolf"];
@@ -248,7 +259,8 @@ const SPELL_SUMMON_CREATURES = ["Wolf"];
  * templates (createUnitFromSpec's fresh props) of the creatures the board can raise: Infest's when a unit holds Infest,
  * the Wolf when a unit holds a summon spell entry or a summoned Wolf stands. With vines on the board the System "Vine
  * Throw" config joins spellConfigs (the snare on arrival reads it; a book spell's config travels in its Spell object),
- * and with a Disguise Aura card the System "Hidden" and "Visible" markers the stat refresh writes. */
+ * with a Disguise Aura card the System "Hidden" and "Visible" markers the stat refresh writes, and with a Spit Ball card
+ * the seven debuffs it applies (Death and Order spells). */
 function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Record<string, Record<string, unknown>> {
     const abilityConfigs: Record<string, any> = {};
     const effectConfigs: Record<string, unknown> = {};
@@ -267,10 +279,12 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
     let summons = false;
     let spellSummons = false;
     let disguise = false;
+    let spitBall = false;
     for (const unit of unitsHolder.getAllUnits().values()) {
         const props = unit.getUnitProperties();
         addProps(props);
         if ((props.abilities ?? []).includes("Disguise Aura")) disguise = true;
+        if ((props.abilities ?? []).includes("Spit Ball")) spitBall = true;
         if ((props.abilities ?? []).includes("Infest")) summons = true;
         if ((props.spells ?? []).some((entry: string) => entry.includes(":Summon "))) spellSummons = true;
         if (unit.summoned && SPELL_SUMMON_CREATURES.includes(unit.getName())) spellSummons = true;
@@ -316,6 +330,10 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
     }
     if (disguise) {
         for (const name of ["Hidden", "Visible"]) spellConfigs[name] = plainConfig(getSpellConfig("System", name));
+    }
+    if (spitBall) {
+        for (const [faction, name] of SPIT_BALL_DEBUFFS)
+            spellConfigs[name] = plainConfig(getSpellConfig(faction, name));
     }
     return {
         abilityConfigs,

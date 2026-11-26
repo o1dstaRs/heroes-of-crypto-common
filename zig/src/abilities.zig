@@ -11,6 +11,7 @@ const std = @import("std");
 const st = @import("state.zig");
 const js = @import("jsnum.zig");
 const engine = @import("engine.zig");
+const spells = @import("spells.zig");
 
 const Unit = st.Unit;
 const State = st.State;
@@ -24,12 +25,18 @@ pub const MAX_UNIT_STACK_POWER: f64 = 5;
 // Ability formulas (src/units/unit.ts)
 // =====================================================================================================================
 
-/// Unit.calculateAbilityMultiplier
+/// Unit.calculateAbilityMultiplier with the unit's own team ability power (every engine call site in scope).
 pub fn abilityMultiplier(u: *const Unit, a: *const Ability) f64 {
+    return abilityMultiplierSyn(u, a, u.syn_power);
+}
+
+/// Unit.calculateAbilityMultiplier(ability, synergyAbilityPowerIncrease) with an explicit synergy power (the AI's
+/// damage estimates pass 0 or the attacker's).
+pub fn abilityMultiplierSyn(u: *const Unit, a: *const Ability, syn: f64) f64 {
     var coeff: f64 = 1;
     switch (a.power_type) {
         PT.TOTAL_DAMAGE_PERCENTAGE, PT.MAGIC_DAMAGE, PT.KILL_RANDOM_AMOUNT, PT.IGNORE_ARMOR, PT.MAGIC_RESIST_50, PT.MAGIC_RESIST_25, PT.ABSORB_DEBUFF, PT.BOOST_HEALTH => {
-            var combined = a.power + engine.getLuck(u) + 0 + u.syn_power;
+            var combined = a.power + engine.getLuck(u) + 0 + syn;
             if (combined < 0) combined = 1;
             if (a.stack_powered) {
                 coeff *= (combined / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u);
@@ -39,7 +46,7 @@ pub fn abilityMultiplier(u: *const Unit, a: *const Ability) f64 {
         },
         PT.ADDITIONAL_DAMAGE_PERCENTAGE, PT.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE, PT.ADDITIONAL_RANGE_ARMOR_PERCENTAGE => {
             const own = if (a.stack_powered) (a.power / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) else a.power / 100;
-            coeff += own + (engine.getLuck(u) + u.syn_power) / 100 + @as(f64, 0) / 100;
+            coeff += own + (engine.getLuck(u) + syn) / 100 + @as(f64, 0) / 100;
         },
         else => {},
     }
@@ -145,7 +152,7 @@ pub fn shatterArmor(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     if (to.isDead()) return;
     const a = from.ability(.shatter_armor) orelse return;
     const existing = to.effects.power(.shatter_armor) orelse 0;
-    const amplifier: f64 = 1; // 1.5 for a STATUS-type card on a Mechanism target: no Mechanism in scope
+    const amplifier: f64 = if (a.ty == st.AbilityKind.STATUS and to.has(.mechanism)) 1.5 else 1;
     const power = js.toFixed(existing + abilityCount(from, a) * amplifier, 2);
     var laps = a.effect_laps;
     if (to_i == active_i and laps != st.LAPS_AURA and laps != st.NUMBER_OF_LAPS_TOTAL) laps += 1; // Effect.extend
@@ -293,14 +300,14 @@ fn captureCensus(s: *const State) Census {
     return c;
 }
 
-/// canReceiveSharpenedWeapons (melee or magic attackers) and canReceiveRallyingVolley (isRangeCapable; no Endless
-/// Quiver in scope).
+/// canReceiveSharpenedWeapons (melee or magic attackers) and canReceiveRallyingVolley (isRangeCapable, or an active
+/// Endless Quiver: a thief's refresh grants the row before its shot distance and mod exist).
 const Eligible = enum { all, melee_or_magic, ranged };
 
 /// Unit.tryGrantRallyingVolleyShots: applyBuff("Rallying Volley Blessing") adds the arrows once per unit (no ranked
-/// authoritative shots or Endless Quiver in scope).
+/// authoritative shots in scope).
 fn grantRallyingVolleyShots(u: *Unit, power: f64) void {
-    if (!engine.isRangeCapable(u)) return;
+    if (!engine.isRangeCapable(u) and !u.has(.endless_quiver)) return;
     const bonus = @max(0, @floor(power));
     if (bonus > u.rallying_volley_granted) {
         u.range_shots += bonus - u.rallying_volley_granted;
@@ -322,7 +329,7 @@ fn reapply(s: *State, c: *const Census, powers: *const TeamPowers, bit: u32, id:
         switch (eligible) {
             .all => {},
             .melee_or_magic => if (u.attack_type != AT.MELEE and u.attack_type != AT.MAGIC and u.attack_type != AT.MELEE_MAGIC) continue,
-            .ranged => if (!engine.isRangeCapable(u)) continue,
+            .ranged => if (!engine.isRangeCapable(u) and !u.has(.endless_quiver)) continue,
         }
         if (id == .rallying_volley_blessing) grantRallyingVolleyShots(u, power);
         pushChecked(s, &u.buffs, .{ .id = id, .laps = st.NUMBER_OF_LAPS_TOTAL, .power = power });
@@ -521,7 +528,7 @@ pub fn refreshAuras(s: *State) void {
 
 /// applyPoisonEffect (poison_ability.ts): a new hit stacks onto the active poison.
 fn applyPoison(s: *State, tgt: *Unit, poison_hp: f64) void {
-    if (tgt.isDead() or poison_hp <= 0) return; // canBePoisoned: no Mechanism in scope; no Holy Cross
+    if (tgt.isDead() or poison_hp <= 0 or tgt.has(.mechanism)) return; // canBePoisoned; no Holy Cross
     const active = tgt.effects.power(.poison) orelse 0;
     const stacked = if (active != 0) @max(poison_hp, active + @max(1, js.round(poison_hp * 0.5))) else poison_hp;
     if (stacked <= active) return;
@@ -555,21 +562,23 @@ pub fn aggr(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < applyChance(from, a) * 1)) return;
     if (to.effects.find(.aggr) != null) return;
     const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
-    // Aggr is a MIND effect: hasMindAttackResistance (Madness; no Mechanism in scope) resists it after the roll.
-    if (to.has(.madness)) return;
+    // Aggr is a MIND effect: hasMindAttackResistance (Madness or Mechanism) resists it after the roll.
+    if (a.ty == st.AbilityKind.MIND and mindResistant(to)) return;
     replaceChecked(s, &to.effects, .{ .id = .aggr, .laps = laps, .power = a.effect_power });
     to.target = @intCast(from_i);
 }
 
-/// processStunAbility(from, target, currentActiveUnit): calculateStunApplyChance (no Mechanism or status resist in
-/// scope) clamped to [0, 100]; the roll is drawn even when the target is already stunned (then nothing changes). The
-/// stun lasts a lap longer on the active unit. `from` may be dead (its blow still lands).
+/// processStunAbility(from, target, currentActiveUnit): calculateStunApplyChance (x1.5 for the STATUS card on a
+/// Mechanism target; no status resist in scope) clamped to [0, 100]; the roll is drawn even when the target is already
+/// stunned (then nothing changes). The stun lasts a lap longer on the active unit. `from` may be dead (its blow still
+/// lands).
 pub fn stun(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     const to = &s.units[to_i];
     if (to.isDead()) return;
     const from = &s.units[from_i];
     const a = from.ability(.stun) orelse return;
-    const chance = @max(0, @min(100, applyChance(from, a) * 1 * (1 - @as(f64, 0) / 100)));
+    const amplifier: f64 = if (a.ty == st.AbilityKind.STATUS and to.has(.mechanism)) 1.5 else 1;
+    const chance = @max(0, @min(100, applyChance(from, a) * amplifier * (1 - @as(f64, 0) / 100)));
     if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < chance)) return; // stun_ability.ts:58
     if (to.isStunned()) return;
     const laps: f64 = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
@@ -632,7 +641,7 @@ pub fn boarSaliva(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     coeff *= (combined / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(from);
     const power = js.toFixed(coeff * 100, 2);
     const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
-    if (a.ty == st.AbilityKind.MIND and to.has(.madness)) return; // hasMindAttackResistance (no Mechanism in scope)
+    if (a.ty == st.AbilityKind.MIND and mindResistant(to)) return; // hasMindAttackResistance
     replaceChecked(s, &to.effects, .{ .id = .boar_saliva, .laps = laps, .power = power });
 }
 
@@ -650,7 +659,7 @@ pub fn terrifyingGaze(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
         return;
     }
     const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
-    if (a.ty == st.AbilityKind.MIND and to.has(.madness)) return;
+    if (a.ty == st.AbilityKind.MIND and mindResistant(to)) return;
     replaceChecked(s, &to.effects, .{ .id = .terrifying_gaze, .laps = laps, .power = a.effect_power });
     to.forbidden = from.uid;
 }
@@ -1049,7 +1058,8 @@ pub fn devourEssence(s: *State, ui: u8, died: []const u8) void {
     if (power <= 0) return;
     const up_to = @ceil(u.max_hp * @min(1, power / 100));
     if (up_to > u.hp) {
-        // Unit.applyHeal
+        // Unit.applyHeal: a Mechanism cannot be healed.
+        if (u.has(.mechanism)) return;
         const heal = up_to - u.hp;
         if (heal < 0) return;
         u.hp += @floor(heal);
@@ -1057,18 +1067,136 @@ pub fn devourEssence(s: *State, ui: u8, died: []const u8) void {
     }
 }
 
-/// processSpitBallAbility(from, target) for a shooter without Spit Ball: only EffectHelper.getAbsorptionTarget's roll,
-/// drawn when the target carries Absorb Penalties Aura and a unit stands on its source cell. The outcome is unused.
-pub fn spitBall(s: *State, tgt_i: u8) void {
-    if (!s.auras) return; // the buff exists only through the aura refresh
+/// hasMindAttackResistance: an active Madness or Mechanism.
+pub inline fn mindResistant(u: *const Unit) bool {
+    return engine.moraleLocked(u);
+}
+
+/// EffectHelper.getAbsorptionTarget: when the target carries an Absorb Penalties Aura row and a unit stands on its source
+/// cell, the roll getRandomInt(0, 100) < floor(power), and a living source takes the penalty. Returns the unit that
+/// receives it.
+fn absorptionTarget(s: *State, tgt_i: u8) u8 {
+    if (!s.auras) return tgt_i; // the buff exists only through the aura refresh
     const tgt = &s.units[tgt_i];
-    const b = tgt.buffs.get(.absorb_penalties_aura) orelse return;
-    if (b.src_x < 0 or b.src_y < 0) return;
+    const b = tgt.buffs.get(.absorb_penalties_aura) orelse return tgt_i;
+    if (b.src_x < 0 or b.src_y < 0) return tgt_i;
     const c = st.Cell{ .x = b.src_x, .y = b.src_y };
-    if (!engine.cellWithinGrid(c)) return;
+    if (!engine.cellWithinGrid(c)) return tgt_i;
     const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
-    if (!st.isUnitCode(o)) return;
-    _ = s.rng.int(0, 100); // getRandomInt(0, 100) < floor(power) && !source.isDead(): discarded
+    if (!st.isUnitCode(o)) return tgt_i;
+    const roll: f64 = @floatFromInt(s.rng.int(0, 100)); // effect_helper.ts:370
+    const src = o - 1;
+    if (roll < @floor(b.power) and !s.units[src].isDead()) return src;
+    return tgt_i;
+}
+
+/// processSpitBallAbility(from, target, currentActiveUnit) on a landed shot, counter-shot or splash victim: the Absorb
+/// Penalties redirect, then (a living receiver, a shooter with an active Spit Ball) per candidate debuff in table order
+/// (Rangebane only for an attack_type RANGE receiver, none it already carries) the chance roll, after a pass the
+/// magic-resist save (always drawn; a MIND name is then resisted by Madness or Mechanism), and after a landing the
+/// receiver's mirror roll (always drawn): a mirrored copy goes to the shooter unless it resists a MIND name, and may
+/// duplicate a row it carries. The rows are appended (laps + 1 on the active unit). Inline: only a board with auras or a
+/// Spit Ball holder goes further.
+pub inline fn spitBall(s: *State, from_i: u8, tgt_i: u8, active_i: u8) void {
+    if (s.auras or s.spit) spitBallOn(s, from_i, tgt_i, active_i);
+}
+
+fn spitBallOn(s: *State, from_i: u8, tgt_i: u8, active_i: u8) void {
+    const t_i = absorptionTarget(s, tgt_i);
+    if (!s.spit) return;
+    const t = &s.units[t_i];
+    if (t.isDead()) return;
+    const from = &s.units[from_i];
+    if (from.ability_mask & st.AbilityId.spit_ball.bit() == 0) return;
+    const a = from.ability(.spit_ball) orelse return;
+    spitBallRolls(s, from_i, t_i, active_i, a);
+}
+
+noinline fn spitBallRolls(s: *State, from_i: u8, t_i: u8, active_i: u8, a: *const Ability) void {
+    const t = &s.units[t_i];
+    const from = &s.units[from_i];
+    var cands: [7]u8 = undefined;
+    var n: usize = 0;
+    for (st.SpellId.SPIT_BALL, 0..) |id, k| {
+        if (id == .rangebane and t.attack_type != AT.RANGE) continue;
+        if (t.debuffs.find(id) != null) continue;
+        cands[n] = @intCast(k);
+        n += 1;
+    }
+    if (n == 0) return;
+    const chance = applyChance(from, a);
+    const resist = @floor(engine.getMagicResist(t));
+    for (cands[0..n]) |k| {
+        if (@as(f64, @floatFromInt(s.rng.int(0, 100))) >= chance) continue; // spit_ball_ability.ts:73
+        const cfg = &s.spit_cfg[k];
+        if (!cfg.loaded) {
+            s.overflow = true; // the recording carries no config for the debuff
+            return;
+        }
+        const id = st.SpellId.SPIT_BALL[k];
+        const saved = @as(f64, @floatFromInt(s.rng.int(0, 100))) < resist; // spit_ball_ability.ts:94
+        if (saved or (cfg.mind and mindResistant(t))) continue;
+        pushChecked(s, &t.debuffs, .{ .id = id, .laps = if (t_i == active_i) cfg.laps + 1 else cfg.laps, .power = cfg.power });
+        // SpellHelper.isMirrored(target): max(Magic Mirror buff power (none in scope), Magic Reflection's chance).
+        const mirror = @floor(@max(0, spells.mirroredShare(t)));
+        if (@as(f64, @floatFromInt(s.rng.int(0, 100))) < mirror and !(cfg.mind and mindResistant(from))) { // spell_helper.ts:1232
+            pushChecked(s, &from.debuffs, .{ .id = id, .laps = if (from_i == active_i) cfg.laps + 1 else cfg.laps, .power = cfg.power });
+        }
+    }
+}
+
+/// calculatePetrifyingGazeKillChance's range factor 0.75^log2(divisor) for the divisors in scope (powers of two to 8).
+inline fn petrifyRangeFactor(divisor: f64) f64 {
+    const d = @max(1, divisor);
+    if (d == 1) return 1;
+    if (d == 2) return 0.75;
+    if (d == 4) return 0.5625;
+    if (d == 8) return 0.421875;
+    return std.math.pow(f64, 0.75, std.math.log2(d));
+}
+
+/// processPetrifyingGazeAbility(from, to, damage, ..., rangeDivisor): after a landed, unabsorbed hit of `damage` on a
+/// living victim, the holder's active Gaze (a MIND card: Madness or Mechanism resists before any roll) rolls the kill
+/// coefficient getRandomInt(floor(pmax * 2 / 3), pmax) / 100 (pmax = floor(applyChance)), kills that share of the damage
+/// in whole creatures (never the last), then the petrify roll getRandomInt(0, 100) < min(35, round(pmax / 4) + 4 *
+/// (level - 1)) x 0.75^log2(divisor), rounded, which adds the front creature's hp. The damage lands with break chance 0
+/// and adds a damage statistic. Inline: every hit site of the engine calls it, and only a holder goes further.
+pub inline fn petrifyingGaze(s: *State, from_i: u8, to_i: u8, damage: f64, divisor: f64) void {
+    if (s.units[from_i].ability_mask & st.AbilityId.petrifying_gaze.bit() != 0) petrifyingGazeHeld(s, from_i, to_i, damage, divisor);
+}
+
+fn petrifyingGazeHeld(s: *State, from_i: u8, to_i: u8, damage: f64, divisor: f64) void {
+    const to = &s.units[to_i];
+    if (to.isDead() or damage <= 0) return;
+    const from = &s.units[from_i];
+    const a = from.ability(.petrifying_gaze) orelse return;
+    if (a.ty == st.AbilityKind.MIND and mindResistant(to)) return;
+    gazeRolls(s, from_i, to_i, damage, divisor, a);
+}
+
+noinline fn gazeRolls(s: *State, from_i: u8, to_i: u8, damage: f64, divisor: f64, a: *const Ability) void {
+    const to = &s.units[to_i];
+    const from = &s.units[from_i];
+    const pmax = @floor(applyChance(from, a));
+    const pmin = @floor((pmax / 3) * 2);
+    const coeff = @as(f64, @floatFromInt(s.rng.int(@intFromFloat(pmin), @intFromFloat(pmax)))) / 100; // petrifying_gaze_ability.ts:81
+    const killed = (damage * coeff) / to.max_hp;
+    var amount = @min(@floor(killed), to.amount_alive - 1);
+    var dmg = amount * to.max_hp;
+    var proc = false;
+    if (amount < to.amount_alive) {
+        const level: f64 = @floatFromInt(to.level);
+        const base = @min(35, js.round(pmax * 0.25) + 4 * (level - 1));
+        const chance = @max(0, js.round(base * petrifyRangeFactor(divisor) * (1 - @as(f64, 0) / 100)));
+        if (@as(f64, @floatFromInt(s.rng.int(0, 100))) < chance) { // petrifying_gaze_ability.ts:100
+            dmg += to.hp;
+            proc = true;
+        }
+    } else amount = to.amount_alive;
+    if (amount != 0 or proc) {
+        _ = engine.applyDamageBreak(s, to_i, dmg, 0, false);
+        s.damage_lap = s.fight.lap;
+    }
 }
 
 // =====================================================================================================================

@@ -54,39 +54,45 @@ pub fn policyFor(version: []const u8) ?DecideFn {
     return null;
 }
 
-/// The boards the v0.8 port covers (src/v08 is checked on ability-free battles: its levels treat every ability, aura
-/// and ability-born buff as absent). Null when `s` is one, else what puts it outside. No ability can appear inside a
-/// rollout from such a root (no Infest, no theft, no spells), so checking the root covers every state of the call.
+/// The boards the v0.8 port covers. Null when `s` is one, else what puts it outside. No batch-5 card or debuff and no
+/// spell outside the list can appear inside a rollout from such a root (steals, Infest and summons only move or raise
+/// cards of batches 1-4), so checking the root covers every state of the call.
 pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 {
     _ = ident; // the src/v08 gap checks that named creatures are gone (common 6e6aff54, d5fddea9)
-    // src/v08 covers the abilities of batches 1-3 (common 4f5152ba), which is everything the loader accepts; its
-    // casting passes are not ported yet, so a board where a unit can cast, or vines lie, stays out of scope.
+    // src/v08 covers the abilities of batches 1-4 (common 4f5152ba, 2346a159), the wave-1 casts and the batch-4
+    // castables (bcf722a4, 66e72e9e), vines included. A board where a unit holds any other spell stays out of scope, and
+    // so does batch 5 (no src/v08 reader yet).
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
-        if (u.n_book > 0 or u.n_spells > 0) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
-        // Batch 4 is not in src/v08 yet: its abilities (but AI Driven, whose holders play v0.1 here) and their state.
-        if (u.ability_mask & BATCH4_MASK != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-4 ability", .{i}) catch "batch 4";
-        if (u.forbidden != st.NO_UID) return std.fmt.bufPrint(buf, "slot {d} is frightened (Terrifying Gaze)", .{i}) catch "batch 4";
-        for ([_]st.SpellId{ .deep_wounds, .boar_saliva, .terrifying_gaze }) |id| {
-            if (u.effects.find(id) != null) return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 4";
+        for (u.book[0..u.n_book]) |e| {
+            if (!v08Castable(e.spell)) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
         }
-        for ([_]st.SpellId{ .disguise_aura, .hidden, .warding_mane_blessing, .battle_roar }) |id| {
-            if (u.buffs.find(id) != null) return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 4";
+        for (u.spells[0..u.n_spells]) |b| {
+            if (!v08Castable(b.spell)) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
         }
-        for ([_]st.SpellId{ .range_null_field_aura, .visible }) |id| {
-            if (u.debuffs.find(id) != null) return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 4";
+        // Batch 5 is not in src/v08 yet: the shooters' and throwers' cards (a stolen Endless Quiver included) and Spit
+        // Ball's debuffs.
+        if (u.ability_mask & st.AbilityId.BATCH5_MASK != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-5 ability", .{i}) catch "batch 5";
+        for (u.debuffs.items[0..u.debuffs.len]) |d| {
+            if (d.id.isSpitBall()) return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, d.id.name() }) catch "batch 5";
         }
     }
-    if (s.fight.n_vines != 0) return "vines on the board";
     return null;
 }
 
-/// The batch-4 abilities src/v08 does not read yet (AI Driven is the mindless pin: its holders play v0.1).
-const BATCH4_MASK: st.AbilityMask = blk: {
-    var m: st.AbilityMask = 0;
-    for ([_]st.AbilityId{ .deep_wounds_level_0, .deep_wounds_level_1, .deep_wounds_level_2, .deep_wounds_level_3, .boar_saliva, .range_null_field_aura, .sky_runner, .disguise_aura, .warding_mane_blessing, .terrifying_gaze, .unyielding_power, .battle_roar, .wild_regeneration }) |id| m |= id.bit();
-    break :blk m;
+/// The castables src/v08 decides: the wave-1 spells and the batch-4 castables. A whitelist: every other spell (wave 2,
+/// whatever joins `st.CastSpell` later) keeps a board out of v0.8 rollouts until src/v08 decides it and joins this list.
+const V08_CASTABLE = [_]st.CastSpell{
+    .heal,          .blessing,   .lightning_strike, .fire_strike, .meteor_shower,     .meteorite,
+    .summon_wolves, .vine_throw, .ring_of_fire,     .battle_roar, .wild_regeneration,
 };
+
+fn v08Castable(spell: u8) bool {
+    for (V08_CASTABLE) |c| {
+        if (@intFromEnum(c) == spell) return true;
+    }
+    return false;
+}
 
 /// MINDLESS_AI_VERSION: an "AI Driven" unit plays v0.1 whatever its seat (aiVersionForUnit).
 pub const mindless_policy: DecideFn = decideV01;

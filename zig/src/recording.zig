@@ -17,7 +17,9 @@ pub const Action = union(enum) {
     /// `has_lava` is the action's hasLavaCell (a flyer's route over lava; no state reads it in scope).
     move_unit: struct { unit: u8, path: []const Cell, target_cells: []const Cell, has_lava: bool = false },
     melee_attack: struct { attacker: u8, target: u8, attack_from: Cell, path: []const Cell, has_lava: bool = false },
-    range_attack: struct { attacker: u8, target: u8, aim_cell: ?Cell = null, aim_side: u8 = 0 },
+    /// A shot at `target` (aimCell / aimSide the requested edge), or with `free` a Through Shot aimed at the world point
+    /// (`tx`, `ty`): `targetPosition` with `targetId` empty or absent (isFreeAim); `target` is then unused.
+    range_attack: struct { attacker: u8, target: u8, aim_cell: ?Cell = null, aim_side: u8 = 0, free: bool = false, tx: f64 = 0, ty: f64 = 0 },
     /// A strike on a mountain cell or a stone at `targetPosition` (a cell centre) from `attackFrom`; `path` is the
     /// approach route (empty when striking in place, where the recorded action has no path or route flags).
     /// `has_from` false: the action carries no attackFrom (a shooter's ranged shot at the obstacle).
@@ -27,6 +29,8 @@ pub const Action = union(enum) {
     /// A cast (`cast_spell`): the spell (state.CastSpell, or NO_SPELL for a name outside the port), the target unit
     /// (`has_target`) and the target cell (`has_cell`). targetOrientation (Fire Wall) is not in scope.
     cast_spell: struct { caster: u8, spell: u8, target: u8 = 0, has_target: bool = false, cell: Cell = .{ .x = 0, .y = 0 }, has_cell: bool = false },
+    /// Area Throw at a cell (`targetCell`: empty, lava or a scattered stone), sent by v0.8 only.
+    area_throw_attack: struct { attacker: u8, target_cell: Cell },
 };
 
 pub const EventKind = enum(u8) {
@@ -194,14 +198,27 @@ pub fn parseAction(arena: std.mem.Allocator, ids: []const []const u8, kind: []co
         } };
     }
     if (std.mem.eql(u8, t, "range_attack")) {
-        if (get(a, "targetPosition") != .null) return error.UnsupportedAim; // free aim needs Through Shot
+        const pos = get(a, "targetPosition");
+        const tid = get(a, "targetId");
+        // isFreeAim: a position and no target id ("" counts as none); a shot naming both ignores the position.
+        if (pos != .null and (tid != .string or tid.string.len == 0)) {
+            const x = get(pos, "x");
+            const y = get(pos, "y");
+            if ((x != .integer and x != .float) or (y != .integer and y != .float)) return error.UnsupportedAim;
+            return .{ .range_attack = .{ .attacker = try unitArg(ids, get(a, "attackerId")), .target = 0, .free = true, .tx = num(x), .ty = num(y) } };
+        }
         const aim = get(a, "aimCell");
         return .{ .range_attack = .{
             .attacker = try unitArg(ids, get(a, "attackerId")),
-            .target = try unitArg(ids, get(a, "targetId")),
+            .target = try unitArg(ids, tid),
             .aim_cell = if (aim != .null and get(a, "aimSide") != .null) cell(aim) else null,
             .aim_side = @intCast(int(get(a, "aimSide"))),
         } };
+    }
+    if (std.mem.eql(u8, t, "area_throw_attack")) {
+        const tc = get(a, "targetCell");
+        if (tc != .object) return error.MissingCell;
+        return .{ .area_throw_attack = .{ .attacker = try unitArg(ids, get(a, "attackerId")), .target_cell = cell(tc) } };
     }
     std.debug.print("unsupported action type {s}\n", .{t});
     return error.UnsupportedAction;

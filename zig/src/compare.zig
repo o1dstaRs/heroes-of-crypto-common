@@ -61,7 +61,7 @@ fn spellsMatch(list: []const st.AppliedSpell, names: []const u8, laps: []const u
         if (!std.mem.eql(u8, n, list[i].id.name())) return false;
         const l = lit.next() orelse return false;
         const lv = std.fmt.parseFloat(f64, l) catch return false;
-        if (lv != list[i].laps) return false;
+        if (lv != list[i].shownLaps()) return false;
         if (powers != null) {
             const p = pit.next() orelse return false;
             const pv = std.fmt.parseFloat(f64, p) catch return false;
@@ -492,6 +492,8 @@ pub fn actionsEqual(a: rec.Action, b: rec.Action) bool {
         },
         .range_attack => |x| blk: {
             const y = b.range_attack;
+            if (x.free != y.free) break :blk false;
+            if (x.free) break :blk x.attacker == y.attacker and x.tx == y.tx and x.ty == y.ty;
             if (x.attacker != y.attacker or x.target != y.target) break :blk false;
             if ((x.aim_cell == null) != (y.aim_cell == null)) break :blk false;
             if (x.aim_cell) |ac| break :blk ac.x == y.aim_cell.?.x and ac.y == y.aim_cell.?.y and x.aim_side == y.aim_side;
@@ -504,6 +506,8 @@ pub fn actionsEqual(a: rec.Action, b: rec.Action) bool {
             if (x.has_cell and (x.cell.x != y.cell.x or x.cell.y != y.cell.y)) break :blk false;
             break :blk true;
         },
+        .area_throw_attack => |x| x.attacker == b.area_throw_attack.attacker and x.target_cell.x == b.area_throw_attack.target_cell.x and
+            x.target_cell.y == b.area_throw_attack.target_cell.y,
         .decide => |x| blk: {
             const y = b.decide;
             if (x.unit != y.unit or x.out.len != y.out.len) break :blk false;

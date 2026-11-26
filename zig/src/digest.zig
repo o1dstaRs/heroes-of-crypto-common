@@ -49,7 +49,7 @@ fn spellColumn(w: *Writer, list: []const st.AppliedSpell, comptime what: enum { 
         if (i > 0) try w.writeByte(',');
         switch (what) {
             .names => try w.writeAll(a.id.name()),
-            .laps => try num(w, a.laps),
+            .laps => try num(w, a.shownLaps()),
             .powers => try num(w, a.power),
         }
     }

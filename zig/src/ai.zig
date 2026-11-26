@@ -220,14 +220,17 @@ pub fn enemiesAround(s: *const State, ui: u8, out: *engine.UnitList) void {
     combat.enemiesAround(s, ui, engine.baseCell(&s.units[ui]), out);
 }
 
-/// canSelectMeleeTarget (ai.ts): a living enemy that is not Hidden, and the live forced target only while the unit is
-/// Aggr'd (no Cowardice in scope). The Terrifying Gaze lock is not read here (findTarget keeps the gazer).
+/// canSelectMeleeTarget (ai.ts): a living enemy that is not Hidden, the live forced target only while the unit is
+/// Aggr'd, and not a stronger enemy (cumulative hp) while the unit carries Cowardice. The Terrifying Gaze lock is not
+/// read here (findTarget keeps the gazer).
 pub fn canSelectMeleeTarget(s: *const State, ui: u8, t: u8) bool {
     const target = &s.units[t];
     if (target.isDead() or target.team == s.units[ui].team) return false;
     if (s.disguise and target.isHidden()) return false;
-    if (combat.forcedTarget(s, &s.units[ui])) |f| return f == t;
-    return true;
+    if (combat.forcedTarget(s, &s.units[ui])) |f| {
+        if (f != t) return false;
+    }
+    return !engine.cowardBarred(s, &s.units[ui], target);
 }
 
 /// isLegalMeleeTargetAtHp (v0_1.ts): canSelectMeleeTarget's checks on a holder unit (the forced target read the same
@@ -291,19 +294,27 @@ pub fn lineBlockedByObstacle(m: *const Matrix, from: Cell, to: Cell) bool {
     return false;
 }
 
+/// findRangeAttackAction (ai.ts): the best enemy cell in a y-major scan by 1 / divisor (an active Sniper ignores the
+/// bands and the range), a splash shooter scoring its splash (countAOESplashValue) and skipping the stone and screen
+/// tests, a Through Shot holder the enemies beyond (countEnemiesBeyondInLine) and skipping the screen test; strict
+/// improvement only, so the first best cell wins.
 pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
     const s = c.s;
     const u = c.unit();
     if (engine.getRangeShots(u) <= 0) return null;
-    // A shooter inside an enemy's Range Null Field cannot fire (no Rangebane in scope): no target, no memory write.
-    if (engine.nullFielded(s, u)) return null;
+    // A shooter inside an enemy's Range Null Field, or under Rangebane, cannot fire: no target, no memory write.
+    if (engine.nullFielded(s, u) or engine.rangebaned(s, u)) return null;
     const unit_cell = engine.baseCell(u);
     const enemy: i8 = @intCast(engine.opposite(u.team));
     const body = engine.unitCells(u);
+    const aoe = combat.isSplashShooter(u);
+    const through = u.has(.through_shot);
+    const double = combat.doubleShotAbility(u) != null;
+    const sniper = u.ability_mask & st.AbilityId.sniper.bit() != 0 and u.has(.sniper);
     const shot_distance = u.shot_distance;
-    if (shot_distance <= 0) return null;
+    if (shot_distance <= 0 and !sniper) return null;
     const band = if (std.math.isFinite(shot_distance) and shot_distance > 0) @floor(shot_distance) else 0;
-    const max_range = band * 4;
+    const max_range = if (sniper) INF else band * 4;
     var best: ?Cell = null;
     var best_score: f64 = -1;
     var y: i32 = 0;
@@ -313,9 +324,9 @@ pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
             if (mat(&c.m, x, y) != enemy) continue;
             const t = Cell{ .x = x, .y = y };
             const d: f64 = @floatFromInt(@max(@abs(t.x - unit_cell.x), @abs(t.y - unit_cell.y)));
-            if (d > max_range) continue;
-            if (lineBlockedByObstacle(&c.m, unit_cell, t)) continue;
-            if (lineBlockedByFriendly(&c.m, unit_cell, t, u.team, body.slice())) continue;
+            if (!sniper and d > max_range) continue;
+            if (!aoe and lineBlockedByObstacle(&c.m, unit_cell, t)) continue;
+            if (!aoe and !through and lineBlockedByFriendly(&c.m, unit_cell, t, u.team, body.slice())) continue;
             // A Hidden enemy can never be the shot's primary target.
             if (s.disguise) {
                 if (occupant(s, t)) |o| {
@@ -323,7 +334,7 @@ pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
                 }
             }
             var divisor: f64 = 1;
-            if (band > 0) {
+            if (!sniper and band > 0) {
                 var dd = d;
                 while (dd > band) {
                     dd -= band;
@@ -331,7 +342,14 @@ pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
                 }
                 if (divisor > 8) divisor = 8;
             }
-            const score = 1 / divisor;
+            var score = 1 / divisor;
+            if (aoe) {
+                const splash = aoeSplashValue(&c.m, t, enemy, @intCast(u.team));
+                score *= @as(f64, @floatFromInt(splash.enemies)) + 1;
+                if (splash.allies > 0) score *= js.max(0.1, 1 - 0.3 * @as(f64, @floatFromInt(splash.allies)));
+            }
+            if (through) score *= 1 + @as(f64, @floatFromInt(enemiesBeyondInLine(&c.m, unit_cell, t, enemy))) * 0.5;
+            if (double) score *= 2;
             if (score > best_score) {
                 best_score = score;
                 best = t;
@@ -341,6 +359,131 @@ pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
     const b = best orelse return null;
     if (occupant(s, b)) |o| s.ai_prev_target[c.ui] = @intCast(o);
     return .{ .kind = .range, .attack = b };
+}
+
+/// countAOESplashValue (ai.ts): the enemy and ally units around a target cell on the matrix alone. The target cells are
+/// the cell and each of its (-1,0), (0,-1), (-1,-1) neighbours holding the same value (the cell itself listed twice); the
+/// splash is the union of their on-board 8-neighbourhoods minus the target cells, in insertion order of packed keys
+/// (x << 4) | y; enemy and ally cells are then counted once per "2x2" (a counted cell marks its (-1,0), (0,-1),
+/// (-1,-1) keys).
+pub fn aoeSplashValue(m: *const Matrix, target: Cell, enemy: i8, ally: i8) struct { enemies: u32, allies: u32 } {
+    var targets: [5]Cell = undefined;
+    var n_targets: usize = 1;
+    targets[0] = target;
+    var target_keys: [4]u64 = .{ 0, 0, 0, 0 };
+    const Key = struct {
+        inline fn of(x: i32, y: i32) u8 {
+            return @intCast((x << 4) | y);
+        }
+        inline fn mark(set: *[4]u64, k: u8) void {
+            set[k >> 6] |= @as(u64, 1) << @intCast(k & 63);
+        }
+        inline fn has(set: *const [4]u64, k: i32) bool {
+            if (k < 0 or k > 255) return false;
+            const kk: u8 = @intCast(k);
+            return set[kk >> 6] & (@as(u64, 1) << @intCast(kk & 63)) != 0;
+        }
+    };
+    Key.mark(&target_keys, Key.of(target.x, target.y));
+    const tv = mat(m, target.x, target.y);
+    if (tv != 0) {
+        for ([_][2]i32{ .{ 0, 0 }, .{ -1, 0 }, .{ 0, -1 }, .{ -1, -1 } }) |d| {
+            const nx = target.x + d[0];
+            const ny = target.y + d[1];
+            if (nx >= 0 and ny >= 0 and nx < st.GRID and ny < st.GRID and mat(m, nx, ny) == tv) {
+                targets[n_targets] = .{ .x = nx, .y = ny };
+                n_targets += 1;
+                Key.mark(&target_keys, Key.of(nx, ny));
+            }
+        }
+    }
+    var check: [64]u8 = undefined;
+    var n_check: usize = 0;
+    var in_check: [4]u64 = .{ 0, 0, 0, 0 };
+    for (targets[0..n_targets]) |tc| {
+        var dy: i32 = -1;
+        while (dy <= 1) : (dy += 1) {
+            var dx: i32 = -1;
+            while (dx <= 1) : (dx += 1) {
+                if (dx == 0 and dy == 0) continue;
+                const nx = tc.x + dx;
+                const ny = tc.y + dy;
+                if (nx < 0 or ny < 0 or nx >= st.GRID or ny >= st.GRID) continue;
+                const k = Key.of(nx, ny);
+                if (Key.has(&target_keys, k) or Key.has(&in_check, k)) continue;
+                Key.mark(&in_check, k);
+                check[n_check] = k;
+                n_check += 1;
+            }
+        }
+    }
+    var enemy_cells: [64]u8 = undefined;
+    var n_enemy: usize = 0;
+    var enemy_set: [4]u64 = .{ 0, 0, 0, 0 };
+    var ally_cells: [64]u8 = undefined;
+    var n_ally: usize = 0;
+    var ally_set: [4]u64 = .{ 0, 0, 0, 0 };
+    for (check[0..n_check]) |k| {
+        const v = mat(m, @intCast(k >> 4), @intCast(k & 0xf));
+        if (v == 0) continue;
+        if (v == enemy) {
+            enemy_cells[n_enemy] = k;
+            n_enemy += 1;
+            Key.mark(&enemy_set, k);
+        } else if (v == ally) {
+            ally_cells[n_ally] = k;
+            n_ally += 1;
+            Key.mark(&ally_set, k);
+        }
+    }
+    const Dedupe = struct {
+        fn count(cells: []const u8, set: *const [4]u64) u32 {
+            var counted: [4]u64 = .{ 0, 0, 0, 0 };
+            var n: u32 = 0;
+            for (cells) |k| {
+                if (Key.has(&counted, k)) continue;
+                n += 1;
+                Key.mark(&counted, k);
+                const cx: i32 = k >> 4;
+                const cy: i32 = k & 0xf;
+                for ([_][2]i32{ .{ -1, 0 }, .{ 0, -1 }, .{ -1, -1 } }) |d| {
+                    const nx = cx + d[0];
+                    const ny = cy + d[1];
+                    // JavaScript's ((nx << 4) | ny) of a negative coordinate is negative: it never matches.
+                    if (nx < 0 or ny < 0) continue;
+                    const nk = (nx << 4) | ny;
+                    if (Key.has(set, nk)) Key.mark(&counted, @intCast(nk));
+                }
+            }
+            return n;
+        }
+    };
+    return .{ .enemies = Dedupe.count(enemy_cells[0..n_enemy], &enemy_set), .allies = Dedupe.count(ally_cells[0..n_ally], &ally_set) };
+}
+
+/// countEnemiesBeyondInLine (ai.ts): from the target cell on, `len` steps of (dx, dy) / len (f64, Math.round per axis)
+/// until the board edge, counting enemy-team cells.
+pub fn enemiesBeyondInLine(m: *const Matrix, from: Cell, target: Cell, enemy: i8) u32 {
+    const dx: f64 = @floatFromInt(target.x - from.x);
+    const dy: f64 = @floatFromInt(target.y - from.y);
+    const len_i = @max(@abs(target.x - from.x), @abs(target.y - from.y));
+    if (len_i == 0) return 0;
+    const len: f64 = @floatFromInt(len_i);
+    const sx = dx / len;
+    const sy = dy / len;
+    var count: u32 = 0;
+    var cx_f = @as(f64, @floatFromInt(target.x)) + sx;
+    var cy_f = @as(f64, @floatFromInt(target.y)) + sy;
+    var i: u32 = 0;
+    while (i < len_i) : (i += 1) {
+        const rx = js.round(cx_f);
+        const ry = js.round(cy_f);
+        if (rx < 0 or ry < 0 or rx >= st.GRID or ry >= st.GRID) break;
+        if (mat(m, @intFromFloat(rx), @intFromFloat(ry)) == enemy) count += 1;
+        cx_f += sx;
+        cy_f += sy;
+    }
+    return count;
 }
 
 pub const Engagement = struct {
@@ -634,6 +777,8 @@ pub fn doFindTarget(c: *Ctx) ?AIAction {
                     for (layer.cells[0..layer.n]) |lc| {
                         if (depth == 0 and sameCell(lc, unit_cell)) {
                             s.ai_prev_target[c.ui] = @intCast(target);
+                            // A No Melee unit repositions toward the actual-path target instead.
+                            if (u.has(.no_melee)) return .{ .kind = .move, .move = unit_cell, .paths = mp };
                             return .{ .kind = .melee, .move = unit_cell, .attack = .{ .x = x, .y = y }, .paths = mp };
                         }
                         if (!canLandAt(s, c.ui, lc)) continue;
@@ -655,6 +800,19 @@ pub fn doFindTarget(c: *Ctx) ?AIAction {
     }
 
     const target_cell = closest orelse return null;
+    // A RANGE No Melee unit (Tsar Cannon) moves toward the closest target instead of striking it.
+    if (u.attack_type == AT.RANGE and u.has(.no_melee)) {
+        if (occupant(s, target_cell)) |o| s.ai_prev_target[c.ui] = @intCast(o);
+        var move: ?Cell = null;
+        if (result) |r| {
+            if (used_infinite and result_index != null) {
+                const len = c.infinite.routeCells(routeOf(c, r), &route_cells);
+                const ri: usize = @intCast(result_index.?);
+                if (ri < len) move = route_cells[ri];
+            } else move = routeOf(c, r).cell;
+        }
+        return .{ .kind = .move, .move = move, .paths = c.actualPath() };
+    }
     if (result_index) |ri| {
         if (ri == 0) {
             if (occupant(s, target_cell)) |o| s.ai_prev_target[c.ui] = @intCast(o);
@@ -702,7 +860,8 @@ pub fn findTarget(c: *Ctx) ?AIAction {
     if (selected == null and list.len > 0) selected = list.items[@intCast(s.rng.int(0, list.len))];
 
     var action: ?AIAction = null;
-    if (selected) |e| {
+    // A No Melee unit still draws its pick above, but builds no melee strike from it.
+    if (selected) |e| if (!u.has(.no_melee)) {
         const ec_list = engine.unitCells(&s.units[e]);
         const uc_list = engine.unitCells(u);
         outer: for (ec_list.slice()) |ec| {
@@ -713,7 +872,7 @@ pub fn findTarget(c: *Ctx) ?AIAction {
                 }
             }
         }
-    }
+    };
     if (action == null and u.attack_type == AT.RANGE and engine.getRangeShots(u) > 0) action = findRangeAttackAction(c);
 
     const eng = analyzeEngagement(c);
@@ -984,6 +1143,7 @@ pub fn completeMoveWithMelee(c: *Ctx, mp: *const MovePath, r: *const Route, pref
     for (targets.slice(), 0..) |t, i| out.targets[i] = t;
     const len = mp.routeCells(r, &out.path);
     const move = rec.Action{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..targets.len], .has_lava = r.has_lava } };
+    if (u.has(.no_melee)) return out.push(move);
 
     var adjacent_enemies: engine.UnitList = .{};
     for (s.holderOrder()) |i| {
@@ -1058,7 +1218,9 @@ pub fn fallbackTurn(c: *Ctx, out: *Decision) void {
     completeMoveWithMelee(c, mp, b, null, out);
 }
 
-/// isRangeShotLandable
+/// isRangeShotLandable: the aim edge and the ray with the shooter's Through Shot and Large Caliber / Area Throw flags,
+/// the ray's first hit a live legal enemy (Hidden only on a single-group ray; the live forced target), and a Cowardly
+/// shooter (not a Through Shot) no weaker than it.
 pub fn rangeShotLandable(s: *const State, ui: u8, ti: u8, aim_cell: ?Cell, aim_side: u8) bool {
     const u = &s.units[ui];
     const t = &s.units[ti];
@@ -1066,14 +1228,17 @@ pub fn rangeShotLandable(s: *const State, ui: u8, ti: u8, aim_cell: ?Cell, aim_s
     if ((s.disguise and t.isHidden()) or s.forbids(u, t.uid)) return false;
     if (!engine.canLandRangeAttack(s, u)) return false;
     const to = combat.aimEdge(s, u, t, aim_cell, aim_side) orelse return false;
-    const hits = combat.evaluateRange(s, ui, u.pos_x, u.pos_y, to[0], to[1]);
+    const through = u.has(.through_shot);
+    const hits = combat.evaluateRangeFlags(s, ui, u.pos_x, u.pos_y, to[0], to[1], through, combat.isSplashShooter(u));
     if (hits.len == 0) return false;
     const first = &s.units[hits.units[0]];
     if (first.isDead() or first.team == u.team or s.forbids(u, first.uid)) return false;
     if (s.disguise and hits.len == 1 and first.isHidden()) return false;
     // An Aggr'd shooter's first hit must be its live forced target.
-    if (combat.forcedTarget(s, u)) |forced| return hits.units[0] == forced;
-    return true;
+    if (combat.forcedTarget(s, u)) |forced| {
+        if (hits.units[0] != forced) return false;
+    }
+    return through or !engine.cowardBarred(s, u, first);
 }
 
 /// findLegalRangeAttack
@@ -1097,12 +1262,14 @@ pub fn findLegalRangeAttack(c: *const Ctx, preferred: u8) ?rec.Action {
         if (has_preferred and i == preferred) continue;
         order.push(i);
     }
+    const through = u.has(.through_shot);
+    const ignores = combat.isSplashShooter(u);
     for (order.slice()) |t| {
         if (rangeShotLandable(s, c.ui, t, null, 0)) return .{ .range_attack = .{ .attacker = c.ui, .target = t } };
         const cells = engine.unitCells(&s.units[t]);
         for (cells.slice()) |cell| {
             for ([_]u8{ 0, 1, 2, 3 }) |side| {
-                if (!combat.sideObservable(s, cell, side, u.team)) continue;
+                if (!combat.sideObservableEx(s, cell, side, u.team, through, ignores)) continue;
                 if (rangeShotLandable(s, c.ui, t, cell, side)) {
                     return .{ .range_attack = .{ .attacker = c.ui, .target = t, .aim_cell = cell, .aim_side = side } };
                 }
@@ -1161,6 +1328,8 @@ pub fn decideWith(c: *Ctx, out: *Decision) void {
             out.push(shot);
         },
         .melee, .move_and_melee => {
+            // findTarget can hand a melee to a unit that cannot strike (a No Melee shooter boxed in): reposition instead.
+            if (u.has(.no_melee)) return fallbackTurn(c, out);
             const tc = a.attack orelse return fallbackTurn(c, out);
             const from = a.move orelse engine.baseCell(u);
             const target0 = occupant(s, tc) orelse return fallbackTurn(c, out);

@@ -306,13 +306,60 @@ pub inline fn enemyAggr(s: *const State, u: *const Unit) *const [st.GRID][st.GRI
 // Unit getters (src/units/unit.ts)
 // =====================================================================================================================
 
-/// Unit.getMorale: the clamped stored morale, 0 under an active Madness (no Mechanism in scope).
+/// Unit.getMorale: the clamped stored morale, 0 under an active Madness or Mechanism.
 pub inline fn getMorale(u: *const Unit) f64 {
     const m = js.round(u.morale);
     if (m > MORALE_MAX) return MORALE_MAX;
     if (m < -MORALE_MAX) return -MORALE_MAX;
-    if (u.ability_mask & st.AbilityId.madness.bit() != 0 and u.has(.madness)) return 0;
+    if (moraleLocked(u)) return 0;
     return m;
+}
+
+/// hasAbilityActive("Madness") || hasAbilityActive("Mechanism"): morale pinned at 0 (and hasMindAttackResistance).
+pub inline fn moraleLocked(u: *const Unit) bool {
+    return u.ability_mask & (st.AbilityId.madness.bit() | st.AbilityId.mechanism.bit()) != 0 and !u.isBroken();
+}
+
+/// hasDebuffActive(name) for one of Spit Ball's debuffs (every reader in scope reads the list; the display list is the
+/// same names).
+pub inline fn hasDebuff(u: *const Unit, id: st.SpellId) bool {
+    return u.debuffs.len != 0 and u.debuffs.find(id) != null;
+}
+
+/// hasStatusApplied("Rangebane") on battles where Spit Ball can land it.
+pub inline fn rangebaned(s: *const State, u: *const Unit) bool {
+    return s.spit and hasDebuff(u, .rangebane);
+}
+
+/// hasStatusApplied("Cowardice") on battles where Spit Ball can land it.
+pub inline fn cowardly(s: *const State, u: *const Unit) bool {
+    return s.spit and hasDebuff(u, .cowardice);
+}
+
+/// Unit.getCumulativeHp: 0 when dead, else (alive - 1) * max_hp + max(hp, 0).
+pub inline fn cumulativeHp(u: *const Unit) f64 {
+    if (u.isDead()) return 0;
+    const hp = if (u.hp < 0) 0 else u.hp;
+    return (u.amount_alive - 1) * u.max_hp + hp;
+}
+
+/// The Cowardice gates: `u` carries Cowardice and has less cumulative hp than `other`. Only the flag and the list length
+/// are inline (the AI's melee filters call it for every candidate).
+pub inline fn cowardBarred(s: *const State, u: *const Unit, other: *const Unit) bool {
+    return s.spit and u.debuffs.len != 0 and cowardBarredSlow(u, other);
+}
+
+noinline fn cowardBarredSlow(u: *const Unit, other: *const Unit) bool {
+    return u.debuffs.find(.cowardice) != null and cumulativeHp(u) < cumulativeHp(other);
+}
+
+/// getDistanceToFurthestCorner (grid_math.ts): the largest distance to a board corner.
+pub fn distanceToFurthestCorner(x: f64, y: f64) f64 {
+    const a = distance(x, y, MIN_X, MIN_Y);
+    const b = distance(x, y, MIN_X, MAX_Y);
+    const c = distance(x, y, MAX_X, MIN_Y);
+    const d = distance(x, y, MAX_X, MAX_Y);
+    return js.max(js.max(js.max(a, b), c), d);
 }
 
 pub inline fn getLuck(u: *const Unit) f64 {
@@ -368,9 +415,10 @@ pub inline fn opposite(team: u8) u8 {
     return if (team == Team.NO_TEAM) Team.NO_TEAM else if (team == Team.LEFT) Team.RIGHT else Team.LEFT;
 }
 
-/// increaseMorale / decreaseMorale: change the BASE morale, blocked under Madness and under Morale/Dismorale.
+/// increaseMorale / decreaseMorale: change the BASE morale, blocked under Madness or Mechanism, Morale, Sadness and
+/// Dismorale.
 pub fn changeMorale(u: *Unit, amount: f64, increase: bool) void {
-    if (amount <= 0 or u.has(.madness) or hasMoraleBuff(u) or hasDismorale(u)) return;
+    if (amount <= 0 or moraleLocked(u) or hasMoraleBuff(u) or hasDismorale(u) or hasDebuff(u, .sadness)) return;
     var m = if (increase) u.init.morale + amount else u.init.morale - amount;
     if (m > MORALE_MAX) m = MORALE_MAX;
     if (m < -MORALE_MAX) m = -MORALE_MAX;
@@ -460,10 +508,20 @@ inline fn augmentBuff(s: *const State, u: *const Unit, id: st.SpellId) ?*const s
 /// Unit.adjustBaseStats, with the team's synergy values (refreshStackPowerForAllUnits' per-team modifiers) and the
 /// augment buffs. Might and Sniper read the attack type selected now: selection changes do not refresh.
 pub fn adjustBaseStats(s: *State, u: *Unit) void {
+    if (s.spit or s.shot_hooks) adjustBaseStatsWith(s, u, true) else adjustBaseStatsWith(s, u, false);
+}
+
+/// adjustBaseStats, instantiated without batch 5's hooks for boards where nothing can trigger them: their code in the one
+/// shared body cost the ability-free refresh 3% (register pressure, not the tests).
+fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     const f = &s.fight;
     const syn = &s.setup[u.team];
     const lap_bit: u128 = if (f.lap >= 0 and f.lap < 128) @as(u128, 1) << @intCast(f.lap) else 0;
     const lap_adjusted = u.adjusted_laps & lap_bit != 0;
+    // Batch 5's hooks, read once (`u` lies in `s`, so each store to it made every later test reload its flag); every Spit
+    // Ball hook needs a debuff on the unit, and nothing here changes the list.
+    const spit = batch5 and s.spit and u.debuffs.len != 0;
+    const shot_hooks = batch5 and s.shot_hooks;
 
     // resetTarget unless the Aggr status is still applied
     if (s.stat_hooks and u.target >= 0 and u.effects.find(.aggr) == null and u.debuffs.find(.aggr) == null) u.target = -1;
@@ -471,8 +529,8 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     if (s.gaze and u.forbidden != st.NO_UID and u.effects.find(.terrifying_gaze) == null and u.debuffs.find(.terrifying_gaze) == null) u.forbidden = st.NO_UID;
 
     // HP
-    if (s.unit_hooks and u.has(.unyielding_power)) {
-        unyieldingPower(f, u, lap_adjusted);
+    if (shot_hooks or (s.unit_hooks and u.has(.unyielding_power))) {
+        hpHooks(s, f, u, lap_adjusted);
     } else {
         const was_full = u.hp >= u.max_hp;
         u.max_hp = u.init.max_hp;
@@ -499,17 +557,21 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
         u.luck_mod = -LUCK_MAX - u.luck;
     }
 
-    // MORALE (Madness pins it to 0, a leftover Morale or Dismorale entry notwithstanding)
+    // MORALE (Madness or Mechanism pins it to 0, a leftover Morale or Dismorale entry notwithstanding; Sadness pins it
+    // to -20, which a Morale buff overrides)
     u.attack_multiplier = 1;
     u.morale = if (syn.morale > 0) u.init.morale + syn.morale else u.init.morale;
-    if (u.has(.madness)) {
+    if (moraleLocked(u)) {
         u.morale = 0;
-    } else if (hasMoraleBuff(u)) {
-        u.attack_multiplier = 1.25;
-        u.morale = MORALE_MAX;
-    } else if (hasDismorale(u)) {
-        u.attack_multiplier = 0.8;
-        u.morale = -MORALE_MAX;
+    } else {
+        if (spit and u.debuffs.find(.sadness) != null) u.morale = -MORALE_MAX;
+        if (hasMoraleBuff(u)) {
+            u.attack_multiplier = 1.25;
+            u.morale = MORALE_MAX;
+        } else if (hasDismorale(u)) {
+            u.attack_multiplier = 0.8;
+            u.morale = -MORALE_MAX;
+        }
     }
     if (u.morale > MORALE_MAX) u.morale = MORALE_MAX;
     if (u.morale < -MORALE_MAX) u.morale = -MORALE_MAX;
@@ -520,7 +582,11 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     if (pegasus_might) |pm| u.base_armor += pm;
     const armor_augment = augmentBuff(s, u, .armor_augment);
     if (armor_augment) |aa| u.base_armor += js.roundUnitStat((u.base_armor / 100) * aa.power, 2);
+    // Weakening Beam's multiplier comes first: the f64 product is (100 - p) / 100 * (1 + Heavy Armor's share).
     var base_armor_multiplier: f64 = 1;
+    if (spit) {
+        if (u.debuffs.get(.weakening_beam)) |wb| base_armor_multiplier = (100 - wb.power) / 100;
+    }
     if (u.ability(.heavy_armor)) |ha| {
         base_armor_multiplier = base_armor_multiplier *
             (1 + ((ha.power + getLuck(u) + syn.ability_power + 0) / 100 / abilities.MAX_UNIT_STACK_POWER) * getStackPower(u));
@@ -554,6 +620,9 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     }
     u.magic_resist = js.roundUnitStat((1 - no_resist) * 100, 2);
 
+    // SHOTS: Limited Supply's cap and Endless Quiver's mod.
+    if (shot_hooks) shotHooks(u);
+
     // INITIATIVE
     u.initiative = u.init.initiative;
 
@@ -575,16 +644,27 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
             if (u.debuffs.get(.vine_throw)) |vt| u.steps = @max(1, u.steps - vt.power);
         }
     }
-    u.steps = js.roundUnitStat(u.steps * 1, 1);
-    u.steps_mod = js.roundUnitStat(u.steps_mod * 1, 1);
+    // Quagmire (the first debuff of the name): steps and steps_mod x (100 - power) / 100.
+    var steps_multiplier: f64 = 1;
+    if (spit) {
+        if (u.debuffs.get(.quagmire)) |q| steps_multiplier *= (100 - q.power) / 100;
+    }
+    u.steps = js.roundUnitStat(u.steps * steps_multiplier, 1);
+    u.steps_mod = js.roundUnitStat(u.steps_mod * steps_multiplier, 1);
 
     // ATTACK
     u.base_attack = u.init.base_attack;
     u.shot_distance = u.init.shot_distance;
+    // A stolen Endless Quiver makes a natively melee unit a shooter: Medusa's distance (STOLEN_ENDLESS_QUIVER_SHOT_DISTANCE).
+    if (shot_hooks and u.init.shot_distance <= 0 and u.has(.endless_quiver)) u.shot_distance = 6.5;
     u.attack_damage_min = u.init.attack_damage_min;
     u.attack_damage_max = u.init.attack_damage_max;
-    // Blessing and Battle Roar: every roll is the maximum (no Curse in scope).
-    if (s.spell_hooks and (u.buffs.find(.blessing) != null or u.buffs.find(.battle_roar) != null)) u.attack_damage_min = u.attack_damage_max;
+    // Blessing and Battle Roar: every roll is the maximum; else Curse: every roll is the minimum.
+    if (s.spell_hooks and (u.buffs.find(.blessing) != null or u.buffs.find(.battle_roar) != null)) {
+        u.attack_damage_min = u.attack_damage_max;
+    } else if (spit and u.debuffs.find(.curse) != null) {
+        u.attack_damage_max = u.attack_damage_min;
+    }
     var base_attack_multiplier: f64 = 1;
     if (u.buffs.power(.sharpened_weapons_blessing)) |sw| base_attack_multiplier = base_attack_multiplier * (1 + sw / 100);
     if (pegasus_might) |pm| u.base_attack += pm;
@@ -600,6 +680,10 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
         }
     }
     u.attack_mod = u.init.attack_mod;
+    // Weakness (the first debuff of the name): power% of the running base attack, before Sharpened Weapons' multiplier.
+    if (spit) {
+        if (u.debuffs.get(.weakness)) |w| u.attack_mod -= (u.base_attack * w.power) / 100;
+    }
     // Blind Fury: the share of the stack already lost, of the INITIAL base attack.
     if (u.has(.blind_fury)) u.attack_mod += (1 - u.amount_alive / (u.amount_alive + u.amount_died)) * u.init.base_attack;
     u.attack_mod = js.roundUnitStat(u.attack_mod + 0, 2);
@@ -610,18 +694,47 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     if (f.started and !lap_adjusted) u.adjusted_laps |= lap_bit;
 }
 
-/// Unyielding Power in adjustBaseStats (hasAbilityActive, read once: Break-aware): max hp = initial + 5 per lap, and on the
-/// lap's first refresh after the start +5 hp (the top creature), +1 initial step and +2 initial base attack (the two
-/// initial stats are first read after this step, by the STEPS and ATTACK copies), then the full-hp refill or the cap.
-noinline fn unyieldingPower(f: *const st.Fight, u: *Unit, lap_adjusted: bool) void {
+/// adjustBaseStats' HP block with the unit hooks (hasAbilityActive, read once: Break-aware): refreshAndGetAdjustedMaxHp's
+/// max hp (initial, + 5 per lap under Unyielding Power), Boost Health's boost (`round(max + max * multiplier)`, the
+/// multiplier read with the luck left by the previous refresh; a top creature at exactly the reset maximum is refilled to
+/// the boosted one, the free heal), then on Unyielding Power's lap's first refresh after the start +5 hp, +1 initial step
+/// and +2 initial base attack (first read after this block, by the STEPS and ATTACK copies), then the full-hp refill or
+/// the cap.
+noinline fn hpHooks(s: *const State, f: *const st.Fight, u: *Unit, lap_adjusted: bool) void {
     const was_full = u.hp >= u.max_hp;
-    u.max_hp = u.init.max_hp + @as(f64, @floatFromInt(f.lap)) * 5;
-    if (f.started and !lap_adjusted) {
+    const up = s.unit_hooks and u.has(.unyielding_power);
+    u.max_hp = if (up) u.init.max_hp + @as(f64, @floatFromInt(f.lap)) * 5 else u.init.max_hp;
+    if (s.shot_hooks) {
+        if (u.ability(.boost_health)) |bh| {
+            const m = abilities.abilityMultiplier(u, bh);
+            const reset_full = u.hp == u.max_hp;
+            u.max_hp = js.round(u.max_hp + u.max_hp * m);
+            if (reset_full) u.hp = u.max_hp;
+        }
+    }
+    // max_hp is refreshAndGetAdjustedMaxHp's result here (+ baseStatsDiff.hp, 0 in scope): the seam for the max-hp
+    // artifacts (Pendant of Vitality), before Unyielding Power's +5 and the refill.
+    if (up and f.started and !lap_adjusted) {
         u.hp += 5;
         u.init.steps += 1;
         u.init.base_attack += 2;
     }
     if (was_full or u.max_hp < u.hp) u.hp = u.max_hp;
+}
+
+/// adjustBaseStats' SHOTS block: Limited Supply caps range_shots at floor(maxRangeShots * stack power / 5) plus the
+/// Rallying Volley arrows (it only lowers them); Endless Quiver pins range_shots_mod to its power (99), cleared once the
+/// quiver is off (Broken or stolen away).
+noinline fn shotHooks(u: *Unit) void {
+    if (u.has(.limited_supply)) {
+        const coeff = getStackPower(u) / abilities.MAX_UNIT_STACK_POWER;
+        u.range_shots = @min(u.range_shots, @floor(u.max_range_shots * coeff) + u.rallying_volley_granted);
+    }
+    if (u.ability(.endless_quiver)) |eq| {
+        u.range_shots_mod = eq.power;
+    } else if (u.range_shots_mod != 0) {
+        u.range_shots_mod = 0;
+    }
 }
 
 /// FightProperties.setUnitsCalculatedStacksPower
@@ -1031,6 +1144,11 @@ fn finishDirectedMove(s: *State, ui: u8, target: []const Cell, new_pos: ?[2]f64,
         };
     }
     if (pos) |p| {
+        // Unit.setPosition: an active Sniper's shot distance is rewritten from the position it leaves (the next stat
+        // refresh rebuilds it, so only a move_unit step shows it).
+        if (u.ability_mask & st.AbilityId.sniper.bit() != 0 and u.has(.sniper)) {
+            u.shot_distance = js.toFixed(distanceToFurthestCorner(u.pos_x, u.pos_y) / CELL - 0.45, 2);
+        }
         u.pos_x = p[0];
         u.pos_y = p[1];
     }
@@ -1314,7 +1432,7 @@ pub fn canLandRangeAttack(s: *const State, u: *const Unit) bool {
         if (aggr[@intCast(c.x)][@intCast(c.y)] > 1) return false;
     }
     if (getRangeShots(u) <= 0) return false;
-    return !nullFielded(s, u);
+    return !nullFielded(s, u) and !rangebaned(s, u);
 }
 
 /// hasDebuffActive("Range Null Field Aura"), only on battles where a field can stand.
@@ -1322,8 +1440,8 @@ pub inline fn nullFielded(s: *const State, u: *const Unit) bool {
     return s.null_field and u.debuffs.len != 0 and u.debuffs.find(.range_null_field_aura) != null;
 }
 
-/// Unit.refreshPossibleAttackTypes (no No Melee in scope): a MAGIC creature with charges (and not Broken) leads with
-/// MAGIC, every other caster gets MAGIC last.
+/// Unit.refreshPossibleAttackTypes: a MAGIC creature with charges (and not Broken) leads with MAGIC, every other caster
+/// gets MAGIC last; an active No Melee leaves the melee type out, and an empty list is [NO_ATTACK].
 fn refreshPossibleAttackTypes(u: *Unit, can_land_range: bool) void {
     u.n_possible = 0;
     const casts = u.n_book != 0 and u.spellsCount() > 0;
@@ -1334,8 +1452,10 @@ fn refreshPossibleAttackTypes(u: *Unit, can_land_range: bool) void {
         u.possible[u.n_possible] = AT.RANGE;
         u.n_possible += 1;
     }
-    u.possible[u.n_possible] = if (u.attack_type == AT.MELEE_MAGIC) AT.MELEE_MAGIC else AT.MELEE;
-    u.n_possible += 1;
+    if (!u.has(.no_melee)) {
+        u.possible[u.n_possible] = if (u.attack_type == AT.MELEE_MAGIC) AT.MELEE_MAGIC else AT.MELEE;
+        u.n_possible += 1;
+    }
     if (!possibleIncludes(u, AT.RANGE) and u.attack_type != AT.RANGE and getRangeShots(u) > 0 and u.shot_distance > 0 and can_land_range) {
         u.possible[u.n_possible] = AT.RANGE;
         u.n_possible += 1;
@@ -1343,6 +1463,10 @@ fn refreshPossibleAttackTypes(u: *Unit, can_land_range: bool) void {
     if (casts and !possibleIncludes(u, AT.MAGIC)) {
         u.possible[u.n_possible] = AT.MAGIC;
         u.n_possible += 1;
+    }
+    if (u.n_possible == 0) {
+        u.possible[0] = AT.NO_ATTACK;
+        u.n_possible = 1;
     }
     u.attack_type_selected = u.possible[0];
 }
@@ -1406,7 +1530,64 @@ fn minusLap(u: *Unit) void {
     const dismorale = hasDismorale(u);
     if (!dismorale) minusLapList(&u.effects);
     if (!hasMoraleBuff(u)) minusLapList(&u.buffs);
-    if (!dismorale) minusLapList(&u.debuffs);
+    if (!dismorale) {
+        if (hasDuplicateName(&u.debuffs)) minusLapDuplicates(&u.debuffs) else minusLapList(&u.debuffs);
+    }
+}
+
+fn hasDuplicateName(list: anytype) bool {
+    if (list.len < 2) return false;
+    const items = list.items[0..list.len];
+    for (items, 0..) |a, i| {
+        for (items[i + 1 ..]) |b| if (a.id == b.id) return true;
+    }
+    return false;
+}
+
+/// Unit.minusLap's loop over a list holding duplicate names (a mirrored Spit Ball debuff): for each object row in order,
+/// its laps tick (sentinels excepted) and, while not 0, EVERY display entry of the name ticks (display sentinels
+/// excepted); a row reaching 0 deletes the name (all rows), and the name's later rows are then detached and change
+/// nothing. Names are independent, so each is resolved at its first row.
+fn minusLapDuplicates(list: anytype) void {
+    var done: u64 = 0;
+    var i: usize = 0;
+    while (i < list.len) {
+        const id = list.items[i].id;
+        const bit = @as(u64, 1) << @intCast(@intFromEnum(id));
+        if (done & bit != 0) {
+            i += 1;
+            continue;
+        }
+        done |= bit;
+        // The name's rows (object identities) at the start of the tick.
+        var rows: [@TypeOf(list.*).capacity]u8 = undefined;
+        var n: usize = 0;
+        for (list.items[i..list.len], i..) |e, k| {
+            if (e.id == id) {
+                rows[n] = @intCast(k);
+                n += 1;
+            }
+        }
+        var deleted = false;
+        for (rows[0..n]) |k| {
+            const e = &list.items[k];
+            if (e.laps != st.LAPS_AURA and e.laps != st.NUMBER_OF_LAPS_TOTAL and e.laps > 0) e.laps -= 1;
+            if (e.laps != 0) {
+                // This row's own display entry falls with its laps (lag kept); the name's other entries fall too.
+                for (rows[0..n]) |r| {
+                    if (r == k) continue;
+                    const other = &list.items[r];
+                    const shown = other.shownLaps();
+                    if (shown != st.LAPS_AURA and shown != st.NUMBER_OF_LAPS_TOTAL) other.lag += 1;
+                }
+            } else {
+                list.delete(id);
+                deleted = true;
+                break;
+            }
+        }
+        if (!deleted) i += 1;
+    }
 }
 
 /// TurnEngine.completeTurn
@@ -1904,6 +2085,10 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     s.disguise = false;
     s.unit_hooks = false;
     s.gaze = false;
+    s.spit = false;
+    s.shot_hooks = false;
+    s.spit_cfg = .{st.SpitConfig{}} ** 7;
+    var spit_holder = false;
     var poisons = false;
     var covenant = false;
     var breaks = false;
@@ -1945,6 +2130,8 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         if (mask & AB.disguise_aura.bit() != 0) swaps = true;
         // Battle Roar's row is read where Blessing's is (the castable card holds a charge, the loop below sees it).
         if (mask & AB.battle_roar.bit() != 0) s.spell_hooks = true;
+        if (mask & AB.spit_ball.bit() != 0) spit_holder = true;
+        if (mask & (AB.limited_supply.bit() | AB.endless_quiver.bit() | AB.boost_health.bit()) != 0 or u.range_shots_mod != 0) s.shot_hooks = true;
         if (u.effects.find(.break_) != null) breaks = true;
         // A template's aura links hold SpellId values (loadSummons): only the battle's units index aura_defs.
         const aura_def = struct {
@@ -1972,6 +2159,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         }
         for (u.debuffs.items[0..u.debuffs.len]) |b| {
             if (b.laps == st.LAPS_AURA) s.auras = true;
+            if (b.id.isSpitBall()) s.spit = true;
             if (b.id == .vine_throw) s.spell_hooks = true;
             if (b.id == .range_null_field_aura) s.null_field = true;
             if (b.id == .visible) s.disguise = true;
@@ -1982,6 +2170,20 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     }
     // Configs read without an ability naming them (record.ts: effectConfigs.Poison, spellConfigs).
     if (s.auras) s.stat_hooks = true;
+    // Spit Ball's seven debuffs (spellConfigs of Death and Order, recorded when a unit holds the card).
+    if (spit_holder) {
+        s.spit = true;
+        for (st.SpellId.SPIT_BALL, 0..) |id, k| {
+            const cfg = rec.get(rec.get(init, "spellConfigs"), id.name());
+            if (cfg == .null) return error.MissingSpellConfig;
+            s.spit_cfg[k] = .{
+                .laps = rec.num(rec.get(cfg, "laps")),
+                .power = rec.num(rec.get(cfg, "power")),
+                .mind = rec.int(rec.get(cfg, "power_type")) == st.SpellPower.MIND,
+                .loaded = true,
+            };
+        }
+    }
     s.poison_laps = st.NUMBER_OF_LAPS_TOTAL;
     if (poisons) {
         const cfg = rec.get(rec.get(init, "effectConfigs"), "Poison");
@@ -2229,6 +2431,8 @@ fn unitFromRecord(u: std.json.Value, name_id: u16) Unit {
         .n_auras = 0,
         .syn_power = 0,
         .rallying_volley_granted = if (rv == .null) 0 else rec.num(rv),
+        // The constructor's range_shots (initialUnitProperties never move it; pre-refresh props hold the same value).
+        .max_range_shots = pn(base, "range_shots"),
     };
 }
 
@@ -2565,9 +2769,10 @@ pub fn actionToSlots(s: *const State, a: rec.Action) rec.Action {
         },
         .range_attack => |*x| {
             x.attacker = slotOrNone(s, x.attacker);
-            x.target = slotOrNone(s, x.target);
+            if (!x.free) x.target = slotOrNone(s, x.target);
         },
         .obstacle_attack => |*x| x.attacker = slotOrNone(s, x.attacker),
+        .area_throw_attack => |*x| x.attacker = slotOrNone(s, x.attacker),
         .decide => |*x| x.unit = slotOrNone(s, x.unit),
         .cast_spell => |*x| {
             x.caster = slotOrNone(s, x.caster);
@@ -2598,9 +2803,10 @@ pub fn actionToUids(s: *const State, a: rec.Action) rec.Action {
         },
         .range_attack => |*x| {
             x.attacker = uidOf(s, x.attacker);
-            x.target = uidOf(s, x.target);
+            if (!x.free) x.target = uidOf(s, x.target);
         },
         .obstacle_attack => |*x| x.attacker = uidOf(s, x.attacker),
+        .area_throw_attack => |*x| x.attacker = uidOf(s, x.attacker),
         .decide => |*x| x.unit = uidOf(s, x.unit),
         .cast_spell => |*x| {
             x.caster = uidOf(s, x.caster);
@@ -2625,7 +2831,11 @@ pub fn apply(s: *State, action: rec.Action, events: *Events) bool {
         .select_attack_type => |a| if (selectAttackType(s, a.unit, a.attack_type)) true else |_| false,
         .move_unit => |a| if (moveUnit(s, a.unit, a.path, a.target_cells)) true else |_| false,
         .melee_attack => |a| if (combat.meleeAttack(s, a.attacker, a.target, a.attack_from, a.path, events)) true else |_| false,
-        .range_attack => |a| if (combat.rangeAttack(s, a.attacker, a.target, a.aim_cell, a.aim_side, events)) true else |_| false,
+        .range_attack => |a| if (a.free)
+            (if (combat.freeAimAttack(s, a.attacker, a.tx, a.ty, events)) true else |_| false)
+        else
+            (if (combat.rangeAttack(s, a.attacker, a.target, a.aim_cell, a.aim_side, events)) true else |_| false),
+        .area_throw_attack => |a| if (combat.areaThrowAttack(s, a.attacker, a.target_cell, events)) true else |_| false,
         .obstacle_attack => |a| if (combat.obstacleAttackAt(s, a.attacker, a.target_x, a.target_y, if (a.has_from) a.attack_from else null, a.path, events)) true else |_| false,
         .decide => true, // AI decisions are not engine calls
         .cast_spell => |a| if (spells.castSpell(s, a.caster, a.spell, if (a.has_target) a.target else null, if (a.has_cell) a.cell else null, events)) true else |_| false,

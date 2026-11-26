@@ -60,7 +60,7 @@ import {
 import { runMatch } from "../../src/simulation/battle_engine";
 import { getDeterministicRandomSource, setDeterministicRandomSource } from "../../src/utils/lib";
 import { battleDigest, digestFields, fightDigest, terrainDigest } from "./digest";
-import { exportBattleState } from "./state_export";
+import { exportBattleState, SPIT_BALL_DEBUFFS } from "./state_export";
 
 type Ctx = { grid: any; fightProperties: any; unitsHolder: any };
 
@@ -492,6 +492,21 @@ const SPELLS = keptSpellbook || SPELL_KEEP !== undefined;
 // "Visible" configs in `spellConfigs`. Under a RECORD_VERSION other than v0.1, a mindless unit's ("AI Driven")
 // decisions, which runMatch makes with StrategyV0_1, are recorded as decide steps marked `v: "v0.1"`.
 const BATCH3_COLUMNS = BATCH3 || SPELLS || BATCH4;
+// ---- batch 5 ----
+// No new digest column. A start state holding a Spit Ball card gains the seven debuffs' configs in `spellConfigs` (they
+// are applied by an ability, so no book names them) and the .meta.json gains `spit`; a start-state unit holding Sniper
+// records `initialProps` without setup options too (placement's setPosition rewrites its props.shot_distance, so the
+// props are no initial distance).
+const holdsCard = (name: string): boolean =>
+    Object.entries(creaturesJson as Record<string, any>).some(
+        ([faction, creatures]) =>
+            faction !== "version" &&
+            typeof creatures === "object" &&
+            Object.entries(creatures as Record<string, any>).some(
+                ([creature, cfg]) => KEEP.has(creature) && (cfg.abilities ?? []).includes(name),
+            ),
+    );
+const SPIT = holdsCard("Spit Ball");
 const SPELL_SUMMON_CREATURES = ["Wolf"];
 
 const DIGEST_FIELDS = digestFields(SETUP, BATCH3 || BATCH4, SPELLS, BATCH4);
@@ -595,6 +610,9 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
             cells: u.getCells().map((c: any) => ({ ...c })),
             position: { ...u.getPosition() },
             props: JSON.parse(JSON.stringify(p)),
+            ...(!SETUP && (p.abilities ?? []).includes("Sniper")
+                ? { initialProps: JSON.parse(JSON.stringify(u.initialUnitProperties)) }
+                : {}),
             ...(SETUP
                 ? {
                       initialProps: JSON.parse(JSON.stringify(u.initialUnitProperties)),
@@ -668,6 +686,16 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
     if (disguise) {
         for (const name of ["Hidden", "Visible"]) {
             spellConfigs[name] = JSON.parse(JSON.stringify(getSpellConfig("System", name)));
+        }
+    }
+    // Spit Ball's seven debuffs (Death and Order spells applied by the ability).
+    let spitBall = false;
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        if (u.getUnitProperties().abilities.includes("Spit Ball")) spitBall = true;
+    }
+    if (spitBall) {
+        for (const [faction, name] of SPIT_BALL_DEBUFFS) {
+            spellConfigs[name] = JSON.parse(JSON.stringify(getSpellConfig(faction, name)));
         }
     }
     const templates = canSummon(ctx)
@@ -1138,6 +1166,7 @@ function main(): void {
         ...(AMOUNT_MODE !== "levelTable" ? { amounts: AMOUNT_MODE } : {}),
         ...(SPELL_KEEP ? { spells: [...SPELL_KEEP] } : {}),
         ...(STRIP.size ? { strip: [...STRIP] } : {}),
+        ...(SPIT ? { spit: true } : {}),
         ...(SETUP
             ? {
                   setup: {

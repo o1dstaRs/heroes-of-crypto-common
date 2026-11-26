@@ -506,16 +506,25 @@ fn loadLists(u: *Unit, fields: Value, props: Value, why: *Why) Error!void {
         .{ "debuffs", u.debuffs.items[0..u.debuffs.len] },
         .{ "effects", u.effects.items[0..u.effects.len] },
     };
-    for (lists) |l| {
+    for (lists, 0..) |l, li| {
         const objects = try items(get(fields, l[0]), why, l[0]);
         if (objects.len != l[1].len) return why.unsupported("{s}: {d} objects for {d} applied names", .{ l[0], objects.len, l[1].len });
-        for (objects, l[1]) |o, a| {
+        for (objects, l[1], 0..) |o, a, k| {
             // AppliedSpell {name, power, lapsRemaining}; Effect {effectProperties: {name, laps, power, stacks}}.
             const ep = get(o, "effectProperties");
             const props_obj = if (ep == .object) ep else o;
             const name = try string(get(props_obj, "name"), why, l[0]);
             const laps = try number(if (ep == .object) get(ep, "laps") else get(o, "lapsRemaining"), why, "laps");
             const power = try number(get(props_obj, "power"), why, "power");
+            // A duplicate debuff row (a mirrored Spit Ball debuff) ticks its display laps faster than its object laps:
+            // the object governs expiry, the display list is what the digest shows (AppliedSpell.lag).
+            if (li == 1 and std.mem.eql(u8, name, a.id.name()) and power == a.power and laps != a.laps) {
+                const lag = laps - a.laps;
+                if (lag != @trunc(lag) or @abs(lag) > 1000) return why.unsupported("debuffs: object {s} laps {d}", .{ name, laps });
+                u.debuffs.items[k].laps = laps;
+                u.debuffs.items[k].lag = @intFromFloat(lag);
+                continue;
+            }
             if (!std.mem.eql(u8, name, a.id.name()) or laps != a.laps or power != a.power) {
                 return why.unsupported("{s}: object {s} differs from the applied list", .{ l[0], name });
             }
@@ -668,6 +677,8 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
     };
     const u = &s.units[idx];
     u.syn_power = s.setup[u.team].ability_power;
+    // Unit.maxRangeShots (the constructor's range_shots, Limited Supply's base): hidden, exported as a unit field.
+    u.max_range_shots = try field(fields, "maxRangeShots", why);
     const rv = get(props, "rallying_volley_granted");
     u.rallying_volley_granted = if (isUndefined(rv)) 0 else try number(rv, why, "rallying_volley_granted");
     const web = get(props, "web_movement_locked");

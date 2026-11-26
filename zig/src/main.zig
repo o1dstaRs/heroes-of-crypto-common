@@ -600,9 +600,14 @@ const TraceOut = struct {
             },
             .melee_attack => |x| try w.print("melee_attack {s} {s} from {d},{d}", .{ self.id8(s, x.attacker, &b1), self.id8(s, x.target, &b2), x.attack_from.x, x.attack_from.y }),
             .range_attack => |x| {
-                try w.print("range_attack {s} {s}", .{ self.id8(s, x.attacker, &b1), self.id8(s, x.target, &b2) });
-                if (x.aim_cell) |c| try w.print(" aim {d},{d},{d}", .{ c.x, c.y, x.aim_side });
+                if (x.free) {
+                    try w.print("range_attack {s} at {d},{d}", .{ self.id8(s, x.attacker, &b1), x.tx, x.ty });
+                } else {
+                    try w.print("range_attack {s} {s}", .{ self.id8(s, x.attacker, &b1), self.id8(s, x.target, &b2) });
+                    if (x.aim_cell) |c| try w.print(" aim {d},{d},{d}", .{ c.x, c.y, x.aim_side });
+                }
             },
+            .area_throw_attack => |x| try w.print("area_throw_attack {s} {d},{d}", .{ self.id8(s, x.attacker, &b1), x.target_cell.x, x.target_cell.y }),
             .obstacle_attack => |x| try w.print("obstacle_attack {s} {d},{d}", .{ self.id8(s, x.attacker, &b1), x.target_x, x.target_y }),
             .cast_spell => |x| {
                 const name = if (x.spell < st.N_CAST_SPELLS) @as(st.CastSpell, @enumFromInt(x.spell)).name() else "?";

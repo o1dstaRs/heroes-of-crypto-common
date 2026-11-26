@@ -19,10 +19,11 @@ pub const GRID = 16;
 /// augments, a cast Blessing, Battle Roar and the Hidden marker (19), with one to spare. A push past a capacity sets
 /// State.overflow (the checks report it).
 pub const MAX_SPELLS = 20;
-/// Debuffs (Dismorale, Dulling Defense, Miner, the Web Aura and Range Null Field Aura rows, the Vine Throw snare, the
-/// Visible marker) and effects (Stun, Break, Poison, Aggr, Shatter Armor, Pegasus Light, Deep Wounds, Boar Saliva,
-/// Terrifying Gaze), one to spare each.
-pub const MAX_DEBUFFS = 8;
+/// Debuffs: Dismorale, Dulling Defense, Miner, the Web Aura and Range Null Field Aura rows, the Vine Throw snare, the
+/// Visible marker and Spit Ball's seven, which a Magic Reflection mirror can duplicate on the shooter (19 in scope; 9 seen
+/// on one unit). Effects: Stun, Break, Poison, Aggr, Shatter Armor, Pegasus Light, Deep Wounds, Boar Saliva, Terrifying
+/// Gaze, one to spare.
+pub const MAX_DEBUFFS = 20;
 pub const MAX_EFFECTS = 10;
 
 pub const Team = struct {
@@ -106,6 +107,21 @@ pub const SpellId = enum(u8) {
     warding_mane_blessing,
     /// Behemoth's mass cast: +power steps_mod and maximum damage rolls.
     battle_roar,
+    // batch 5: Spit Ball's debuffs (spells.json Death and Order configs, recorded in `init.spellConfigs`)
+    /// Every damage roll of its holder is the minimum (unless Blessing or Battle Roar).
+    curse,
+    /// MIND: morale -20 and no morale change.
+    sadness,
+    /// steps and steps_mod x (100 - power) / 100.
+    quagmire,
+    /// The base-armor multiplier x (100 - power) / 100, before Heavy Armor.
+    weakening_beam,
+    /// attack_mod -= power% of the running base attack.
+    weakness,
+    /// MIND: no ranged attack or counter-shot (only an attack_type RANGE target receives it).
+    rangebane,
+    /// MIND: no strike, response or switch onto an enemy with more cumulative hp.
+    cowardice,
 
     pub fn name(self: SpellId) []const u8 {
         return switch (self) {
@@ -145,7 +161,22 @@ pub const SpellId = enum(u8) {
             .visible => "Visible",
             .warding_mane_blessing => "Warding Mane Blessing",
             .battle_roar => "Battle Roar",
+            .curse => "Curse",
+            .sadness => "Sadness",
+            .quagmire => "Quagmire",
+            .weakening_beam => "Weakening Beam",
+            .weakness => "Weakness",
+            .rangebane => "Rangebane",
+            .cowardice => "Cowardice",
         };
+    }
+
+    /// Spit Ball's candidates (POSSIBLE_DEBUFFS_TO_FACTIONS, spit_ball_ability.ts), in roll order.
+    pub const SPIT_BALL = [_]SpellId{ .curse, .sadness, .quagmire, .weakening_beam, .weakness, .rangebane, .cowardice };
+
+    /// One of Spit Ball's seven debuffs.
+    pub inline fn isSpitBall(self: SpellId) bool {
+        return @intFromEnum(self) >= @intFromEnum(SpellId.curse) and @intFromEnum(self) <= @intFromEnum(SpellId.cowardice);
     }
 
     /// An augment buff (UnitsHolder.applyAugments).
@@ -168,8 +199,10 @@ pub const LAPS_AURA: f64 = 9007199254740991;
 pub const NUMBER_OF_LAPS_TOTAL: f64 = 15;
 
 /// One applied buff/debuff/effect. TypeScript keeps the object (AppliedSpell / Effect) and the parallel
-/// `applied_*` display arrays; in scope a name is never applied twice to one list (every apply deletes the name
-/// first), so both always agree and one record holds them.
+/// `applied_*` display arrays. They agree while a name sits once in a list; only a Magic Reflection mirror of a Spit
+/// Ball debuff appends a second debuff row of a name (applyDebuff never checks), and then every live object row of the
+/// name ticks every display entry of it in Unit.minusLap, so a row's display laps (`laps - lag`) fall faster than its
+/// object laps (`laps`, which govern expiry).
 pub const AppliedSpell = struct {
     id: SpellId,
     /// firstSpellProperty / secondSpellProperty: an aura row's source cell (the emitter's base cell, buff or debuff
@@ -179,6 +212,13 @@ pub const AppliedSpell = struct {
     src_y: i8 = -1,
     laps: f64,
     power: f64 = 0,
+    /// Object laps minus display laps (applied_*_laps): 0 except on duplicate debuff rows (see above).
+    lag: i16 = 0,
+
+    /// The display laps (the digest's `*_laps` columns).
+    pub inline fn shownLaps(self: AppliedSpell) f64 {
+        return if (self.lag == 0) self.laps else self.laps - @as(f64, @floatFromInt(self.lag));
+    }
 };
 
 /// A unit's buff list (the widest of the three).
@@ -242,7 +282,7 @@ pub fn SpellListN(comptime cap: u8) type {
 pub const MAX_ABILITIES = 10;
 /// Abilities a unit can lose to Predatory Assimilation (props.stolen_abilities).
 pub const MAX_STOLEN = 6;
-pub const AbilityMask = u64;
+pub const AbilityMask = u128;
 
 /// The abilities the port implements. A recorded unit carrying any other ability is refused at load.
 pub const AbilityId = enum(u8) {
@@ -315,6 +355,35 @@ pub const AbilityId = enum(u8) {
     battle_roar,
     /// Castable and giftable: the regeneration at activation, and the ":Wild Regeneration" charge that gives it away.
     wild_regeneration,
+    // batch 5: the shooters and throwers
+    /// Arbalester: no distance bands (divisor 1); setPosition rewrites shot_distance from the position it leaves.
+    sniper,
+    /// Arbalester: range_shots capped at floor(maxRangeShots * stack power / 5) + the Rallying Volley arrows.
+    limited_supply,
+    /// Elf: a second single-target shot after the counter-shot and the switch.
+    double_shot,
+    /// Medusa: range_shots_mod 99 and shots that cost nothing; a melee thief shoots from 6.5.
+    endless_quiver,
+    /// Medusa (MIND): a share of the hit's damage in whole creatures, and a petrify roll.
+    petrifying_gaze,
+    /// Beholder: up to seven random debuffs per landed shot.
+    spit_ball,
+    /// Cyclops: a stack-powered splash on the 3x3 around the cell the ray entered; rays pass stones.
+    large_caliber,
+    /// Tsar Cannon: Madness's morale lock, MIND, poison and heal immunity, x1.5 from physical AOE and STATUS cards.
+    mechanism,
+    /// Tsar Cannon: no MELEE attack type, no melee strike or response.
+    no_melee,
+    /// Tsar Cannon: every enemy on the line to the field edge, no counter-shot either way.
+    through_shot,
+    /// Gargantuan: a second splash (Area Throw's multiplier) after the counter-shot and the switch.
+    double_throw,
+    /// Gargantuan: the flat splash, and the cell-aimed area_throw_attack.
+    area_throw,
+    /// Centaur: the target's armor x (1 - multiplier) in every damage band the holder rolls.
+    piercing_spear,
+    /// Centaur: max hp x (1 + multiplier) at every refresh.
+    boost_health,
 
     pub fn name(self: AbilityId) []const u8 {
         return switch (self) {
@@ -379,6 +448,20 @@ pub const AbilityId = enum(u8) {
             .unyielding_power => "Unyielding Power",
             .battle_roar => "Battle Roar",
             .wild_regeneration => "Wild Regeneration",
+            .sniper => "Sniper",
+            .limited_supply => "Limited Supply",
+            .double_shot => "Double Shot",
+            .endless_quiver => "Endless Quiver",
+            .petrifying_gaze => "Petrifying Gaze",
+            .spit_ball => "Spit Ball",
+            .large_caliber => "Large Caliber",
+            .mechanism => "Mechanism",
+            .no_melee => "No Melee",
+            .through_shot => "Through Shot",
+            .double_throw => "Double Throw",
+            .area_throw => "Area Throw",
+            .piercing_spear => "Piercing Spear",
+            .boost_health => "Boost Health",
         };
     }
 
@@ -428,8 +511,15 @@ pub const AbilityId = enum(u8) {
     }
 
     pub inline fn bit(self: AbilityId) AbilityMask {
-        return @as(AbilityMask, 1) << @as(u6, @intCast(@intFromEnum(self)));
+        return @as(AbilityMask, 1) << @as(u7, @intCast(@intFromEnum(self)));
     }
+
+    /// The batch-5 cards (the shooters' and throwers').
+    pub const BATCH5_MASK: AbilityMask = blk: {
+        var m: AbilityMask = 0;
+        for ([_]AbilityId{ .sniper, .limited_supply, .double_shot, .endless_quiver, .petrifying_gaze, .spit_ball, .large_caliber, .mechanism, .no_melee, .through_shot, .double_throw, .area_throw, .piercing_spear, .boost_health }) |id| m |= id.bit();
+        break :blk m;
+    };
 };
 
 // =====================================================================================================================
@@ -552,6 +642,14 @@ pub const SpellConfig = struct {
     loaded: bool = false,
 };
 
+/// One Spit Ball debuff's config: laps, power and whether its power type is MIND.
+pub const SpitConfig = struct {
+    laps: f64 = 0,
+    power: f64 = 0,
+    mind: bool = false,
+    loaded: bool = false,
+};
+
 /// One raw spell entry (unitProperties.spells "<Faction>:<Name>"): the spell and its faction prefix.
 pub const BookEntry = struct {
     spell: u8,
@@ -608,6 +706,8 @@ pub const AuraDef = struct {
 /// AbilityPowerType values the ported formulas branch on (src/abilities/ability_properties.ts).
 pub const PowerType = struct {
     pub const TOTAL_DAMAGE_PERCENTAGE: u8 = 1;
+    /// Endless Quiver: projectShotCost reads it (a holder's volleys cost no arrow).
+    pub const UNLIMITED_SUPPLIES: u8 = 4;
     pub const ADDITIONAL_DAMAGE_PERCENTAGE: u8 = 2;
     pub const MAGIC_RESIST_100: u8 = 6;
     pub const APPLY_EFFECT: u8 = 7;
@@ -636,7 +736,9 @@ pub const PowerType = struct {
 
 /// AbilityType values the ported processors branch on.
 pub const AbilityKind = struct {
-    /// A MIND ability (Aggr, Boar Saliva, Terrifying Gaze): Madness resists its effect.
+    /// A STATUS card (Stun, Shatter Armor): x1.5 on a Mechanism target.
+    pub const STATUS: u8 = 7;
+    /// A MIND ability (Aggr, Boar Saliva, Terrifying Gaze, Petrifying Gaze): Madness and Mechanism resist its effect.
     pub const MIND: u8 = 13;
 };
 
@@ -808,6 +910,8 @@ pub const Unit = struct {
     /// unitProperties.forbidden_target (Terrifying Gaze): the uid of the gazer this unit may not attack or answer
     /// (NO_UID = ""). An id, not a slot: TypeScript keeps it after the gazer dies, until the effect is gone.
     forbidden: u8 = NO_UID,
+    /// Unit.maxRangeShots: the constructor's range_shots (the creature config), hidden; Limited Supply's cap reads it.
+    max_range_shots: f64 = 0,
 
     pub fn isDead(self: *const Unit) bool {
         return self.amount_alive <= 0;
@@ -1148,6 +1252,13 @@ pub const State = struct {
     hidden_power: f64 = 0,
     visible_laps: f64 = 1,
     visible_power: f64 = 0,
+    /// Batch-5 gates (loadScopeFlags): some unit can hold Spit Ball or carries one of its debuffs (the debuff stat hooks,
+    /// the Sadness morale lock, the Rangebane and Cowardice gates), and some unit can hold Limited Supply, Endless
+    /// Quiver or Boost Health (their refresh hooks).
+    spit: bool = false,
+    shot_hooks: bool = false,
+    /// Spit Ball's debuff configs (getSpellConfig of Death / Order, recorded `spellConfigs`), by SpellId.SPIT_BALL index.
+    spit_cfg: [7]SpitConfig = .{SpitConfig{}} ** 7,
 
     /// cannotAttackUnitId on battles where a gaze can land (Unit.forbidden is never set otherwise).
     pub inline fn forbids(self: *const State, u: *const Unit, target_uid: u8) bool {
