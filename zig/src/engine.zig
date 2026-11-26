@@ -2529,13 +2529,17 @@ fn walkFacts(s: *const State, u: *const Unit, route: []const Cell, lava: bool, a
     return .{ .legal = legal, .len = route.len, .travelled = travelled.len, .lava = lava };
 }
 
-/// Server mode: whether the server's route decides the move differently from the action's path (both refused decide
-/// nothing; with burning cells any other cell can change the burn).
+/// Server mode: whether the server's route decides the move differently from the action's path. Both refused decide
+/// nothing; past legality only Crusade reads the travelled count, only Rapid Charge the route's length (the turn's
+/// stationary strike charges moved_route_cells: abilities.rapidCharge is 1 without the card), only Made of Fire the
+/// lava flag, and with burning cells any other cell can change the burn.
 fn walkDiffers(s: *const State, u: *const Unit, route: []const Cell, route_lava: bool, path: []const Cell, anchor: Cell) bool {
     const a = walkFacts(s, u, route, route_lava, anchor);
     const b = walkFacts(s, u, path, s.action_lava, anchor);
     if (!a.legal and !b.legal) return false;
-    if (a.legal != b.legal or a.len != b.len or a.travelled != b.travelled) return true;
+    if (a.legal != b.legal) return true;
+    if (a.travelled != b.travelled and u.ability(.crusade) != null) return true;
+    if (a.len != b.len and u.ability(.rapid_charge) != null) return true;
     if (s.artifacts and a.lava != b.lava) return true;
     return s.fight.n_fire != 0;
 }

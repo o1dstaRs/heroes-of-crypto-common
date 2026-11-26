@@ -407,8 +407,9 @@ fn applyStrikeMoveModifiers(s: *State, ui: u8, path: []const Cell, has_lava: boo
 /// handleMeleeAttack's movement prefix: a stationary strike, or (with a client `path`) the walk to `from`. A refusal
 /// after the move modifiers keeps their morale change, as in TypeScript.
 /// Server mode: whether a path-bearing strike's approach under the provider decides anything differently from runMatch's
-/// (the action's own path): the route's presence, its length (the charge), the travelled count (Crusade), the last
-/// travelled cell (distance morale), a ground crossing of "B", the lava flag, or with burning cells any cell.
+/// (the action's own path): the route's presence, its length (Rapid Charge's cells, read only with the card), the
+/// travelled count (Crusade, only with the card), the last travelled cell (distance morale), a ground crossing of "B",
+/// the lava flag, or with burning cells any cell.
 fn approachDiffers(s: *const State, ai: u8, am: server.Approach, path: []const Cell) bool {
     if (path.len == 0) return false; // path-less: server.approach flags the approach the full map accepts
     const r = am.route orelse return false; // unreached: flagged where the missing route refuses the strike (noRoute)
@@ -419,8 +420,10 @@ fn approachDiffers(s: *const State, ai: u8, am: server.Approach, path: []const C
     if (s.fight.n_fire != 0) return true;
     const tr = server.travelledOf(r, base);
     const tp = server.travelledOf(path, base);
-    if (r.len != path.len or tr.len != tp.len) return true;
-    if (tr.len != 0 and (tr[tr.len - 1].x != tp[tp.len - 1].x or tr[tr.len - 1].y != tp[tp.len - 1].y)) return true;
+    if (r.len != path.len and u.ability(.rapid_charge) != null) return true;
+    if (tr.len != tp.len and u.ability(.crusade) != null) return true;
+    if (tr.len == 0 or tp.len == 0) return tr.len != tp.len;
+    if (tr[tr.len - 1].x != tp[tp.len - 1].x or tr[tr.len - 1].y != tp[tp.len - 1].y) return true;
     return engine.groundRouteCrossesObstacle(s, u, r) != engine.groundRouteCrossesObstacle(s, u, path);
 }
 

@@ -57,10 +57,18 @@ fn cellsInOrder(a: []const Cell, b: []const Cell) bool {
 }
 
 /// `hoc-sim rollout-trace`'s provider log (debugging, this thread; null everywhere else): each knownPaths call's map
-/// size (-1 without a map), and whether its stat refresh changed the trace's per-unit stats line ("h": morale, luck,
-/// steps, base attack and their modifiers, the hourglass and reply flags) or the active unit's steps, as the server
-/// oracle records its provider's calls, so the two call sequences can be compared step by step.
-pub const KpEntry = struct { size: i32, stats: bool, steps: bool };
+/// size (-1 without a map), whether its stat refresh changed the trace's per-unit stats line ("h": morale, luck, steps,
+/// base attack and their modifiers, the hourglass and reply flags) or the active unit's steps, and the route the action
+/// takes from that map (a move's to its path's last cell, a strike's to its attack-from cell; none when the map holds
+/// none), as the server oracle records its provider's calls, so the two call sequences can be compared step by step.
+pub const KpEntry = struct {
+    size: i32,
+    stats: bool,
+    steps: bool,
+    /// -1: no route was looked up (no map), -2: the map holds none, else the route's length in `route`.
+    route_len: i16 = -1,
+    route: [96]Cell = undefined,
+};
 pub const KpLog = struct {
     n: usize = 0,
     items: [64]KpEntry = undefined,
@@ -71,6 +79,20 @@ pub const KpLog = struct {
     }
 };
 pub threadlocal var kp_log: ?*KpLog = null;
+
+/// The route the action takes from the latest logged map (kp_log), or none.
+fn logRoute(r: ?[]const Cell) void {
+    const l = kp_log orelse return;
+    if (l.n == 0 or l.n > l.items.len) return;
+    const e = &l.items[l.n - 1];
+    const cells = r orelse {
+        e.route_len = -2;
+        return;
+    };
+    const k = @min(cells.len, e.route.len);
+    @memcpy(e.route[0..k], cells[0..k]);
+    e.route_len = @intCast(k);
+}
 
 fn statsLine(s: *const State) u64 {
     var h = std.hash.Wyhash.init(0);
@@ -184,10 +206,16 @@ pub fn moveRoute(s: *State, p: []const Cell, buf: *RouteBuf) MoveRoute {
     var mp: pathing.MovePath = undefined;
     switch (knownPaths(s, &mp)) {
         .none => return .runmatch,
-        .empty => return .rejected,
+        .empty => {
+            logRoute(null);
+            return .rejected;
+        },
         .paths => {
-            if (mp.size() == 0) return .rejected;
-            const r = routeTo(&mp, p[p.len - 1], buf) orelse return .rejected;
+            const r = routeTo(&mp, p[p.len - 1], buf) orelse {
+                logRoute(null);
+                return .rejected;
+            };
+            logRoute(buf.slice());
             return .{ .route = .{ .cells = buf.slice(), .has_lava = r.has_lava } };
         },
     }
@@ -218,9 +246,13 @@ pub fn approach(s: *State, from: Cell, p: []const Cell, has_lava: bool, buf: *Ro
     var mp: pathing.MovePath = undefined;
     switch (knownPaths(s, &mp)) {
         .none => return Approach.fromPath(p, has_lava),
-        .empty => return if (p.len == 0) .{ .defined = true } else .{},
+        .empty => {
+            logRoute(null);
+            return if (p.len == 0) .{ .defined = true } else .{};
+        },
         .paths => {
             const r = routeTo(&mp, from, buf);
+            logRoute(if (r != null) buf.slice() else null);
             const base = engine.baseCell(&s.units[@intCast(s.active)]);
             if (p.len == 0) {
                 // A path-less approach the full map accepts (runMatch refuses it): not seen by the oracle yet.

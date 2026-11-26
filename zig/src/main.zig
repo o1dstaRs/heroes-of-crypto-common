@@ -722,7 +722,17 @@ const TraceOut = struct {
                 try w.writeAll(",\"kp\":[");
                 for (l.items[0..@min(l.n, l.items.len)], 0..) |e, k| {
                     if (k != 0) try w.writeAll(",");
-                    try w.print("[{d},{d},{d}]", .{ e.size, @intFromBool(e.stats), @intFromBool(e.steps) });
+                    try w.print("[{d},{d},{d}", .{ e.size, @intFromBool(e.stats), @intFromBool(e.steps) });
+                    if (e.route_len == -2) try w.writeAll(",\"-\"");
+                    if (e.route_len >= 0) {
+                        try w.writeAll(",\"");
+                        for (e.route[0..@intCast(e.route_len)], 0..) |c, ci| {
+                            if (ci != 0) try w.writeAll(";");
+                            try w.print("{d},{d}", .{ c.x, c.y });
+                        }
+                        try w.writeAll("\"");
+                    }
+                    try w.writeAll("]");
                 }
                 try w.writeAll("]");
                 l.n = 0;
