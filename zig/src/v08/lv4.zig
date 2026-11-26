@@ -606,8 +606,10 @@ fn inPlaceStrike(c: *ai.Ctx, out: *ai.Decision, target: u8) void {
     out.push(.{ .melee_attack = .{ .attacker = c.ui, .target = target, .attack_from = engine.baseCell(u), .path = &.{} } });
 }
 
-/// (11) enforceMeleeLegality: only the forced (Aggr) target may be struck; a strike on a gone target retargets in
-/// place or advances. Cowardice and Hidden are out of scope.
+/// (11) enforceMeleeLegality: only the forced (Aggr) target may be struck; a strike the engine would refuse (the target
+/// gone, Hidden, or a stronger stack while the unit carries Cowardice, or a move the unit cannot make) becomes an
+/// in-place strike on the first enemy (getAllAllies order) that is not the Terrifying Gaze gazer and is strikable in
+/// place (alive, not Hidden, not Cowardice-barred, adjacent now), else the fallback turn.
 fn enforceMeleeLegality(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
@@ -615,9 +617,9 @@ fn enforceMeleeLegality(c: *ai.Ctx, out: *ai.Decision) void {
     const strike = out.actions[i].melee_attack;
     const mine = engine.unitCells(u);
     const Strikable = struct {
-        fn ok(st_: *const State, t: u8, my: []const Cell) bool {
+        fn ok(st_: *const State, att: *const st.Unit, t: u8, my: []const Cell) bool {
             const e = &st_.units[t];
-            if (!e.in_holder or e.isDead()) return false;
+            if (!e.in_holder or e.isDead() or e.isHidden() or engine.cowardBarred(st_, att, e)) return false;
             const ec = engine.unitCells(e);
             return util.footprintsNear(ec.slice(), my);
         }
@@ -625,19 +627,18 @@ fn enforceMeleeLegality(c: *ai.Ctx, out: *ai.Decision) void {
     if (u.target >= 0 and u.target != @as(i8, @intCast(strike.target))) {
         const f: u8 = @intCast(u.target);
         if (s.units[f].in_holder and !s.units[f].isDead()) {
-            if (Strikable.ok(s, f, mine.slice())) return inPlaceStrike(c, out, f);
+            if (Strikable.ok(s, u, f, mine.slice())) return inPlaceStrike(c, out, f);
             return ai.fallbackTurn(c, out);
         }
     }
-    // The target is gone, or the strike needs a move the unit cannot make (a web-locked flyer): hit a legal adjacent
-    // enemy instead (getAllAllies order), else fall back. Hidden and Cowardice are not in scope.
     const t = &s.units[strike.target];
     const moves = !ai.sameCell(strike.attack_from, engine.baseCell(u));
-    if (!t.in_holder or t.isDead() or (moves and !u.canMove())) {
+    if (!t.in_holder or t.isDead() or t.isHidden() or engine.cowardBarred(s, u, t) or (moves and !u.canMove())) {
         if (u.target >= 0) return ai.fallbackTurn(c, out);
         const opp = engine.opposite(u.team);
         for (s.holderOrder()) |k| {
-            if (s.units[k].team == opp and Strikable.ok(s, k, mine.slice())) return inPlaceStrike(c, out, k);
+            if (s.units[k].team != opp or u.cannotAttack(s.units[k].uid)) continue;
+            if (Strikable.ok(s, u, k, mine.slice())) return inPlaceStrike(c, out, k);
         }
         return ai.fallbackTurn(c, out);
     }
