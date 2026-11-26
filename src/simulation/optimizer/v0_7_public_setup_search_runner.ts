@@ -294,8 +294,8 @@ function playPublicSetupGame(
         endReason: result.endReason,
         decidedByArmageddon: result.attrition.decidedByArmageddon,
         setupFingerprintSha256: sha256({
-            lowerCreatureIds: left.creatureIds,
-            upperCreatureIds: right.creatureIds,
+            leftCreatureIds: left.creatureIds,
+            rightCreatureIds: right.creatureIds,
             leftSetup,
             rightSetup,
             leftReveals: left.revealedOpponentCreatures,

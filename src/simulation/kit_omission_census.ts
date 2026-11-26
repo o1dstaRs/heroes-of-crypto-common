@@ -110,8 +110,8 @@ function round1Game(genome: ILeagueGenome, options: IKitCensusOptions, game: num
         redArtifactT2: pick.state.right.tier2Artifact,
         greenDoctrine: pick.state.left.doctrine,
         redDoctrine: pick.state.right.doctrine,
-        greenAugments: pick.lowerAugments,
-        redAugments: pick.upperAugments,
+        greenAugments: pick.leftAugments,
+        redAugments: pick.rightAugments,
         greenSynergies: SETUP_POLICY_V0.pickSynergies(pick.state.left.creatures),
         redSynergies: SETUP_POLICY_V0.pickSynergies(pick.state.right.creatures),
     };

@@ -231,7 +231,7 @@ describe("B1 full-game league genome", () => {
         expect(first.state.right.creatures).toHaveLength(6);
         expect(first.state.left.tier1Artifact).toBeGreaterThan(0);
         expect(first.state.left.tier2Artifact).toBeGreaterThan(0);
-        expect(first.lowerAugments.reduce((sum, augment) => sum + augment.value, 0)).toBe(7);
+        expect(first.leftAugments.reduce((sum, augment) => sum + augment.value, 0)).toBe(7);
 
         const collisionSeed = Array.from({ length: 200 }, (_, seed) => seed).find((seed) =>
             resolveLeaguePick(seed, anchor, melee).state.transcript.some(
@@ -272,7 +272,7 @@ describe("B1 full-game league genome", () => {
         expect(resolved.state.left.creatures).not.toEqual(baseline.state.left.creatures);
         expect(resolved.state.left.tier2Artifact).toBe(1);
         expect(resolved.state.left.doctrine).toBe(Doctrine.SEE_ALL);
-        expect(resolved.lowerAugments).toEqual([{ kind: "Movement", value: 2 }]);
+        expect(resolved.leftAugments).toEqual([{ kind: "Movement", value: 2 }]);
         expect(resolved.leftPlacement).toBe("adaptive");
 
         let wiredConfig: IMatchConfig | undefined;

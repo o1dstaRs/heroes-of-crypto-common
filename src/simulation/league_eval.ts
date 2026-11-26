@@ -97,8 +97,8 @@ export interface IResolvedLeaguePick {
     state: IPickSimState;
     leftPlacement: LeaguePlacementTemplate;
     rightPlacement: LeaguePlacementTemplate;
-    lowerAugments: ReturnType<typeof pickLeagueAugments>;
-    upperAugments: ReturnType<typeof pickLeagueAugments>;
+    leftAugments: ReturnType<typeof pickLeagueAugments>;
+    rightAugments: ReturnType<typeof pickLeagueAugments>;
 }
 
 export interface ILeagueGameRecord {
@@ -331,13 +331,13 @@ export function resolveLeaguePick(
             pickLeaguePlacement(state.right.creatures, rightOpponent, rightGenome),
             rightOpponent,
         ),
-        lowerAugments: pickLeagueAugments(
+        leftAugments: pickLeagueAugments(
             state.left.creatures,
             leftOpponent,
             getUpgradePoints(state.left.doctrine),
             leftGenome,
         ),
-        upperAugments: pickLeagueAugments(
+        rightAugments: pickLeagueAugments(
             state.right.creatures,
             rightOpponent,
             getUpgradePoints(state.right.doctrine),
@@ -439,7 +439,7 @@ export function playLeagueGame(
         artifactT1: pick.state.left.tier1Artifact,
         artifactT2: pick.state.left.tier2Artifact,
         doctrine: pick.state.left.doctrine,
-        augments: pick.lowerAugments,
+        augments: pick.leftAugments,
         synergies: SETUP_POLICY_V0.pickSynergies(pick.state.left.creatures),
     };
     const pickRight = {
@@ -448,7 +448,7 @@ export function playLeagueGame(
         artifactT1: pick.state.right.tier1Artifact,
         artifactT2: pick.state.right.tier2Artifact,
         doctrine: pick.state.right.doctrine,
-        augments: pick.upperAugments,
+        augments: pick.rightAugments,
         synergies: SETUP_POLICY_V0.pickSynergies(pick.state.right.creatures),
     };
     const matchLeft = battleMirror ? pickRight : pickLeft;

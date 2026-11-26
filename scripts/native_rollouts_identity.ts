@@ -30,8 +30,8 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 
 interface ICensusLine {
     gridType: number;
-    lowerDoctrine?: number;
-    upperDoctrine?: number;
+    leftDoctrine?: number;
+    rightDoctrine?: number;
     artifacts: { lower: [number, number]; upper: [number, number] };
     lower: { name: string; level: number }[];
     upper: { name: string; level: number }[];
@@ -250,8 +250,8 @@ function playBattle(seed: number, mode: string, index: number): IBattleRun {
     if (CENSUS.length && !census) throw new Error(`CENSUS: no line ${CENSUS_OFFSET + index}`);
     const roster = census ? censusRoster(census.lower) : rosterFor(seed);
     const redRoster = census ? censusRoster(census.upper) : rosterFor((seed ^ 0x5bd1e995) >>> 0);
-    const green = census ? census.lowerDoctrine || 0 : doctrineFor(seed, 0);
-    const red = census ? census.upperDoctrine || 0 : doctrineFor(seed, 1);
+    const green = census ? census.leftDoctrine || 0 : doctrineFor(seed, 0);
+    const red = census ? census.rightDoctrine || 0 : doctrineFor(seed, 1);
     const artifacts = census
         ? {
               ...(census.artifacts.lower[0] ? { greenArtifactT1: census.artifacts.lower[0] } : {}),

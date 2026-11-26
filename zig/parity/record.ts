@@ -200,7 +200,7 @@ function rosterFor(seed: number, teamIndex = 0): ReturnType<typeof buildRoster> 
 }
 
 // RECORD_ROSTERS=<census.jsonl> plays a draft census, battle g reading line g: the `lower` and `upper` creature lists
-// (by name and level), `artifacts.lower` / `artifacts.upper` ([Tier 1, Tier 2]), `lowerDoctrine` / `upperDoctrine` and
+// (by name and level), `artifacts.lower` / `artifacts.upper` ([Tier 1, Tier 2]), `leftDoctrine` / `rightDoctrine` and
 // `gridType`; lower is green. It replaces the rosters (red always its own), the artifacts, the doctrines and the map, and
 // needs RECORD_AMOUNTS=expBudget and RECORD_SIDE=1 (production's amounts and boards). A setup option.
 const ROSTERS_PATH = (process.env.RECORD_ROSTERS ?? "").trim();
@@ -1348,8 +1348,8 @@ function main(): void {
             : DISTINCT_RED
               ? rosterFor((seed ^ 0x5bd1e995) >>> 0, 1)
               : roster;
-        const greenDoctrine = census ? census.lowerDoctrine || undefined : doctrineFor(seed, 0);
-        const redDoctrine = census ? census.upperDoctrine || undefined : doctrineFor(seed, 1);
+        const greenDoctrine = census ? census.leftDoctrine || undefined : doctrineFor(seed, 0);
+        const redDoctrine = census ? census.rightDoctrine || undefined : doctrineFor(seed, 1);
         const greenAugments = augmentsFor(seed, 0, getUpgradePoints(greenDoctrine ?? 0), roster, redRoster);
         const redAugments = augmentsFor(seed, 1, getUpgradePoints(redDoctrine ?? 0), redRoster, roster);
         const greenArtifacts: [number, number] | undefined = census ? census.artifacts.lower : artifactsFor(seed, 0);

@@ -66,7 +66,7 @@ their original family. The generic strength analyzer records a zero-gain failed 
 for identical-intelligence observation arms; the scientific verdict here is exact diagnostic parity.
 
 The first input-only audit used nonexistent `leftDoctrine/rightDoctrine` fields. Its invalid counts,
-source and erratum remain preserved; corrected extraction asserts the actual `lowerDoctrine/upperDoctrine`
+source and erratum remain preserved; corrected extraction asserts the actual `leftDoctrine/rightDoctrine`
 values. An initial CLI seal command omitted `--root .` and failed before any game. The first independent
 verifier incorrectly required intermediate calls to be fully funded; its failed attempt remains, and
 the corrected verifier checks every call plus exact final funding. No native source, case, observation,

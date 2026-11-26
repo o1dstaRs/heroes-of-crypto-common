@@ -12,7 +12,7 @@
 // Doctrines are the FIRST pick-phase choice (Stage 0), made simultaneously by both players. A doctrine is a
 // "scouting doctrine" trade-off: it sets BOTH how much of the opponent's draft you can see AND your upgrade
 // (augment) point budget. More vision costs points. The chosen doctrine id is the wire value sent via
-// DoctrineRequest and stored on the pick document (doctrineLower/doctrineUpper).
+// DoctrineRequest and stored on the pick document (doctrineLeft/doctrineRight).
 
 import { MAX_AUGMENT_POINTS } from "../constants";
 
