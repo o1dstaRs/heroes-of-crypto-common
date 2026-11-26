@@ -940,7 +940,7 @@ const Gen = struct {
 
     fn canMelee(self: *const Gen) bool {
         const u = self.unit();
-        // No Melee is not in the engine's ability set yet (no creature in scope has it).
+        if (u.has(.no_melee)) return false;
         const sel = u.attack_type_selected;
         if (sel == AT.MELEE or sel == AT.MELEE_MAGIC) return true;
         return engine.possibleIncludes(u, AT.MELEE) or engine.possibleIncludes(u, AT.MELEE_MAGIC);
@@ -949,8 +949,8 @@ const Gen = struct {
     /// The candidate's value and kill, and (shots) the expected damage to the primary when it is an enemy.
     const Dmg = struct { ed: f64, ek: u8, primary: f64 = 0 };
 
-    /// meleeDamage: the mean of the melee roll's bounds (native shooters strike at half; Handyman, which would lift
-    /// that, is not in the engine's ability set yet), capped at the target's health.
+    /// meleeDamage: the mean of the melee roll's bounds (native shooters strike at half unless Handyman), capped at the
+    /// target's health.
     fn meleeDamage(self: *const Gen, ti: u8) Dmg {
         const u = self.unit();
         const t = &self.c.s.units[ti];

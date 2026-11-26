@@ -1344,7 +1344,9 @@ pub fn coherentMelee(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool
         if (f.in_holder and !f.isDead() and u.target != @as(i8, @intCast(hit.target))) forced_other = true;
     }
     const tc = engine.unitCells(t);
-    if (!t.in_holder or t.isDead() or t.team == u.team or forced_other or !ai.adjacent(desired.slice(), tc.slice())) {
+    if (!t.in_holder or t.isDead() or t.team == u.team or t.isHidden() or u.has(.no_melee) or u.cannotAttack(t.uid) or
+        forced_other or !ai.adjacent(desired.slice(), tc.slice()))
+    {
         out.n = @intCast(mi + 1);
         return true;
     }

@@ -841,10 +841,12 @@ fn dropBlockedMove(c: *ai.Ctx, out: *ai.Decision) void {
 }
 
 /// A melee unit's pure move that ends next to an attackable enemy (or an idle end while already adjacent) strikes it:
-/// a stack it can kill first, else the highest-firepower one (holder order breaks ties).
+/// a stack it can kill first, else the highest-firepower one (holder order breaks ties). Never for a unit with an active
+/// No Melee card (a Queen can steal one).
 fn takeAdjacentAttack(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
+    if (u.has(.no_melee)) return;
     if (u.attack_type != AT.MELEE and u.attack_type != AT.MELEE_MAGIC) return;
     if (util.combatAction(out)) return;
     const mi = firstIndex(out, .move_unit);
