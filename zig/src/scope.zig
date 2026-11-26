@@ -210,6 +210,12 @@ pub const PolicyScope = struct {
     /// Cards and rows refused after the board-level checks, with their own messages (v0.8: the wave-2 rows that outlive
     /// their casters). The manifest lists them with the ones above.
     late: RowScope = .{},
+    /// Other version strings a request may name for this policy (the same decide; what differs arrives as switches).
+    aliases: []const []const u8 = &.{},
+    /// The switch names a request may send in `policies.<team>.switches`, and the ones the policy reads. A switch the
+    /// policy does not read is accepted only at its production value (v08/util.zig Switches defaults).
+    switches: []const []const u8 = &.{},
+    switches_read: []const []const u8 = &.{},
 };
 
 /// Cards and rows a policy refuses.
@@ -476,7 +482,14 @@ pub fn writePolicy(w: *std.Io.Writer, p: PolicyScope) !void {
     try w.writeAll(if (p.refuse_revived) ",\"refusedRevived\":true" else ",\"refusedRevived\":false");
     try w.writeAll(if (p.refuse_artifact_rows) ",\"refusedArtifactRows\":true" else ",\"refusedArtifactRows\":false");
     try w.writeAll(if (p.refuse_smoke) ",\"refusedSmoke\":true" else ",\"refusedSmoke\":false");
-    try w.writeAll(if (p.refuse_fire_walls) ",\"refusedFireWalls\":true}" else ",\"refusedFireWalls\":false}");
+    try w.writeAll(if (p.refuse_fire_walls) ",\"refusedFireWalls\":true" else ",\"refusedFireWalls\":false");
+    try w.writeAll(",\"aliases\":");
+    try writeStrings(w, p.aliases);
+    try w.writeAll(",\"switches\":");
+    try writeStrings(w, p.switches);
+    try w.writeAll(",\"switchesRead\":");
+    try writeStrings(w, p.switches_read);
+    try w.writeByte('}');
 }
 
 /// The whole scope (every policy): the body `coverage` hashes.

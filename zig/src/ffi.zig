@@ -17,6 +17,7 @@ const rollout = @import("rollout.zig");
 const digest = @import("digest.zig");
 const ai = @import("ai.zig");
 const scope = @import("scope.zig");
+const v08util = @import("v08/util.zig");
 
 /// Bumped on any change to a signature, a struct layout or the request/snapshot format. 2: RolloutStats carries the
 /// summon counters; requests take v0.8 policies, the antithetic chance, the v1/v2 leaves and the counters. 3: requests
@@ -482,9 +483,12 @@ fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []
             return null;
         };
         const switches = rec.get(p, "switches");
-        if (switches == .object and switches.object.count() > 0) {
-            e.fail("unsupported request: switches for {s} (production switches only)", .{version.string});
-            return null;
+        if (switches != .null) {
+            var why_buf: [128]u8 = undefined;
+            if (parseSwitches(switches, rollout.scopeOf(version.string).?, &req.switches[team], &why_buf)) |why| {
+                e.fail("unsupported request: policies.{s}.switches: {s}", .{ k, why });
+                return null;
+            }
         }
         if (req.policies[team] == rollout.policyFor("v0.8")) {
             // v0.7's army profile comes from the strategy instance that models the team in the rollouts. One that never
@@ -796,6 +800,54 @@ comptime {
     for (POLICY_SCOPES, rollout.policies) |a, b| std.debug.assert(std.mem.eql(u8, a.name, b.version));
 }
 
+/// `policies.<team>.switches` ({name: bool}, the two release sets as lists of member names) into `out`, null when
+/// accepted. Only the policy's switch names are taken, and one it does not read (scope.switches_read) only at its
+/// production value, so a request never asks the library for a policy it does not play.
+fn parseSwitches(v: std.json.Value, ps: *const scope.PolicyScope, out: *v08util.Switches, buf: []u8) ?[]const u8 {
+    if (v != .object) return "must be an object";
+    var it = v.object.iterator();
+    while (it.next()) |entry| {
+        const name = entry.key_ptr.*;
+        const val = entry.value_ptr.*;
+        if (!listed(ps.switches, name)) return std.fmt.bufPrint(buf, "unknown switch {s} for {s}", .{ name, ps.name }) catch "unknown switch";
+        inline for (std.meta.fields(v08util.Switches)) |f| {
+            if (std.mem.eql(u8, f.name, name)) {
+                if (comptime f.type == bool) {
+                    if (val != .bool) return std.fmt.bufPrint(buf, "{s} must be a boolean", .{name}) catch "a switch must be a boolean";
+                    @field(out, f.name) = val.bool;
+                } else {
+                    if (val != .array) return std.fmt.bufPrint(buf, "{s} must be a list of names", .{name}) catch "a set must be a list";
+                    var set: f.type = .{};
+                    for (val.array.items) |item| {
+                        if (item != .string) return std.fmt.bufPrint(buf, "{s} must be a list of names", .{name}) catch "a set must be a list";
+                        var hit = false;
+                        inline for (std.meta.fields(f.type)) |g| {
+                            if (std.mem.eql(u8, g.name, item.string)) {
+                                @field(set, g.name) = true;
+                                hit = true;
+                            }
+                        }
+                        if (!hit) return std.fmt.bufPrint(buf, "unknown member {s} of {s}", .{ item.string, name }) catch "unknown member";
+                    }
+                    @field(out, f.name) = set;
+                }
+            }
+        }
+    }
+    const production = v08util.Switches{};
+    inline for (std.meta.fields(v08util.Switches)) |f| {
+        if (!std.meta.eql(@field(out.*, f.name), @field(production, f.name)) and !listed(ps.switches_read, f.name)) {
+            return std.fmt.bufPrint(buf, "{s} is not ported (only its production value)", .{f.name}) catch "a switch is not ported";
+        }
+    }
+    return null;
+}
+
+fn listed(names: []const []const u8, name: []const u8) bool {
+    for (names) |n| if (std.mem.eql(u8, n, name)) return true;
+    return false;
+}
+
 const Manifest = struct {
     coverage: [64]u8,
     /// Every policy (hoc_scope_manifest with no name).
@@ -1014,6 +1066,48 @@ test "build info and the scope manifest parse, and every policy's manifest share
     }
     try std.testing.expect(hoc_scope_manifest("v9", 2) == null);
     try std.testing.expectEqual(@as(f64, 1), hoc_exp(0));
+}
+
+fn switchCase(text: []const u8, ps: *const scope.PolicyScope, out: *v08util.Switches, buf: []u8) !?[]const u8 {
+    const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, text, .{});
+    defer parsed.deinit();
+    return parseSwitches(parsed.value, ps, out, buf);
+}
+
+test "policy switches: production values pass, unread ones refuse, read ones apply" {
+    var buf: [128]u8 = undefined;
+    const ex = std.testing.expectEqualStrings;
+    var out: v08util.Switches = .{};
+    try std.testing.expect(try switchCase("{}", &rollout.V08_SCOPE, &out, &buf) == null);
+    try std.testing.expect(std.meta.eql(out, v08util.Switches{}));
+    try std.testing.expect(try switchCase("{\"decoy_aware\":true,\"role_release\":[],\"mage_damage_kill_priority\":false,\"engine_reachable_routes\":true}", &rollout.V08_SCOPE, &out, &buf) == null);
+    try ex("decoy_aware is not ported (only its production value)", (try switchCase("{\"decoy_aware\":false}", &rollout.V08_SCOPE, &out, &buf)).?);
+    out = .{};
+    try ex("support_roles is not ported (only its production value)", (try switchCase("{\"support_roles\":false}", &rollout.V08_SCOPE, &out, &buf)).?);
+    try ex("unknown switch nope for v0.8", (try switchCase("{\"nope\":true}", &rollout.V08_SCOPE, &out, &buf)).?);
+    try ex("decoy_aware must be a boolean", (try switchCase("{\"decoy_aware\":1}", &rollout.V08_SCOPE, &out, &buf)).?);
+    try ex("unknown member x of role_release", (try switchCase("{\"role_release\":[\"healer_sustain\",\"x\"]}", &rollout.V08_SCOPE, &out, &buf)).?);
+    try ex("unknown switch decoy_aware for v0.1", (try switchCase("{\"decoy_aware\":true}", &rollout.V01_SCOPE, &out, &buf)).?);
+    out = .{};
+    try std.testing.expect(try switchCase("{\"engine_reachable_routes\":true}", &rollout.V01_SCOPE, &out, &buf) == null);
+    try ex("engine_reachable_routes is not ported (only its production value)", (try switchCase("{\"engine_reachable_routes\":false}", &rollout.V01_SCOPE, &out, &buf)).?);
+    // Once a switch is read, its other values apply.
+    const reads = scope.PolicyScope{ .name = "v0.8", .switches = &rollout.SWITCH_NAMES, .switches_read = &.{ "decoy_aware", "role_release" } };
+    out = .{};
+    try std.testing.expect(try switchCase("{\"decoy_aware\":false,\"role_release\":[\"healer_sustain\"]}", &reads, &out, &buf) == null);
+    try std.testing.expect(!out.decoy_aware and out.role_release.healer_sustain and !out.role_release.blacksmith_craft);
+    // v0.8s is the v0.8 decide and scope.
+    try std.testing.expect(rollout.policyFor("v0.8s").? == rollout.policyFor("v0.8").?);
+    try ex("v0.8", rollout.scopeOf("v0.8s").?.name);
+    try std.testing.expect(rollout.scopeOf("v0.9") == null);
+    // The manifest names them.
+    const text = std.mem.span(hoc_scope_manifest("v0.8", 4).?);
+    const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, text, .{});
+    defer parsed.deinit();
+    const pol = parsed.value.object.get("scope").?.object.get("policies").?.object.get("v0.8").?.object;
+    try ex("v0.8s", pol.get("aliases").?.array.items[0].string);
+    try std.testing.expectEqual(rollout.SWITCH_NAMES.len, pol.get("switches").?.array.items.len);
+    try std.testing.expectEqual(@as(usize, 0), pol.get("switchesRead").?.array.items.len);
 }
 
 test "the engine request field: match plays, server waits for its build, anything else is malformed" {

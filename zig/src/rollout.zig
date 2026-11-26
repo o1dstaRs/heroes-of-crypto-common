@@ -57,6 +57,16 @@ pub const policies = [_]Policy{
 
 pub fn policyFor(version: []const u8) ?DecideFn {
     for (policies) |p| if (std.mem.eql(u8, p.version, version)) return p.decide;
+    for (V08_SCOPE.aliases) |a| if (std.mem.eql(u8, a, version)) return v08policy.decideV08;
+    return null;
+}
+
+/// The scope of the policy `version` names (an alias included), null for an unknown one.
+pub fn scopeOf(version: []const u8) ?*const scope.PolicyScope {
+    for ([_]*const scope.PolicyScope{ &V01_SCOPE, &V08_SCOPE }) |p| {
+        if (std.mem.eql(u8, p.name, version)) return p;
+        for (p.aliases) |a| if (std.mem.eql(u8, a, version)) return p;
+    }
     return null;
 }
 
@@ -132,10 +142,31 @@ pub const V08_SCOPE = scope.PolicyScope{
     // refusals).
     .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit() & ~st.AbilityId.water_element.bit() & ~st.AbilityId.water_shield.bit() & ~st.AbilityId.wind_element.bit() & ~st.AbilityId.chain_lightning.bit() & ~st.AbilityId.fire_element.bit() & ~st.AbilityId.enchanted_skin.bit() & ~st.AbilityId.fire_breath.bit() & ~st.AbilityId.dense_flesh.bit() & ~st.AbilityId.flesh_shield_aura.bit() & ~st.AbilityId.made_of_fire.bit() & ~st.AbilityId.fire_shield.bit(),
     .refused_buffs = &.{},
+    // v0.8s is the v0.8 decide; its version-scoped features (support roles, ranged positioning, ...) arrive as switches.
+    .aliases = &.{"v0.8s"},
+    .switches = &SWITCH_NAMES,
+    .switches_read = &SWITCHES_READ,
 };
 
 /// The v0.1 policy takes every board the loader takes.
-pub const V01_SCOPE = scope.PolicyScope{ .name = "v0.1" };
+pub const V01_SCOPE = scope.PolicyScope{
+    .name = "v0.1",
+    // A19_ENGINE_REACHABLE_ROUTES_<SIDE> is the only switch StrategyV0_1 reads; its off branch is not ported yet.
+    .switches = &.{"engine_reachable_routes"},
+};
+
+/// Every switch of the v0.8 rollout policy (v08/util.zig Switches), in declaration order.
+pub const SWITCH_NAMES = blk: {
+    const fields = std.meta.fields(v08util.Switches);
+    var names: [fields.len][]const u8 = undefined;
+    for (fields, 0..) |f, i| names[i] = f.name;
+    const out = names;
+    break :blk out;
+};
+
+/// The switches src/v08 reads. A request may set any other only to its production value (the policy plays that one);
+/// a switch joins this list in the commit that ports its reads.
+pub const SWITCHES_READ = [_][]const u8{};
 
 fn v08Castable(spell: u8) bool {
     for (V08_SCOPE.castable.?) |c| {
@@ -238,6 +269,8 @@ pub const Request = struct {
     /// v0.7's isAuraSaturatedArmy per team from the same profile (util.Battle.aura_saturated): every starting stack
     /// emits an aura, so v0.7 plays its standalone v0.4 anchor. False for a team without a profile.
     aura_saturated: [3]bool = .{ false, false, false },
+    /// Each team's rollout-policy switches (`policies.<team>.switches`; util.Battle.switches, production defaults).
+    switches: [3]v08util.Switches = .{ .{}, .{}, .{} },
     /// The summon counters the first rollout starts from (runMatch's createSummonedUnit counter, lib.ts
     /// deterministicUuidSequence) and the summon id scheme; null = the root state's.
     summon_sequence: ?u32 = null,
@@ -473,6 +506,7 @@ const Tables = struct {
     ident: *const Identity = undefined,
     melee_magic: [3]u8 = .{ 0, 0, 0 },
     aura_saturated: [3]bool = .{ false, false, false },
+    switches: [3]v08util.Switches = .{ .{}, .{}, .{} },
     root: v08util.Battle = .{},
     root_uid: u8 = 0,
     built_uid: u8 = 0,
@@ -486,7 +520,9 @@ const Tables = struct {
         self.ident = req.identity.?;
         self.melee_magic = req.melee_magic;
         self.aura_saturated = req.aura_saturated;
+        self.switches = req.switches;
         self.root = battleTable(root, self.ident, self.melee_magic, self.aura_saturated);
+        self.root.switches = self.switches;
         self.root_uid = root.next_uid;
         self.built_uid = root.next_uid;
         v08util.battle = self.root;
@@ -501,6 +537,7 @@ const Tables = struct {
     fn sync(self: *Tables, s: *const State) void {
         if (!self.on or s.next_uid == self.built_uid) return;
         v08util.battle = battleTable(s, self.ident, self.melee_magic, self.aura_saturated);
+        v08util.battle.switches = self.switches;
         self.built_uid = s.next_uid;
     }
 };
