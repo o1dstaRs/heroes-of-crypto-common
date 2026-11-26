@@ -126,10 +126,10 @@ pub const V08_CASTABLE = [_]st.CastSpell{
 pub const V08_SCOPE = scope.PolicyScope{
     .name = "v0.8",
     .castable = &V08_CASTABLE,
-    // Batch 6b: src/v08 has no 6b support yet, so its cards (stolen ones too) and the rows that outlive their source.
-    // Castling is in src/v08 (3193517c: candidates, the caster router, the destination cells).
-    .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit(),
-    .refused_buffs = &.{ .water_shield, .flesh_shield_aura },
+    // Batch 6b: the cards (stolen ones too) and rows src/v08 does not cover yet. Covered: Castling (3193517c: candidates,
+    // the caster router, the destination cells) and the Mermaid's Water Element and Water Shield (73ffe9a5).
+    .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit() & ~st.AbilityId.water_element.bit() & ~st.AbilityId.water_shield.bit(),
+    .refused_buffs = &.{.flesh_shield_aura},
     .refuse_fire_walls = true,
     .late = .{ .abilities = st.AbilityId.time_denial.bit() },
 };
