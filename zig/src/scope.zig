@@ -13,10 +13,31 @@ pub const Field = struct { key: []const u8, what: []const u8 };
 
 /// Unit fields (`units[].fields.<key>`) that must be empty: undefined, false, 0, "", [] or {} (snapshot.requireEmpty).
 /// (Warlord's Edge's warlordsEdgeAttackBase / warlordsEdgeAppliedAttackBonus are loaded since the artifacts port, War
-/// Anger's currentAttackModIncrease since batch 6a.)
+/// Anger's currentAttackModIncrease since batch 6a.) The Mermaid's waterShieldSpent waits for her slice of batch 6b
+/// (REFUSED_ABILITIES).
 pub const REFUSED_UNIT_FIELDS = [_]Field{
     .{ .key = "waterShieldSpent", .what = "Water Shield spent" },
 };
+
+/// Batch 6b lands creature by creature. st.AbilityId names every batch-6b card and the engine code behind them is in
+/// place, but only the Harpy's Castling (Shadow Touch is batch 1's) is checked: the loader refuses the other cards by
+/// name, active or stolen (snapshot.loadUnit), and the manifest leaves them out of `abilities`, as for a name the port
+/// does not know. Each later slice takes its creature's cards out of this mask.
+pub const REFUSED_ABILITIES: st.AbilityMask = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit();
+
+/// The applied rows of the refused batch-6b cards (the Mermaid's Water Shield, the Abomination's Flesh Shield aura row):
+/// refused by name in the applied lists and left out of the manifest's `applied` and `auraEffects`.
+pub const REFUSED_ROWS = [_]st.SpellId{ .water_shield, .flesh_shield_aura };
+
+/// Whether the loader takes card `id` (not in REFUSED_ABILITIES).
+pub inline fn abilityLoaded(id: st.AbilityId) bool {
+    return id.bit() & REFUSED_ABILITIES == 0;
+}
+
+/// Whether the loader takes applied row `id` (not in REFUSED_ROWS).
+pub fn rowLoaded(id: st.SpellId) bool {
+    return !listed(&REFUSED_ROWS, id);
+}
 
 /// Unit fields refused when the field is present and its `inner` part is too (neither undefined nor null), refused as
 /// `what`: a Last Fuse fatal hit with a source (the striker's row) is pending state; a sourceless one (a corpse a step
@@ -310,14 +331,14 @@ fn writeArtifactIds(w: *std.Io.Writer, tier: usize) !void {
     try w.writeByte(']');
 }
 
-/// The aura effects the loader interns: the X of every applied-spell row named "X Aura".
+/// The aura effects the loader interns: the X of every applied-spell row named "X Aura" (REFUSED_ROWS left out).
 fn writeAuraEffects(w: *std.Io.Writer) !void {
     try w.writeByte('[');
     var first = true;
     inline for (std.meta.fields(st.SpellId)) |f| {
         const id: st.SpellId = @enumFromInt(f.value);
         const n = id.name();
-        if (std.mem.endsWith(u8, n, " Aura")) {
+        if (std.mem.endsWith(u8, n, " Aura") and rowLoaded(id)) {
             if (!first) try w.writeByte(',');
             first = false;
             try writeString(w, n[0 .. n.len - " Aura".len]);
@@ -338,11 +359,11 @@ fn writeFields(w: *std.Io.Writer, fields: []const Field) !void {
 /// The loader's scope (snapshot.load): what an exported root may hold.
 pub fn writeLoader(w: *std.Io.Writer, snapshot_format: i64) !void {
     try w.print("{{\"format\":{d},\"abilities\":", .{snapshot_format});
-    try writeEnumNames(w, st.AbilityId, null);
+    try writeEnumNames(w, st.AbilityId, ~REFUSED_ABILITIES);
     try w.writeAll(",\"auraEffects\":");
     try writeAuraEffects(w);
     try w.writeAll(",\"applied\":");
-    try writeEnumNames(w, st.SpellId, null);
+    try writeSpellIds(w, rowLoaded);
     try w.writeAll(",\"spells\":");
     try writeEnumNames(w, st.CastSpell, null);
     try w.writeAll(",\"spellEntryPrefixes\":");
@@ -486,7 +507,13 @@ test "the manifest names the loader's tables and hashes stably" {
     const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, text, .{});
     defer parsed.deinit();
     const loader = parsed.value.object.get("loader").?;
-    try std.testing.expectEqual(@as(usize, std.meta.fields(st.AbilityId).len), loader.object.get("abilities").?.array.items.len);
+    try std.testing.expectEqual(@as(usize, std.meta.fields(st.AbilityId).len - @popCount(REFUSED_ABILITIES)), loader.object.get("abilities").?.array.items.len);
+    try std.testing.expectEqual(@as(usize, std.meta.fields(st.SpellId).len - REFUSED_ROWS.len), loader.object.get("applied").?.array.items.len);
+    for (loader.object.get("abilities").?.array.items) |n| try std.testing.expect(!std.mem.eql(u8, n.string, "Water Shield"));
+    for (loader.object.get("auraEffects").?.array.items) |n| try std.testing.expect(!std.mem.eql(u8, n.string, "Flesh Shield"));
+    var castling = false;
+    for (loader.object.get("abilities").?.array.items) |n| castling = castling or std.mem.eql(u8, n.string, "Castling");
+    try std.testing.expect(castling);
     try std.testing.expectEqualStrings("Venom Cloud", loader.object.get("auraEffects").?.array.items[0].string);
     const refused = parsed.value.object.get("policies").?.object.get("v0.8").?.object.get("refusedAbilities").?.array.items;
     try std.testing.expectEqual(@as(usize, @popCount(st.AbilityId.BATCH6A_MASK)), refused.len);

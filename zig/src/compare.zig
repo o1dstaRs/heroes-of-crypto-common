@@ -340,15 +340,17 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
         }
         // Setup columns (recordings with augments or synergies): the Sniper shot distance and the two bases Bitter
         // Experience moves (column 47 is a number: shot_distance; the batch-3 columns start with a string). Then the
-        // batch-3 columns (digest.ts: 5), the spellbook columns (2), the batch-4 forbidden target (1) and Helping Hand's
-        // link (1, with the spellbook and forbidden columns): after the setup columns a row has 0, 5 (batch 3), 6 (batch 3
-        // and 4), 7 (spells), 8 (spells and batch 4) or 9 (spells, batch 4 and the link) more.
+        // batch-3 columns (digest.ts: 5), the spellbook columns (2), the batch-4 forbidden target (1), Helping Hand's
+        // link (1, with the spellbook and forbidden columns) and batch 6b's two (with all of those): after the setup
+        // columns a row has 0, 5 (batch 3), 6 (batch 3 and 4), 7 (spells), 8 (spells and batch 4), 9 (spells, batch 4
+        // and the link) or 11 (and batch 6b) more.
         const has_setup = row.len >= 50 and row[47] != .string;
         const extra: usize = row.len -| @as(usize, if (has_setup) 50 else 47);
         const has_b3 = extra >= 5;
         const has_spells = extra >= 7;
         const has_b4 = extra == 6 or extra >= 8;
         const has_link = extra >= 9;
+        const has_b6b = extra >= 11;
         const setup_cols = [_]struct { []const u8, f64, usize }{
             .{ "shot_distance", u.shot_distance, 47 },
             .{ "base_armor_init", u.init.base_armor, 48 },
@@ -395,6 +397,16 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
                 });
                 if (want != u.forbidden) {
                     m.set("unit {d} forbidden_target: zig {d}, ts {d}", .{ idx, u.forbidden, want });
+                    return false;
+                }
+            }
+            if (has_b6b) {
+                if (!eqNum(flag(u.water_shield_spent), rec.num(row[b + 9]))) {
+                    m.set("unit {d} water_shield_spent: zig {}, ts {d}", .{ idx, u.water_shield_spent, rec.num(row[b + 9]) });
+                    return false;
+                }
+                if (!eqNum(u.magic_resist_mod, rec.num(row[b + 10]))) {
+                    m.set("unit {d} magic_resist_mod: zig {d}, ts {d}", .{ idx, u.magic_resist_mod, rec.num(row[b + 10]) });
                     return false;
                 }
             }
@@ -508,6 +520,30 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
                 m.set("fight fire wall {d}: zig ({d},{d}) laps {d} share {d}, ts ({d},{d}) laps {d} share {d}", .{ i, c.x, c.y, c.laps, pct, rec.int(a[0]), rec.int(a[1]), rec.int(a[2]), rec.num(a[3]) });
                 return false;
             }
+        }
+    }
+    // Lava (batch-6b recordings): the board's "L" cells, x-major (a Made of Fire unit stands on them; a death erases one).
+    const lava = rec.get(f, "lava");
+    if (lava == .array) {
+        var nl: usize = 0;
+        for (0..st.GRID) |x| {
+            for (0..st.GRID) |y| {
+                if (s.grid.board[x][y] != st.LAVA) continue;
+                if (nl >= lava.array.items.len) {
+                    m.set("fight lava: zig has ({d},{d}) past ts's {d} cells", .{ x, y, lava.array.items.len });
+                    return false;
+                }
+                const a = lava.array.items[nl].array.items;
+                if (rec.int(a[0]) != x or rec.int(a[1]) != y) {
+                    m.set("fight lava {d}: zig ({d},{d}), ts ({d},{d})", .{ nl, x, y, rec.int(a[0]), rec.int(a[1]) });
+                    return false;
+                }
+                nl += 1;
+            }
+        }
+        if (nl != lava.array.items.len) {
+            m.set("fight lava: zig {d} cells, ts {d}", .{ nl, lava.array.items.len });
+            return false;
         }
     }
     // Terrain (recordings of LAVA_CENTER / BLOCK_CENTER or side boards): hit counters, cleared sides, the dried

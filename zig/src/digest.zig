@@ -231,7 +231,11 @@ pub fn write(w: *Writer, s: *const State, ids: []const []const u8) Writer.Error!
         if (u.hh_caster != st.NO_UID) try w.writeAll(if (u.hh_caster < ids.len) ids[u.hh_caster] else uidText(s, u.hh_caster, &id_buf));
         try w.writeByte(';');
         if (u.hh_penalty != st.NO_UID) try w.writeAll(if (u.hh_penalty < ids.len) ids[u.hh_penalty] else uidText(s, u.hh_penalty, &id_buf));
-        try w.writeAll("\"]");
+        try w.writeAll("\"");
+        // Batch-6b columns: the spent Water Shield flag and magic_resist_mod (Enchanted Skin's 100).
+        try w.print(",{d},", .{@intFromBool(u.water_shield_spent)});
+        try num(w, u.magic_resist_mod);
+        try w.writeByte(']');
     }
     const f = &s.fight;
     try w.print("],\"fight\":{{\"lap\":{d},\"started\":{d},\"finished\":{d},\"firstTurnMade\":{d},\"previousTurnTeam\":{d},\"highestInitiative\":", .{
@@ -286,6 +290,17 @@ pub fn write(w: *Writer, s: *const State, ids: []const []const u8) Writer.Error!
         try w.print("[{d},{d},{d},", .{ c.x, c.y, c.laps });
         try num(w, @as(f64, @floatFromInt(c.pct10)) / 10);
         try w.writeByte(']');
+    }
+    // The board's lava cells (x-major), which a death on lava erases and a unit leaving a centre cell restores.
+    try w.writeAll("],\"lava\":[");
+    var first_lava = true;
+    for (0..st.GRID) |x| {
+        for (0..st.GRID) |y| {
+            if (s.grid.board[x][y] != st.LAVA) continue;
+            if (!first_lava) try w.writeByte(',');
+            first_lava = false;
+            try w.print("[{d},{d}]", .{ x, y });
+        }
     }
     const t = &s.grid.terrain;
     try w.print("],\"terrain\":{{\"hitsL\":{d},\"hitsR\":{d},\"leftCleared\":{d},\"rightCleared\":{d},\"cleanedUpCenter\":{d},\"standing\":[", .{

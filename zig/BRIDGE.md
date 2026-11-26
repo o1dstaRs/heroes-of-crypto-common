@@ -312,11 +312,13 @@ Scope of the v0.8 policy (`rollout.v08Scope`, checked on the root; no spell outs
 no burning cell can appear inside a rollout from a root without one): src/v08 covers batches 1 to 5 and 6a with
 revived units, the artifact rows, smoke, and every wave-1 and wave-2 cast but Fire Wall, so a request with a v0.8 seat
 is refused when any holder unit holds a book entry or parsed spell outside the whitelist `rollout.V08_CASTABLE` (every
-`st.CastSpell` but Fire Wall: a spell added to `st.CastSpell` later is refused until it joins the list) or holds Time
-Denial (`V08_SCOPE.late`), or when the board has a burning cell. Fire Wall waits for v0.1's
+`st.CastSpell` but Fire Wall and Castling: a spell added to `st.CastSpell` later is refused until it joins the list),
+holds a batch-6b card or carries its row (`V08_SCOPE.refused_abilities` = `BATCH6B_MASK`, `refused_buffs`: the Harpy's
+Castling, a Queen thief's too, until src/v08 decides it) or holds Time Denial (`V08_SCOPE.late`), or when the board has
+a burning cell. Fire Wall waits for v0.1's
 projectPostMoveActorAvailability (v0_1.ts), which `ai.zig` does not port yet: a mindless unit (Berserker, Frenzied
 Boar) plays v0.1 on a board where v0.8 cast walls. The v0.1 policy takes every board the engine port loads, batches 5
-and 6a included. Candidates may be any action the engine replays,
+and 6a and the Harpy included. Candidates may be any action the engine replays,
 `area_throw_attack` and the free-aim `range_attack` included. The two refusals for
 src/v08 gaps (a removed unit in alreadyMadeTurn, an Angel or Queen with a synergy aura range) are gone: its owner fixed
 them (common `d5fddea9`, `6e6aff54`), and the holder-ordered copy the learned leaves were scored on went with them.
@@ -396,7 +398,7 @@ loader and `rollout.v08Scope` refuse by (`src/scope.zig`, the AbilityId / SpellI
                          "boardCodes": ["", "B", "L", "H"], "stackingEffect": "Poison",
                          "storedPropertyBuffs": [...], "artifacts": { "tier1": [0, 1, ...], "tier2": [0, 1, ...] },
                          "artifactRows": { "buffs": [...], "debuffs": ["Gravebound"] },
-                         "capacities": { "units": 32, "ids": 255, "abilities": 10, "barrels": 4, ... },
+                         "capacities": { "units": 32, "ids": 255, "abilities": 12, "barrels": 4, ... },
                          "refuse": { "unitFields": [...], "unitFieldParts": ["lastFuseFatalHit.source"],
                                      "unitProps": [...],
                                      "unitPropsLimited": { "artifact_granted_abilities": ["Deep Wounds Level 1"] },
@@ -408,8 +410,9 @@ loader and `rollout.v08Scope` refuse by (`src/scope.zig`, the AbilityId / SpellI
              "actions": [...] } }
 ```
 
-`applied` lists every name a buff, debuff or effect row may carry; `castable: null` means every spell the loader
-takes. `artifacts` lists the Tier-1 and Tier-2 ids the port plays (`artifacts.supportedT1/T2`; 0 is no artifact);
+`applied` lists every name a buff, debuff or effect row may carry and `abilities` every card a unit may hold (active
+or stolen): the enums minus the batch-6b names the loader still refuses (`scope.REFUSED_ABILITIES`, `REFUSED_ROWS`,
+also left out of `auraEffects`); `castable: null` means every spell the loader takes. `artifacts` lists the Tier-1 and Tier-2 ids the port plays (`artifacts.supportedT1/T2`; 0 is no artifact);
 `storedPropertyBuffs` the buff rows whose stored properties are loaded besides the aura rows (the augments and every
 artifact row but Keen Blade's), each an integer 0..`storedProperty` or undefined; `artifactRows` the rows that make a
 board an artifact board (`State.artifacts`), which a policy with `refusedArtifactRows` refuses (`refusedSmoke` and
@@ -439,6 +442,7 @@ them, so a porter changes the table and nothing else on the bridge side:
 | The port now plays | Edit |
 | --- | --- |
 | an ability, aura, buff, debuff or effect | its `AbilityId` / `SpellId` (the loader interns by name; the manifest lists the enums) |
+| a batch-6b creature (its slice) | take its cards out of `scope.REFUSED_ABILITIES` and its rows out of `REFUSED_ROWS` (the Mermaid: `waterShieldSpent` out of `REFUSED_UNIT_FIELDS`); v0.8 seats stay refused by `V08_SCOPE.refused_abilities` (`BATCH6B_MASK`) until src/v08 covers them |
 | a spell | its `st.CastSpell` entry; for v0.8 seats also `rollout.V08_CASTABLE` once src/v08 decides it |
 | a unit field or prop that was refused | drop it from `REFUSED_UNIT_FIELDS` / `REFUSED_UNIT_PROPS` and read it in snapshot.zig |
 | more names in a limited list (artifact-granted cards) | `LIMITED_UNIT_PROPS[..].accepted` |

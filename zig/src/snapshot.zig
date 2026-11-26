@@ -535,6 +535,12 @@ fn loadLists(u: *Unit, fields: Value, props: Value, why: *Why) Error!void {
     u.buffs = engine.loadSpells(@TypeOf(u.buffs), props, "buffs") catch |err| return spellError(err, why);
     u.debuffs = engine.loadSpells(@TypeOf(u.debuffs), props, "debuffs") catch |err| return spellError(err, why);
     u.effects = engine.loadSpells(@TypeOf(u.effects), props, "effects") catch |err| return spellError(err, why);
+    // The rows of the batch-6b cards not checked yet (scope.REFUSED_ROWS), as for an unknown name.
+    for ([_][]const st.AppliedSpell{ u.buffs.items[0..u.buffs.len], u.debuffs.items[0..u.debuffs.len], u.effects.items[0..u.effects.len] }) |rows| {
+        for (rows) |a| {
+            if (!scope.rowLoaded(a.id)) return why.unsupported("buff, debuff or effect {s}", .{a.id.name()});
+        }
+    }
     const lists = [_]struct { []const u8, []const st.AppliedSpell }{
         .{ "buffs", u.buffs.items[0..u.buffs.len] },
         .{ "debuffs", u.debuffs.items[0..u.debuffs.len] },
@@ -762,6 +768,15 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
         error.TooManyAbilities => why.unsupported("more abilities than the port holds", .{}),
         else => why.malformed("abilities: {s}", .{@errorName(err)}),
     };
+    // The batch-6b cards not checked yet (scope.REFUSED_ABILITIES), active or stolen, as for an unknown name.
+    if (u.ability_mask & scope.REFUSED_ABILITIES != 0) {
+        for (u.abilities[0..u.n_abilities]) |a| {
+            if (!scope.abilityLoaded(a.id)) return why.unsupported("ability {s}", .{a.id.name()});
+        }
+    }
+    for (u.stolen[0..u.n_stolen]) |id| {
+        if (!scope.abilityLoaded(id)) return why.unsupported("ability {s}", .{id.name()});
+    }
     engine.loadAuras(configs, props, s, u) catch |err| return switch (err) {
         error.UnsupportedAura => why.unsupported("aura {s}", .{engine.unsupported_name}),
         else => why.malformed("auras: {s}", .{@errorName(err)}),
@@ -773,6 +788,13 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
     for (aura_objects) |o| {
         const ap = get(o, "auraEffectProperties");
         if (std.mem.eql(u8, try string(get(ap, "name"), why, "auraEffectProperties"), "War Anger")) u.war_anger_power = try number(get(ap, "power"), why, "War Anger power");
+        // Flesh Shield's emitter power (the redirect reads it; a Broken emitter keeps a stale one).
+        if (std.mem.eql(u8, try string(get(ap, "name"), why, "auraEffectProperties"), "Flesh Shield")) u.flesh_power = try number(get(ap, "power"), why, "Flesh Shield power");
+    }
+    // Water Shield's hidden state: waterShieldSpent (undefined or false for a unit that never absorbed).
+    {
+        const ws = get(fields, "waterShieldSpent");
+        u.water_shield_spent = !isUndefined(ws) and try boolean(ws, why, "waterShieldSpent");
     }
 
     const target = get(props, "target");

@@ -114,6 +114,11 @@ const BATCH4 = BATCH4_CREATURES.some((name) => KEEP.has(name));
  * charge, so it counts as a kept spellbook. */
 const BATCH6A_CREATURES = ["Dryad", "Valkyrie", "Angel", "Champion", "Wolf Rider", "Unicorn", "Mantis"];
 const BATCH6A = BATCH6A_CREATURES.some((name) => KEEP.has(name));
+/** The batch-6b creatures: keeping any turns on the batch-3, spellbook and batch-4 columns and adds two unit columns
+ * (`water_shield_spent`, `magic_resist_mod`) and the fight's `lava` cells; the Harpy's castable Castling holds a charge,
+ * so it counts as a kept spellbook. */
+const BATCH6B_CREATURES = ["Harpy", "Mermaid", "Efreet", "Black Dragon", "Abomination", "Thunderbird"];
+const BATCH6B = BATCH6B_CREATURES.some((name) => KEEP.has(name));
 /** A kept creature with a spellbook (or RECORD_SPELLS set): the spellbook digest columns and spell configs are written.
  * A kept batch-4 creature with a castable card (Behemoth's Battle Roar, Troll's Wild Regeneration) holds a charge too. */
 let keptSpellbook = false;
@@ -123,7 +128,9 @@ for (const [faction, creatures] of Object.entries(creaturesJson as Record<string
         if (KEEP.has(name)) {
             if (STRIP.size) creature.abilities = creature.abilities.filter((card: string) => !STRIP.has(card));
             if (
-                (BATCH4_CREATURES.includes(name) || BATCH6A_CREATURES.includes(name)) &&
+                (BATCH4_CREATURES.includes(name) ||
+                    BATCH6A_CREATURES.includes(name) ||
+                    BATCH6B_CREATURES.includes(name)) &&
                 creature.abilities.some((card: string) => getAbilityConfig(card)?.can_be_cast)
             ) {
                 keptSpellbook = true;
@@ -537,14 +544,14 @@ const SUMMON_CREATURES = ["Arachna Spider", "Arachna Queen"];
 // (keyed by name; the System "Vine Throw" config too, which the snare reads) and, when a unit holds a summon spell,
 // the "Wolf" summon template. A Trent-only battle (Vine Throw is a castable ability, not a book) sets RECORD_SPELLS to
 // get the columns.
-const SPELLS = keptSpellbook || SPELL_KEEP !== undefined;
+const SPELLS = keptSpellbook || SPELL_KEEP !== undefined || BATCH6B;
 // ---- batch 4 ----
 // Keeping any batch-4 creature turns on the batch-3 columns (the active and stolen lists move with gifts and steals;
 // `debuffs_sources` names the Range Null Field row's source) and adds `forbidden_target` (Terrifying Gaze's lock, the
 // gazer's id or "") as the last unit column. A start state holding Disguise Aura gains the System "Hidden" and
 // "Visible" configs in `spellConfigs`. Under a RECORD_VERSION other than v0.1, a mindless unit's ("AI Driven")
 // decisions, which runMatch makes with StrategyV0_1, are recorded as decide steps marked `v: "v0.1"`.
-const BATCH3_COLUMNS = BATCH3 || SPELLS || BATCH4 || BATCH6A;
+const BATCH3_COLUMNS = BATCH3 || SPELLS || BATCH4 || BATCH6A || BATCH6B;
 // ---- batch 5 ----
 // No new digest column. A start state holding a Spit Ball card gains the seven debuffs' configs in `spellConfigs` (they
 // are applied by an ability, so no book names them) and the .meta.json gains `spit`; a start-state unit holding Sniper
@@ -562,16 +569,24 @@ const holdsCard = (name: string): boolean =>
 const SPIT = holdsCard("Spit Ball");
 const SPELL_SUMMON_CREATURES = ["Wolf"];
 
-const DIGEST_FIELDS = digestFields(SETUP, BATCH3 || BATCH4 || BATCH6A, SPELLS, BATCH4, SPELLS);
+const DIGEST_FIELDS = digestFields(
+    SETUP,
+    BATCH3 || BATCH4 || BATCH6A || BATCH6B,
+    SPELLS,
+    BATCH4 || BATCH6B,
+    SPELLS,
+    BATCH6B,
+);
 
 function digest(ctx: Ctx): { units: unknown[][]; fight: Record<string, unknown> } {
     return battleDigest(ctx, {
         setup: SETUP,
         terrain: TERRAIN,
-        batch3: BATCH3 || BATCH6A,
+        batch3: BATCH3 || BATCH6A || BATCH6B,
         spells: SPELLS,
-        batch4: BATCH4,
+        batch4: BATCH4 || BATCH6B,
         helpingHand: SPELLS,
+        batch6b: BATCH6B,
     });
 }
 
@@ -793,11 +808,23 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
             break;
         }
     }
-    // Artifacts: a Lava Striders army's lava routes apply the System "Made of Fire" buff.
+    // Artifacts: a Lava Striders army's lava routes apply the System "Made of Fire" buff; so do the Efreet's (batch 6b:
+    // a Made of Fire card holder).
     for (const u of ctx.unitsHolder.getAllUnits().values()) {
         const names = u.getUnitProperties().applied_buffs as string[];
-        if (names.includes("Lava Striders") || names.includes("Made of Fire")) {
+        if (
+            names.includes("Lava Striders") ||
+            names.includes("Made of Fire") ||
+            u.getUnitProperties().abilities.includes("Made of Fire")
+        ) {
             spellConfigs["Made of Fire"] = JSON.parse(JSON.stringify(getSpellConfig("System", "Made of Fire")));
+            break;
+        }
+    }
+    // Batch 6b: the System "Water Shield" a holder of the card is seeded with (a Queen that steals it).
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        if (u.getUnitProperties().abilities.includes("Water Shield")) {
+            spellConfigs["Water Shield"] = JSON.parse(JSON.stringify(getSpellConfig("System", "Water Shield")));
             break;
         }
     }
@@ -1125,6 +1152,11 @@ function main(): void {
                         forcedCastCount += 1;
                         return [{ type: "cast_spell", casterId: unit.getId(), spellName: name }];
                     }
+                    // Castling (ENEMY_WITHIN_MOVEMENT_RANGE) reads runMatch's eager movement-range hook, as castSpell does.
+                    const reach =
+                        targetType === STT.ENEMY_WITHIN_MOVEMENT_RANGE
+                            ? context.getCurrentEnemiesCellsWithinMovementRange?.()
+                            : undefined;
                     const ok = (t: any) =>
                         SH.canCastSpell(
                             false,
@@ -1137,7 +1169,7 @@ function main(): void {
                             t.getMagicResist(),
                             t.hasMindAttackResistance(),
                             t.canBeHealed(),
-                            undefined,
+                            reach,
                         );
                     let pool: any[];
                     if (spell.isBuff()) {

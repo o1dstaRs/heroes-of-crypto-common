@@ -20,6 +20,9 @@ export interface IDigestOptions {
     batch4?: boolean;
     /** Helping Hand's link column ("caster id;penalty id"), after the forbidden target (which it turns on); with `spells`. */
     helpingHand?: boolean;
+    /** Batch 6b (with `spells` on; it turns the forbidden target and the link on): the spent Water Shield flag and
+     * magic_resist_mod (Enchanted Skin) after the link, and the fight's lava cells. */
+    batch6b?: boolean;
 }
 
 export function unitDigest(
@@ -29,6 +32,7 @@ export function unitDigest(
     spells = false,
     batch4 = false,
     helpingHand = false,
+    batch6b = false,
 ): unknown[] {
     const p = u.getUnitProperties();
     const c = u.getBaseCell();
@@ -112,9 +116,12 @@ export function unitDigest(
               ]
             : []),
         // Batch-4 column: Terrifying Gaze's lock (the gazer's id; TypeScript keeps it after the gazer dies).
-        ...(batch4 || helpingHand ? [p.forbidden_target ?? ""] : []),
+        ...(batch4 || helpingHand || batch6b ? [p.forbidden_target ?? ""] : []),
         // Helping Hand's link: the caster's and the penalty unit's ids.
-        ...(helpingHand ? [`${p.helping_hand_caster_id ?? ""};${p.helping_hand_penalty_id ?? ""}`] : []),
+        ...(helpingHand || batch6b ? [`${p.helping_hand_caster_id ?? ""};${p.helping_hand_penalty_id ?? ""}`] : []),
+        // Batch-6b columns: Unit.waterShieldSpent (the seeding refresh reads it) and magic_resist_mod (Enchanted Skin's
+        // 100, which getMagicResist answers with; the magic_resist column is then the unfolded base).
+        ...(batch6b ? [u.waterShieldSpent ? 1 : 0, p.magic_resist_mod ?? 0] : []),
     ];
 }
 
@@ -125,6 +132,7 @@ export function digestFields(
     spells = false,
     batch4 = false,
     helpingHand = false,
+    batch6b = false,
 ): string[] {
     return [
         "id",
@@ -179,9 +187,21 @@ export function digestFields(
             ? ["abilities", "stolen_abilities", "web_locked", "debuffs_sources", "rallying_volley_granted"]
             : []),
         ...(spells ? ["spell_entries", "spellbook"] : []),
-        ...(batch4 || helpingHand ? ["forbidden_target"] : []),
-        ...(helpingHand ? ["helping_hand_link"] : []),
+        ...(batch4 || helpingHand || batch6b ? ["forbidden_target"] : []),
+        ...(helpingHand || batch6b ? ["helping_hand_link"] : []),
+        ...(batch6b ? ["water_shield_spent", "magic_resist_mod"] : []),
     ];
+}
+
+/** The board's lava cells ("L" in boardCoord), x-major: a death on lava erases one, a unit leaving a centre cell restores
+ * it, and a Made of Fire unit stands on them. */
+export function lavaDigest(grid: any): number[][] {
+    const out: number[][] = [];
+    const board: string[][] = grid.boardCoord;
+    for (let x = 0; x < board.length; x += 1) {
+        for (let y = 0; y < board[x].length; y += 1) if (board[x][y] === "L") out.push([x, y]);
+    }
+    return out;
 }
 
 /** The vines store (FightProperties.vines) in Map order: [x, y, lapsRemaining, team]. */
@@ -251,7 +271,7 @@ export function battleDigest(
 ): { units: unknown[][]; fight: Record<string, unknown> } {
     const units: unknown[][] = [];
     for (const u of ctx.unitsHolder.getAllUnits().values()) {
-        units.push(unitDigest(u, opts.setup, opts.batch3, opts.spells, opts.batch4, opts.helpingHand));
+        units.push(unitDigest(u, opts.setup, opts.batch3, opts.spells, opts.batch4, opts.helpingHand, opts.batch6b));
     }
     const emberTeams = [...(ctx.unitsHolder.emberCovenantTeams ?? [])].sort();
     const fight: Record<string, unknown> = { ...fightDigest(ctx.fightProperties), emberTeams };
@@ -259,5 +279,6 @@ export function battleDigest(
     if (opts.spells) fight.vines = vinesDigest(ctx.fightProperties);
     if (opts.spells) fight.smoke = smokeDigest(ctx.fightProperties);
     if (opts.spells) fight.fireWalls = fireWallDigest(ctx.fightProperties);
+    if (opts.batch6b) fight.lava = lavaDigest(ctx.grid);
     return { units, fight };
 }

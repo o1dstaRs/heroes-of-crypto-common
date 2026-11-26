@@ -17,6 +17,7 @@ const artifacts = @import("artifacts.zig");
 const js = @import("jsnum.zig");
 const engine = @import("engine.zig");
 const combat = @import("combat.zig");
+const path = @import("path.zig");
 const abilities = @import("abilities.zig");
 
 const Cell = st.Cell;
@@ -40,12 +41,17 @@ pub fn usable(u: *const Unit, b: *const st.BookSpell, cfg: *const st.SpellConfig
     return !u.isBroken() and cfg.laps > 0 and b.amount > 0 and cfg.min_stack_power <= engine.getStackPower(u);
 }
 
-/// elementalSpellMultiplier against `u` (only Earth Element is in scope: no Fire, Water or Wind Element creature).
+/// elementalSpellMultiplier against `u` (Break-aware element cards): its own element 0 (immunity first), the element it
+/// counters x1.5 (ELEMENT_COUNTER_MULTIPLIER, not the card power), else 1.
 pub fn elementMultiplier(element: u8, u: *const Unit) f64 {
-    const earth = u.ability_mask & st.AbilityId.earth_element.bit() != 0 and u.has(.earth_element);
+    const AB = st.AbilityId;
+    const any = AB.water_element.bit() | AB.fire_element.bit() | AB.wind_element.bit() | AB.earth_element.bit();
+    if (u.ability_mask & any == 0) return 1;
     return switch (element) {
-        EL.AIR => if (earth) 1.5 else 1,
-        EL.EARTH => if (earth) 0 else 1,
+        EL.FIRE => if (u.has(.fire_element)) 0 else if (u.has(.water_element)) 1.5 else 1,
+        EL.WATER => if (u.has(.water_element)) 0 else if (u.has(.fire_element)) 1.5 else 1,
+        EL.AIR => if (u.has(.wind_element)) 0 else if (u.has(.earth_element)) 1.5 else 1,
+        EL.EARTH => if (u.has(.earth_element)) 0 else if (u.has(.wind_element)) 1.5 else 1,
         else => 1,
     };
 }
@@ -101,7 +107,9 @@ pub fn canCastSpell(s: *const State, ci: u8, ti: u8, spell: CS, cfg: *const st.S
         if (mr == 100) return false;
         if (caster.team == t.team and (cfg.self_cast or !self_cast)) return notAlreadyApplied(t, spell, cfg);
     }
-    if (cfg.target == ST.ANY_ENEMY) {
+    // ENEMY_WITHIN_MOVEMENT_RANGE (Castling) joins the ANY_ENEMY gates when the target has the caster's footprint and its
+    // base cell is in the caster's eager movement-range list (castlingReach).
+    if (cfg.target == ST.ANY_ENEMY or (cfg.target == ST.ENEMY_WITHIN_MOVEMENT_RANGE and t.fw == caster.fw and t.fh == caster.fh and castlingReach(s, ci, ti))) {
         // hasMindAttackResistance: Madness or Mechanism; getTarget(): the raw Aggr lock
         const mind = cfg.power_type == SP.MIND and engine.moraleLocked(t);
         const forced = caster.target >= 0 and caster.target != @as(i8, @intCast(ti));
@@ -109,6 +117,76 @@ pub fn canCastSpell(s: *const State, ci: u8, ti: u8, spell: CS, cfg: *const st.S
         if (caster.team != t.team and !self_cast) return notAlreadyApplied(t, spell, cfg);
     }
     return false;
+}
+
+/// An aggression board of ones: getMovePath without one (every step costs 1).
+const ALL_ONES: [st.GRID][st.GRID]i16 = .{.{1} ** st.GRID} ** st.GRID;
+
+/// getEnemiesCellsWithinMovementRange(caster) holds `ti`'s base cell (castSpell passes it as targetCell): [] when the
+/// caster cannot move (the web lock, Paralysis, Whirlpool); else getMovePath(base, getMatrixNoUnits (unit cells read 0,
+/// a lava cell under a unit too), steps + 1 (CASTLING_RANGE_BONUS_CELLS), no aggression board (every step costs 1), its
+/// own fly / lava / In Its Own World flags, the board's vines and fire walls) and `cells`, which for a 1x1 are the
+/// knownPaths keys and for a larger body every body cell of an accepted destination (the closest-move pass marks a
+/// step's leading edge, the rest being the caster's own body, where no enemy stands); the target must be a living enemy
+/// in the holder anchored there. Draws nothing. Only the vine strider's merge can overflow the route table, and a
+/// Castling holder that strides vines (a Queen thief holding both cards) is not met; the result is then read as is.
+pub fn castlingReach(s: *const State, ci: u8, ti: u8) bool {
+    const caster = &s.units[ci];
+    const t = &s.units[ti];
+    if (!caster.canMove() or t.isDead() or t.team == caster.team or !t.in_holder) return false;
+    var m = path.buildMatrix(s);
+    for (0..st.GRID) |x| {
+        for (0..st.GRID) |y| {
+            if (st.isUnitCode(s.grid.board[x][y])) m[x][y] = 0;
+        }
+    }
+    var mp: path.MovePath = undefined;
+    path.getMovePath(&m, .{
+        .start = engine.baseCell(caster),
+        .max_steps = engine.getSteps(caster) + 1,
+        .aggr = &ALL_ONES,
+        .can_fly = engine.canFly(caster),
+        .w = caster.fw,
+        .h = caster.fh,
+        .vines = if (s.fight.n_vines != 0) &s.fight.vine_cells else null,
+        .vine_stride = caster.has(.in_its_own_world),
+        .fire = if (s.fight.n_fire != 0) &s.fight.fire_cells else null,
+        .made_of_fire = artifacts.canTraverseLava(s, caster),
+    }, &mp);
+    const a = engine.baseCell(t);
+    if (engine.isSmall(caster)) return mp.get(path.key(a.x, a.y)) != null;
+    for (mp.known()) |r| {
+        const body = engine.cellsForAnchor(r.cell, caster.fw, caster.fh);
+        for (body.slice()) |c| {
+            if (c.x == a.x and c.y == a.y) return true;
+        }
+    }
+    return false;
+}
+
+/// handleMagicAttack's POSITION_CHANGE branch (Castling): the magic-resist save (always drawn); unresisted, the Absorb
+/// Penalties redirect (its roll), and when the effective target has the caster's footprint the two bodies exchange
+/// anchors (cleanupAll both, then each setPosition at getPositionForFootprintAnchor of the other's anchor and
+/// occupyCells; no move modifiers, snare or route), then the smoke on both bodies is dispelled. No mirror roll.
+fn castling(s: *State, ci: u8, ti: u8) void {
+    const t = &s.units[ti];
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) < @floor(engine.getMagicResist(t))) return; // attack_handler.ts:684
+    const di = abilities.absorptionTarget(s, ti); // effect_helper.ts:370
+    const caster = &s.units[ci];
+    const d = &s.units[di];
+    if (d.fw != caster.fw or d.fh != caster.fh) return;
+    const ca = engine.baseCell(caster);
+    const da = engine.baseCell(d);
+    engine.cleanupAll(s, ci);
+    engine.cleanupAll(s, di);
+    engine.setPosition(caster, engine.positionForFootprintAnchor(da, caster.fw, caster.fh));
+    _ = engine.occupyCells(s, ci, engine.cellsForAnchor(da, caster.fw, caster.fh).slice());
+    engine.setPosition(d, engine.positionForFootprintAnchor(ca, caster.fw, caster.fh));
+    _ = engine.occupyCells(s, di, engine.cellsForAnchor(ca, caster.fw, caster.fh).slice());
+    if (s.fight.n_smoke != 0) {
+        engine.dispelSmoke(s, ci, engine.unitCells(caster).slice());
+        engine.dispelSmoke(s, di, engine.unitCells(d).slice());
+    }
 }
 
 // =====================================================================================================================
@@ -342,7 +420,7 @@ pub inline fn moraleMultiplier(spell: CS, attack_multiplier: f64) f64 {
 
 /// Unit.getMagicDamageBonusPercentage: the Empower Augment, the Empower buff (the Nightmare's cast), Sylvan Focus Blessing
 /// and the arcane rings, additive.
-fn magicDamageBonus(u: *const Unit) f64 {
+pub fn magicDamageBonus(u: *const Unit) f64 {
     var total: f64 = 0;
     if (u.augment(.empower_augment)) |e| {
         const p = e.power;
@@ -459,7 +537,8 @@ fn applyVictims(s: *State, ci: u8, element: u8, victims: *const Victims, died: *
     for (victims.items[0..victims.len]) |v| {
         const u = &s.units[v.slot];
         if (u.isDead()) continue;
-        const applied = engine.applyDamageElement(s, v.slot, v.damage, 0, false, element);
+        // The caster is the attacker of every row, its own rebound too (a Fire Element caster's hit passes a Water Shield).
+        const applied = engine.applyDamageFrom(s, v.slot, v.damage, 0, false, element, ci);
         // A spell kill records the caster's Last Fuse source (the rebound onto the caster is same-team: none).
         if (s.artifacts and u.isDead()) artifacts.recordFatal(s, v.slot, applied, ci);
         if (!v.rebounded) engine.markDamageLap(s, applied);
@@ -689,6 +768,12 @@ fn magicAttack(s: *State, ci: u8, target: ?u8, spell: CS, cfg: *const st.SpellCo
             if (b.spell == @intFromEnum(CS.resurrection) and b.amount > 0) remaining = true;
         }
         if (!remaining) _ = abilities.deleteAbility(s, caster, .resurrection);
+        engine.completeTurn(s, ci, false, false, events);
+        return;
+    }
+    if (!cfg.is_buff and cfg.power_type == SP.POSITION_CHANGE) {
+        castling(s, ci, ti);
+        useSpell(caster, spell);
         engine.completeTurn(s, ci, false, false, events);
         return;
     }

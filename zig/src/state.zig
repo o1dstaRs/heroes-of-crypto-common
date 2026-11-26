@@ -211,6 +211,13 @@ pub const SpellId = enum(u8) {
     /// The Nightmare's Empower (wave 2): + power to the holder's magic damage bonus.
     empower,
 
+    // batch 6b
+    /// The Mermaid's one-per-battle shield (System "Water Shield", laps 15, power 0): the first damage instance that is not
+    /// fire and not from a Fire Element striker deals 0 and deletes the row (Unit.water_shield_spent).
+    water_shield,
+    /// The Abomination's buff aura row on its own team (read by nothing in the engine: the redirect recomputes coverage).
+    flesh_shield_aura,
+
     /// An artifact buff row or marker debuff (UnitsHolder.applyArtifacts).
     pub inline fn isArtifact(self: SpellId) bool {
         return @intFromEnum(self) >= @intFromEnum(SpellId.veteran_helm) and @intFromEnum(self) <= @intFromEnum(SpellId.aegis_of_the_arcane);
@@ -314,6 +321,8 @@ pub const SpellId = enum(u8) {
             .paralysis => "Paralysis",
             .helping_hand => "Helping Hand",
             .empower => "Empower",
+            .water_shield => "Water Shield",
+            .flesh_shield_aura => "Flesh Shield Aura",
         };
     }
 
@@ -581,6 +590,33 @@ pub const AbilityId = enum(u8) {
     book_of_nightmares,
     /// Nightmare (DISABLE_HOURGLASS): while a living holder has it active, no unit may wait.
     time_denial,
+    // batch 6b
+    /// Mermaid: the physical pair (Fire strikers x1.5 on it, its hits x1.5 on Fire), WATER spells 0, FIRE x1.5; its own
+    /// hits pass an Ember Covenant ring.
+    water_element,
+    /// Mermaid: seeds the one-per-battle Water Shield buff (the row absorbs; the card only seeds it).
+    water_shield,
+    /// Efreet, Black Dragon: the physical pair with Water, FIRE spells 0; Fire Breath's stop, Fire Shield's skip, Water
+    /// Shield's pass.
+    fire_element,
+    /// Efreet: canTraverseLava (lands on lava) and the Made of Fire buff after a lava route.
+    made_of_fire,
+    /// Efreet (stack-powered REFLECT): a FIRE share of every melee hit landed on its holder back onto the striker.
+    fire_shield,
+    /// Black Dragon: magic_resist_mod 100 (every spell gate, the magic damage of the breath, shield and chain).
+    enchanted_skin,
+    /// Black Dragon (stack-powered): one extra physical roll per unit in the band behind the target, as FIRE damage.
+    fire_breath,
+    /// Abomination: a volley read off its holder costs two arrows (projectShotCost).
+    dense_flesh,
+    /// Abomination: the Flesh Shield aura (ABSORB_DAMAGE): a covered ally's physical hits are partly redirected to it.
+    flesh_shield_aura,
+    /// Thunderbird: the physical pair with Earth, AIR spells 0, EARTH x1.5; it earths a Chain Lightning.
+    wind_element,
+    /// Thunderbird (stack-powered MAGIC_DAMAGE): the AIR chain off its landed blow and response.
+    chain_lightning,
+    /// Harpy: castable, one ":Castling" charge (swap with an enemy of the same footprint within movement range).
+    castling,
 
     pub fn name(self: AbilityId) []const u8 {
         return switch (self) {
@@ -682,6 +718,18 @@ pub const AbilityId = enum(u8) {
             .paralysis => "Paralysis",
             .book_of_nightmares => "Book of Nightmares",
             .time_denial => "Time Denial",
+            .water_element => "Water Element",
+            .water_shield => "Water Shield",
+            .fire_element => "Fire Element",
+            .made_of_fire => "Made of Fire",
+            .fire_shield => "Fire Shield",
+            .enchanted_skin => "Enchanted Skin",
+            .fire_breath => "Fire Breath",
+            .dense_flesh => "Dense Flesh",
+            .flesh_shield_aura => "Flesh Shield Aura",
+            .wind_element => "Wind Element",
+            .chain_lightning => "Chain Lightning",
+            .castling => "Castling",
         };
     }
 
@@ -717,6 +765,7 @@ pub const AbilityId = enum(u8) {
             .wild_regeneration => .wild_regeneration,
             .wind_flow => .wind_flow,
             .resurrection => .resurrection,
+            .castling => .castling,
             else => null,
         };
     }
@@ -752,6 +801,14 @@ pub const AbilityId = enum(u8) {
     pub const BATCH6A_MASK: AbilityMask = blk: {
         var m: AbilityMask = 0;
         for ([_]AbilityId{ .guiding_winds_aura, .hamstring, .war_anger_aura, .wind_flow, .resurrection, .arrows_wingshield_blessing, .angelic_host_blessing, .tie_up_the_horses_blessing, .crusade, .wolf_trail_blessing, .one_in_the_field, .blindness, .paralysis }) |id| m |= id.bit();
+        break :blk m;
+    };
+
+    /// The batch-6b cards (Harpy's Castling, Mermaid, Efreet, Black Dragon, Abomination, Thunderbird; Shadow Touch is
+    /// batch 1's).
+    pub const BATCH6B_MASK: AbilityMask = blk: {
+        var m: AbilityMask = 0;
+        for ([_]AbilityId{ .water_element, .water_shield, .fire_element, .made_of_fire, .fire_shield, .enchanted_skin, .fire_breath, .dense_flesh, .flesh_shield_aura, .wind_element, .chain_lightning, .castling }) |id| m |= id.bit();
         break :blk m;
     };
 };
@@ -803,6 +860,8 @@ pub const CastSpell = enum(u8) {
     // wave 2a: the Nightmare's Book of Nightmares
     fire_wall,
     empower,
+    // batch 6b: the Harpy's castable swap
+    castling,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -837,6 +896,7 @@ pub const CastSpell = enum(u8) {
             .helping_hand => "Helping Hand",
             .fire_wall => "Fire Wall",
             .empower => "Empower",
+            .castling => "Castling",
         };
     }
 
@@ -1055,6 +1115,11 @@ pub const PowerType = struct {
     pub const UNTARGETABLE: u8 = 46;
     /// The Guiding Winds aura (Dryad): allied RANGE creatures shoot power% of their initial distance further.
     pub const ADDITIONAL_SHOT_DISTANCE_PERCENTAGE: u8 = 65;
+    /// Dense Flesh (Abomination): a volley read off its holder costs `power` arrows.
+    pub const SHOTS_COST: u8 = 49;
+    /// The Flesh Shield aura (Abomination): min(100, max(0, power / 5 * stack power + luck + ability power)) % of a
+    /// covered ally's physical hit is redirected to the emitter.
+    pub const ABSORB_DAMAGE: u8 = 50;
 };
 
 /// AbilityType values the ported processors branch on.
@@ -1272,6 +1337,11 @@ pub const Unit = struct {
     /// The leading buff rows that have no AppliedSpell object: a Resurrection revive (deleteAllBuffs) keeps the augment
     /// display rows and drops every object, so the stat refresh no longer reads them while the digest still lists them.
     aug_orphans: u8 = 0,
+    /// Unit.waterShieldSpent (batch 6b): its Water Shield absorbed a hit, so the seeding refresh never re-grants it.
+    water_shield_spent: bool = false,
+    /// The power its Flesh Shield AuraEffect holds (the last aura refresh that iterated it, i.e. the last refresh it was
+    /// not Broken), hidden: the redirect reads it (coveringFleshShield).
+    flesh_power: f64 = 0,
 
     pub fn isDead(self: *const Unit) bool {
         return self.amount_alive <= 0;
@@ -1738,6 +1808,24 @@ pub const State = struct {
     /// spells.json Death "Hamstrung" (laps, power), recorded in `spellConfigs` when a unit holds Hamstring.
     hamstrung_laps: f64 = 3,
     hamstrung_power: f64 = 30,
+    /// Batch-6b gates (loadScopeFlags): some unit can hold an element card (the physical pair, the covenant's water hit);
+    /// some unit can hold Water Shield or carries its row (the absorb and the seeding pass); some unit can hold Flesh
+    /// Shield (the redirect, the owners-first order); Fire Shield, Fire Breath, Chain Lightning, Dense Flesh, Enchanted
+    /// Skin; some unit can hold Made of Fire (lava traversal and the buff for the ability holder).
+    elements: bool = false,
+    water_shield: bool = false,
+    flesh: bool = false,
+    fire_shield: bool = false,
+    fire_breath: bool = false,
+    chain: bool = false,
+    dense: bool = false,
+    skin: bool = false,
+    fire_walkers: bool = false,
+    /// The Flesh Shield aura def's index in aura_defs (NO_AURA when none).
+    flesh_def: u8 = NO_AURA,
+    /// The System "Water Shield" spell (recorded `spellConfigs`): the seeded row's laps and power.
+    water_shield_laps: f64 = 15,
+    water_shield_power: f64 = 0,
 
     /// cannotAttackUnitId on battles where a gaze can land (Unit.forbidden is never set otherwise).
     pub inline fn forbids(self: *const State, u: *const Unit, target_uid: u8) bool {

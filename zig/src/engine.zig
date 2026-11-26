@@ -293,8 +293,8 @@ pub fn occupyCells(s: *State, ui: u8, cells: []const Cell) bool {
     return true;
 }
 
-/// cleanupAll (unit removal).
-fn cleanupAll(s: *State, ui: u8) void {
+/// cleanupAll (unit removal, and Castling's swap): the cells written empty (no lava restore), the rings unstamped.
+pub fn cleanupAll(s: *State, ui: u8) void {
     const u = &s.units[ui];
     if (u.n_reg == 0) return;
     for (u.reg[0..u.n_reg]) |oc| setOcc(s, oc, st.EMPTY);
@@ -489,15 +489,29 @@ pub fn applyDamageBreak(s: *State, ui: u8, minus_hp: f64, chance: f64, extend: b
     return applyDamageElement(s, ui, minus_hp, chance, extend, st.Element.UNSET);
 }
 
-/// Unit.applyDamage with a spell element (`damageElement`; st.Element.UNSET for a creature's hit): a covenant ring
-/// blocks every hit but a WATER one (isEmberCovenantWaterHit; no Water Element attacker in scope), and a FIRE hit
-/// leaves the ring standing (isEmberCovenantFireHit) where any other block dissolves the team's covenant.
+/// Unit.applyDamage with a spell element (`damageElement`; st.Element.UNSET for a creature's hit) and no attacker: see
+/// applyDamageFrom.
 pub fn applyDamageElement(s: *State, ui: u8, minus_hp: f64, chance: f64, extend: bool, element: u8) f64 {
+    return applyDamageFrom(s, ui, minus_hp, chance, extend, element, null);
+}
+
+/// Unit.applyDamage(minusHp, chanceToBreak, sceneLog, extendBreak, attacker, lastFuseSource, damageElement) with the
+/// attacker's slot (`striker`, null for none): a covenant ring blocks every hit but a water one (isEmberCovenantWaterHit:
+/// the element is WATER, or with no element the attacker holds an active Water Element), and a FIRE hit leaves the ring
+/// standing (isEmberCovenantFireHit) where any other block dissolves the team's covenant; then an intact Water Shield
+/// row on an unbroken holder absorbs a hit that is not FIRE and not from a Fire Element attacker (the row deleted,
+/// waterShieldSpent set, no break roll); then the break roll, the stack projection and Bitter Experience.
+pub fn applyDamageFrom(s: *State, ui: u8, minus_hp: f64, chance: f64, extend: bool, element: u8, striker: ?u8) f64 {
     const u = &s.units[ui];
     if (minus_hp <= 0) return 0;
     // Only a covenant team's units carry the ring (seeded per team, removed team-wide when the team's bit clears).
-    if (s.ember_teams != 0 and element != st.Element.WATER and abilities.absorbsHit(u)) {
+    if (s.ember_teams != 0 and abilities.absorbsHit(u) and !waterHit(s, element, striker)) {
         if (element != st.Element.FIRE) abilities.breakEmberCovenant(s, u.team); // notifyEmberCovenantDamage
+        return 0;
+    }
+    if (s.water_shield and abilities.waterShieldAbsorbs(s, u, if (striker) |a| &s.units[a] else null, element)) {
+        u.water_shield_spent = true;
+        u.buffs.delete(.water_shield);
         return 0;
     }
     if (chance > 0 and (extend or !u.isBroken())) {
@@ -521,6 +535,14 @@ pub fn applyDamageElement(s: *State, ui: u8, minus_hp: f64, chance: f64, extend:
         u.init.steps += 1;
     }
     return r.applied;
+}
+
+/// isEmberCovenantWaterHit(attacker, damageElement): an element given is water only when WATER; without one, the
+/// attacker's active Water Element makes the hit water.
+inline fn waterHit(s: *const State, element: u8, striker: ?u8) bool {
+    if (element != st.Element.UNSET) return element == st.Element.WATER;
+    const a = striker orelse return false;
+    return s.elements and s.units[a].has(.water_element);
 }
 
 // =====================================================================================================================
@@ -563,7 +585,7 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     if (s.gaze and u.forbidden != st.NO_UID and u.effects.find(.terrifying_gaze) == null and u.debuffs.find(.terrifying_gaze) == null) u.forbidden = st.NO_UID;
 
     // Made of Fire (a lava route with Lava Striders): the +init/power terms at the top of each stat's chain.
-    const mof: ?f64 = if (s.artifacts) artifacts.madeOfFire(u) else null;
+    const mof: ?f64 = if (s.artifacts or s.fire_walkers) artifacts.madeOfFire(u) else null;
     // Artifact rows (statBuffs' first row of each name), read below at their TypeScript points; a battle without
     // artifacts reads the empty set and pays one branch per hook.
     var art_rows: artifacts.Rows = undefined;
@@ -688,23 +710,29 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     // MAGIC RESIST
     u.magic_resist = if (mof) |fp| u.init.magic_resist + u.init.magic_resist / fp else u.init.magic_resist;
     if (armor_augment) |aa| u.magic_resist = js.roundUnitStat(u.magic_resist + aa.power, 2); // flat magic armor
-    u.magic_resist_mod = 0;
-    const p = (if (u.magic_resist_mod != 0) u.magic_resist_mod else u.magic_resist) / 100;
-    // winningAtLeastOneEventProbability([getMagicResist() / 100, Magic Shield's and Wardguard's multipliers, the
-    // Arcane Ward Blessing row's power / 100]), folded in that order
-    var no_resist = 1 * (1 - p);
-    if (u.ability(.magic_shield)) |ms| no_resist = no_resist * (1 - abilities.abilityMultiplier(u, ms));
-    if (s.stat_hooks) {
-        if (u.ability(.wardguard)) |wg| no_resist = no_resist * (1 - abilities.abilityMultiplier(u, wg));
+    // Enchanted Skin (Break-aware): magic_resist_mod = its power (100) and the fold is skipped.
+    const skin: ?f64 = if (s.skin) (if (u.ability(.enchanted_skin)) |es| es.power else null) else null;
+    if (skin) |sk| {
+        u.magic_resist_mod = sk;
+    } else {
+        u.magic_resist_mod = 0;
+        const p = (if (u.magic_resist_mod != 0) u.magic_resist_mod else u.magic_resist) / 100;
+        // winningAtLeastOneEventProbability([getMagicResist() / 100, Magic Shield's and Wardguard's multipliers, the
+        // Arcane Ward Blessing row's power / 100]), folded in that order
+        var no_resist = 1 * (1 - p);
+        if (u.ability(.magic_shield)) |ms| no_resist = no_resist * (1 - abilities.abilityMultiplier(u, ms));
+        if (s.stat_hooks) {
+            if (u.ability(.wardguard)) |wg| no_resist = no_resist * (1 - abilities.abilityMultiplier(u, wg));
+        }
+        if (s.blessings) {
+            // Warding Mane is folded before Arcane Ward (re-granted after it): the order matters under toFixed(2).
+            if (u.buffs.get(.warding_mane_blessing)) |wm| no_resist = no_resist * (1 - @max(0, wm.power) / 100);
+            if (u.buffs.get(.arcane_ward_blessing)) |aw| no_resist = no_resist * (1 - @max(0, aw.power) / 100);
+        }
+        // Aegis of the Arcane: one more independent roll, folded last.
+        if (s.artifacts) no_resist = artifacts.aegis(art, no_resist);
+        u.magic_resist = js.roundUnitStat((1 - no_resist) * 100, 2);
     }
-    if (s.blessings) {
-        // Warding Mane is folded before Arcane Ward (re-granted after it): the order matters under toFixed(2).
-        if (u.buffs.get(.warding_mane_blessing)) |wm| no_resist = no_resist * (1 - @max(0, wm.power) / 100);
-        if (u.buffs.get(.arcane_ward_blessing)) |aw| no_resist = no_resist * (1 - @max(0, aw.power) / 100);
-    }
-    // Aegis of the Arcane: one more independent roll, folded last.
-    if (s.artifacts) no_resist = artifacts.aegis(art, no_resist);
-    u.magic_resist = js.roundUnitStat((1 - no_resist) * 100, 2);
 
     // SHOTS: Limited Supply's cap and Endless Quiver's mod.
     if (shot_hooks) shotHooks(u);
@@ -920,6 +948,7 @@ pub fn refreshStackPowerForAllUnits(s: *State) void {
     setStackPowers(s);
     if (s.auras) abilities.refreshAuras(s);
     if (s.blessings) abilities.refreshBlessings(s);
+    if (s.water_shield) seedWaterShields(s);
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
         if (!cellWithinGrid(baseCell(u))) continue;
@@ -927,6 +956,18 @@ pub fn refreshStackPowerForAllUnits(s: *State) void {
         if (s.war_anger) increaseAttackMod(u, warAngerMod(s, i));
     }
     if (s.disguise) disguisePass(s);
+}
+
+/// UnitsHolder.refreshWaterShieldForAllUnits (after the blessings, before the stat loop): every living holder unit on the
+/// board that holds Water Shield active (Break-aware), never spent one and carries no row gets the System row appended
+/// (trySeedWaterShield). In practice a Queen that stole the card; the Mermaids' own rows come from the setup refresh.
+noinline fn seedWaterShields(s: *State) void {
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.isDead() or !cellWithinGrid(baseCell(u))) continue;
+        if (u.water_shield_spent or !u.has(.water_shield) or u.buffs.find(.water_shield) != null) continue;
+        abilities.pushChecked(s, &u.buffs, .{ .id = .water_shield, .laps = s.water_shield_laps, .power = s.water_shield_power });
+    }
 }
 
 /// UnitsHolder.getUnitAuraAttackMod(unit) (the unit's cells now): a unit holding the War Anger AuraEffect and not Broken
@@ -1416,16 +1457,25 @@ fn finishDirectedMove(s: *State, ui: u8, target: []const Cell, new_pos: ?[2]f64,
             .right => .{ u.pos_x + CELL, u.pos_y },
         };
     }
-    if (pos) |p| {
-        // Unit.setPosition: an active Sniper's shot distance is rewritten from the position it leaves (the next stat
-        // refresh rebuilds it, so only a move_unit step shows it).
-        if (u.ability_mask & st.AbilityId.sniper.bit() != 0 and u.has(.sniper)) {
-            u.shot_distance = js.toFixed(distanceToFurthestCorner(u.pos_x, u.pos_y) / CELL - 0.45, 2);
-        }
-        u.pos_x = p[0];
-        u.pos_y = p[1];
-    }
+    if (pos) |p| setPosition(u, p);
     return pos;
+}
+
+/// GridMath.getPositionForFootprintAnchor: the anchor cell's centre, shifted half a cell left and down per extra column
+/// and row.
+pub fn positionForFootprintAnchor(anchor: Cell, w: u8, h: u8) [2]f64 {
+    const p = positionForCell(@floatFromInt(anchor.x), @floatFromInt(anchor.y));
+    return .{ p[0] - (@as(f64, @floatFromInt(@max(1, w))) - 1) * HALF, p[1] - (@as(f64, @floatFromInt(@max(1, h))) - 1) * HALF };
+}
+
+/// Unit.setPosition: an active Sniper's shot distance is rewritten from the position it leaves (the next stat refresh
+/// rebuilds it, so only a move_unit step shows it).
+pub fn setPosition(u: *Unit, p: [2]f64) void {
+    if (u.has(.sniper)) {
+        u.shot_distance = js.toFixed(distanceToFurthestCorner(u.pos_x, u.pos_y) / CELL - 0.45, 2);
+    }
+    u.pos_x = p[0];
+    u.pos_y = p[1];
 }
 
 /// MoveHandler.moveUnitTowardsCenter + TurnEngine.handleSystemMoveResult. Returns whether the unit was destroyed.
@@ -2558,7 +2608,7 @@ fn walkDiffers(s: *const State, u: *const Unit, route: []const Cell, route_lava:
     if (!a.legal and !b.legal) return false;
     if (a.legal != b.legal) return true;
     if (a.travelled != b.travelled and u.ability(.crusade) != null) return true;
-    if (s.artifacts and a.lava != b.lava) return true;
+    if ((s.artifacts or s.fire_walkers) and a.lava != b.lava) return true;
     return s.fight.n_fire != 0;
 }
 
@@ -2622,7 +2672,7 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell, e
     // over the travelled route (the path minus its origin), then applyLavaWaterModifier (Made of Fire on a lava route).
     applyDistanceMorale(s, ui, from, to);
     if (s.crusade) crusade(u, travelled.len);
-    if (s.artifacts) artifacts.lavaRoute(s, ui, route_lava);
+    if (s.artifacts or s.fire_walkers) artifacts.lavaRoute(s, ui, route_lava);
     snareOnVineArrival(s, ui, target_cells);
     u.moved_this_turn = true;
     u.moved_route_cells = @floatFromInt(route.len); // setMovedRouteCellsThisTurn(knownMoveRoute?.route.length ?? action.path.length)
@@ -2836,6 +2886,8 @@ fn internAura(init: std.json.Value, s: *State, name: []const u8) !u8 {
         st.PowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR, st.PowerType.POISON_ON_HIT, st.PowerType.ABSORB_DEBUFF, st.PowerType.DISABLE_FLY_MOVEMENT => {},
         // batch 6a: War Anger (the Valkyrie's debuff aura) and Guiding Winds (the Dryad's buff aura)
         st.PowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE, st.PowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE => {},
+        // batch 6b: Flesh Shield (the Abomination's buff aura)
+        st.PowerType.ABSORB_DAMAGE => {},
         // power 0 (calculateAuraPower is never called): the Range Null Field and Disguise
         st.PowerType.DISABLE_RANGE_ATTACK, st.PowerType.UNTARGETABLE => if (def.power != 0) {
             unsupported_name = name;
@@ -2892,6 +2944,17 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     s.war_anger_def = st.NO_AURA;
     s.hamstrung_laps = 3;
     s.hamstrung_power = 30;
+    s.elements = false;
+    s.water_shield = false;
+    s.flesh = false;
+    s.fire_shield = false;
+    s.fire_breath = false;
+    s.chain = false;
+    s.dense = false;
+    s.skin = false;
+    s.fire_walkers = false;
+    s.flesh_def = st.NO_AURA;
+    var water_cards = false;
     var spit_holder = false;
     var poisons = false;
     var covenant = false;
@@ -2947,6 +3010,24 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         if (mask & AB.hamstring.bit() != 0) s.hamstring = true;
         if (mask & AB.crusade.bit() != 0) s.crusade = true;
         if (mask & AB.resurrection.bit() != 0) s.resurrection = true;
+        // Batch 6b.
+        if (mask & (AB.water_element.bit() | AB.fire_element.bit() | AB.wind_element.bit()) != 0) s.elements = true;
+        if (mask & AB.water_shield.bit() != 0) {
+            s.water_shield = true;
+            water_cards = true;
+        }
+        if (mask & AB.flesh_shield_aura.bit() != 0) s.flesh = true;
+        if (mask & AB.fire_shield.bit() != 0) s.fire_shield = true;
+        if (mask & AB.fire_breath.bit() != 0) s.fire_breath = true;
+        if (mask & AB.chain_lightning.bit() != 0) s.chain = true;
+        if (mask & AB.dense_flesh.bit() != 0) s.dense = true;
+        if (mask & AB.enchanted_skin.bit() != 0) s.skin = true;
+        if (mask & AB.made_of_fire.bit() != 0) {
+            // The ability holder traverses lava and takes the Made of Fire buff off a lava route (the Lava Striders hooks,
+            // gated by `fire_walkers` as well as `artifacts`).
+            s.fire_walkers = true;
+            fire = true;
+        }
         // Wind Flow's row is read where Battle Roar's is.
         if (mask & AB.wind_flow.bit() != 0) s.spell_hooks = true;
         if (mask & (AB.limited_supply.bit() | AB.endless_quiver.bit() | AB.boost_health.bit()) != 0 or u.range_shots_mod != 0) s.shot_hooks = true;
@@ -2985,6 +3066,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.id.isBatch6Stat()) s.b6_hooks = true;
             if (b.id == .wind_flow) s.spell_hooks = true;
             if (b.id == .helping_hand) s.helping_hand = true;
+            if (b.id == .water_shield) s.water_shield = true;
         }
         for (u.debuffs.items[0..u.debuffs.len]) |b| {
             // Gravechain's Gravebound outlives its holder's rows (Rime Charm's Quagmire is Spit Ball's, below).
@@ -3042,9 +3124,20 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             }
         }
     }
-    // The War Anger aura def (its range; the holder's attack mod reads the power its AuraEffect holds).
+    // The War Anger aura def (its range; the holder's attack mod reads the power its AuraEffect holds) and the Flesh
+    // Shield def (the redirect reads its range and the emitter's power).
     for (s.aura_defs[0..s.n_aura_defs], 0..) |d, k| {
         if (d.buff == .war_anger_aura) s.war_anger_def = @intCast(k);
+        if (d.buff == .flesh_shield_aura) s.flesh_def = @intCast(k);
+    }
+    // Water Shield: the System row the seeding pass appends (recorded `spellConfigs` when a unit holds the card).
+    s.water_shield_laps = st.NUMBER_OF_LAPS_TOTAL;
+    s.water_shield_power = 0;
+    if (water_cards) {
+        const cfg = rec.get(rec.get(init, "spellConfigs"), "Water Shield");
+        if (cfg == .null) return error.MissingSpellConfig;
+        s.water_shield_laps = rec.num(rec.get(cfg, "laps"));
+        s.water_shield_power = rec.num(rec.get(cfg, "power"));
     }
     s.poison_laps = st.NUMBER_OF_LAPS_TOTAL;
     if (poisons) {
@@ -3463,6 +3556,14 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
     s.summons = try loadSummons(init, rec.get(init, "summonTemplates"), &s);
     summonNameIds(&s, names[0..n_names]);
     try loadScopeFlags(&s, init);
+    // Flesh Shield: the emitter's AuraEffect power as the setup refresh left it, which its own row carries (it covers
+    // itself, and a team fields one emitter at the start; the power is integral, so toFixed(1) kept it).
+    if (s.flesh) {
+        for (s.units[0..s.n_units]) |*u| {
+            if (u.ability_mask & st.AbilityId.flesh_shield_aura.bit() == 0) continue;
+            if (u.buffs.power(.flesh_shield_aura)) |p| u.flesh_power = p;
+        }
+    }
     // Grid: stamp the terrain, register each unit's placement cells, then build the threat boards from them.
     for (0..st.GRID) |x| {
         for (0..st.GRID) |y| s.grid.board[x][y] = st.EMPTY;

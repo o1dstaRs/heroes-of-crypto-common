@@ -18,8 +18,8 @@ without an export, and fail-safe loading (`loadHocEngine`: null and one log line
 Zig plays whole battles that match the TypeScript `runMatch` step for step, for battles with:
 
 - every creature's stats, sizes (1x1, 2x1, 2x2), walking and flying, melee and ranged;
-- the abilities of the creatures ported so far (batches 1 to 5 and 6a, below), including the units Infest and Summon
-  Wolves summon, the abilities Predatory Assimilation and the Wild Regeneration gift move between units, and the
+- the abilities of the creatures ported so far (batches 1 to 5 and 6a, and of batch 6b the Harpy, below), including the
+  units Infest and Summon Wolves summon, the abilities Predatory Assimilation and the Wild Regeneration gift move between units, and the
   Angel's revive in place; every other creature's abilities stripped;
 - the artifacts (below; `src/artifacts.zig`): all 28 in the live pools, played as runMatch applies them (once, at
   setup); a team holding the disabled Broken Aegis or Holy Cross is refused;
@@ -76,7 +76,8 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
 The engine also replays (`hoc-sim parity`) the actions later AI versions emit on these boards: move-then-strike
 (`melee_attack` with a `path`), `wait_turn`, `defend_turn`, aimed shots, refused `select_attack_type`, ranged
 obstacle shots (`obstacle_attack` without `attackFrom`, which v0.8 sends), the wave-1 casts (`cast_spell`), batch 4's
-casts (Battle Roar, the Wild Regeneration gift), batch 6a's (Wind Flow, Resurrection) and batch 5's two action shapes (`area_throw_attack`, and the free-aim
+casts (Battle Roar, the Wild Regeneration gift), batch 6a's (Wind Flow, Resurrection), batch 6b's Castling and batch 5's
+two action shapes (`area_throw_attack`, and the free-aim
 Through Shot: `range_attack` with `targetPosition` and no target id).
 
 Ported:
@@ -499,6 +500,53 @@ Exact in both modes (coverage under "How parity is checked"):
   `resurrection`, `war_anger_def`, `hamstrung_laps`, `hamstrung_power`. A state is 81,152 bytes (Unit 2,400; 75,872
   and 2,240 before).
 
+### Batch 6b
+
+Batch 6b lands creature by creature. Slice 1, exact in both modes (coverage under "How parity is checked"):
+
+| Creature | Abilities |
+| --- | --- |
+| Harpy (L2, MELEE_MAGIC flyer) | Shadow Touch (batch 1's), Castling (a castable swap: one `":Castling"` charge) |
+
+- **Castling** (`spells.castlingReach`, `spells.castling`): castSpell's gates as for any unit-targeted cast (a Hidden
+  enemy is refused before the hook), then canCastSpell's ENEMY_WITHIN_MOVEMENT_RANGE branch: the target has the
+  caster's footprint and its base cell is in getEnemiesCellsWithinMovementRange (runMatch's eager hook): getMovePath on
+  the units-free matrix (unit cells read 0, lava under a unit too) with the caster's steps + 1, no aggression board
+  (every step costs 1), its fly / lava / In Its Own World flags and the board's vines and fire walls; for a 1x1 the
+  knownPaths keys, for a larger body (a Queen thief) every body cell of an accepted destination, so a 2x2 enemy
+  qualifies when its anchor lies under some reachable 2x2 body; `[]` when the caster cannot move (the Web lock,
+  Paralysis, Whirlpool). Then the ANY_ENEMY gates (magic resist 100, the Aggr lock). The hook draws nothing, and a
+  refused cast draws nothing.
+- **The cast** (handleMagicAttack's POSITION_CHANGE branch): the magic-resist save against the aimed target (2 raw,
+  always), then, unresisted, the Absorb Penalties redirect (2 raw when the target carries the row and its source cell
+  holds a unit; a success swaps the Harpy with the Peasant wherever it stands), the footprint re-check (a redirect to
+  another shape moves nobody), and the swap: `cleanupAll` on both bodies (no lava restore), each `setPosition` at
+  getPositionForFootprintAnchor of the other's anchor (an active Sniper's shot distance from the position it leaves)
+  and `occupyCells`; no move modifiers, vine snare, Made of Fire, moved flag or route. The smoke on both bodies is
+  dispelled (`engine.dispelSmoke`, attack_handler.ts:787; never reached: every arrival already dispels the smoke under
+  its body). TypeScript burns no Fire Wall at the swap (only moves, strike approaches and shoves burn), so neither does
+  the port. No mirror roll; the charge; completeTurn. A resisted cast spends the charge and moves nobody.
+- **AI**: v0.1 never casts. src/v08 does not decide Castling yet: `rollout.V08_CASTABLE` leaves it out and
+  `V08_SCOPE.refused_abilities` holds the batch-6b cards, so a v0.8 rollout refuses a board where any unit holds the
+  card (a Queen thief too). `RECORD_FORCE_CASTS="Castling"` passes runMatch's hook to canCastSpell, so a forced cast
+  reaches it in v0.8s recordings.
+- **The rest of batch 6b is in the tree, refused at load**: Mermaid (Water Element, Water Shield), Efreet (Fire Element,
+  Made of Fire, Fire Shield), Black Dragon (Fire Element, Enchanted Skin, Fire Breath), Abomination (Dense Flesh, Flesh
+  Shield Aura) and Thunderbird (Wind Element, Chain Lightning). Their engine code (the physical element pair and the
+  spell element table, the Ember Covenant's water hit, Water Shield's absorb in `engine.applyDamageFrom` and its seeding
+  pass, the Flesh Shield redirect, Fire Shield, Fire Breath and its stones, Chain Lightning, Dense Flesh's arrow cost,
+  Enchanted Skin's magic_resist_mod, the Made of Fire card's lava walk and buff) plays v0.1 recordings of each creature
+  alone identically (40 battles each, 2026-11-26), but it is not yet checked beside the casters, the artifacts, Queen
+  steals or in v0.8s replays. `scope.REFUSED_ABILITIES` (active or stolen), `scope.REFUSED_ROWS` (the Water Shield and
+  Flesh Shield rows) and `REFUSED_UNIT_FIELDS` (`waterShieldSpent`) refuse those boards at load, and the manifest leaves
+  the names out; `hoc-sim parity` / `native` still play them from recordings, for the next slices.
+- **Recorder**: keeping a batch-6b creature turns on the batch-3, spellbook and batch-4 columns (a Harpy's charge is a
+  spellbook), adds `water_shield_spent` and `magic_resist_mod` after `helping_hand_link` and the fight's `lava` cells,
+  and records the System "Water Shield" and "Made of Fire" configs when a unit holds those cards.
+- **State**: `Unit.water_shield_spent`, `flesh_power`; `State.elements`, `water_shield`, `flesh`, `fire_shield`,
+  `fire_breath`, `chain`, `dense`, `skin`, `fire_walkers`, `flesh_def`, `water_shield_laps`, `water_shield_power`. A
+  state is 87,136 bytes (Unit 2,528; 86,544 and 2,512 before).
+
 ### Spells (wave 1)
 
 The framework the spells added (all exact in both modes, coverage below; references in the session's
@@ -527,7 +575,7 @@ The framework the spells added (all exact in both modes, coverage below; referen
   element immunity) and the dispatch in action_engine.ts order: Summon Wolves, (mass and area spells: wave 2,
   overflow), Vine Throw, Fire Strike, Meteorite, Lightning Strike, Ring of Fire, Meteor Shower, else
   `handleMagicAttack` (Heal, Blessing; a debuff spell there is wave 2). The Castling hook's eager `getMovePath` draws
-  nothing and feeds only Castling, so it is skipped.
+  nothing and feeds only Castling, so it is computed only for that target type (`spells.castlingReach`, Batch 6b).
 - **The damage tail** (`spells.damageTail`): `floor(alive * power * (1 + bonus/100) * morale)` (bonus = Empower
   Augment + Sylvan Focus Blessing, now read; morale 1.25 / 0.8 for the morale-scaled spells), per victim Heavy Armor's
   magic multiplier (no synergy term), the element (AIR on an Earth Element x1.5, EARTH on it 0), the magic resist
@@ -849,8 +897,8 @@ The framework the army setup added (exact in both modes, coverage below):
     (`isMirrored`, drawn for every landed debuff), the Absorb Penalties redirect, MIND resistance (Madness), and the
     mass casts' own gates (`canMassCastSpell`, `hasAlreadyAppliedSpell` per ally). Smoke and Fire Wall bring their own
     stores and pather terms (the pather's `terrainAdjustedCost` already has the vine term, the Fire Wall toll sweeps
-    the body); Resurrection needs `deleteUnitById(id, true)` (a corpse kept) and Wind Flow / Castling the Castling
-    hook this port skips (`getEnemiesCellsWithinMovementRange`, the ENEMY_WITHIN_MOVEMENT_RANGE target type).
+    the body); Resurrection needs `deleteUnitById(id, true)` (a corpse kept) and Castling the movement-range hook
+    (`getEnemiesCellsWithinMovementRange`, the ENEMY_WITHIN_MOVEMENT_RANGE target type: `spells.castlingReach`).
   - New cast buffs are takeable by Borrowed Grace unless they are markers (`abilities.isMarkerSpell`): every Courage,
     Spiritual Armor or Helping Hand row is a copy candidate with its chance and pick rolls, and Absolving Arrow lifts
     the new debuffs (the snare included).
@@ -953,7 +1001,7 @@ The framework the army setup added (exact in both modes, coverage below):
     ring, Through Shot, the area throw's 3x3, and for batch 6b Chain Lightning's arcs and Fire Breath's band) must ask
     TypeScript whether an owner stops it.
   - Mass casts over a filtered team list (`ALL_FLYING`) visit the caster's team first, then the other, in holder order;
-    Tome of Amplification only for the caster's team. Castling's eager movement-range hook is still not ported.
+    Tome of Amplification only for the caster's team.
   - forceStalledLap appears as soon as a battery has many skipped activations (Blindness and Stun): keep the recorder's
     `stall` marks and run a Unicorn or Squire battery for any change to the activation loop.
   - Perf: batch 6a's stat hooks live in the same comptime instance as batch 5's (`State.b6_hooks` selects it), its rare
@@ -1181,6 +1229,39 @@ cd zig && zig build test         # unit tests (random stream, JS number rounding
 ```
 
 Run `check.sh` after changing any rules or v0.1 AI code the port covers, both with and without the batch kept.
+
+Batch 6b slice 1 (the Harpy), checked on 2026-11-26 on the final code over common `de955067` (every battle identical;
+every run on side-oriented production-mix maps with the production-like setup, `RECORD_AMOUNTS=expBudget` and
+`RECORD_RESUME=random:2`; fresh seeds 70000000-70999999). v0.1 never casts, so most casts come from an injection preload
+that replaces a v0.1 decision of a unit holding a usable charge by a cast at a legal target or at an illegal one (an
+ally, another footprint, out of reach), checked by engine replay:
+
+- native v0.1 and engine replay: the Harpy alone at keep rate 1 (200: 70200000; 40,080 steps, 400 resume points with
+  39,087 remaining steps identical in both modes), the Harpy with batches 1 to 6a, the casters and `RECORD_ARTIFACTS=random`
+  at the default rate (200: 70400000; 35,358 steps, 400 resume points, 35,061 remaining steps, both modes);
+- engine replay with injected casts: Harpies beside Peasants, Queens and Spiders at keep rate 1, 640 battles
+  (70100000, 70300000, 70320000, 70340000; 140,852 steps, 1,280 resume replays): 793 legal casts (123 by Queens holding
+  a stolen charge, 2x2 on 2x2) and 775 refused ones;
+- engine replay of v0.8s battles with `RECORD_FORCE_CASTS="Castling"` (280: 70500000, 70520000; 59,642 steps, 560
+  resume replays): 195 casts (49 with the Absorb Penalties roll; 91 of the second run's 135 with fire walls on the
+  board) beside 300 Fire Walls,
+  414 Fireballs, 30 Smokes and the other casters' spells, with artifacts;
+- negative tests diverge: no Absorb Penalties redirect, the hook's budget without the +1, the target left on its cell;
+- the rollout oracle (`BRIDGE.md`): v0.1 with Harpies, Queens and Peasants at keep rate 1, 16 battles, 38 roots (34
+  with a Harpy, 36 with the card active), 36,480 values identical, and with a wider mix at 0.6 another 32 battles, 84
+  roots, 80,640 values identical, 0 refused (70600000, 70620000, 70640000); v0.8 on batches 1 to 6a, the casters, the
+  Harpy and artifacts at 0.6, 32 battles, 81 roots, 69 compared with 66,240 values identical, the other 12 (holding the
+  card or the Nightmare's Fire Wall) refused by v08Scope (70700000, 70720000);
+- the rest of batch 6b, each creature alone at keep rate 1 (40 each, 70021000-70025030): native v0.1 and engine replay
+  identical, the resume points holding the creature refused at load ("ability Water Element", ..., "Water Shield spent
+  is not empty");
+- unchanged: classic `check.sh 100` (70800000), `ffi/smoke.ts 8` (70810000, and with Harpies and Queens 70820000),
+  `zig build test`; the Task 0 rollout
+  (`63500007_34`: a Queen with a stolen Boost Health and No Melee) is identical; it was a src/v08 divergence (the
+  healer's Blessing target), fixed by `2f9f470b`;
+- cost: eight alternated pairs of `native-bench --reps 5` gave medians of 316.7 µs (origin/main `de955067`) and 317.3
+  µs per battle, pairwise -1.1%, and six pairs of the engine-only bench 669 and 671.5 ns per step, pairwise +0.8%, with
+  the same run checksums (load 12 to 16).
 
 Batch 6a, checked on 2026-11-25 (every battle identical; every run on side-oriented production-mix maps with the
 production-like setup and `RECORD_AMOUNTS=expBudget`, most with `RECORD_RESUME=random:2` and traced draws; fresh seeds
@@ -1606,25 +1687,20 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 
 ## Not covered yet
 
-- the abilities of every creature outside batches 1 to 5 and 6a and the wave-1 casters (batch 6b: Harpy, Mermaid,
-  Efreet, Black Dragon, Abomination, Thunderbird), the spells outside wave 1, the Book of Chaos, the Blacksmith's book and
-  batch 6a's castables
-  (Castling and the rest: a book holding one is refused by
-  name), the disabled Broken Aegis (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and
-  mirror rolls of debuff spells); the revealed-ranged delivery layer of
-  production's augment plan (it needs the live draft); WATER_CENTER (never played); on the maps, Fire Breath through
-  stones. The ported code leaves out what no battle in scope can reach: the Made of Fire ability (no creature in scope
-  holds it; the Lava Striders buff is ported), Water Shield and Water Element, Flesh Shield, Dense Flesh
-  (`spendShotsAgainst` spends one arrow), the aura power types outside the eight in scope, the Wind Element (Thunderbird
-  is not ported), Freeze in `isSkipping` (no Freeze in scope), the Castling hook's getMovePath (it draws nothing), the
-  mass casts other than Battle Roar's ALL_ALLIES buff and Wind Flow's ALL_FLYING one (Mass Heal, the enemy casts), Holy
-  Cross (a gift the caster keeps, and its x1.5 on the Resurrection cast). An Angel revived by Armageddon's first wave is
-  ported (`engine.applyArmageddon`) but never reached in the batteries. The ranged Deep Wounds riders are reached
-  through Wounding Charm's granted card (and a Queen holding both a stolen Deep Wounds and a stolen Endless Quiver).
+- the rest of batch 6b (Mermaid, Efreet, Black Dragon, Abomination, Thunderbird): every creature card and book spell
+  is named by the port now, and these are the only ones refused at load (in the tree, unchecked; Batch 6b, above); the
+  disabled Broken Aegis (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and mirror
+  rolls of debuff spells); the revealed-ranged delivery layer of production's augment plan (it needs the live draft);
+  WATER_CENTER (never played); on the maps, Fire Breath through stones. The ported code leaves out what no battle in
+  scope can reach: the aura power types outside those in scope, the enemy mass casts, Holy Cross (a gift the caster
+  keeps, and its x1.5 on the Resurrection cast). An Angel revived by Armageddon's first wave is ported
+  (`engine.applyArmageddon`) but never reached in the batteries. The ranged Deep Wounds riders are reached through
+  Wounding Charm's granted card (and a Queen holding both a stolen Deep Wounds and a stolen Endless Quiver).
 - the AI versions the research uses (v0.8 with the a19 search). The production rollout policy is the v0.8 chain, about
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and
   `compare.NativeCheck`. The bridge's rollouts take each unit's decide function from `rollout.policies` (v0.1 and
   v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers batches 1 to 5 and 6a, the artifacts and every
-  cast but Fire Wall, so a v0.8 request on a board with Fire Wall, a burning cell or Time Denial is refused (the known
+  cast but Fire Wall, so a v0.8 request on a board with Fire Wall, a burning cell, Time Denial or a batch-6b card (the
+  Harpy's Castling included) is refused (the known
   gaps and what the search still needs are in `BRIDGE.md`).

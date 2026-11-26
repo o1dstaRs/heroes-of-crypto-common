@@ -300,6 +300,7 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
     // "Wind Flow" config (the caster's Spell object may be spent or gone).
     let hamstring = false;
     let windFlow = false;
+    let waterShield = false;
     for (const unit of unitsHolder.getAllUnits().values()) {
         const props = unit.getUnitProperties();
         addProps(props);
@@ -308,6 +309,9 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
         if ((props.spells ?? []).some((entry: string) => entry.endsWith(":Craft"))) craft = true;
         if ((props.applied_buffs ?? []).some((name: string) => name === "Lava Striders" || name === "Made of Fire"))
             madeOfFire = true;
+        // Batch 6b: the Efreet's card applies the same buff; the Mermaid's card seeds the System "Water Shield".
+        if ((props.abilities ?? []).includes("Made of Fire")) madeOfFire = true;
+        if ((props.abilities ?? []).includes("Water Shield")) waterShield = true;
         if (
             (props.applied_buffs ?? []).some((name: string) => name === "Rime Charm" || name === "Gravechain") ||
             (props.applied_debuffs ?? []).some((name: string) => name === "Quagmire" || name === "Gravebound")
@@ -385,6 +389,7 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
         if (!("Stun" in effectConfigs)) effectConfigs.Stun = plainConfig(getEffectConfig("Stun"));
     }
     if (madeOfFire) spellConfigs["Made of Fire"] = plainConfig(getSpellConfig("System", "Made of Fire"));
+    if (waterShield) spellConfigs["Water Shield"] = plainConfig(getSpellConfig("System", "Water Shield"));
     if (hamstring) spellConfigs.Hamstrung = plainConfig(getSpellConfig("Death", "Hamstrung"));
     if (windFlow) spellConfigs["Wind Flow"] = plainConfig(getSpellConfig("System", "Wind Flow"));
     if (riders)

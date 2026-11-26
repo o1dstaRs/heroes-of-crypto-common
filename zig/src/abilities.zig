@@ -53,8 +53,16 @@ pub fn abilityMultiplierSyn(u: *const Unit, a: *const Ability, syn: f64) f64 {
         },
         else => {},
     }
-    // Empower scales only Chain Lightning, Fire Breath and Fire Shield: none in scope.
+    // Empower (isMagicDamageAbility): Chain Lightning, Fire Breath and Fire Shield scale with the magic-damage bonus
+    // (Empower Augment, Sylvan Focus Blessing, the rings), on the finished coefficient.
+    if (a.id == .chain_lightning or a.id == .fire_breath or a.id == .fire_shield) coeff *= magicEmpower(u);
     return coeff;
+}
+
+/// empowerMultiplier(getEmpowerPercentage()) of a magic-damage ability's holder.
+noinline fn magicEmpower(u: *const Unit) f64 {
+    const bonus = spells.magicDamageBonus(u);
+    return if (!std.math.isFinite(bonus) or bonus <= 0) 1 else 1 + bonus / 100;
 }
 
 /// Unit.calculateAbilityApplyChance
@@ -449,6 +457,8 @@ pub fn auraPower(u: *const Unit, def: *const st.AuraDef) f64 {
                 artifacts.fireTerm(artifacts.madeOfFire(u), def.power) / 100;
             break :blk js.toFixed(coeff * 100, 2) - 100;
         },
+        // Flesh Shield: stack-powered plus the owner's luck and ability power, held to 0..100 (no toFixed).
+        PT.ABSORB_DAMAGE => @min(100, @max(0, (def.power / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + engine.getLuck(u) + u.syn_power)),
         else => unreachable, // refused at load
     };
 }
@@ -536,6 +546,7 @@ pub fn refreshAuras(s: *State) void {
             const power = if (def.power != 0) auraPower(u, def) else def.power;
             // The AuraEffect keeps this power until the next refresh that iterates it: War Anger's attack mod reads it.
             if (d == s.war_anger_def) u.war_anger_power = power;
+            if (d == s.flesh_def) u.flesh_power = power;
             const range = def.range + s.setup[u.team].aura_range;
             if (range < 0) continue;
             const team = if (def.is_buff) u.team else engine.opposite(u.team);
@@ -1102,6 +1113,8 @@ pub fn isMarkerSpell(id: st.SpellId) bool {
         .morale, .dismorale, .luck_blessing, .sylvan_focus_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .ember_covenant_blessing, .hidden, .visible, .warding_mane_blessing => true,
         // batch 6a: the stack blessings and the Angel's two (ENGINE_MARKER_SPELL_NAMES); Wind Flow is takeable
         .tie_up_the_horses_blessing, .wolf_trail_blessing, .angelic_host_blessing, .arrows_wingshield_blessing => true,
+        // batch 6b: the seeded Water Shield row
+        .water_shield => true,
         else => false,
     };
 }
@@ -1431,6 +1444,35 @@ pub inline fn absorbsHit(u: *const Unit) bool {
 /// absorbsHit, skipping the buff scan while no team holds a covenant.
 pub inline fn absorbs(s: *const State, u: *const Unit) bool {
     return s.ember_teams != 0 and absorbsHit(u);
+}
+
+/// Unit.willAbsorbIncomingHit(attacker) for a creature's hit (no element): the covenant blocks it unless the striker
+/// holds an active Water Element (isEmberCovenantWaterHit), or an intact Water Shield row on an unbroken holder absorbs
+/// it unless the striker holds an active Fire Element (willWaterShieldAbsorb). `striker` null: a hit without an
+/// attacker (Flesh Shield's precheck passes the attacker; Chain Lightning, poison and Armageddon pass none).
+pub inline fn absorbsBy(s: *const State, u: *const Unit, striker: ?*const Unit) bool {
+    if (s.ember_teams == 0 and !s.water_shield) return false;
+    return absorbsBySlow(s, u, striker);
+}
+
+noinline fn absorbsBySlow(s: *const State, u: *const Unit, striker: ?*const Unit) bool {
+    if (u.buffs.len == 0) return false;
+    if (s.ember_teams != 0 and absorbsHit(u)) {
+        const water = if (striker) |a| s.elements and a.has(.water_element) else false;
+        if (!water) return true;
+    }
+    return waterShieldAbsorbs(s, u, striker, st.Element.UNSET);
+}
+
+/// Unit.willWaterShieldAbsorb(attacker, damageElement): the row (not the card) on an unbroken holder, a striker without
+/// an active Fire Element, an element other than FIRE.
+pub inline fn waterShieldAbsorbs(s: *const State, u: *const Unit, striker: ?*const Unit, element: u8) bool {
+    if (!s.water_shield or element == st.Element.FIRE or u.buffs.len == 0) return false;
+    if (u.buffs.find(.water_shield) == null or u.isBroken()) return false;
+    if (striker) |a| {
+        if (a.has(.fire_element)) return false;
+    }
+    return true;
 }
 
 test "Absorb Penalties aura power is 10 * stack power + luck" {

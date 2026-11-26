@@ -66,7 +66,7 @@ pub fn policyFor(version: []const u8) ?DecideFn {
 /// call.
 pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 {
     _ = ident; // the src/v08 gap checks that named creatures are gone (common 6e6aff54, d5fddea9)
-    // src/v08 covers batches 1-5 and 6a, revived units, the artifacts, smoke and every cast but Fire Wall
+    // src/v08 covers batches 1-5 and 6a, revived units, the artifacts, smoke and every cast but Fire Wall and Castling
     // (V08_CASTABLE). A board where a unit holds any other spell stays out of scope.
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
@@ -76,8 +76,9 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
         for (u.spells[0..u.n_spells]) |b| {
             if (!v08Castable(b.spell)) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
         }
-        // The cards and rows V08_SCOPE's tables refuse (stolen cards too) and a revive's orphan augment rows.
-        if (u.ability_mask & V08_SCOPE.refused_abilities != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-6a ability", .{i}) catch "batch 6a";
+        // The cards and rows V08_SCOPE's tables refuse (stolen cards too: batch 6b is not in src/v08 yet, and a Water
+        // Shield or Flesh Shield row outlives its source) and a revive's orphan augment rows.
+        if (u.ability_mask & V08_SCOPE.refused_abilities != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-6b ability", .{i}) catch "batch 6b";
         if (V08_SCOPE.refuse_revived and u.aug_orphans != 0) return std.fmt.bufPrint(buf, "slot {d} was revived", .{i}) catch "batch 6a";
         if (refusedRow(u)) |id| return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 6a";
     }
@@ -106,8 +107,8 @@ fn refusedRow(u: *const st.Unit) ?st.SpellId {
     return null;
 }
 
-/// The castables src/v08 decides: every `st.CastSpell` but Fire Wall (V08_SCOPE). A whitelist: whatever joins
-/// `st.CastSpell` later keeps a board out of v0.8 rollouts until src/v08 decides it and joins this list.
+/// The castables src/v08 decides: every `st.CastSpell` but Fire Wall and Castling (V08_SCOPE). A whitelist: whatever
+/// joins `st.CastSpell` later keeps a board out of v0.8 rollouts until src/v08 decides it and joins this list.
 pub const V08_CASTABLE = [_]st.CastSpell{
     .heal,             .blessing,    .lightning_strike,  .fire_strike, .meteor_shower,     .meteorite,
     .summon_wolves,    .vine_throw,  .ring_of_fire,      .battle_roar, .wild_regeneration, .fireball,
@@ -116,13 +117,17 @@ pub const V08_CASTABLE = [_]st.CastSpell{
     .magic_mirror,     .mass_riot,   .mass_magic_mirror, .courage,     .helping_hand,      .empower,
 };
 
-/// v08Scope's tables, which the scope manifest exports (scope.zig): the castables, the burning cells and (`late`, checked
-/// after the board) Time Denial. src/v08 covers batches 1-5 and 6a with revived units, the artifact rows, smoke and the
-/// wave-2 cards and rows. Fire Wall (the spell and the walls) waits for v0.1's projectPostMoveActorAvailability, which
-/// ai.zig does not port yet: a mindless unit (Berserker, Frenzied Boar) plays v0.1 on a board where v0.8 cast walls.
+/// v08Scope's tables, which the scope manifest exports (scope.zig): the castables, the batch-6b cards and rows, the burning
+/// cells and (`late`, checked after the board) Time Denial. src/v08 covers batches 1-5 and 6a with revived units, the
+/// artifact rows, smoke and the wave-2 cards and rows. Fire Wall (the spell and the walls) waits for v0.1's
+/// projectPostMoveActorAvailability, which ai.zig does not port yet: a mindless unit (Berserker, Frenzied Boar) plays
+/// v0.1 on a board where v0.8 cast walls.
 pub const V08_SCOPE = scope.PolicyScope{
     .name = "v0.8",
     .castable = &V08_CASTABLE,
+    // Batch 6b: src/v08 has no 6b support yet, so its cards (stolen ones too) and the rows that outlive their source.
+    .refused_abilities = st.AbilityId.BATCH6B_MASK,
+    .refused_buffs = &.{ .water_shield, .flesh_shield_aura },
     .refuse_fire_walls = true,
     .late = .{ .abilities = st.AbilityId.time_denial.bit() },
 };

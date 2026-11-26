@@ -297,8 +297,10 @@ test "toFixed4 matches JavaScript" {
 // square; a lava route gives the System "Made of Fire" buff)
 // =====================================================================================================================
 
-/// Unit.canTraverseLava: hasAbilityActive("Made of Fire") (no Fire creature in scope) or the Lava Striders row.
+/// Unit.canTraverseLava: hasAbilityActive("Made of Fire") (the Efreet's card, Break-aware, a thief's too) or the Lava
+/// Striders row.
 pub inline fn canTraverseLava(s: *const st.State, u: *const Unit) bool {
+    if (s.fire_walkers and u.has(.made_of_fire)) return true;
     return s.artifacts and u.buffs.len != 0 and u.buffs.find(.lava_striders) != null;
 }
 
