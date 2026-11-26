@@ -47,7 +47,12 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   base attack x power / 100, Riot first) and Magic Mirror / Mass Magic Mirror (the holder's mirror share
   max(buff power, Magic Reflection) in spell rebounds and every mirror roll; a Fireforged Sword burn reflects the buff
   share onto its wielder); the Satyr's Courage (morale pinned at +20, 0 with Sadness and then locked against Morale and
-  Dismorale, and frozen: no morale change reaches the holder while the row lasts); batch 6a's
+  Dismorale, and frozen: no morale change reaches the holder while the row lasts) and Helping Hand (the ally's row adds
+  ceil(30% x the caster's max hp and base armor at the cast, Tome-amplified) to its max hp and base armor, before Pendant
+  of Vitality and the armor multipliers; the caster, or its Absorb Penalties source after that roll, carries the same
+  amounts at the config's power as a penalty row; the target's link ends both rows when either ends, a linked unit dies
+  (mid-attack) or leaves the holder, and the release refreshes the affected units at once; Borrowed Grace copies the row
+  with its link, Absolving Arrow lifts the penalty); batch 6a's
   castables, the Valkyrie's Wind Flow (a
   mass buff on every flyer) and the Angel's Resurrection (on a wounded ally stack); a book holding any other spell is
   refused;
@@ -134,7 +139,7 @@ Wave-1 spells (`spells.zig`), exact in both modes:
 | --- | --- | --- |
 | Healer (L2, MAGIC) | Book of Healing | Heal x4, Spiritual Armor x2, Blessing x2, Mass Heal x3 (the whole book) |
 | Battle Mage (L2, MELEE_MAGIC) | Basic Tome of Battle Magic | Fire Strike x3, Meteorite x1 |
-| Satyr (L2, MAGIC) | Forest Spellbook, Sylvan Focus Blessing | Summon Wolves x2 (Courage and Helping Hand are wave 2) |
+| Satyr (L2, MAGIC) | Forest Spellbook, Sylvan Focus Blessing | Summon Wolves x2, Courage x3, Helping Hand x1 (wave 2: the whole book) |
 | Magic Dragon (L4, MELEE_MAGIC) | Tome of Elements, Magic Reflection | Whirlpool x1, Lightning Strike x4, Ring of Fire x2, Meteor Shower x1 (the whole book) |
 | Trent (L2) | Vine Throw (castable) | Vine Throw x1 |
 | Ogre Mage (L3, MELEE_MAGIC) | Tome of Might | Riot x2, Magic Mirror x2, Mass Riot x1, Mass Magic Mirror x1 (wave 2, the whole book) |
@@ -1100,7 +1105,8 @@ is unchanged otherwise):
 
 - Keeping any of Wolf, Berserker, Frenzied Boar, Griffin, White Tiger, Manticore, Behemoth or Troll turns on the batch-3
   columns (gifts and steals move the active list; `debuffs_sources` names the Range Null Field row's source) and adds
-  `forbidden_target` (Terrifying Gaze's lock: the gazer's id, or "") as the last unit column. A kept Behemoth or Troll
+  `forbidden_target` (Terrifying Gaze's lock: the gazer's id, or "") as the last unit column (a recording with spellbooks
+  always carries it, then `helping_hand_link`: "caster id;penalty id"). A kept Behemoth or Troll
   counts as a kept spellbook (its castable card holds a charge): the spellbook columns and `spellConfigs` follow.
 - `RECORD_STRIP_ABILITIES="Deep Wounds Level 2,AI Driven"` strips those cards from the kept creatures (a stripped castable
   card takes its charge along), so each card can be checked alone. The `.meta.json` gains `strip`.
@@ -1593,7 +1599,7 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 - the abilities of every creature outside batches 1 to 5 and 6a and the wave-1 casters (batch 6b: Harpy, Mermaid,
   Efreet, Black Dragon, Abomination, Thunderbird), the spells outside wave 1, the Book of Chaos, the Blacksmith's book and
   batch 6a's castables
-  (Helping Hand, Castling and the rest: a book holding one is refused by
+  (Castling and the rest: a book holding one is refused by
   name), the disabled Broken Aegis (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and
   mirror rolls of debuff spells); the revealed-ranged delivery layer of
   production's augment plan (it needs the live draft); WATER_CENTER (never played); on the maps, Fire Breath through

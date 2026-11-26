@@ -98,6 +98,8 @@ Read into the Zig `State` (`snapshot.zig`):
 | the handle's creature names (by `name_id`) and army profiles | `units[].name` and the summon templates' names; `harness.armyProfile` |
 | `target` | `props.target` |
 | `forbidden` | `props.forbidden_target` (Terrifying Gaze's lock: the gazer's id as its uid, a removed gazer's too) |
+| `hh_caster`, `hh_penalty` | `props.helping_hand_caster_id` / `helping_hand_penalty_id` (a Helping Hand target's link, as uids) |
+| `hh_gift`, `hh_cost` | the Helping Hand buff's / debuff's `firstSpellProperty` and `secondSpellProperty` (one row of the name per list) |
 | `State.disguise_range`, `hidden_*`, `visible_*` | `configs.auraEffectConfigs.Disguise`, `configs.spellConfigs.Hidden` / `.Visible` |
 | `name_id`, `creature_id` | `name`, `creatureId` |
 | `reg`, `grid.board`, `grid.aggr` | `cellsByUnitId`, `boardCoord` ("" / id / "H" / "B" / "L"), `boardAggrPerTeam` |
@@ -199,8 +201,8 @@ struct PairRecord   { double value, material; uint32_t turns, flags, summon_sequ
   swap names. A refused state reads "unsupported state: ...", a refused request "unsupported request: ...", a rollout that
   reached unported code "unsupported rollout: ..."; the caller falls back to TypeScript for that decision.
 - `hoc_state_digest_json` writes `{units, fight, active, rng}` with the record.ts digest columns (setup, terrain,
-  batch-3, spellbook and batch-4 `forbidden_target` columns and the fight's `vines` always on; `buffs_sources` and `debuffs_sources` name aura and
-  augment rows only). `hoc_state_check_digest` takes a `parity/digest.ts` `battleDigest` and runs `compare.state`.
+  batch-3, spellbook, batch-4 `forbidden_target` and `helping_hand_link` columns and the fight's `vines` always on;
+  `buffs_sources` and `debuffs_sources` name aura and augment rows and Helping Hand's stored properties only). `hoc_state_check_digest` takes a `parity/digest.ts` `battleDigest` and runs `compare.state`.
 
 ### `hoc_rollouts`: SearchDriver.rollout and leafValue
 

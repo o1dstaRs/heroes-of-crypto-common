@@ -18,9 +18,18 @@ export interface IDigestOptions {
     spells?: boolean;
     /** The forbidden target column (the gazer's id or ""), after every other column; implies `batch3`. */
     batch4?: boolean;
+    /** Helping Hand's link column ("caster id;penalty id"), after the forbidden target (which it turns on); with `spells`. */
+    helpingHand?: boolean;
 }
 
-export function unitDigest(u: any, setup: boolean, batch3 = false, spells = false, batch4 = false): unknown[] {
+export function unitDigest(
+    u: any,
+    setup: boolean,
+    batch3 = false,
+    spells = false,
+    batch4 = false,
+    helpingHand = false,
+): unknown[] {
     const p = u.getUnitProperties();
     const c = u.getBaseCell();
     return [
@@ -103,12 +112,20 @@ export function unitDigest(u: any, setup: boolean, batch3 = false, spells = fals
               ]
             : []),
         // Batch-4 column: Terrifying Gaze's lock (the gazer's id; TypeScript keeps it after the gazer dies).
-        ...(batch4 ? [p.forbidden_target ?? ""] : []),
+        ...(batch4 || helpingHand ? [p.forbidden_target ?? ""] : []),
+        // Helping Hand's link: the caster's and the penalty unit's ids.
+        ...(helpingHand ? [`${p.helping_hand_caster_id ?? ""};${p.helping_hand_penalty_id ?? ""}`] : []),
     ];
 }
 
 /** The column names of unitDigest, in order. */
-export function digestFields(setup: boolean, batch3 = false, spells = false, batch4 = false): string[] {
+export function digestFields(
+    setup: boolean,
+    batch3 = false,
+    spells = false,
+    batch4 = false,
+    helpingHand = false,
+): string[] {
     return [
         "id",
         "amount_alive",
@@ -162,7 +179,8 @@ export function digestFields(setup: boolean, batch3 = false, spells = false, bat
             ? ["abilities", "stolen_abilities", "web_locked", "debuffs_sources", "rallying_volley_granted"]
             : []),
         ...(spells ? ["spell_entries", "spellbook"] : []),
-        ...(batch4 ? ["forbidden_target"] : []),
+        ...(batch4 || helpingHand ? ["forbidden_target"] : []),
+        ...(helpingHand ? ["helping_hand_link"] : []),
     ];
 }
 
@@ -226,7 +244,7 @@ export function battleDigest(
 ): { units: unknown[][]; fight: Record<string, unknown> } {
     const units: unknown[][] = [];
     for (const u of ctx.unitsHolder.getAllUnits().values()) {
-        units.push(unitDigest(u, opts.setup, opts.batch3, opts.spells, opts.batch4));
+        units.push(unitDigest(u, opts.setup, opts.batch3, opts.spells, opts.batch4, opts.helpingHand));
     }
     const emberTeams = [...(ctx.unitsHolder.emberCovenantTeams ?? [])].sort();
     const fight: Record<string, unknown> = { ...fightDigest(ctx.fightProperties), emberTeams };

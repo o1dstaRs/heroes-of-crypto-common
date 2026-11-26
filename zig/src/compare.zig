@@ -76,13 +76,17 @@ fn spellsMatch(list: []const st.AppliedSpell, names: []const u8, laps: []const u
 /// and the augments' stored properties (Sniper "27;70", the others ";"). Other rows are skipped: a team blessing
 /// stores its power there (`applyBuff(buff, power)`), compared as its power. TypeScript reads the column off the buff
 /// objects, so a revive's orphan augment rows (`skip`: the list's leading rows without an object) are not in it.
-fn sourcesMatch(list: *const st.SpellList, skip: u8, srcs: []const u8) bool {
+fn sourcesMatch(list: *const st.SpellList, skip: u8, srcs: []const u8, gift: [2]f64) bool {
     var it = std.mem.splitScalar(u8, srcs, ',');
     var i: usize = skip;
     if (srcs.len == 0) return list.len == skip;
     while (it.next()) |entry| : (i += 1) {
         if (i >= list.len) return false;
         const b = list.items[i];
+        if (b.id == .helping_hand) {
+            if (!pairMatches(entry, gift)) return false;
+            continue;
+        }
         if (b.laps != st.LAPS_AURA and !b.id.isAugment() and !artifacts.storesProperties(b.id)) continue;
         var parts = std.mem.splitScalar(u8, entry, ';');
         const xs = parts.next() orelse return false;
@@ -94,15 +98,39 @@ fn sourcesMatch(list: *const st.SpellList, skip: u8, srcs: []const u8) bool {
     return i == list.len;
 }
 
+/// A Helping Hand row's "max hp;base armor" entry against the unit's stored pair, as numbers.
+fn pairMatches(entry: []const u8, p: [2]f64) bool {
+    var parts = std.mem.splitScalar(u8, entry, ';');
+    const a = parts.next() orelse return false;
+    const b = parts.next() orelse return false;
+    const x = std.fmt.parseFloat(f64, a) catch return false;
+    const y = std.fmt.parseFloat(f64, b) catch return false;
+    return x == p[0] and y == p[1];
+}
+
+/// Helping Hand's link column ("caster id;penalty id", "" each when absent) against the unit's two uids.
+fn linkMatches(s: *const st.State, ids: []const []const u8, u: *const st.Unit, text: []const u8) bool {
+    var parts = std.mem.splitScalar(u8, text, ';');
+    const c = parts.next() orelse return false;
+    const p = parts.next() orelse "";
+    const want_c: u8 = if (c.len == 0) st.NO_UID else (uidOf(s, ids, c) orelse return false);
+    const want_p: u8 = if (p.len == 0) st.NO_UID else (uidOf(s, ids, p) orelse return false);
+    return want_c == u.hh_caster and want_p == u.hh_penalty;
+}
+
 /// The "x;y,..." debuff column: the aura rows' source cells (the Web Aura's emitter); other rows store their power
 /// (Miner) or nothing and are compared as their power.
-fn debuffSourcesMatch(list: []const st.AppliedSpell, srcs: []const u8) bool {
+fn debuffSourcesMatch(list: []const st.AppliedSpell, srcs: []const u8, cost: [2]f64) bool {
     if (srcs.len == 0) return list.len == 0;
     var it = std.mem.splitScalar(u8, srcs, ',');
     var i: usize = 0;
     while (it.next()) |entry| : (i += 1) {
         if (i >= list.len) return false;
         const b = list[i];
+        if (b.id == .helping_hand) {
+            if (!pairMatches(entry, cost)) return false;
+            continue;
+        }
         if (b.laps != st.LAPS_AURA) continue;
         var parts = std.mem.splitScalar(u8, entry, ';');
         const xs = parts.next() orelse return false;
@@ -305,20 +333,22 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
             return false;
         }
         if (column(row, 46)) |srcs| {
-            if (!sourcesMatch(&u.buffs, u.aug_orphans, srcs)) {
+            if (!sourcesMatch(&u.buffs, u.aug_orphans, srcs, u.hh_gift)) {
                 m.set("unit {d} buffs_sources: ts '{s}'", .{ idx, srcs });
                 return false;
             }
         }
         // Setup columns (recordings with augments or synergies): the Sniper shot distance and the two bases Bitter
         // Experience moves (column 47 is a number: shot_distance; the batch-3 columns start with a string). Then the
-        // batch-3 columns (digest.ts: 5), the spellbook columns (2) and the batch-4 forbidden target (1): after the
-        // setup columns a row has 0, 5 (batch 3), 6 (batch 3 and 4), 7 (spells) or 8 (spells and batch 4) more.
+        // batch-3 columns (digest.ts: 5), the spellbook columns (2), the batch-4 forbidden target (1) and Helping Hand's
+        // link (1, with the spellbook and forbidden columns): after the setup columns a row has 0, 5 (batch 3), 6 (batch 3
+        // and 4), 7 (spells), 8 (spells and batch 4) or 9 (spells, batch 4 and the link) more.
         const has_setup = row.len >= 50 and row[47] != .string;
         const extra: usize = row.len -| @as(usize, if (has_setup) 50 else 47);
         const has_b3 = extra >= 5;
-        const has_spells = extra == 7 or extra == 8;
-        const has_b4 = extra == 6 or extra == 8;
+        const has_spells = extra >= 7;
+        const has_b4 = extra == 6 or extra >= 8;
+        const has_link = extra >= 9;
         const setup_cols = [_]struct { []const u8, f64, usize }{
             .{ "shot_distance", u.shot_distance, 47 },
             .{ "base_armor_init", u.init.base_armor, 48 },
@@ -349,7 +379,7 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
                 m.set("unit {d} web_locked: zig {}, ts {d}", .{ idx, u.web_locked, rec.num(row[b + 2]) });
                 return false;
             }
-            if (!debuffSourcesMatch(u.debuffs.items[0..u.debuffs.len], column(row, b + 3) orelse "")) {
+            if (!debuffSourcesMatch(u.debuffs.items[0..u.debuffs.len], column(row, b + 3) orelse "", u.hh_cost)) {
                 m.set("unit {d} debuffs_sources: ts '{s}'", .{ idx, column(row, b + 3) orelse "" });
                 return false;
             }
@@ -375,6 +405,13 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
                 }
                 if (!bookSpellsMatch(u, column(row, b + 6) orelse "")) {
                     m.set("unit {d} spellbook: ts '{s}' (zig has {d})", .{ idx, column(row, b + 6) orelse "", u.n_spells });
+                    return false;
+                }
+            }
+            if (has_link) {
+                const t = column(row, b + 8) orelse "";
+                if (!linkMatches(s, ids, u, t)) {
+                    m.set("unit {d} helping_hand_link: ts '{s}' (zig uids {d};{d})", .{ idx, t, u.hh_caster, u.hh_penalty });
                     return false;
                 }
             }

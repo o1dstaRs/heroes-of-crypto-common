@@ -26,10 +26,7 @@ pub const REFUSED_UNIT_FIELD_PARTS = [_]NestedField{
 };
 
 /// Unit properties (`fields.unitProperties.<key>`) that must be empty.
-pub const REFUSED_UNIT_PROPS = [_]Field{
-    .{ .key = "helping_hand_caster_id", .what = "Helping Hand caster" },
-    .{ .key = "helping_hand_penalty_id", .what = "Helping Hand penalty" },
-};
+pub const REFUSED_UNIT_PROPS = [_]Field{};
 
 /// A unit property that is a list of names and may hold only `accepted` ones (undefined or [] passes); any other name
 /// is refused as `what`.

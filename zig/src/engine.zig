@@ -508,8 +508,11 @@ pub fn applyDamageElement(s: *State, ui: u8, minus_hp: f64, chance: f64, extend:
             abilities.replaceChecked(s, &u.effects, .{ .id = .break_, .laps = laps, .power = s.break_power });
         }
     }
+    const alive_before = u.amount_alive;
     const r = projectStackDamage(u, minus_hp);
     if (r.applied > 0 and s.ember_teams != 0) abilities.breakEmberCovenant(s, u.team);
+    // damage.dead && unitsDied > 0: the stack's Helping Hand links end now, before the rest of the attack.
+    if (s.helping_hand and alive_before > 0 and u.amount_alive == 0) helpingHandChanged(s, st.NO_UID);
     if (r.lost_and_survived and u.has(.bitter_experience)) {
         u.base_armor += 1;
         u.init.base_armor += 1;
@@ -567,13 +570,15 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
         art_rows = artifacts.rows(u);
         break :blk &art_rows;
     } else &artifacts.none;
+    // calculateBuffsDebuffsEffect's baseStats: Helping Hand's max hp and base armor terms (0 on other boards).
+    const hh: [2]f64 = if (s.helping_hand) helpingHandTerms(u) else .{ 0, 0 };
 
     // HP
     if (shot_hooks or (s.unit_hooks and u.has(.unyielding_power))) {
-        hpHooks(s, f, u, lap_adjusted, art, mof);
+        hpHooks(s, f, u, lap_adjusted, art, mof, hh[0]);
     } else {
         const was_full = u.hp >= u.max_hp;
-        u.max_hp = if (mof) |fp| @ceil(u.init.max_hp + u.init.max_hp / fp) else u.init.max_hp;
+        u.max_hp = (if (mof) |fp| @ceil(u.init.max_hp + u.init.max_hp / fp) else u.init.max_hp) + hh[0];
         // Pendant of Vitality: +% max hp (a full unit is refilled to the new, fractional, max).
         if (s.artifacts) artifacts.pendantHp(u, art);
         if (was_full or u.max_hp < u.hp) u.hp = u.max_hp;
@@ -642,7 +647,7 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
 
     // ARMOR
     const pegasus_might = if (s.stat_hooks and s.auras) abilities.appliedAuraPower(u, .pegasus_might_aura) else null;
-    u.base_armor = js.roundUnitStat((if (mof != null) u.init.base_armor + u.init.base_armor / 10 else u.init.base_armor) + 0, 2);
+    u.base_armor = js.roundUnitStat((if (mof != null) u.init.base_armor + u.init.base_armor / 10 else u.init.base_armor) + hh[1], 2);
     if (pegasus_might) |pm| u.base_armor += pm;
     if (wind) |wf| u.base_armor += wf;
     const armor_augment = augmentBuff(s, u, .armor_augment);
@@ -849,7 +854,7 @@ inline fn runeStacks(u: *const Unit, id: st.SpellId) ?f64 {
 /// refresh; a top creature at exactly the reset maximum is refilled to the boosted one, the free heal), Pendant of
 /// Vitality's share, then on Unyielding Power's lap's first refresh after the start +5 hp, +1 initial step and +2
 /// initial base attack (first read after this block, by the STEPS and ATTACK copies), then the full-hp refill or the cap.
-noinline fn hpHooks(s: *const State, f: *const st.Fight, u: *Unit, lap_adjusted: bool, art: *const artifacts.Rows, mof: ?f64) void {
+noinline fn hpHooks(s: *const State, f: *const st.Fight, u: *Unit, lap_adjusted: bool, art: *const artifacts.Rows, mof: ?f64, hh_hp: f64) void {
     const was_full = u.hp >= u.max_hp;
     const up = s.unit_hooks and u.has(.unyielding_power);
     const base = if (mof) |fp| @ceil(u.init.max_hp + u.init.max_hp / fp) else u.init.max_hp;
@@ -862,8 +867,9 @@ noinline fn hpHooks(s: *const State, f: *const st.Fight, u: *Unit, lap_adjusted:
             if (reset_full) u.hp = u.max_hp;
         }
     }
-    // max_hp is refreshAndGetAdjustedMaxHp's result here (+ baseStatsDiff.hp, 0 in scope): Pendant of Vitality's share,
-    // before Unyielding Power's +5 and the refill.
+    // max_hp is refreshAndGetAdjustedMaxHp's result here, plus baseStatsDiff.hp (Helping Hand): Pendant of Vitality's
+    // share, before Unyielding Power's +5 and the refill.
+    u.max_hp += hh_hp;
     artifacts.pendantHp(u, art);
     if (up and f.started and !lap_adjusted) {
         u.hp += 5;
@@ -909,6 +915,7 @@ fn setStackPowers(s: *State) void {
 /// stack power and the luck left by the previous refresh), the blessings, then every unit's stats, each followed by
 /// increaseAttackMod(getUnitAuraAttackMod) (War Anger) and the Disguise swap.
 pub fn refreshStackPowerForAllUnits(s: *State) void {
+    if (s.helping_hand) _ = reconcileHelpingHand(s, st.NO_UID);
     setStackPowers(s);
     if (s.auras) abilities.refreshAuras(s);
     if (s.blessings) abilities.refreshBlessings(s);
@@ -999,6 +1006,8 @@ pub fn tryRevive(s: *State, ui: u8) bool {
     if (!s.resurrection) return false;
     const u = &s.units[ui];
     if (u.ability_mask & st.AbilityId.resurrection.bit() == 0 or !canSelfResurrect(u)) return false;
+    // deleteUnitById runs refreshHelpingHandLinks(id) before it considers the resurrection.
+    if (s.helping_hand) helpingHandChanged(s, u.uid);
     const died = u.amount_died;
     const count = @min(died, @max(1, @floor(died / 2)));
     // reviveAfterDeath
@@ -1008,9 +1017,10 @@ pub fn tryRevive(s: *State, ui: u8) bool {
     u.amount_alive += revived;
     u.amount_died -= revived;
     u.fuse = .{}; // lastFuseFatalHit = undefined
-    // deleteAllEffects, deleteAllBuffs (the " Augment" display rows stay, objects none), deleteAllDebuffs
+    // deleteAllEffects, deleteAllBuffs (the " Augment" display rows stay, objects none), deleteAllDebuffs; each list
+    // that held a Helping Hand row notifies once it is cleared.
     u.effects.len = 0;
-    u.debuffs.len = 0;
+    const hh_buff = s.helping_hand and u.buffs.find(.helping_hand) != null;
     var w: u8 = 0;
     for (u.buffs.items[0..u.buffs.len]) |b| {
         if (!b.id.isAugment()) continue;
@@ -1019,6 +1029,10 @@ pub fn tryRevive(s: *State, ui: u8) bool {
     }
     u.buffs.len = w;
     u.aug_orphans = w;
+    if (hh_buff) helpingHandChanged(s, st.NO_UID);
+    const hh_debuff = s.helping_hand and u.debuffs.find(.helping_hand) != null;
+    u.debuffs.len = 0;
+    if (hh_debuff) helpingHandChanged(s, st.NO_UID);
     u.target = -1; // resetTarget: initialUnitProperties.target is "" in scope
     _ = abilities.deleteAbility(s, u, .resurrection);
     return true;
@@ -1125,6 +1139,7 @@ pub fn distanceToEnemyCentroid(s: *const State, enemy_team: u8, x: f64, y: f64) 
 
 /// deleteUnitById (no resurrection in scope). Always returns true for a real id. Releases every Aggr lock on the unit.
 pub fn deleteUnit(s: *State, ui: u8) void {
+    if (s.helping_hand) helpingHandChanged(s, s.units[ui].uid);
     const u = &s.units[ui];
     if (u.in_holder) {
         u.in_holder = false;
@@ -1830,23 +1845,30 @@ fn activateNextUnit(s: *State, ui: u8) Activation {
     return if (u.isSkipping() or u.whirlpooled()) .skipped else .ready;
 }
 
-/// One list's pass of Unit.minusLap: each entry loses a lap (sentinel counts excepted) and is deleted at 0.
-fn minusLapList(list: anytype) void {
+/// One list's pass of Unit.minusLap: each entry loses a lap (sentinel counts excepted) and is deleted at 0; deleting a
+/// Helping Hand row notifies the holder at once (deleteBuff / deleteDebuff), before the list's later rows tick.
+fn minusLapList(s: *State, list: anytype) void {
     var i: usize = 0;
     while (i < list.len) {
         const e = &list.items[i];
         if (e.laps > 0 and e.laps != st.LAPS_AURA and e.laps != st.NUMBER_OF_LAPS_TOTAL) e.laps -= 1;
-        if (e.laps != 0) i += 1 else list.removeAt(i);
+        if (e.laps != 0) {
+            i += 1;
+        } else {
+            const id = e.id;
+            list.removeAt(i);
+            if (id == .helping_hand and s.helping_hand) helpingHandChanged(s, st.NO_UID);
+        }
     }
 }
 
 /// Unit.minusLap: Dismorale holds the effects and debuffs, Morale holds the buffs.
-fn minusLap(u: *Unit) void {
+fn minusLap(s: *State, u: *Unit) void {
     const dismorale = hasDismorale(u);
-    if (!dismorale) minusLapList(&u.effects);
-    if (!hasMoraleBuff(u)) minusLapList(&u.buffs);
+    if (!dismorale) minusLapList(s, &u.effects);
+    if (!hasMoraleBuff(u)) minusLapList(s, &u.buffs);
     if (!dismorale) {
-        if (hasDuplicateName(&u.debuffs)) minusLapDuplicates(&u.debuffs) else minusLapList(&u.debuffs);
+        if (hasDuplicateName(&u.debuffs)) minusLapDuplicates(s, &u.debuffs) else minusLapList(s, &u.debuffs);
     }
 }
 
@@ -1863,12 +1885,13 @@ fn hasDuplicateName(list: anytype) bool {
 /// its laps tick (sentinels excepted) and, while not 0, EVERY display entry of the name ticks (display sentinels
 /// excepted); a row reaching 0 deletes the name (all rows), and the name's later rows are then detached and change
 /// nothing. Names are independent, so each is resolved at its first row.
-fn minusLapDuplicates(list: anytype) void {
-    var done: u64 = 0;
+fn minusLapDuplicates(s: *State, list: anytype) void {
+    // A set over every SpellId (an enum(u8)): Gravebound, Hamstrung and later rows sit past bit 63.
+    var done: u256 = 0;
     var i: usize = 0;
     while (i < list.len) {
         const id = list.items[i].id;
-        const bit = @as(u64, 1) << @intCast(@intFromEnum(id));
+        const bit = @as(u256, 1) << @intFromEnum(id);
         if (done & bit != 0) {
             i += 1;
             continue;
@@ -1898,10 +1921,123 @@ fn minusLapDuplicates(list: anytype) void {
             } else {
                 list.delete(id);
                 deleted = true;
+                if (id == .helping_hand and s.helping_hand) helpingHandChanged(s, st.NO_UID);
                 break;
             }
         }
         if (!deleted) i += 1;
+    }
+}
+
+/// calculateBuffsDebuffsEffect (spell_helper.ts:1050), its Helping Hand terms: the first buff row of the name with laps
+/// > 0 adds ceil(max hp x m) max hp and ceil(base armor x m) base armor, the first such debuff row takes its own off; m
+/// is the row's power (30 when 0) / 100, the two numbers the row's stored properties.
+pub fn helpingHandTerms(u: *const Unit) [2]f64 {
+    var out: [2]f64 = .{ 0, 0 };
+    if (u.buffs.len != 0) {
+        if (u.buffs.get(.helping_hand)) |b| {
+            if (b.laps > 0) {
+                const m = (if (b.power != 0) b.power else 30) / 100;
+                out[0] += @ceil(u.hh_gift[0] * m);
+                out[1] += @ceil(u.hh_gift[1] * m);
+            }
+        }
+    }
+    if (u.debuffs.len != 0) {
+        if (u.debuffs.get(.helping_hand)) |b| {
+            if (b.laps > 0) {
+                const m = (if (b.power != 0) b.power else 30) / 100;
+                out[0] -= @ceil(u.hh_cost[0] * m);
+                out[1] -= @ceil(u.hh_cost[1] * m);
+            }
+        }
+    }
+    return out;
+}
+
+/// The units a Helping Hand reconcile touched, once each: the ended targets (holder order), then the released penalty
+/// units (first-ended order).
+pub const HelpingHandAffected = struct {
+    items: [st.MAX_UNITS]u8 = undefined,
+    len: u8 = 0,
+    seen: st.UnitSet = 0,
+
+    fn add(self: *HelpingHandAffected, ui: u8) void {
+        if (self.seen & unitBit(ui) != 0) return;
+        self.seen |= unitBit(ui);
+        self.items[self.len] = ui;
+        self.len += 1;
+    }
+};
+
+/// holder.getAllUnits().get(id): the slot of `uid` while that unit is in the holder (dead or alive).
+fn holderSlot(s: *const State, uid: u8) ?u8 {
+    if (uid == st.NO_UID) return null;
+    const i = s.slotOf(uid) orelse return null;
+    return if (s.units[i].in_holder) i else null;
+}
+
+/// hasHelpingHand (spells/helping_hand.ts): the list's first row of the name has laps > 0.
+fn helpingHandLive(list: anytype) bool {
+    if (list.len == 0) return false;
+    const r = list.get(.helping_hand) orelse return false;
+    return r.laps > 0;
+}
+
+/// reconcileHelpingHandLinks (spells/helping_hand.ts): a link (holder order) ends when its target is dead, its caster
+/// or penalty unit is gone or dead, it names `removed`, its target has no live buff row or its penalty unit no live
+/// debuff row. Each ended target loses its link and buff rows; then each released penalty unit that no holding link
+/// still names loses its debuff rows. The deletes do not notify again (the reconcile is not re-entrant).
+pub fn reconcileHelpingHand(s: *State, removed: u8) HelpingHandAffected {
+    var out: HelpingHandAffected = .{};
+    var ended: [st.MAX_UNITS]u8 = undefined;
+    var n_ended: usize = 0;
+    var released: [st.MAX_UNITS]u8 = undefined;
+    var n_released: usize = 0;
+    var retained: u256 = 0;
+    for (s.holderOrder()) |ti| {
+        const t = &s.units[ti];
+        if (t.hh_caster == st.NO_UID) continue;
+        const pen = t.hh_penalty;
+        const ci = holderSlot(s, t.hh_caster);
+        const pi = holderSlot(s, pen);
+        const end = t.isDead() or ci == null or s.units[ci.?].isDead() or pi == null or s.units[pi.?].isDead() or
+            (removed != st.NO_UID and (removed == t.uid or removed == t.hh_caster or removed == pen)) or
+            !helpingHandLive(&t.buffs) or !helpingHandLive(&s.units[pi.?].debuffs);
+        if (end) {
+            ended[n_ended] = ti;
+            n_ended += 1;
+            if (pen != st.NO_UID and std.mem.indexOfScalar(u8, released[0..n_released], pen) == null) {
+                released[n_released] = pen;
+                n_released += 1;
+            }
+        } else if (pen != st.NO_UID) retained |= @as(u256, 1) << pen;
+    }
+    for (ended[0..n_ended]) |ti| {
+        const t = &s.units[ti];
+        t.hh_caster = st.NO_UID;
+        t.hh_penalty = st.NO_UID;
+        t.buffs.delete(.helping_hand);
+        out.add(ti);
+    }
+    for (released[0..n_released]) |pen| {
+        if (retained & (@as(u256, 1) << pen) != 0) continue;
+        const pi = holderSlot(s, pen) orelse continue;
+        s.units[pi].debuffs.delete(.helping_hand);
+        out.add(pi);
+    }
+    return out;
+}
+
+/// notifyHelpingHandChange, UnitsHolder.refreshHelpingHandLinks(removedUnitId): the reconcile, then every affected unit
+/// still alive, in order, takes the refresh pair (adjustBaseStats, then the War Anger attack mod) at once.
+pub fn helpingHandChanged(s: *State, removed: u8) void {
+    const out = reconcileHelpingHand(s, removed);
+    for (out.items[0..out.len]) |ui| {
+        const u = &s.units[ui];
+        if (u.isDead()) continue;
+        adjustBaseStats(s, u);
+        if (s.war_anger) increaseAttackMod(u, warAngerMod(s, ui));
     }
 }
 
@@ -1913,7 +2049,7 @@ pub fn completeTurn(s: *State, ui: u8, hourglass: bool, skip: bool, events: *Eve
         events.push(.unit_skipped, u.uid);
     }
     if (!hourglass) {
-        minusLap(u);
+        minusLap(s, u);
         s.fight.made |= unitBit(ui);
         _ = s.fight.up_next.removeOnce(ui);
         u.on_hourglass = false;
@@ -2542,6 +2678,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.id == .disguise_aura) swaps = true;
             if (b.id.isBatch6Stat()) s.b6_hooks = true;
             if (b.id == .wind_flow) s.spell_hooks = true;
+            if (b.id == .helping_hand) s.helping_hand = true;
         }
         for (u.debuffs.items[0..u.debuffs.len]) |b| {
             // Gravechain's Gravebound outlives its holder's rows (Rime Charm's Quagmire is Spit Ball's, below).
@@ -2555,7 +2692,9 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
                 s.hamstring = true;
                 s.b6_hooks = true;
             }
+            if (b.id == .helping_hand) s.helping_hand = true;
         }
+        if (u.hh_caster != st.NO_UID or u.hh_penalty != st.NO_UID) s.helping_hand = true;
         // Spells move only with Predatory Assimilation, so the board's books cover every later holder.
         if (u.n_book != 0 or u.n_spells != 0) s.spell_hooks = true;
         for (u.spells[0..u.n_spells]) |b| {
@@ -2563,6 +2702,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             // A spent Craft lingers in the parsed book at 0 (its raw entry is gone, and with it the recorded configs).
             if (b.spell == @intFromEnum(st.CastSpell.craft) and b.amount > 0) crafts = true;
             if (b.spell == @intFromEnum(st.CastSpell.armor_rune) or b.spell == @intFromEnum(st.CastSpell.weapon_rune)) s.runes = true;
+            if (b.spell == @intFromEnum(st.CastSpell.helping_hand)) s.helping_hand = true;
         }
         if (u.effects.find(.poison) != null) poisons = true;
     }

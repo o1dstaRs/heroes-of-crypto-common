@@ -200,6 +200,22 @@ fn unitIndexOf(ids: []const []const u8, id: []const u8, why: *Why, what: []const
     return rec.unitIndex(ids, id) catch why.malformed("{s}: unknown unit {s}", .{ what, id });
 }
 
+/// An optional unit id property (undefined or "" = none) as a uid.
+fn linkId(v: Value, ids: []const []const u8, why: *Why, what: []const u8) Error!u8 {
+    if (isUndefined(v)) return st.NO_UID;
+    if (v != .string) return why.unsupported("{s} that is not an id", .{what});
+    if (v.string.len == 0) return st.NO_UID;
+    return unitIndexOf(ids, v.string, why, what);
+}
+
+/// A Helping Hand row's stored properties: the caster's max hp and base armor at the cast.
+fn helpingHandProperties(o: Value, why: *Why) Error![2]f64 {
+    const hp = get(o, "firstSpellProperty");
+    const armor = get(o, "secondSpellProperty");
+    if (isUndefined(hp) or isUndefined(armor)) return why.unsupported("a Helping Hand row without its stored properties", .{});
+    return .{ try number(hp, why, "Helping Hand max hp"), try number(armor, why, "Helping Hand base armor") };
+}
+
 fn cellOf(v: Value, why: *Why, what: []const u8) Error!st.Cell {
     if (v == .array and v.array.items.len == 2) {
         return .{ .x = try intAs(i32, v.array.items[0], why, what), .y = try intAs(i32, v.array.items[1], why, what) };
@@ -570,15 +586,30 @@ fn loadLists(u: *Unit, fields: Value, props: Value, why: *Why) Error!void {
     }
     // Stored properties: the aura rows' source cells (buff and debuff rows), the augments' (Sniper "27;70") and the
     // artifact rows' (scope.storesProperties), as engine.loadBuffSources.
+    // Helping Hand's rows keep theirs on the unit (one row of the name per list).
     const objects = try items(get(fields, "buffs"), why, "buffs");
+    var gifts: u8 = 0;
     for (objects, 0..) |o, i| {
         const b = &u.buffs.items[u.aug_orphans + i];
+        if (b.id == .helping_hand) {
+            gifts += 1;
+            if (gifts > 1) return why.unsupported("two Helping Hand buff rows", .{});
+            u.hh_gift = try helpingHandProperties(o, why);
+            continue;
+        }
         if (b.laps != st.LAPS_AURA and !scope.storesProperties(b.id)) continue;
         b.src_x = try storedProperty(get(o, "firstSpellProperty"), why);
         b.src_y = try storedProperty(get(o, "secondSpellProperty"), why);
     }
+    var costs: u8 = 0;
     for (try items(get(fields, "debuffs"), why, "debuffs"), 0..) |o, i| {
         const b = &u.debuffs.items[i];
+        if (b.id == .helping_hand) {
+            costs += 1;
+            if (costs > 1) return why.unsupported("two Helping Hand debuff rows", .{});
+            u.hh_cost = try helpingHandProperties(o, why);
+            continue;
+        }
         if (b.laps != st.LAPS_AURA) continue;
         b.src_x = try storedProperty(get(o, "firstSpellProperty"), why);
         b.src_y = try storedProperty(get(o, "secondSpellProperty"), why);
@@ -747,6 +778,9 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
     const forbidden = get(props, "forbidden_target");
     u.forbidden = st.NO_UID;
     if (forbidden == .string and forbidden.string.len > 0) u.forbidden = try unitIndexOf(ids, forbidden.string, why, "forbidden_target");
+    // Helping Hand's link (spells/helping_hand.ts) names the caster and the penalty unit by id: kept as uids.
+    u.hh_caster = try linkId(get(props, "helping_hand_caster_id"), ids, why, "helping_hand_caster_id");
+    u.hh_penalty = try linkId(get(props, "helping_hand_penalty_id"), ids, why, "helping_hand_penalty_id");
     try loadLists(u, fields, props, why);
     try loadBook(s, u, fields, props, why);
     u.summoned = get(uv, "summoned") == .bool and get(uv, "summoned").bool;

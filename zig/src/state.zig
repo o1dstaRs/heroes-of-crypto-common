@@ -205,6 +205,9 @@ pub const SpellId = enum(u8) {
     blindness,
     /// The Mantis's effect: the holder cannot move and deals (100 - power)% of its damage.
     paralysis,
+    /// The Satyr's Helping Hand (wave 2): a buff on the gifted ally and a debuff on the caster or its Absorb Penalties
+    /// source, each carrying the caster's max hp and base armor at the cast (Unit.hh_gift, Unit.hh_cost).
+    helping_hand,
 
     /// An artifact buff row or marker debuff (UnitsHolder.applyArtifacts).
     pub inline fn isArtifact(self: SpellId) bool {
@@ -307,6 +310,7 @@ pub const SpellId = enum(u8) {
             .wolf_trail_blessing => "Wolf Trail Blessing",
             .blindness => "Blindness",
             .paralysis => "Paralysis",
+            .helping_hand => "Helping Hand",
         };
     }
 
@@ -674,7 +678,7 @@ pub const AbilityId = enum(u8) {
     pub fn ownsSpell(self: AbilityId, spell: CastSpell) bool {
         return switch (self) {
             .book_of_healing => spell == .heal or spell == .blessing or spell == .spiritual_armor or spell == .mass_heal,
-            .forest_spellbook => spell == .summon_wolves or spell == .courage,
+            .forest_spellbook => spell == .summon_wolves or spell == .courage or spell == .helping_hand,
             .basic_tome_of_battle_magic => spell == .fire_strike or spell == .meteorite,
             .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower or spell == .whirlpool,
             .book_of_chaos => spell == .fireball or spell == .fireforged_sword or spell == .misfortune or spell == .smoke,
@@ -783,6 +787,7 @@ pub const CastSpell = enum(u8) {
     mass_magic_mirror,
     // wave 2a: the Satyr's Forest Spellbook
     courage,
+    helping_hand,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -814,6 +819,7 @@ pub const CastSpell = enum(u8) {
             .mass_riot => "Mass Riot",
             .mass_magic_mirror => "Mass Magic Mirror",
             .courage => "Courage",
+            .helping_hand => "Helping Hand",
         };
     }
 
@@ -843,6 +849,7 @@ pub const CastSpell = enum(u8) {
             .mass_riot => .mass_riot,
             .mass_magic_mirror => .mass_magic_mirror,
             .courage => .courage,
+            .helping_hand => .helping_hand,
             else => null,
         };
     }
@@ -1206,6 +1213,14 @@ pub const Unit = struct {
     /// unitProperties.forbidden_target (Terrifying Gaze): the uid of the gazer this unit may not attack or answer
     /// (NO_UID = ""). An id, not a slot: TypeScript keeps it after the gazer dies, until the effect is gone.
     forbidden: u8 = NO_UID,
+    /// unitProperties.helping_hand_caster_id / helping_hand_penalty_id (spells/helping_hand.ts): on a Helping Hand target
+    /// or a Borrowed Grace thief, the uids of the caster and of the unit holding the penalty row (NO_UID = absent).
+    hh_caster: u8 = NO_UID,
+    hh_penalty: u8 = NO_UID,
+    /// The stored properties (the caster's max hp and base armor at the cast) of this unit's Helping Hand buff row
+    /// (hh_gift) and debuff row (hh_cost); a list holds at most one row of the name.
+    hh_gift: [2]f64 = .{ 0, 0 },
+    hh_cost: [2]f64 = .{ 0, 0 },
     /// Unit.maxRangeShots: the constructor's range_shots (the creature config), hidden; Limited Supply's cap reads it.
     max_range_shots: f64 = 0,
     /// Artifacts: Warlord's Edge's warlordsEdgeAttackBase and warlordsEdgeAppliedAttackBonus (rewritten by every
@@ -1613,6 +1628,9 @@ pub const State = struct {
     mof_laps: f64 = 2,
     /// Fireforged Sword: some unit carries the buff or holds the spell, so the hits collect their burn victims.
     swords: bool = false,
+    /// Helping Hand: some unit holds the spell, a row or a link, so the refresh adds the rows' terms and the link hooks
+    /// run (engine.helpingHandChanged).
+    helping_hand: bool = false,
     /// Craft: the four cards it grants (Crafted Double Punch, Double Shot, Frozen Sword, Frozen Bow, from the recorded
     /// `abilityConfigs`) and the effects.json Stun it applies by name; loaded when a book holds a Craft charge.
     crafted: [4]Ability = undefined,

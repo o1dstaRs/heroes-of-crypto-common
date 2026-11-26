@@ -6,7 +6,8 @@
 //! names the stored properties of aura rows and augments only ("x;y"); other rows print ";" (TypeScript prints a
 //! blessing's power there, which the port keeps as the row's power). The batch-3 columns follow the setup columns
 //! (abilities, stolen abilities, the Web lock, `debuffs_sources` with the same rule as `buffs_sources`, the Rallying
-//! Volley arrows), then the spellbook columns (`spell_entries`, `spellbook`), then the batch-4 `forbidden_target`; the
+//! Volley arrows), then the spellbook columns (`spell_entries`, `spellbook`), then the batch-4 `forbidden_target` and
+//! `helping_hand_link` ("caster id;penalty id"; a Helping Hand row's sources print its max hp and base armor); the
 //! fight block carries the vines. Ids come from `ids` by uid; a unit summoned after the table was built prints its UUID.
 
 const std = @import("std");
@@ -25,6 +26,13 @@ fn num(w: *Writer, x: f64) Writer.Error!void {
     if (std.math.isNan(x) or std.math.isInf(x)) return w.writeAll("null");
     if (x == 0) return w.writeAll("0");
     try w.print("{d}", .{x});
+}
+
+/// A Helping Hand row's stored properties as TypeScript prints them: "max hp;base armor".
+fn pair(w: *Writer, p: [2]f64) Writer.Error!void {
+    try num(w, p[0]);
+    try w.writeByte(';');
+    try num(w, p[1]);
 }
 
 fn str(w: *Writer, s: []const u8) Writer.Error!void {
@@ -167,6 +175,10 @@ pub fn write(w: *Writer, s: *const State, ids: []const []const u8) Writer.Error!
         // buffs_sources reads the buff objects: a revive's orphan augment rows have none.
         for (buffs[u.aug_orphans..], 0..) |b, i| {
             if (i > 0) try w.writeByte(',');
+            if (b.id == .helping_hand) {
+                try pair(w, u.hh_gift);
+                continue;
+            }
             if (b.src_x >= 0) try w.print("{d}", .{b.src_x});
             try w.writeByte(';');
             if (b.src_y >= 0) try w.print("{d}", .{b.src_y});
@@ -190,6 +202,10 @@ pub fn write(w: *Writer, s: *const State, ids: []const []const u8) Writer.Error!
         try w.print("\",{d},\"", .{@intFromBool(u.web_locked)});
         for (debuffs, 0..) |b, i| {
             if (i > 0) try w.writeByte(',');
+            if (b.id == .helping_hand) {
+                try pair(w, u.hh_cost);
+                continue;
+            }
             if (b.src_x >= 0) try w.print("{d}", .{b.src_x});
             try w.writeByte(';');
             if (b.src_y >= 0) try w.print("{d}", .{b.src_y});
@@ -210,7 +226,12 @@ pub fn write(w: *Writer, s: *const State, ids: []const []const u8) Writer.Error!
         // Batch-4 column: Terrifying Gaze's forbidden target (the gazer's id, "" for none).
         try w.writeAll("\",");
         try str(w, if (u.forbidden != st.NO_UID and u.forbidden < ids.len) ids[u.forbidden] else if (u.forbidden != st.NO_UID) uidText(s, u.forbidden, &id_buf) else "");
-        try w.writeByte(']');
+        // Helping Hand's link: "caster id;penalty id" (each "" when absent).
+        try w.writeAll(",\"");
+        if (u.hh_caster != st.NO_UID) try w.writeAll(if (u.hh_caster < ids.len) ids[u.hh_caster] else uidText(s, u.hh_caster, &id_buf));
+        try w.writeByte(';');
+        if (u.hh_penalty != st.NO_UID) try w.writeAll(if (u.hh_penalty < ids.len) ids[u.hh_penalty] else uidText(s, u.hh_penalty, &id_buf));
+        try w.writeAll("\"]");
     }
     const f = &s.fight;
     try w.print("],\"fight\":{{\"lap\":{d},\"started\":{d},\"finished\":{d},\"firstTurnMade\":{d},\"previousTurnTeam\":{d},\"highestInitiative\":", .{

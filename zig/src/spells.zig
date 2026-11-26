@@ -710,8 +710,8 @@ fn magicAttack(s: *State, ci: u8, target: ?u8, spell: CS, cfg: *const st.SpellCo
             if (t.hp > t.max_hp) t.hp = t.max_hp;
         }
     } else {
-        // applyBuff (no Helping Hand body): the row at the end of the list, its power raised by the caster's Tome of
-        // Amplification (amplifyCastBuffForTarget: an ally's or the caster's own copy)
+        // applyBuff: the row at the end of the list, its power raised by the caster's Tome of Amplification
+        // (amplifyCastBuffForTarget: an ally's or the caster's own copy); Helping Hand's carries the caster's body.
         const id = spell.applied() orelse {
             s.overflow = true;
             return error.Rejected;
@@ -719,9 +719,30 @@ fn magicAttack(s: *State, ci: u8, target: ?u8, spell: CS, cfg: *const st.SpellCo
         const laps = cfg.laps + @as(f64, if (ci == ti) 1 else 0);
         const power = if (s.artifacts and caster.team == t.team) artifacts.tomePower(caster, cfg, cfg.power) else cfg.power;
         abilities.pushChecked(s, &t.buffs, .{ .id = id, .laps = laps, .power = power });
+        if (spell == .helping_hand) helpingHand(s, ci, ti, cfg);
     }
     useSpell(caster, spell);
     engine.completeTurn(s, ci, false, false, events);
+}
+
+/// handleMagicAttack's Helping Hand (attack_handler.ts:669, :847), after the gift row: the gift stores the caster's max
+/// hp and base armor; the penalty goes to the caster or, after the Absorb Penalties roll, to that aura's source, as a
+/// debuff row (the config's power, laps + 1, the same two numbers) unless that unit holds one already; the target then
+/// links the caster and the penalty unit.
+fn helpingHand(s: *State, ci: u8, ti: u8, cfg: *const st.SpellConfig) void {
+    const caster = &s.units[ci];
+    const t = &s.units[ti];
+    t.hh_gift = .{ caster.max_hp, caster.base_armor };
+    const di = abilities.absorptionTarget(s, ci);
+    const d = &s.units[di];
+    if (d.debuffs.find(.helping_hand) == null) {
+        abilities.pushChecked(s, &d.debuffs, .{ .id = .helping_hand, .laps = cfg.laps + 1, .power = cfg.power });
+        d.hh_cost = .{ caster.max_hp, caster.base_armor };
+    }
+    if (t.buffs.find(.helping_hand) != null) {
+        t.hh_caster = caster.uid;
+        t.hh_penalty = d.uid;
+    }
 }
 
 /// handleMagicAttack's debuff branch (Misfortune): the magic-resist save getRandomInt(0, 100) < floor(magic resist) (a MIND

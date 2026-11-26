@@ -528,7 +528,7 @@ const holdsCard = (name: string): boolean =>
 const SPIT = holdsCard("Spit Ball");
 const SPELL_SUMMON_CREATURES = ["Wolf"];
 
-const DIGEST_FIELDS = digestFields(SETUP, BATCH3 || BATCH4 || BATCH6A, SPELLS, BATCH4);
+const DIGEST_FIELDS = digestFields(SETUP, BATCH3 || BATCH4 || BATCH6A, SPELLS, BATCH4, SPELLS);
 
 function digest(ctx: Ctx): { units: unknown[][]; fight: Record<string, unknown> } {
     return battleDigest(ctx, {
@@ -537,6 +537,7 @@ function digest(ctx: Ctx): { units: unknown[][]; fight: Record<string, unknown> 
         batch3: BATCH3 || BATCH6A,
         spells: SPELLS,
         batch4: BATCH4,
+        helpingHand: SPELLS,
     });
 }
 

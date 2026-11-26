@@ -1139,7 +1139,19 @@ pub fn borrowedGrace(s: *State, thief_i: u8, target_i: u8, active_i: u8) void {
     var copy = applied;
     copy.laps = laps;
     thief.buffs.delete(id);
+    if (id != .helping_hand) {
+        pushChecked(s, &thief.buffs, copy);
+        return;
+    }
+    // deleteBuff("Helping Hand") notifies whether or not the thief held a row; the copy keeps the stored properties
+    // and takes the target's link when it has one.
+    if (s.helping_hand) engine.helpingHandChanged(s, st.NO_UID);
     pushChecked(s, &thief.buffs, copy);
+    thief.hh_gift = target.hh_gift;
+    if (target.hh_caster != st.NO_UID and target.hh_penalty != st.NO_UID) {
+        thief.hh_caster = target.hh_caster;
+        thief.hh_penalty = target.hh_penalty;
+    }
 }
 
 /// processAbsolvingArrowAbility's lifts on one ally: every effect with laps > 0, then every debuff with laps > 0
@@ -1168,6 +1180,8 @@ pub fn absolveAlly(s: *State, ally: *Unit, first: f64) void {
         if (roll >= chance) continue;
         ally.effects.delete(id);
         ally.debuffs.delete(id);
+        // deleteDebuff("Helping Hand") ends the penalty's links in the same shot.
+        if (id == .helping_hand and s.helping_hand) engine.helpingHandChanged(s, st.NO_UID);
     }
 }
 
