@@ -42,6 +42,8 @@ import {
 } from "../../../src/ai/versions/v0_8_support_roles";
 import { prioritizeV08A13FinishDecision, V08S_URGENT_FINISH_START_LAP } from "../../../src/ai/versions/v0_8s_finish";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../../../src/ai/candidates";
+import { fillValueFeaturesV2 } from "../../../src/simulation/value_features";
+import { V08_A13_VALUE_LEAF } from "../../../src/ai/versions/v0_8_a13_profile";
 import { battleMageTargetsEnabled } from "../../../src/ai/battle_mage_targets";
 import { v08DominantFinishState } from "../../../src/ai/versions/v0_8_dominant_finish";
 
@@ -141,6 +143,23 @@ function note(name: string, actions: GameAction[], entered = previousExit): void
     log.push([name, text === previous ? null : JSON.parse(text), entered, exit]);
     previous = text;
     previousExit = exit;
+}
+
+/**
+ * RECORD_LEAF=1: the production V2 rollout leaf at a decision's board for each team (search_driver leafValue with
+ * V08_A13_VALUE_LEAF): [team 1 P, team 2 P, ...team 1 features, ...team 2 features]. Pure; no RNG.
+ */
+export function leafOracle(unitsHolder: unknown, fightProperties: unknown): number[] {
+    const out: number[] = [];
+    const feats: number[][] = [];
+    for (const team of [1, 2]) {
+        const f = fillValueFeaturesV2([], unitsHolder as never, fightProperties as never, team as never);
+        let z = V08_A13_VALUE_LEAF.b;
+        for (let i = 0; i < f.length; i += 1) z += V08_A13_VALUE_LEAF.w[i] * f[i];
+        out.push(1 / (1 + Math.exp(-z)));
+        feats.push(f);
+    }
+    return [...out, ...feats[0], ...feats[1]];
 }
 
 /** RECORD_CANDIDATES=1 also logs the candidate lists (they do not change the battle; check with a plain recording). */

@@ -690,7 +690,7 @@ pub fn waitFeatures(s: *const State, ui: u8, incumbent: []const rec.Action, out:
     const lap_capped = @min(lap, 8) / 8;
     const is_melee: f64 = if (at == AT.MELEE or at == AT.MELEE_MAGIC) 1 else 0;
     const is_ranged: f64 = if (at == AT.RANGE) 1 else 0;
-    const made: f64 = @floatFromInt(@popCount(s.fight.made));
+    const made: f64 = @floatFromInt(s.fight.madeCount());
     var f = out[VALUE_FEATURES..];
     f[0] = fm;
     f[1] = clampCnt(own_yet);

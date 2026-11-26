@@ -30,9 +30,7 @@ import { TurnEngine } from "../../../src/engine/turn_engine";
 import { getAIStrategy } from "../../../src/ai";
 import { captureAITargetMemory } from "../../../src/ai/ai";
 import { StrategyV0_8 } from "../../../src/ai/versions/v0_8";
-import { beginDecision, endCandidates, endDecision, installLayerLog, type Layer } from "./layers";
-import { fillValueFeaturesV2 } from "../../../src/simulation/value_features";
-import { V08_A13_VALUE_LEAF } from "../../../src/ai/versions/v0_8_a13_profile";
+import { beginDecision, endCandidates, endDecision, installLayerLog, leafOracle, type Layer } from "./layers";
 import { PathHelper } from "../../../src/grid/path_helper";
 import { creatureIdForName } from "../../../src/ai/setup/creature_score";
 import { buildRoster, creaturesByLevel, makeRng } from "../../../src/simulation/army";
@@ -386,23 +384,6 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
     };
 }
 
-/**
- * RECORD_LEAF=1: the production V2 rollout leaf at the decision's board for each team (search_driver leafValue with
- * V08_A13_VALUE_LEAF): [team 1 P, team 2 P, ...team 1 features, ...team 2 features].
- */
-function leafOracle(ctx: Ctx): number[] {
-    const out: number[] = [];
-    const feats: number[][] = [];
-    for (const team of [1, 2]) {
-        const f = fillValueFeaturesV2([], ctx.unitsHolder, ctx.fightProperties, team as never);
-        let z = V08_A13_VALUE_LEAF.b;
-        for (let i = 0; i < f.length; i += 1) z += V08_A13_VALUE_LEAF.w[i] * f[i];
-        out.push(1 / (1 + Math.exp(-z)));
-        feats.push(f);
-    }
-    return [...out, ...feats[0], ...feats[1]];
-}
-
 function main(): void {
     const games = Number(process.argv[2] ?? 50);
     const firstSeed = Number(process.argv[3] ?? 1);
@@ -538,7 +519,9 @@ function main(): void {
             draws: rng.draws - d0,
             out: JSON.parse(JSON.stringify(actions)),
             ...(layers ? { layers, memory, ...(candidates?.length ? { candidates } : {}) } : {}),
-            ...(process.env.RECORD_LEAF === "1" && ctx ? { leaf: leafOracle(ctx) } : {}),
+            ...(process.env.RECORD_LEAF === "1" && ctx
+                ? { leaf: leafOracle(ctx.unitsHolder, ctx.fightProperties) }
+                : {}),
         });
         return actions;
     };
