@@ -722,10 +722,13 @@ fn search(comptime fly: bool, comptime pass: Pass, m: *const Matrix, p: Params, 
         if (!c[0]) continue;
         const cell = Cell{ .x = start.x + c[1], .y = start.y + c[2] };
         const k = key(cell.x, cell.y);
-        const entry = Route{ .cell = cell, .parent = 0, .weight = 1, .remaining = 0, .first_aggr_met = false };
+        var entry = Route{ .cell = cell, .parent = 0, .weight = 1, .remaining = 0, .first_aggr_met = false };
+        const mof = p.made_of_fire;
         if (small) {
-            if (at(m, cell.x, cell.y) != 0 or allowed.has(k)) continue;
+            const me1 = at(m, cell.x, cell.y);
+            if (!freeForClosest(me1, mof) or allowed.has(k)) continue;
             allowed.put(k);
+            entry.has_lava = me1 == LAVA;
             out.set(k, entry);
         } else if (!legacy) {
             var edge_blocked = false;
@@ -733,10 +736,12 @@ fn search(comptime fly: bool, comptime pass: Pass, m: *const Matrix, p: Params, 
                 const cx = cell.x - off_x[i];
                 const cy = cell.y - off_y[i];
                 if (ctx.covers(start, cx, cy)) continue;
-                if (allowed.has(key(cx, cy)) or at(m, cx, cy) != 0) {
+                const el = at(m, cx, cy);
+                if (allowed.has(key(cx, cy)) or !freeForClosest(el, mof)) {
                     edge_blocked = true;
                     break;
                 }
+                if (el == LAVA) entry.has_lava = true;
             }
             if (!edge_blocked) {
                 for (0..n_off) |i| {
@@ -761,9 +766,12 @@ fn search(comptime fly: bool, comptime pass: Pass, m: *const Matrix, p: Params, 
             }
             const k1 = key(e[0][0], e[0][1]);
             const k2 = key(e[1][0], e[1][1]);
-            if (!allowed.has(k1) and at(m, e[0][0], e[0][1]) == 0 and !allowed.has(k2) and at(m, e[1][0], e[1][1]) == 0) {
+            const me1 = at(m, e[0][0], e[0][1]);
+            const me2 = at(m, e[1][0], e[1][1]);
+            if (!allowed.has(k1) and freeForClosest(me1, mof) and !allowed.has(k2) and freeForClosest(me2, mof)) {
                 allowed.put(k1);
                 allowed.put(k2);
+                entry.has_lava = me1 == LAVA or me2 == LAVA;
                 out.set(k, entry);
             }
         }
@@ -992,4 +1000,29 @@ fn merge(out: *MovePath, sc: *StrideScratch, vines: *const [st.GRID]u16) void {
     out.n = r.n;
     out.by_key = r.by_key;
     @memcpy(out.routes[0..next_hidden], r.routes[0..next_hidden]);
+}
+
+test "the closest-move pass gives a made-of-fire walker the threatened lava cell the search cannot afford" {
+    // Seed 61300064's Troll (Lava Striders): a walker on (5,9) with 1.5 steps. The search meets its left neighbour
+    // (4,9) first, a threatened cell, which flips the start's firstAggrMet; the threatened lava cell (6,9) then costs
+    // its full aggression, 2, so only calculateMovePath's closest-move pass reaches it: weight 1, hasLavaCell.
+    var m = std.mem.zeroes(Matrix);
+    m[6][9] = LAVA;
+    m[6][8] = LAVA;
+    var aggr = std.mem.zeroes([st.GRID][st.GRID]i16);
+    aggr[4][9] = 2;
+    aggr[6][9] = 2;
+    const p = Params{ .start = .{ .x = 5, .y = 9 }, .max_steps = 1.5, .aggr = &aggr, .can_fly = false, .w = 1, .h = 1, .made_of_fire = true };
+    var out: MovePath = .{};
+    getMovePath(&m, p, &out);
+    const lava = out.get(key(6, 9)) orelse return error.TestExpectedLavaCell;
+    try std.testing.expectEqual(@as(f64, 1), lava.weight);
+    try std.testing.expect(lava.has_lava);
+    try std.testing.expect(out.get(key(4, 9)) != null);
+    // A walker not made of fire never stands on lava.
+    var plain = p;
+    plain.made_of_fire = false;
+    var walker: MovePath = .{};
+    getMovePath(&m, plain, &walker);
+    try std.testing.expect(walker.get(key(6, 9)) == null);
 }
