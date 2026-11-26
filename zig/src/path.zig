@@ -1,5 +1,6 @@
 //! PathHelper.getMovePath as the v0.1 AI uses it (src/grid/path_helper.ts, indexed fast path), in scope: holes,
-//! mountains and stones (-1), lava (-3) and vines, no water or fire walls and nothing made of fire, footprints 1x1, 2x1
+//! mountains and stones (-1), lava (-3), vines and fire walls (a walker's toll per burning cell its body sweeps into),
+//! no water and nothing made of fire, footprints 1x1, 2x1
 //! and 2x2. The terrain predicates are read literally: a walker is stopped by any non-zero cell, a flyer by any
 //! non-zero cell except lava and water, and a flyer route over lava carries hasLavaCell.
 //!
@@ -155,6 +156,8 @@ pub const Params = struct {
     vines: ?*const [st.GRID]u16 = null,
     /// hasAbilityActive("In Its Own World"): the vine strider's free second pass.
     vine_stride: bool = false,
+    /// FightProperties.fireWalls as a cell bitmap (bit y of fire[x]); null when the board has none.
+    fire: ?*const [st.GRID]u16 = null,
     /// isMadeOfFire = unit.canTraverseLava() (a Lava Striders army, artifacts.zig): a walker's body may stand on lava,
     /// a walker route that touches lava carries hasLavaCell, and the closest-move pass takes lava cells.
     made_of_fire: bool = false,
@@ -167,6 +170,51 @@ pub const PATH_BUDGET_EPSILON: f64 = 1e-9;
 
 inline fn vined(v: *const [st.GRID]u16, x: i32, y: i32) bool {
     return v[@intCast(x)] & (@as(u16, 1) << @intCast(y)) != 0;
+}
+
+/// FIRE_WALL_CROSS_PENALTY (src/spells/fire_walls.ts)
+pub const FIRE_WALL_CROSS_PENALTY: f64 = 1;
+
+/// terrainAdjustedCost's Fire Wall term for a walker's step from anchor `a` to the neighbour `b`: the toll per burning
+/// cell of getSweptFootprintCells(a, b) (the cells the body newly touches, the start footprint excluded; a diagonal
+/// step touches both side footprints, then the destination's).
+fn fireToll(fire: *const [st.GRID]u16, a: Cell, b: Cell, w: u8, h: u8) f64 {
+    const sx = b.x - a.x;
+    const sy = b.y - a.y;
+    var anchors: [3]Cell = undefined;
+    var na: usize = 0;
+    if (sx != 0 and sy != 0) {
+        anchors[0] = .{ .x = a.x + sx, .y = a.y };
+        anchors[1] = .{ .x = a.x, .y = a.y + sy };
+        na = 2;
+    }
+    anchors[na] = b;
+    na += 1;
+    var seen: [12]Cell = undefined;
+    var ns: usize = 0;
+    var burning: f64 = 0;
+    for (anchors[0..na]) |anc| {
+        var dx: i32 = 0;
+        while (dx < w) : (dx += 1) {
+            var dy: i32 = 0;
+            while (dy < h) : (dy += 1) {
+                const c = Cell{ .x = anc.x - dx, .y = anc.y - dy };
+                // the start footprint: a's own cells
+                if (c.x <= a.x and c.x > a.x - @as(i32, w) and c.y <= a.y and c.y > a.y - @as(i32, h)) continue;
+                var dup = false;
+                for (seen[0..ns]) |x| {
+                    if (x.x == c.x and x.y == c.y) dup = true;
+                }
+                if (dup) continue;
+                if (ns < seen.len) {
+                    seen[ns] = c;
+                    ns += 1;
+                }
+                if (c.x >= 0 and c.y >= 0 and c.x < st.GRID and c.y < st.GRID and vined(fire, c.x, c.y)) burning += 1;
+            }
+        }
+    }
+    return burning * FIRE_WALL_CROSS_PENALTY;
 }
 
 /// getMovePath -> calculateMovePath (indexed branch) -> filterUnallowedDestinations (it filters only `cells`, which
@@ -627,11 +675,17 @@ fn search(comptime fly: bool, comptime pass: Pass, m: *const Matrix, p: Params, 
                 cost = if (fly) DIAGONAL_MOVE_COST else DIAGONAL_MOVE_COST * ctx.aggr(n, parent);
                 // vineAdjustedCost: a walker pays the toll on a vined anchor (a strider not in this pass)
                 if (pass == .first and !fly and !p.vine_stride and vined(p.vines.?, n.x, n.y)) cost += VINE_CROSS_PENALTY;
+                if (!fly) if (p.fire) |fw| {
+                    cost += fireToll(fw, cur, n, p.w, p.h);
+                };
                 if (!(remaining >= cost)) continue;
                 if (!fly and ctx.sneaks(cur, n)) continue;
             } else {
                 cost = if (fly) 1 else ctx.aggr(n, parent);
                 if (pass == .first and !fly and !p.vine_stride and vined(p.vines.?, n.x, n.y)) cost += VINE_CROSS_PENALTY;
+                if (!fly) if (p.fire) |fw| {
+                    cost += fireToll(fw, cur, n, p.w, p.h);
+                };
                 if (!(remaining >= cost)) continue;
             }
             const child = Route{
@@ -812,6 +866,9 @@ fn strideSearch(comptime fly: bool, m: *const Matrix, p: Params, vines: *const [
                 cost = if (fly) 1 else g.aggr(n, parent);
             }
             if (on_vine) cost = 0; // VINE_STRIDE_CELL_COST
+            if (!fly) if (p.fire) |fw| {
+                cost += fireToll(fw, cur, n, p.w, p.h);
+            };
             if (!(remaining >= cost)) continue;
             const next = remaining - cost;
             if (visited.has(kn) and !(next > left[kn] + PATH_BUDGET_EPSILON)) continue; // relaxesBudget

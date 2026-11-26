@@ -330,6 +330,14 @@ fn cleanupDeadUnits(s: *State, died: *const Died, events: *Events, attribution: 
     }
 }
 
+/// cleanupDeadUnits([unit]) for a stack a Fire Wall burned to death on its way (with the strike's kill attributions when
+/// it was walking in to strike: a target holding Infest raises a summon from the attacker's corpse).
+pub fn cleanupFireDeath(s: *State, ui: u8, attribution: ?*const Attribution, events: *Events) void {
+    var died: Died = .{};
+    died.push(ui);
+    cleanupDeadUnits(s, &died, events, attribution);
+}
+
 /// cleanupDeadUnits with a spell's kill attributions (createDirectKillAttributions over the caster's enemy victims,
 /// `killed`): each dead unit of `died` leaves the holder in order, and a killed corpse raises a summon when the
 /// caster (`killer`, captured before the cleanup) holds Infest.
@@ -457,6 +465,26 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     const stationary = current.x == from.x and current.y == from.y;
     const cells_before = engine.unitCells(att); // the snare on arrival compares the body before and after
     try strikeMovePrefix(s, ai, from, from_cells.slice(), path, stationary);
+    // burnAttackerOnFireWalls: the walk in burns before the blow (after the smoke dispel); a stack the flames kill never
+    // strikes: the action completes with its cleanup (the melee kill attributions) and completeTurn.
+    if (!stationary and s.fight.n_fire != 0) {
+        const travelled = if (path.len > 0 and path[0].x == current.x and path[0].y == current.y) path[1..] else path;
+        const landing = engine.unitCells(att);
+        var burning: engine.Swept = .{};
+        engine.burningCellsEntered(s, ai, cells_before.slice(), travelled, landing.slice(), false, &burning);
+        engine.burnOnFire(s, ai, burning.slice());
+        if (att.isDead()) {
+            const attribution: Attribution = .{
+                .v1 = ti,
+                .k1 = engine.killerOf(&s.units[ai]),
+                .v2 = ai,
+                .k2 = engine.killerOf(&s.units[ti]),
+            };
+            cleanupFireDeath(s, ai, &attribution, events);
+            engine.completeTurn(s, ai, false, false, events);
+            return;
+        }
+    }
 
     // chargedRouteCells: a stationary strike after this turn's move charges that move's route; a path-bearing strike
     // charges its whole route (path.length, origin included); otherwise there are no known paths and no charge.
@@ -2457,7 +2485,7 @@ fn obstacleEcho(s: *State, ai: u8, tx: f64, ty: f64) void {
 /// melee branch: the walk in (or a strike in place), the hit, Skewer Strike's pierce, Double Punch's second hit,
 /// then Hydra's Lightning Spin around the strike anchor. No miss or damage roll on the stone itself. Returns
 /// `completed`; kills from the pierce and the spin go to `died`. `from` is null for a shot without attackFrom.
-fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, path: []const Cell, died: *Died) bool {
+fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, path: []const Cell, died: *Died, burned: *bool) bool {
     const att = &s.units[ai];
     const target = engine.cellForPosition(tx, ty);
     const is_right = target.x >= st.GRID >> 1;
@@ -2493,6 +2521,8 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, pa
     const base = engine.baseCell(att);
     const stationary = base.x == from.x and base.y == from.y;
     const has_route = path.len != 0; // currentActiveKnownPaths.get(attackFrom)?.length
+    // Captured before either branch relocates the attacker (burnAttackerOnFireWalls).
+    const start_cells = engine.unitCells(att);
     if (engine.isSmall(att)) {
         if (!(engine.cellsFreeFor(s, ai, from_cells.slice()) and (stationary or has_route))) return false;
         const pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
@@ -2518,6 +2548,20 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, pa
         att.pos_x = pos[0];
         att.pos_y = pos[1];
         if (s.fight.n_smoke != 0) engine.dispelSmoke(s, ai, cells.slice()); // attack_handler.ts:4189
+    }
+    // The walk in burns before the obstacle is struck (both branches, after the smoke dispel); burned to death, the
+    // strike is skipped and the action completes with the cleanup alone.
+    if (!stationary and s.fight.n_fire != 0) {
+        const travelled = if (path.len > 0 and path[0].x == base.x and path[0].y == base.y) path[1..] else path;
+        const landing = engine.unitCells(att);
+        var burning: engine.Swept = .{};
+        engine.burningCellsEntered(s, ai, start_cells.slice(), travelled, landing.slice(), false, &burning);
+        engine.burnOnFire(s, ai, burning.slice());
+        if (att.isDead()) {
+            died.push(ai);
+            burned.* = true;
+            return true;
+        }
     }
     terrain.spendObstacleHit(s, target, is_right);
     pierceStoneBehind(s, ai, from, target, died);
@@ -2577,7 +2621,13 @@ pub fn obstacleAttackAt(s: *State, ai: u8, tx: f64, ty: f64, from: ?Cell, path: 
     }
 
     var died: Died = .{};
-    const completed = handleObstacleAttack(s, ai, tx, ty, from, path, &died);
+    var burned = false;
+    const completed = handleObstacleAttack(s, ai, tx, ty, from, path, &died, &burned);
+    if (burned) {
+        cleanupDeadUnits(s, &died, events, null);
+        engine.completeTurn(s, ai, false, false, events);
+        return;
+    }
     const landed = if (scattered) terrain.standingCount(s) < standing_before else terrain.hitsLeft(s) < hits_before;
     if (!completed or !landed) return error.Rejected;
 

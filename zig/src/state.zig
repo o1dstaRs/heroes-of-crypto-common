@@ -208,6 +208,8 @@ pub const SpellId = enum(u8) {
     /// The Satyr's Helping Hand (wave 2): a buff on the gifted ally and a debuff on the caster or its Absorb Penalties
     /// source, each carrying the caster's max hp and base armor at the cast (Unit.hh_gift, Unit.hh_cost).
     helping_hand,
+    /// The Nightmare's Empower (wave 2): + power to the holder's magic damage bonus.
+    empower,
 
     /// An artifact buff row or marker debuff (UnitsHolder.applyArtifacts).
     pub inline fn isArtifact(self: SpellId) bool {
@@ -311,6 +313,7 @@ pub const SpellId = enum(u8) {
             .blindness => "Blindness",
             .paralysis => "Paralysis",
             .helping_hand => "Helping Hand",
+            .empower => "Empower",
         };
     }
 
@@ -572,6 +575,10 @@ pub const AbilityId = enum(u8) {
     blindness,
     /// Mantis (STATUS): the Paralysis rider of its blow and response.
     paralysis,
+    /// Nightmare: the spellbook card (Fire Wall, Empower).
+    book_of_nightmares,
+    /// Nightmare (DISABLE_HOURGLASS): while a living holder has it active, no unit may wait.
+    time_denial,
 
     pub fn name(self: AbilityId) []const u8 {
         return switch (self) {
@@ -671,6 +678,8 @@ pub const AbilityId = enum(u8) {
             .one_in_the_field => "One in the Field",
             .blindness => "Blindness",
             .paralysis => "Paralysis",
+            .book_of_nightmares => "Book of Nightmares",
+            .time_denial => "Time Denial",
         };
     }
 
@@ -685,13 +694,14 @@ pub const AbilityId = enum(u8) {
             .blacksmith_tools => spell == .craft,
             .enchants => spell == .armor_rune or spell == .weapon_rune,
             .tome_of_might => spell == .riot or spell == .magic_mirror or spell == .mass_riot or spell == .mass_magic_mirror,
+            .book_of_nightmares => spell == .fire_wall or spell == .empower,
             else => false,
         };
     }
 
     pub inline fn isSpellbook(self: AbilityId) bool {
         return switch (self) {
-            .book_of_healing, .basic_tome_of_battle_magic, .forest_spellbook, .tome_of_elements, .book_of_chaos, .blacksmith_tools, .enchants, .tome_of_might => true,
+            .book_of_healing, .basic_tome_of_battle_magic, .forest_spellbook, .tome_of_elements, .book_of_chaos, .blacksmith_tools, .enchants, .tome_of_might, .book_of_nightmares => true,
             else => false,
         };
     }
@@ -788,6 +798,9 @@ pub const CastSpell = enum(u8) {
     // wave 2a: the Satyr's Forest Spellbook
     courage,
     helping_hand,
+    // wave 2a: the Nightmare's Book of Nightmares
+    fire_wall,
+    empower,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -820,6 +833,8 @@ pub const CastSpell = enum(u8) {
             .mass_magic_mirror => "Mass Magic Mirror",
             .courage => "Courage",
             .helping_hand => "Helping Hand",
+            .fire_wall => "Fire Wall",
+            .empower => "Empower",
         };
     }
 
@@ -850,6 +865,7 @@ pub const CastSpell = enum(u8) {
             .mass_magic_mirror => .mass_magic_mirror,
             .courage => .courage,
             .helping_hand => .helping_hand,
+            .empower => .empower,
             else => null,
         };
     }
@@ -976,6 +992,18 @@ pub const Smoke = struct {
 
 /// FightProperties.smokeClouds: one entry per cell in Map insertion order (a re-smoke resets the laps in place).
 pub const MAX_SMOKE = 96;
+
+/// One burning cell (src/spells/fire_walls.ts FireWall): laps remaining and the burn share it was lit with, in tenths
+/// of a percent (fireWallBurnPercentage rounds to one decimal: share = pct10 / 10, exactly).
+pub const FireWall = struct {
+    x: u8,
+    y: u8,
+    laps: i16,
+    pct10: u16,
+};
+
+/// FightProperties.fireWalls: one entry per cell in Map insertion order (a re-cast resets laps and share in place).
+pub const MAX_FIRE = 64;
 
 pub const MAX_AURA_DEFS = 6;
 /// Aura effects one unit emits: its own, plus the ones it stole (a Queen: Web and two stolen ones seen).
@@ -1439,6 +1467,10 @@ pub const Fight = struct {
     smoke: [MAX_SMOKE]Smoke = undefined,
     n_smoke: u8 = 0,
     smoke_cells: [GRID]u16 = .{0} ** GRID,
+    /// FightProperties.fireWalls (Fire Wall): the burning cells in Map order, and a bit per cell (bit y of fire_cells[x]).
+    fire: [MAX_FIRE]FireWall = undefined,
+    n_fire: u8 = 0,
+    fire_cells: [GRID]u16 = .{0} ** GRID,
 
     /// getAlreadyMadeTurnSize: the units in `made` plus the removed ones it still names.
     pub fn madeCount(self: *const Fight) u32 {
@@ -1455,6 +1487,21 @@ pub const Fight = struct {
     pub inline fn hasSmoke(self: *const Fight, x: i32, y: i32) bool {
         if (self.n_smoke == 0 or x < 0 or y < 0 or x >= GRID or y >= GRID) return false;
         return self.smoke_cells[@intCast(x)] & (@as(u16, 1) << @intCast(y)) != 0;
+    }
+
+    /// FireWalls.has(cell)
+    pub inline fn hasFire(self: *const Fight, x: i32, y: i32) bool {
+        if (self.n_fire == 0 or x < 0 or y < 0 or x >= GRID or y >= GRID) return false;
+        return self.fire_cells[@intCast(x)] & (@as(u16, 1) << @intCast(y)) != 0;
+    }
+
+    /// FireWalls.burnPercentageAt(cell): the share the cell was lit with, 0 when it is not alight.
+    pub fn firePct(self: *const Fight, x: i32, y: i32) f64 {
+        if (!self.hasFire(x, y)) return 0;
+        for (self.fire[0..self.n_fire]) |w| {
+            if (w.x == x and w.y == y) return @as(f64, @floatFromInt(w.pct10)) / 10;
+        }
+        return 0;
     }
 
     /// Vines.teamAt(cell)
@@ -1632,6 +1679,8 @@ pub const State = struct {
     mof_laps: f64 = 2,
     /// Fireforged Sword: some unit carries the buff or holds the spell, so the hits collect their burn victims.
     swords: bool = false,
+    /// Time Denial: some unit holds the card, so the hourglass gate scans for a living active holder.
+    time_denial: bool = false,
     /// Helping Hand: some unit holds the spell, a row or a link, so the refresh adds the rows' terms and the link hooks
     /// run (engine.helpingHandChanged).
     helping_hand: bool = false,

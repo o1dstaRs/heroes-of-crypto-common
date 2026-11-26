@@ -964,6 +964,9 @@ function main(): void {
                 // The vines the pather reads (the fight's store), when there are any: the cells in Map order.
                 const vineStore = ctx?.fightProperties?.getVines?.();
                 const vines = vineStore?.size?.() ? vineStore.cells().map((c: any) => [c.x, c.y]) : undefined;
+                // The burning cells (the Fire Wall toll), likewise.
+                const fireStore = ctx?.fightProperties?.getFireWalls?.();
+                const fireWalls = fireStore?.size?.() ? fireStore.cells().map((c: any) => [c.x, c.y]) : undefined;
                 pathLines.push(
                     JSON.stringify({
                         cell: [cell.x, cell.y],
@@ -978,6 +981,7 @@ function main(): void {
                         h: h ?? (isSmall === false ? 2 : 1),
                         known,
                         ...(vines ? { vines } : {}),
+                        ...(fireWalls ? { fireWalls } : {}),
                     }),
                 );
             }
@@ -1104,10 +1108,17 @@ function main(): void {
                     let pool: any[];
                     if (spell.isBuff()) {
                         pool = all.filter((u: any) => u.getTeam() === unit.getTeam() && ok(u));
+                        // Empower raises magic damage: a caster with charges first, then the Nightmare itself (its Fire
+                        // Wall's share); every other buff goes to the sweepers and shooters first.
+                        const casts = (u: any) =>
+                            u.getSpells().some((s: any) => s.getAmount() > 0 && s.getName() !== name);
                         const score = (u: any) =>
-                            (SWEEPERS.some((n) => u.hasAbilityActive(n)) ? 4 : 0) +
-                            (u.getAttackType() === 2 ? 2 : 0) +
-                            (u.getId() === unit.getId() ? 0 : 1);
+                            name === "Empower"
+                                ? (casts(u) && u.getId() !== unit.getId() ? 8 : 0) +
+                                  (u.getId() === unit.getId() ? 4 : 0)
+                                : (SWEEPERS.some((n) => u.hasAbilityActive(n)) ? 4 : 0) +
+                                  (u.getAttackType() === 2 ? 2 : 0) +
+                                  (u.getId() === unit.getId() ? 0 : 1);
                         pool.sort((a: any, b: any) => score(b) - score(a));
                     } else {
                         pool = all.filter(

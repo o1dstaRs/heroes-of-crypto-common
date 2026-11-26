@@ -494,6 +494,22 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
             }
         }
     }
+    // Fire walls (recordings with spells, from wave 2): [x, y, laps, share] in Map order.
+    const fire = rec.get(f, "fireWalls");
+    if (fire == .array) {
+        if (fire.array.items.len != fs.n_fire) {
+            m.set("fight fire walls: zig {d}, ts {d}", .{ fs.n_fire, fire.array.items.len });
+            return false;
+        }
+        for (fire.array.items, fs.fire[0..fs.n_fire], 0..) |e, c, i| {
+            const a = e.array.items;
+            const pct = @as(f64, @floatFromInt(c.pct10)) / 10;
+            if (rec.int(a[0]) != c.x or rec.int(a[1]) != c.y or rec.int(a[2]) != c.laps or rec.num(a[3]) != pct) {
+                m.set("fight fire wall {d}: zig ({d},{d}) laps {d} share {d}, ts ({d},{d}) laps {d} share {d}", .{ i, c.x, c.y, c.laps, pct, rec.int(a[0]), rec.int(a[1]), rec.int(a[2]), rec.num(a[3]) });
+                return false;
+            }
+        }
+    }
     // Terrain (recordings of LAVA_CENTER / BLOCK_CENTER or side boards): hit counters, cleared sides, the dried
     // centre and the standing stones in layout order.
     const tv = rec.get(f, "terrain");

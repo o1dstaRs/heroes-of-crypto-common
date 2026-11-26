@@ -27,8 +27,8 @@ pub const Action = union(enum) {
     /// An AI decision: the unit and the actions `decideTurn` returned (not an engine call).
     decide: struct { unit: u8, out: []const Action },
     /// A cast (`cast_spell`): the spell (state.CastSpell, or NO_SPELL for a name outside the port), the target unit
-    /// (`has_target`) and the target cell (`has_cell`). targetOrientation (Fire Wall) is not in scope.
-    cast_spell: struct { caster: u8, spell: u8, target: u8 = 0, has_target: bool = false, cell: Cell = .{ .x = 0, .y = 0 }, has_cell: bool = false },
+    /// (`has_target`), the target cell (`has_cell`) and Fire Wall's targetOrientation (normalized: 0 to 3).
+    cast_spell: struct { caster: u8, spell: u8, target: u8 = 0, has_target: bool = false, cell: Cell = .{ .x = 0, .y = 0 }, has_cell: bool = false, orientation: u8 = 0 },
     /// Area Throw at a cell (`targetCell`: empty, lava or a scattered stone), sent by v0.8 only.
     area_throw_attack: struct { attacker: u8, target_cell: Cell },
 };
@@ -188,7 +188,6 @@ pub fn parseAction(arena: std.mem.Allocator, ids: []const []const u8, kind: []co
         const name = get(a, "spellName");
         if (name != .string) return error.MissingSpell;
         const spell = @import("state.zig").CastSpell.fromName(name.string);
-        if (get(a, "targetOrientation") != .null) return error.UnsupportedSpell; // Fire Wall
         const tid = get(a, "targetId");
         const tc = get(a, "targetCell");
         return .{ .cast_spell = .{
@@ -198,6 +197,7 @@ pub fn parseAction(arena: std.mem.Allocator, ids: []const []const u8, kind: []co
             .has_target = tid == .string,
             .cell = if (tc == .object) cell(tc) else .{ .x = 0, .y = 0 },
             .has_cell = tc == .object,
+            .orientation = orientationOf(get(a, "targetOrientation")),
         } };
     }
     if (std.mem.eql(u8, t, "range_attack")) {
@@ -225,6 +225,20 @@ pub fn parseAction(arena: std.mem.Allocator, ids: []const []const u8, kind: []co
     }
     std.debug.print("unsupported action type {s}\n", .{t});
     return error.UnsupportedAction;
+}
+
+/// normalizeFireWallOrientation: a finite number truncated and taken mod 4 (negatives wrap); anything else HORIZONTAL.
+fn orientationOf(v: std.json.Value) u8 {
+    const x: f64 = switch (v) {
+        .integer => |i| @floatFromInt(i),
+        .float => |f| f,
+        else => return 0,
+    };
+    if (!std.math.isFinite(x)) return 0;
+    const t = @trunc(x);
+    if (@abs(t) > 1e15) return 0;
+    const i: i64 = @intFromFloat(t);
+    return @intCast(@mod(i, 4));
 }
 
 fn parseEvent(ids: []const []const u8, v: std.json.Value) !Event {

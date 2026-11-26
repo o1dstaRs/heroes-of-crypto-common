@@ -340,13 +340,18 @@ pub inline fn moraleMultiplier(spell: CS, attack_multiplier: f64) f64 {
     return if (std.math.isFinite(attack_multiplier)) @max(0, attack_multiplier) else 1;
 }
 
-/// Unit.getMagicDamageBonusPercentage: the Empower Augment and Sylvan Focus Blessing powers, additive (no Empower scroll
-/// or arcane rings in scope).
+/// Unit.getMagicDamageBonusPercentage: the Empower Augment, the Empower buff (the Nightmare's cast), Sylvan Focus Blessing
+/// and the arcane rings, additive.
 fn magicDamageBonus(u: *const Unit) f64 {
     var total: f64 = 0;
     if (u.augment(.empower_augment)) |e| {
         const p = e.power;
         if (std.math.isFinite(p) and p > 0) total += p;
+    }
+    if (u.buffs.len != 0) {
+        if (u.buffs.power(.empower)) |p| {
+            if (std.math.isFinite(p) and p > 0) total += p;
+        }
     }
     if (u.buffs.power(.sylvan_focus_blessing)) |p| {
         if (std.math.isFinite(p) and p > 0) total += p;
@@ -601,8 +606,14 @@ fn affectedUnits(s: *const State, cells: []const Cell, out: *Slots) void {
 
 /// GameActionEngine.castSpell: the turn checks, the caster's Spell and its charge gate, the target and its cell, the
 /// generic unit-target gate (line of sight, canCastSpell), then the dispatch in action_engine.ts order. `target` is a
-/// slot (NO_SLOT for an id outside the battle), `cell` the action's targetCell.
+/// slot (NO_SLOT for an id outside the battle), `cell` the action's targetCell. A Fire Wall lies HORIZONTAL here.
 pub fn castSpell(s: *State, ci: u8, spell_raw: u8, target: ?u8, cell: ?Cell, events: *Events) Reject!void {
+    return castSpellOriented(s, ci, spell_raw, target, cell, 0, events);
+}
+
+/// castSpell with the action's targetOrientation (normalizeFireWallOrientation: 0 HORIZONTAL, 1 DIAGONAL_DOWN, 2
+/// VERTICAL, 3 DIAGONAL_UP), read by Fire Wall only.
+pub fn castSpellOriented(s: *State, ci: u8, spell_raw: u8, target: ?u8, cell: ?Cell, orientation: u8, events: *Events) Reject!void {
     try engine.validateTurnAction(s, ci);
     const caster = &s.units[ci];
     if (caster.moved_this_turn) return error.Rejected; // spell_not_available (moved this turn)
@@ -650,6 +661,7 @@ pub fn castSpell(s: *State, ci: u8, spell_raw: u8, target: ?u8, cell: ?Cell, eve
     } else switch (spell) {
         .meteorite, .meteor_shower => return meteor(s, ci, spell, cfg, cell, events),
         .smoke => return smokeCast(s, ci, spell, cfg, cell, events),
+        .fire_wall => return fireWallCast(s, ci, spell, cfg, cell, orientation, events),
         else => {},
     }
     return magicAttack(s, ci, ti, spell, cfg, events);
@@ -1099,6 +1111,39 @@ fn smokeCast(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, target_ce
     for (cells.slice()) |x| engine.addSmoke(s, x, cfg.laps + 1);
     useSpell(&s.units[ci], spell);
     engine.completeTurn(s, ci, false, false, events);
+}
+
+/// fireWallCast (fire_walls.ts fireWallLitCells): the 4-cell line through `targetCell` (the aimed cell third, -2..+1
+/// along the orientation's step) lights its cells on the board that are empty or lava (a unit, a stone, a barrel or a
+/// hole leaves its cell unlit); none lit refuses the cast. Each lit cell burns for the config's laps at
+/// fireWallBurnPercentage of the caster's magic damage bonus (Empower included) at the cast; the charge; completeTurn.
+fn fireWallCast(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, target_cell: ?Cell, orientation: u8, events: *Events) Reject!void {
+    const c = target_cell orelse return error.Rejected;
+    const step: [2]i32 = switch (orientation % 4) {
+        0 => .{ 1, 0 },
+        1 => .{ 1, -1 },
+        2 => .{ 0, 1 },
+        else => .{ 1, 1 },
+    };
+    var lit: Cells = .{};
+    var i: i32 = -2;
+    while (i < 2) : (i += 1) {
+        const x = Cell{ .x = c.x + step[0] * i, .y = c.y + step[1] * i };
+        if (!engine.cellWithinGrid(x)) continue;
+        const o = boardAt(s, x);
+        if (o == st.EMPTY or o == st.LAVA) lit.push(x);
+    }
+    if (lit.len == 0) return error.Rejected;
+    const pct10 = fireWallPct10(magicDamageBonus(&s.units[ci]));
+    for (lit.slice()) |x| engine.addFire(s, x, cfg.laps, pct10);
+    useSpell(&s.units[ci], spell);
+    engine.completeTurn(s, ci, false, false, events);
+}
+
+/// fireWallBurnPercentage(bonus) in tenths: 25, or Math.round(25 x (100 + bonus) / 100 x 10) for a positive bonus.
+pub fn fireWallPct10(bonus: f64) u16 {
+    if (!std.math.isFinite(bonus) or bonus <= 0) return 250;
+    return @intFromFloat(js.round(((25 * (100 + bonus)) / 100) * 10));
 }
 
 /// meteorShowerCast / meteoriteCast: the block at `targetCell` (Meteor Shower's 3x3 centred on it, Meteorite's 2x2 from

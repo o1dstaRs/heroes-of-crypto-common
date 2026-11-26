@@ -87,12 +87,14 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
     if (V08_SCOPE.refuse_artifact_rows and s.artifacts) return "artifact rows (src/v08 not checked on artifacts)";
     // Smoke halves shots through it; src/v08 does not read the store yet.
     if (V08_SCOPE.refuse_smoke and s.fight.n_smoke != 0) return "smoke clouds on the board";
+    // Fire walls toll and burn walkers; src/v08 does not read the store yet.
+    if (V08_SCOPE.refuse_fire_walls and s.fight.n_fire != 0) return "fire walls on the board";
     // Wave-2 rows that outlive their casters (src/v08 does not read them yet): the Sword's burns, Misfortune's luck pin,
     // Whirlpool, the runes, Freeze and the crafted cards (V08_SCOPE.late).
     const late = V08_SCOPE.late;
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
-        if (u.ability_mask & late.abilities != 0) return "a crafted card";
+        if (u.ability_mask & late.abilities != 0) return "a wave-2 card (a crafted card or Time Denial)";
         if (u.buffs.len != 0 and scope.carries(u.buffs.items[0..u.buffs.len], late.buffs)) return "a wave-2 buff";
         if (u.debuffs.len != 0 and scope.carries(u.debuffs.items[0..u.debuffs.len], late.debuffs)) return "a wave-2 debuff";
         if (u.effects.len != 0 and scope.carries(u.effects.items[0..u.effects.len], late.effects)) return "a Freeze effect";
@@ -129,9 +131,10 @@ pub const V08_SCOPE = scope.PolicyScope{
     .refuse_revived = true,
     .refuse_artifact_rows = true,
     .refuse_smoke = true,
+    .refuse_fire_walls = true,
     .late = .{
-        .abilities = st.AbilityId.crafted_double_punch.bit() | st.AbilityId.crafted_double_shot.bit() | st.AbilityId.crafted_frozen_sword.bit() | st.AbilityId.crafted_frozen_bow.bit(),
-        .buffs = &.{ .fireforged_sword, .armor_rune, .weapon_rune, .riot, .mass_riot, .magic_mirror, .mass_magic_mirror, .courage, .helping_hand },
+        .abilities = st.AbilityId.crafted_double_punch.bit() | st.AbilityId.crafted_double_shot.bit() | st.AbilityId.crafted_frozen_sword.bit() | st.AbilityId.crafted_frozen_bow.bit() | st.AbilityId.time_denial.bit(),
+        .buffs = &.{ .fireforged_sword, .armor_rune, .weapon_rune, .riot, .mass_riot, .magic_mirror, .mass_magic_mirror, .courage, .helping_hand, .empower },
         .debuffs = &.{ .misfortune, .whirlpool, .helping_hand },
         .effects = &.{.freeze},
     },

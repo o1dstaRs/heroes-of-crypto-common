@@ -140,7 +140,7 @@ entries or spells than the book holds (16/6); an artifact-granted ability other 
 Hand; ranked `*_authoritative` stats; a spent Water Shield; a pending Last Fuse record; an unported ability, aura,
 buff, debuff or effect; effect stacks other than Poison's; more buffs, debuffs, effects, active or stolen abilities
 than the lists hold (24/25/12/10/6); WATER_CENTER or a water cell; an artifact the port does not play
-(artifacts.supportedT1/T2, or its buff name); legacy-axis seats; fire walls; more than 96 smoked cells or 96 vines; a
+(artifacts.supportedT1/T2, or its buff name); legacy-axis seats; more than 96 smoked cells, 96 vines or 64 burning cells; a
 unit on lava that cannot traverse it, or terrain the board lost; more than
 32 units in the holder or 255 ids; units out of holder order. Malformed input (a missing field, a wrong type, an id no
 list knows, vines without the Vine Throw config) is reported as a malformed state.
@@ -371,7 +371,7 @@ loader and `rollout.v08Scope` refuse by (`src/scope.zig`, the AbilityId / SpellI
                                      "fight": [...], "artifactsPerTeam": ["artifactTier1PerTeam", ...] } },
              "policies": { "v0.8": { "castable": [...], "refusedAbilities": [...], "refusedDebuffs": [...],
                                      "refusedEffects": [...], "refusedBuffs": [...], "refusedRevived": true,
-                                     "refusedArtifactRows": true, "refusedSmoke": true } },
+                                     "refusedArtifactRows": true, "refusedSmoke": true, "refusedFireWalls": true } },
              "actions": [...] } }
 ```
 
@@ -380,8 +380,9 @@ takes. `artifacts` lists the Tier-1 and Tier-2 ids the port plays (`artifacts.su
 `storedPropertyBuffs` the buff rows whose stored properties are loaded besides the aura rows (the augments and every
 artifact row but Keen Blade's), each an integer 0..`storedProperty` or undefined; `artifactRows` the rows that make a
 board an artifact board (`State.artifacts`), which v0.8 refuses until src/v08 is checked on artifacts (and, with
-`refusedSmoke`, a board holding a smoke cloud, until src/v08 reads the store). A policy's `refused*` lists include its
-late rows (`V08_SCOPE.late`: the crafted cards and the wave-2 rows that outlive their casters, which v08Scope checks
+`refusedSmoke` and `refusedFireWalls`, a board holding a smoke cloud or a burning cell, until src/v08 reads the stores).
+A policy's `refused*` lists include its late rows (`V08_SCOPE.late`: the crafted cards, Time Denial and the wave-2 rows
+that outlive their casters, which v08Scope checks
 after the board-level refusals with their own messages). With no policy
 name the manifest carries every policy; `coverage` hashes that full body and is the same in every manifest and in
 `hoc_build_info`.
@@ -412,7 +413,7 @@ them, so a porter changes the table and nothing else on the bridge side:
 | a grid or fight store | drop it from `REFUSED_GRID_FIELDS` / `REFUSED_FIGHT_FIELDS` and read it in snapshot.zig |
 | an artifact | `artifacts.supportedT1/T2` (scope.artifactSupported); its row's name in `SpellId` |
 | a wider list | the capacity in `state.zig` (`MAX_*`, the list types); the manifest's `capacities` follow |
-| v0.8 on batch-6a cards or rows, revived units, artifact rows, smoke, or the wave-2 rows | `rollout.V08_SCOPE` (`refused_abilities`, `refused_debuffs` / `refused_effects` / `refused_buffs`, `refuse_revived`, `refuse_artifact_rows`, `refuse_smoke`, `late`) |
+| v0.8 on batch-6a cards or rows, revived units, artifact rows, smoke, fire walls, or the wave-2 rows | `rollout.V08_SCOPE` (`refused_abilities`, `refused_debuffs` / `refused_effects` / `refused_buffs`, `refuse_revived`, `refuse_artifact_rows`, `refuse_smoke`, `refuse_fire_walls`, `late`) |
 
 A new kind of refusal (a check no table holds yet) gets a table and a manifest key in scope.zig and a line in
 `ffi/precheck.ts`. Then rebuild, run `zig build test` (the manifest tests, the artifact-row cross-check against

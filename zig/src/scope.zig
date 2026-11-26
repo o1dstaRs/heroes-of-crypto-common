@@ -84,11 +84,11 @@ pub const REFUSED_GRID_FIELDS = [_]Field{};
 pub const MAX_BARRELS = @typeInfo(@FieldType(st.Terrain, "barrels")).array.len;
 
 /// FightProperties fields that must be empty (`inner`: the store's field that holds the entries). The smoke clouds
-/// (smokeClouds.clouds) are loaded since Smoke was ported, at most st.MAX_SMOKE cells (`capacities.smoke`).
+/// (smokeClouds.clouds) and the fire walls (fireWalls.walls) are loaded since Smoke and Fire Wall were ported, at most
+/// st.MAX_SMOKE and st.MAX_FIRE cells (`capacities.smoke`, `capacities.fireWalls`).
 pub const NestedField = struct { key: []const u8, inner: ?[]const u8 = null, what: []const u8 };
 pub const REFUSED_FIGHT_FIELDS = [_]NestedField{
     .{ .key = "legacyAxisPolicyTeams", .what = "legacy-axis policy teams" },
-    .{ .key = "fireWalls", .inner = "walls", .what = "fire walls" },
 };
 
 /// The per-team artifact maps (Map team -> id, Tier 1 then Tier 2): every team's id must be one the port plays
@@ -178,6 +178,8 @@ pub const PolicyScope = struct {
     refuse_artifact_rows: bool = false,
     /// The board may hold no smoke cloud (FightProperties.smokeClouds).
     refuse_smoke: bool = false,
+    /// The board may hold no burning cell (FightProperties.fireWalls).
+    refuse_fire_walls: bool = false,
     /// Cards and rows refused after the board-level checks, with their own messages (v0.8: the wave-2 rows that outlive
     /// their casters). The manifest lists them with the ones above.
     late: RowScope = .{},
@@ -378,8 +380,8 @@ pub fn writeLoader(w: *std.Io.Writer, snapshot_format: i64) !void {
     try writeSpellIds(w, artifactRowDebuff);
     try w.writeByte('}');
     try w.print(
-        ",\"capacities\":{{\"units\":{d},\"ids\":{d},\"abilities\":{d},\"stolen\":{d},\"buffs\":{d},\"debuffs\":{d},\"effects\":{d},\"spellEntries\":{d},\"spells\":{d},\"unitAuras\":{d},\"auraDefs\":{d},\"vines\":{d},\"smoke\":{d},\"stones\":{d},\"barrels\":{d},\"lap\":{d},\"possibleAttackTypes\":{d},\"storedProperty\":{d}}}",
-        .{ st.MAX_UNITS, st.MAX_UIDS, st.MAX_ABILITIES, st.MAX_STOLEN, st.MAX_SPELLS, st.MAX_DEBUFFS, st.MAX_EFFECTS, st.MAX_BOOK, st.MAX_BOOK_SPELLS, st.MAX_UNIT_AURAS, st.MAX_AURA_DEFS, st.MAX_VINES, st.MAX_SMOKE, st.MAX_STONES, MAX_BARRELS, MAX_LAP, MAX_POSSIBLE_ATTACK_TYPES, MAX_STORED_PROPERTY },
+        ",\"capacities\":{{\"units\":{d},\"ids\":{d},\"abilities\":{d},\"stolen\":{d},\"buffs\":{d},\"debuffs\":{d},\"effects\":{d},\"spellEntries\":{d},\"spells\":{d},\"unitAuras\":{d},\"auraDefs\":{d},\"vines\":{d},\"smoke\":{d},\"fireWalls\":{d},\"stones\":{d},\"barrels\":{d},\"lap\":{d},\"possibleAttackTypes\":{d},\"storedProperty\":{d}}}",
+        .{ st.MAX_UNITS, st.MAX_UIDS, st.MAX_ABILITIES, st.MAX_STOLEN, st.MAX_SPELLS, st.MAX_DEBUFFS, st.MAX_EFFECTS, st.MAX_BOOK, st.MAX_BOOK_SPELLS, st.MAX_UNIT_AURAS, st.MAX_AURA_DEFS, st.MAX_VINES, st.MAX_SMOKE, st.MAX_FIRE, st.MAX_STONES, MAX_BARRELS, MAX_LAP, MAX_POSSIBLE_ATTACK_TYPES, MAX_STORED_PROPERTY },
     );
     try w.writeAll(",\"refuse\":{\"unitFields\":");
     try writeFields(w, &REFUSED_UNIT_FIELDS);
@@ -446,7 +448,8 @@ pub fn writePolicy(w: *std.Io.Writer, p: PolicyScope) !void {
     try writeSpellList(w, p.refused_buffs, p.late.buffs);
     try w.writeAll(if (p.refuse_revived) ",\"refusedRevived\":true" else ",\"refusedRevived\":false");
     try w.writeAll(if (p.refuse_artifact_rows) ",\"refusedArtifactRows\":true" else ",\"refusedArtifactRows\":false");
-    try w.writeAll(if (p.refuse_smoke) ",\"refusedSmoke\":true}" else ",\"refusedSmoke\":false}");
+    try w.writeAll(if (p.refuse_smoke) ",\"refusedSmoke\":true" else ",\"refusedSmoke\":false");
+    try w.writeAll(if (p.refuse_fire_walls) ",\"refusedFireWalls\":true}" else ",\"refusedFireWalls\":false}");
 }
 
 /// The whole scope (every policy): the body `coverage` hashes.
@@ -475,7 +478,7 @@ pub fn sha256Hex(body: []const u8) [64]u8 {
 test "the manifest names the loader's tables and hashes stably" {
     var a: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer a.deinit();
-    const v08 = PolicyScope{ .name = "v0.8", .castable = &.{ .heal, .blessing }, .refused_abilities = st.AbilityId.BATCH6A_MASK, .refused_debuffs = &.{.hamstrung}, .refused_effects = &.{ .blindness, .paralysis }, .refused_buffs = comptime spellIdsWhere(st.SpellId.isBatch6Stat), .refuse_revived = true, .refuse_artifact_rows = true, .refuse_smoke = true };
+    const v08 = PolicyScope{ .name = "v0.8", .castable = &.{ .heal, .blessing }, .refused_abilities = st.AbilityId.BATCH6A_MASK, .refused_debuffs = &.{.hamstrung}, .refused_effects = &.{ .blindness, .paralysis }, .refused_buffs = comptime spellIdsWhere(st.SpellId.isBatch6Stat), .refuse_revived = true, .refuse_artifact_rows = true, .refuse_smoke = true, .refuse_fire_walls = true };
     try writeScope(&a.writer, 2, &.{ .{ .name = "v0.1" }, v08 }, &.{ "end_turn", "move_unit" });
     const text = a.written();
     const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, text, .{});
@@ -494,6 +497,8 @@ test "the manifest names the loader's tables and hashes stably" {
     try std.testing.expect(!parsed.value.object.get("policies").?.object.get("v0.1").?.object.get("refusedArtifactRows").?.bool);
     try std.testing.expect(parsed.value.object.get("policies").?.object.get("v0.8").?.object.get("refusedSmoke").?.bool);
     try std.testing.expectEqual(@as(i64, st.MAX_SMOKE), loader.object.get("capacities").?.object.get("smoke").?.integer);
+    try std.testing.expect(parsed.value.object.get("policies").?.object.get("v0.8").?.object.get("refusedFireWalls").?.bool);
+    try std.testing.expectEqual(@as(i64, st.MAX_FIRE), loader.object.get("capacities").?.object.get("fireWalls").?.integer);
     const arts = loader.object.get("artifacts").?.object;
     try std.testing.expect(arts.get("tier1").?.array.items.len > 1 and arts.get("tier2").?.array.items.len > 1);
     const limited = loader.object.get("refuse").?.object.get("unitPropsLimited").?.object.get("artifact_granted_abilities").?.array.items;

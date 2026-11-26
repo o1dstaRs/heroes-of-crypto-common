@@ -436,6 +436,7 @@ export interface IHocScopeManifest {
                 | "auraDefs"
                 | "vines"
                 | "smoke"
+                | "fireWalls"
                 | "stones"
                 | "barrels"
                 | "lap"
@@ -471,6 +472,8 @@ export interface IHocScopeManifest {
                 refusedArtifactRows: boolean;
                 /** the board may hold no smoke cloud */
                 refusedSmoke: boolean;
+                /** the board may hold no burning cell (fire walls) */
+                refusedFireWalls: boolean;
             }
         >;
         actions: string[];

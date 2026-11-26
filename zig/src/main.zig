@@ -250,6 +250,11 @@ fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
         if (vines_v == .array) {
             for (vines_v.array.items) |c| vine_cells[@intCast(rec.int(c.array.items[0]))] |= @as(u16, 1) << @intCast(rec.int(c.array.items[1]));
         }
+        var fire_cells: [st.GRID]u16 = .{0} ** st.GRID;
+        const fire_v = rec.get(v, "fireWalls");
+        if (fire_v == .array) {
+            for (fire_v.array.items) |c| fire_cells[@intCast(rec.int(c.array.items[0]))] |= @as(u16, 1) << @intCast(rec.int(c.array.items[1]));
+        }
         const cell = rec.get(v, "cell").array.items;
         pathing.getMovePath(&m, .{
             .start = .{ .x = @intCast(rec.int(cell[0])), .y = @intCast(rec.int(cell[1])) },
@@ -260,6 +265,7 @@ fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
             .h = @intCast(rec.int(rec.get(v, "h"))),
             .vines = if (vines_v == .array) &vine_cells else null,
             .vine_stride = rec.get(v, "vine") == .bool and rec.get(v, "vine").bool,
+            .fire = if (fire_v == .array) &fire_cells else null,
             // isMadeOfFire: canTraverseLava() (Lava Striders)
             .made_of_fire = rec.get(v, "fire") == .bool and rec.get(v, "fire").bool,
         }, &mp);

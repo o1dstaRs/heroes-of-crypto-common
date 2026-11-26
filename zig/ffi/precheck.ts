@@ -98,6 +98,7 @@ export class HocPrecheck {
     private readonly refusedRevived: boolean;
     private readonly refusedArtifactRows: boolean;
     private readonly refusedSmoke: boolean;
+    private readonly refusedFireWalls: boolean;
     private readonly artifactRowBuffs: Set<string>;
     private readonly artifactRowDebuffs: Set<string>;
     private readonly storedBuffs: Set<string>;
@@ -156,6 +157,7 @@ export class HocPrecheck {
         this.refusedRevived = p?.refusedRevived ?? false;
         this.refusedArtifactRows = p?.refusedArtifactRows ?? false;
         this.refusedSmoke = p?.refusedSmoke ?? false;
+        this.refusedFireWalls = p?.refusedFireWalls ?? false;
     }
 
     /** null when the library would load the root and accept a request for the policy; else the first reason found. */
@@ -185,6 +187,9 @@ export class HocPrecheck {
         const smoked: number = fp.smokeClouds?.clouds?.size ?? 0;
         if (smoked > this.cap.smoke) return "smoke";
         if (this.refusedSmoke && smoked > 0) return `${this.policy}: smoke clouds`;
+        const burning: number = fp.fireWalls?.walls?.size ?? 0;
+        if (burning > this.cap.fireWalls) return "fire walls";
+        if (this.refusedFireWalls && burning > 0) return `${this.policy}: fire walls`;
 
         // ---- units ----
         const units: Map<string, any> = ctx.unitsHolder.getAllUnits();

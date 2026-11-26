@@ -106,6 +106,7 @@ pub const Ctx = struct {
             // The fight's vines, and hasAbilityActive("In Its Own World") (every AI getMovePath passes it).
             .vines = if (self.s.fight.n_vines != 0) &self.s.fight.vine_cells else null,
             .vine_stride = u.ability_mask & st.AbilityId.in_its_own_world.bit() != 0 and u.has(.in_its_own_world),
+            .fire = if (self.s.fight.n_fire != 0) &self.s.fight.fire_cells else null,
             .made_of_fire = artifacts.canTraverseLava(self.s, u),
         };
     }
@@ -1249,6 +1250,7 @@ pub noinline fn advanceTowardEnemy(s: *State, ui: u8, out: *Decision) bool {
         .h = u.fh,
         .vines = if (s.fight.n_vines != 0) &s.fight.vine_cells else null,
         .vine_stride = u.ability_mask & st.AbilityId.in_its_own_world.bit() != 0 and u.has(.in_its_own_world),
+        .fire = if (s.fight.n_fire != 0) &s.fight.fire_cells else null,
         .made_of_fire = artifacts.canTraverseLava(s, u),
     }, &mp);
     if (mp.overflow) s.overflow = true;

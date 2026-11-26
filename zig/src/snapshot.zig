@@ -1009,6 +1009,28 @@ fn loadFight(s: *State, fight: Value, root: Value, ids: []const []const u8, why:
             f.smoke_cells[@intCast(c.x)] |= @as(u16, 1) << @intCast(c.y);
         }
     }
+    // Fire walls: Map entries [key, {cell, lapsRemaining, burnPercentage}] in insertion order; a share is a tenth.
+    const walls = get(get(fight, "fireWalls"), "walls");
+    if (!isUndefined(walls)) {
+        for (try mapEntries(walls, why, "fire walls")) |e| {
+            const v = e.array.items[1];
+            const c = try cellOf(get(v, "cell"), why, "fire wall cell");
+            if (!engine.cellWithinGrid(c)) return why.malformed("a fire wall off the board", .{});
+            if (f.n_fire >= st.MAX_FIRE) return why.unsupported("more than {d} burning cells", .{st.MAX_FIRE});
+            if (f.hasFire(c.x, c.y)) return why.malformed("two fire walls on ({d},{d})", .{ c.x, c.y });
+            const pct = try number(get(v, "burnPercentage"), why, "burnPercentage");
+            const tenths = @round(pct * 10);
+            if (!(pct > 0) or tenths / 10 != pct or tenths > 65535) return why.unsupported("a fire wall share of {d}", .{pct});
+            f.fire[f.n_fire] = .{
+                .x = @intCast(c.x),
+                .y = @intCast(c.y),
+                .laps = try intAs(i16, get(v, "lapsRemaining"), why, "lapsRemaining"),
+                .pct10 = @intFromFloat(tenths),
+            };
+            f.n_fire += 1;
+            f.fire_cells[@intCast(c.x)] |= @as(u16, 1) << @intCast(c.y);
+        }
+    }
     // Vines: Map entries [key, {cell, lapsRemaining, team}] in insertion order.
     const vines = get(get(fight, "vines"), "vines");
     if (!isUndefined(vines)) {

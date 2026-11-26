@@ -200,6 +200,13 @@ export function smokeDigest(fp: any): number[][] {
     return [...map.values()].map((c: any) => [c.cell.x, c.cell.y, c.getLapsRemaining()]);
 }
 
+/** The fire wall store (FightProperties.fireWalls) in Map order: [x, y, lapsRemaining, burnPercentage]. */
+export function fireWallDigest(fp: any): number[][] {
+    const store = fp.getFireWalls?.();
+    if (!store) return [];
+    return store.toJSON().map((c: any) => [c.x, c.y, c.l, c.p]);
+}
+
 export function fightDigest(fp: any): Record<string, unknown> {
     const sorted = (s: Set<string>): string[] => [...s].sort();
     return {
@@ -251,5 +258,6 @@ export function battleDigest(
     if (opts.terrain) fight.terrain = terrainDigest(ctx.grid, ctx.fightProperties);
     if (opts.spells) fight.vines = vinesDigest(ctx.fightProperties);
     if (opts.spells) fight.smoke = smokeDigest(ctx.fightProperties);
+    if (opts.spells) fight.fireWalls = fireWallDigest(ctx.fightProperties);
     return { units, fight };
 }

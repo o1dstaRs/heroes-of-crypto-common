@@ -52,7 +52,14 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   of Vitality and the armor multipliers; the caster, or its Absorb Penalties source after that roll, carries the same
   amounts at the config's power as a penalty row; the target's link ends both rows when either ends, a linked unit dies
   (mid-attack) or leaves the holder, and the release refreshes the affected units at once; Borrowed Grace copies the row
-  with its link, Absolving Arrow lifts the penalty); batch 6a's
+  with its link, Absolving Arrow lifts the penalty); the Nightmare's Fire Wall (a 4-cell line in one of four
+  orientations, the aimed cell third; only its empty or lava cells light; each burning cell keeps the config's laps and
+  the share 25% x (100 + the caster's magic bonus) / 100 at one decimal; a walker pays one more step per burning cell
+  its body sweeps into and is seared per cell entered for that share of its cumulative max hp (the fire element table,
+  Heavy Armor, magic resist; at least 1), a flyer only where it lands; moves, melee and obstacle approaches (before the
+  blow: a stack the flames kill never strikes) and narrowing shoves all burn; the walls tick at the lap flip after the
+  vines), Empower (+ power to the holder's magic damage bonus, Tome-amplified) and Time Denial (no unit waits while a
+  living holder has it active); batch 6a's
   castables, the Valkyrie's Wind Flow (a
   mass buff on every flyer) and the Angel's Resurrection (on a wounded ally stack); a book holding any other spell is
   refused;
@@ -143,6 +150,7 @@ Wave-1 spells (`spells.zig`), exact in both modes:
 | Magic Dragon (L4, MELEE_MAGIC) | Tome of Elements, Magic Reflection | Whirlpool x1, Lightning Strike x4, Ring of Fire x2, Meteor Shower x1 (the whole book) |
 | Trent (L2) | Vine Throw (castable) | Vine Throw x1 |
 | Ogre Mage (L3, MELEE_MAGIC) | Tome of Might | Riot x2, Magic Mirror x2, Mass Riot x1, Mass Magic Mirror x1 (wave 2, the whole book) |
+| Nightmare (L3, MELEE) | Book of Nightmares, Time Denial | Fire Wall x1, Empower x1 (wave 2, the whole book) |
 | Wandering Mage (L1, MELEE) | Book of Chaos | Smoke x1, Misfortune x1, Fireforged Sword x2, Fireball x1 (wave 2, the whole book) |
 | Blacksmith (L1, MELEE) | Blacksmith Tools, Enchants | Craft x1, Armor Rune x5, Weapon Rune x5 (wave 2, the whole book) |
 | Wolf (summoned) | its creature's cards when "Wolf" is kept (Double Punch, Deep Wounds Level 1; batch 4), else stripped | none |

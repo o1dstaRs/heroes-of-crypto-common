@@ -1477,6 +1477,19 @@ fn moveUnitTowardsCenter(s: *State, cell: Cell, dir: Dir, laps_narrowed: i32, ev
     if (destroyed) {
         deleteUnit(s, ui);
         events.push(.unit_destroyed, u.uid);
+        return;
+    }
+    // handleSystemMoveResult: a unit shoved onto a Fire Wall burns on its whole new footprint; killed by the fire, it
+    // takes deleteUnitById(id, true) (a Resurrection holder revives) and the Last Fuse check (no source: no blast).
+    if (s.fight.n_fire != 0 and u.in_holder and !u.isDead()) {
+        const body = unitCells(u);
+        var burning: Swept = .{};
+        burningCellsEntered(s, ui, &.{}, &.{}, body.slice(), true, &burning);
+        burnOnFire(s, ui, burning.slice());
+        if (u.isDead() and !tryRevive(s, ui)) {
+            deleteUnit(s, ui);
+            events.push(.unit_destroyed, u.uid);
+        }
     }
 }
 
@@ -1589,6 +1602,8 @@ fn handleLapTransition(s: *State, o: *const Ordered, all_made: bool, damage_deal
         // SmokeClouds.minusAllLaps, then Vines.minusAllLaps: each entry loses a lap and goes at 0.
         if (f.n_smoke != 0) smokeMinusAllLaps(f);
         if (f.n_vines != 0) vinesMinusAllLaps(f);
+        // FireWalls.minusAllLaps: the same accounting for the burning cells.
+        if (f.n_fire != 0) fireMinusAllLaps(f);
         // The lava dries once getLapsNarrowed() (this transition's lap, the additional laps before this
         // transition's increment) reaches the laps till narrowing. runMatch never passes centerAlreadyDried.
         if (f.grid_type == st.GridType.LAVA_CENTER and terrain.lapsNarrowed(f) >= f.laps_till_narrowing) terrain.cleanupCenterObstacle(s);
@@ -1660,6 +1675,182 @@ fn smokeMinusAllLaps(f: *st.Fight) void {
         w += 1;
     }
     f.n_smoke = @intCast(w);
+}
+
+/// FireWalls.minusAllLaps: in Map order, laps-- (never below 0), an entry at 0 is deleted (the rest keep their order).
+fn fireMinusAllLaps(f: *st.Fight) void {
+    var w: usize = 0;
+    for (f.fire[0..f.n_fire]) |c_in| {
+        var c = c_in;
+        if (c.laps > 0) c.laps -= 1;
+        if (c.laps <= 0) {
+            f.fire_cells[c.x] &= ~(@as(u16, 1) << @intCast(c.y));
+            continue;
+        }
+        f.fire[w] = c;
+        w += 1;
+    }
+    f.n_fire = @intCast(w);
+}
+
+/// FireWalls.add (Map.set): a burning cell takes the new laps and share in place, a new one is appended.
+pub fn addFire(s: *State, c: Cell, laps: f64, pct10: u16) void {
+    const f = &s.fight;
+    const l: i16 = @intFromFloat(laps);
+    if (f.hasFire(c.x, c.y)) {
+        for (f.fire[0..f.n_fire]) |*e| {
+            if (e.x == c.x and e.y == c.y) {
+                e.laps = l;
+                e.pct10 = pct10;
+                return;
+            }
+        }
+    }
+    if (f.n_fire >= st.MAX_FIRE) {
+        s.overflow = true;
+        return;
+    }
+    f.fire[f.n_fire] = .{ .x = @intCast(c.x), .y = @intCast(c.y), .laps = l, .pct10 = pct10 };
+    f.n_fire += 1;
+    f.fire_cells[@intCast(c.x)] |= @as(u16, 1) << @intCast(c.y);
+}
+
+/// Cells a body touches on its way: at most a route's worth of swept footprints.
+pub const Swept = struct {
+    items: [160]Cell = undefined,
+    len: u8 = 0,
+
+    fn push(self: *Swept, c: Cell) void {
+        if (self.len < self.items.len) {
+            self.items[self.len] = c;
+            self.len += 1;
+        }
+    }
+
+    pub fn slice(self: *const Swept) []const Cell {
+        return self.items[0..self.len];
+    }
+};
+
+/// getSweptFootprintCells (grid_math.ts): the cells a body touches moving its anchor from `from` to `to`, its starting
+/// footprint excluded, once each, in order; a diagonal corner crossing touches both side footprints first.
+pub fn sweptFootprint(from: Cell, to: Cell, w: u8, h: u8, out: *Swept) void {
+    const start = cellsForAnchor(from, w, h);
+    const base = out.len;
+    const Append = struct {
+        fn f(o: *Swept, first: u8, st_cells: []const Cell, anchor: Cell, fw: u8, fh: u8) void {
+            for (cellsForAnchor(anchor, fw, fh).slice()) |c| {
+                var dup = false;
+                for (st_cells) |x| {
+                    if (x.x == c.x and x.y == c.y) dup = true;
+                }
+                for (o.items[first..o.len]) |x| {
+                    if (x.x == c.x and x.y == c.y) dup = true;
+                }
+                if (!dup) o.push(c);
+            }
+        }
+    };
+    const dx: i32 = @intCast(@abs(to.x - from.x));
+    const dy: i32 = @intCast(@abs(to.y - from.y));
+    const sx: i32 = std.math.sign(to.x - from.x);
+    const sy: i32 = std.math.sign(to.y - from.y);
+    var x = from.x;
+    var y = from.y;
+    var ix: i32 = 0;
+    var iy: i32 = 0;
+    while (ix < dx or iy < dy) {
+        const next_x = (1 + 2 * ix) * dy;
+        const next_y = (1 + 2 * iy) * dx;
+        if (next_x == next_y) {
+            Append.f(out, base, start.slice(), .{ .x = x + sx, .y = y }, w, h);
+            Append.f(out, base, start.slice(), .{ .x = x, .y = y + sy }, w, h);
+            x += sx;
+            y += sy;
+            ix += 1;
+            iy += 1;
+        } else if (next_x < next_y) {
+            x += sx;
+            ix += 1;
+        } else {
+            y += sy;
+            iy += 1;
+        }
+        Append.f(out, base, start.slice(), .{ .x = x, .y = y }, w, h);
+    }
+}
+
+/// fireWallCellsForTraversal + enteredFireWallCells: the burning cells a body enters, once each, in the order it enters
+/// them. A flyer (or a teleported body) touches only `landing`; a walker every cell its body newly occupies along the
+/// anchor route (bodyCellsEnteredAlongPath: swept from the start body's max corner, the start body excluded).
+pub fn burningCellsEntered(s: *const State, ui: u8, start: []const Cell, route: []const Cell, landing: []const Cell, landing_only: bool, out: *Swept) void {
+    const f = &s.fight;
+    if (f.n_fire == 0) return;
+    const u = &s.units[ui];
+    var seen: [st.GRID]u16 = .{0} ** st.GRID;
+    const Mark = struct {
+        fn take(fs: *const st.Fight, sn: *[st.GRID]u16, o: *Swept, c: Cell) void {
+            if (!cellWithinGrid(c)) return;
+            const bit = @as(u16, 1) << @intCast(c.y);
+            if (sn[@intCast(c.x)] & bit != 0) return;
+            sn[@intCast(c.x)] |= bit;
+            if (fs.hasFire(c.x, c.y)) o.push(c);
+        }
+    };
+    if (landing_only or canFly(u)) {
+        for (landing) |c| Mark.take(f, &seen, out, c);
+        return;
+    }
+    // The start body is excluded: mark it seen without taking it.
+    for (start) |c| {
+        if (cellWithinGrid(c)) seen[@intCast(c.x)] |= @as(u16, 1) << @intCast(c.y);
+    }
+    var prev: ?Cell = null;
+    if (start.len != 0) {
+        var mx = start[0].x;
+        var my = start[0].y;
+        for (start) |c| {
+            mx = @max(mx, c.x);
+            my = @max(my, c.y);
+        }
+        prev = .{ .x = mx, .y = my };
+    }
+    for (route) |anchor| {
+        var touched: Swept = .{};
+        if (prev) |p| sweptFootprint(p, anchor, u.fw, u.fh, &touched) else {
+            for (cellsForAnchor(anchor, u.fw, u.fh).slice()) |c| touched.push(c);
+        }
+        for (touched.slice()) |c| Mark.take(f, &seen, out, c);
+        prev = anchor;
+    }
+}
+
+/// fireWallBurnDamage (fire_walls.ts): a share of the stack's cumulative max hp, by the fire element multiplier and Heavy
+/// Armor (floored), then the magic resist cut (floored), at least 1; 0 for an immune element or 100% resist.
+pub fn fireBurnDamage(cum: f64, pct: f64, elem: f64, mr: f64, heavy: f64) f64 {
+    if (!std.math.isFinite(cum) or cum <= 0) return 0;
+    if (elem <= 0) return 0;
+    const share = if (std.math.isFinite(pct) and pct > 0) pct else 25;
+    if (mr >= 100) return 0;
+    const burn = @floor(((cum * share) / 100) * elem * heavy);
+    return @max(1, @floor(burn * (1 - mr / 100)));
+}
+
+/// burnUnitOnFireWallCells: each burning cell entered (in order) sears the stack for fireWallBurnDamage at that cell's
+/// share, re-derived from the stack each time (no break roll); a 0 burn or a death stops it. The element (Ember Covenant
+/// counts as Fire Element), magic resist and Heavy Armor are read once.
+pub fn burnOnFire(s: *State, ui: u8, burning: []const Cell) void {
+    if (burning.len == 0) return;
+    const u = &s.units[ui];
+    const elem: f64 = if (u.buffs.len != 0 and u.buffs.find(.ember_covenant_blessing) != null) 0 else spells.elementMultiplier(st.Element.FIRE, u);
+    const mr = @max(0, @min(100, getMagicResist(u)));
+    const heavy = spells.magicDamageTakenMultiplier(u);
+    for (burning) |c| {
+        const dmg = fireBurnDamage(u.amount_alive * u.max_hp, s.fight.firePct(c.x, c.y), elem, mr, heavy);
+        if (dmg <= 0) break;
+        _ = applyDamageElement(s, ui, dmg, 0, false, st.Element.UNSET);
+        if (u.isDead()) break;
+    }
 }
 
 /// SmokeClouds.add (Map.set): a smoked cell takes the new laps in place, a new one is appended.
@@ -2172,12 +2363,24 @@ fn endTurn(s: *State, ui: u8, reason: rec.EndReason, events: *Events) Reject!voi
     completeTurn(s, ui, false, forced or did_nothing, events);
 }
 
-/// canWaitOnHourglass (src/engine/hourglass.ts; no Time Denial in scope): a LEFT or RIGHT unit that has not moved, with an
-/// unacted living teammate (hasUnactedTeammate), not on the hourglass, queued, done or already waited this lap.
+/// hasActiveTimeDenial (src/engine/hourglass.ts): a living holder unit with Time Denial active (Break-aware; a stolen card
+/// moves with its thief), whatever its team.
+pub fn timeDenied(s: *const State) bool {
+    if (!s.time_denial) return false;
+    for (s.holderOrder()) |i| {
+        const x = &s.units[i];
+        if (!x.isDead() and x.ability_mask & st.AbilityId.time_denial.bit() != 0 and x.has(.time_denial)) return true;
+    }
+    return false;
+}
+
+/// canWaitOnHourglass (src/engine/hourglass.ts): a LEFT or RIGHT unit that has not moved, with no active Time Denial on
+/// the board, an unacted living teammate (hasUnactedTeammate), not on the hourglass, queued, done or already waited.
 pub fn canWaitOnHourglass(s: *const State, ui: u8) bool {
     const u = &s.units[ui];
     if (u.team != Team.LEFT and u.team != Team.RIGHT) return false;
     if (u.moved_this_turn) return false;
+    if (timeDenied(s)) return false;
     var unacted = false;
     if (s.fight.team_units_alive[u.team] > 1) {
         for (s.holderOrder()) |i| {
@@ -2290,7 +2493,7 @@ pub fn applyDistanceMorale(s: *State, ui: u8, from: [2]f64, to: [2]f64) void {
     }
 }
 
-fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) Reject!void {
+fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell, events: *Events) Reject!void {
     try validateTurnAction(s, ui);
     const u = &s.units[ui];
     if (!u.canMove()) return error.Rejected; // move_not_available (the Web lock)
@@ -2318,6 +2521,8 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) R
     if (!cellsFreeFor(s, ui, target_cells)) return error.Rejected;
     const from = [2]f64{ u.pos_x, u.pos_y };
     const to = positionForCells(target_cells) orelse return error.Rejected;
+    // The body the unit leaves: the Fire Wall burn charges only what the walk moves into.
+    const start_cells = unitCells(u);
     _ = finishDirectedMove(s, ui, target_cells, to, null) orelse return error.Rejected;
     // applyRouteMoveModifiers: getTravelledRoute strips nothing here; the route is non-empty. Distance morale, Crusade
     // over the travelled route (the path minus its origin), then applyLavaWaterModifier (Made of Fire on a lava route).
@@ -2327,6 +2532,13 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) R
     snareOnVineArrival(s, ui, target_cells);
     u.moved_this_turn = true;
     u.moved_route_cells = @floatFromInt(path.len); // setMovedRouteCellsThisTurn(action.path.length)
+    // applyFireWallBurn: the walk's burning cells, after the arrival; a stack the flames kill is cleaned up at once.
+    if (s.fight.n_fire != 0) {
+        var burning: Swept = .{};
+        burningCellsEntered(s, ui, start_cells.slice(), travelled, target_cells, false, &burning);
+        burnOnFire(s, ui, burning.slice());
+        if (u.isDead()) combat.cleanupFireDeath(s, ui, null, events);
+    }
 }
 
 // =====================================================================================================================
@@ -2695,6 +2907,8 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.id == .helping_hand) s.helping_hand = true;
         }
         if (u.hh_caster != st.NO_UID or u.hh_penalty != st.NO_UID) s.helping_hand = true;
+        // Time Denial: a holder (its card may later move to a thief) turns the hourglass scan on.
+        if (mask & AB.time_denial.bit() != 0) s.time_denial = true;
         // Spells move only with Predatory Assimilation, so the board's books cover every later holder.
         if (u.n_book != 0 or u.n_spells != 0) s.spell_hooks = true;
         for (u.spells[0..u.n_spells]) |b| {
@@ -3428,7 +3642,7 @@ pub fn apply(s: *State, action: rec.Action, events: *Events) bool {
         .wait_turn => |a| if (waitTurn(s, a.unit, events)) true else |_| false,
         .defend_turn => |a| if (defendTurn(s, a.unit, events)) true else |_| false,
         .select_attack_type => |a| if (selectAttackType(s, a.unit, a.attack_type)) true else |_| false,
-        .move_unit => |a| if (moveUnit(s, a.unit, a.path, a.target_cells)) true else |_| false,
+        .move_unit => |a| if (moveUnit(s, a.unit, a.path, a.target_cells, events)) true else |_| false,
         .melee_attack => |a| if (combat.meleeAttack(s, a.attacker, a.target, a.attack_from, a.path, events)) true else |_| false,
         .range_attack => |a| if (a.free)
             (if (combat.freeAimAttack(s, a.attacker, a.tx, a.ty, events)) true else |_| false)
@@ -3437,7 +3651,7 @@ pub fn apply(s: *State, action: rec.Action, events: *Events) bool {
         .area_throw_attack => |a| if (combat.areaThrowAttack(s, a.attacker, a.target_cell, events)) true else |_| false,
         .obstacle_attack => |a| if (combat.obstacleAttackAt(s, a.attacker, a.target_x, a.target_y, if (a.has_from) a.attack_from else null, a.path, events)) true else |_| false,
         .decide => true, // AI decisions are not engine calls
-        .cast_spell => |a| if (spells.castSpell(s, a.caster, a.spell, if (a.has_target) a.target else null, if (a.has_cell) a.cell else null, events)) true else |_| false,
+        .cast_spell => |a| if (spells.castSpellOriented(s, a.caster, a.spell, if (a.has_target) a.target else null, if (a.has_cell) a.cell else null, a.orientation, events)) true else |_| false,
     };
     for (events.slice()) |e| {
         const active_uid: i32 = if (s.active >= 0) s.units[@intCast(s.active)].uid else -1;
