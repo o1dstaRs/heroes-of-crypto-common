@@ -508,12 +508,14 @@ fn bookSpellPower(s: *const st.State, u: *const st.Unit, raw: u8) ?*const st.Spe
     return null;
 }
 
-/// prioritizeV08HealerSustain: unless the decision is a guaranteed kill, a Healer casts the Blessing worth more than
-/// its best Heal, else that Heal (SUPPORT candidates). A Heal is priced by singleHealValue at the caster's healing
-/// power (no Holy Cross); a Blessing by the target's best direct attack (its own candidates from an empty incumbent,
-/// the most expected damage first) x (max - min) / (max + min) x min(2, the spell's laps) turns (a shooter's capped by
-/// its shots), skipping a target that is Blessed or Stunned. Mass Heal and Spiritual Armor are not in scope;
-/// V08_ROLE_RELEASE is unset.
+/// prioritizeV08HealerSustain: unless the decision is a guaranteed kill, a Healer casts Mass Heal when its candidate
+/// exists and it restores two or more bodies for more than both the best Heal and the best Blessing, else the Blessing
+/// worth more than its best Heal, else that Heal, else Spiritual Armor on the biggest live health pool (x3 on a durable
+/// anchor), else the decision (SUPPORT candidates). A Heal is priced by singleHealValue at the caster's healing power
+/// (no Holy Cross; it is disabled); Mass Heal by massHealValue; a Blessing by the target's best direct attack (its own
+/// candidates from an empty incumbent, the most expected damage first) x (max - min) / (max + min) x min(2, the spell's
+/// laps) turns (a shot or a throw capped by its shots unless Endless Quiver), skipping a target that is Blessed or
+/// Stunned. V08_ROLE_RELEASE is unset.
 fn healerSustain(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
@@ -563,18 +565,65 @@ fn healerSustain(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
         }
         const j = best_attack orelse continue;
         const attack = &attacks.items[j];
-        const turns = if (util.has(&attack.d, .range_attack)) @min(laps, engine.getRangeShots(t)) else laps;
+        const ranged = util.has(&attack.d, .range_attack) or util.has(&attack.d, .area_throw_attack);
+        const turns = if (ranged and !t.has(.endless_quiver)) @min(laps, engine.getRangeShots(t)) else laps;
         const value = ((attack.ed * (mx - mn)) / (mx + mn)) * turns;
         if (value > 0 and (bless == null or value > bless_value)) {
             bless = i;
             bless_value = value;
         }
     }
+    const mass_raw: i16 = @intFromEnum(st.CastSpell.mass_heal);
+    for (set.slice(), 0..) |*cd, i| {
+        if (cd.spell != mass_raw) continue;
+        const mass = massHealValue(s, c.ui);
+        const rival = @max(if (single != null) single_value else 0, if (bless != null) bless_value else 0);
+        if (mass.recipients >= 2 and mass.value > rival) return take(out, &set, i);
+        break;
+    }
     if (bless) |i| {
         if (bless_value > (if (single != null) single_value else 0)) return take(out, &set, i);
     }
     if (single) |i| return take(out, &set, i);
+    // bestArmor: the first Spiritual Armor candidate with the largest cumulative max HP (x3 on a durable anchor).
+    const armor_raw: i16 = @intFromEnum(st.CastSpell.spiritual_armor);
+    var armor: ?usize = null;
+    var armor_value: f64 = -std.math.inf(f64);
+    for (set.slice(), 0..) |*cd, i| {
+        if (cd.spell != armor_raw or cd.target < 0) continue;
+        const ti: u8 = @intCast(cd.target);
+        const t = &s.units[ti];
+        const value = t.amount_alive * t.max_hp * @as(f64, if (durableHealAnchor(s, ti)) 3 else 1);
+        if (value > armor_value) {
+            armor = i;
+            armor_value = value;
+        }
+    }
+    if (armor) |i| return take(out, &set, i);
     util.copyDecision(out, in);
+}
+
+/// massHealValue: over the caster's team in holder order, every living body that can be healed (no active Mechanism)
+/// and is not magic-immune, whose top creature a Mass Heal at the caster's power (spell power x creatures alive x the
+/// spell's morale factor, floored; no Holy Cross) restores more than trivially: how many, and the restored HP (x3 on a
+/// durable anchor).
+fn massHealValue(s: *const st.State, ci: u8) struct { value: f64, recipients: usize } {
+    const u = &s.units[ci];
+    const raw_id: u8 = @intFromEnum(st.CastSpell.mass_heal);
+    const power: f64 = if (bookSpellPower(s, u, raw_id)) |cfg| cfg.power else 0;
+    const raw = @floor(power * @max(0, u.amount_alive) * 1 * spells.moraleMultiplier(.mass_heal, u.attack_multiplier));
+    var value: f64 = 0;
+    var recipients: usize = 0;
+    for (s.holderOrder()) |k| {
+        const a = &s.units[k];
+        if (a.team != u.team or a.isDead() or a.has(.mechanism) or engine.getMagicResist(a) == 100) continue;
+        const effective = frontHeal(a, raw);
+        const trivial = effective < raw * 0.05 and a.max_hp - a.hp < a.max_hp * 0.05;
+        if (effective <= 0 or trivial) continue;
+        recipients += 1;
+        value += effective * @as(f64, if (durableHealAnchor(s, k)) 3 else 1);
+    }
+    return .{ .value = value, .recipients = recipients };
 }
 
 /// bestV08WardSpell: the spell candidate with a kill first, then the most damage, then the spell name (first on ties).
