@@ -821,21 +821,50 @@ fn flyerCastable(s: *const State, team: u8, spell: CS, cfg: *const st.SpellConfi
     return false;
 }
 
-/// SpellHelper.canMassCastSpell for an ALL_ALLIES non-HEAL spell (some unit of the caster's team, holder order, with
-/// magic resist other than 100 that carries no buff of the spell's name or a conflicting one) or an ALL_FLYING one (the
-/// same over the units that can fly, the caster's team first, then the other).
+/// SpellHelper.canMassCastSpell (spell_helper.ts:127), over the holder's units in order (dead ones still in the holder
+/// included, as the team maps are built): ALL_FLYING, a unit that can fly with magic resist other than 100 that carries
+/// no buff of the spell's name or a conflicting one, the caster's team first, then the other; ALL_ALLIES HEAL (Mass
+/// Heal), a unit of the caster's team whose front creature is hurt (hp < max hp) and whose magic resist is not 100;
+/// ALL_ALLIES otherwise, such a unit of the team with no buff of the spell's name or a conflicting one; ALL_ENEMIES, such
+/// a unit of the other team with no debuff of the spell's name or a conflicting one (no ALL_ENEMIES spell is configured).
 pub fn canMassCastSpell(s: *const State, ci: u8, spell: CS, cfg: *const st.SpellConfig) bool {
+    const team = s.units[ci].team;
     if (cfg.target == ST.ALL_FLYING) {
-        const team = s.units[ci].team;
         return flyerCastable(s, team, spell, cfg) or flyerCastable(s, engine.opposite(team), spell, cfg);
     }
-    if (cfg.target != ST.ALL_ALLIES or cfg.power_type == SP.HEAL) return false;
-    const team = s.units[ci].team;
-    for (s.holderOrder()) |i| {
-        const u = &s.units[i];
-        if (u.team != team) continue;
-        if (engine.getMagicResist(u) == 100) continue;
-        if (!alreadyAppliedBuff(u, spell, cfg)) return true;
+    if (cfg.target == ST.ALL_ALLIES) {
+        for (s.holderOrder()) |i| {
+            const u = &s.units[i];
+            if (u.team != team) continue;
+            if (cfg.power_type == SP.HEAL) {
+                if (u.hp < u.max_hp and engine.getMagicResist(u) != 100) return true;
+                continue;
+            }
+            if (engine.getMagicResist(u) == 100) continue;
+            if (!alreadyAppliedBuff(u, spell, cfg)) return true;
+        }
+        return false;
+    }
+    if (cfg.target == ST.ALL_ENEMIES) {
+        for (s.holderOrder()) |i| {
+            const u = &s.units[i];
+            if (u.team == team) continue;
+            if (engine.getMagicResist(u) == 100) continue;
+            if (!alreadyAppliedDebuff(u, spell, cfg)) return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+/// hasAlreadyAppliedSpell's debuff side, as canMassCastSpell's ALL_ENEMIES branch reads it: a debuff of the spell's
+/// name or of a conflicting one.
+fn alreadyAppliedDebuff(u: *const Unit, spell: CS, cfg: *const st.SpellConfig) bool {
+    if (spell.applied()) |id| {
+        if (u.debuffs.find(id) != null) return true;
+    }
+    if (cfg.conflict) |id| {
+        if (u.debuffs.find(id) != null) return true;
     }
     return false;
 }
