@@ -6,6 +6,11 @@
 //!       state with the logged layer of the same name (the k-th Zig "v0.2" against the k-th logged "v0.2").
 //!       --passes also checks every ported v0.8 pass (lv8.zig) in isolation: run on the logged output of the layer
 //!       before it, its output must equal its own logged layer. Passes not ported yet are skipped.
+//!
+//!   hoc-sim v08 candidates <recording.jsonl> [--max-fail N]
+//!       For a recording with RECORD_CANDIDATES=1: rebuilds every logged candidate list (cand.zig) from the logged
+//!       incumbent (the explicit layer at the boundary, defend-to-wait at the finish) and compares each candidate's
+//!       kind, actions, target, stand and target cells, expected damage and kill.
 
 const std = @import("std");
 const rec = @import("../recording.zig");
@@ -16,6 +21,7 @@ const ai = @import("../ai.zig");
 const policy = @import("policy.zig");
 const util = @import("util.zig");
 const lv8 = @import("lv8.zig");
+const cand = @import("cand.zig");
 
 fn argValue(args: []const []const u8, name: []const u8) ?[]const u8 {
     for (args, 0..) |a, i| {
@@ -43,6 +49,10 @@ pub fn run(gpa: std.mem.Allocator, args: []const []const u8) !void {
     if (std.mem.eql(u8, args[0], "layers")) {
         const top = policy.levelFromName(argValue(args, "--top") orelse "v0.2") orelse return error.UnknownLevel;
         if (!try layers(gpa, args[1], top, hasFlag(args, "--passes"), argNumber(args, "--max-fail", 10))) std.process.exit(1);
+        return;
+    }
+    if (std.mem.eql(u8, args[0], "candidates")) {
+        if (!try candidates(gpa, args[1], argNumber(args, "--max-fail", 10))) std.process.exit(1);
         return;
     }
     std.debug.print("hoc-sim v08: unknown command {s}\n", .{args[0]});
@@ -313,6 +323,154 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
         gpa.free(e.key_ptr.*);
     }
     return decisions_ok == decisions;
+}
+
+// =====================================================================================================================
+// Candidate-list check
+// =====================================================================================================================
+
+fn optCell(v: std.json.Value) ?rec.Cell {
+    if (v != .object) return null;
+    return .{ .x = @intCast(rec.int(rec.get(v, "x"))), .y = @intCast(rec.int(rec.get(v, "y"))) };
+}
+
+fn cellEq(a: ?rec.Cell, b: ?rec.Cell) bool {
+    if (a == null or b == null) return a == null and b == null;
+    return a.?.x == b.?.x and a.?.y == b.?.y;
+}
+
+fn printList(label: []const u8, kinds: []const []const u8, targets: []const i16, eds: []const f64, eks: []const u8, acts: []const []const rec.Action) void {
+    std.debug.print("    {s} ({d}):\n", .{ label, kinds.len });
+    for (kinds, 0..) |k, i| {
+        std.debug.print("      [{d}] {s} target {d} ed {d} ek {d}\n", .{ i, k, targets[i], eds[i], eks[i] });
+        printActions("   ", acts[i]);
+    }
+}
+
+fn candidates(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
+    const buf = try std.fs.cwd().readFileAlloc(gpa, path, 1 << 34);
+    defer gpa.free(buf);
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    var decision_arena = std.heap.ArenaAllocator.init(gpa);
+    defer decision_arena.deinit();
+    var lists: usize = 0;
+    var compared: usize = 0;
+    var matched: usize = 0;
+    var with_shots: usize = 0;
+    var fails: usize = 0;
+    var games: usize = 0;
+    var lines = rec.lines(buf);
+    while (lines.next()) |line| {
+        _ = arena_state.reset(.retain_capacity);
+        const arena = arena_state.allocator();
+        const game = rec.parseGame(arena, line, true) catch continue;
+        const root = try std.json.parseFromSliceLeaky(std.json.Value, arena, line, .{});
+        const raw_steps = rec.get(root, "steps").array.items;
+        games += 1;
+        util.battle = util.Battle.fromInit(game.init);
+        var s = engine.initState(game.init, game.ids) catch continue;
+        util.battle.primeProfile(&s);
+        var events: engine.Events = .{};
+        for (game.steps, 0..) |step, i| {
+            if (step.action == .decide) {
+                const raw = raw_steps[i];
+                const cands_raw = rec.get(raw, "candidates");
+                const logged_raw = rec.get(raw, "layers");
+                if (cands_raw == .array and logged_raw == .array) {
+                    _ = decision_arena.reset(.retain_capacity);
+                    const da = decision_arena.allocator();
+                    const logged = try parseLayers(da, game.ids, logged_raw);
+                    s.ai_prev_target = .{-1} ** st.MAX_UNITS;
+                    for (rec.get(raw, "memory").array.items) |pair| {
+                        const a = rec.unitIndex(game.ids, pair.array.items[0].string) catch continue;
+                        const t = rec.unitIndex(game.ids, pair.array.items[1].string) catch continue;
+                        s.ai_prev_target[a] = @intCast(t);
+                    }
+                    for (cands_raw.array.items) |cl| {
+                        lists += 1;
+                        const at = rec.get(cl, "at").string;
+                        const list = rec.get(cl, "list").array.items;
+                        for (list) |e| if (std.mem.eql(u8, rec.get(e, "kind").string, "shot")) {
+                            with_shots += 1;
+                            break;
+                        };
+                        const boundary = std.mem.eql(u8, at, "boundary");
+                        const want = if (boundary) "explicit" else "defend-to-wait";
+                        var inc_actions: ?[]const rec.Action = null;
+                        for (logged) |l| if (std.mem.eql(u8, l.name, want)) {
+                            inc_actions = l.out;
+                        };
+                        var inc: ai.Decision = .{};
+                        if (inc_actions == null or !lv8.fromActions(&inc, inc_actions.?)) continue;
+                        var copy = s;
+                        copy.rng.state = step.r0;
+                        var c: ai.Ctx = undefined;
+                        ai.initCtxInto(&c, &copy, step.action.decide.unit);
+                        var set: cand.Set = .{};
+                        cand.enumerate(&c, &inc, if (boundary) cand.BOUNDARY else cand.FINISH, &set);
+                        compared += 1;
+                        // Compare entry by entry.
+                        var ok = set.n == list.len and !set.incomplete;
+                        if (ok) {
+                            for (list, set.slice()) |e, *m| {
+                                const kind = rec.get(e, "kind").string;
+                                if (!std.mem.eql(u8, kind, cand.kindName(m.kind))) ok = false;
+                                const raw_actions = rec.get(e, "actions").array.items;
+                                const parsed = try da.alloc(rec.Action, raw_actions.len);
+                                for (raw_actions, 0..) |o, j| parsed[j] = try rec.parseAction(da, game.ids, "apply", o);
+                                if (!sameActions(parsed, m.d.slice())) ok = false;
+                                const tid = rec.get(e, "targetId");
+                                const t: i16 = if (tid == .string) @intCast(rec.unitIndex(game.ids, tid.string) catch 255) else -1;
+                                if (t != m.target) ok = false;
+                                if (!cellEq(optCell(rec.get(e, "standCell")), m.stand)) ok = false;
+                                if (!cellEq(optCell(rec.get(e, "targetCell")), m.tcell)) ok = false;
+                                const ed_raw = rec.get(e, "ed");
+                                const ed: f64 = switch (ed_raw) {
+                                    .integer => |v| @floatFromInt(v),
+                                    .float => |v| v,
+                                    else => std.math.nan(f64),
+                                };
+                                if (ed != m.ed) ok = false;
+                                if (@as(u8, @intCast(rec.int(rec.get(e, "ek")))) != m.ek) ok = false;
+                                if (!ok) break;
+                            }
+                        }
+                        if (ok) {
+                            matched += 1;
+                            continue;
+                        }
+                        fails += 1;
+                        if (fails <= max_fail) {
+                            std.debug.print("seed {d} step {d} unit {d} {s} list differs (ts {d}, zig {d}{s})\n", .{ game.seed, i, step.action.decide.unit, at, list.len, set.n, if (set.incomplete) ", incomplete" else "" });
+                            for (list, 0..) |e, j| {
+                                const raw_actions = rec.get(e, "actions").array.items;
+                                const parsed = try da.alloc(rec.Action, raw_actions.len);
+                                for (raw_actions, 0..) |o, jj| parsed[jj] = try rec.parseAction(da, game.ids, "apply", o);
+                                const tid = rec.get(e, "targetId");
+                                std.debug.print("      ts  [{d}] {s} target {s} ed {any} ek {any}\n", .{ j, rec.get(e, "kind").string, if (tid == .string) tid.string[0..8] else "-", rec.get(e, "ed"), rec.get(e, "ek") });
+                                printActions("   ", parsed);
+                            }
+                            for (set.slice(), 0..) |*m, j| {
+                                std.debug.print("      zig [{d}] {s} target {d} ed {d} ek {d}\n", .{ j, cand.kindName(m.kind), m.target, m.ed, m.ek });
+                                printActions("   ", m.d.slice());
+                            }
+                        }
+                    }
+                }
+                s.rng.state = step.r1;
+                continue;
+            }
+            s.rng.state = step.r0;
+            events.len = 0;
+            const ok = engine.apply(&s, step.action, &events);
+            var m: compare.Mismatch = .{};
+            if (ok != step.ok or s.rng.state != step.r1 or !compare.eventsMatch(events.slice(), step.events) or
+                !compare.state(&s, game.ids, step.digest.?, &m)) break;
+        }
+    }
+    std.debug.print("candidates: {d} games, {d} lists ({d} hold a shot), {d}/{d} compared lists identical\n", .{ games, lists, with_shots, matched, compared });
+    return matched == compared;
 }
 
 test {
