@@ -119,6 +119,7 @@ pub const Battle = struct {
     /// standalone StrategyV0_4 anchor (not ported), so decideV08 refuses those seats. The rollout bridge must set it
     /// from the TS profile, as it does `melee_magic`.
     aura_saturated: [3]bool = .{ false, false, false },
+
     /// Each unit's place in its ids' localeCompare order (UUIDs: the same as byte order), for the TS id tie-breaks.
     id_rank: [st.MAX_UNITS]u16 = .{0} ** st.MAX_UNITS,
     /// v0.8's ranged positioning runs (V08_RANGED_POSITION_VERSIONS, default "v0.8": production). False for the
@@ -187,6 +188,19 @@ pub const Battle = struct {
         return b;
     }
 };
+
+/// The aura-saturated anchor is ported where it equals the chain's v0.4 level: a team whose living stacks are all
+/// melee without a spellbook (every batch 1-3 aura emitter is), so v0.1's and v0.8's ranged outputs are both 0
+/// for it, v0.8's front move is v0.4's, and the shot seams (v0.3's scorer, unresolved primary targets) never run.
+pub fn anchorPorted(s: *const State, team: u8) bool {
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (!u.in_holder or u.isDead() or u.team != team) continue;
+        if (u.attack_type != AT.MELEE and u.attack_type != AT.MELEE_MAGIC) return false;
+        if (u.n_book > 0 or u.n_spells > 0) return false;
+    }
+    return true;
+}
 
 /// The battle being decided (set by whoever runs the policy, before the first decision).
 pub threadlocal var battle: Battle = .{};

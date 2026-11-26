@@ -1,6 +1,7 @@
 //! The v0.7 level of the v0.8 chain (src/ai/versions/v0_7.ts StrategyV0_7.decideTurn): v0.6, then the melee-magic
-//! stance fix. Not ported: the aura-saturated archetype anchor (decideV08 refuses such a seat), the Arachna Queen
-//! assimilation router (no spells or Endless Quiver) and the Terrifying Gaze repair.
+//! stance fix. The aura-saturated archetype anchor is the chain's v0.4 level where they are equal (util.anchorPorted;
+//! decideV08 refuses the seat otherwise). Identity in scope: the Arachna Queen assimilation router (no spells or Endless
+//! Quiver) and the Terrifying Gaze repair.
 
 const rec = @import("../recording.zig");
 const st = @import("../state.zig");
@@ -8,13 +9,19 @@ const engine = @import("../engine.zig");
 const ai = @import("../ai.zig");
 const policy = @import("policy.zig");
 const lv6 = @import("lv6.zig");
+const lv4 = @import("lv4.zig");
+const util = @import("util.zig");
 
 const AT = st.AttackType;
 
 pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     const rin = c.s.rng.state;
     defer policy.note("v0.7", out, c.s, rin);
-    lv6.decide(c, out);
+    // isAuraSaturatedArmy: v0.6's learned policy is out of distribution when every stack emits an aura, so v0.7 plays its
+    // standalone v0.4 anchor (lv8 refuses the seat unless util.anchorPorted, where the anchor is the chain's v0.4
+    // level); the universal caster router (Resurrection, Wind Flow), the Queen's assimilation router and the Gaze repair
+    // have nothing to route in scope.
+    if (util.battle.aura_saturated[c.unit().team]) lv4.decide(c, out) else lv6.decide(c, out);
     normalizeMeleeMagicSelection(c, out);
 }
 

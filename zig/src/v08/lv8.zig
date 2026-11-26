@@ -1105,8 +1105,9 @@ pub fn coherentMelee(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool
 /// The passes after v0.7, in decideTurn's order; false when a pass this board needs is not ported (cemetery with
 /// standing scattered stones, a coherent-melee repair, or an unported ability term).
 pub fn decide(c: *ai.Ctx, out: *ai.Decision) bool {
-    // v0.7's aura-saturated archetype anchor (a standalone StrategyV0_4 with the universal caster router) is not ported.
-    if (util.battle.aura_saturated[c.unit().team]) return false;
+    // v0.7's aura-saturated archetype anchor (a standalone StrategyV0_4 with the universal caster router) is ported only
+    // where it equals the chain's v0.4 level (util.anchorPorted).
+    if (util.battle.aura_saturated[c.unit().team] and !util.anchorPorted(c.s, c.unit().team)) return false;
     var cur: ai.Decision = .{};
     var next: ai.Decision = .{};
     @import("lv7.zig").decide(c, &cur);
