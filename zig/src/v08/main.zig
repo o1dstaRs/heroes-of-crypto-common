@@ -8,6 +8,10 @@
 //!       before it, its output must equal its own logged layer. Passes not ported yet are skipped.
 //!       --v08s: the recording ran the v0.8s alias outside V08_RANGED_POSITION_VERSIONS (no ranged positioning).
 //!
+//!   hoc-sim v08 leaf <recording.jsonl> [--max-fail N]
+//!       For a recording with RECORD_LEAF=1: at every decision, the V2 rollout leaf (util.leafV2) and its 60 features
+//!       for both teams, bit-exact against the recorder's leafValue.
+//!
 //!   hoc-sim v08 candidates <recording.jsonl> [--max-fail N]
 //!       For a recording with RECORD_CANDIDATES=1: rebuilds every logged candidate list (cand.zig) from the logged
 //!       incumbent (the explicit layer at the boundary, defend-to-wait at the finish) and compares each candidate's
@@ -51,6 +55,10 @@ pub fn run(gpa: std.mem.Allocator, args: []const []const u8) !void {
         const top = policy.levelFromName(argValue(args, "--top") orelse "v0.2") orelse return error.UnknownLevel;
         alias_v08s = hasFlag(args, "--v08s");
         if (!try layers(gpa, args[1], top, hasFlag(args, "--passes"), argNumber(args, "--max-fail", 10))) std.process.exit(1);
+        return;
+    }
+    if (std.mem.eql(u8, args[0], "leaf")) {
+        if (!try leafCheck(gpa, args[1], argNumber(args, "--max-fail", 10))) std.process.exit(1);
         return;
     }
     if (std.mem.eql(u8, args[0], "candidates")) {
@@ -350,6 +358,74 @@ fn printList(label: []const u8, kinds: []const []const u8, targets: []const i16,
         std.debug.print("      [{d}] {s} target {d} ed {d} ek {d}\n", .{ i, k, targets[i], eds[i], eks[i] });
         printActions("   ", acts[i]);
     }
+}
+
+fn num(v: std.json.Value) f64 {
+    return switch (v) {
+        .integer => |i| @floatFromInt(i),
+        .float => |f| f,
+        else => std.math.nan(f64),
+    };
+}
+
+fn leafCheck(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
+    const buf = try std.fs.cwd().readFileAlloc(gpa, path, 1 << 34);
+    defer gpa.free(buf);
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    var checked: usize = 0;
+    var matched: usize = 0;
+    var fails: usize = 0;
+    var lines = rec.lines(buf);
+    while (lines.next()) |line| {
+        _ = arena_state.reset(.retain_capacity);
+        const arena = arena_state.allocator();
+        const game = rec.parseGame(arena, line, true) catch continue;
+        const root = try std.json.parseFromSliceLeaky(std.json.Value, arena, line, .{});
+        const raw_steps = rec.get(root, "steps").array.items;
+        util.battle = util.Battle.fromInit(game.init);
+        var s = engine.initState(game.init, game.ids) catch continue;
+        var events: engine.Events = .{};
+        for (game.steps, 0..) |step, i| {
+            if (step.action == .decide) {
+                const leaf = rec.get(raw_steps[i], "leaf");
+                if (leaf == .array) {
+                    const want = leaf.array.items;
+                    var got: [122]f64 = undefined;
+                    got[0] = util.leafV2(&s, 1);
+                    got[1] = util.leafV2(&s, 2);
+                    var f: [util.VALUE_FEATURES_V2]f64 = undefined;
+                    util.valueFeaturesV2(&s, 1, &f);
+                    @memcpy(got[2..62], &f);
+                    util.valueFeaturesV2(&s, 2, &f);
+                    @memcpy(got[62..122], &f);
+                    checked += 1;
+                    var bad: ?usize = null;
+                    for (want, 0..) |w, k| {
+                        if (k >= got.len or num(w) != got[k]) {
+                            bad = k;
+                            break;
+                        }
+                    }
+                    if (bad == null and want.len == got.len) {
+                        matched += 1;
+                    } else {
+                        fails += 1;
+                        if (fails <= max_fail) std.debug.print("seed {d} step {d}: leaf entry {d} differs: ts {d} zig {d}\n", .{ game.seed, i, bad orelse want.len, if (bad) |b| num(want[b]) else 0, if (bad) |b| got[b] else 0 });
+                    }
+                }
+                s.rng.state = step.r1;
+                continue;
+            }
+            s.rng.state = step.r0;
+            events.len = 0;
+            const ok = engine.apply(&s, step.action, &events);
+            var m: compare.Mismatch = .{};
+            if (ok != step.ok or s.rng.state != step.r1 or !compare.state(&s, game.ids, step.digest.?, &m)) break;
+        }
+    }
+    std.debug.print("leaf: {d}/{d} decisions with both teams' V2 leaf and features bit-exact\n", .{ matched, checked });
+    return matched == checked;
 }
 
 fn candidates(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {

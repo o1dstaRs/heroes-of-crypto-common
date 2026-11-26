@@ -9,6 +9,8 @@ import { writeFileSync } from "node:fs";
 import { getAIStrategy } from "../../../src/ai";
 import { V05_WEIGHT_KEYS } from "../../../src/ai/versions/v0_5_weights";
 import { v07BakedWaitWeights, WAIT_FEATURE_NAMES } from "../../../src/ai/versions/wait_scorer";
+import { V08_A13_VALUE_LEAF } from "../../../src/ai/versions/v0_8_a13_profile";
+import { VALUE_FEATURE_NAMES_V2 } from "../../../src/simulation/value_features";
 
 const strategy = getAIStrategy("v0.8s") as unknown as { w: number[]; applyMeleeDims(): void };
 strategy.applyMeleeDims();
@@ -36,6 +38,15 @@ const text = [
     `pub const WAIT_W = [${wait.w.length}]f64{`,
     ...wait.w.map(
         (value, i) => `    @bitCast(@as(u64, 0x${bitsOf(value)})), // ${i} ${WAIT_FEATURE_NAMES[i]} = ${value}`,
+    ),
+    "};",
+    "",
+    "/// The production rollout leaf (V08_A13_VALUE_LEAF = V07_VALUE_WEIGHTS_V2): bias and one weight per V2 feature.",
+    `pub const LEAF_V2_B: f64 = @bitCast(@as(u64, 0x${bitsOf(V08_A13_VALUE_LEAF.b)})); // ${V08_A13_VALUE_LEAF.b}`,
+    `pub const LEAF_V2_W = [${V08_A13_VALUE_LEAF.w.length}]f64{`,
+    ...V08_A13_VALUE_LEAF.w.map(
+        (value: number, i: number) =>
+            `    @bitCast(@as(u64, 0x${bitsOf(value)})), // ${i} ${VALUE_FEATURE_NAMES_V2[i]} = ${value}`,
     ),
     "};",
     "",

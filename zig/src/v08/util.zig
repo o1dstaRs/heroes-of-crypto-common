@@ -550,6 +550,84 @@ pub fn valueFeatures(s: *const State, team: u8, out: *[VALUE_FEATURES]f64) void 
     out[19] = averageCenterDistance(enemy_cells[0..n_enemy], span);
 }
 
+pub const VALUE_FEATURES_V2 = 60;
+
+/// fillValueFeaturesV2 (value_features.ts): the 20 base features, the class/composition block (ranged, flyer and
+/// caster shares, ranged HP shares, remaining shots, ranged standoff), then the rangedness-interaction copy of all 30.
+pub fn valueFeaturesV2(s: *const State, team: u8, out: *[VALUE_FEATURES_V2]f64) void {
+    var base: [VALUE_FEATURES]f64 = undefined;
+    valueFeatures(s, team, &base);
+    @memcpy(out[0..VALUE_FEATURES], &base);
+    var own_cnt: f64 = 0;
+    var enemy_cnt: f64 = 0;
+    var own_ranged: f64 = 0;
+    var enemy_ranged: f64 = 0;
+    var own_fly: f64 = 0;
+    var enemy_fly: f64 = 0;
+    var own_caster: f64 = 0;
+    var enemy_caster: f64 = 0;
+    var own_hp: f64 = 0;
+    var enemy_hp: f64 = 0;
+    var own_ranged_hp: f64 = 0;
+    var enemy_ranged_hp: f64 = 0;
+    var own_shots: f64 = 0;
+    var enemy_shots: f64 = 0;
+    for (s.units[0..s.n_units]) |*u| {
+        if (!u.in_holder or u.isDead()) continue;
+        const ranged = u.attack_type == AT.RANGE;
+        const caster = u.attack_type == AT.MAGIC or u.attack_type == AT.MELEE_MAGIC;
+        const hp = cumulativeHp(u);
+        const shots = if (ranged) engine.getRangeShots(u) else 0;
+        if (u.team == team) {
+            own_cnt += 1;
+            own_hp += hp;
+            if (ranged) {
+                own_ranged += 1;
+                own_ranged_hp += hp;
+                own_shots += shots;
+            }
+            if (engine.canFly(u)) own_fly += 1;
+            if (caster) own_caster += 1;
+        } else {
+            enemy_cnt += 1;
+            enemy_hp += hp;
+            if (ranged) {
+                enemy_ranged += 1;
+                enemy_ranged_hp += hp;
+                enemy_shots += shots;
+            }
+            if (engine.canFly(u)) enemy_fly += 1;
+            if (caster) enemy_caster += 1;
+        }
+    }
+    const own_ranged_frac = if (own_cnt != 0) own_ranged / own_cnt else 0;
+    out[20] = own_ranged_frac;
+    out[21] = if (enemy_cnt != 0) enemy_ranged / enemy_cnt else 0;
+    out[22] = if (own_cnt != 0) own_fly / own_cnt else 0;
+    out[23] = if (enemy_cnt != 0) enemy_fly / enemy_cnt else 0;
+    out[24] = if (own_cnt != 0) own_caster / own_cnt else 0;
+    out[25] = if (enemy_cnt != 0) enemy_caster / enemy_cnt else 0;
+    out[26] = if (own_hp > 0) own_ranged_hp / own_hp else 0;
+    out[27] = if (enemy_hp > 0) enemy_ranged_hp / enemy_hp else 0;
+    out[28] = normalizedDifference(own_shots, enemy_shots);
+    out[29] = own_ranged_frac * out[14];
+    const rangedness = (out[20] + out[21]) / 2;
+    for (0..30) |i| out[30 + i] = if (rangedness != 0) out[i] * rangedness else 0;
+}
+
+extern "c" fn exp(x: f64) f64;
+
+/// SearchDriver.leafValue with the production V2 model (V08_A13_VALUE_LEAF) and no research logit adjustments:
+/// P(win) for `team`. Math.exp is the C library's exp, as JavaScriptCore's is.
+pub fn leafV2(s: *const State, team: u8) f64 {
+    const W = @import("weights.zig");
+    var f: [VALUE_FEATURES_V2]f64 = undefined;
+    valueFeaturesV2(s, team, &f);
+    var z = W.LEAF_V2_B;
+    for (0..VALUE_FEATURES_V2) |i| z += W.LEAF_V2_W[i] * f[i];
+    return 1 / (1 + exp(-z));
+}
+
 pub const WAIT_FEATURES = 41;
 
 /// The v0.5 hourglass rule's counterfactual verdict (incumbentRuleWaits): a melee charge, a legal wait, fm >= 0.67.
