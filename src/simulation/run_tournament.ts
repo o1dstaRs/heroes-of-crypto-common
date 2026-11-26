@@ -14,6 +14,7 @@ import { availableParallelism } from "node:os";
 import { join } from "node:path";
 
 import { AI_VERSIONS } from "../ai";
+import { A19_BOT_SEAT_SEARCH_DRIVER_ID } from "./a19_bot_seat_search";
 import { runTournamentConcurrent } from "./concurrent_tournament";
 
 /**
@@ -33,6 +34,10 @@ import { runTournamentConcurrent } from "./concurrent_tournament";
  *
  * Feed the .jsonl (and especially the placement + early-action lines of games the new version LOST)
  * to an LLM to mine concrete improvements for the next version.
+ *
+ * Searched v0.8 seats play the production bot seat's search by default (--search-driver=bot-seat: deep fit, neural
+ * off, offline deterministic work; a19_bot_seat_search.ts). --search-driver=stock keeps the stock A19 search with the
+ * live-bounded or --offline-deterministic-work budget, as every run before 2026-11-26 played. The summary records it.
  */
 async function main(): Promise<void> {
     // Flags (e.g. --random) may appear anywhere; strip them so positional args keep their order.
@@ -40,7 +45,16 @@ async function main(): Promise<void> {
     const flags = argv.filter((a) => a.startsWith("--"));
     const [versionA, versionB, gamesArg, seedArg, outDirArg, concurrencyArg] = argv.filter((a) => !a.startsWith("--"));
     const randomizePicks = flags.includes("--random") || flags.includes("--randomize-picks");
-    const searchOfflineDeterministicWork = flags.includes("--offline-deterministic-work");
+    const driverFlag = flags.find((f) => f.startsWith("--search-driver="))?.slice("--search-driver=".length);
+    if (driverFlag !== undefined && driverFlag !== "bot-seat" && driverFlag !== "stock") {
+        console.error(`--search-driver must be bot-seat or stock; got ${driverFlag}`);
+        process.exit(1);
+    }
+    const searchDriver =
+        (driverFlag ?? (versionA === "v0.8" || versionB === "v0.8" ? "bot-seat" : "stock")) === "bot-seat"
+            ? A19_BOT_SEAT_SEARCH_DRIVER_ID
+            : undefined;
+    const searchOfflineDeterministicWork = searchDriver !== undefined || flags.includes("--offline-deterministic-work");
     // --livetwin (or env LIVETWIN=1): the committed live-faithful eval preset — exp-budget stacks
     // (ceil(1000/exp) per creature), melee-drafted rosters (FIGHT_MELEE_ROSTERS default 1), SEE_NONE shipped
     // setup on both sides, paired side-swap seeds (the tournament default). Set BEFORE workers spawn so the
@@ -59,7 +73,7 @@ async function main(): Promise<void> {
         : undefined;
     if (!versionA || !versionB) {
         console.error(
-            "usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency] [--random] [--maps[=normal,water,lava,block]] [--livetwin] [--offline-deterministic-work]",
+            "usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency] [--random] [--maps[=normal,water,lava,block]] [--livetwin] [--offline-deterministic-work] [--search-driver=bot-seat|stock]",
         );
         console.error(`known versions: ${AI_VERSIONS.join(", ")}`);
         process.exit(1);
@@ -94,10 +108,20 @@ async function main(): Promise<void> {
         `Running ${games} games: ${versionA} vs ${versionB} (seed ${baseSeed}, concurrency ${concurrency}, ` +
             `picks ${randomizePicks ? "RANDOM per team" : "mirrored"}, maps ${mapTypes ? mapTypes.join("/") : "NORMAL"}, ` +
             `LIVETWIN ${liveTwin ? "ON [expBudget stacks + melee drafts + SEE_NONE setup]" : "off"}, ` +
-            `search work ${searchOfflineDeterministicWork ? "offline deterministic" : "live bounded"}) -> ${jsonlPath}`,
+            `search work ${searchOfflineDeterministicWork ? "offline deterministic" : "live bounded"}, ` +
+            `search driver ${searchDriver ?? "stock"}) -> ${jsonlPath}`,
     );
     const summary = await runTournamentConcurrent(
-        { versionA, versionB, games, baseSeed, randomizePicks, mapTypes, searchOfflineDeterministicWork },
+        {
+            versionA,
+            versionB,
+            games,
+            baseSeed,
+            randomizePicks,
+            mapTypes,
+            searchOfflineDeterministicWork,
+            ...(searchDriver ? { searchDriver } : {}),
+        },
         concurrency,
         (record) => {
             buffer.push(`${JSON.stringify(record)}\n`);
@@ -112,7 +136,9 @@ async function main(): Promise<void> {
     );
     flush();
 
-    writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
+    // A stock run records its driver too (the summary of a named driver carries the driver's provenance).
+    const recorded = summary.searchDriver ? summary : { ...summary, searchDriver: { id: "stock" } };
+    writeFileSync(summaryPath, `${JSON.stringify(recorded, null, 2)}\n`);
 
     const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
     console.log("");

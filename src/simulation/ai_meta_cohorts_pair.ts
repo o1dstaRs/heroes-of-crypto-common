@@ -35,6 +35,7 @@ import { summarizePremiumParticipation } from "./ai_meta_participation";
 import { summarizePremiumCombatMetrics } from "./ai_meta_combat_metrics";
 import { AI_META_OFFLINE_SEARCH_ENVIRONMENT } from "./ai_meta_search_budget";
 import type { IAiMetaRuntimeAdapter } from "./ai_meta_runtime_adapter";
+import { createA19BotSeatSearchDriverFactory, type A19BotSeatSearchDriverId } from "./a19_bot_seat_search";
 
 export const aiMetaMatchConfig = (
     green: IAiMetaArmy,
@@ -115,6 +116,8 @@ export function playMetaPair(
     strategyProfileId: AiMetaStrategyProfileId,
     offlineDeterministicWork = false,
     adapter?: IAiMetaRuntimeAdapter,
+    /** The searched seats' driver (a19-bot-seat); omitted: the stock A19 search. */
+    searchDriver?: A19BotSeatSearchDriverId,
 ): IAiMetaPairRecord {
     if (Boolean(options.authoritativeRanked) !== Boolean(adapter))
         throw new Error("Authoritative collection requires its native adapter");
@@ -123,6 +126,8 @@ export function playMetaPair(
     if (options.collectEvidence && !offlineDeterministicWork) {
         throw new Error("AI meta evidence requires a19-work: recording must not change a wall-clock search budget");
     }
+    if (searchDriver && (!offlineDeterministicWork || options.nativeV09 || adapter))
+        throw new Error(`${searchDriver} plays offline deterministic work on the A19 fight path only`);
     // runMatch is synchronous and workers have isolated environments. Restore even on an engine failure.
     const previousNoActions = process.env.SIM_NO_ACTIONS;
     const previousSpellEffects = process.env.SIM_RECORD_SPELL_EFFECTS;
@@ -131,7 +136,14 @@ export function playMetaPair(
         process.env.SIM_RECORD_SPELL_EFFECTS = "1";
     }
     try {
-        const record = playMetaPairInner(options, pair, strategyProfileId, offlineDeterministicWork, adapter);
+        const record = playMetaPairInner(
+            options,
+            pair,
+            strategyProfileId,
+            offlineDeterministicWork,
+            adapter,
+            searchDriver,
+        );
         if (options.collectEvidence) validateAiMetaEvidence(record);
         return record;
     } finally {
@@ -260,18 +272,21 @@ function playMetaPairInner(
     strategyProfileId: AiMetaStrategyProfileId,
     offlineDeterministicWork: boolean,
     adapter?: IAiMetaRuntimeAdapter,
+    searchDriver?: A19BotSeatSearchDriverId,
 ): IAiMetaPairRecord {
     const prepared = adapter?.preparePair(options, pair) ?? prepareMetaPair(options, pair);
     const synergyVariants =
         prepared.evidence?.synergyVariants ?? aiMetaSynergyVariantsForPair(prepared.setupSeed, prepared.combatSeed);
     // Finite search budgets replace the live move deadline, so outcomes stop depending on host speed and load.
-    const searchBudget =
-        offlineDeterministicWork && !options.nativeV09
-            ? {
-                  searchOfflineDeterministicWork: true,
-                  researchA19BaseSearchEnvironment: AI_META_OFFLINE_SEARCH_ENVIRONMENT,
-              }
-            : {};
+    // The bot seat's driver carries its own budget and the server's environment (a19_bot_seat_search.ts).
+    const searchBudget = searchDriver
+        ? { searchOfflineDeterministicWork: true, searchDriverFactory: createA19BotSeatSearchDriverFactory() }
+        : offlineDeterministicWork && !options.nativeV09
+          ? {
+                searchOfflineDeterministicWork: true,
+                researchA19BaseSearchEnvironment: AI_META_OFFLINE_SEARCH_ENVIRONMENT,
+            }
+          : {};
     FightStateManager.getInstance();
     const learning = options.studyProfile === PREMIUM_META_POLICY_LEARNING_STUDY;
     const formationCollection = (aIsGreen: boolean) => {

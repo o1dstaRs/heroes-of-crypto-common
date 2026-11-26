@@ -7,7 +7,12 @@ matching Puffalo's physical cores. The versioned defaults are in
 
 The default algorithm is **H64 / complementary R2 / shortlist 6 / max melee 10**, with uniform rollout allocation.
 Use `a19-work` for cohort measurement: its finite work budget prevents machine load from silently
-shortening a move through the live deadline. Complementary actor/lap-aligned sampling was adopted as the
+shortening a move through the live deadline. The versioned Puffalo defaults and every study that recorded
+`a19-work` keep it. Since 2026-11-26 (owner: newly sealed research plans default to the production bot-seat
+driver) a meta invocation that names no fight profile plays `a19-bot-seat`: the bot seat's deep-fit search in the
+server's bot-search environment, neural off, offline deterministic work (`src/simulation/a19_bot_seat_search.ts`).
+`run_tournament.ts` and `run_match.ts` do the same for searched v0.8 seats unless `--search-driver=stock` is given;
+summaries record the driver. Complementary actor/lap-aligned sampling was adopted as the
 general v0.8 default by explicit user instruction on October 25, accepting the remaining strength uncertainty.
 Shorter horizons, plain independent R2, halving, and narrower/adaptive shortlists remain unadopted.
 

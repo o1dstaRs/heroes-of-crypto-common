@@ -43,6 +43,7 @@ import {
 } from "../../src/simulation/ai_meta_cohorts_core";
 import { ChaosSynergy, LifeSynergy, MightSynergy, NatureSynergy } from "../../src/synergies/synergy_properties";
 import {
+    AI_META_DEFAULT_FIGHT_PROFILE,
     AiMetaAccumulator,
     AiMetaAggregation,
     captureAiMetaSourceIdentity,
@@ -332,6 +333,35 @@ describe("AI meta cohort generation", () => {
             },
             genomeSha256: productionProfile.provenance.genomeSha256,
             search: productionProfile.provenance.search,
+        });
+
+        // a19-work keeps the stock driver it recorded: no driver of its own, the same provenance keys.
+        expect(workProfile.searchDriver).toBeUndefined();
+        expect("searchDriver" in workProfile.provenance).toBe(false);
+
+        // An invocation that names no profile plays the production bot seat's search (owner, 2026-11-26).
+        expect(AI_META_DEFAULT_FIGHT_PROFILE).toBe("a19-bot-seat");
+        const botSeat = resolveAiMetaFightProfile(AI_META_DEFAULT_FIGHT_PROFILE);
+        expect(botSeat.offlineDeterministicWork).toBe(true);
+        expect(botSeat.searchDriver).toBe("a19-bot-seat-deep-fit-v1");
+        expect(botSeat.strategyProfileId).toBe(workProfile.strategyProfileId);
+        expect(botSeat.provenance).toMatchObject({
+            name: "v0.8+a19-bot-seat",
+            searchBudget: "offline-deterministic-work",
+            genomeSha256: productionProfile.provenance.genomeSha256,
+            searchDriver: {
+                id: "a19-bot-seat-deep-fit-v1",
+                driver: "a19-deep-fit-v1",
+                stockBudget: { SEARCH_DECISION_DEADLINE_MS: "2500", SEARCH_CIRCUIT_BREAKER_MS: "3750" },
+                rolloutTurnBudget: 4000,
+            },
+        });
+        // The server's bot-search environment: the profile's values plus its explicit research seams off.
+        expect(sanitizedAiMetaEnvironment({ SEARCH_ROLLOUTS: "4" }, botSeat)).toEqual({
+            ...sanitizedAiMetaEnvironment({}, workProfile),
+            SEARCH_V08_RANKED_REPLAY_TIEBREAK_EPSILON: "0",
+            V08_FLYER_BACKLINE_PRIORITY_LEFT: "0",
+            V08_FLYER_BACKLINE_PRIORITY_RIGHT: "0",
         });
 
         expect(() => resolveAiMetaFightProfile(undefined)).toThrow("AI meta fight profile is required");

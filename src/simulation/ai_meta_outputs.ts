@@ -19,9 +19,9 @@ export function aiMetaOutputContract(profile: string, environment: NodeJS.Proces
             throw new Error("legacy-oracle conflicts with AI_META_STUDY_PROFILE; do not silently change a study");
         return { mode, studyProfile: undefined, collectEvidence: environment.AI_META_COLLECT_EVIDENCE === "1" };
     }
-    if (!["a19-work", "v09-draft-a19-work", "ranked-current-a19-work"].includes(profile))
+    if (!["a19-bot-seat", "a19-work", "v09-draft-a19-work", "ranked-current-a19-work"].includes(profile))
         throw new Error(
-            "Automatic Premium snapshots require a19-work or v09-draft-a19-work; " +
+            "Automatic Premium snapshots require a19-bot-seat, a19-work or v09-draft-a19-work; " +
                 "use AI_META_OUTPUT_MODE=legacy-oracle explicitly for outcome-only research",
         );
     if (environment.AI_META_COLLECT_EVIDENCE !== undefined && environment.AI_META_COLLECT_EVIDENCE !== "1")

@@ -45,6 +45,11 @@ import {
 import { creatureIdForName, DEFAULT_OFFER_K, draftRoster } from "./draft";
 import { isLiveTwin, LIVETWIN_PRESET, liveTwinMeleeFraction, liveTwinSetup } from "./livetwin";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
+import {
+    A19_BOT_SEAT_SEARCH_DRIVER,
+    createA19BotSeatSearchDriverFactory,
+    type A19BotSeatSearchDriverId,
+} from "./a19_bot_seat_search";
 
 /** Entrant A runs the production a19 profile (placement + sealed search); entrant B is native v0.8 without search. */
 export const TOURNAMENT_RESEARCH_A19 = "v0.8-a19" as const;
@@ -65,6 +70,11 @@ export interface ITournamentOptions {
      * production-bounded timing, including operational qualification runs.
      */
     searchOfflineDeterministicWork?: boolean;
+    /**
+     * The searched seats' driver: "a19-bot-seat-deep-fit-v1" plays the production bot seat's search
+     * (a19_bot_seat_search.ts) under offline deterministic work. Omitted: runMatch's stock search (registered behavior).
+     */
+    searchDriver?: A19BotSeatSearchDriverId;
     /**
      * Research-only, structured-clone-safe strategy selector for entrant A. The worker materializes fresh
      * match-local strategy state on A's current physical side; omitted preserves registered-version behavior.
@@ -387,6 +397,8 @@ export interface ITournamentSummary {
     games: number;
     baseSeed: number;
     entrantAResearchProfile?: ITournamentResearchProfileProvenance;
+    /** The searched seats' driver when the run named one (ITournamentOptions.searchDriver). */
+    searchDriver?: typeof A19_BOT_SEAT_SEARCH_DRIVER;
     a: IVersionStats;
     b: IVersionStats;
     draws: number;
@@ -792,7 +804,8 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
             seed,
             gridType,
             maxLaps: options.maxLaps,
-            searchOfflineDeterministicWork: options.searchOfflineDeterministicWork,
+            searchOfflineDeterministicWork: options.searchDriver ? true : options.searchOfflineDeterministicWork,
+            ...(options.searchDriver ? { searchDriverFactory: createA19BotSeatSearchDriverFactory() } : {}),
             greenArtifactT1,
             redArtifactT1,
             greenArtifactT2,
@@ -889,6 +902,7 @@ export function finalizeTally(tally: ITournamentTally, options: ITournamentOptio
                   entrantAResearchProfile: resolveTournamentResearchProfile(options.researchEntrantAStrategyProfile)
                       .provenance,
               }),
+        ...(options.searchDriver ? { searchDriver: A19_BOT_SEAT_SEARCH_DRIVER } : {}),
         a: tally.a,
         b: tally.b,
         draws: tally.draws,

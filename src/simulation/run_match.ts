@@ -11,13 +11,14 @@
 
 import { AI_VERSIONS } from "../ai";
 import { buildRoster, makeRng } from "./army";
+import { A19_BOT_SEAT_SEARCH_DRIVER_ID, createA19BotSeatSearchDriverFactory } from "./a19_bot_seat_search";
 import { runMatch } from "./battle_engine";
 
 /**
  * CLI: run a SINGLE AI-vs-AI battle and print a human-readable fight log (roster, result, the failures,
  * and a per-lap blow-by-blow). Good for eyeballing that a fight is legit.
  *
- *   bun src/simulation/run_match.ts [versionA] [versionB] [seed] [maxLaps]
+ *   bun src/simulation/run_match.ts [versionA] [versionB] [seed] [maxLaps] [--search-driver=bot-seat|stock]
  *
  * Examples:
  *   bun src/simulation/run_match.ts                 # v0.1 vs v0.2, seed 42
@@ -27,23 +28,41 @@ import { runMatch } from "./battle_engine";
  * GREEN plays the LEFT team, RED plays RIGHT. Both sides get the SAME 6-unit army (2xL1, 2xL2, 1xL3,
  * 1xL4), so the only difference is the AI. NOTE: the fight uses global RNG, so the same seed gives the
  * same ROSTER but not necessarily the same outcome run-to-run.
+ *
+ * A searched v0.8 seat plays the production bot seat's search by default (bot-seat: deep fit, neural off, offline
+ * deterministic work; a19_bot_seat_search.ts); --search-driver=stock keeps the stock A19 search under live bounds.
  */
 function main(): void {
-    const [, , versionA = "v0.1", versionB = "v0.2", seedArg, lapsArg] = process.argv;
-    if (versionA === "--help" || versionB === "--help") {
-        console.log("usage: run_match [versionA] [versionB] [seed] [maxLaps]");
+    const args = process.argv.slice(2);
+    const driverFlag = args.find((a) => a.startsWith("--search-driver="))?.slice("--search-driver=".length);
+    const [versionA = "v0.1", versionB = "v0.2", seedArg, lapsArg] = args.filter((a) => !a.startsWith("--search-"));
+    if (versionA === "--help" || versionB === "--help" || (driverFlag && !["bot-seat", "stock"].includes(driverFlag))) {
+        console.log("usage: run_match [versionA] [versionB] [seed] [maxLaps] [--search-driver=bot-seat|stock]");
         console.log(`known versions: ${AI_VERSIONS.join(", ")}`);
         return;
     }
     const seed = seedArg ? Number(seedArg) : 42;
     const maxLaps = lapsArg ? Number(lapsArg) : 60;
 
+    const botSeat = (driverFlag ?? (versionA === "v0.8" || versionB === "v0.8" ? "bot-seat" : "stock")) === "bot-seat";
+
     const roster = buildRoster(makeRng(seed));
-    const result = runMatch({ greenVersion: versionA, redVersion: versionB, roster, seed, maxLaps });
+    const result = runMatch({
+        greenVersion: versionA,
+        redVersion: versionB,
+        roster,
+        seed,
+        maxLaps,
+        ...(botSeat
+            ? { searchOfflineDeterministicWork: true, searchDriverFactory: createA19BotSeatSearchDriverFactory() }
+            : {}),
+    });
 
     const rule = "-".repeat(74);
     console.log(rule);
-    console.log(`MATCH  seed=${seed}  GREEN=${versionA}  RED=${versionB}`);
+    console.log(
+        `MATCH  seed=${seed}  GREEN=${versionA}  RED=${versionB}  search=${botSeat ? A19_BOT_SEAT_SEARCH_DRIVER_ID : "stock"}`,
+    );
     console.log("ROSTER (identical for both sides):");
     for (const r of roster) {
         console.log(`   L${r.level}  ${r.creatureName.padEnd(16)} x${r.amount}`);

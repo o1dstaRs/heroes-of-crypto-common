@@ -14,11 +14,13 @@ import { parentPort, workerData } from "node:worker_threads";
 import { type IAiMetaPairRecord, type IAiMetaRunOptions } from "./ai_meta_cohorts_core";
 import { playMetaPair } from "./ai_meta_cohorts_pair";
 import { type AiMetaStrategyProfileId } from "./ai_meta_strategy_profile";
+import type { A19BotSeatSearchDriverId } from "./a19_bot_seat_search";
 
 interface IAiMetaWorkerData {
     options: IAiMetaRunOptions;
     strategyProfileId: AiMetaStrategyProfileId;
     offlineDeterministicWork?: boolean;
+    searchDriver?: A19BotSeatSearchDriverId;
 }
 
 type WorkerRequest = { type: "pair"; pair: number } | { type: "stop" };
@@ -34,7 +36,7 @@ process.env.LIVETWIN = "1";
 process.env.FIGHT_MELEE_ROSTERS = "0";
 
 if (!parentPort) throw new Error("ai_meta_cohorts_worker must run in a worker thread");
-const { options, strategyProfileId, offlineDeterministicWork = false } = workerData as IAiMetaWorkerData;
+const { options, strategyProfileId, offlineDeterministicWork = false, searchDriver } = workerData as IAiMetaWorkerData;
 const adapter = options.authoritativeRanked
     ? await (await import("./ai_meta_authoritative")).loadAuthoritativeMetaAdapter()
     : undefined;
@@ -47,7 +49,14 @@ parentPort.on("message", (message: WorkerRequest) => {
     try {
         parentPort!.postMessage({
             type: "result",
-            record: playMetaPair(options, message.pair, strategyProfileId, offlineDeterministicWork, adapter),
+            record: playMetaPair(
+                options,
+                message.pair,
+                strategyProfileId,
+                offlineDeterministicWork,
+                adapter,
+                searchDriver,
+            ),
         } satisfies WorkerResponse);
     } catch (error) {
         parentPort!.postMessage({

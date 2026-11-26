@@ -35,6 +35,7 @@ describe("AI meta CLI output contract", () => {
             studyProfile: undefined,
             collectEvidence: false,
         });
+        expect(aiMetaOutputContract("a19-bot-seat", {}).collectEvidence).toBe(true);
         expect(() => aiMetaOutputContract("a19", {})).toThrow("Automatic Premium snapshots require");
         expect(() => aiMetaOutputContract("v09-native", {})).toThrow("Automatic Premium snapshots require");
         expect(() => aiMetaOutputContract("a19-work", { AI_META_COLLECT_EVIDENCE: "0" })).toThrow("capture");

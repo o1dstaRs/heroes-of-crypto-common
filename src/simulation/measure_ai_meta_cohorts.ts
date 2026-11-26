@@ -85,6 +85,11 @@ import { captureGitSourceStatus } from "./git_source_status";
 import { fingerprintSourceTree } from "./source_tree_fingerprint";
 import { AI_META_EVIDENCE_SCHEMA } from "./ai_meta_evidence";
 import { AI_META_OFFLINE_SEARCH_ENVIRONMENT } from "./ai_meta_search_budget";
+import {
+    A19_BOT_SEAT_SEARCH_DRIVER,
+    A19_BOT_SEAT_SEARCH_ENVIRONMENT,
+    type A19BotSeatSearchDriverId,
+} from "./a19_bot_seat_search";
 import { aiMetaOutputContract, finalizeAiMetaOutputs } from "./ai_meta_outputs";
 import { AiMetaPairCheckpoints, openAiMetaRun } from "./ai_meta_checkpoint";
 import { AiMetaDoctrineCollector } from "./ai_meta_doctrines";
@@ -802,7 +807,13 @@ interface IWorkerError {
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
 export type AiMetaFightProfileId =
-    "a13" | "a19" | "a19-work" | "v09-native" | "v09-draft-a19-work" | "ranked-current-a19-work";
+    "a13" | "a19" | "a19-work" | "a19-bot-seat" | "v09-native" | "v09-draft-a19-work" | "ranked-current-a19-work";
+
+/**
+ * The profile an invocation that names none plays (owner, 2026-11-26: newly sealed research plans default to the
+ * production bot-seat driver). A named profile, and every study that recorded one, keeps its own driver.
+ */
+export const AI_META_DEFAULT_FIGHT_PROFILE: AiMetaFightProfileId = "a19-bot-seat";
 
 export interface IAiMetaFightProfile {
     id: AiMetaFightProfileId;
@@ -816,6 +827,8 @@ export interface IAiMetaFightProfile {
     authoritativeRanked?: boolean;
     /** Finite search operation budgets decide every move instead of wall-clock deadlines (host-independent). */
     offlineDeterministicWork?: boolean;
+    /** The searched seats' driver; omitted: the stock A19 search the profile's environment builds. */
+    searchDriver?: A19BotSeatSearchDriverId;
 }
 
 const definedEnvironment = (
@@ -931,6 +944,30 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             V08_A19_SEARCH: "1",
         }),
         strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+    }),
+    "a19-bot-seat": Object.freeze({
+        id: "a19-bot-seat",
+        title: "Heroes of Crypto — v0.8+a19 Production Bot-Seat Search AI Meta Balance Cohorts",
+        provenance: Object.freeze({
+            name: "v0.8+a19-bot-seat",
+            schema: V08_A19_PROFILE.schema,
+            candidateId: V08_A19_PROFILE.candidateId,
+            researchOnly: true,
+            productionVersion: V08_A19_PROFILE.productionVersion,
+            genomeSha256: V08_A19_PROFILE.genomeSha256,
+            behaviorEnvironmentSha256: V08_A19_PROFILE.behaviorEnvironmentSha256,
+            search: V08_A19_PROFILE.search,
+            policy: V08_A19_PROFILE.policy,
+            searchRules: V08_A19_PROFILE.searchRules,
+            placementPolicy: V08_A19_PROFILE.placementPolicy,
+            searchBudget: "offline-deterministic-work",
+            searchDriver: A19_BOT_SEAT_SEARCH_DRIVER,
+            workerOverride: "server bot-search environment; V08_A19_SEARCH=1; searchOfflineDeterministicWork=true",
+        }),
+        workerEnvironment: definedEnvironment({ ...A19_BOT_SEAT_SEARCH_ENVIRONMENT, V08_A19_SEARCH: "1" }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+        offlineDeterministicWork: true,
+        searchDriver: A19_BOT_SEAT_SEARCH_DRIVER.id,
     }),
     "a19-work": Object.freeze({
         id: "a19-work",
@@ -1107,6 +1144,7 @@ export async function runAiMetaWorkerPool(
                     },
                     strategyProfileId: fightProfile.strategyProfileId,
                     offlineDeterministicWork: fightProfile.offlineDeterministicWork === true,
+                    ...(fightProfile.searchDriver ? { searchDriver: fightProfile.searchDriver } : {}),
                 },
                 env: workerEnvironment,
             });
@@ -1575,7 +1613,9 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "<fight-profile=a13|a19|a19-work|v09-native|v09-draft-a19-work|ranked-current-a19-work> [pair-start=0] [pair-count=all]. " +
+    "[fight-profile=a19-bot-seat|a13|a19|a19-work|v09-native|v09-draft-a19-work|ranked-current-a19-work] [pair-start=0] [pair-count=all]. " +
+    "An empty or omitted fight profile plays a19-bot-seat (the production bot seat's deep-fit search, neural off, " +
+    "offline deterministic work); a named profile keeps its own driver. " +
     "Defaults to premium-ranked-v4 learning capture and an audited premium.sqlite (a19-work or v09-draft-a19-work). " +
     "Outcome-only research requires AI_META_OUTPUT_MODE=legacy-oracle explicitly. " +
     "Sharded drivers set AI_META_SHARD=1 and finalize the merged study with ai_meta_outputs.ts.";
@@ -1595,7 +1635,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         return;
     }
     if (argv.length > 9) throw new Error(AI_META_USAGE);
-    const fightProfile = resolveAiMetaFightProfile(argv[6]);
+    const fightProfile = resolveAiMetaFightProfile(argv[6]?.trim() ? argv[6] : AI_META_DEFAULT_FIGHT_PROFILE);
     const outputContract = aiMetaOutputContract(fightProfile.id, process.env);
     if (outputContract.studyProfile) process.env.AI_META_STUDY_PROFILE = outputContract.studyProfile;
     if (outputContract.collectEvidence) process.env.AI_META_COLLECT_EVIDENCE = "1";
