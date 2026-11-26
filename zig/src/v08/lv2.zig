@@ -326,14 +326,26 @@ fn counterMatters(s: *const State, t: u8) bool {
 /// withAura (v0_2.ts): an aura emitter that would only move repositions to the reachable cell covering the most targets,
 /// else hourglasses while more targets can still come into range and nothing threatens it, else refuses an advance that
 /// would drag its auras off targets it covers now. Attacks pass straight through; non-emitters are untouched.
-/// decideCreatureOpener: a Behemoth casts Battle Roar (an all-allies buff) while the mass cast is legal (canMassCastSpell,
-/// the engine's own gate). The Ogre Mage's Mass Riot is wave 2: no book in scope holds it.
+/// decideCreatureOpener: a Behemoth casts Battle Roar, an Ogre Mage Mass Riot (all-allies buffs) while the mass cast is
+/// legal (canMassCastSpell, the engine's own gate); an Ogre Mage next to a living enemy strikes instead.
 fn creatureOpener(c: *ai.Ctx, out: *ai.Decision) bool {
     const s = c.s;
     const u = c.unit();
     if (!u.canCastSpells()) return false;
-    if (util.creature(s, c.ui) != .behemoth) return false;
-    const spell = st.CastSpell.battle_roar;
+    const spell: st.CastSpell = switch (util.creature(s, c.ui)) {
+        .behemoth => .battle_roar,
+        .ogre_mage => .mass_riot,
+        else => return false,
+    };
+    if (spell == .mass_riot) {
+        // adjacentEnemy: any living enemy whose cells touch the Ogre's
+        const mine = engine.unitCells(u);
+        for (s.holderOrder()) |k| {
+            const e = &s.units[k];
+            if (!e.in_holder or e.isDead() or e.team == u.team) continue;
+            if (ai.adjacent(engine.unitCells(e).slice(), mine.slice())) return false;
+        }
+    }
     const raw: u8 = @intFromEnum(spell);
     const b = u.bookSpell(raw) orelse return false;
     const cfg = &s.spell_cfg[raw];

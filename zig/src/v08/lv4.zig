@@ -32,7 +32,8 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     defer policy.note("v0.4", out, s, rin);
     // (2) Out-gunning them at range, a shooter that cannot fire yet holds.
     if (u.attack_type == AT.RANGE and engine.getRangeShots(u) > 0 and u.canMove() and holdWhenRangedSuperior(c, out)) return;
-    // (6) The Ogre Mage's single Riot is not in scope (no Riot spell).
+    // (6) A small army's Ogre Mage that can move and cannot strike self-casts Riot.
+    if (util.creature(s, c.ui) == .ogre_mage and u.canMove() and ogreSingleRiot(c, out)) return;
     // (7) The Healer's spell policy.
     if (util.creature(s, c.ui) == .healer and healerSpell(c, out)) return;
     // (8) The Troll's Wild Regeneration gift (V04_TROLL on).
@@ -71,15 +72,59 @@ pub fn woundFraction(u: *const st.Unit) f64 {
     return if (cap > 0) 1 - util.cumulativeHp(u) / cap else 0;
 }
 
-/// (7) decideHealerSpell: with stack power 1 or more, Heal the most wounded living level-3+ ally that the engine would
-/// heal (its top creature hurt, magic resist below 100) and that has lost over 30% (first of the most wounded), when
-/// canCastSpell allows it. Mass Heal and Spiritual Armor are not in scope.
+/// (6) ogreMageSingleRiot: an Ogre Mage with no living enemy adjacent, no Riot or Mass Riot on it and a small army
+/// (fewer than OGRE_BIG_ARMY = 3 living stacks, itself included) self-casts Riot when its book holds a charge (the
+/// laps and the caster's stack power checked as TypeScript does) and the engine's canCastSpell accepts it.
+fn ogreSingleRiot(c: *ai.Ctx, out: *ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    const mine = engine.unitCells(u);
+    var allies: usize = 0;
+    for (s.holderOrder()) |k| {
+        const o = &s.units[k];
+        if (!o.in_holder or o.isDead()) continue;
+        if (o.team == u.team) {
+            allies += 1;
+        } else if (ai.adjacent(engine.unitCells(o).slice(), mine.slice())) return false;
+    }
+    if (u.buffs.len != 0 and (u.buffs.find(.riot) != null or u.buffs.find(.mass_riot) != null)) return false;
+    if (allies >= 3) return false;
+    const raw: u8 = @intFromEnum(st.CastSpell.riot);
+    const b = u.bookSpell(raw) orelse return false;
+    const cfg = &s.spell_cfg[raw];
+    if (!cfg.loaded or !(b.amount > 0) or cfg.laps <= 0 or cfg.min_stack_power > engine.getStackPower(u)) return false;
+    if (!spells.canCastSpell(s, c.ui, c.ui, .riot, cfg)) return false;
+    out.* = .{};
+    out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = raw, .target = c.ui, .has_target = true } });
+    return true;
+}
+
+/// Slots ordered by a key, descending and stable (JavaScript's sort with `(p, q) => key(q) - key(p)`).
+const Ordered = struct {
+    slot: [st.MAX_UNITS]u8 = undefined,
+    key: [st.MAX_UNITS]f64 = undefined,
+    n: usize = 0,
+    fn add(self: *Ordered, slot: u8, key: f64) void {
+        var i = self.n;
+        while (i > 0 and self.key[i - 1] < key) : (i -= 1) {
+            self.slot[i] = self.slot[i - 1];
+            self.key[i] = self.key[i - 1];
+        }
+        self.slot[i] = slot;
+        self.key[i] = key;
+        self.n += 1;
+    }
+};
+
+/// (7) decideHealerSpell (stack power 1 or more): the critical allies are living level-3+ stacks the engine would heal
+/// (healEligible) that lost more than 30%, most hurt first. Two or more: Mass Heal when the mass cast is legal. One or
+/// more: Heal on the most hurt when canCastSpell accepts it. Otherwise Spiritual Armor on the first ally (the caster
+/// excluded, none already armored), by max damage x alive descending, that canCastSpell accepts.
 fn healerSpell(c: *ai.Ctx, out: *ai.Decision) bool {
     const s = c.s;
     const u = c.unit();
     if (engine.getStackPower(u) < 1) return false;
-    var best: ?u8 = null;
-    var best_lost: f64 = 0;
+    var critical: Ordered = .{};
     for (s.holderOrder()) |k| {
         const a = &s.units[k];
         if (!util.livingOf(s, k, u.team)) continue;
@@ -88,17 +133,42 @@ fn healerSpell(c: *ai.Ctx, out: *ai.Decision) bool {
         if (a.level < 3) continue;
         const lost = woundFraction(a);
         if (!(lost > 0.3)) continue;
-        if (best == null or lost > best_lost) {
-            best = k;
-            best_lost = lost;
+        critical.add(k, lost);
+    }
+    if (critical.n >= 2) {
+        if (usableSpell(s, u, .mass_heal)) |cfg| {
+            if (spells.canMassCastSpell(s, c.ui, .mass_heal, cfg)) {
+                out.* = .{};
+                out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = @intFromEnum(st.CastSpell.mass_heal) } });
+                return true;
+            }
         }
     }
-    const t = best orelse return false;
-    const cfg = usableSpell(s, u, .heal) orelse return false;
-    if (!spells.canCastSpell(s, c.ui, t, .heal, cfg)) return false;
-    out.* = .{};
-    out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = @intFromEnum(st.CastSpell.heal), .target = t, .has_target = true } });
-    return true;
+    if (critical.n >= 1) {
+        if (usableSpell(s, u, .heal)) |cfg| {
+            const t = critical.slot[0];
+            if (spells.canCastSpell(s, c.ui, t, .heal, cfg)) {
+                out.* = .{};
+                out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = @intFromEnum(st.CastSpell.heal), .target = t, .has_target = true } });
+                return true;
+            }
+        }
+    }
+    const cfg = usableSpell(s, u, .spiritual_armor) orelse return false;
+    var order: Ordered = .{};
+    for (s.holderOrder()) |k| {
+        const a = &s.units[k];
+        if (k == c.ui or !util.livingOf(s, k, u.team)) continue;
+        if (a.buffs.len != 0 and a.buffs.find(.spiritual_armor) != null) continue;
+        order.add(k, a.attack_damage_max * a.amount_alive);
+    }
+    for (order.slot[0..order.n]) |k| {
+        if (!spells.canCastSpell(s, c.ui, k, .spiritual_armor, cfg)) continue;
+        out.* = .{};
+        out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = @intFromEnum(st.CastSpell.spiritual_armor), .target = k, .has_target = true } });
+        return true;
+    }
+    return false;
 }
 
 /// (1) retargetHeal: a lone single-target ally heal (a HEAL spell aimed at ANY_ALLY) goes to the living ally with the
@@ -645,8 +715,8 @@ fn enforceMeleeLegality(c: *ai.Ctx, out: *ai.Decision) void {
 }
 
 /// waitForMassBuff (V04_BUFFWAIT, on; the Ogre and Behemoth self-delays are off): on lap 1 a unit without a strike or cast
-/// waits while its army's Behemoth roar (no living ally carries Battle Roar yet, unless range-heavy) or Ogre Mage riot is
-/// still pending. Mass Riot and Riot are wave 2: no buff of theirs can land, so a pending riot stays pending.
+/// waits while its army's Behemoth roar (no living ally carries Battle Roar yet, unless range-heavy) or Ogre Mage riot
+/// (no living ally carries Mass Riot or Riot yet) is still pending.
 fn waitForMassBuff(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     if (s.fight.lap > 1) return;
@@ -656,12 +726,14 @@ fn waitForMassBuff(c: *ai.Ctx, out: *ai.Decision) void {
     var behemoth = false;
     var ogre = false;
     var roared = false;
+    var rioted = false;
     for (s.holderOrder()) |i_slot| {
         const i: usize = i_slot;
         const a = &s.units[i_slot];
         if (!util.livingOf(s, i, team)) continue;
         if (a.attack_type == AT.RANGE) ranged += 1;
         if (a.buffs.find(.battle_roar) != null) roared = true;
+        if (a.buffs.find(.mass_riot) != null or a.buffs.find(.riot) != null) rioted = true;
         switch (util.creature(s, @intCast(i))) {
             .behemoth => behemoth = true,
             .ogre_mage => ogre = true,
@@ -669,7 +741,7 @@ fn waitForMassBuff(c: *ai.Ctx, out: *ai.Decision) void {
         }
     }
     const roar_pending = ranged < 3 and behemoth and !roared;
-    const riot_pending = ogre; // no Mass Riot / Riot buff in scope
+    const riot_pending = ogre and !rioted;
     const me = util.creature(c.s, c.ui);
     const wait = (roar_pending and me != .behemoth) or (riot_pending and me != .ogre_mage);
     if (wait and util.canHourglass(s, c.ui)) util.setWait(out, c.ui);
