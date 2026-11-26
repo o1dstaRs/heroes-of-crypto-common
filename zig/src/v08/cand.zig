@@ -56,6 +56,10 @@ pub const Options = struct {
     coverage: bool = false,
     /// includeMountainAttacks: one strike on a standing scattered stone (the classic centre mountain is not ported).
     mountains: bool = false,
+    /// Port-only: the incumbent and the spell candidates, nothing else. A caller that reads only the spell candidates
+    /// of an uncapped list gets them in the same order (no other class shares a cast signature, and the incumbent it
+    /// passes is not a cast), without the MAX overflow the uncapped moves and melee pairs could hit.
+    spells_only: bool = false,
 };
 
 pub const MAX = 64;
@@ -814,6 +818,11 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
     var inc = Candidate{ .kind = .incumbent };
     util.copyDecision(&inc.d, incumbent);
     g.push(&inc);
+    if (opt.spells_only) {
+        g.addSpells();
+        if (out.incomplete) util.unsupported = true;
+        return;
+    }
     g.addWait();
     g.addDefend();
     g.addMelee();

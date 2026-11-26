@@ -139,7 +139,8 @@ fn scoreShot(c: *const ai.Ctx, hits: *const combat.Hits) f64 {
             if (t.attack_type == AT.RANGE) value += w_range * effective;
             value += w_firepower * (firepowerOf(t) / 1000);
             value += w_level * @as(f64, @floatFromInt(t.level));
-            // getCanCastSpells: no spells in scope.
+            // getCanCastSpells (a spellbook; a gifted Wild Regeneration or a stolen castable card adds one).
+            if (t.canCastSpells()) value += W[52];
             if (w_focus != 0) {
                 const tc = engine.unitCells(t);
                 var adjacent: f64 = 0;

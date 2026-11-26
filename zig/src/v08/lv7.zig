@@ -1,7 +1,7 @@
 //! The v0.7 level of the v0.8 chain (src/ai/versions/v0_7.ts StrategyV0_7.decideTurn): v0.6, then the melee-magic
 //! stance fix. The aura-saturated archetype anchor is the chain's v0.4 level where they are equal (util.anchorPorted;
-//! decideV08 refuses the seat otherwise). Identity in scope: the Arachna Queen assimilation router (no spells or Endless
-//! Quiver) and the Terrifying Gaze repair.
+//! decideV08 refuses the seat otherwise). Then the Arachna Queen assimilation router (a stolen spell; Endless Quiver is
+//! not in scope), the melee-magic stance fix and the Terrifying Gaze repair.
 
 const rec = @import("../recording.zig");
 const st = @import("../state.zig");
@@ -21,11 +21,34 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     defer policy.note("v0.7", out, c.s, rin);
     // isAuraSaturatedArmy: v0.6's learned policy is out of distribution when every stack emits an aura, so v0.7 plays its
     // standalone v0.4 anchor (lv8 refuses the seat unless util.anchorPorted, where the anchor is the chain's v0.4
-    // level); the universal caster router (Resurrection, Wind Flow), the Queen's assimilation router and the Gaze repair
-    // have nothing to route in scope.
+    // level); its universal caster router (Resurrection, Wind Flow) has nothing to route in scope.
     if (util.battle.aura_saturated[c.unit().team]) lv4.decide(c, out) else lv6.decide(c, out);
+    routeQueenAssimilation(c, out);
     normalizeMeleeMagicSelection(c, out);
     repairForbiddenTarget(c, out);
+}
+
+/// routeArachnaQueenAssimilation: an Arachna Queen holding a spell with charges left (Predatory Assimilation took a
+/// castable card) casts the first spell candidate instead of a turn that neither casts nor deals damage (melee, shot,
+/// area throw or obstacle strike). A stolen Endless Quiver is not in scope.
+fn routeQueenAssimilation(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (util.creature(s, c.ui) != .arachna_queen) return;
+    var remaining = false;
+    for (u.spells[0..u.n_spells]) |b| {
+        if (b.amount > 0) remaining = true;
+    }
+    if (!remaining) return;
+    for (out.slice()) |a| switch (a) {
+        .cast_spell, .melee_attack, .range_attack, .obstacle_attack => return,
+        else => {},
+    };
+    var set: cand.Set = .{};
+    cand.enumerate(c, out, .{ .spells_only = true }, &set);
+    for (set.slice()) |*k| {
+        if (k.kind == .spell) return util.copyDecision(out, &k.d);
+    }
 }
 
 /// attacksForbiddenTarget: a melee or a shot aimed at the Terrifying Gaze gazer (cannotAttackUnitId).
