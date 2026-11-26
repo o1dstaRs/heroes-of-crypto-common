@@ -79,6 +79,9 @@ pub const Battle = struct {
     melee_magic: [3]u8 = .{ 0, 0, 0 },
     /// Each unit's place in its ids' localeCompare order (UUIDs: the same as byte order), for the TS id tie-breaks.
     id_rank: [st.MAX_UNITS]u16 = .{0} ** st.MAX_UNITS,
+    /// v0.8's ranged positioning runs (V08_RANGED_POSITION_VERSIONS, default "v0.8": production). False for the
+    /// v0.8s alias outside that scope, as the plain v0.8s recordings ran.
+    ranged_positioning: bool = true,
 
     /// The profile from the fight's start state (every holder unit).
     pub fn primeProfile(self: *Battle, s: *const State) void {

@@ -10,6 +10,10 @@ const ai = @import("../ai.zig");
 const util = @import("util.zig");
 const cand = @import("cand.zig");
 const engine = @import("../engine.zig");
+const path = @import("../path.zig");
+const js = @import("../jsnum.zig");
+const AT = st.AttackType;
+const abilities = @import("../abilities.zig");
 
 /// The recorder's pass names, in decideTurn's order (zig/parity/v08/layers.ts).
 pub const Pass = enum {
@@ -499,6 +503,192 @@ pub fn backlineWard(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void 
     util.setEndTurn(out, c.ui);
 }
 
+// ---- ranged positioning (v0_8_ranged_positioning.ts), production path: the pinned retreat ----
+
+/// Unit.calculateAttackDamageMin/Max at an explicit attack rate (combat.damageBound reads the unit's own attack).
+fn boundAt(att: *const st.Unit, tgt: *const st.Unit, dmg: f64, rate: f64, is_range: bool) f64 {
+    const armor = if (is_range) engine.getRangeArmor(tgt) else engine.getArmor(tgt);
+    const luck = engine.getLuck(tgt);
+    return @max(1, @ceil(((((dmg * rate * att.amount_alive) / armor) * (1 - luck / 100)) / 1) * att.attack_multiplier * 1));
+}
+
+/// estimatePrimaryMeleeDamage, reduced to what pinnedRetreat reads: null when unsupported, else whether the hit is a
+/// secure kill. `ok` turns false on a board term not ported yet (auras, or an attacker ability that sequences damage).
+fn meleeSecureKill(s: *const st.State, ai_: u8, ti: u8, actions: []const rec.Action, ok: *bool) ?bool {
+    const u = &s.units[ai_];
+    const t = &s.units[ti];
+    if (t.isDead()) return null;
+    for (actions) |a| if (a == .move_unit and a.move_unit.has_lava) return null;
+    if (u.ability(.lightning_spin) != null or u.ability(.double_punch) != null or u.ability(.skewer_strike) != null) return null;
+    if (u.ability(.rapid_charge) != null or u.ability(.backstab) != null or u.ability(.lucky_strike) != null or u.ability(.penetrating_bite) != null) ok.* = false;
+    for (s.units[0..s.n_units]) |*o| {
+        if (o.in_holder and !o.isDead() and (o.ability(.pegasus_might_aura) != null or o.ability(.absorb_penalties_aura) != null or o.ability(.venom_cloud_aura) != null)) ok.* = false;
+    }
+    if (!ok.*) return null;
+    const rate = @max(u.base_attack, engine.getAttack(u));
+    const lo = boundAt(u, t, u.attack_damage_min, rate, false);
+    const hi = boundAt(u, t, u.attack_damage_max, rate, false);
+    if (hi < lo or hi - lo > 10_000) return null;
+    const type_mult: f64 = if (u.attack_type == AT.RANGE) 0.5 else 1;
+    const smallest = @floor(lo * type_mult);
+    const hit = 1 - @min(100, @max(0, abilities.missChance(u, t))) / 100;
+    return hit == 1 and smallest >= util.cumulativeHp(t);
+}
+
+fn cellsDistance(a: []const rec.Cell, b: []const rec.Cell) i32 {
+    return footprintDistance(a, b);
+}
+
+/// canBeAttackedByMelee at a position: any footprint cell inside the enemy aggression zone.
+fn pinnedAt(s: *const st.State, u: *const st.Unit, px: f64, py: f64) bool {
+    const aggr = engine.enemyAggr(s, u);
+    const cells = engine.cellsForPosition(px, py, u.fw, u.fh);
+    for (cells.slice()) |c| {
+        if (c.x < 0 or c.x >= st.GRID or c.y < 0 or c.y >= st.GRID) continue;
+        if (aggr[@intCast(c.x)][@intCast(c.y)] > 1) return true;
+    }
+    return false;
+}
+
+/// AttackHandler.getRangeAttackDivisor (combat.zig rangeDivisor / shotCellDistance, copied: they are file-private).
+fn rangeDivisorAt(att: *const st.Unit, hx: f64, hy: f64, ax: f64, ay: f64) f64 {
+    var divisor: f64 = 1;
+    const band = if (att.shot_distance > 0 and std.math.isFinite(att.shot_distance)) @floor(att.shot_distance) else 0;
+    if (band > 0) {
+        const tc = engine.cellForPosition(hx, hy);
+        const t = engine.positionForCell(@floatFromInt(tc.x), @floatFromInt(tc.y));
+        const hfx = ((@as(f64, @floatFromInt(att.fw)) - 1) / 2) * engine.CELL;
+        const hfy = ((@as(f64, @floatFromInt(att.fh)) - 1) / 2) * engine.CELL;
+        var away = @max(0, js.round(@max(@abs(t[0] - ax) - hfx, @abs(t[1] - ay) - hfy) / engine.CELL));
+        while (away > band) {
+            away -= band;
+            divisor *= 2;
+        }
+    }
+    return @max(1, divisor);
+}
+
+/// allyScreensThreat: the ally sits between the shooter's cells and that enemy, within reach of the shooter.
+fn allyScreens(dest: []const rec.Cell, ally: []const rec.Cell, enemy: []const rec.Cell) bool {
+    const shooter_enemy = cellsDistance(dest, enemy);
+    const ally_enemy = cellsDistance(ally, enemy);
+    const shooter_ally = cellsDistance(dest, ally);
+    return ally_enemy < shooter_enemy and shooter_ally <= 3 and ally_enemy + shooter_ally <= shooter_enemy + 1;
+}
+
+const RouteView = struct {
+    route: u16,
+    unscreened: i32,
+    reachable: i32,
+    eligible: bool,
+    min_enemy: i32,
+    nearest_front: i32,
+    divisor: f64,
+    cost: f64,
+};
+
+fn preferRetreat(l: *const RouteView, r: *const RouteView) bool {
+    if (l.unscreened != r.unscreened) return l.unscreened < r.unscreened;
+    if (l.reachable != r.reachable) return l.reachable < r.reachable;
+    if (l.min_enemy != r.min_enemy) return l.min_enemy > r.min_enemy;
+    if (l.nearest_front != r.nearest_front) return l.nearest_front < r.nearest_front;
+    if (l.divisor != r.divisor) return l.divisor < r.divisor;
+    return l.cost < r.cost;
+}
+
+/// pinnedRetreat (legacy selection; the supported-delta catalog is an off-by-default experiment): a shooter that is
+/// pinned in melee reach and would strike a non-securely-killed target in melee, or would not shoot, retreats to the
+/// best reachable cell outside melee reach where every enemy that could reach it is screened by a melee ally.
+fn pinnedRetreat(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision, ok: *bool) void {
+    const s = c.s;
+    const u = c.unit();
+    util.copyDecision(out, in);
+    if (u.attack_type != AT.RANGE or engine.getRangeShots(u) <= 0) return;
+    if (!pinnedAt(s, u, u.pos_x, u.pos_y)) return;
+    var melee: ?rec.Action = null;
+    for (in.slice()) |a| switch (a) {
+        .range_attack, .obstacle_attack => return,
+        .melee_attack => melee = a,
+        else => {},
+    };
+    if (melee) |m| {
+        if (isDirectCombat(in.slice()) and util.dominantFinishState(s, u.team).active) return;
+        if (s.fight.lap >= engine.NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 1) return;
+        const secure = meleeSecureKill(s, c.ui, m.melee_attack.target, in.slice(), ok) orelse return;
+        if (secure) return;
+    }
+    var enemies: [st.MAX_UNITS]u8 = undefined;
+    var ne: usize = 0;
+    var front: [st.MAX_UNITS]u8 = undefined;
+    var nfr: usize = 0;
+    for (s.units[0..s.n_units], 0..) |*o, i| {
+        if (!o.in_holder or o.isDead()) continue;
+        if (o.team != u.team) {
+            enemies[ne] = @intCast(i);
+            ne += 1;
+        } else if (i != c.ui and (o.attack_type == AT.MELEE or o.attack_type == AT.MELEE_MAGIC)) {
+            front[nfr] = @intCast(i);
+            nfr += 1;
+        }
+    }
+    if (ne == 0) return;
+    const mp = c.actualPath();
+    const base = engine.baseCell(u);
+    var best: ?RouteView = null;
+    for (mp.known(), 0..) |*r, ri| {
+        if (r.cell.x == base.x and r.cell.y == base.y) continue;
+        if (r.has_lava or !ai.canLandAt(s, c.ui, r.cell)) continue;
+        const body = ai.footprintForAnchor(u, r.cell);
+        const foot = body.slice();
+        const pos = engine.positionForCells(foot) orelse continue;
+        if (pinnedAt(s, u, pos[0], pos[1])) continue;
+        var reachable: i32 = 0;
+        var screened: i32 = 0;
+        var min_enemy: i32 = std.math.maxInt(i32);
+        var divisor: f64 = std.math.inf(f64);
+        for (enemies[0..ne]) |ei| {
+            const e = &s.units[ei];
+            const ecells = engine.unitCells(e);
+            const d = cellsDistance(foot, ecells.slice());
+            min_enemy = @min(min_enemy, d);
+            divisor = @min(divisor, rangeDivisorAt(u, e.pos_x, e.pos_y, pos[0], pos[1]));
+            if (@as(f64, @floatFromInt(d)) > @ceil(@max(0, engine.getSteps(e))) + 1) continue; // withinMeleeHorizon
+            reachable += 1;
+            for (front[0..nfr]) |fi| {
+                if (allyScreens(foot, engine.unitCells(&s.units[fi]).slice(), ecells.slice())) {
+                    screened += 1;
+                    break;
+                }
+            }
+        }
+        var nearest: i32 = std.math.maxInt(i32);
+        for (front[0..nfr]) |fi| nearest = @min(nearest, cellsDistance(foot, engine.unitCells(&s.units[fi]).slice()));
+        const view = RouteView{ .route = @intCast(ri), .unscreened = reachable - screened, .reachable = reachable, .eligible = reachable == screened, .min_enemy = min_enemy, .nearest_front = nearest, .divisor = divisor, .cost = r.weight };
+        if (!view.eligible) continue;
+        if (best == null or preferRetreat(&view, &best.?)) best = view;
+    }
+    const b = best orelse return;
+    const r = &mp.known()[b.route];
+    out.* = .{};
+    const len = mp.routeCells(r, &out.path);
+    const body = ai.footprintForAnchor(u, r.cell);
+    const cells = body.slice();
+    @memcpy(out.targets[0..cells.len], cells);
+    out.push(.{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..cells.len], .has_lava = r.has_lava } });
+}
+
+/// prioritizeV08RangedPositioning at production settings (V08_RANGED_POSITION_MODE "retreat", the band-advance and
+/// pre-pin egress experiments off): the pinned retreat. False on a board term not ported yet.
+pub fn rangedPositioning(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
+    if (!util.battle.ranged_positioning) {
+        util.copyDecision(out, in);
+        return true;
+    }
+    var ok = true;
+    pinnedRetreat(c, in, out, &ok);
+    return ok;
+}
+
 /// Runs one ported pass on `in`; false when the pass is not ported yet.
 pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision) bool {
     switch (pass) {
@@ -507,6 +697,7 @@ pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision
         .prioritize => prioritize(c, in, out),
         .finish => return finish(c, in, out),
         .backline_ward => backlineWard(c, in, out),
+        .ranged_positioning => return rangedPositioning(c, in, out),
         else => return false,
     }
     return true;

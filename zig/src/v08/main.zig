@@ -6,6 +6,7 @@
 //!       state with the logged layer of the same name (the k-th Zig "v0.2" against the k-th logged "v0.2").
 //!       --passes also checks every ported v0.8 pass (lv8.zig) in isolation: run on the logged output of the layer
 //!       before it, its output must equal its own logged layer. Passes not ported yet are skipped.
+//!       --v08s: the recording ran the v0.8s alias outside V08_RANGED_POSITION_VERSIONS (no ranged positioning).
 //!
 //!   hoc-sim v08 candidates <recording.jsonl> [--max-fail N]
 //!       For a recording with RECORD_CANDIDATES=1: rebuilds every logged candidate list (cand.zig) from the logged
@@ -48,6 +49,7 @@ pub fn run(gpa: std.mem.Allocator, args: []const []const u8) !void {
     }
     if (std.mem.eql(u8, args[0], "layers")) {
         const top = policy.levelFromName(argValue(args, "--top") orelse "v0.2") orelse return error.UnknownLevel;
+        alias_v08s = hasFlag(args, "--v08s");
         if (!try layers(gpa, args[1], top, hasFlag(args, "--passes"), argNumber(args, "--max-fail", 10))) std.process.exit(1);
         return;
     }
@@ -62,6 +64,8 @@ pub fn run(gpa: std.mem.Allocator, args: []const []const u8) !void {
 // =====================================================================================================================
 // Layer check
 // =====================================================================================================================
+
+var alias_v08s = false;
 
 const Logged = struct { name: []const u8, out: []const rec.Action, rin: u32, rout: u32 };
 
@@ -197,6 +201,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
         const raw_steps = rec.get(root, "steps").array.items;
         games += 1;
         util.battle = util.Battle.fromInit(game.init);
+        util.battle.ranged_positioning = !alias_v08s;
         var s = engine.initState(game.init, game.ids) catch |err| {
             std.debug.print("seed {d}: start state not supported ({s})\n", .{ game.seed, @errorName(err) });
             continue;
