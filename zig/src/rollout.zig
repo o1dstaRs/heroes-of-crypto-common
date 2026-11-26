@@ -249,6 +249,8 @@ pub const Request = struct {
     summon_sequence: ?u32 = null,
     uuid_sequence: ?u64 = null,
     id_scheme: st.IdScheme = .match,
+    /// The engine path the rollouts reproduce (`engine`: "match", runMatch's; "server", the server's bot-seat deps).
+    engine: st.EngineMode = .match,
     /// scoreCandidates' bank semantics (the request's `bank`, ABI 3); the defaults are ABI 2's plain pair loop.
     bank: Bank = .{},
 };
@@ -874,6 +876,7 @@ pub fn runRecords(root: *const State, scratch: *State, req: *const Request, out:
         scratch.summon_seq = summon_seq;
         scratch.uuid_seq = uuid_seq;
         scratch.id_scheme = req.id_scheme;
+        scratch.engine_mode = req.engine;
         const v = rolloutIn(scratch, req, &req.candidates[p[0]], p[1], ctl, &ses);
         summon_seq = if (bank.summon_per_rollout) summon_start else scratch.summon_seq;
         uuid_seq = scratch.uuid_seq;

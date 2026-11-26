@@ -366,6 +366,12 @@ export fn hoc_play_v01(eng: ?*Engine, handle: ?*Handle, max_laps: i32, out: ?*ro
 
 // ---- hoc_rollouts --------------------------------------------------------------------------------------------------
 
+/// Whether this build plays the server's engine path (`engine: "server"`). Off until server mode is complete: a
+/// request for it is then refused as unsupported, so the caller keeps those rollouts in TypeScript.
+pub const SERVER_ENGINE = false;
+/// The engine paths a request may select (`supportedEngines` in the manifest and the build info).
+pub const SUPPORTED_ENGINES: []const []const u8 = if (SERVER_ENGINE) &.{ "match", "server" } else &.{"match"};
+
 pub const SUPPORTED_ACTIONS = [_][]const u8{
     "end_turn",   "wait_turn",         "defend_turn", "select_attack_type", "move_unit", "melee_attack", "range_attack", "obstacle_attack",
     "cast_spell", "area_throw_attack",
@@ -512,6 +518,26 @@ fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []
             e.fail("request: summonIds {s} (\"match\" or \"uuidSequence\")", .{name});
             return null;
         }
+    }
+    const engine_v = rec.get(v, "engine");
+    if (engine_v != .null) {
+        const name = if (engine_v == .string) engine_v.string else "?";
+        if (std.mem.eql(u8, name, "match")) {
+            req.engine = .match;
+        } else if (std.mem.eql(u8, name, "server")) {
+            if (!SERVER_ENGINE) {
+                e.fail("unsupported request: engine \"server\" (this build's supportedEngines: match)", .{});
+                return null;
+            }
+            req.engine = .server;
+        } else {
+            e.fail("request: engine {s} (\"match\" or \"server\")", .{name});
+            return null;
+        }
+    }
+    if (req.engine == .server and req.id_scheme != .uuid_sequence) {
+        e.fail("request: engine \"server\" needs summonIds \"uuidSequence\"", .{});
+        return null;
     }
     const seq_v = rec.get(v, "summonSequence");
     if (seq_v != .null) {
@@ -784,7 +810,7 @@ fn buildManifest() !Manifest {
     const pa = std.heap.page_allocator;
     var body: std.Io.Writer.Allocating = .init(pa);
     defer body.deinit();
-    try scope.writeScope(&body.writer, snapshot.FORMAT_VERSION, &POLICY_SCOPES, &SUPPORTED_ACTIONS);
+    try scope.writeScope(&body.writer, snapshot.FORMAT_VERSION, &POLICY_SCOPES, &SUPPORTED_ACTIONS, SUPPORTED_ENGINES);
     var m: Manifest = undefined;
     m.coverage = scope.sha256Hex(body.written());
     {
@@ -801,7 +827,7 @@ fn buildManifest() !Manifest {
         errdefer w.deinit();
         try writeHeader(&w.writer, &m.coverage);
         try w.writer.print(",\"policy\":\"{s}\",\"scope\":", .{p.name});
-        try scope.writeScope(&w.writer, snapshot.FORMAT_VERSION, &.{p}, &SUPPORTED_ACTIONS);
+        try scope.writeScope(&w.writer, snapshot.FORMAT_VERSION, &.{p}, &SUPPORTED_ACTIONS, SUPPORTED_ENGINES);
         try w.writer.writeByte('}');
         m.per_policy[i] = try w.toOwnedSliceSentinel(0);
     }
@@ -812,6 +838,8 @@ fn buildManifest() !Manifest {
         const glibc: ?std.SemanticVersion = if (builtin.os.tag == .linux and builtin.abi.isGnu()) builtin.os.version_range.linux.glibc else null;
         try w.writer.print(",\"zig\":\"{s}\",\"target\":\"{s}\",\"cpu\":\"{s}\",\"optimize\":\"{s}\",\"snapshotFormat\":{d}", .{ builtin.zig_version_string, targetName(), builtin.cpu.model.name, @tagName(builtin.mode), snapshot.FORMAT_VERSION });
         if (glibc) |g| try w.writer.print(",\"glibc\":\"{d}.{d}\"", .{ g.major, g.minor }) else try w.writer.writeAll(",\"glibc\":null");
+        try w.writer.writeAll(",\"supportedEngines\":");
+        try scope.writeStrings(&w.writer, SUPPORTED_ENGINES);
         try w.writer.writeByte('}');
         m.build_info = try w.toOwnedSliceSentinel(0);
     }
@@ -977,6 +1005,37 @@ test "build info and the scope manifest parse, and every policy's manifest share
     }
     try std.testing.expect(hoc_scope_manifest("v9", 2) == null);
     try std.testing.expectEqual(@as(f64, 1), hoc_exp(0));
+}
+
+test "the engine request field: match plays, server waits for its build, anything else is malformed" {
+    const e = hoc_engine_new().?;
+    defer hoc_engine_free(e);
+    const h = hoc_state_load(e, SELFTEST_STATE.ptr, SELFTEST_STATE.len).?;
+    defer hoc_state_free(e, h);
+    const a = std.testing.allocator;
+    const requests = try std.json.parseFromSlice(std.json.Value, a, SELFTEST_REQUESTS, .{});
+    defer requests.deinit();
+    var text: std.Io.Writer.Allocating = .init(a);
+    defer text.deinit();
+    try std.json.Stringify.value(requests.value.array.items[0], .{}, &text.writer);
+    const body = text.written();
+    var out: [4096]f64 = undefined;
+    const Case = struct { []const u8, ?[]const u8 };
+    const server_error = if (SERVER_ENGINE) "request: engine \"server\" needs summonIds" else "unsupported request: engine \"server\"";
+    for ([_]Case{
+        .{ "{\"engine\":\"match\",", null },
+        .{ "{\"engine\":\"server\",", server_error },
+        .{ "{\"engine\":\"bogus\",", "request: engine bogus" },
+        .{ "{\"engine\":7,", "request: engine ?" },
+    }) |case| {
+        const req = try std.mem.concat(a, u8, &.{ case[0], body[1..] });
+        defer a.free(req);
+        const written = hoc_rollouts(e, h, req.ptr, req.len, &out, out.len, 0);
+        if (case[1]) |want| {
+            try std.testing.expect(written < 0);
+            try std.testing.expect(std.mem.startsWith(u8, std.mem.span(hoc_last_error(e)), want));
+        } else try std.testing.expect(written > 0);
+    }
 }
 
 test "the compiled-in self-test fixture replays bit for bit" {

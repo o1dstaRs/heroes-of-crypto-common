@@ -265,6 +265,11 @@ exact doubles.
   the id createSecureUuid gives under a seeded source, the "sim" UUID of deterministicUuidSequence, as the server's
   createSummonedUnit does inside its search. Every summon takes one value of each counter (UnitProperties' id is
   allocated in both cases).
+- `engine`: `match` (default) reproduces runMatch's engine path; `server` the server's bot-seat deps
+  (play_session.ts createBotSearchDeps: the known-paths provider, a full stat refresh and an aggression rebuild before
+  every move and approach, the server's routes, damage laps marked by damage > 0 only). `server` needs
+  `summonIds: "uuidSequence"` and a library whose `supportedEngines` (scope manifest and build info) lists it; another
+  build refuses it as an unsupported request, so the caller keeps those rollouts in TypeScript.
 
 The v0.8 policy reads a per-battle table besides the State (`v08/util.zig` `battle`: each slot's creature, its id rank
 for the TypeScript id tie-breaks, and the army profile). It is a thread-local, so `hoc_rollouts` builds it on the

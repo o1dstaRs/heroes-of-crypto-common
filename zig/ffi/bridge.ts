@@ -66,6 +66,8 @@ export interface IHocBuildInfo {
     optimize: string;
     snapshotFormat: number;
     glibc: string | null;
+    /** the engine paths a rollout request may select (`engine`): "match", and "server" once that mode is built */
+    supportedEngines: string[];
 }
 
 interface ILoadedLibrary {
@@ -205,6 +207,9 @@ export interface IHocRolloutRequest {
     uuidSequence?: number;
     /** how a summon is named: runMatch's createSummonedUnit ("match", default) or the server's createSecureUuid */
     summonIds?: "match" | "uuidSequence";
+    /** the engine path the rollouts reproduce: runMatch's ("match", default) or the server's bot-seat deps ("server",
+     * which needs summonIds "uuidSequence" and a library whose supportedEngines lists it) */
+    engine?: "match" | "server";
     /** ABI 3: scoreCandidates' bank semantics; absent = ABI 2's plain pair loop */
     bank?: IHocBank;
 }
@@ -477,6 +482,8 @@ export interface IHocScopeManifest {
             }
         >;
         actions: string[];
+        /** the engine paths a rollout request may select */
+        supportedEngines: string[];
     };
 }
 

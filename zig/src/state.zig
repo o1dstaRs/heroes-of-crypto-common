@@ -1589,6 +1589,10 @@ pub const SUMMON_NAMES = [N_SUMMONS][]const u8{ "Arachna Spider", "Arachna Queen
 /// server's createSecureUuid() under a seeded source, the "sim" UUID of deterministicUuidSequence (`uuid_sequence`).
 pub const IdScheme = enum(u8) { match, uuid_sequence };
 
+/// The engine path a rollout reproduces: runMatch's (`match`) or the server's bot-seat deps (`server`: the known-paths
+/// provider before every move and approach, its routes, and damage laps marked by damage > 0 only).
+pub const EngineMode = enum(u8) { match, server };
+
 pub const State = struct {
     units: [MAX_UNITS]Unit,
     /// The slots in use: every slot below it holds a unit, in the holder or removed (`in_holder` false).
@@ -1608,6 +1612,8 @@ pub const State = struct {
     uuid_seq: u64 = 0,
     /// How a summon is named (runMatch's createSummonedUnit, or the server's, which keeps createSecureUuid's id).
     id_scheme: IdScheme = .match,
+    /// The engine path of this call's rollouts (rollout.Request.engine); `match` everywhere else.
+    engine_mode: EngineMode = .match,
     /// The summon templates, when a unit can summon (null otherwise).
     summons: ?*const Summons = null,
     /// A capacity of the port was exceeded (unit slots, uids, ability or spell lists): the state no longer follows

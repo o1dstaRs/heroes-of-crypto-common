@@ -3306,6 +3306,7 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
     s.summon_seq = 0;
     s.uuid_seq = 0;
     s.id_scheme = .match;
+    s.engine_mode = .match;
     s.n_holder = 0;
     s.spell_cfg = .{st.SpellConfig{}} ** st.N_CAST_SPELLS;
     loadSpellConfigs(&s, rec.get(init, "spellConfigs"));

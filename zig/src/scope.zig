@@ -258,7 +258,7 @@ fn writeSpellList(w: *std.Io.Writer, a: []const st.SpellId, b: []const st.SpellI
     try w.writeByte(']');
 }
 
-fn writeStrings(w: *std.Io.Writer, items: []const []const u8) !void {
+pub fn writeStrings(w: *std.Io.Writer, items: []const []const u8) !void {
     try w.writeByte('[');
     for (items, 0..) |s, i| {
         if (i > 0) try w.writeByte(',');
@@ -453,7 +453,7 @@ pub fn writePolicy(w: *std.Io.Writer, p: PolicyScope) !void {
 }
 
 /// The whole scope (every policy): the body `coverage` hashes.
-pub fn writeScope(w: *std.Io.Writer, snapshot_format: i64, policies: []const PolicyScope, actions: []const []const u8) !void {
+pub fn writeScope(w: *std.Io.Writer, snapshot_format: i64, policies: []const PolicyScope, actions: []const []const u8, engines: []const []const u8) !void {
     try w.writeAll("{\"loader\":");
     try writeLoader(w, snapshot_format);
     try w.writeAll(",\"policies\":{");
@@ -465,6 +465,8 @@ pub fn writeScope(w: *std.Io.Writer, snapshot_format: i64, policies: []const Pol
     }
     try w.writeAll("},\"actions\":");
     try writeStrings(w, actions);
+    try w.writeAll(",\"supportedEngines\":");
+    try writeStrings(w, engines);
     try w.writeByte('}');
 }
 
@@ -479,7 +481,7 @@ test "the manifest names the loader's tables and hashes stably" {
     var a: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer a.deinit();
     const v08 = PolicyScope{ .name = "v0.8", .castable = &.{ .heal, .blessing }, .refused_abilities = st.AbilityId.BATCH6A_MASK, .refused_debuffs = &.{.hamstrung}, .refused_effects = &.{ .blindness, .paralysis }, .refused_buffs = comptime spellIdsWhere(st.SpellId.isBatch6Stat), .refuse_revived = true, .refuse_artifact_rows = true, .refuse_smoke = true, .refuse_fire_walls = true };
-    try writeScope(&a.writer, 2, &.{ .{ .name = "v0.1" }, v08 }, &.{ "end_turn", "move_unit" });
+    try writeScope(&a.writer, 2, &.{ .{ .name = "v0.1" }, v08 }, &.{ "end_turn", "move_unit" }, &.{"match"});
     const text = a.written();
     const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, text, .{});
     defer parsed.deinit();
