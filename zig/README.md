@@ -502,12 +502,14 @@ Exact in both modes (coverage under "How parity is checked"):
 
 ### Batch 6b
 
-Batch 6b lands creature by creature. Slices 1 and 2, exact in both modes (coverage under "How parity is checked"):
+Batch 6b lands creature by creature. Slices 1 to 3, exact in both modes (coverage under "How parity is checked"):
 
 | Creature | Abilities |
 | --- | --- |
 | Harpy (L2, MELEE_MAGIC flyer) | Shadow Touch (batch 1's), Castling (a castable swap: one `":Castling"` charge) |
 | Mermaid (L1, MELEE walker) | Water Element, Water Shield (the first damage of the battle absorbed) |
+| Abomination (L4, MELEE) | Dense Flesh, Flesh Shield Aura (landed in its own commit, `d59cccb4`) |
+| Thunderbird (L4, 2x2 MELEE flyer) | Wind Element, Chain Lightning (AIR arcs off its landed blows and responses) |
 
 - **Castling** (`spells.castlingReach`, `spells.castling`): castSpell's gates as for any unit-targeted cast (a Hidden
   enemy is refused before the hook), then canCastSpell's ENEMY_WITHIN_MOVEMENT_RANGE branch: the target has the
@@ -549,14 +551,28 @@ Batch 6b lands creature by creature. Slices 1 and 2, exact in both modes (covera
   stack-power refresh) appends a row to a living holder of the card (Break-aware) that never spent one and carries
   none: a Queen that steals the card (the robbed Mermaid keeps her row), or a holder revived after a death that did not
   spend it. The v0.1 AI reads neither card; v0.8 rollouts refuse both cards and the row (`V08_SCOPE`).
-- **The rest of batch 6b is in the tree, refused at load**: Efreet (Fire Element, Made of Fire, Fire Shield), Black
-  Dragon (Fire Element, Enchanted Skin, Fire Breath), Abomination (Dense Flesh, Flesh Shield Aura) and Thunderbird (Wind
-  Element, Chain Lightning). Their engine code (the other element pairs, the Flesh Shield redirect, Fire Shield, Fire
-  Breath and its stones, Chain Lightning, Dense Flesh's arrow cost, Enchanted Skin's magic_resist_mod, the Made of Fire
-  card's lava walk and buff) plays v0.1 recordings of each creature alone identically (40 battles each, 2026-11-26), but
+- **Wind Element** (Break-aware, power 50): the physical pair with Earth Elements both ways (x1.5, the defender's card
+  power), the spell table (AIR 0, EARTH x1.5: Lightning Strike at it is refused, the meteors hit it harder) and it
+  earths Chain Lightning.
+- **Chain Lightning** (`combat.chainLightning`, the call sites after the blow's and the response's hit and riders,
+  outside the absorbed gate): no draw. A primary with magic resist exactly 100 or a Wind Element resists it whole; else
+  the base is the swing's requested damage (a shield or ring that ate the swing does not stop it, a primary the swing
+  killed still conducts it) divided by the wielder's physical pair, the primary takes `floor(am x base x element x (1 -
+  mr / 100)) x Heavy Armor`, and up to three layers of the primary's team spread from each struck body's cells (the
+  cell, then its ring, first seen first; Hidden and dead units included), all of layer 1 before layer 2, depth-first
+  below it, at 7/8, 6/8 and 5/8 with one floor. A Wind Element arc victim halts the chain (the rest of its layer too),
+  magic resist 100 skips an arc victim unvisited, an Earth Element takes x1.5. Every hit has no striker and no element:
+  an intact Water Shield absorbs it, a covenant ring blocks it. `am` is `abilities.abilityMultiplier` (luck, the Might
+  synergy's ability power, stack power, then Empower and Sylvan Focus). A Magic Mirror buff on a victim reflects its
+  share (`spells.mirrorBuffPower`) as AIR onto the wielder: nothing onto a Thunderbird (its Wind Element), a share onto
+  a Queen that stole the card. Kill morale and the same-name losses settle inside the chain. Arrows Wingshield,
+  Range Null Field and Aggr are not read. The v0.1 AI reads neither card; v0.8 rollouts refuse them (`V08_SCOPE`).
+- **The rest of batch 6b is in the tree, refused at load**: Efreet (Fire Element, Made of Fire, Fire Shield) and Black
+  Dragon (Fire Element, Enchanted Skin, Fire Breath). Their engine code (the Fire Element pairs, Fire Shield, Fire Breath
+  and its stones, Enchanted Skin's magic_resist_mod, the Made of Fire card's lava walk and buff) plays v0.1 recordings of each creature alone identically (40 battles each, 2026-11-26), but
   it is not yet checked beside the casters, the artifacts, Queen steals or in v0.8s replays. `scope.REFUSED_ABILITIES`
-  (active or stolen; `scope.CHECKED_6B` names the cards taken) and `scope.REFUSED_ROWS` (the Flesh Shield row) refuse
-  those boards at load, and the manifest leaves the names out; `hoc-sim parity` / `native` still play them from
+  (active or stolen; `scope.CHECKED_6B` names the cards taken; `scope.REFUSED_ROWS` is empty now) refuses those boards
+  at load, and the manifest leaves the names out; `hoc-sim parity` / `native` still play them from
   recordings, for the next slices.
 - **Recorder**: keeping a batch-6b creature turns on the batch-3, spellbook and batch-4 columns (a Harpy's charge is a
   spellbook), adds `water_shield_spent` and `magic_resist_mod` after `helping_hand_link` and the fight's `lava` cells,
@@ -1318,6 +1334,40 @@ setup on side-oriented production-mix maps, `RECORD_AMOUNTS=expBudget`, `RECORD_
   393.3 µs per battle, of the engine bench 779 and 785 ns per step (medians, the same checksums: the engine code did not
   change, only the loader's tables).
 
+Batch 6b slice 3 (the Thunderbird), checked on 2026-11-26 over common `582f128b` (every battle identical; the same
+settings; fresh seeds 72000000-72999999; counts from the counting preload):
+
+- native v0.1 and engine replay, every resume point loaded equal to its digest and replayed identical in both modes,
+  1,120 battles, 220,704 steps, 2,240 points: the Thunderbird alone at keep rate 1 (200: 72000000; 1,042 primaries, 624
+  arcs, 141 halts by a Wind Element arc victim, 375 Wind primaries resisted); with Gargantuans, Trents, Mermaids,
+  Goblin Knights, Pikemen, Hydras and Monks at keep rate 1 (200: 72010000; 140 Earth arcs at x1.5, 110 Heavy Armor
+  victims, 44 arcs eaten by a Water Shield, 214 physical x1.5 rolls); with the Harpy, the Mermaid, batches 1 to 6a,
+  the casters and random artifacts at the default rate (240: 72100000); slice 2's Mermaid-heavy battery at 0.8 with
+  Thunderbirds (200: 72400000); Queen steals at keep rate 1 with artifacts (160: 72200000; 757 arcs, 67 eaten by a
+  shield, 30 Queens seeded); every chain Empowered (`RECORD_AUGMENTS="Empower:3,Armor:2,Might:2|Empower:2,Might:3"`,
+  Satyrs, Hydras; 120: 72500000; 225 Empowered chains);
+- engine replay of v0.8s battles (320 battles, 85,676 steps, 640 resume replays identical): forced Magic Mirrors,
+  Empower, the Lightning Strike (55 at an immune Thunderbird refused), the meteors and the fire spells beside
+  Thunderbirds, Mermaids and Trents (200: 72300000; 165 Empowered chains, 195 chain hits on mirror holders, which reflect
+  nothing onto a Thunderbird), and Queens with Magic Mirrors (120: 72600000; 33 chains by Queen thieves, 16 rebounds
+  onto them);
+- over all of it 2,644 primaries and 2,518 arcs, 161 arcs absorbed by a Water Shield, 689 Earth arcs at x1.5, 405
+  halts, and 136 chains by a wielder the response had killed (in the four runs that counted them);
+- the rollout oracle: v0.1 with Thunderbirds, Earth Elements, Mermaids, Goblin Knights, Queens, Hydras and Pikemen at
+  keep rate 1 and with everything at 0.8, 20 battles, 47 roots, 45,120 values identical (72800000-72800304); v0.8 on
+  batches 1 to 6a, the casters, the Harpy and artifacts at 0.6, 16 battles, 34 roots compared, 32,640 values identical
+  (72850000-72850303), and the Thunderbird's roots refused by v08Scope (8 of 9 at keep rate 1);
+- negative tests diverge (scratch builds): no Wind halt, no Empower on the chain, arcs passing a Water Shield, no
+  affinity divide, layer 1 at 8/8, no Magic Mirror rebound on arcs;
+- unchanged: classic `check.sh 100` (72910000), `ffi/smoke.ts 6` (72920000) and 12 with Thunderbirds, Mermaids,
+  Harpies, Queens and Earth Elements (72930000), `zig build test`; cost: five alternated pairs of `native-bench` 500.8 and
+  498.3 µs per battle, of the engine bench 713 and 715 ns per step (medians, the same checksums: only the loader's
+  tables changed);
+- after the rebase onto the Abomination's slice (`d59cccb4`, both loaded): Thunderbirds beside Abominations, Mermaids,
+  Trents, Goblin Knights, Queens and artifacts at keep rate 1 (160: 72992000; 390 primaries, 924 arcs) and everything at
+  the default rate (100: 72994000), identical in both modes with 520 resume points; `check.sh 40` (72991000) and
+  `ffi/smoke.ts 6` (72990000).
+
 Batch 6a, checked on 2026-11-25 (every battle identical; every run on side-oriented production-mix maps with the
 production-like setup and `RECORD_AMOUNTS=expBudget`, most with `RECORD_RESUME=random:2` and traced draws; fresh seeds
 50000000-61999999 plus six stall seeds from earlier recordings, 18080754-18081812). The batteries ran on the same
@@ -1742,7 +1792,7 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 
 ## Not covered yet
 
-- the rest of batch 6b (Efreet, Black Dragon, Abomination, Thunderbird): every creature card and book spell
+- the rest of batch 6b (Efreet, Black Dragon): every creature card and book spell
   is named by the port now, and these are the only ones refused at load (in the tree, unchecked; Batch 6b, above); the
   disabled Broken Aegis (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and mirror
   rolls of debuff spells); the revealed-ranged delivery layer of production's augment plan (it needs the live draft);
