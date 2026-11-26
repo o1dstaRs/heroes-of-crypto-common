@@ -152,6 +152,54 @@ pub const Switches = struct {
     engine_reachable_routes: bool = true,
 };
 
+/// One team's `policies.<team>.switches` (also the `hoc-sim v08` CLI's --switches): an object of {name: bool}, with
+/// role_release / protector_release as lists of names. Names left out keep their production values. Null when a name
+/// or a value is not one of Switches' (the caller refuses the request); a JSON null is the production table.
+pub fn parseSwitches(v: std.json.Value) ?Switches {
+    var out: Switches = .{};
+    if (v == .null) return out;
+    if (v != .object) return null;
+    var it = v.object.iterator();
+    while (it.next()) |e| {
+        const name = e.key_ptr.*;
+        const val = e.value_ptr.*;
+        if (std.mem.eql(u8, name, "role_release")) {
+            if (!parseNameSet(RoleRelease, val, &out.role_release)) return null;
+            continue;
+        }
+        if (std.mem.eql(u8, name, "protector_release")) {
+            if (!parseNameSet(ProtectorRelease, val, &out.protector_release)) return null;
+            continue;
+        }
+        if (val != .bool) return null;
+        var known = false;
+        inline for (std.meta.fields(Switches)) |f| {
+            if (f.type == bool and std.mem.eql(u8, f.name, name)) {
+                @field(out, f.name) = val.bool;
+                known = true;
+            }
+        }
+        if (!known) return null;
+    }
+    return out;
+}
+
+fn parseNameSet(comptime T: type, v: std.json.Value, out: *T) bool {
+    if (v != .array) return false;
+    for (v.array.items) |item| {
+        if (item != .string) return false;
+        var known = false;
+        inline for (std.meta.fields(T)) |f| {
+            if (std.mem.eql(u8, f.name, item.string)) {
+                @field(out, f.name) = true;
+                known = true;
+            }
+        }
+        if (!known) return false;
+    }
+    return true;
+}
+
 /// V08_RELEASABLE_ROLES (v0_8_role_release.ts).
 pub const RoleRelease = struct {
     blacksmith_craft: bool = false,
@@ -1166,4 +1214,24 @@ pub fn rangeDivisorAt(att: *const st.Unit, hx: f64, hy: f64, ax: f64, ay: f64) f
     if (divisor < 1) divisor = 1;
     if (divisor > 8) divisor = 8;
     return @floor(divisor);
+}
+
+test "parseSwitches: production defaults, named bools, release sets, and refusals" {
+    const parse = struct {
+        fn of(text: []const u8) ?Switches {
+            const parsed = std.json.parseFromSlice(std.json.Value, std.testing.allocator, text, .{}) catch return null;
+            defer parsed.deinit();
+            return parseSwitches(parsed.value);
+        }
+    }.of;
+    try std.testing.expectEqual(Switches{}, parse("{}").?);
+    try std.testing.expectEqual(Switches{}, parse("null").?);
+    const s = parse("{\"decoy_aware\": false, \"mage_damage_kill_priority\": true, \"role_release\": [\"healer_sustain\"]}").?;
+    try std.testing.expect(!s.decoy_aware and s.coherent_melee and s.mage_damage_kill_priority);
+    try std.testing.expect(s.role_release.healer_sustain and !s.role_release.blacksmith_craft and !s.protector_release.angel);
+    try std.testing.expect(parse("{\"no_such_switch\": true}") == null);
+    try std.testing.expect(parse("{\"decoy_aware\": 0}") == null);
+    try std.testing.expect(parse("{\"role_release\": [\"tank\"]}") == null);
+    try std.testing.expect(parse("{\"protector_release\": \"angel\"}") == null);
+    try std.testing.expect(parse("[1]") == null);
 }

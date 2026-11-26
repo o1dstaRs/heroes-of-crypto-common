@@ -7,6 +7,8 @@
 //!       --passes also checks every ported v0.8 pass (lv8.zig) in isolation: run on the logged output of the layer
 //!       before it, its output must equal its own logged layer. Passes not ported yet are skipped.
 //!       --v08s: the recording ran the v0.8s alias outside V08_RANGED_POSITION_VERSIONS (no ranged positioning).
+//!       --switches '{"1": {...}, "2": {...}}': each team's rollout-policy switches (util.Switches, as a request's
+//!       policies carry them) for a recording made with those environment switches; also on `candidates`.
 //!
 //!   hoc-sim v08 leaf <recording.jsonl> [--max-fail N]
 //!       For a recording with RECORD_LEAF=1: at every decision, the V2 rollout leaf (util.leafV2) and its 60 features
@@ -54,6 +56,7 @@ pub fn run(gpa: std.mem.Allocator, args: []const []const u8) !void {
     if (std.mem.eql(u8, args[0], "layers")) {
         const top = policy.levelFromName(argValue(args, "--top") orelse "v0.2") orelse return error.UnknownLevel;
         alias_v08s = hasFlag(args, "--v08s");
+        if (argValue(args, "--switches")) |text| try parseCliSwitches(gpa, text);
         if (!try layers(gpa, args[1], top, hasFlag(args, "--passes"), argNumber(args, "--max-fail", 10))) std.process.exit(1);
         return;
     }
@@ -66,6 +69,7 @@ pub fn run(gpa: std.mem.Allocator, args: []const []const u8) !void {
         return;
     }
     if (std.mem.eql(u8, args[0], "candidates")) {
+        if (argValue(args, "--switches")) |text| try parseCliSwitches(gpa, text);
         if (!try candidates(gpa, args[1], argNumber(args, "--max-fail", 10))) std.process.exit(1);
         return;
     }
@@ -78,6 +82,21 @@ pub fn run(gpa: std.mem.Allocator, args: []const []const u8) !void {
 // =====================================================================================================================
 
 var alias_v08s = false;
+/// --switches: each team's rollout-policy switches, as the request's `policies` object holds them
+/// ({"1": {...}, "2": {...}}, util.parseSwitches); production for a team left out.
+var cli_switches: [3]util.Switches = .{ .{}, .{}, .{} };
+
+fn parseCliSwitches(gpa: std.mem.Allocator, text: []const u8) !void {
+    const parsed = std.json.parseFromSlice(std.json.Value, gpa, text, .{}) catch return error.BadSwitches;
+    defer parsed.deinit();
+    if (parsed.value != .object) return error.BadSwitches;
+    var it = parsed.value.object.iterator();
+    while (it.next()) |entry| {
+        const team = std.fmt.parseInt(u8, entry.key_ptr.*, 10) catch return error.BadSwitches;
+        if (team != st.Team.LEFT and team != st.Team.RIGHT) return error.BadSwitches;
+        cli_switches[team] = util.parseSwitches(entry.value_ptr.*) orelse return error.BadSwitches;
+    }
+}
 
 const Logged = struct { name: []const u8, out: []const rec.Action, rin: u32, rout: u32 };
 
@@ -234,6 +253,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
         const raw_steps = rec.get(root, "steps").array.items;
         games += 1;
         util.battle = util.Battle.fromInit(game.init);
+        util.battle.switches = cli_switches;
         util.battle.ranged_positioning = !alias_v08s;
         var s = engine.initState(game.init, game.ids) catch |err| {
             std.debug.print("seed {d}: start state not supported ({s})\n", .{ game.seed, @errorName(err) });
@@ -422,6 +442,7 @@ fn censusPins(gpa: std.mem.Allocator, path: []const u8) !void {
         const arena = arena_state.allocator();
         const game = rec.parseGame(arena, line, true) catch continue;
         util.battle = util.Battle.fromInit(game.init);
+        util.battle.switches = cli_switches;
         var s = engine.initState(game.init, game.ids) catch continue;
         util.battle.primeProfile(&s);
         var events: engine.Events = .{};
@@ -522,6 +543,7 @@ fn leafCheck(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
         const root = try std.json.parseFromSliceLeaky(std.json.Value, arena, line, .{});
         const raw_steps = rec.get(root, "steps").array.items;
         util.battle = util.Battle.fromInit(game.init);
+        util.battle.switches = cli_switches;
         var s = engine.initState(game.init, game.ids) catch continue;
         var events: engine.Events = .{};
         for (game.steps, 0..) |step, i| {
@@ -588,6 +610,7 @@ fn candidates(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
         const raw_steps = rec.get(root, "steps").array.items;
         games += 1;
         util.battle = util.Battle.fromInit(game.init);
+        util.battle.switches = cli_switches;
         var s = engine.initState(game.init, game.ids) catch continue;
         util.battle.primeProfile(&s);
         var events: engine.Events = .{};
