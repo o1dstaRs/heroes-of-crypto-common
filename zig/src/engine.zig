@@ -769,7 +769,16 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
         if (abilities.appliedAuraPower(u, .guiding_winds_aura)) |gw| u.shot_distance += js.roundUnitStat((u.init.shot_distance / 100) * gw, 2);
     }
     const we_bonus: f64 = if (s.artifacts) artifacts.attackArtifacts(u, art) else 0;
+    // Riot (the first row of the name), else Mass Riot: that share of the base attack (unrounded until the round below);
+    // else the initial mod.
     u.attack_mod = u.init.attack_mod;
+    if (u.buffs.len != 0) {
+        if (u.buffs.get(.riot)) |r| {
+            u.attack_mod = (u.base_attack * r.power) / 100;
+        } else if (u.buffs.get(.mass_riot)) |m| {
+            u.attack_mod = (u.base_attack * m.power) / 100;
+        }
+    }
     // Weakness (the first debuff of the name): power% of the running base attack, before Sharpened Weapons' multiplier.
     if (spit) {
         if (u.debuffs.get(.weakness)) |w| u.attack_mod -= (u.base_attack * w.power) / 100;

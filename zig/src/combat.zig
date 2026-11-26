@@ -207,29 +207,53 @@ fn swordDamage(to: *const Unit, base: f64, power: f64) f64 {
     return @max(0, @floor(@floor(burn * element) * (1 - resist / 100)));
 }
 
+const Burn = struct { killed: bool = false, wielder_died: bool = false };
+
 /// processFireforgedSwordAbility: a living victim of a holder takes the burn (the buff's power when finite and positive)
 /// as FIRE damage with no break roll (an Ember Covenant ring blocks it and stays), the damage statistic row, and a
-/// killing burn records the wielder's Last Fuse. Returns whether it killed.
-fn swordBurn(s: *State, from_i: u8, to_i: u8, base: f64) bool {
+/// killing burn records the wielder's Last Fuse. Then applyMagicMirrorDamage: a victim holding a Magic Mirror buff
+/// reflects floor(burn x its buff power / 100) onto a living wielder, through the wielder's Heavy Armor, element and
+/// magic resist, as FIRE with no break roll and no Last Fuse source (its own team).
+fn swordBurn(s: *State, from_i: u8, to_i: u8, base: f64) Burn {
     const to = &s.units[to_i];
-    if (to.isDead()) return false;
-    const sword = s.units[from_i].buffs.get(.fireforged_sword) orelse return false;
+    if (to.isDead()) return .{};
+    const sword = s.units[from_i].buffs.get(.fireforged_sword) orelse return .{};
     const power: f64 = if (std.math.isFinite(sword.power) and sword.power > 0) sword.power else 0;
     const burn = swordDamage(to, base, power);
-    if (burn <= 0) return false;
+    if (burn <= 0) return .{};
     const dealt = engine.applyDamageElement(s, to_i, burn, 0, false, st.Element.FIRE);
     s.damage_lap = s.fight.lap;
     if (s.artifacts and to.isDead()) artifacts.recordFatal(s, to_i, dealt, from_i);
-    return to.isDead();
+    var out: Burn = .{ .killed = to.isDead() };
+    const from = &s.units[from_i];
+    const share = spells.mirrorBuffPower(to);
+    if (share > 0 and from_i != to_i and !from.isDead()) {
+        const reflected = @floor((burn * share) / 100);
+        const heavy = spells.magicDamageTakenMultiplier(from);
+        const landed = spells.damageAgainstNoHeavy(if (heavy == 1) reflected else @floor(reflected * heavy), st.Element.FIRE, from);
+        if (landed > 0) {
+            const back = engine.applyDamageElement(s, from_i, landed, 0, false, st.Element.FIRE);
+            if (s.artifacts and from.isDead()) artifacts.recordFatal(s, from_i, back, from_i);
+            out.wielder_died = from.isDead();
+        }
+    }
+    return out;
 }
 
 /// A single-target burn (the blow, the second punch, the shots, the responses): a kill joins `died` once and its
 /// same-name stacks' loss merges into `decrease`; returns the kill morale (+4) for the sites that grant it.
 fn swordHit(s: *State, from_i: u8, to_i: u8, base: f64, died: *Died, decrease: *MoraleDecrease) f64 {
-    if (!holdsSword(s, &s.units[from_i]) or !swordBurn(s, from_i, to_i, base)) return 0;
-    if (!died.includes(to_i)) died.push(to_i);
-    decrease.add(&s.units[to_i], engine.MORALE_CHANGE_FOR_KILL);
-    return engine.MORALE_CHANGE_FOR_KILL;
+    if (!holdsSword(s, &s.units[from_i])) return 0;
+    const b = swordBurn(s, from_i, to_i, base);
+    var plus: f64 = 0;
+    if (b.killed) {
+        if (!died.includes(to_i)) died.push(to_i);
+        decrease.add(&s.units[to_i], engine.MORALE_CHANGE_FOR_KILL);
+        plus = engine.MORALE_CHANGE_FOR_KILL;
+    }
+    // A wielder killed by the reflection joins the deaths (no morale either way).
+    if (b.wielder_died and !died.includes(from_i)) died.push(from_i);
+    return plus;
 }
 
 /// processFireforgedSwordOnVictims: each listed unit once, at its first entry with a positive base, never the wielder;
@@ -242,10 +266,13 @@ fn swordOnVictims(s: *State, from_i: u8, hits: *const SwordHits, died: *Died, de
     for (hits.slots[0..hits.len], hits.bases[0..hits.len]) |v, base| {
         if (!(base > 0) or burned & engine.unitBit(v) != 0 or v == from_i) continue;
         burned |= engine.unitBit(v);
-        if (!swordBurn(s, from_i, v, base)) continue;
-        if (!died.includes(v)) died.push(v);
-        if (decrease) |d| d.add(&s.units[v], engine.MORALE_CHANGE_FOR_KILL);
-        plus += engine.MORALE_CHANGE_FOR_KILL;
+        const b = swordBurn(s, from_i, v, base);
+        if (b.killed) {
+            if (!died.includes(v)) died.push(v);
+            if (decrease) |d| d.add(&s.units[v], engine.MORALE_CHANGE_FOR_KILL);
+            plus += engine.MORALE_CHANGE_FOR_KILL;
+        }
+        if (b.wielder_died and !died.includes(from_i)) died.push(from_i);
     }
     return plus;
 }

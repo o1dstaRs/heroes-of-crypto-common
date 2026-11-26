@@ -43,7 +43,10 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   share) of the base armor, Shatter Armor subtracted twice) and Mass Heal (every ally with magic resist other than 100
   and no active Mechanism heals floor(2.5 x caster alive), no morale factor; the gate ignores Mechanism); the Magic
   Dragon's Whirlpool (the debuff branch: the save on the target, the redirect, the always-drawn mirror roll; laps 1, the
-  holder skips its next activation and cannot move but still replies); batch 6a's
+  holder skips its next activation and cannot move but still replies); the Ogre Mage's Riot / Mass Riot (attack_mod =
+  base attack x power / 100, Riot first) and Magic Mirror / Mass Magic Mirror (the holder's mirror share
+  max(buff power, Magic Reflection) in spell rebounds and every mirror roll; a Fireforged Sword burn reflects the buff
+  share onto its wielder); batch 6a's
   castables, the Valkyrie's Wind Flow (a
   mass buff on every flyer) and the Angel's Resurrection (on a wounded ally stack); a book holding any other spell is
   refused;
@@ -133,6 +136,7 @@ Wave-1 spells (`spells.zig`), exact in both modes:
 | Satyr (L2, MAGIC) | Forest Spellbook, Sylvan Focus Blessing | Summon Wolves x2 (Courage and Helping Hand are wave 2) |
 | Magic Dragon (L4, MELEE_MAGIC) | Tome of Elements, Magic Reflection | Whirlpool x1, Lightning Strike x4, Ring of Fire x2, Meteor Shower x1 (the whole book) |
 | Trent (L2) | Vine Throw (castable) | Vine Throw x1 |
+| Ogre Mage (L3, MELEE_MAGIC) | Tome of Might | Riot x2, Magic Mirror x2, Mass Riot x1, Mass Magic Mirror x1 (wave 2, the whole book) |
 | Wandering Mage (L1, MELEE) | Book of Chaos | Smoke x1, Misfortune x1, Fireforged Sword x2, Fireball x1 (wave 2, the whole book) |
 | Blacksmith (L1, MELEE) | Blacksmith Tools, Enchants | Craft x1, Armor Rune x5, Weapon Rune x5 (wave 2, the whole book) |
 | Wolf (summoned) | its creature's cards when "Wolf" is kept (Double Punch, Deep Wounds Level 1; batch 4), else stripped | none |

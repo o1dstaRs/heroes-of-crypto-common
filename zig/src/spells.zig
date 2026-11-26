@@ -381,6 +381,11 @@ fn elementAndResist(raw: f64, element_multiplier: f64, magic_resist: f64) f64 {
     return @max(0, @floor(scaled * (1 - resist / 100)));
 }
 
+/// elementalMagicDamageAgainstUnit: the element, then the unit's magic resist (Heavy Armor applied by the caller).
+pub fn damageAgainstNoHeavy(raw: f64, element: u8, u: *const Unit) f64 {
+    return elementAndResist(raw, elementMultiplier(element, u), engine.getMagicResist(u));
+}
+
 /// spellDamageAgainstUnit (projectSpellDamageAgainstUnit): Heavy Armor first, then the element, then the unit's magic
 /// resist.
 pub fn damageAgainst(raw: f64, element: u8, u: *const Unit) f64 {
@@ -388,13 +393,24 @@ pub fn damageAgainst(raw: f64, element: u8, u: *const Unit) f64 {
     return elementAndResist(if (m == 1) raw else @floor(raw * m), elementMultiplier(element, u), engine.getMagicResist(u));
 }
 
-/// mirroredDamageShare: the Magic Dragon's Magic Reflection, floor(power / 5 * stack power + luck) clamped to 0..100
-/// (no Magic Mirror buff in scope).
+/// mirroredDamageShare / isMirrored's chance: max(the Magic Mirror buffs' power, the Magic Dragon's Magic Reflection,
+/// floor(power / 5 * stack power + luck) clamped to 0..100).
 pub fn mirroredShare(u: *const Unit) f64 {
-    if (u.ability_mask & st.AbilityId.magic_reflection.bit() == 0) return 0;
-    const a = u.ability(.magic_reflection) orelse return 0;
+    const buff = mirrorBuffPower(u);
+    if (u.ability_mask & st.AbilityId.magic_reflection.bit() == 0) return buff;
+    const a = u.ability(.magic_reflection) orelse return buff;
     const sp = @max(0, @min(MAX_UNIT_STACK_POWER, engine.getStackPower(u)));
-    return @max(0, @min(100, @floor((a.power / MAX_UNIT_STACK_POWER) * sp + engine.getLuck(u))));
+    return @max(buff, @max(0, @min(100, @floor((a.power / MAX_UNIT_STACK_POWER) * sp + engine.getLuck(u)))));
+}
+
+/// getMagicMirrorPower: the first Magic Mirror row's power, max the first Mass Magic Mirror row's, clamped to 0..100 and
+/// floored (no stack power, no luck). The burns' reflection reads only this.
+pub fn mirrorBuffPower(u: *const Unit) f64 {
+    if (u.buffs.len == 0) return 0;
+    var p: f64 = 0;
+    if (u.buffs.power(.magic_mirror)) |m| p = m;
+    if (u.buffs.power(.mass_magic_mirror)) |m| p = @max(p, m);
+    return @floor(@min(100, @max(0, p)));
 }
 
 pub const Victim = struct { slot: u8, damage: f64, rebounded: bool };

@@ -855,6 +855,7 @@ let forcedCastCount = 0;
 /** The cards Craft grants (craft_ability.ts). */
 const CRAFTED_CARDS = ["Crafted Double Punch", "Crafted Double Shot", "Crafted Frozen Sword", "Crafted Frozen Bow"];
 const forceSpellHelper = FORCE_CASTS.length ? await import("../../src/spells/spell_helper") : undefined;
+const forceSpellProps = FORCE_CASTS.length ? await import("../../src/spells/spell_properties") : undefined;
 const leafModule = LEAF_LOG ? (layersModule ?? (await import("./v08/layers"))) : undefined;
 
 function main(): void {
@@ -1059,6 +1060,32 @@ function main(): void {
                 for (const name of FORCE_CASTS) {
                     const spell = unit.getSpells().find((s: any) => s.getName() === name);
                     if (!spell || !SH.isSpellUsableByCaster(unit, spell)) continue;
+                    // A mass spell is cast with no target when canMassCastSpell opens.
+                    const targetType = spell.getSpellTargetType();
+                    const STT = forceSpellProps!.SpellTargetType;
+                    if (
+                        targetType === STT.ALL_ALLIES ||
+                        targetType === STT.ALL_ENEMIES ||
+                        targetType === STT.ALL_FLYING
+                    ) {
+                        const holder = context.unitsHolder;
+                        const team = unit.getTeam();
+                        const open = SH.canMassCastSpell(
+                            spell,
+                            holder.getAllTeamUnitsBuffs(team),
+                            holder.getAllEnemyUnitsBuffs(team),
+                            holder.getAllEnemyUnitsDebuffs(team),
+                            holder.getAllTeamUnitsMagicResist(team),
+                            holder.getAllEnemyUnitsMagicResist(team),
+                            holder.getAllTeamUnitsHp(team),
+                            holder.getAllTeamUnitsMaxHp(team),
+                            holder.getAllTeamUnitsCanFly(team),
+                            holder.getAllEnemyUnitsCanFly(team),
+                        );
+                        if (!open) continue;
+                        forcedCastCount += 1;
+                        return [{ type: "cast_spell", casterId: unit.getId(), spellName: name }];
+                    }
                     const ok = (t: any) =>
                         SH.canCastSpell(
                             false,

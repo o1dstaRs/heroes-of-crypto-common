@@ -101,6 +101,12 @@ pub const SpellId = enum(u8) {
     spiritual_armor,
     /// The Magic Dragon's debuff (wave 2): the holder skips its next activation and cannot move (it still replies).
     whirlpool,
+    /// The Ogre Mage's buffs (wave 2): Riot (30) / Mass Riot (25) set attack_mod to that share of base attack; Magic
+    /// Mirror (40) / Mass Magic Mirror (32) raise the holder's mirror share (rebounds and mirror rolls).
+    riot,
+    mass_riot,
+    magic_mirror,
+    mass_magic_mirror,
     /// The Blacksmith's runes (wave 2): never-ticking buff rows (laps 15) whose first stored property is the stacked
     /// bonus N, added flat to armor_mod / attack_mod.
     armor_rune,
@@ -236,6 +242,10 @@ pub const SpellId = enum(u8) {
             .misfortune => "Misfortune",
             .spiritual_armor => "Spiritual Armor",
             .whirlpool => "Whirlpool",
+            .riot => "Riot",
+            .mass_riot => "Mass Riot",
+            .magic_mirror => "Magic Mirror",
+            .mass_magic_mirror => "Mass Magic Mirror",
             .armor_rune => "Armor Rune",
             .weapon_rune => "Weapon Rune",
             .freeze => "Freeze",
@@ -475,6 +485,7 @@ pub const AbilityId = enum(u8) {
     book_of_chaos,
     blacksmith_tools,
     enchants,
+    tome_of_might,
     /// Craft's grants (permanent ordinary cards): the second attacks (Double Punch's and Double Shot's configs) and the
     /// frozen weapons (Stun's mechanism at power 30 with the Freeze effect).
     crafted_double_punch,
@@ -605,6 +616,7 @@ pub const AbilityId = enum(u8) {
             .book_of_chaos => "Book of Chaos",
             .blacksmith_tools => "Blacksmith Tools",
             .enchants => "Enchants",
+            .tome_of_might => "Tome of Might",
             .crafted_double_punch => "Crafted Double Punch",
             .crafted_double_shot => "Crafted Double Shot",
             .crafted_frozen_sword => "Crafted Frozen Sword",
@@ -665,13 +677,14 @@ pub const AbilityId = enum(u8) {
             .book_of_chaos => spell == .fireball or spell == .fireforged_sword or spell == .misfortune or spell == .smoke,
             .blacksmith_tools => spell == .craft,
             .enchants => spell == .armor_rune or spell == .weapon_rune,
+            .tome_of_might => spell == .riot or spell == .magic_mirror or spell == .mass_riot or spell == .mass_magic_mirror,
             else => false,
         };
     }
 
     pub inline fn isSpellbook(self: AbilityId) bool {
         return switch (self) {
-            .book_of_healing, .basic_tome_of_battle_magic, .forest_spellbook, .tome_of_elements, .book_of_chaos, .blacksmith_tools, .enchants => true,
+            .book_of_healing, .basic_tome_of_battle_magic, .forest_spellbook, .tome_of_elements, .book_of_chaos, .blacksmith_tools, .enchants, .tome_of_might => true,
             else => false,
         };
     }
@@ -760,6 +773,11 @@ pub const CastSpell = enum(u8) {
     mass_heal,
     // wave 2a: the Magic Dragon's Tome of Elements
     whirlpool,
+    // wave 2a: the Ogre Mage's Tome of Might
+    riot,
+    magic_mirror,
+    mass_riot,
+    mass_magic_mirror,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -786,6 +804,10 @@ pub const CastSpell = enum(u8) {
             .spiritual_armor => "Spiritual Armor",
             .mass_heal => "Mass Heal",
             .whirlpool => "Whirlpool",
+            .riot => "Riot",
+            .magic_mirror => "Magic Mirror",
+            .mass_riot => "Mass Riot",
+            .mass_magic_mirror => "Mass Magic Mirror",
         };
     }
 
@@ -810,6 +832,10 @@ pub const CastSpell = enum(u8) {
             .weapon_rune => .weapon_rune,
             .spiritual_armor => .spiritual_armor,
             .whirlpool => .whirlpool,
+            .riot => .riot,
+            .magic_mirror => .magic_mirror,
+            .mass_riot => .mass_riot,
+            .mass_magic_mirror => .mass_magic_mirror,
             else => null,
         };
     }
