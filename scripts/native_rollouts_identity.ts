@@ -21,7 +21,27 @@
 //   SPELLS         "wave1" (default: the books src/v08 casts), "all", or "none"
 //   LIVE=1         the bot seat's live code path (single-call banks, no tail bounds) instead of offline work
 //   BUDGET_STRESS=1  the deep search gets a third of its rollout turns (turn-budget stops)
-import { appendFileSync, writeFileSync } from "node:fs";
+//   CENSUS=<census.jsonl>  battle k plays census line CENSUS_OFFSET + k instead of the seed's random board: the lower
+//                  (green) and upper (red) creature lists at expBudget amounts, both teams' Tier-1 / Tier-2 artifacts,
+//                  the doctrines and the map (zig/parity/record.ts's RECORD_ROSTERS lines). KEEP and SPELLS then
+//                  default to ALL and all.
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+
+interface ICensusLine {
+    gridType: number;
+    lowerDoctrine?: number;
+    upperDoctrine?: number;
+    artifacts: { lower: [number, number]; upper: [number, number] };
+    lower: { name: string; level: number }[];
+    upper: { name: string; level: number }[];
+}
+const CENSUS: ICensusLine[] = process.env.CENSUS
+    ? readFileSync(process.env.CENSUS, "utf8")
+          .split("\n")
+          .filter((line) => line.trim())
+          .map((line) => JSON.parse(line) as ICensusLine)
+    : [];
+const CENSUS_OFFSET = Number(process.env.CENSUS_OFFSET ?? 0);
 
 const PRESETS: Record<string, string> = {
     B13: "Leprechaun,Nomad,Crusader,Fairy,Goblin Knight,Hyena,Scavenger,Wyvern,Pikeman,Peasant,Pegasus,Hydra,Zena,Arachna Queen,Arachna Spider,Squire,Troglodyte,Monk",
@@ -52,7 +72,7 @@ const WAVE1_SPELLS = new Set([
     "Wild Regeneration",
 ]);
 
-const keepSpec = process.env.KEEP ?? "B14C";
+const keepSpec = process.env.KEEP ?? (CENSUS.length ? "ALL" : "B14C");
 const keepAll = keepSpec === "ALL";
 const KEEP = new Set(
     (preset(keepSpec) ?? keepSpec)
@@ -60,7 +80,7 @@ const KEEP = new Set(
         .map((name) => name.trim())
         .filter(Boolean),
 );
-const spells = process.env.SPELLS ?? "wave1";
+const spells = process.env.SPELLS ?? (CENSUS.length ? "all" : "wave1");
 
 // The creature table is edited before any engine module reads it.
 const creatures = (await import("../src/configuration/creatures.json")).default as unknown as Record<
@@ -85,7 +105,8 @@ for (const [faction, byName] of Object.entries(creatures)) {
 }
 
 const { runMatch } = await import("../src/simulation/battle_engine");
-const { buildRoster, creaturesByLevel, makeRng } = await import("../src/simulation/army");
+const { buildRoster, creaturesByLevel, DEFAULT_AMOUNT_BY_LEVEL, makeRng, resolveStackAmount } =
+    await import("../src/simulation/army");
 const { createV08A19DeepFitSearchDriver } = await import("../src/simulation/v0_8_a19_deep_fit");
 const { withScopedAIEnvironment } = await import("../src/simulation/v0_8_a13_search");
 const { buildV08A19SearchEnvironment } = await import("../src/ai/versions/v0_8_a19_profile");
@@ -135,6 +156,25 @@ function rosterFor(seed: number): Spec[] {
                 ? {}
                 : { footprintWidth: pick.footprintWidth, footprintHeight: pick.footprintHeight }),
             amount: spec.amount,
+        };
+    });
+}
+/** A census army as a roster: each creature at its expBudget amount (record.ts's censusRoster). */
+function censusRoster(list: { name: string; level: number }[]): Spec[] {
+    return list.map((creature) => {
+        const pick = (creaturesByLevel(creature.level) as unknown as Spec[]).find(
+            (entry) => entry.creatureName === creature.name,
+        );
+        if (!pick) throw new Error(`CENSUS: unknown creature ${creature.name} (level ${creature.level})`);
+        return {
+            faction: pick.faction,
+            creatureName: pick.creatureName,
+            level: pick.level,
+            size: pick.size,
+            ...(pick.footprintWidth === undefined || pick.footprintHeight === undefined
+                ? {}
+                : { footprintWidth: pick.footprintWidth, footprintHeight: pick.footprintHeight }),
+            amount: resolveStackAmount(pick.creatureName, pick.level, DEFAULT_AMOUNT_BY_LEVEL, "expBudget"),
         };
     });
 }
@@ -191,12 +231,22 @@ interface ISearchDriverLike {
     nativeRolloutStatistics: Record<string, unknown>;
 }
 
-function playBattle(seed: number, mode: string): IBattleRun {
+function playBattle(seed: number, mode: string, index: number): IBattleRun {
     process.env[NATIVE_ROLLOUTS_ENV] = mode;
-    const roster = rosterFor(seed);
-    const redRoster = rosterFor((seed ^ 0x5bd1e995) >>> 0);
-    const green = doctrineFor(seed, 0);
-    const red = doctrineFor(seed, 1);
+    const census = CENSUS.length ? CENSUS[CENSUS_OFFSET + index] : undefined;
+    if (CENSUS.length && !census) throw new Error(`CENSUS: no line ${CENSUS_OFFSET + index}`);
+    const roster = census ? censusRoster(census.lower) : rosterFor(seed);
+    const redRoster = census ? censusRoster(census.upper) : rosterFor((seed ^ 0x5bd1e995) >>> 0);
+    const green = census ? census.lowerDoctrine || 0 : doctrineFor(seed, 0);
+    const red = census ? census.upperDoctrine || 0 : doctrineFor(seed, 1);
+    const artifacts = census
+        ? {
+              ...(census.artifacts.lower[0] ? { greenArtifactT1: census.artifacts.lower[0] } : {}),
+              ...(census.artifacts.lower[1] ? { greenArtifactT2: census.artifacts.lower[1] } : {}),
+              ...(census.artifacts.upper[0] ? { redArtifactT1: census.artifacts.upper[0] } : {}),
+              ...(census.artifacts.upper[1] ? { redArtifactT2: census.artifacts.upper[1] } : {}),
+          }
+        : {};
     const variants = synergyVariantsForSeed(`rec-${seed}`);
     const decisions: IDecisionRow[] = [];
     const drivers: ISearchDriverLike[] = [];
@@ -209,10 +259,11 @@ function playBattle(seed: number, mode: string): IBattleRun {
         seed,
         maxLaps: 60,
         headlessEvents: true,
-        gridType: gridTypeFor(seed),
+        gridType: census ? Number(census.gridType) : gridTypeFor(seed),
         sideOrientedPlacement: true,
-        greenDoctrine: green,
-        redDoctrine: red,
+        ...(green ? { greenDoctrine: green } : {}),
+        ...(red ? { redDoctrine: red } : {}),
+        ...artifacts,
         greenAugments: augmentsFor(getUpgradePoints(green), roster, redRoster),
         redAugments: augmentsFor(getUpgradePoints(red), redRoster, roster),
         greenSynergies: synergiesFor(roster, variants),
@@ -301,12 +352,17 @@ const totals = {
 };
 for (let index = 0; index < battles; index += 1) {
     const seed = firstSeed + index;
-    const runs = modes.map((mode) => playBattle(seed, mode));
+    const runs = modes.map((mode) => playBattle(seed, mode, index));
     const [reference, ...others] = runs;
     totals.battles += 1;
     let identical = true;
+    const compare: Record<
+        string,
+        { compared: number; identical: number; identicalTurns: number; first: string | null }
+    > = {};
     for (const [k, run] of others.entries()) {
         const mode = modes[k + 1];
+        const counts = (compare[mode] = { compared: 0, identical: 0, identicalTurns: 0, first: null as string | null });
         if (run.winner !== reference.winner || run.laps !== reference.laps) {
             identical = false;
             totals.failures.push(
@@ -324,16 +380,22 @@ for (let index = 0; index < battles; index += 1) {
             const a = reference.decisions[i];
             const b = run.decisions[i];
             totals.decisions += 1;
-            if (a.unit === b.unit && a.team === b.team && a.actions === b.actions) totals.identicalDecisions += 1;
-            else {
+            counts.compared += 1;
+            if (a.unit === b.unit && a.team === b.team && a.actions === b.actions) {
+                totals.identicalDecisions += 1;
+                counts.identical += 1;
+            } else {
                 identical = false;
+                counts.first = `decision ${i}: ${b.actions.slice(0, 300)} vs ${a.actions.slice(0, 300)}`;
                 totals.failures.push(
                     `seed ${seed} ${mode} decision ${i}: ${a.actions.slice(0, 140)} vs ${b.actions.slice(0, 140)}`,
                 );
                 break;
             }
-            if (a.turns === b.turns) totals.identicalTurns += 1;
-            else totals.failures.push(`seed ${seed} ${mode} decision ${i}: rollout turns ${b.turns} vs ${a.turns}`);
+            if (a.turns === b.turns) {
+                totals.identicalTurns += 1;
+                counts.identicalTurns += 1;
+            } else totals.failures.push(`seed ${seed} ${mode} decision ${i}: rollout turns ${b.turns} vs ${a.turns}`);
         }
     }
     if (identical) totals.identicalBattles += 1;
@@ -354,6 +416,12 @@ for (let index = 0; index < battles; index += 1) {
         winner: reference.winner,
         laps: reference.laps,
         searchMs: Object.fromEntries(runs.map((run, k) => [modes[k], Math.round(run.searchMs)])),
+        // per mode, for scripts that report each mode on its own (identity against the first mode, the drivers' native
+        // statistics, every decision's wall time)
+        compare,
+        decisionsByMode: Object.fromEntries(runs.map((run, k) => [modes[k], run.decisions.length])),
+        stats: Object.fromEntries(runs.map((run, k) => [modes[k], run.native])),
+        ms: Object.fromEntries(runs.map((run, k) => [modes[k], run.decisions.map((d) => Math.round(d.ms * 10) / 10)])),
     };
     if (outPath) appendFileSync(outPath, `${JSON.stringify(row)}\n`);
     console.error(
