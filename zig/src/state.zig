@@ -97,6 +97,8 @@ pub const SpellId = enum(u8) {
     fireforged_sword,
     /// The Wandering Mage's MIND debuff (wave 2): the holder's luck pinned at -10 (0 when luck-buffed), no lap roll.
     misfortune,
+    /// The Healer's cast buff (wave 2): armor_mod becomes a share of base armor, (power / 100) x (1 + the flyer share).
+    spiritual_armor,
     /// The Blacksmith's runes (wave 2): never-ticking buff rows (laps 15) whose first stored property is the stacked
     /// bonus N, added flat to armor_mod / attack_mod.
     armor_rune,
@@ -230,6 +232,7 @@ pub const SpellId = enum(u8) {
             .sylvan_focus_blessing => "Sylvan Focus Blessing",
             .fireforged_sword => "Fireforged Sword",
             .misfortune => "Misfortune",
+            .spiritual_armor => "Spiritual Armor",
             .armor_rune => "Armor Rune",
             .weapon_rune => "Weapon Rune",
             .freeze => "Freeze",
@@ -652,7 +655,7 @@ pub const AbilityId = enum(u8) {
     /// A SPELLBOOK card (unit.ts SPELLBOOK_SPELL_NAMES): whether it owns the charges of `spell`.
     pub fn ownsSpell(self: AbilityId, spell: CastSpell) bool {
         return switch (self) {
-            .book_of_healing => spell == .heal or spell == .blessing,
+            .book_of_healing => spell == .heal or spell == .blessing or spell == .spiritual_armor or spell == .mass_heal,
             .forest_spellbook => spell == .summon_wolves,
             .basic_tome_of_battle_magic => spell == .fire_strike or spell == .meteorite,
             .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower,
@@ -749,6 +752,9 @@ pub const CastSpell = enum(u8) {
     craft,
     armor_rune,
     weapon_rune,
+    // wave 2a: the Healer's Book of Healing
+    spiritual_armor,
+    mass_heal,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -772,6 +778,8 @@ pub const CastSpell = enum(u8) {
             .craft => "Craft",
             .armor_rune => "Armor Rune",
             .weapon_rune => "Weapon Rune",
+            .spiritual_armor => "Spiritual Armor",
+            .mass_heal => "Mass Heal",
         };
     }
 
@@ -794,6 +802,7 @@ pub const CastSpell = enum(u8) {
             .wind_flow => .wind_flow,
             .armor_rune => .armor_rune,
             .weapon_rune => .weapon_rune,
+            .spiritual_armor => .spiritual_armor,
             else => null,
         };
     }

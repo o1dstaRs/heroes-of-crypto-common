@@ -616,6 +616,7 @@ pub fn castSpell(s: *State, ci: u8, spell_raw: u8, target: ?u8, cell: ?Cell, eve
     }
     if (ti == null and spell == .summon_wolves and cfg.target == ST.RANDOM_CLOSE_TO_CASTER) return summonSpell(s, ci, spell, cfg, cell, events);
     if (ti == null and cfg.target == ST.ALL_ALLIES and cfg.power_type != SP.HEAL) return massCastSpell(s, ci, spell, cfg, events);
+    if (ti == null and cfg.target == ST.ALL_ALLIES) return massHeal(s, ci, spell, cfg, events);
     if (ti == null and cfg.target == ST.ALL_FLYING) return massCastOnFlyers(s, ci, spell, cfg, events);
     if (ti == null and cfg.target == ST.ALLIES_AREA) return craftCast(s, ci, spell, cfg, cell, events);
     if (ti == null and (cfg.target == ST.ALL_ALLIES or cfg.target == ST.ALL_ENEMIES)) {
@@ -805,6 +806,36 @@ fn alreadyAppliedBuff(u: *const Unit, spell: CS, cfg: *const st.SpellConfig) boo
 /// then every ally in holder order (the caster included) with magic resist other than 100 that does not carry it yet
 /// gets the buff appended: power = the caster's creatures alive for UNIT_AMOUNT (else the config's), laps + 1 on the
 /// caster; then the charge and completeTurn. No draw.
+/// massCastSpell's ALL_ALLIES HEAL branch (Mass Heal): canMassCastSpell (some unit of the team, holder order, whose front
+/// creature is hurt and whose magic resist is not 100; Mechanism is not tested), then every unit of the team in holder
+/// order with magic resist other than 100 that can be healed (no active Mechanism) gains floor(power x caster alive) hp,
+/// capped at its max (no morale factor; Holy Cross is disabled); the charge after the heals; completeTurn.
+fn massHeal(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, events: *Events) Reject!void {
+    const team = s.units[ci].team;
+    var castable = false;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.team != team) continue;
+        if (u.hp < u.max_hp and engine.getMagicResist(u) != 100) {
+            castable = true;
+            break;
+        }
+    }
+    if (!castable) return error.Rejected; // spell_not_available
+    const amount = @floor(cfg.power * s.units[ci].amount_alive);
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.team != team or engine.getMagicResist(u) == 100 or u.has(.mechanism)) continue;
+        // Unit.applyHeal: the front creature only, never a revival.
+        if (amount > 0) {
+            u.hp += amount;
+            if (u.hp > u.max_hp) u.hp = u.max_hp;
+        }
+    }
+    useSpell(&s.units[ci], spell);
+    engine.completeTurn(s, ci, false, false, events);
+}
+
 fn massCastSpell(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, events: *Events) Reject!void {
     if (!canMassCastSpell(s, ci, spell, cfg)) return error.Rejected; // spell_not_available
     const id = spell.applied() orelse {

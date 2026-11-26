@@ -649,12 +649,15 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     u.base_armor = js.roundUnitStat(u.base_armor * base_armor_multiplier, 2);
     const shatter = u.effects.power(.shatter_armor) orelse 0;
     u.armor_mod = if (shatter > 0) -shatter else u.init.armor_mod;
-    // Nature's flyer armor: a flying creature (grounded or not) gets a share of its final base armor as armor_mod;
-    // an active Shatter Armor is subtracted twice.
-    if (u.movement_type == st.Movement.FLY and syn.fly_armor > 0) {
-        const armor_mod_multiplier = syn.fly_armor / 100;
-        u.armor_mod = js.roundUnitStat(@max(u.base_armor - shatter, 1) * armor_mod_multiplier - shatter, 2);
+    // Nature's flyer armor (a flying creature, grounded or not) and Spiritual Armor (the first row of the name:
+    // (power / 100) x (1 + the flyer share)) make armor_mod a share of the final base armor; an active Shatter Armor is
+    // subtracted twice.
+    var armor_mod_multiplier: f64 = 0;
+    if (u.movement_type == st.Movement.FLY and syn.fly_armor > 0) armor_mod_multiplier = syn.fly_armor / 100;
+    if (u.buffs.len != 0) {
+        if (u.buffs.get(.spiritual_armor)) |sa| armor_mod_multiplier = (sa.power / 100) * (1 + armor_mod_multiplier);
     }
+    if (armor_mod_multiplier != 0) u.armor_mod = js.roundUnitStat(@max(u.base_armor - shatter, 1) * armor_mod_multiplier - shatter, 2);
     // Veteran Helm: a share of the final base armor (no outer rounding); then Titan Plate's captured share (rounded).
     if (s.artifacts) artifacts.armorMod(u, art, titan_bonus);
     // Angelic Host's power (rounded), after the artifacts' armor_mod terms.
