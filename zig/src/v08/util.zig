@@ -891,7 +891,8 @@ pub fn valueFeaturesV2(s: *const State, team: u8, out: *[VALUE_FEATURES_V2]f64) 
     for (0..30) |i| out[30 + i] = if (rangedness != 0) out[i] * rangedness else 0;
 }
 
-extern "c" fn exp(x: f64) f64;
+/// Math.exp (cmath.zig: glibc's on Linux, not the bundled compiler-rt exp).
+const cExp = @import("../cmath.zig").cExp;
 
 /// SearchDriver.leafValue with the production V2 model (V08_A13_VALUE_LEAF) and no research logit adjustments:
 /// P(win) for `team`. Math.exp is the C library's exp, as JavaScriptCore's is.
@@ -901,7 +902,7 @@ pub fn leafV2(s: *const State, team: u8) f64 {
     valueFeaturesV2(s, team, &f);
     var z = W.LEAF_V2_B;
     for (0..VALUE_FEATURES_V2) |i| z += W.LEAF_V2_W[i] * f[i];
-    return 1 / (1 + exp(-z));
+    return 1 / (1 + cExp(-z));
 }
 
 pub const WAIT_FEATURES = 41;

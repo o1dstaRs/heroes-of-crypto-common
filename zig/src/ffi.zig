@@ -773,9 +773,10 @@ export fn hoc_rollout_pairs(eng: ?*const Engine, out: ?[*]rollout.PairRecord, ca
 
 /// libc's `exp`, the one the learned leaves' sigmoid calls (rollout.zig, v08/util.zig): the bridge's self-test compares
 /// it with the runtime's Math.exp on a fixed table, because exact ties decide choices.
-extern "c" fn exp(x: f64) f64;
+/// Math.exp (cmath.zig: glibc's on Linux, not the bundled compiler-rt exp).
+const cExp = @import("cmath.zig").cExp;
 export fn hoc_exp(x: f64) f64 {
-    return exp(x);
+    return cExp(x);
 }
 
 // ---- build identity and scope manifest -----------------------------------------------------------------------------

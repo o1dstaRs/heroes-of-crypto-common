@@ -686,7 +686,8 @@ fn recoverNoopTurn(s: *State, ui: u8, sim: *Sim) void {
     if (!advanced and !sim.finished and s.active == ui) _ = sim.apply(s, .{ .defend_turn = .{ .unit = ui } });
 }
 
-extern "c" fn exp(x: f64) f64;
+/// Math.exp (cmath.zig: glibc's on Linux, not the bundled compiler-rt exp).
+const cExp = @import("cmath.zig").cExp;
 
 /// DEFAULT_V07_VALUE_WEIGHTS (src/simulation/v0_7_value_weights.ts), the 20-feature LiveTwin leaf.
 pub const LEAF_V1_B: f64 = 0.13187;
@@ -709,7 +710,7 @@ fn learnedLeaf(kind: LeafKind, s: *const State, team: u8) f64 {
     v08util.valueFeatures(s, team, &f);
     var z = LEAF_V1_B;
     for (0..v08util.VALUE_FEATURES) |i| z += LEAF_V1_W[i] * f[i];
-    return 1 / (1 + exp(-z));
+    return 1 / (1 + cExp(-z));
 }
 
 /// leafValue with the request's model: the exact terminal result when asked for, else `kind`'s P(win) for `team`

@@ -37,10 +37,15 @@ cd zig && zig build lib -Drelease=true -Dtarget=x86_64-linux-gnu.2.35 -Dcpu=x86_
 
 Every artifact links the C library: the learned leaves' sigmoid calls libc's `exp`, because Bun's `Math.exp` is the
 platform libm's and exact ties decide choices. On Linux build against the system glibc (`x86_64-linux-gnu`, dynamic),
-never static musl, whose `exp` can differ in the last bit. Checked on the 9800X3D (glibc 2.39, Bun 1.4.5) on
-2026-11-25: Bun's `Math.exp` equals glibc's `exp` (through bun:ffi) on 4,000,010 inputs, and the cross-built `.so`
-returned 2,560 of 2,560 rollout values (v1 and v2 leaves) and 160 of 160 turn counts bit-identical to the macOS
-library on the same requests. The production host was not checked; repeat the check there before relying on it.
+never static musl, whose `exp` can differ in the last bit. A plain `extern "c" fn exp` is NOT enough on Linux: Zig
+bundles compiler-rt into the shared library, and its `exp` (a local `t exp`) satisfies the extern before glibc's libm is
+considered; it differs from glibc in the last bit on about one input in ten (519 of the self-test's 5,138). So every
+`exp` goes through `src/cmath.zig` `cExp`, which binds glibc's `exp` at run time (dlopen("libm.so.6") + dlsym) on
+Linux and is the plain libSystem import on macOS; the library imports dlopen/dlsym@GLIBC_2.34. Checked on the 9800X3D
+(glibc 2.39, Bun 1.4.5) on 2026-11-26 with `-Dtarget=x86_64-linux-gnu.2.35 -Dcpu=x86_64_v3`: the self-test passes (0 of
+5,138), the library's `hoc_exp` equals Bun's `Math.exp` on 2,000,000 inputs, and `ffi/smoke.ts 8` passes (with a Linux
+`hoc-sim` in zig-out/bin: the smoke's play-state step runs the CLI). An earlier note here (2026-11-25) compared Bun with
+glibc's libm directly, not with the library's `exp`, so it did not catch this. Repeat the self-test on each host.
 
 ## The state format (export version 2)
 
