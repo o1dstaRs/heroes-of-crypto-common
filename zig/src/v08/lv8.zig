@@ -997,11 +997,26 @@ pub fn rangedPositioning(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) 
     return true;
 }
 
+/// Unit.getFootprintCellsForAnchor (grid_math getFootprintCellsForAnchor): the anchor's body, dx outer and dy inner
+/// (a 2x2 is (x,y), (x,y-1), (x-1,y), (x-1,y-1), unlike the AI's footprintCellsForAnchor order).
+fn gridFootprint(u: *const st.Unit, a: rec.Cell) engine.Cells {
+    var out: engine.Cells = .{};
+    var dx: i32 = 0;
+    while (dx < @max(1, u.fw)) : (dx += 1) {
+        var dy: i32 = 0;
+        while (dy < @max(1, u.fh)) : (dy += 1) out.push(.{ .x = a.x - dx, .y = a.y - dy });
+    }
+    return out;
+}
+
 /// a19CoherentMeleeApproach (on unless A19_COHERENT_MELEE_APPROACH_<SIDE>=0): a move followed by a strike from a cell
-/// the move does not reach is repaired. Ported only where it leaves the decision unchanged (no such move, or the move
-/// ends on the strike's footprint); a repair returns false (not ported).
+/// the move does not reach (an aura or Rapid Charge reposition replaced the strike, not the move) is repaired: the move
+/// is rebuilt to the strike's stand cell and the strike made stationary; a strike from the current cell drops the stale
+/// move; an approach the engine would not allow keeps the actions up to the move and drops the strike. Hidden, No
+/// Melee, Terrifying Gaze, Cowardice and Fire Walls (repairUnavailableMovePrefixedAttack) are not in scope.
 pub fn coherentMelee(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
     util.copyDecision(out, in);
+    const s = c.s;
     const acts = in.slice();
     var strike: ?usize = null;
     for (acts, 0..) |a, i| if (a == .melee_attack and a.melee_attack.attacker == c.ui) {
@@ -1016,15 +1031,75 @@ pub fn coherentMelee(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool
     };
     const mi = move orelse return true;
     const u = c.unit();
-    const desired = ai.footprintForAnchor(u, acts[si].melee_attack.attack_from);
+    const hit = acts[si].melee_attack;
+    const desired = gridFootprint(u, hit.attack_from);
     const m = acts[mi].move_unit;
+    // resolveMoveTargetCells: the supplied cells, else the body at the path's end, else none.
     var old_buf: engine.Cells = .{};
-    const old: []const rec.Cell = if (m.target_cells.len > 0) m.target_cells else blk: {
-        if (m.path.len == 0) return false;
-        old_buf = ai.footprintForAnchor(u, m.path[m.path.len - 1]);
+    const old: []const rec.Cell = if (m.target_cells.len > 0) m.target_cells else if (m.path.len > 0) blk: {
+        old_buf = gridFootprint(u, m.path[m.path.len - 1]);
         break :blk old_buf.slice();
+    } else &.{};
+    if (sameFootprint(old, desired.slice())) return true;
+
+    // preserveMove: the actions up to and including the move.
+    const t = &s.units[hit.target];
+    var forced_other = false;
+    if (u.target >= 0) {
+        const f = &s.units[@intCast(u.target)];
+        if (f.in_holder and !f.isDead() and u.target != @as(i8, @intCast(hit.target))) forced_other = true;
+    }
+    const tc = engine.unitCells(t);
+    if (!t.in_holder or t.isDead() or t.team == u.team or forced_other or !ai.adjacent(desired.slice(), tc.slice())) {
+        out.n = @intCast(mi + 1);
+        return true;
+    }
+    const stationary = rec.Action{ .melee_attack = .{ .attacker = hit.attacker, .target = hit.target, .attack_from = hit.attack_from, .path = &.{} } };
+    // The rebuilt decision owns its cells: any other action carrying cells is not expected (refuse rather than alias).
+    for (acts, 0..) |a, i| {
+        if (i == mi or i == si) continue;
+        switch (a) {
+            .move_unit => |x| if (x.path.len > 0 or x.target_cells.len > 0) return false,
+            .melee_attack => |x| if (x.path.len > 0) return false,
+            .obstacle_attack => |x| if (x.path.len > 0) return false,
+            else => {},
+        }
+    }
+    const base = engine.baseCell(u);
+    var d: ai.Decision = .{};
+    if (ai.sameCell(base, hit.attack_from)) {
+        // The strike is from the current cell: drop the stale move.
+        for (acts, 0..) |a, i| {
+            if (i == mi) continue;
+            d.push(if (i == si) stationary else a);
+        }
+        util.copyDecision(out, &d);
+        return true;
+    }
+    if (!u.canMove()) {
+        out.n = @intCast(mi + 1);
+        return true;
+    }
+    const mp = c.actualPath();
+    const r = mp.get(path.key(hit.attack_from.x, hit.attack_from.y)) orelse {
+        out.n = @intCast(mi + 1);
+        return true;
     };
-    return sameFootprint(old, desired.slice());
+    if (!engine.cellsFreeFor(s, c.ui, desired.slice())) {
+        out.n = @intCast(mi + 1);
+        return true;
+    }
+    // The aligned approach: the move along the route to the stand cell, then the stationary strike.
+    for (acts, 0..) |a, i| {
+        if (i == mi) {
+            const len = mp.routeCells(r, &d.path);
+            const body = desired.slice();
+            @memcpy(d.targets[0..body.len], body);
+            d.push(.{ .move_unit = .{ .unit = m.unit, .path = d.path[0..len], .target_cells = d.targets[0..body.len], .has_lava = r.has_lava } });
+        } else d.push(if (i == si) stationary else a);
+    }
+    util.copyDecision(out, &d);
+    return true;
 }
 
 /// The passes after v0.7, in decideTurn's order; false when a pass this board needs is not ported (cemetery with
