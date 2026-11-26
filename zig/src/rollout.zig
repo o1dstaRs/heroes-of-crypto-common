@@ -10,10 +10,13 @@
 //! -Infinity), defend when nothing landed, end the turn, then every unit plays its policy forward to the horizon (turns:
 //! N unit turns; lap: until the lap flips, at most 64; reply: until the opponent has played once, at most 12; leaf:
 //! none), and score the leaf as P(win) for the acting team (`material`, `v1` or `v2`, with `exactTerminal`). Summons
-//! keep counting across the rollouts of one call (TypeScript restores neither runMatch's createSummonedUnit counter nor
-//! lib.ts deterministicUuidSequence per rollout). A policy turn that lands nothing takes the recovery net
-//! (advanceTowardEnemyAction, else defend), and a stalled queue forceStalledLap. Not ported (the call fails rather than
-//! guess): the research logit adjustments and an opponent model. See zig/BRIDGE.md.
+//! keep counting across the rollouts of one call (SearchDriver.rollout called directly restores neither runMatch's
+//! createSummonedUnit counter nor lib.ts deterministicUuidSequence per rollout); `Request.bank` gives a call
+//! scoreCandidates' bank semantics instead (ABI 3: the -Infinity break, runMatch's per-rollout summon restore, the A19
+//! material sample, the offline hopeless-tail bound) and `runRecords` reports every pair (`PairRecord`). A policy turn
+//! that lands nothing takes the recovery net (advanceTowardEnemyAction, else defend), and a stalled queue
+//! forceStalledLap. Not ported (the call fails rather than guess): the research logit adjustments and an opponent model.
+//! See zig/BRIDGE.md.
 
 const std = @import("std");
 const rec = @import("recording.zig");
@@ -24,6 +27,7 @@ const rng_mod = @import("rng.zig");
 const uuid = @import("uuid.zig");
 const v08policy = @import("v08/policy.zig");
 const v08util = @import("v08/util.zig");
+const scope = @import("scope.zig");
 const Rng = rng_mod.Rng;
 
 const State = st.State;
@@ -72,46 +76,72 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
             if (!v08Castable(b.spell)) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
         }
         // Batch 6a is not in src/v08 yet: its cards (stolen ones too), its rows (a Hamstrung flyer, Blindness,
-        // Paralysis, Wind Flow and the blessings outlive their source) and a revive's orphan augment rows.
-        if (u.ability_mask & st.AbilityId.BATCH6A_MASK != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-6a ability", .{i}) catch "batch 6a";
-        if (u.aug_orphans != 0) return std.fmt.bufPrint(buf, "slot {d} was revived", .{i}) catch "batch 6a";
-        if (batch6aRow(u)) |id| return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 6a";
+        // Paralysis, Wind Flow and the blessings outlive their source) and a revive's orphan augment rows
+        // (V08_SCOPE's tables).
+        if (u.ability_mask & V08_SCOPE.refused_abilities != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-6a ability", .{i}) catch "batch 6a";
+        if (V08_SCOPE.refuse_revived and u.aug_orphans != 0) return std.fmt.bufPrint(buf, "slot {d} was revived", .{i}) catch "batch 6a";
+        if (refusedRow(u)) |id| return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 6a";
     }
     // Artifacts: the engine plays the stat artifacts (artifacts.zig), but src/v08 is not checked on them yet (lv8's
     // explicit-rate damage bound has no Warlord's Edge re-price), so a v0.8 seat stays out of scope with any row.
-    if (s.artifacts) return "artifact rows (src/v08 not checked on artifacts)";
+    if (V08_SCOPE.refuse_artifact_rows and s.artifacts) return "artifact rows (src/v08 not checked on artifacts)";
     // Smoke halves shots through it; src/v08 does not read the store yet.
-    if (s.fight.n_smoke != 0) return "smoke clouds on the board";
+    if (V08_SCOPE.refuse_smoke and s.fight.n_smoke != 0) return "smoke clouds on the board";
     // Wave-2 rows that outlive their casters (src/v08 does not read them yet): the Sword's burns, Misfortune's luck pin,
-    // the runes, Freeze and the crafted cards.
+    // Whirlpool, the runes, Freeze and the crafted cards (V08_SCOPE.late).
+    const late = V08_SCOPE.late;
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
-        if (u.ability_mask & (st.AbilityId.crafted_double_punch.bit() | st.AbilityId.crafted_double_shot.bit() |
-            st.AbilityId.crafted_frozen_sword.bit() | st.AbilityId.crafted_frozen_bow.bit()) != 0) return "a crafted card";
-        if (u.buffs.len != 0 and (u.buffs.find(.fireforged_sword) != null or u.buffs.find(.armor_rune) != null or u.buffs.find(.weapon_rune) != null)) return "a wave-2 buff";
-        if (u.debuffs.len != 0 and (u.debuffs.find(.misfortune) != null or u.debuffs.find(.whirlpool) != null)) return "a wave-2 debuff";
-        if (u.effects.len != 0 and u.effects.find(.freeze) != null) return "a Freeze effect";
+        if (u.ability_mask & late.abilities != 0) return "a crafted card";
+        if (u.buffs.len != 0 and scope.carries(u.buffs.items[0..u.buffs.len], late.buffs)) return "a wave-2 buff";
+        if (u.debuffs.len != 0 and scope.carries(u.debuffs.items[0..u.debuffs.len], late.debuffs)) return "a wave-2 debuff";
+        if (u.effects.len != 0 and scope.carries(u.effects.items[0..u.effects.len], late.effects)) return "a Freeze effect";
     }
     return null;
 }
 
-/// A batch-6a row on the unit (a debuff, an effect or a buff), if any.
-fn batch6aRow(u: *const st.Unit) ?st.SpellId {
-    for (u.debuffs.items[0..u.debuffs.len]) |d| if (d.id == .hamstrung or d.id == .war_anger_aura) return d.id;
-    for (u.effects.items[0..u.effects.len]) |e| if (e.id == .blindness or e.id == .paralysis) return e.id;
-    for (u.buffs.items[0..u.buffs.len]) |b| if (b.id.isBatch6Stat()) return b.id;
+/// A row V08_SCOPE refuses on the unit (a debuff, then an effect, then a buff: the batch-6a rows), if any.
+fn refusedRow(u: *const st.Unit) ?st.SpellId {
+    for (u.debuffs.items[0..u.debuffs.len]) |d| if (scope.listed(V08_SCOPE.refused_debuffs, d.id)) return d.id;
+    for (u.effects.items[0..u.effects.len]) |e| if (scope.listed(V08_SCOPE.refused_effects, e.id)) return e.id;
+    for (u.buffs.items[0..u.buffs.len]) |b| if (scope.listed(V08_SCOPE.refused_buffs, b.id)) return b.id;
     return null;
 }
 
 /// The castables src/v08 decides: the wave-1 spells and the batch-4 castables. A whitelist: every other spell (wave 2,
 /// whatever joins `st.CastSpell` later) keeps a board out of v0.8 rollouts until src/v08 decides it and joins this list.
-const V08_CASTABLE = [_]st.CastSpell{
+pub const V08_CASTABLE = [_]st.CastSpell{
     .heal,          .blessing,   .lightning_strike, .fire_strike, .meteor_shower,     .meteorite,
     .summon_wolves, .vine_throw, .ring_of_fire,     .battle_roar, .wild_regeneration,
 };
 
+/// v08Scope's tables, which the scope manifest exports (scope.zig): the castables, the batch-6a cards and rows
+/// (Hamstrung and War Anger debuffs, Blindness and Paralysis effects, the batch-6 stat buffs `isBatch6Stat`), a revive's
+/// orphan augment rows, the artifact rows (State.artifacts: scope.artifactRowBuff / artifactRowDebuff), the smoke
+/// clouds, and (`late`, checked after those) the wave-2 cards and rows that outlive their casters.
+pub const V08_SCOPE = scope.PolicyScope{
+    .name = "v0.8",
+    .castable = &V08_CASTABLE,
+    .refused_abilities = st.AbilityId.BATCH6A_MASK,
+    .refused_debuffs = &.{ .hamstrung, .war_anger_aura },
+    .refused_effects = &.{ .blindness, .paralysis },
+    .refused_buffs = scope.spellIdsWhere(st.SpellId.isBatch6Stat),
+    .refuse_revived = true,
+    .refuse_artifact_rows = true,
+    .refuse_smoke = true,
+    .late = .{
+        .abilities = st.AbilityId.crafted_double_punch.bit() | st.AbilityId.crafted_double_shot.bit() | st.AbilityId.crafted_frozen_sword.bit() | st.AbilityId.crafted_frozen_bow.bit(),
+        .buffs = &.{ .fireforged_sword, .armor_rune, .weapon_rune },
+        .debuffs = &.{ .misfortune, .whirlpool },
+        .effects = &.{.freeze},
+    },
+};
+
+/// The v0.1 policy takes every board the loader takes.
+pub const V01_SCOPE = scope.PolicyScope{ .name = "v0.1" };
+
 fn v08Castable(spell: u8) bool {
-    for (V08_CASTABLE) |c| {
+    for (V08_SCOPE.castable.?) |c| {
         if (@intFromEnum(c) == spell) return true;
     }
     return false;
@@ -216,7 +246,90 @@ pub const Request = struct {
     summon_sequence: ?u32 = null,
     uuid_sequence: ?u64 = null,
     id_scheme: st.IdScheme = .match,
+    /// scoreCandidates' bank semantics (the request's `bank`, ABI 3); the defaults are ABI 2's plain pair loop.
+    bank: Bank = .{},
 };
+
+/// How one call reproduces a SearchDriver.scoreCandidates bank (search_driver.ts): the pairs must then be
+/// candidate-major (every pair of a candidate before the next candidate's), as the bank's loops are.
+pub const Bank = struct {
+    /// The `break` after an illegal (-Infinity) rollout: the candidate's later pairs are not played (no turns, no
+    /// summons, no uuid values).
+    skip_after_illegal: bool = false,
+    /// runMatch's captureAuxiliaryState, restored after every rollout of a bank: each rollout starts from the
+    /// request's summon sequence instead of the previous rollout's (the server has no such counter: "call").
+    summon_per_rollout: bool = false,
+    /// The A19 material sample after every finite rollout (scoreCandidates' captureMaterial: "turns" banks with
+    /// captureA19Material), in `PairRecord.material`.
+    material: bool = false,
+    /// The offline hopeless-tail bound (remainingRolloutsCannotWin) with one reference for every candidate of the call
+    /// (a caller whose reference moves between candidates calls once per candidate).
+    tail: ?TailBound = null,
+};
+
+/// remainingRolloutsCannotWin(sum, completed, count, reference, margin) after each finite rollout of a candidate:
+/// the candidate's later pairs are skipped. Off for the rest of the call once a leaf is not in [0, 1]
+/// (scoreCandidates' leafOutsideUnitInterval).
+pub const TailBound = struct {
+    reference: f64,
+    margin: f64,
+    /// The bank's rolloutCount (the bound's divisor).
+    count: u32,
+};
+
+/// What happened to one pair of a call (`PairRecord.flags`).
+pub const PairFlag = struct {
+    pub const PLAYED: u32 = 0;
+    /// Not played: an earlier rollout of its candidate was illegal (Bank.skip_after_illegal).
+    pub const SKIPPED_ILLEGAL: u32 = 1;
+    /// Cut by the deadline or the turn budget (its turns are counted, its value is not).
+    pub const ABORTED: u32 = 2;
+    /// Not reached: the call stopped before it.
+    pub const NOT_REACHED: u32 = 3;
+    /// Not played: the tail bound said its candidate cannot win (Bank.tail).
+    pub const SKIPPED_TAIL: u32 = 4;
+};
+
+/// One pair's outcome, in request order (C layout, 40 bytes: hoc_rollout_pairs copies these).
+pub const PairRecord = extern struct {
+    /// The leaf value, -Infinity for a rejected candidate, NaN when the pair was not played.
+    value: f64 = std.math.nan(f64),
+    /// The A19 material sample (Bank.material and a finite value), else NaN.
+    material: f64 = std.math.nan(f64),
+    /// Rollout turns the pair played (an aborted one included).
+    turns: u32 = 0,
+    flags: u32 = PairFlag.NOT_REACHED,
+    /// The summon counters after the pair (runMatch's createSummonedUnit counter, lib.ts deterministicUuidSequence): as
+    /// the rollout left them, before Bank.summon_per_rollout restores the summon sequence (a skipped pair: the counters
+    /// the next pair starts from).
+    summon_seq: u32 = 0,
+    /// The fight_finished team inside the rollout (0 = none), -1 when the fight did not finish.
+    winner: i32 = -1,
+    uuid_seq: u64 = 0,
+};
+
+/// SearchDriver.scoreCandidates' material sample: 0.5 * (1 + (ours - enemy) / (ours + enemy + 1000)) with each living
+/// unit's strength exp * cumulativeHp / max(1, maxHp), in holder order (unitsHolder.getAllUnits()).
+pub fn materialSample(s: *const State, team: u8) f64 {
+    var ours: f64 = 0;
+    var enemy: f64 = 0;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.isDead()) continue;
+        const strength = (u.exp * v08util.cumulativeHp(u)) / @max(1.0, u.max_hp);
+        if (u.team == team) ours += strength else enemy += strength;
+    }
+    return 0.5 * (1 + (ours - enemy) / (ours + enemy + 1000));
+}
+
+/// remainingRolloutsCannotWin (search_driver.ts): every unplayed leaf in [0, 1] still leaves the candidate strictly
+/// more than `margin` below `best`.
+pub fn remainingRolloutsCannotWin(sum: f64, completed: u32, count: u32, best: f64, margin: f64) bool {
+    if (!std.math.isFinite(sum) or !std.math.isFinite(best) or !std.math.isFinite(margin) or margin < 0 or completed < 1 or count < 2 or completed >= count) return false;
+    const remaining: f64 = @floatFromInt(count - completed);
+    const max_mean = (sum + remaining) / @as(f64, @floatFromInt(count));
+    return max_mean + margin < best;
+}
 
 pub const Stop = enum(i32) { done = 0, deadline = 1, turn_budget = 2, out_full = 3 };
 
@@ -441,6 +554,8 @@ const Sim = struct {
 const Session = struct {
     tables: Tables = .{},
     chance: ActorChance = .{},
+    /// The last rollout's fight_finished team, -1 when its fight did not finish (PairRecord.winner).
+    winner: i32 = -1,
     /// The policy calls of this rollout (Request.drop_decisions).
     decisions: u32 = 0,
 };
@@ -626,12 +741,17 @@ pub fn rollout(s: *State, req: *const Request, cand: *const Candidate, r: u32, c
 }
 
 fn rolloutIn(s: *State, req: *const Request, cand: *const Candidate, r: u32, ctl: *Control, ses: *Session) Error!?f64 {
+    var sim: Sim = .{};
+    defer ses.winner = if (sim.finished) sim.winner else -1;
+    return rolloutBody(s, req, cand, r, ctl, ses, &sim);
+}
+
+fn rolloutBody(s: *State, req: *const Request, cand: *const Candidate, r: u32, ctl: *Control, ses: *Session, sim: *Sim) Error!?f64 {
     if (ctl.expired()) return null;
     s.rng = Rng.init(plainSeed(req.seed_base, r));
     if (req.chance == .antithetic) ses.chance.begin(s, req.identity.?, toUint32(req.seed_base), r);
     ses.tables.reset();
     ses.decisions = 0;
-    var sim: Sim = .{};
     const actor = req.actor;
     s.active = @intCast(actor);
     const acting = s.units[actor].team;
@@ -672,7 +792,7 @@ fn rolloutIn(s: *State, req: *const Request, cand: *const Candidate, r: u32, ctl
         if (ctl.expired()) return null;
         if (req.horizon == .lap and s.fight.lap > start_lap) break;
         if (s.active < 0) {
-            try simAdvance(s, &sim);
+            try simAdvance(s, sim);
             if (sim.finished or s.active < 0) break;
         }
         const ui: u8 = @intCast(s.active);
@@ -681,7 +801,7 @@ fn rolloutIn(s: *State, req: *const Request, cand: *const Candidate, r: u32, ctl
             s.active = -1;
             continue;
         }
-        try simPlayTurn(s, ui, req, &sim, ses, enemy_team);
+        try simPlayTurn(s, ui, req, sim, ses, enemy_team);
         turns += 1;
         ctl.turns += 1;
         if (req.horizon == .reply and s.units[ui].team == enemy_team) break;
@@ -692,9 +812,17 @@ fn rolloutIn(s: *State, req: *const Request, cand: *const Candidate, r: u32, ctl
 }
 
 /// Every (candidate, r) pair of the request in order, each on a fresh copy of `root` made in `scratch` (the summon
-/// counters carry over from one rollout to the next); writes one value per pair into `out` and returns how many it
-/// wrote (a prefix when the deadline, the turn budget or `out` stops it). `ctl` ends with the counters.
+/// counters carry over from one rollout to the next unless `req.bank` restores them); writes one value per pair into
+/// `out` and returns how many it wrote (a prefix when the deadline, the turn budget or `out` stops it). `ctl` ends with
+/// the counters.
 pub fn run(root: *const State, scratch: *State, req: *const Request, out: []f64, ctl: *Control) Error!usize {
+    return runRecords(root, scratch, req, out, ctl, &.{});
+}
+
+/// `run`, also filling `records` (one per request pair while it lasts, in pair order; entries past the stop stay
+/// NOT_REACHED). With `req.bank` the call is one scoreCandidates bank (or a candidate-major slice of one): a skipped
+/// pair counts as written (value NaN in `out`, its flag in the record) and plays nothing.
+pub fn runRecords(root: *const State, scratch: *State, req: *const Request, out: []f64, ctl: *Control, records: []PairRecord) Error!usize {
     // Every rollout turn decides with a fresh DecisionPathCatalog (search_driver.ts simPlayTurn).
     const saved_catalog = ai.catalog_decisions;
     ai.catalog_decisions = true;
@@ -702,28 +830,79 @@ pub fn run(root: *const State, scratch: *State, req: *const Request, out: []f64,
     try requireIdentity(req);
     var ses: Session = .{};
     ses.tables.init(root, req);
-    var summon_seq = req.summon_sequence orelse root.summon_seq;
+    const summon_start = req.summon_sequence orelse root.summon_seq;
+    var summon_seq = summon_start;
     var uuid_seq = req.uuid_sequence orelse root.uuid_seq;
     defer {
         ctl.summon_sequence = summon_seq;
         ctl.uuid_sequence = uuid_seq;
         scratch.rng.keyed = null;
     }
+    for (records) |*rc| rc.* = .{};
+    const bank = req.bank;
+    const acting_team = root.units[req.actor].team;
+    // scoreCandidates' per-candidate loop state (pairs are candidate-major when a bank skips).
+    const NONE = std.math.maxInt(u32);
+    var cur_cand: u32 = NONE;
+    var skip: u32 = PairFlag.PLAYED;
+    var cand_sum: f64 = 0;
+    var cand_done: u32 = 0;
+    var outside_unit = false;
     var written: usize = 0;
-    for (req.pairs) |p| {
+    for (req.pairs, 0..) |p, i| {
         if (written >= out.len) {
             ctl.stop = .out_full;
             break;
         }
+        if (p[0] != cur_cand) {
+            cur_cand = p[0];
+            skip = PairFlag.PLAYED;
+            cand_sum = 0;
+            cand_done = 0;
+        }
+        if (skip != PairFlag.PLAYED) {
+            out[written] = std.math.nan(f64);
+            if (i < records.len) records[i] = .{ .flags = skip, .summon_seq = summon_seq, .uuid_seq = uuid_seq };
+            written += 1;
+            continue;
+        }
+        const turns_before = ctl.turns;
         scratch.* = root.*;
         scratch.summon_seq = summon_seq;
         scratch.uuid_seq = uuid_seq;
         scratch.id_scheme = req.id_scheme;
         const v = rolloutIn(scratch, req, &req.candidates[p[0]], p[1], ctl, &ses);
-        summon_seq = scratch.summon_seq;
+        summon_seq = if (bank.summon_per_rollout) summon_start else scratch.summon_seq;
         uuid_seq = scratch.uuid_seq;
-        out[written] = ((try v) orelse break);
+        const turns: u32 = @intCast(ctl.turns - turns_before);
+        const value = (try v) orelse {
+            if (i < records.len) records[i] = .{ .flags = PairFlag.ABORTED, .turns = turns, .summon_seq = scratch.summon_seq, .uuid_seq = uuid_seq, .winner = ses.winner };
+            break;
+        };
+        out[written] = value;
         written += 1;
+        if (i < records.len) {
+            records[i] = .{
+                .value = value,
+                .material = if (bank.material and std.math.isFinite(value)) materialSample(scratch, acting_team) else std.math.nan(f64),
+                .flags = PairFlag.PLAYED,
+                .turns = turns,
+                .summon_seq = scratch.summon_seq,
+                .uuid_seq = uuid_seq,
+                .winner = ses.winner,
+            };
+        }
+        if (value == -std.math.inf(f64)) {
+            if (bank.skip_after_illegal) skip = PairFlag.SKIPPED_ILLEGAL;
+            continue;
+        }
+        cand_sum += value;
+        cand_done += 1;
+        if (!std.math.isFinite(value) or value > 1) {
+            outside_unit = true;
+        } else if (bank.tail) |t| {
+            if (!outside_unit and remainingRolloutsCannotWin(cand_sum, cand_done, t.count, t.reference, t.margin)) skip = PairFlag.SKIPPED_TAIL;
+        }
     }
     return written;
 }
@@ -825,4 +1004,17 @@ test "plain chance seed is (seedBase + r * 0x9e3779b1) >>> 0" {
     try std.testing.expectEqual(@as(u32, @intCast((123456789 + 3 * 2654435761) % 4294967296)), plainSeed(123456789, 3));
     try std.testing.expectEqual(@as(u32, 4294967295), toUint32(-1));
     try std.testing.expectEqual(@as(u32, 5), toUint32(5.9));
+}
+
+test "remainingRolloutsCannotWin matches search_driver.ts" {
+    // 1 of 4 rollouts at 0.1: the best possible mean is (0.1 + 3) / 4 = 0.775
+    try std.testing.expect(remainingRolloutsCannotWin(0.1, 1, 4, 0.8, 0));
+    try std.testing.expect(!remainingRolloutsCannotWin(0.1, 1, 4, 0.775, 0));
+    try std.testing.expect(!remainingRolloutsCannotWin(0.1, 1, 4, 0.8, 0.03));
+    // guards: no rollout yet, a single rollout, all done, a non-finite reference, a negative margin
+    try std.testing.expect(!remainingRolloutsCannotWin(0, 0, 4, 0.9, 0));
+    try std.testing.expect(!remainingRolloutsCannotWin(0.1, 1, 1, 0.9, 0));
+    try std.testing.expect(!remainingRolloutsCannotWin(0.4, 4, 4, 0.9, 0));
+    try std.testing.expect(!remainingRolloutsCannotWin(0.1, 1, 4, -std.math.inf(f64), 0));
+    try std.testing.expect(!remainingRolloutsCannotWin(0.1, 1, 4, 0.9, -1));
 }

@@ -10,4 +10,5 @@ test {
     _ = @import("rollout.zig");
     _ = @import("ffi.zig");
     _ = @import("artifacts.zig");
+    _ = @import("scope.zig");
 }

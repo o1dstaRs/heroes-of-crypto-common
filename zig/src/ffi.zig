@@ -6,6 +6,8 @@
 //! bad input: they return an error code (-1, or null) and `hoc_last_error(engine)` says why.
 
 const std = @import("std");
+const builtin = @import("builtin");
+const build_options = @import("build_options");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
 const engine_mod = @import("engine.zig");
@@ -14,10 +16,17 @@ const snapshot = @import("snapshot.zig");
 const rollout = @import("rollout.zig");
 const digest = @import("digest.zig");
 const ai = @import("ai.zig");
+const scope = @import("scope.zig");
 
 /// Bumped on any change to a signature, a struct layout or the request/snapshot format. 2: RolloutStats carries the
-/// summon counters; requests take v0.8 policies, the antithetic chance, the v1/v2 leaves and the counters.
-pub const ABI_VERSION: u32 = 2;
+/// summon counters; requests take v0.8 policies, the antithetic chance, the v1/v2 leaves and the counters. 3: requests
+/// take `bank` (scoreCandidates' bank semantics) and hoc_rollout_pairs returns per-pair records; hoc_build_info,
+/// hoc_scope_manifest, hoc_exp and hoc_self_test. An ABI 2 request (no `bank`) runs exactly as before.
+pub const ABI_VERSION: u32 = 3;
+
+/// The common commit the library was built from (`zig build -Dcommon-sha=<sha>`, default "unknown"): the TypeScript
+/// policy and this port are only the same when they come from one revision.
+pub const COMMON_SHA: []const u8 = build_options.common_sha;
 
 const alloc = std.heap.smp_allocator;
 
@@ -31,6 +40,9 @@ pub const Engine = struct {
     stats: RolloutStats = .{},
     /// The names behind the handle a rollout call runs on (rollout.Request.identity points here during the call).
     ident: rollout.Identity = .{ .ids = &.{}, .names = &.{} },
+    /// The last hoc_rollouts call's per-pair records (one per request pair; hoc_rollout_pairs copies them out).
+    records: []rollout.PairRecord = &.{},
+    n_records: usize = 0,
 
     fn fail(self: *Engine, comptime fmt: []const u8, args: anytype) void {
         const s = std.fmt.bufPrint(self.err[0 .. self.err.len - 1], fmt, args) catch self.err[0 .. self.err.len - 1];
@@ -110,6 +122,7 @@ pub export fn hoc_engine_new() ?*Engine {
 
 pub export fn hoc_engine_free(eng: ?*Engine) void {
     const e = eng orelse return;
+    if (e.records.len > 0) alloc.free(e.records);
     e.arena.deinit();
     alloc.destroy(e);
 }
@@ -353,7 +366,7 @@ export fn hoc_play_v01(eng: ?*Engine, handle: ?*Handle, max_laps: i32, out: ?*ro
 
 // ---- hoc_rollouts --------------------------------------------------------------------------------------------------
 
-const SUPPORTED_ACTIONS = [_][]const u8{
+pub const SUPPORTED_ACTIONS = [_][]const u8{
     "end_turn",   "wait_turn",         "defend_turn", "select_attack_type", "move_unit", "melee_attack", "range_attack", "obstacle_attack",
     "cast_spell", "area_throw_attack",
 };
@@ -589,7 +602,83 @@ fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []
     req.pairs = out_pairs;
     const budget = rec.get(v, "turnBudget");
     if (budget == .integer and budget.integer >= 0) req.turn_budget = @intCast(budget.integer);
+    if (!parseBank(e, rec.get(v, "bank"), &req)) return null;
     return req;
+}
+
+/// The request's `bank` (ABI 3): scoreCandidates' bank semantics, see rollout.Bank. Unknown keys are refused, never
+/// ignored. A bank that skips pairs needs candidate-major pairs.
+fn parseBank(e: *Engine, v: std.json.Value, req: *rollout.Request) bool {
+    if (v == .null) return true;
+    if (v != .object) {
+        e.fail("request: bank must be an object", .{});
+        return false;
+    }
+    var it = v.object.iterator();
+    while (it.next()) |entry| {
+        const key = entry.key_ptr.*;
+        const x = entry.value_ptr.*;
+        if (std.mem.eql(u8, key, "skipAfterIllegal")) {
+            if (x != .bool) {
+                e.fail("request: bank.skipAfterIllegal must be a boolean", .{});
+                return false;
+            }
+            req.bank.skip_after_illegal = x.bool;
+        } else if (std.mem.eql(u8, key, "summonScope")) {
+            const name = if (x == .string) x.string else "?";
+            if (std.mem.eql(u8, name, "rollout")) {
+                req.bank.summon_per_rollout = true;
+            } else if (std.mem.eql(u8, name, "call")) {
+                req.bank.summon_per_rollout = false;
+            } else {
+                e.fail("request: bank.summonScope {s} (\"call\" or \"rollout\")", .{name});
+                return false;
+            }
+        } else if (std.mem.eql(u8, key, "material")) {
+            if (x != .bool) {
+                e.fail("request: bank.material must be a boolean", .{});
+                return false;
+            }
+            req.bank.material = x.bool;
+        } else if (std.mem.eql(u8, key, "tailBound")) {
+            if (x == .null) continue;
+            const reference = rec.get(x, "reference");
+            const margin = rec.get(x, "margin");
+            const count = rec.get(x, "rolloutCount");
+            const isNum = struct {
+                fn f(n: std.json.Value) bool {
+                    return n == .integer or n == .float;
+                }
+            }.f;
+            if (x != .object or !isNum(margin) or count != .integer or count.integer < 1 or count.integer > std.math.maxInt(u32) or (reference != .null and !isNum(reference))) {
+                e.fail("request: bank.tailBound must be {{reference: number | null, margin: number, rolloutCount: positive integer}}", .{});
+                return false;
+            }
+            // A null reference is TypeScript's -Infinity (no candidate finished yet): the bound never fires.
+            if (reference != .null) req.bank.tail = .{ .reference = rec.num(reference), .margin = rec.num(margin), .count = @intCast(count.integer) };
+        } else {
+            e.fail("unsupported request: bank.{s}", .{key});
+            return false;
+        }
+    }
+    if (req.bank.skip_after_illegal or req.bank.tail != null) {
+        // Candidate-major: once a candidate's run of pairs ends, it never comes back.
+        var seen = std.DynamicBitSetUnmanaged.initEmpty(e.arena.allocator(), req.candidates.len) catch {
+            e.fail("out of memory", .{});
+            return false;
+        };
+        var cur: ?u32 = null;
+        for (req.pairs, 0..) |p, i| {
+            if (cur != null and cur.? == p[0]) continue;
+            if (seen.isSet(p[0])) {
+                e.fail("request: pair {d}: a bank that skips needs candidate-major pairs", .{i});
+                return false;
+            }
+            seen.set(p[0]);
+            cur = p[0];
+        }
+    }
+    return true;
 }
 
 /// parseRequest for in-process callers (`hoc-sim rollout-trace`): the request names point into `h` and `e.ident`.
@@ -600,10 +689,10 @@ pub fn requestFor(e: *Engine, h: *const Handle, json: []const u8) ?rollout.Reque
 
 /// Runs the request's (candidate, r) rollouts on copies of the handle's state (SearchDriver.rollout + leafValue; the
 /// request format is in zig/BRIDGE.md) and writes one f64 per pair, in request order: the leaf P(win) for the actor's
-/// team, or -Infinity for a rejected candidate. Returns how many it wrote (a prefix when `deadline_ns` (hoc_now_ns
-/// clock, 0 = none), the request's turnBudget or `out_cap` cut it; hoc_rollout_stats says which), or -1 on an
-/// unsupported or malformed request or a rollout that reached unported code (hoc_last_error; fall back to TypeScript
-/// for the decision).
+/// team, or -Infinity for a rejected candidate (NaN for a pair a `bank` skipped). Returns how many it wrote (a prefix
+/// when `deadline_ns` (hoc_now_ns clock, 0 = none), the request's turnBudget or `out_cap` cut it; hoc_rollout_stats
+/// says which; hoc_rollout_pairs gives every pair's record), or -1 on an unsupported or malformed request or a rollout
+/// that reached unported code (hoc_last_error; fall back to TypeScript for the decision).
 export fn hoc_rollouts(eng: ?*Engine, handle: ?*const Handle, req_json: ?[*]const u8, req_len: usize, out_values: ?[*]f64, out_cap: usize, deadline_ns: u64) i32 {
     const e = eng orelse return -1;
     e.clearError();
@@ -612,10 +701,20 @@ export fn hoc_rollouts(eng: ?*Engine, handle: ?*const Handle, req_json: ?[*]cons
         e.fail("no state", .{});
         return -1;
     };
+    e.n_records = 0;
     const req = parseRequest(e, e.tmp(), h, bytes(req_json, req_len)) orelse return -1;
     var ctl: rollout.Control = .{ .deadline_ns = deadline_ns, .turn_budget = req.turn_budget };
     const out: []f64 = if (out_values) |o| o[0..out_cap] else &.{};
-    const written = rollout.run(&h.state, &e.scratch, &req, out, &ctl) catch |err| {
+    if (e.records.len < req.pairs.len) {
+        if (e.records.len > 0) alloc.free(e.records);
+        e.records = alloc.alloc(rollout.PairRecord, @max(req.pairs.len, 256)) catch {
+            e.records = &.{};
+            e.fail("out of memory", .{});
+            return -1;
+        };
+    }
+    e.n_records = req.pairs.len;
+    const written = rollout.runRecords(&h.state, &e.scratch, &req, out, &ctl, e.records[0..req.pairs.len]) catch |err| {
         e.stats = .{ .turns = ctl.turns, .written = 0, .stop = @intFromEnum(ctl.stop), .summon_sequence = ctl.summon_sequence, .uuid_sequence = ctl.uuid_sequence };
         e.fail("unsupported rollout: {s}", .{switch (err) {
             error.UnsupportedPolicy => "a unit without a policy had to play, or its policy needs a pass the port lacks",
@@ -633,6 +732,222 @@ export fn hoc_rollout_stats(eng: ?*const Engine, out: ?*RolloutStats) i32 {
     return 0;
 }
 
+/// Copies the last hoc_rollouts call's per-pair records (rollout.PairRecord, 40 bytes each, one per request pair in
+/// order; pairs after a stop read NOT_REACHED) into `out`, at most `cap`; returns how many the call has (0 after a
+/// refused request), or -1.
+export fn hoc_rollout_pairs(eng: ?*const Engine, out: ?[*]rollout.PairRecord, cap: usize) i32 {
+    const e = eng orelse return -1;
+    if (out) |o| {
+        const n = @min(cap, e.n_records);
+        @memcpy(o[0..n], e.records[0..n]);
+    }
+    return @intCast(e.n_records);
+}
+
+/// libc's `exp`, the one the learned leaves' sigmoid calls (rollout.zig, v08/util.zig): the bridge's self-test compares
+/// it with the runtime's Math.exp on a fixed table, because exact ties decide choices.
+extern "c" fn exp(x: f64) f64;
+export fn hoc_exp(x: f64) f64 {
+    return exp(x);
+}
+
+// ---- build identity and scope manifest -----------------------------------------------------------------------------
+
+/// The policies a request may name with their extra scope, in rollout.policies' order.
+const POLICY_SCOPES = [_]scope.PolicyScope{ rollout.V01_SCOPE, rollout.V08_SCOPE };
+
+comptime {
+    std.debug.assert(POLICY_SCOPES.len == rollout.policies.len);
+    for (POLICY_SCOPES, rollout.policies) |a, b| std.debug.assert(std.mem.eql(u8, a.name, b.version));
+}
+
+const Manifest = struct {
+    coverage: [64]u8,
+    /// Every policy (hoc_scope_manifest with no name).
+    full: [:0]const u8,
+    per_policy: [POLICY_SCOPES.len][:0]const u8,
+    build_info: [:0]const u8,
+};
+
+var manifest_lock: std.Thread.Mutex = .{};
+var manifest_cache: ?Manifest = null;
+
+fn targetName() []const u8 {
+    return @tagName(builtin.cpu.arch) ++ "-" ++ @tagName(builtin.os.tag) ++ "-" ++ @tagName(builtin.abi);
+}
+
+fn writeHeader(w: *std.Io.Writer, coverage: []const u8) !void {
+    try w.print("{{\"abi\":{d},\"commonSha\":\"{s}\",\"coverage\":\"{s}\"", .{ ABI_VERSION, COMMON_SHA, coverage });
+}
+
+fn buildManifest() !Manifest {
+    const pa = std.heap.page_allocator;
+    var body: std.Io.Writer.Allocating = .init(pa);
+    defer body.deinit();
+    try scope.writeScope(&body.writer, snapshot.FORMAT_VERSION, &POLICY_SCOPES, &SUPPORTED_ACTIONS);
+    var m: Manifest = undefined;
+    m.coverage = scope.sha256Hex(body.written());
+    {
+        var w: std.Io.Writer.Allocating = .init(pa);
+        errdefer w.deinit();
+        try writeHeader(&w.writer, &m.coverage);
+        try w.writer.writeAll(",\"policy\":null,\"scope\":");
+        try w.writer.writeAll(body.written());
+        try w.writer.writeByte('}');
+        m.full = try w.toOwnedSliceSentinel(0);
+    }
+    for (POLICY_SCOPES, 0..) |p, i| {
+        var w: std.Io.Writer.Allocating = .init(pa);
+        errdefer w.deinit();
+        try writeHeader(&w.writer, &m.coverage);
+        try w.writer.print(",\"policy\":\"{s}\",\"scope\":", .{p.name});
+        try scope.writeScope(&w.writer, snapshot.FORMAT_VERSION, &.{p}, &SUPPORTED_ACTIONS);
+        try w.writer.writeByte('}');
+        m.per_policy[i] = try w.toOwnedSliceSentinel(0);
+    }
+    {
+        var w: std.Io.Writer.Allocating = .init(pa);
+        errdefer w.deinit();
+        try writeHeader(&w.writer, &m.coverage);
+        const glibc: ?std.SemanticVersion = if (builtin.os.tag == .linux and builtin.abi.isGnu()) builtin.os.version_range.linux.glibc else null;
+        try w.writer.print(",\"zig\":\"{s}\",\"target\":\"{s}\",\"cpu\":\"{s}\",\"optimize\":\"{s}\",\"snapshotFormat\":{d}", .{ builtin.zig_version_string, targetName(), builtin.cpu.model.name, @tagName(builtin.mode), snapshot.FORMAT_VERSION });
+        if (glibc) |g| try w.writer.print(",\"glibc\":\"{d}.{d}\"", .{ g.major, g.minor }) else try w.writer.writeAll(",\"glibc\":null");
+        try w.writer.writeByte('}');
+        m.build_info = try w.toOwnedSliceSentinel(0);
+    }
+    return m;
+}
+
+fn manifestData() ?*const Manifest {
+    manifest_lock.lock();
+    defer manifest_lock.unlock();
+    if (manifest_cache == null) manifest_cache = buildManifest() catch return null;
+    return &manifest_cache.?;
+}
+
+/// The library's identity as JSON (static, NUL-terminated, owned by the library): {abi, commonSha, coverage (the scope
+/// manifest's sha256), zig, target, cpu, optimize, snapshotFormat, glibc}. Null only when out of memory.
+export fn hoc_build_info() ?[*:0]const u8 {
+    const m = manifestData() orelse return null;
+    return m.build_info.ptr;
+}
+
+/// The scope manifest (scope.zig) as JSON (static, NUL-terminated): `{abi, commonSha, coverage, policy, scope: {loader,
+/// policies: {<name>: {castable, refusedAbilities, refusedDebuffs}}, actions}}` for policy `name` ("v0.1", "v0.8"), or
+/// every policy when `name` is null or empty. Null for an unknown policy (or out of memory).
+export fn hoc_scope_manifest(name: ?[*]const u8, len: usize) ?[*:0]const u8 {
+    const m = manifestData() orelse return null;
+    const n = bytes(name, len);
+    if (n.len == 0) return m.full.ptr;
+    for (POLICY_SCOPES, 0..) |p, i| {
+        if (std.mem.eql(u8, p.name, n)) return m.per_policy[i].ptr;
+    }
+    return null;
+}
+
+// ---- self-test ------------------------------------------------------------------------------------------------------
+
+/// A compiled-in root (an exportBattleState export), requests on it and the records TypeScript's scoreCandidates
+/// produced for them (zig/BRIDGE.md "Loading safely and the self-test" says how they were made): hoc_self_test replays
+/// them on the host, so a CPU, libc or build that changes a single bit of a rollout is caught before the backend is
+/// used.
+const SELFTEST_STATE = @embedFile("selftest/state.json");
+const SELFTEST_REQUESTS = @embedFile("selftest/requests.json");
+const SELFTEST_EXPECTED = @embedFile("selftest/expected.json");
+
+fn hexBits(v: std.json.Value) ?f64 {
+    if (v == .null) return std.math.nan(f64);
+    if (v != .string) return null;
+    const bits = std.fmt.parseInt(u64, v.string, 16) catch return null;
+    return @bitCast(bits);
+}
+
+fn sameBits(a: f64, b: f64) bool {
+    if (std.math.isNan(a) or std.math.isNan(b)) return std.math.isNan(a) and std.math.isNan(b);
+    return @as(u64, @bitCast(a)) == @as(u64, @bitCast(b));
+}
+
+/// Runs the compiled-in requests on the compiled-in state and compares every pair record (value and material bit for
+/// bit, turns, flags, the summon counters, the winner) and each call's totals with the expected records. Returns 1
+/// when all match, 0 when one differs or the fixture does not load (hoc_last_error names it), -1 without an engine.
+export fn hoc_self_test(eng: ?*Engine) i32 {
+    const e = eng orelse return -1;
+    e.clearError();
+    var arena = std.heap.ArenaAllocator.init(alloc);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const expected = std.json.parseFromSliceLeaky(std.json.Value, a, SELFTEST_EXPECTED, .{}) catch {
+        e.fail("self-test: the expected records do not parse", .{});
+        return 0;
+    };
+    const requests = std.json.parseFromSliceLeaky(std.json.Value, a, SELFTEST_REQUESTS, .{}) catch {
+        e.fail("self-test: the requests do not parse", .{});
+        return 0;
+    };
+    if (expected != .array or requests != .array or requests.array.items.len == 0 or requests.array.items.len != expected.array.items.len) {
+        e.fail("self-test: no fixture compiled in", .{});
+        return 0;
+    }
+    const h = hoc_state_load(e, SELFTEST_STATE.ptr, SELFTEST_STATE.len) orelse {
+        var msg: [512]u8 = undefined;
+        const why = std.fmt.bufPrint(&msg, "{s}", .{std.mem.span(hoc_last_error(e))}) catch "?";
+        e.fail("self-test: the fixture state: {s}", .{why});
+        return 0;
+    };
+    defer hoc_state_free(e, h);
+    for (requests.array.items, expected.array.items, 0..) |rq, ex, k| {
+        var text: std.Io.Writer.Allocating = .init(a);
+        std.json.Stringify.value(rq, .{}, &text.writer) catch {
+            e.fail("out of memory", .{});
+            return 0;
+        };
+        const pairs = rec.get(ex, "pairs");
+        if (pairs != .array) {
+            e.fail("self-test: request {d} has no expected pairs", .{k});
+            return 0;
+        }
+        const out = a.alloc(f64, @max(1, pairs.array.items.len)) catch {
+            e.fail("out of memory", .{});
+            return 0;
+        };
+        const json = text.written();
+        const written = hoc_rollouts(e, h, json.ptr, json.len, out.ptr, pairs.array.items.len, 0);
+        if (written < 0) {
+            var msg: [512]u8 = undefined;
+            const why = std.fmt.bufPrint(&msg, "{s}", .{std.mem.span(hoc_last_error(e))}) catch "?";
+            e.fail("self-test: request {d} refused: {s}", .{ k, why });
+            return 0;
+        }
+        if (e.stats.turns != @as(u64, @intCast(rec.int(rec.get(ex, "turns")))) or e.stats.stop != rec.int(rec.get(ex, "stop"))) {
+            e.fail("self-test: request {d}: {d} turns, stop {d}; expected {d}, {d}", .{ k, e.stats.turns, e.stats.stop, rec.int(rec.get(ex, "turns")), rec.int(rec.get(ex, "stop")) });
+            return 0;
+        }
+        if (e.n_records != pairs.array.items.len) {
+            e.fail("self-test: request {d}: {d} records for {d} expected", .{ k, e.n_records, pairs.array.items.len });
+            return 0;
+        }
+        for (pairs.array.items, e.records[0..e.n_records], 0..) |want, got, i| {
+            const value = hexBits(rec.get(want, "value")) orelse {
+                e.fail("self-test: request {d} pair {d}: bad expected value", .{ k, i });
+                return 0;
+            };
+            const material = hexBits(rec.get(want, "material")) orelse {
+                e.fail("self-test: request {d} pair {d}: bad expected material", .{ k, i });
+                return 0;
+            };
+            const same = sameBits(value, got.value) and sameBits(material, got.material) and got.turns == rec.int(rec.get(want, "turns")) and
+                got.flags == rec.int(rec.get(want, "flags")) and got.summon_seq == rec.int(rec.get(want, "summonSequence")) and
+                got.uuid_seq == rec.int(rec.get(want, "uuidSequence")) and got.winner == rec.int(rec.get(want, "winner"));
+            if (!same) {
+                e.fail("self-test: request {d} pair {d}: value {x} material {x} turns {d} flags {d} summons {d} uuid {d} winner {d} differ from the expected record", .{ k, i, @as(u64, @bitCast(got.value)), @as(u64, @bitCast(got.material)), got.turns, got.flags, got.summon_seq, got.uuid_seq, got.winner });
+                return 0;
+            }
+        }
+    }
+    e.clearError();
+    return 1;
+}
+
 // Placeholder for the A19 search port (not implemented; see zig/BRIDGE.md "Growing into the search"):
 //   hoc_score_candidates(eng, handle, req_json, len, out_means, out_materials, out_completed, cap, deadline_ns)
 // would move scoreCandidates' per-candidate loop, the certified tail bounds and the material sample into Zig, and
@@ -645,4 +960,29 @@ test "engine lifecycle and errors" {
     try std.testing.expect(hoc_state_load(e, bad, bad.len) == null);
     try std.testing.expect(std.mem.startsWith(u8, std.mem.span(hoc_last_error(e)), "malformed state"));
     try std.testing.expectEqual(ABI_VERSION, hoc_abi_version());
+}
+
+test "build info and the scope manifest parse, and every policy's manifest shares the coverage" {
+    const info = std.mem.span(hoc_build_info().?);
+    const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, info, .{});
+    defer parsed.deinit();
+    try std.testing.expectEqual(@as(i64, ABI_VERSION), parsed.value.object.get("abi").?.integer);
+    const coverage = parsed.value.object.get("coverage").?.string;
+    try std.testing.expectEqual(@as(usize, 64), coverage.len);
+    for ([_][]const u8{ "", "v0.1", "v0.8" }) |p| {
+        const text = std.mem.span(hoc_scope_manifest(p.ptr, p.len).?);
+        const m = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, text, .{});
+        defer m.deinit();
+        try std.testing.expectEqualStrings(coverage, m.value.object.get("coverage").?.string);
+    }
+    try std.testing.expect(hoc_scope_manifest("v9", 2) == null);
+    try std.testing.expectEqual(@as(f64, 1), hoc_exp(0));
+}
+
+test "the compiled-in self-test fixture replays bit for bit" {
+    const e = hoc_engine_new().?;
+    defer hoc_engine_free(e);
+    const r = hoc_self_test(e);
+    if (r != 1) std.debug.print("{s}\n", .{std.mem.span(hoc_last_error(e))});
+    try std.testing.expectEqual(@as(i32, 1), r);
 }

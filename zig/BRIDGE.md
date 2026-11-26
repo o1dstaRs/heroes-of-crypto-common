@@ -10,19 +10,30 @@ search rollouts on it. It is one-way: Zig never writes a battle back into TypeSc
 | Rollouts and play-out | `src/rollout.zig` (`rollout.run`, `rollout.play`, the policy registry) |
 | State digest as JSON | `src/digest.zig` (the columns of `parity/digest.ts`) |
 | C ABI and shared library | `src/ffi.zig`, `zig build lib` |
-| bun:ffi binding | `ffi/bridge.ts` (`HocEngine`, `HocState`) |
+| bun:ffi binding, fail-safe loading and self-test | `ffi/bridge.ts` (`HocEngine`, `HocState`, `loadHocEngine`, `runHocSelfTest`) |
+| What the library accepts, as data | `src/scope.zig` (`hoc_scope_manifest`), the TypeScript pre-check `ffi/precheck.ts` |
+| Self-test fixture (a root, two banks, TypeScript's records) | `src/selftest/` |
 | Smoke test (export, load, play, compare, overheads) | `ffi/smoke.ts` |
 | Oracle: resume mid-battle in both modes | `hoc-sim resume` on a `RECORD_RESUME` recording |
 | Debugging a rollout step by step | `hoc-sim rollout-trace <state.json> <request.json> [--pair K] [--digests]` |
 
 ```bash
 cd zig && zig build -Drelease=true && zig build lib -Drelease=true && cd ..   # hoc-sim and libhocsim
+# a release library names its common commit: zig build lib -Drelease=true -Dcommon-sha=$(git rev-parse HEAD)
 bun zig/ffi/smoke.ts 24 9000                         # batches 1 and 2 kept; SMOKE_KEEP=none for ability-free
 RECORD_RESUME=random:2 bun zig/parity/record.ts 300 8100000 /tmp/r.jsonl && zig/zig-out/bin/hoc-sim resume /tmp/r.jsonl
 ```
 
 The library is `zig/zig-out/lib/libhocsim.dylib` on macOS and `libhocsim.so` on Linux (`HOC_SIM_LIB` overrides the
-path in `bridge.ts`). For the 9800X3D, add `-Dtarget=x86_64-linux-gnu -Dcpu=znver5` (a shared library for glibc).
+path in `bridge.ts`). For the 9800X3D, add `-Dtarget=x86_64-linux-gnu -Dcpu=znver5` (a shared library for glibc). A
+library for the production hosts (glibc 2.35, any x86-64-v3 CPU), cross-built from macOS:
+
+```bash
+cd zig && zig build lib -Drelease=true -Dtarget=x86_64-linux-gnu.2.35 -Dcpu=x86_64_v3 -Dcommon-sha=$(git rev-parse HEAD)
+```
+
+`hoc_build_info` then reports `"target":"x86_64-linux-gnu","cpu":"x86_64_v3","glibc":"2.35"` and the commit; run
+`runHocSelfTest` on the host before using it (below).
 
 Every artifact links the C library: the learned leaves' sigmoid calls libc's `exp`, because Bun's `Math.exp` is the
 platform libm's and exact ties decide choices. On Linux build against the system glibc (`x86_64-linux-gnu`, dynamic),
@@ -120,18 +131,19 @@ from `auraEffects` (`Unit.war_anger_power`), a revived unit's leading augment di
 them), and the `Hamstrung` and System `Wind Flow` configs in `spellConfigs` (`state_export.ts` adds them when a unit
 holds Hamstring or carries Wind Flow).
 
-Refused as an unsupported state (the loader names what it found): summoned units other than the creatures Infest and
-Summon Wolves raise, and non-creature units; a spell outside the ported ones (by name, in the raw entries or the Spell objects),
-more spell entries or spells than the book holds (16/6); an artifact-granted ability other than the Wounding Charm's
-card; Helping Hand; ranked `*_authoritative` stats; a spent Water Shield; a pending Last Fuse record; an unported
-ability, aura, buff, debuff or effect; effect stacks other than Poison's; more buffs, debuffs, effects, active or
-stolen abilities than the lists hold (24/25/12/10/6); WATER_CENTER or a water cell; an artifact
-the port does not play (artifacts.supportedT1/T2, or its buff name); legacy-axis seats; smoke clouds or fire walls; more
-than 96 vines; a unit on lava that cannot traverse it, or terrain the board lost; more than
+Refused as an unsupported state (the loader names what it found; the names and limits are `src/scope.zig`'s tables,
+which `hoc_scope_manifest` exports): summoned units other than the creatures Infest and Summon Wolves raise, and
+non-creature units; a spell outside `st.CastSpell` (by name, in the raw entries or the Spell objects), more spell
+entries or spells than the book holds (16/6); an artifact-granted ability other than the Wounding Charm's card; Helping
+Hand; ranked `*_authoritative` stats; a spent Water Shield; a pending Last Fuse record; an unported ability, aura,
+buff, debuff or effect; effect stacks other than Poison's; more buffs, debuffs, effects, active or stolen abilities
+than the lists hold (24/25/12/10/6); WATER_CENTER or a water cell; an artifact the port does not play
+(artifacts.supportedT1/T2, or its buff name); legacy-axis seats; fire walls; more than 96 smoked cells or 96 vines; a
+unit on lava that cannot traverse it, or terrain the board lost; more than
 32 units in the holder or 255 ids; units out of holder order. Malformed input (a missing field, a wrong type, an id no
 list knows, vines without the Vine Throw config) is reported as a malformed state.
 
-## The C ABI (`src/ffi.zig`, ABI version 2)
+## The C ABI (`src/ffi.zig`, ABI version 3)
 
 ```c
 uint32_t hoc_abi_version(void);
@@ -148,10 +160,17 @@ int32_t  hoc_play_v01(Engine*, Handle*, int32_t max_laps, PlayResult* out);     
 int32_t  hoc_rollouts(Engine*, const Handle*, const uint8_t* req, size_t req_len,
                       double* out_values, size_t out_cap, uint64_t deadline_ns);     // values written, or -1
 int32_t  hoc_rollout_stats(const Engine*, RolloutStats* out);                       // of the last hoc_rollouts
+int32_t  hoc_rollout_pairs(const Engine*, PairRecord* out, size_t cap);             // records the last call has
+const char* hoc_build_info(void);                           // JSON, static: abi, commonSha, coverage, zig, target, ...
+const char* hoc_scope_manifest(const uint8_t* policy, size_t len);  // JSON, static; null for an unknown policy
+double   hoc_exp(double x);                                 // libc exp, the learned leaves' sigmoid
+int32_t  hoc_self_test(Engine*);                            // 1 pass, 0 fail (see error), -1 no engine
 
 struct PlayResult   { int32_t end, winner, lap; uint32_t steps, decisions, rng; };  // 24 bytes
 struct RolloutStats { uint64_t turns; uint32_t written; int32_t stop;
                       uint64_t summon_sequence, uuid_sequence; };                   // 32 bytes
+struct PairRecord   { double value, material; uint32_t turns, flags, summon_sequence;
+                      int32_t winner; uint64_t uuid_sequence; };                    // 40 bytes
 ```
 
 - `end`: 0 elimination, 1 turn cap, 2 stuck, 3 observer stop, 4 unsupported (kept for the ABI; no longer produced
@@ -161,6 +180,16 @@ struct RolloutStats { uint64_t turns; uint32_t written; int32_t stop;
   deterministicUuidSequence after the call (aborted rollouts included), for the next request's start values.
 - ABI 2 (2026-11-25): RolloutStats grew the two counters; requests take the v0.8 policy, the antithetic chance, the v1
   and v2 leaves, the sole-Abomination rule, the army profile and the summon counters and id scheme.
+- ABI 3 (2026-11-25): requests take `bank` (scoreCandidates' bank semantics, below); `hoc_rollout_pairs` returns every
+  pair's record; `hoc_build_info`, `hoc_scope_manifest`, `hoc_exp` and `hoc_self_test`. Every ABI 2 signature, struct
+  and request is unchanged: a request without `bank` runs exactly as under ABI 2, so an ABI 2 caller needs only the
+  version constant bumped.
+- `PairRecord` (one per request pair, in pair order): `value` the leaf (-Infinity for a rejected candidate, NaN when not
+  played), `material` the A19 material sample (`bank.material` and a finite value, else NaN), `turns` the rollout
+  turns the pair played (an aborted one included), `flags` 0 played / 1 skipped after an illegal rollout / 2 aborted by
+  the deadline or turn budget / 3 not reached / 4 skipped by the tail bound, the summon counters as the rollout left them
+  (before `bank.summonScope: "rollout"` restores the summon sequence; a skipped pair: the counters the next pair starts
+  from), and `winner` the fight_finished team inside the rollout (0 none), -1 when the fight did not finish.
 - Ownership: an engine owns its error text, its request arena and its rollout scratch state; use one per thread. A
   handle (a state copy plus its id strings) is freed with `hoc_state_free`; any engine may read a handle (rollouts and
   digests copy or read it), but only one call may mutate it at a time (`hoc_play_v01` plays in place: clone first).
@@ -225,9 +254,10 @@ exact doubles.
 - `armyProfile` overrides the export's `harness.armyProfile` per team. An aura-saturated profile is passed to src/v08
   (`Request.aura_saturated`, `util.Battle.aura_saturated`): v0.7's v0.4 anchor is played where it equals the v0.4 level
   (common `6998c2dd`), not refused.
-- Summons: the counters carry over from one rollout to the next and come back in `hoc_rollout_stats`, because
-  TypeScript restores neither runMatch's createSummonedUnit counter nor lib.ts deterministicUuidSequence per rollout
-  (later rollouts' summons get later ids, and the ids key the antithetic stream). `summonSequence` / `uuidSequence`
+- Summons: the counters carry over from one rollout to the next and come back in `hoc_rollout_stats`, as for
+  `SearchDriver.rollout` called directly (later rollouts' summons get later ids, and the ids key the antithetic
+  stream); inside `scoreCandidates` runMatch's captureAuxiliaryState restores the createSummonedUnit counter after every
+  rollout, which `bank.summonScope: "rollout"` reproduces (deterministicUuidSequence is never restored per rollout). `summonSequence` / `uuidSequence`
   give the first rollout's values (default: the export's harness values). `summonIds`: `match` names a summon as
   runMatch's createSummonedUnit does (`deterministicSimulationId("summon", seed, ..., sequence)`); `uuidSequence` keeps
   the id createSecureUuid gives under a seeded source, the "sim" UUID of deterministicUuidSequence, as the server's
@@ -270,8 +300,34 @@ antithetic keys per rollout). A policy turn that lands nothing plays SearchDrive
 living holder unit marked as having made its turn, then the advance again), as TypeScript does. A test hook, the
 request field `testDropDecisions` (k), replaces the policy calls whose per-rollout index n has `Math.imul(n,
 0x85ebca6b) >>> 0` divisible by k with nothing after computing them, so a TypeScript oracle that wraps its policy the
-same way checks the net on thousands of turns. Not modelled: an opponent model
-(`SEARCH_OPP_MODEL`, empty in production) and the material sample of `scoreCandidates`.
+same way checks the net on thousands of turns. Not modelled: an opponent model (`SEARCH_OPP_MODEL`, empty in
+production).
+
+`bank` (ABI 3) makes one call one `SearchDriver.scoreCandidates` bank, or a candidate-major slice of one (every pair of
+a candidate before the next candidate's; checked when the bank skips):
+
+```json
+"bank": { "skipAfterIllegal": true, "summonScope": "rollout", "material": true,
+          "tailBound": { "reference": 0.42, "margin": 0.0, "rolloutCount": 8 } }
+```
+
+- `skipAfterIllegal`: the bank's `break` after a -Infinity rollout; the candidate's later pairs are not played (no turns,
+  no summons, no uuid values) and read flag 1.
+- `summonScope`: `"rollout"` restores the summon sequence after every rollout (runMatch's captureAuxiliaryState, restored
+  in scoreCandidates' `finally`), `"call"` (default) carries it over (the server's bot seat, whose summons are named by
+  uuid and which has no such counter).
+- `material`: the A19 material sample after every finite rollout (`captureMaterial`: "turns" banks with
+  captureA19Material): `0.5 * (1 + (ours - enemy) / (ours + enemy + 1000))` over the living units' `exp *
+  cumulativeHp / max(1, maxHp)` in holder order.
+- `tailBound`: the offline hopeless-tail bound, `remainingRolloutsCannotWin(sum, completed, rolloutCount, reference,
+  margin)` after each finite rollout of a candidate, with one reference for the whole call (`null`: TypeScript's
+  -Infinity, the bound never fires); off for the rest of the call once a leaf is outside [0, 1]. scoreCandidates'
+  reference moves between candidates (`SearchSelectionBounds.referenceMean(c) ?? bestFinishedMean`), so a bounded bank
+  is one call per candidate, the caller replaying the bookkeeping between calls (a later `hoc_score_candidates` can
+  port `SearchSelectionBounds`).
+
+The means, the material evidence and every counter a TypeScript bank leaves behind follow from the records: the
+integration design's adapter replays scoreCandidates' bookkeeping on them in the same order.
 
 ### Traps for a caller
 
@@ -290,6 +346,103 @@ same way checks the net on thousands of turns. Not modelled: an opponent model
   (`ai.catalog_decisions`, set by `rollout.run`); the two differ only for a vine strider (a route of weight 0). A harness
   that wraps `PathHelper.prototype.getMovePath` turns the catalog's cache and elision off (`cacheSafe` checks the
   method's identity) and then differs from production on such boards.
+
+## Scope manifest and pre-check
+
+`hoc_scope_manifest(policy)` returns what the library accepts as JSON, generated at first use from the tables the
+loader and `rollout.v08Scope` refuse by (`src/scope.zig`, the AbilityId / SpellId / CastSpell enums, `V08_SCOPE`,
+`ffi.SUPPORTED_ACTIONS`), so it cannot drift from them:
+
+```json
+{ "abi": 3, "commonSha": "<built-from commit>", "coverage": "<sha256 of the scope body>", "policy": "v0.8",
+  "scope": { "loader": { "format": 2, "abilities": [...], "auraEffects": [...], "applied": [...], "spells": [...],
+                         "spellEntryPrefixes": [...], "spellFactions": [4, 3, 1, 2], "summons": [...],
+                         "unitTypes": [1], "teams": [1, 2], "footprint": [1, 2], "gridTypes": [1, 3, 4],
+                         "boardCodes": ["", "B", "L", "H"], "stackingEffect": "Poison",
+                         "storedPropertyBuffs": [...], "artifacts": { "tier1": [0, 1, ...], "tier2": [0, 1, ...] },
+                         "artifactRows": { "buffs": [...], "debuffs": ["Gravebound"] },
+                         "capacities": { "units": 32, "ids": 255, "abilities": 10, "barrels": 4, ... },
+                         "refuse": { "unitFields": [...], "unitFieldParts": ["lastFuseFatalHit.source"],
+                                     "unitProps": [...],
+                                     "unitPropsLimited": { "artifact_granted_abilities": ["Deep Wounds Level 1"] },
+                                     "unitPropSuffix": "_authoritative", "unitPropSuffixKept": [...], "grid": [],
+                                     "fight": [...], "artifactsPerTeam": ["artifactTier1PerTeam", ...] } },
+             "policies": { "v0.8": { "castable": [...], "refusedAbilities": [...], "refusedDebuffs": [...],
+                                     "refusedEffects": [...], "refusedBuffs": [...], "refusedRevived": true,
+                                     "refusedArtifactRows": true, "refusedSmoke": true } },
+             "actions": [...] } }
+```
+
+`applied` lists every name a buff, debuff or effect row may carry; `castable: null` means every spell the loader
+takes. `artifacts` lists the Tier-1 and Tier-2 ids the port plays (`artifacts.supportedT1/T2`; 0 is no artifact);
+`storedPropertyBuffs` the buff rows whose stored properties are loaded besides the aura rows (the augments and every
+artifact row but Keen Blade's), each an integer 0..`storedProperty` or undefined; `artifactRows` the rows that make a
+board an artifact board (`State.artifacts`), which v0.8 refuses until src/v08 is checked on artifacts (and, with
+`refusedSmoke`, a board holding a smoke cloud, until src/v08 reads the store). A policy's `refused*` lists include its
+late rows (`V08_SCOPE.late`: the crafted cards and the wave-2 rows that outlive their casters, which v08Scope checks
+after the board-level refusals with their own messages). With no policy
+name the manifest carries every policy; `coverage` hashes that full body and is the same in every manifest and in
+`hoc_build_info`.
+
+`ffi/precheck.ts` compiles a manifest into sets once (`compileHocPrecheck(engine.scopeManifest("v0.8"))`) and answers
+`refusal({unitsHolder, grid, fightProperties})` from the live objects: the units' raw fields (the Ability objects, not
+`getAbilities()`, which hides a Broken unit's), applied lists and their stored properties, spellbook entries and Spell
+objects, effect stacks, the unported unit fields, the artifact-granted cards, `props.target`, the summon templates a
+board can raise (computed once per process from the creature configs), the teams' artifact ids, Barrel Barricade's
+barrels, the smoked cells, and the grid's and fight's refused stores; for a policy that refuses artifact rows, every
+unit's applied names against `artifactRows`, for one that refuses revived units, more `applied_buffs` names than buff
+objects, and for one that refuses smoke, any cloud. It skips the loader's consistency checks (a unit on lava without Lava Striders, a barrel off the
+layout, ...), which hold on every state the TypeScript engine produces, and reads the known `*_authoritative` fields by
+name (`AUTHORITATIVE_PROPS`; `strict` mode enumerates the keys as the loader does). A root it passes and the library
+refuses costs an export and a load, never a wrong value.
+
+### Accepting a newly ported feature
+
+The loader's and v08Scope's refusals are tables in `src/scope.zig`; the manifest and the pre-check are generated from
+them, so a porter changes the table and nothing else on the bridge side:
+
+| The port now plays | Edit |
+| --- | --- |
+| an ability, aura, buff, debuff or effect | its `AbilityId` / `SpellId` (the loader interns by name; the manifest lists the enums) |
+| a spell | its `st.CastSpell` entry; for v0.8 seats also `rollout.V08_CASTABLE` once src/v08 decides it |
+| a unit field or prop that was refused | drop it from `REFUSED_UNIT_FIELDS` / `REFUSED_UNIT_PROPS` and read it in snapshot.zig |
+| more names in a limited list (artifact-granted cards) | `LIMITED_UNIT_PROPS[..].accepted` |
+| a grid or fight store | drop it from `REFUSED_GRID_FIELDS` / `REFUSED_FIGHT_FIELDS` and read it in snapshot.zig |
+| an artifact | `artifacts.supportedT1/T2` (scope.artifactSupported); its row's name in `SpellId` |
+| a wider list | the capacity in `state.zig` (`MAX_*`, the list types); the manifest's `capacities` follow |
+| v0.8 on batch-6a cards or rows, revived units, artifact rows, smoke, or the wave-2 rows | `rollout.V08_SCOPE` (`refused_abilities`, `refused_debuffs` / `refused_effects` / `refused_buffs`, `refuse_revived`, `refuse_artifact_rows`, `refuse_smoke`, `late`) |
+
+A new kind of refusal (a check no table holds yet) gets a table and a manifest key in scope.zig and a line in
+`ffi/precheck.ts`. Then rebuild, run `zig build test` (the manifest tests, the artifact-row cross-check against
+`engine.loadScopeFlags`, the fixture replay) and the pre-check comparison: a root the pre-check passes and the library
+refuses is a miss.
+
+## Loading safely and the self-test
+
+Importing `ffi/bridge.ts` loads nothing. `HocEngine.open()` loads the library on first use and throws `HocError` when
+it is missing or has another ABI (smoke tests and oracles). Production uses `loadHocEngine({ commonSha })`, which never
+throws: it returns null, logging once per process and reason, when the library is missing, does not load, has another
+ABI, was built from another common commit (a development build says "unknown"), or fails `runHocSelfTest`:
+
+- `Math.exp` against the library's `hoc_exp` (libc `exp`, the learned leaves' sigmoid) on a fixed table of 5,138
+  inputs (`hocExpTable`: the leaf logit range, the whole finite range, the extremes and signed zeros), bit for bit;
+- `hoc_self_test`: a compiled-in root and two banks on it (`src/selftest/`), the stock bank (antithetic R2) and the deep
+  bank (plain R8), both H64 with the v2 leaf, exact terminals, v0.8 on both seats and `bank` semantics; every pair's
+  value and material bit for bit, turns, flags, summon counters and winner, and each call's turns and stop, against the
+  records TypeScript's scoreCandidates produced on that root.
+
+`runHocSelfTest({ path, commonSha })` returns the report (`ok`, `reason`, `buildInfo`, the exp mismatches, the fixture
+result): a deploy runs it on the host with `bun -e` before pointing `HOC_SIM_LIB` at a new library.
+
+### Deploying the binding with the package
+
+The server installs common from a git pin, and the package ships only what `package.json` `files` names: `dist`,
+`src`, and of `zig/` exactly `zig/ffi/bridge.ts`, `zig/ffi/precheck.ts` and `zig/parity/state_export.ts` (the binding,
+the pre-check, and the exporter they need; each imports only from `../../src`, which ships). They stay under `zig/`:
+`bridge.ts` imports `bun:ffi`, which `tsc` and the client bundle must never see, so they are not moved into `src/`. The
+library itself is not in the package: build it for the host (`-Dcommon-sha` of the pinned commit, above), copy it
+beside the server, point `HOC_SIM_LIB` at it and run `runHocSelfTest` there. `npm pack --dry-run --ignore-scripts`
+lists the three files and nothing else from `zig/`; a new file the binding imports from `zig/` must join `files`.
 
 ## How it is checked
 
@@ -324,6 +477,50 @@ same way checks the net on thousands of turns. Not modelled: an opponent model
   calls with a unit digest, each v0.8 layer's output, the wait scorer's features, each decision; with `--digests` the
   digest.zig state at each decision), the format the scratch harness writes for the TypeScript side, so the first
   differing step shows where a rollout leaves TypeScript's.
+
+Re-checked on 2026-11-26 on common `2b0155c3` (the artifacts, the Book of Chaos, batch 6a with the recovery net, the
+Blacksmith) plus this change, the scope tables folding in each of them, and again after the sync to `cab3decd`:
+
+- `zig build test` (23 tests: the manifest, the artifact-row cross-check against `engine.loadScopeFlags`, the fixture
+  replay bit for bit); the production-host cross build (`x86_64-linux-gnu.2.35`, `x86_64_v3`) compiles.
+- `check.sh 40 27970000` 40 of 40 in both modes; production-like with batches 1 to 6a, the casters, the Wandering Mage
+  and the Blacksmith (wave-1, Book of Chaos and Blacksmith spells), random artifacts and resume points (`27980000`):
+  40 of 40 in both modes, 80 of 80 resume points loaded equal to their digests and replayed identical; `ffi/smoke.ts
+  12 27990000`; the self-test and its negative controls (missing file, an ABI 2 library, a development build against
+  a real commit, one flipped bit of the fixture, one perturbed `Math.exp` input, another commit) as expected.
+- Pre-check against export + load + a v0.8 request at every decision of 72 battles (all creatures with full books or
+  the ported spells and random artifacts; batches 1 to 6a with the casters, the Wandering Mage and the Blacksmith; seeds
+  27930000-27960011): 4,099 roots, both policies, 0 false accepts, 0 false refusals (v0.8 refusals seen: batch-6a
+  cards and rows, crafted cards, Misfortune, the Sword's burn, smoke, artifact rows, Book of Chaos and Craft spells).
+- Identity, batches 1 to 4 (rate 0.4, 27900000-27900019): 20 of 20 battles and 836 of 836 decisions identical to pure
+  TypeScript (actions and rollout turns), every bank native (2,155); shadow 50,205 rollouts compared one by one, 0
+  mismatches (9,389 with summons).
+- ABI 2 requests (the v0.8 rollout oracle, casters and batches 1 to 4 with wave-1 books, `expBudget`, rate 0.6, 12
+  battles from 27990100 and 27990200): 33,600 of 33,600 values, the same 358,920 rollout turns, summon counters and
+  turn-budget banks.
+- After the sync to `cab3decd` (the Healer's and the Magic Dragon's whole books; Whirlpool joins the late debuffs):
+  `zig build test`, `check.sh 40 27997000` and the production-like 40 (`27998000`, the new spells kept, 80 resume
+  points) identical in both modes, `ffi/smoke.ts 12 27999000`, the pre-check on 24 more battles (1,407 roots, 0 false
+  accepts or refusals; v0.8 refusals of Whirlpool and Spiritual Armor books seen) and the identity run (836 of 836
+  decisions, every bank native).
+
+Results with ABI 3 on 2026-11-25 (common `3538ee55` plus this change; production-like setup, side boards, maps mixed
+by seed; a scratch scoreCandidates adapter over the bot seat's deep-fit driver, offline deterministic work, the
+integration design's identity harness):
+
+- Decisions: batches 1 to 4 kept (rate 0.4, seeds 24200000-24200029) 30 of 30 battles and 1,403 of 1,403 searched
+  decisions identical to pure TypeScript (actions and rollout turns), every bank native (3,567; 27 turn-budget stops);
+  with the wave-1 casters (Healer, Battle Mage, Satyr, Magic Dragon, wave-1 books; 24500000-24500019) 20 of 20 battles
+  and 833 of 833 decisions, 2,171 of 2,174 banks native (3 recovery-net refusals ran in TypeScript).
+- Per rollout, in shadow mode (TypeScript decides; every bank replayed natively and its records compared with
+  TypeScript's rollouts one by one: value and material bit for bit, turns, uuid and summon counters, winner): 131,098
+  rollouts and 5,741 banks, 0 mismatches, with 7,518 pairs skipped after an illegal rollout and 24,988 rollouts that
+  summoned (Infest, Summon Wolves); the live code path (single-call banks) 5,961 rollouts, 0 mismatches.
+- The pre-check against export + load + a v0.8 request at every decision of 95 battles (batches 1-5 with the casters,
+  all creatures with full books, random artifacts; 5,736 roots, both policies): 0 false accepts, 0 false refusals;
+  about 2 us per root warm (3 to 6 us on the first call of a decision, 15 to 20 us right after a search's rollouts).
+- `ffi/smoke.ts` 12 (24600000), 30 with batches 1 to 4 (24610000) and 12 ability-free (24620000); `check.sh 100
+  24400000` both modes 100 of 100; `zig build test`.
 
 Results with batch 4 on 2026-11-25 (common `6998c2dd` plus this change; production-like setup, side boards, maps mixed
 by seed; the oracle's battles play native v0.8, so the roots carry Battle Roar rows, gifts, Hidden markers, forbidden
@@ -453,15 +650,20 @@ by a flat binary one.
 1. Port the rule and its state into `State` as usual (the README's porting notes), and extend `compare.state` and the
    recorder's digest when the state is observable.
 2. In `snapshot.zig`, read the new field from the export (the raw TypeScript field, or a value added to the export's
-   `configs` / `setup` when it needs unported TypeScript to compute), and remove its refusal (`checkUnitScope`,
-   `requireEmpty` in `loadGrid` / `loadFight`, a spell's name in `st.CastSpell`). Keep every other refusal: the loader
-   must refuse what the port cannot play.
+   `configs` / `setup` when it needs unported TypeScript to compute), and remove its refusal from `scope.zig`'s tables
+   ("Accepting a newly ported feature" above; a spell's name joins `st.CastSpell`). Keep every other refusal: the
+   loader must refuse what the port cannot play.
 3. When TypeScript gains a field, the export's coverage check throws until `state_export.ts` classifies it; then decide
    here: read it, ignore it (say why in the list above), or refuse non-empty values.
 4. Record with `RECORD_RESUME` in the new scope and run `hoc-sim resume`; it checks the loaded state against the
    recorded digest and every step after it. Then `ffi/smoke.ts` and the rollout comparison.
 5. Bump `ABI_VERSION` (ffi.zig and bridge.ts) on any change to a signature, a struct layout or the request format, and
    the export `version` (state_export.ts, `snapshot.FORMAT_VERSION`) on a format change.
+6. A refusal belongs in `scope.zig`'s tables (or the enums and v08Scope's `V08_SCOPE` the manifest reads), so the scope
+   manifest and the TypeScript pre-check follow it; a new kind of refusal also needs a line in `ffi/precheck.ts`, and
+   the pre-check comparison (a passed root the library refuses is a miss) shows a missing one. A rule change that moves
+   a rollout of the self-test fixture fails `zig build test`: regenerate `src/selftest/` from TypeScript's records of the
+   same banks (the scoreCandidates shadow comparison writes them; there is no committed generator yet).
 
 ## Known gaps of src/v08 (owner: the v0.8 port)
 
@@ -493,8 +695,10 @@ order), their refusals and the leaf copy are removed, and every root compares id
 
 `hoc_rollouts` is the per-rollout seam the TypeScript SearchDriver can call (phase 1 of the A19 port plan): the driver
 keeps enumeration, shortlists, pruning and arbitration, and swaps its `rollout` for a native call per `scoreCandidates`
-bank. Placeholders, not implemented: `hoc_score_candidates` (the per-candidate loop, certified tail bounds and the
-material sample in Zig, returning means, materials and completed counts) and `hoc_decide` (a whole decision).
+bank. ABI 3's `bank` and pair records reproduce a bank exactly (one call per bank live, one per candidate while the
+offline certified bounds are on). Placeholders, not implemented: `hoc_score_candidates` (SearchSelectionBounds and
+bestFinishedMean in Zig: one call per offline bank, returning means, materials and completed counts) and `hoc_decide`
+(a whole decision).
 
 Done for the A19 rollouts: the v0.8 policy (production switches) with its per-thread battle table and the army
 profile, the per-unit mindless pin, the actor-antithetic stream, the v1 and v2 leaves with libc's `exp` (glibc checked

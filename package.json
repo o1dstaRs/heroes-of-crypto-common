@@ -14,7 +14,10 @@
     "types": "./src/index.ts",
     "files": [
         "dist",
-        "src"
+        "src",
+        "zig/ffi/bridge.ts",
+        "zig/ffi/precheck.ts",
+        "zig/parity/state_export.ts"
     ],
     "scripts": {
         "prebuild": "rimraf dist && bun run fmt",

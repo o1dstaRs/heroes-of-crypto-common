@@ -6,7 +6,12 @@ could run on a native simulator. It is not wired into the package build, lint, t
 A bridge (`BRIDGE.md`) hands a live TypeScript battle to the engine mid-fight: `parity/state_export.ts` exports it,
 `src/snapshot.zig` loads it (refusing what the port does not model), and a C ABI (`zig build lib`, `ffi/bridge.ts`)
 plays it out or runs A19 search rollouts on it, with v0.1 or the native v0.8 policy (`src/v08`) on each seat, the
-plain or actor-antithetic chance stream and the material, v1 or v2 leaf.
+plain or actor-antithetic chance stream and the material, v1 or v2 leaf. ABI 3 adds scoreCandidates' bank semantics
+(`bank`) with one record per rollout pair (`hoc_rollout_pairs`), the library's identity (`hoc_build_info`: ABI, common
+commit, scope hash, target, CPU, glibc), a scope manifest (`hoc_scope_manifest`, generated from `src/scope.zig`'s
+refusal tables) that the TypeScript pre-check `ffi/precheck.ts` compiles to answer "would the library take this root"
+without an export, and fail-safe loading (`loadHocEngine`: null and one log line instead of an exception, after the
+`hoc_exp` and compiled-in fixture self-test).
 
 ## Scope
 
@@ -692,6 +697,10 @@ The framework the army setup added (exact in both modes, coverage below):
 
 - Add the ability to `AbilityId` (and any buff, debuff or effect it applies to `SpellId`), then port its branches from
   the real TypeScript; the reduced references mark the hook points but drop the ability code.
+- Accepting new state on the bridge: the loader's and v08Scope's refusals are tables in `src/scope.zig` (refused unit
+  fields and props, limited name lists, grid and fight stores, artifact ids, capacities, `rollout.V08_SCOPE`). Edit the
+  table, not the loader's checks: the scope manifest and the TypeScript pre-check follow it (`BRIDGE.md`, "Accepting a
+  newly ported feature").
 - Order is state. Every apply deletes the name and appends it, blessings are re-granted at the end of the buff list on
   every stat refresh, and the digest compares lists in order.
 - Random draws follow the source line by line: a damage roll and a Lucky Strike roll happen even when the blow then
@@ -1482,6 +1491,9 @@ cd zig && zig build -Drelease=true                                   # plain `zi
 ```
 
 For the 9800X3D: `zig build -Drelease=true -Dtarget=x86_64-linux-gnu -Dcpu=znver5` (dynamic, against the system glibc).
+The bridge library for the production hosts (glibc 2.35, x86-64-v3): `zig build lib -Drelease=true
+-Dtarget=x86_64-linux-gnu.2.35 -Dcpu=x86_64_v3 -Dcommon-sha=$(git rev-parse HEAD)` (`hoc_build_info` reports the target,
+CPU, glibc and commit).
 Every artifact links libc: the learned leaves call libc's `exp`, as Bun's `Math.exp` does, and musl's `exp` can differ
 from glibc's in the last bit (the check is in `BRIDGE.md`), so the static musl build is no longer used.
 

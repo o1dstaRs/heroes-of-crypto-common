@@ -30,7 +30,18 @@ import {
 } from "../../src/utils/lib";
 import { battleDigest } from "../parity/digest";
 import { exportBattleState } from "../parity/state_export";
-import { HocEngine, HOC_END_REASONS, hocNowNs, hocSymbols, type IHocRolloutRequest } from "./bridge";
+import {
+    HOC_END_REASONS,
+    HOC_PAIR_PLAYED,
+    HOC_PAIR_SKIPPED_ILLEGAL,
+    HocEngine,
+    hocNowNs,
+    hocSymbols,
+    loadHocEngine,
+    requireHocLibrary,
+    runHocSelfTest,
+    type IHocRolloutRequest,
+} from "./bridge";
 
 const DEFAULT_KEEP =
     "Leprechaun,Nomad,Crusader,Fairy,Goblin Knight,Hyena,Scavenger,Wyvern,Pikeman,Peasant,Pegasus,Hydra,Trent";
@@ -233,8 +244,9 @@ function main(): void {
             const reps = 10;
             const encoded = new TextEncoder().encode(battle.json);
             const t0 = performance.now();
+            const sym = engine.symbols;
             for (let i = 0; i < reps; i += 1) {
-                hocSymbols.hoc_state_free(engine.ptr, hocSymbols.hoc_state_load(engine.ptr, encoded, encoded.length));
+                sym.hoc_state_free(engine.ptr, sym.hoc_state_load(engine.ptr, encoded, encoded.length));
             }
             loadMs += performance.now() - t0;
             loads += reps;
@@ -296,6 +308,52 @@ function main(): void {
                 rolloutNs += hocNowNs() - t1;
                 rolloutPairs += a.values.length;
                 rolloutTurns += a.turns;
+                const recs = engine.rolloutPairs();
+                if (
+                    recs.length !== pairs.length ||
+                    recs.some((p, i) => p.flags !== HOC_PAIR_PLAYED || !Object.is(p.value, a.values[i])) ||
+                    recs.reduce((sum, p) => sum + p.turns, 0) !== a.turns ||
+                    recs[recs.length - 1].uuidSequence !== a.uuidSequence
+                ) {
+                    fail("the pair records disagree with the call's values and totals");
+                }
+                // ABI 3's bank: the same pairs with scoreCandidates' semantics. An illegal pair skips its candidate's
+                // later pairs; every played pair keeps its ABI 2 value when no rollout summons (the summon scope only
+                // moves summon ids); material samples lie in [0, 1].
+                const banked = engine.rollouts(state, {
+                    ...request,
+                    bank: { skipAfterIllegal: true, summonScope: "rollout", material: true },
+                });
+                const brecs = engine.rolloutPairs();
+                // every summon takes one value of the uuid counter
+                const summons = a.uuidSequence !== (JSON.parse(battle.json).harness.uuidSequence ?? 0);
+                for (let i = 0; i < pairs.length; i += 1) {
+                    const p = brecs[i];
+                    const illegalBefore = brecs.some(
+                        (q, j) =>
+                            j < i &&
+                            pairs[j][0] === pairs[i][0] &&
+                            q.flags === HOC_PAIR_PLAYED &&
+                            q.value === -Infinity,
+                    );
+                    if (illegalBefore ? p.flags !== HOC_PAIR_SKIPPED_ILLEGAL : p.flags !== HOC_PAIR_PLAYED) {
+                        fail(`bank pair ${i}: flags ${p.flags}`);
+                        break;
+                    }
+                    if (p.flags === HOC_PAIR_PLAYED && !summons && !Object.is(p.value, a.values[i])) {
+                        fail(`bank pair ${i}: value ${p.value}, ABI 2 ${a.values[i]}`);
+                        break;
+                    }
+                    if (
+                        p.flags === HOC_PAIR_PLAYED &&
+                        Number.isFinite(p.value) &&
+                        !(p.material >= 0 && p.material <= 1)
+                    ) {
+                        fail(`bank pair ${i}: material ${p.material}`);
+                        break;
+                    }
+                }
+                if (banked.values.length !== pairs.length) fail(`bank wrote ${banked.values.length}`);
                 const b = engine.rollouts(state, request);
                 if (a.values.length !== pairs.length || a.stop !== "done") fail(`rollouts stopped early (${a.stop})`);
                 if (a.values.some((v, i) => !Object.is(v, b.values[i]))) fail("rollouts are not deterministic");
@@ -319,13 +377,30 @@ function main(): void {
             checked += 1;
         }
 
+        // The fail-safe entry and the self-test (ABI, Math.exp against the library's exp, the compiled-in rollouts).
+        const report = runHocSelfTest();
+        if (!report.ok) failures.push(`self-test: ${report.reason}`);
+        const safe = loadHocEngine({ log: (m) => failures.push(m) });
+        if (!safe) failures.push("loadHocEngine refused a library that passed its self-test");
+        safe?.free();
+        const missing = loadHocEngine({ path: join(tmp, "no-such-libhocsim"), log: () => undefined });
+        if (missing) failures.push("loadHocEngine returned an engine for a missing library");
+        const wrongCommit = loadHocEngine({ commonSha: "not-this-commit", log: () => undefined });
+        if (wrongCommit) failures.push("loadHocEngine accepted a library built from another common commit");
+        console.log(`  build: ${JSON.stringify(engine.buildInfo)}`);
+        console.log(
+            `  self-test: exp ${report.exp?.mismatches ?? "?"} / ${report.exp?.inputs ?? "?"} mismatches, fixture ${report.fixture?.ok ? "ok" : report.fixture?.error}`,
+        );
+        if (hocSymbols.hoc_abi_version() !== 3) failures.push("hocSymbols proxy");
+
         // Per-call overhead of the FFI boundary itself.
+        const sym = requireHocLibrary().symbols;
         const calls = 1_000_000;
         let t = performance.now();
-        for (let i = 0; i < calls; i += 1) hocSymbols.hoc_abi_version();
+        for (let i = 0; i < calls; i += 1) sym.hoc_abi_version();
         const noopNs = ((performance.now() - t) * 1e6) / calls;
         t = performance.now();
-        for (let i = 0; i < calls; i += 1) hocSymbols.hoc_now_ns();
+        for (let i = 0; i < calls; i += 1) sym.hoc_now_ns();
         const nowNs = ((performance.now() - t) * 1e6) / calls;
 
         console.log(

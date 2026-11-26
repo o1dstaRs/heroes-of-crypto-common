@@ -6,11 +6,11 @@
 //! arrows, turn flags, position, grid registration; summoned units too), the grid (board, aggression boards, terrain
 //! and stones), the fight (laps, queues, sets, flags, hit counters), the units holder (distances, Ember Covenant),
 //! the AI target memory, the damage-statistic laps, the summon templates and the summon id parts (the harness's
-//! battle seed and summon counter), the spellbooks, the vines and the smoke clouds. Anything non-empty the port does not
-//! model (fire walls, unported artifacts or spells, unported abilities, buffs or effects, ranked authoritative
-//! stats, ...) is refused as an
-//! unsupported state, naming what it found: the loader is fail-closed, like the export's coverage check on the
-//! TypeScript side.
+//! battle seed and summon counter), the spellbooks, the vines and the smoke clouds, the teams' artifacts and Barrel
+//! Barricade's barrels. Anything non-empty the port does not model (fire walls, unported artifacts or spells, unported
+//! abilities, buffs or effects, ranked authoritative stats, ...) is refused as an unsupported state, naming what it
+//! found: the loader is fail-closed, like the export's coverage check on the TypeScript side. The refusals' names and
+//! limits are tables in scope.zig, which the scope manifest (`hoc_scope_manifest`) exports.
 //!
 //! Slots: the holder's units take slots 0.. in holder order; the removed units the turn sets still name (made,
 //! hourglass, replied) are kept by uid (Fight.removed_*). Uids are indices into the caller's `ids`.
@@ -22,6 +22,7 @@ const engine = @import("engine.zig");
 const artifacts = @import("artifacts.zig");
 const terrain = @import("terrain.zig");
 const uuid = @import("uuid.zig");
+const scope = @import("scope.zig");
 const Rng = @import("rng.zig").Rng;
 
 const Value = std.json.Value;
@@ -412,34 +413,39 @@ fn checkUnitScope(uv: Value, fields: Value, props: Value, why: *Why) Error!void 
         if (!known) return why.unsupported("summoned {s}", .{name});
     }
     const unit_type = get(uv, "unitType");
-    if (unit_type != .integer or unit_type.integer != 1) return why.unsupported("unit type is not a creature", .{});
-    // The Wounding Charm lends "Deep Wounds Level 1" (the only artifact-granted card): the card itself is in the
-    // ability lists; the record only matters to a re-apply, which runMatch and rollouts never do.
-    const granted = get(props, "artifact_granted_abilities");
-    if (!isUndefined(granted)) {
-        for (try items(granted, why, "artifact_granted_abilities")) |g| {
-            if (!std.mem.eql(u8, try string(g, why, "artifact_granted_abilities"), "Deep Wounds Level 1")) return why.unsupported("artifact-granted ability", .{});
+    var creature = false;
+    for (scope.UNIT_TYPES) |t| {
+        if (unit_type == .integer and unit_type.integer == t) creature = true;
+    }
+    if (!creature) return why.unsupported("unit type is not a creature", .{});
+    // Lists that may hold only the names scope.zig accepts: the Wounding Charm lends "Deep Wounds Level 1" (the only
+    // artifact-granted card); the card itself is in the ability lists, the record only matters to a re-apply, which
+    // runMatch and rollouts never do.
+    for (scope.LIMITED_UNIT_PROPS) |f| {
+        const list = get(props, f.key);
+        if (isUndefined(list)) continue;
+        for (try items(list, why, f.key)) |g| {
+            if (!f.accepts(try string(g, why, f.key))) return why.unsupported("{s}", .{f.what});
         }
     }
-    try requireEmpty(get(props, "helping_hand_caster_id"), why, "Helping Hand caster");
-    try requireEmpty(get(props, "helping_hand_penalty_id"), why, "Helping Hand penalty");
+    for (scope.REFUSED_UNIT_PROPS) |f| try requireEmpty(get(props, f.key), why, f.what);
     if (props == .object) {
         var it = props.object.iterator();
         while (it.next()) |e| {
             // The ranked client's authoritative stats (`*_authoritative`); spell_entries_authoritative only says the
             // spell list was built (spells must be empty anyway).
             const key = e.key_ptr.*;
-            if (std.mem.endsWith(u8, key, "_authoritative") and !std.mem.eql(u8, key, "spell_entries_authoritative")) {
-                try requireEmpty(e.value_ptr.*, why, key);
-            }
+            if (scope.refusedAuthoritative(key)) try requireEmpty(e.value_ptr.*, why, key);
         }
     }
-    try requireEmpty(get(fields, "waterShieldSpent"), why, "Water Shield spent");
+    for (scope.REFUSED_UNIT_FIELDS) |f| try requireEmpty(get(fields, f.key), why, f.what);
     // Last Fuse: TypeScript records a fatal hit on every killing blow; only one with a source (the striker's Last Fuse
     // row) is pending state the port does not load. A sourceless one (a corpse a step left in the holder) is the port's
-    // empty `fuse`.
-    const fuse_hit = get(fields, "lastFuseFatalHit");
-    if (!isUndefined(fuse_hit) and !isUndefined(get(fuse_hit, "source"))) return why.unsupported("a pending Last Fuse record", .{});
+    // empty `fuse`. (scope.REFUSED_UNIT_FIELD_PARTS)
+    for (scope.REFUSED_UNIT_FIELD_PARTS) |f| {
+        const v = get(fields, f.key);
+        if (!isUndefined(v) and !isUndefined(get(v, f.inner.?))) return why.unsupported("{s}", .{f.what});
+    }
 }
 
 /// The unit's spellbook: the raw entries (props.spells "<Faction>:<Name>", one per charge) and the parsed Spell objects
@@ -469,13 +475,7 @@ fn loadBook(s: *State, u: *Unit, fields: Value, props: Value, why: *Why) Error!v
         const faction = get(sp, "faction");
         var prefix: u8 = st.BookEntry.NO_FACTION;
         if (faction == .integer) {
-            prefix = switch (faction.integer) {
-                4 => 2, // Life
-                3 => 3, // Nature
-                1 => 4, // Chaos
-                2 => 5, // Might
-                else => return why.unsupported("spell {s} of faction {d}", .{ name, faction.integer }),
-            };
+            prefix = scope.spellFactionPrefix(faction.integer) orelse return why.unsupported("spell {s} of faction {d}", .{ name, faction.integer });
         }
         u.spells[u.n_spells] = .{ .spell = @intFromEnum(spell), .prefix = prefix, .amount = amount };
         u.n_spells += 1;
@@ -506,7 +506,7 @@ fn checkNames(objects: []const Value, names: []const Value, comptime props_key: 
 fn storedProperty(v: Value, why: *Why) Error!i8 {
     if (isUndefined(v)) return -1;
     const x = try number(v, why, "spell property");
-    if (x != @trunc(x) or x < 0 or x > std.math.maxInt(i8)) return why.unsupported("stored spell property {d}", .{x});
+    if (x != @trunc(x) or x < 0 or x > scope.MAX_STORED_PROPERTY) return why.unsupported("stored spell property {d}", .{x});
     return @intFromFloat(x);
 }
 
@@ -568,12 +568,12 @@ fn loadLists(u: *Unit, fields: Value, props: Value, why: *Why) Error!void {
             if (!poison and (x != .integer or x.integer != 1)) return why.unsupported("effect stacks other than 1", .{});
         }
     }
-    // Stored properties: the aura rows' source cells (buff and debuff rows) and the augments' (Sniper "27;70"), as
-    // engine.loadBuffSources.
+    // Stored properties: the aura rows' source cells (buff and debuff rows), the augments' (Sniper "27;70") and the
+    // artifact rows' (scope.storesProperties), as engine.loadBuffSources.
     const objects = try items(get(fields, "buffs"), why, "buffs");
     for (objects, 0..) |o, i| {
         const b = &u.buffs.items[u.aug_orphans + i];
-        if (!b.id.isAugment() and b.laps != st.LAPS_AURA and !artifacts.storesProperties(b.id)) continue;
+        if (b.laps != st.LAPS_AURA and !scope.storesProperties(b.id)) continue;
         b.src_x = try storedProperty(get(o, "firstSpellProperty"), why);
         b.src_y = try storedProperty(get(o, "secondSpellProperty"), why);
     }
@@ -612,7 +612,7 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
     if (team != Team.LEFT and team != Team.RIGHT) return why.unsupported("team {d}", .{team});
     const fw = try integer(get(props, "footprint_width"), why, "footprint_width");
     const fh = try integer(get(props, "footprint_height"), why, "footprint_height");
-    if (fw < 1 or fw > 2 or fh < 1 or fh > 2) return why.unsupported("footprint {d}x{d}", .{ fw, fh });
+    if (fw < scope.FOOTPRINT_MIN or fw > scope.FOOTPRINT_MAX or fh < scope.FOOTPRINT_MIN or fh > scope.FOOTPRINT_MAX) return why.unsupported("footprint {d}x{d}", .{ fw, fh });
     const cid = get(uv, "creatureId");
     s.units[idx] = .{
         .in_holder = true,
@@ -757,7 +757,7 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
         u.adjusted_laps |= @as(u128, 1) << @intCast(lap);
     }
     const possible = try items(get(fields, "possibleAttackTypes"), why, "possibleAttackTypes");
-    if (possible.len > u.possible.len) return why.unsupported("{d} possible attack types", .{possible.len});
+    if (possible.len > u.possible.len or possible.len > scope.MAX_POSSIBLE_ATTACK_TYPES) return why.unsupported("{d} possible attack types", .{possible.len});
     for (possible, 0..) |p, k| u.possible[k] = try intAs(u8, p, why, "possibleAttackTypes");
     u.n_possible = @intCast(possible.len);
 }
@@ -765,7 +765,8 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
 fn loadGrid(s: *State, grid: Value, fight: Value, ids: []const []const u8, why: *Why) Error!void {
     const gt = try integer(get(fight, "gridType"), why, "gridType");
     if (gt != try integer(get(grid, "gridType"), why, "grid.gridType")) return why.malformed("grid and fight grid types differ", .{});
-    if (gt != GT.NORMAL and gt != GT.LAVA_CENTER and gt != GT.BLOCK_CENTER) return why.unsupported("grid type {d}", .{gt});
+    if (!scope.gridTypeAccepted(gt)) return why.unsupported("grid type {d}", .{gt});
+    for (scope.REFUSED_GRID_FIELDS) |f| try requireEmpty(get(grid, f.key), why, f.what);
     s.fight = .{};
     s.fight.grid_type = @intCast(gt);
 
@@ -938,7 +939,7 @@ fn turnSet(s: *State, v: Value, ids: []const []const u8, removed: *st.UidSet, wh
 fn loadFight(s: *State, fight: Value, root: Value, ids: []const []const u8, why: *Why) Error!void {
     const f = &s.fight;
     const lap = try integer(get(fight, "currentLap"), why, "currentLap");
-    if (lap < 0 or lap >= 127) return why.unsupported("lap {d}", .{lap});
+    if (lap < 0 or lap > scope.MAX_LAP) return why.unsupported("lap {d}", .{lap});
     f.lap = @intCast(lap);
     f.started = try boolean(get(fight, "fightStarted"), why, "fightStarted");
     f.finished = try boolean(get(fight, "fightFinished"), why, "fightFinished");
@@ -952,7 +953,10 @@ fn loadFight(s: *State, fight: Value, root: Value, ids: []const []const u8, why:
     f.side_oriented = try boolean(get(fight, "sideOrientedPlacement"), why, "sideOrientedPlacement");
     f.hits_left = try intAs(i32, get(fight, "obstacleHitsLeftLeft"), why, "obstacleHitsLeftLeft");
     f.hits_right = try intAs(i32, get(fight, "obstacleHitsLeftRight"), why, "obstacleHitsLeftRight");
-    try requireEmpty(get(fight, "legacyAxisPolicyTeams"), why, "legacy-axis policy teams");
+    for (scope.REFUSED_FIGHT_FIELDS) |rf| {
+        const v = get(fight, rf.key);
+        try requireEmpty(if (rf.inner) |inner| get(v, inner) else v, why, rf.what);
+    }
     // Smoke: Map entries [key, {cell, lapsRemaining}] in insertion order.
     const clouds = get(get(fight, "smokeClouds"), "clouds");
     if (!isUndefined(clouds)) {
@@ -971,7 +975,6 @@ fn loadFight(s: *State, fight: Value, root: Value, ids: []const []const u8, why:
             f.smoke_cells[@intCast(c.x)] |= @as(u16, 1) << @intCast(c.y);
         }
     }
-    try requireEmpty(get(get(fight, "fireWalls"), "walls"), why, "fire walls");
     // Vines: Map entries [key, {cell, lapsRemaining, team}] in insertion order.
     const vines = get(get(fight, "vines"), "vines");
     if (!isUndefined(vines)) {
@@ -992,13 +995,13 @@ fn loadFight(s: *State, fight: Value, root: Value, ids: []const []const u8, why:
         }
         if (f.n_vines != 0 and !s.spell_cfg[@intFromEnum(st.CastSpell.vine_throw)].loaded) return why.malformed("vines without the Vine Throw config", .{});
     }
-    // The teams' artifacts (Map team -> id): ids the port plays (artifacts.supportedT1/T2) or refused by number.
-    for ([_][]const u8{ "artifactTier1PerTeam", "artifactTier2PerTeam" }, 0..) |key, tier| {
+    // The teams' artifacts (Map team -> id): ids the port plays (scope.artifactSupported: artifacts.supportedT1/T2) or
+    // refused by number.
+    for (scope.ARTIFACT_FIELDS, 0..) |key, tier| {
         for (try mapEntries(get(fight, key), why, key)) |e| {
             const team = try integer(e.array.items[0], why, "artifact team");
             const id = try integer(e.array.items[1], why, "artifact id");
-            const ok = if (tier == 0) artifacts.supportedT1(id) else artifacts.supportedT2(id);
-            if (!ok) return why.unsupported("Tier-{d} artifact {d}", .{ tier + 1, id });
+            if (!scope.artifactSupported(tier, id)) return why.unsupported("Tier-{d} artifact {d}", .{ tier + 1, id });
             if (team != st.Team.LEFT and team != st.Team.RIGHT) return why.malformed("artifact team {d}", .{team});
             const row = &s.setup[@intCast(team)];
             if (tier == 0) row.artifact_t1 = @intCast(id) else row.artifact_t2 = @intCast(id);
