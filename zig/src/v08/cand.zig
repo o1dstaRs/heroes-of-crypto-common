@@ -49,6 +49,14 @@ pub const Candidate = struct {
     ek: u8 = 0,
     /// spellName: a spell candidate's spell (a CastSpell raw id), or -1.
     spell: i16 = -1,
+    /// shotFeatures.primaryTargetDamage: a shot's expected damage to the stack it hits first when that stack is an enemy
+    /// (0 for a candidate without shot features).
+    primary_dmg: f64 = 0,
+    /// pressureTargetId (an area throw under preserveAttackTargetCoverage): the first enemy its splash touches, which
+    /// v0.8s target pressure schedules when the engine primary is an ally; -1 when absent.
+    pressure: i16 = -1,
+    /// pressureExpectedKill: whether that throw kills the pressure target; null when absent.
+    pressure_ek: ?u8 = null,
 };
 
 pub const Options = struct {
@@ -211,17 +219,21 @@ const Gen = struct {
         if (!self.opt.enrich) {
             if (cand.kind == .shot) {
                 anchor.target = cand.target;
+                anchor.primary_dmg = cand.primary_dmg;
                 anchor.ed = cand.ed;
                 anchor.ek = cand.ek;
             }
             return;
         }
         anchor.target = cand.target;
+        if (cand.pressure >= 0) anchor.pressure = cand.pressure;
+        if (cand.pressure_ek) |k| anchor.pressure_ek = k;
         anchor.stand = cand.stand;
         anchor.tcell = cand.tcell;
         anchor.ed = cand.ed;
         anchor.ek = cand.ek;
         anchor.spell = cand.spell;
+        anchor.primary_dmg = cand.primary_dmg; // incumbent.shotFeatures = cand.shotFeatures
     }
 
     fn push(self: *Gen, cand: *const Candidate) void {
@@ -747,7 +759,8 @@ const Gen = struct {
         return engine.possibleIncludes(u, AT.MELEE) or engine.possibleIncludes(u, AT.MELEE_MAGIC);
     }
 
-    const Dmg = struct { ed: f64, ek: u8 };
+    /// The candidate's value and kill, and (shots) the expected damage to the primary when it is an enemy.
+    const Dmg = struct { ed: f64, ek: u8, primary: f64 = 0 };
 
     /// meleeDamage: the mean of the melee roll's bounds (native shooters strike at half; Handyman, which would lift
     /// that, is not in the engine's ability set yet), capped at the target's health.
@@ -792,6 +805,8 @@ const Gen = struct {
         ty: f64 = 0,
         ed: f64,
         ek: u8,
+        /// shotFeatures.primaryTargetDamage
+        primary_dmg: f64 = 0,
         index: u16,
         line: u64,
         fn stationary(_: Shot) bool {
@@ -804,7 +819,7 @@ const Gen = struct {
     };
 
     fn shotCandidate(self: *Gen, sh: *const Shot, cand: *Candidate) void {
-        cand.* = .{ .kind = .shot, .target = sh.target, .ed = sh.ed, .ek = sh.ek };
+        cand.* = .{ .kind = .shot, .target = sh.target, .ed = sh.ed, .ek = sh.ek, .primary_dmg = sh.primary_dmg };
         if (self.unit().attack_type_selected != AT.RANGE) cand.d.push(.{ .select_attack_type = .{ .unit = self.c.ui, .attack_type = AT.RANGE } });
         if (sh.free) {
             // A free line names no stack: the engine resolves its victims from the ray.
@@ -962,7 +977,9 @@ const Gen = struct {
             const only = g.group(0)[0];
             if (s.units[only].team == opp) {
                 if (fuse.lastFuseRanged(s, u, only, g.divisors[0])) |f| {
-                    return .{ .ed = f.net, .ek = if (only == primary and f.secure) 1 else 0 };
+                    // directDamage: the primary estimate, else the blow and blasts before friendly losses.
+                    const direct = f.primary orelse f.net + f.friendly;
+                    return .{ .ed = f.net, .ek = if (only == primary and f.secure) 1 else 0, .primary = if (only == primary) direct else 0 };
                 }
             }
         }
@@ -972,6 +989,7 @@ const Gen = struct {
         const groups: usize = if (prep.through) g.n else @min(1, g.n);
         var value: f64 = 0;
         var kill: u8 = 0;
+        var primary_dmg: f64 = 0;
         var counted: st.UnitSet = 0;
         for (0..groups) |k| for (g.group(k)) |ti| {
             if (counted & engine.unitBit(ti) != 0) continue;
@@ -1030,9 +1048,10 @@ const Gen = struct {
             if (t.team == opp) {
                 value += effective;
                 if (ti == primary and effective >= hp) kill = 1;
+                if (ti == primary) primary_dmg = effective;
             } else value -= effective;
         };
-        return .{ .ed = value, .ek = kill };
+        return .{ .ed = value, .ek = kill, .primary = primary_dmg };
     }
 
     /// lineSignatureOf: (divisor, stack ids) per group in ray order, hashed.
@@ -1103,7 +1122,7 @@ const Gen = struct {
                         continue;
                     }
                     const dmg = self.shotValue(&prep, &g, primary);
-                    found[nf] = .{ .target = primary, .aim = ei, .cell = cell, .side = side, .ed = dmg.ed, .ek = dmg.ek, .index = @intCast(nf), .line = line };
+                    found[nf] = .{ .target = primary, .aim = ei, .cell = cell, .side = side, .ed = dmg.ed, .ek = dmg.ek, .primary_dmg = dmg.primary, .index = @intCast(nf), .line = line };
                     nf += 1;
                 }
             }
@@ -1139,7 +1158,7 @@ const Gen = struct {
                             continue;
                         }
                         const dmg = self.shotValue(&prep, &g, primary);
-                        found[nf] = .{ .target = primary, .aim = primary, .free = true, .tx = tx, .ty = ty, .ed = dmg.ed, .ek = dmg.ek, .index = @intCast(nf), .line = line };
+                        found[nf] = .{ .target = primary, .aim = primary, .free = true, .tx = tx, .ty = ty, .ed = dmg.ed, .ek = dmg.ek, .primary_dmg = dmg.primary, .index = @intCast(nf), .line = line };
                         nf += 1;
                     };
                 }
@@ -1283,6 +1302,10 @@ const Gen = struct {
 
     fn throwCandidate(self: *Gen, t: *const Throw, cand: *Candidate) void {
         cand.* = .{ .kind = .throw, .target = t.primary, .tcell = t.cell, .ed = t.ed, .ek = t.kill };
+        if (self.opt.coverage) {
+            cand.pressure = t.pressure;
+            cand.pressure_ek = t.ek; // the pressure target's kill under coverage
+        }
         if (self.unit().attack_type_selected != AT.RANGE) cand.d.push(.{ .select_attack_type = .{ .unit = self.c.ui, .attack_type = AT.RANGE } });
         cand.d.push(.{ .area_throw_attack = .{ .attacker = self.c.ui, .target_cell = t.cell } });
     }

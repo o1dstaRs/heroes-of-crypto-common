@@ -460,7 +460,8 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         }
     };
     var war_anger_range: f64 = 0;
-    if (s.war_anger_def != st.NO_AURA) {
+    // getAuraEffects().find(War Anger): a Broken unit projects no aura.
+    if (s.war_anger_def != st.NO_AURA and !u.isBroken()) {
         for (u.auras[0..u.n_auras]) |d| {
             if (d == s.war_anger_def) war_anger_range = s.aura_defs[d].range;
         }

@@ -329,7 +329,7 @@ pub fn lastFuseMelee(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape, fro
     if (u.buffs.find(.last_fuse) == null or t.isDead() or t.team == u.team) return null;
     if (u.buffs.find(.fireforged_sword) != null or secondaryRider(u)) return null;
     if (shape.moved) {
-        for (s.holderOrder()) |i| if (s.units[i].n_auras != 0) return null;
+        for (s.holderOrder()) |i| if (s.units[i].auraCount() != 0) return null; // getAuraEffects(): none while Broken
     }
     const resurrects = engine.canSelfResurrect(t);
     if (resurrects and s.setup[u.team].break_chance > 0) return null;

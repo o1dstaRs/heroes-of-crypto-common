@@ -554,10 +554,14 @@ fn dullingSwingCuts(s: *const st.State, actor: u8, t: u8, melee: bool, ek: u8) b
     return ek == 0 and melee and a.has(.dulling_defense) and util.abilityPower(a, .dulling_defense) > 0 and s.units[t].base_attack > 1;
 }
 
-/// targetWork: the hits the target still needs (no creature in scope regenerates, so no Wild Regeneration reserve),
-/// taxed when a knight's answer will cut our attack, and raised for the knight's own dulling swing.
+/// targetWork: the hits the target still needs, with one top-creature refill per activation left before Armageddon for
+/// a Wild Regeneration stack (TypeScript also reads a Wild Regeneration buff; the gift grants the ability, so the
+/// engine has none), taxed when a knight's answer will cut our attack, and raised for the knight's own dulling swing.
 fn targetWork(s: *const st.State, actor: u8, t: u8, melee: bool, delivery: f64, ek: u8) f64 {
-    const base_work = @max(0, util.cumulativeHp(&s.units[t])) / @max(delivery, DELIVERY_EPSILON);
+    const tu = &s.units[t];
+    const activations: f64 = @floatFromInt(@max(1, engine.NUMBER_OF_LAPS_FIRST_ARMAGEDDON - @max(0, s.fight.lap)));
+    const reserve: f64 = if (tu.has(.wild_regeneration)) @max(0, tu.max_hp) * activations else 0;
+    const base_work = (@max(0, util.cumulativeHp(tu)) + reserve) / @max(delivery, DELIVERY_EPSILON);
     var work = base_work;
     if (melee and knightAnswers(s, actor, t)) {
         const power = @max(0, util.abilityPower(&s.units[t], .dulling_defense));
@@ -592,11 +596,17 @@ fn targetPressure(s: *const st.State, actor: u8, set: *const cand.Set, ok: *bool
     var nt: usize = 0;
     var deliveries: [st.MAX_UNITS]Delivery = undefined;
     for (set.slice(), 0..) |*c, i| {
-        if (c.target < 0 or !isDirectCombat(c.d.slice())) continue;
-        const ti: u8 = @intCast(c.target);
+        // candidate.pressureTargetId ?? candidate.targetId
+        const pressure_target = if (c.pressure >= 0) c.pressure else c.target;
+        if (pressure_target < 0 or !isDirectCombat(c.d.slice())) continue;
+        const ti: u8 = @intCast(pressure_target);
         const t = &s.units[ti];
         const ed = if (std.math.isFinite(c.ed) and c.ed > 0) c.ed else 0;
-        if (t.isDead() or t.team == team or ed <= 0) continue;
+        // targetDeliveryDamage: a shot's damage to its primary stack when positive, else the expected damage.
+        const primary = if (std.math.isFinite(c.primary_dmg) and c.primary_dmg > 0) c.primary_dmg else 0;
+        const delivery = if (util.has(&c.d, .range_attack) and primary > 0) primary else ed;
+        if (t.isDead() or t.team == team or ed <= 0 or delivery <= 0) continue;
+        const ek = c.pressure_ek orelse c.ek;
         const melee = util.has(&c.d, .melee_attack);
         const original = @max(0, t.amount_alive + t.amount_died) * @max(0, t.max_hp);
         const remaining = if (original > 0) @min(1, util.cumulativeHp(t) / original) else 1;
@@ -604,13 +614,13 @@ fn targetPressure(s: *const st.State, actor: u8, set: *const cand.Set, ok: *bool
             .cand = i,
             .incumbent = c.kind == .incumbent,
             .ed = ed,
-            .ek = c.ek,
+            .ek = ek,
             .stationary = !moves(c.d.slice()),
             .target = ti,
             .remaining = remaining,
-            .unsafe_dulling = c.ek == 0 and melee and knightAnswers(s, actor, ti),
-            .dulling_swing = dullingSwingCuts(s, actor, ti, melee, c.ek),
-            .work = targetWork(s, actor, ti, melee, ed, c.ek),
+            .unsafe_dulling = ek == 0 and melee and knightAnswers(s, actor, ti),
+            .dulling_swing = dullingSwingCuts(s, actor, ti, melee, ek),
+            .work = targetWork(s, actor, ti, melee, delivery, ek),
         };
         if (by_target[ti] < 0) {
             by_target[ti] = @intCast(nt);
