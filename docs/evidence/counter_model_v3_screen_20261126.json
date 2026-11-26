@@ -1,0 +1,328 @@
+{
+    "id": "counter-model-v3-MV4-20261125",
+    "registration": {
+        "file": "docs/evidence/counter_model_v3_registration_20261125.json",
+        "sha256": "150f095aa4e663e579aa85aa4e76e850cd79563790a72cf4acad9f3850409487",
+        "decisionRuleSha256": "ef15e06fd319ebb279c58402b5ba1e536f6e7c63f90b6cf7b8f2c6071b92c373",
+        "registeredAt": "2026-11-25T20:29:00Z"
+    },
+    "analysisScriptSha256": "793239f0efbbe07e9f407201f4ba98c9efed4cbab329d26a0ab788237fb92748",
+    "guardAnalysisScriptSha256": "4fa37ef1af2959adaffb9906aabc08a1010c445d7fe3e7749906a22014e77ee7",
+    "reportScriptSha256": {
+        "integrity4.py": "4fc2937a6127396e558d2760a4a70c7bd440369e86253b74ee77fec97c91db48",
+        "report4.py": "f40760f1797b0dc42d0befff40bbcbf63cedcf69ccc7dad9c4543745d51887f8"
+    },
+    "runs": {
+        "stage1": "every host drafted all of stage 1 itself (S4 2,000 cases, C4 800); x3d's stage-1 rows are byte-identical to this Mac's; every distinct army of every changed case played exactly once (S4 1,786 changed cases, 4,517 games; C4 673, 1,662), none missing, none duplicated, none foreign",
+        "stage2": [
+            {
+                "host": "x3d",
+                "shards": "14-27",
+                "start": "2026-11-25T21:57:29Z",
+                "end": "2026-11-26T00:22:33Z"
+            },
+            {
+                "host": "Mac Studio",
+                "shards": "0-13",
+                "start": "2026-11-25T23:26:46Z",
+                "end": "2026-11-26T01:37:32Z"
+            },
+            {
+                "host": "x3d",
+                "shards": "28-37",
+                "start": "2026-11-26T00:23:08Z",
+                "end": "2026-11-26T02:28:02Z"
+            },
+            {
+                "host": "Mac Studio",
+                "shards": "38-47",
+                "start": "2026-11-26T01:38:22Z",
+                "end": "2026-11-26T03:27:42Z"
+            }
+        ],
+        "shardNote": "the rule planned basenode for shards 28-47; the client session kept basenode, so x3d and this Mac played them by agreement",
+        "guard": {
+            "host": "Mac Studio",
+            "start": "2026-11-26T01:37:33Z",
+            "end": "2026-11-26T02:32:24Z"
+        },
+        "rowsSha256": {
+            "method": "sha256 of the rows sorted as text, one JSON line each, newline-terminated",
+            "stage1S": {
+                "rows": 2000,
+                "sha256": "781471ed7ac5faeb920aa9d1bc6a92698e24fdec8ff67383b5bcc21c310e26ce"
+            },
+            "stage2S": {
+                "rows": 4517,
+                "sha256": "92f2ecdc5dd8007a702b8e14255f930888fbc123871e02215959c57d1d19a113"
+            },
+            "stage1C": {
+                "rows": 800,
+                "sha256": "b1d78bb4190522bbd91133c1a7a28bb7fa71b9de62ea333b7d078c4f91a2650d"
+            },
+            "stage2C": {
+                "rows": 1662,
+                "sha256": "a2f525bf1ba67f339a77bf49295b683b83a5d25feccea73f51058db449fd78a8"
+            },
+            "mv4g-cand": {
+                "rows": 240,
+                "sha256": "a3ccd61aef152c98792cdd75b425d1b5194250a714357196f30257ebcda3afc8"
+            },
+            "mv4g-prod": {
+                "rows": 240,
+                "sha256": "6b86994cbae70b0b9be9d4d15a41ddf38df8025efff26ce78096ec2ffc747d55"
+            }
+        }
+    },
+    "S4": {
+        "cases": 2000,
+        "v3 - v1": {
+            "changedCases": 1719,
+            "families": 988,
+            "estimatePerChangedCase": 8.02,
+            "ci95": [4.88, 11.13],
+            "better": 441,
+            "worse": 289,
+            "equal": 989,
+            "populationEstimatePerGame": 6.89,
+            "byOpponentDoctrine": {
+                "Battle Trance": {
+                    "estimate": 10.18,
+                    "ci95": [5.07, 15.44],
+                    "changedCases": 598,
+                    "families": 523
+                },
+                "Scout": {
+                    "estimate": 5.34,
+                    "ci95": [-0.2, 10.79],
+                    "changedCases": 579,
+                    "families": 496
+                },
+                "Spymaster": {
+                    "estimate": 9.78,
+                    "ci95": [4.09, 15.48],
+                    "changedCases": 542,
+                    "families": 483
+                }
+            },
+            "activation": 0.86
+        },
+        "v3 - v2": {
+            "changedCases": 1100,
+            "families": 771,
+            "estimatePerChangedCase": -0.49,
+            "ci95": [-4.44, 3.53],
+            "better": 219,
+            "worse": 227,
+            "equal": 654,
+            "populationEstimatePerGame": -0.27,
+            "byOpponentDoctrine": {
+                "Battle Trance": {
+                    "estimate": -1.9,
+                    "ci95": [-8.15, 4.35],
+                    "changedCases": 387,
+                    "families": 356
+                },
+                "Scout": {
+                    "estimate": -3.54,
+                    "ci95": [-10.02, 2.79],
+                    "changedCases": 368,
+                    "families": 332
+                },
+                "Spymaster": {
+                    "estimate": 1.89,
+                    "ci95": [-5.19, 8.81],
+                    "changedCases": 345,
+                    "families": 318
+                }
+            },
+            "activation": 0.55
+        },
+        "v2 - v1": {
+            "changedCases": 1698,
+            "families": 984,
+            "estimatePerChangedCase": 9.17,
+            "ci95": [5.95, 12.32],
+            "better": 427,
+            "worse": 268,
+            "equal": 1003,
+            "populationEstimatePerGame": 7.79,
+            "byOpponentDoctrine": {
+                "Battle Trance": {
+                    "estimate": 11.73,
+                    "ci95": [6.76, 16.7],
+                    "changedCases": 585,
+                    "families": 518
+                },
+                "Scout": {
+                    "estimate": 7.51,
+                    "ci95": [2.08, 13.03],
+                    "changedCases": 580,
+                    "families": 493
+                },
+                "Spymaster": {
+                    "estimate": 8.81,
+                    "ci95": [3.46, 14.26],
+                    "changedCases": 533,
+                    "families": 477
+                }
+            },
+            "activation": 0.849
+        },
+        "qualityErrors": 0
+    },
+    "C4": {
+        "cases": 800,
+        "v3 - v1": {
+            "changedCases": 645,
+            "families": 389,
+            "estimatePerChangedCase": 9.06,
+            "ci95": [3.6, 14.33],
+            "better": 171,
+            "worse": 110,
+            "equal": 364,
+            "populationEstimatePerGame": 7.3,
+            "byOpponentDoctrine": {
+                "Battle Trance": {
+                    "estimate": 11.17,
+                    "ci95": [1.86, 20.61],
+                    "changedCases": 221,
+                    "families": 188
+                },
+                "Scout": {
+                    "estimate": 6.94,
+                    "ci95": [-1.73, 15.61],
+                    "changedCases": 205,
+                    "families": 173
+                },
+                "Spymaster": {
+                    "estimate": 9.21,
+                    "ci95": [0.79, 17.63],
+                    "changedCases": 219,
+                    "families": 190
+                }
+            },
+            "activation": 0.806
+        },
+        "v3 - v2": {
+            "changedCases": 380,
+            "families": 297,
+            "estimatePerChangedCase": 1.35,
+            "ci95": [-5.3, 8.16],
+            "better": 81,
+            "worse": 74,
+            "equal": 225,
+            "populationEstimatePerGame": 0.64,
+            "byOpponentDoctrine": {
+                "Battle Trance": {
+                    "estimate": 0.59,
+                    "ci95": [-10.16, 11.13],
+                    "changedCases": 143,
+                    "families": 128
+                },
+                "Scout": {
+                    "estimate": 4.28,
+                    "ci95": [-7.43, 16.44],
+                    "changedCases": 120,
+                    "families": 111
+                },
+                "Spymaster": {
+                    "estimate": -2.5,
+                    "ci95": [-13.41, 9.09],
+                    "changedCases": 117,
+                    "families": 110
+                }
+            },
+            "activation": 0.475
+        },
+        "v2 - v1": {
+            "changedCases": 637,
+            "families": 389,
+            "estimatePerChangedCase": 8.23,
+            "ci95": [2.51, 14.01],
+            "better": 169,
+            "worse": 116,
+            "equal": 352,
+            "populationEstimatePerGame": 6.55,
+            "byOpponentDoctrine": {
+                "Battle Trance": {
+                    "estimate": 11.02,
+                    "ci95": [1.75, 20.16],
+                    "changedCases": 219,
+                    "families": 186
+                },
+                "Scout": {
+                    "estimate": 4.79,
+                    "ci95": [-4.49, 13.92],
+                    "changedCases": 200,
+                    "families": 167
+                },
+                "Spymaster": {
+                    "estimate": 9.87,
+                    "ci95": [1.18, 18.42],
+                    "changedCases": 218,
+                    "families": 190
+                }
+            },
+            "activation": 0.796
+        },
+        "qualityErrors": 0
+    },
+    "registeredReport": {
+        "v3 - v1 by the opponent's doctrine, mean over changed cases (analyze3.py)": {
+            "S4": {
+                "Battle Trance": [598, 10.45],
+                "Scout": [579, 5.35],
+                "Spymaster": [542, 10.15]
+            },
+            "C4": {
+                "Battle Trance": [221, 11.09],
+                "Scout": [205, 8.54],
+                "Spymaster": [219, 8.45]
+            }
+        }
+    },
+    "MV4G": {
+        "pairs": 240,
+        "games": 27,
+        "estimatePerGame": 4.63,
+        "ci95": [-3.7, 14.12],
+        "better": 5,
+        "worse": 5,
+        "owner": {
+            "games": 16,
+            "estimatePerGame": 2.73,
+            "ci95": [-6.64, 13.28]
+        },
+        "others": {
+            "games": 11,
+            "estimatePerGame": 7.39,
+            "ci95": [-5.68, 25.0]
+        },
+        "qualityErrors": 0
+    },
+    "method": "per changed case, the candidate seat's score with one arm minus another, in points; an arm whose army equals another's reuses that game; families weighted equally (the mean over a family's changed cases); 95% from 10,000 family resamples, random.Random(2611246001). byOpponentDoctrine weights families equally within each split (report4.py); it is a report, not a gate, as is every v2 - v1 figure.",
+    "gates": {
+        "S4 v3 - v1 lower bound above 0": {
+            "value": 4.88,
+            "passed": true
+        },
+        "S4 v3 - v2 estimate above 0": {
+            "value": -0.49,
+            "passed": false
+        },
+        "C4 v3 - v1 lower bound at least -3": {
+            "value": 3.6,
+            "passed": true
+        },
+        "0 quality errors in MV4 and MV4G": {
+            "value": 0,
+            "passed": true
+        },
+        "MV4G estimate at least -2 per game": {
+            "value": 4.63,
+            "passed": true
+        }
+    },
+    "verdict": "not adopted: S4's v3 - v2 estimate is -0.49 per changed Spymaster draft (95% -4.44 to +3.53), not above 0. Under the registered rule v2 stays the candidate; v2 is profile v37. MV4 replicates v2 - v1 on the v36 tree with fresh seeds: Spymaster +9.17 (95% +5.95 to +12.32), Scout +8.23 (+2.51 to +14.01)."
+}

@@ -37,9 +37,10 @@ goes through the same decider.
 | MV1 (screen, v35)              | Spymaster 1,600 cases, Scout 800                               | +5.65 per changed Spymaster draft (95% +2.21 to +9.08), +10.12 per changed Scout draft (+4.90 to +15.27); quality gate failed: one game stranded a Magic Dragon (a placement bug, fixed in server 20aea77) |
 | MV3G (human guard, fixed tree) | 29 changed battery games, 264 tasks per arm                    | +2.16 per game (95% −5.60 to +10.13)                                                                                                                                                                       |
 | MV3 (confirmation, fixed tree) | Spymaster 2,000 cases (1,684 changed), Scout 800 (647 changed) | +9.18 per changed Spymaster draft (95% +5.96 to +12.47), +4.88 per changed Scout draft (−0.46 to +10.29); 0 quality errors; all four gates passed                                                          |
+| MV4 (replication, v36 tree)    | Spymaster 2,000 cases (1,698 changed), Scout 800 (637 changed) | v2 − v1 +9.17 per changed Spymaster draft (95% +5.95 to +12.32), +8.23 per changed Scout draft (+2.51 to +14.01); 0 quality errors; a report of screen MV4, which did not adopt v3                         |
 
 MV1 stays recorded with its quality gate failed; MV3 was registered to decide in its place before MV1's final result was
-read, and the model was not changed between them.
+read, and the model was not changed between them. MV4 came after the adoption (below).
 
 ## Evidence
 
@@ -77,15 +78,28 @@ to +16.48).
 Gates, all required: S3's lower bound per changed draft above 0 (+5.96); C3's lower bound at least −3 (−0.46); 0 quality
 errors in MV3 and MV3G (0); MV3G's estimate at least −2 per game (+2.16). All four passed.
 
+**Replication (MV4, November 26).** Screen MV4 was registered for counter model v3 before any MV3 result was read
+(`docs/counter_model_v3_research.md`). It played v1, v2 and v3 on the v36 tree (server 9705f5e, common 19f3c39c) with
+fresh seeds and the same method. It did not adopt v3. Its v2 − v1 comparison is a report, not a bar:
+
+| Population         | Changed cases                 | Per changed draft           | Per game |
+| ------------------ | ----------------------------- | --------------------------- | -------- |
+| S4, Spymaster seat | 1,698 of 2,000 (984 families) | +9.17 (95% +5.95 to +12.32) | +7.79    |
+| C4, Scout seat     | 637 of 800 (389 families)     | +8.23 (95% +2.51 to +14.01) | +6.55    |
+
+The Spymaster seat gained against every opposing doctrine: Scout +7.51 (+2.08 to +13.03), Spymaster +8.81 (+3.46 to
++14.26) and Battle Trance +11.73 (+6.76 to +16.70).
+
 ## What the estimate is and is not
 
 - A gain of a v2 seat against the v1 default AI, in the drafts where v2 changes the seat's army: 84% of Spymaster drafts
   and 81% of Scout drafts. Two v2 seats meet at 50%; it is not a win rate against people.
 - MV3G is a non-inferiority check on human setups: its interval includes 0, and no gain against people is claimed.
-- The Scout gain is not established (its lower bound is below 0); the gate asked only that it cost at most 3 points.
-- MV1 and MV3 ran on common trees before b0100048, whose offline fight driver still applied the A19 neural correction
-  that no live bot seat applies since profile v30. Both arms played with that driver on the same seeds, so the
-  comparison is paired, but the fights are not exactly live's.
+- MV3 did not establish the Scout gain (its lower bound was below 0); its gate asked only that it cost at most 3
+  points. MV4's report on fresh seeds did: +8.23 (95% +2.51 to +14.01).
+- MV1, MV3 and MV4 ran on common trees before b0100048, whose offline fight driver still applied the A19 neural
+  correction that no live bot seat applies since profile v30. Both arms played with that driver on the same seeds, so
+  the comparison is paired, but the fights are not exactly live's.
 - The model changes no rule: it changes which creature the counter draft and the closing pick score best. Battle
   Trance seats see opposing creatures only through hidden-pick collisions, so their drafts change rarely.
 

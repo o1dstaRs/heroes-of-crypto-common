@@ -1,0 +1,98 @@
+{
+    "id": "counter-model-v3-MV4-20261125",
+    "question": "On the v36 tree, does counter model v3 (strengths and counters refit toward a19-counter-draft-v1 on 13,605 games: the 6,549 v34/v35 self-play games of November 25 and the 7,056 fights of the v35 Premium snapshot) gain points over v1 and over v2 for a Spymaster seat where it changes the seat's army, without costing a Scout seat or the human-history guard?",
+    "decisionRule": [
+        "Counter model v3 against v1 and v2, screen MV4 (AI against AI, three arms) and its human guard MV4G, on the v36 tree.",
+        "Written before any game of MV4 or MV4G ran and before any result of MV3 was read (MV3 is running; a 15-family smoke",
+        "on seed 2611253399 checked the scripts), November 25, 2026, 20:29Z.",
+        "",
+        "Why: the owner asked to collect a Premium snapshot and use it (\"you can just collect premium snapshot and use it i",
+        "guess\"; \"once snap is there, we can basically pick very nicely in first two doctrines\"). The v35 snapshot (7,056",
+        "fights, 7 cohorts, maps 1/3/4) was collected; on it, creature strengths, counters, synergies and artifacts predict",
+        "held-out fights, while creature x map, synergy x map and artifact x map terms do not (development lookups). v3 refits",
+        "the counter model's strengths and counters toward v1 on 13,605 games (tonight's 6,549 self-play games and the",
+        "snapshot's 7,056). On the 59 human battery games (out of sample for every model), ranking the level-4 options",
+        "against the human's real army: rank correlation v1 +0.244, v2 +0.283, v3 +0.308; the top option minus production's",
+        "v1 +1.64, v2 +3.65, v3 +4.24 points per game. v2 (MV1's refit, self-play only) predicted the snapshot's armies worse",
+        "than v1 (log loss 0.6443 against 0.6394).",
+        "",
+        "Tree: origin server 9705f5e48d3a4033e217f0a4ce2b9bc137dee3cf (profile v36) with common 19f3c39c (as pinned), plus",
+        "research-only files: the draft harness with hooks model_v2 and model_v3 (draft_guard.ts sha256 ae391b835b030dfa...), the game-id",
+        "override and the counter-model research seam. Arms for the candidate seat: production (v1), model_v2",
+        "(counter_model_v2.json 07c56c687e635814..., MV1/MV3's model) and model_v3 (counter_model_v3.json daef6836ce681795...).",
+        "",
+        "MV4 populations (fresh seeds, the opponent's doctrine drawn live, both seats): S4 1,000 drafted families from seed",
+        "2611253401 (Spymaster seat), C4 400 families from seed 2611253501 (Scout seat). Stage 1 drafts the three arms; stage 2",
+        "plays each distinct army of every case where an arm changed the candidate's army (identical arms reuse one game), deep",
+        "fit, same seeds, in 48 shards (this Mac 0-13, x3d 14-27, basenode 28-47 when the client session can spare it).",
+        "",
+        "MV4G: the owner-history games re-drafted with model_v3 against production's re-draft (27 changed games, 240 tasks per",
+        "arm), each changed army against the human's replayed setup, paired with production's army; on this tree; as MV1G.",
+        "",
+        "Reported (analyze3.py): per stratum v3 - v1, v3 - v2 and v2 - v1 per changed case, families weighted equally, 95% from",
+        "10,000 family resamples; quality errors; v3 - v1 by the opponent's doctrine (report).",
+        "",
+        "Bars: v3 is the adoption candidate (in place of v2) when S4's v3 - v1 lower bound is above 0, S4's v3 - v2 estimate is",
+        "above 0, C4's v3 - v1 lower bound is at least -3, there are 0 quality errors in MV4 and MV4G, and MV4G's estimate is at",
+        "least -2 per game. If v3 fails and MV3 passes, v2 stays the candidate."
+    ],
+    "decisionRuleSha256": "ef15e06fd319ebb279c58402b5ba1e536f6e7c63f90b6cf7b8f2c6071b92c373",
+    "decisionRuleBytes": "the decisionRule lines joined with newlines plus a final newline",
+    "registeredAt": "2026-11-25T20:29:00Z",
+    "tree": {
+        "server": "9705f5e48d3a4033e217f0a4ce2b9bc137dee3cf",
+        "common": "19f3c39cf243863a580b6618ef8de6cd642842ef",
+        "harness": "mv4-bundle.tgz sha256 3e19638bda3ced36585abb4295633dcd7fbbf7a3ba95683b8aefef8fec3b9ca3"
+    },
+    "arms": {
+        "production": "a19-counter-draft-v1 (profile v36)",
+        "v2": "counter_model_v2.json (07c56c687e635814...; MV1 and MV3's model, profile v37 since November 26)",
+        "v3": "counter_model_v3.json (daef6836ce681795...)"
+    },
+    "candidateModelFile": {
+        "file": "docs/evidence/counter_model_v3_candidate_20261125.json",
+        "registeredBytes": "json.dumps(json.load(f)) with Python's defaults and no final newline reproduces the registered bytes (sha256 daef6836ce68179519e70a9c449763ea4c501a25b995199c63f82dc6868a1a63)"
+    },
+    "inputsSha256": {
+        "counter_model_v2.json": "07c56c687e63581421b8dd29222702ddeab35fa4da7995e09a76cf9764215277",
+        "counter_model_v3.json": "daef6836ce68179519e70a9c449763ea4c501a25b995199c63f82dc6868a1a63",
+        "rg3_stage1.ts": "76f49e9b698cdd53c033ec59a74f36d1c09c32f0928d50ddda64fd527b417352",
+        "rg3_stage2.ts": "0037ad3a81a493d73eb61af116ee773729ce95b76a2f73b432d1e72e188337e9",
+        "analyze3.py": "793239f0efbbe07e9f407201f4ba98c9efed4cbab329d26a0ab788237fb92748",
+        "run_mv4.sh": "e7d9d63130e36c8f519cf3d34edeb403a3c0b3fe5d5fb92315e42c1b4e14d7f1",
+        "guard/hook_model_v3.ts": "7491936512e97d6923466f581e0179a2ac0ec001bcc8ce5d4fc59574745ecd5e",
+        "guard/build_guard_bank_mv4.ts": "90561f374894cfcbdfccf66b04a197452d23e3269e9eb75c60dfafae48572ed3",
+        "guard/run_mv4g.sh": "3c6f084326be1628192473c0f10bdf53c72e7c329e3da4652f705d82507176b4",
+        "guard/analyze_guard_mv4.py": "4fa37ef1af2959adaffb9906aabc08a1010c445d7fe3e7749906a22014e77ee7",
+        "guard/hooked-10.json": "c2eb1bd3715c03494674f9c605b9b49e6084ee778c6e110e4418b5c529db772d",
+        "guard/hooked-49.json": "2f2dc54b2ebc3dff24eec1177037cd9aed3c77a49ee4711c64d594978eb05ded",
+        "guard/hooked-0c1e.json": "4c80547ac3a9dbaaa5b0f1199cd2a69e5fdd412e2acf5c7f81d6c8e95fc878a7",
+        "src/simulation/ai_iteration/draft_guard.ts (MV4 tree)": "ae391b835b030dfabefb9c16facab3ce01347017ff3920f56e1f40ee48a86333",
+        "src/simulation/ai_iteration/ranked_adapter.ts (MV4 tree)": "e91e1733aa55563527d9afdee5dcce03ac07bd70a47aeb2d6d47a3e6fcff8525",
+        "src/ai/setup/a19_counter_draft.ts (research seam on the MV4 tree)": "679c1eedf8dec6cda3e40e7a618a34ef241e0156abf5833a5d415ab4dc1a5079",
+        "bank-guard-mv4.json": "5c25df4bf83fcd96a5ed26d253593e425e119f9642f538d68fd2a7aad1f84ae1",
+        "bank-guard-mv4-prod.json": "7420dc4c34471445e45c261c81425d345c89ad6f4eba93e89b5584c0393bdaf3",
+        "games_all.jsonl (the 6,549 v34/v35 self-play games of November 25)": "c575ca28536f95845da53e342ab2fec3293820043bd66dc72207cf525c578a4f",
+        "fights.jsonl (the v35 Premium snapshot's 7,056 fights)": "37ffd30817d0d42c90b931b88821e53f59219a60837f7be35ba59cd999cd169c",
+        "mv4-bundle.tgz": "3e19638bda3ced36585abb4295633dcd7fbbf7a3ba95683b8aefef8fec3b9ca3"
+    },
+    "populations": {
+        "S4": {
+            "families": 1000,
+            "seed": 2611253401,
+            "candidateDoctrine": "Spymaster",
+            "role": "primary"
+        },
+        "C4": {
+            "families": 400,
+            "seed": 2611253501,
+            "candidateDoctrine": "Scout",
+            "role": "secondary"
+        },
+        "MV4G": {
+            "games": 27,
+            "tasksPerArm": 240,
+            "role": "human guard (owner-history re-drafts)"
+        }
+    }
+}

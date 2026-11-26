@@ -23,6 +23,12 @@ against the v1 default AI, not a win rate against people. The switch is `A19_COU
 per process); `v1` restores the old model for every seat. Read `docs/counter_model_v2_adoption.md`; keep
 `a19_closing_pick.test.ts` and `a19_counter_draft.test.ts` passing.
 
+Counter model v3 is not adopted (November 26). It is the same refit on 13,605 games, adding the 7,056 fights of the v35
+Premium snapshot. Registered screen MV4 on the v36 tree measured v3 − v2 at −0.49 points per changed Spymaster draft
+(95% −4.44 to +3.53); its bar required an estimate above 0. MV4 replicated v2 − v1 on fresh seeds: Spymaster +9.17
+(+5.95 to +12.32), Scout +8.23 (+2.51 to +14.01). Read `docs/counter_model_v3_research.md`. Do not waive, re-run or
+relabel MV4's v3 − v2 bar; a new counter model must beat v2.
+
 Profile v36 is retained inside v37.
 
 ## Shield screen — November 25, 2026
