@@ -1,7 +1,7 @@
 //! The v0.8 policy port: entry point for `hoc-sim v08 <command> ...`. Everything outside src/v08/ is read-only API.
 //!
 //!   hoc-sim v08 layers <recording.jsonl> [--top v0.2] [--passes] [--max-fail N]
-//!       Replays a layer recording (zig/parity/v08/record.ts with RECORD_LAYERS=1) in the Zig engine and, at every
+//!       Replays a layer recording (zig/parity/record.ts with RECORD_LAYERS=1) in the Zig engine and, at every
 //!       decision, runs the Zig chain up to --top on a copy of the state, comparing each level's output and random
 //!       state with the logged layer of the same name (the k-th Zig "v0.2" against the k-th logged "v0.2").
 //!       --passes also checks every ported v0.8 pass (lv8.zig) in isolation: run on the logged output of the layer

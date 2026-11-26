@@ -1,5 +1,5 @@
 /**
- * The v0.8 layer log (RECORD_LAYERS=1 in zig/parity/v08/record.ts): every v0.8 decision also records what each level
+ * The v0.8 layer log (RECORD_LAYERS=1 in zig/parity/record.ts): every v0.8 decision also records what each level
  * of the inheritance chain (v0.1 ... v0.7 decideTurn) and each v0.8 pass after super.decideTurn returned, so the Zig
  * port of the flattened v0.8 policy can be checked layer by layer inside real v0.8 battles.
  *
