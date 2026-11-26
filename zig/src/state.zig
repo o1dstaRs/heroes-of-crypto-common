@@ -1290,7 +1290,11 @@ pub const Unit = struct {
         return self.effects.len != 0 and self.effects.find(.stun) != null;
     }
 
-    /// isSkippingThisTurn and canRespond's effect veto: Stun, Blindness or Freeze (no Whirlpool in scope).
+    /// canRespond's effect veto: Stun, Blindness or Freeze. TypeScript's isSkippingThisTurn adds a Whirlpool debuff: the
+    /// activation reads both (engine.zig, `isSkipping() or whirlpooled()`), and its other sites (the second punch, Double
+    /// Shot, Through Shot and its second volley, the Quiver echo) test the unit acting this turn, which a Whirlpool would
+    /// have skipped. A Whirlpooled unit still replies, so the reply gates read this predicate alone, as does src/v08's
+    /// Last Fuse estimate (last_fuse_estimate.ts: target.canRespond(RANGE)).
     pub inline fn isSkipping(self: *const Unit) bool {
         return self.effects.len != 0 and (self.effects.find(.stun) != null or self.effects.find(.blindness) != null or self.effects.find(.freeze) != null);
     }
