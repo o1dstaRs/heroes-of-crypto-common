@@ -1265,14 +1265,15 @@ const Gen = struct {
         };
     }
 
-    /// deepWoundsPowerPerHit: calculateDeepWoundsCount over the held Deep Wounds cards (Made of Fire is not in scope).
+    /// deepWoundsPowerPerHit: calculateDeepWoundsCount over the held Deep Wounds cards, Made of Fire's term included.
     fn woundsPerHit(u: *const st.Unit, syn: f64) f64 {
         if (u.ability_mask & st.AbilityId.DEEP_WOUNDS_MASK == 0) return 0;
         var stacked: f64 = 0;
         var held = false;
+        const mof = artifacts.madeOfFire(u);
         inline for (st.AbilityId.DEEP_WOUNDS) |id| {
             if (u.ability(id)) |a| {
-                stacked += (a.power / abilities.MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + 0;
+                stacked += (a.power / abilities.MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + artifacts.fireTerm(mof, a.power);
                 held = true;
             }
         }

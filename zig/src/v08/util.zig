@@ -431,8 +431,8 @@ pub fn canHourglass(s: *const State, ui: u8) bool {
     return engine.canWaitOnHourglass(s, ui);
 }
 
-/// isAoEUnit (v0_4.ts): by name (AOE_NAMES), or by an active AoE ability (Skewer Strike, which the Queen can steal;
-/// Area Throw, Fire Breath, Through Shot and Large Caliber are not in scope).
+/// isAoEUnit (v0_4.ts): by name (AOE_NAMES), or by an active AoE ability (Skewer Strike, Area Throw, Through Shot,
+/// Large Caliber; a Queen that stole one counts too). Fire Breath is batch 6b.
 pub fn isAoEUnit(s: *const State, ui: u8) bool {
     return switch (creature(s, ui)) {
         .black_dragon, .pikeman, .gargantuan, .cyclops, .tsar_cannon => true,
@@ -525,8 +525,8 @@ pub fn strikes(d: *const ai.Decision) bool {
     return has(d, .melee_attack) or has(d, .range_attack) or has(d, .cast_spell);
 }
 
-/// v0.5's COMBAT_ACTIONS and v0.8's posture-protected types: a strike, a cast or an obstacle attack (Area Throw is not
-/// in scope).
+/// v0.5's COMBAT_ACTIONS and v0.8's posture-protected types: a strike, a shot, a cast, an obstacle attack or an area
+/// throw.
 pub fn combatAction(d: *const ai.Decision) bool {
     return strikes(d) or has(d, .obstacle_attack) or has(d, .area_throw_attack);
 }
@@ -692,7 +692,7 @@ pub fn valueFeatures(s: *const State, team: u8, out: *[VALUE_FEATURES]f64) void 
 /// Field target by its shooter stack size (0 for a non-shooter) and every other aura flat.
 pub const AuraWeight = enum { flat, relevance };
 
-/// AbilityPowerType.DISABLE_RANGE_ATTACK (ability_properties.ts; the Range Null Field aura is not in the engine yet).
+/// AbilityPowerType.DISABLE_RANGE_ATTACK (ability_properties.ts; the Range Null Field aura).
 const PT_DISABLE_RANGE_ATTACK: u8 = 17;
 
 /// auraCoverageScore: per emitted aura, the targets (living allies but the emitter for a buff aura, living enemies for a

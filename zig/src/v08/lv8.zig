@@ -225,7 +225,7 @@ fn forbiddenTarget(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
 /// prioritizeV08SplashRangedDecision: a splash shooter (Area Throw, Large Caliber) or a Through Shot unit
 /// (V08_THROUGH_SHOT_LINE unset: on) whose decision shoots or throws takes the shot or area throw with the most priced
 /// damage over its whole uncapped catalog (free Through Shot lines included), when that beats the priced incumbent.
-/// Last Fuse is an artifact buff, not in scope.
+/// An army holding Last Fuse runs it too (the blast prices single impacts).
 fn splashRanged(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const u = c.unit();
     const through = u.has(.through_shot);
@@ -767,8 +767,8 @@ fn deliveryPrecedes(l: *const Delivery, r: *const Delivery) bool {
 
 /// selectV08STargetPressureCandidate: a kill now first; else, preferring a target that is not a fresh answering knight,
 /// finish an already wounded stack (the least remaining first); else the target with the most remaining attack-work.
-/// Ties: damage, the knight's own dulling swing, stationary, stable order. A plain shot's delivery damage is its
-/// expected damage (Area Throw's pressure target is not in scope).
+/// Ties: damage, the knight's own dulling swing, stationary, stable order. Candidates are scheduled by their pressure
+/// target (an area throw's first enemy) and delivery damage (a shot's damage to its primary stack).
 fn targetPressure(s: *const st.State, actor: u8, set: *const cand.Set, ok: *bool) ?usize {
     _ = ok;
     const team = s.units[actor].team;
@@ -1595,7 +1595,7 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) bool {
 /// best direct attack, else a stone strike, else the decision.
 pub fn cemetery(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
     const t = &c.s.grid.terrain;
-    // V08_POSTURE_PROTECTED_ACTION_TYPES: a strike, a cast or an obstacle attack (Area Throw is not in scope).
+    // V08_POSTURE_PROTECTED_ACTION_TYPES: a strike, a shot, an area throw, an obstacle attack or a cast.
     const protected = util.combatAction(in);
     if (t.n_layout == 0 or t.standing == 0 or protected) {
         util.copyDecision(out, in);

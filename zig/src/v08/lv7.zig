@@ -1,7 +1,7 @@
 //! The v0.7 level of the v0.8 chain (src/ai/versions/v0_7.ts StrategyV0_7.decideTurn): v0.6, then the melee-magic
 //! stance fix. The aura-saturated archetype anchor is the chain's v0.4 level where they are equal (util.anchorPorted;
-//! decideV08 refuses the seat otherwise). Then the Arachna Queen assimilation router (a stolen spell; Endless Quiver is
-//! not in scope), the melee-magic stance fix and the Terrifying Gaze repair.
+//! decideV08 refuses the seat otherwise). Then the Arachna Queen assimilation router (a stolen spell, or a stolen
+//! Endless Quiver's best shot), the melee-magic stance fix and the Terrifying Gaze repair.
 
 const rec = @import("../recording.zig");
 const st = @import("../state.zig");
