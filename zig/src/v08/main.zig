@@ -117,6 +117,24 @@ fn cloneActions(arena: std.mem.Allocator, actions: []const rec.Action) ![]rec.Ac
     return out;
 }
 
+/// The slot holding a recorded uid (identity until a summon reuses a slot).
+fn slotOfUid(s: *const st.State, uid: u8) ?u8 {
+    return s.slotOf(uid);
+}
+
+/// Our (slot-named) actions against logged (uid-named) ones.
+fn sameAsLogged(s: *const st.State, mine: []const rec.Action, logged: []const rec.Action) bool {
+    if (mine.len != logged.len) return false;
+    for (mine, logged) |m, l| if (!compare.actionsEqual(engine.actionToUids(s, m), l)) return false;
+    return true;
+}
+
+/// Logged (uid-named) actions as slot-named ones, into `buf`.
+fn loggedToSlots(s: *const st.State, logged: []const rec.Action, buf: []rec.Action) []rec.Action {
+    for (logged, 0..) |l, i| buf[i] = engine.actionToSlots(s, l);
+    return buf[0..logged.len];
+}
+
 fn sameActions(a: []const rec.Action, b: []const rec.Action) bool {
     if (a.len != b.len) return false;
     for (a, b) |x, y| if (!compare.actionsEqual(x, y)) return false;
@@ -233,16 +251,22 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
                     // The AI target memory the decision started from.
                     s.ai_prev_target = .{-1} ** st.MAX_UNITS;
                     for (rec.get(raw, "memory").array.items) |pair| {
-                        const a = rec.unitIndex(game.ids, pair.array.items[0].string) catch continue;
-                        const t = rec.unitIndex(game.ids, pair.array.items[1].string) catch continue;
+                        const a_uid = rec.unitIndex(game.ids, pair.array.items[0].string) catch continue;
+                        const t_uid = rec.unitIndex(game.ids, pair.array.items[1].string) catch continue;
+                        const a = slotOfUid(&s, @intCast(a_uid)) orelse continue;
+                        const t = slotOfUid(&s, @intCast(t_uid)) orelse continue;
                         s.ai_prev_target[a] = @intCast(t);
                     }
+                    const ui = slotOfUid(&s, step.action.decide.unit) orelse {
+                        s.rng.state = step.r1;
+                        continue;
+                    };
                     var copy = s;
                     copy.rng.state = step.r0;
                     var collector = Collector{ .arena = da };
                     policy.hook = .{ .ctx = &collector, .f = Collector.add };
                     var out: ai.Decision = .{};
-                    policy.decideTo(&copy, step.action.decide.unit, &out, top);
+                    policy.decideTo(&copy, ui, &out, top);
                     policy.hook = null;
                     decisions += 1;
                     var all_ok = true;
@@ -269,7 +293,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
                             gop.value_ptr.* = .{};
                         }
                         gop.value_ptr.compared += 1;
-                        const ok = sameActions(m.out, l.out) and m.rin == l.rin and m.rout == l.rout;
+                        const ok = sameAsLogged(&s, m.out, l.out) and m.rin == l.rin and m.rout == l.rout;
                         if (ok) {
                             gop.value_ptr.matched += 1;
                             continue;
@@ -280,7 +304,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
                             std.debug.print("seed {d} step {d} unit {d} layer {s}: differs (rng in {d}/{d} out {d}/{d})\n", .{ game.seed, i, step.action.decide.unit, l.name, m.rin, l.rin, m.rout, l.rout });
                             printActions("ts ", l.out);
                             printActions("zig", m.out);
-                            if (std.posix.getenv("V08_DEBUG") != null) dumpUnits(&s, step.action.decide.unit);
+                            if (std.posix.getenv("V08_DEBUG") != null) dumpUnits(&s, ui);
                         }
                         break; // later layers build on this one
                     }
@@ -290,11 +314,13 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
                             if (li == 0) continue;
                             const pass = lv8.passFromName(l.name) orelse continue;
                             var input: ai.Decision = .{};
-                            if (!lv8.fromActions(&input, logged[li - 1].out)) continue;
+                            var slot_buf: [8]rec.Action = undefined;
+                            if (logged[li - 1].out.len > slot_buf.len) continue;
+                            if (!lv8.fromActions(&input, loggedToSlots(&s, logged[li - 1].out, &slot_buf))) continue;
                             var pcopy = s;
                             pcopy.rng.state = l.rin;
                             var pc: ai.Ctx = undefined;
-                            ai.initCtxInto(&pc, &pcopy, step.action.decide.unit);
+                            ai.initCtxInto(&pc, &pcopy, ui);
                             var pout: ai.Decision = .{};
                             if (!lv8.runPass(&pc, pass, &input, &pout)) continue;
                             const key = try std.fmt.allocPrint(da, "pass {s}", .{l.name});
@@ -304,7 +330,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
                                 gop.value_ptr.* = .{};
                             }
                             gop.value_ptr.compared += 1;
-                            if (sameActions(pout.slice(), l.out) and pcopy.rng.state == l.rout) {
+                            if (sameAsLogged(&s, pout.slice(), l.out) and pcopy.rng.state == l.rout) {
                                 gop.value_ptr.matched += 1;
                                 continue;
                             }
@@ -325,7 +351,7 @@ fn layers(gpa: std.mem.Allocator, path: []const u8, top: policy.Level, passes: b
             }
             s.rng.state = step.r0;
             events.len = 0;
-            const ok = engine.apply(&s, step.action, &events);
+            const ok = engine.apply(&s, engine.actionToSlots(&s, step.action), &events);
             var m: compare.Mismatch = .{};
             const diverged = ok != step.ok or s.rng.state != step.r1 or !compare.eventsMatch(events.slice(), step.events) or
                 !compare.state(&s, game.ids, step.digest.?, &m);
@@ -393,7 +419,10 @@ fn censusPins(gpa: std.mem.Allocator, path: []const u8) !void {
         var events: engine.Events = .{};
         for (game.steps) |step| {
             if (step.action == .decide) {
-                const ui = step.action.decide.unit;
+                const ui = slotOfUid(&s, step.action.decide.unit) orelse {
+                    s.rng.state = step.r1;
+                    continue;
+                };
                 const u = &s.units[ui];
                 if (u.attack_type != st.AttackType.RANGE and !u.isDead()) {
                     decisions += 1;
@@ -452,7 +481,7 @@ fn censusPins(gpa: std.mem.Allocator, path: []const u8) !void {
             }
             s.rng.state = step.r0;
             events.len = 0;
-            const ok = engine.apply(&s, step.action, &events);
+            const ok = engine.apply(&s, engine.actionToSlots(&s, step.action), &events);
             var m: compare.Mismatch = .{};
             if (ok != step.ok or s.rng.state != step.r1 or !compare.state(&s, game.ids, step.digest.?, &m)) break;
         }
@@ -520,7 +549,7 @@ fn leafCheck(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
             }
             s.rng.state = step.r0;
             events.len = 0;
-            const ok = engine.apply(&s, step.action, &events);
+            const ok = engine.apply(&s, engine.actionToSlots(&s, step.action), &events);
             var m: compare.Mismatch = .{};
             if (ok != step.ok or s.rng.state != step.r1 or !compare.state(&s, game.ids, step.digest.?, &m)) break;
         }
@@ -565,8 +594,10 @@ fn candidates(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
                     const logged = try parseLayers(da, game.ids, logged_raw);
                     s.ai_prev_target = .{-1} ** st.MAX_UNITS;
                     for (rec.get(raw, "memory").array.items) |pair| {
-                        const a = rec.unitIndex(game.ids, pair.array.items[0].string) catch continue;
-                        const t = rec.unitIndex(game.ids, pair.array.items[1].string) catch continue;
+                        const a_uid = rec.unitIndex(game.ids, pair.array.items[0].string) catch continue;
+                        const t_uid = rec.unitIndex(game.ids, pair.array.items[1].string) catch continue;
+                        const a = slotOfUid(&s, @intCast(a_uid)) orelse continue;
+                        const t = slotOfUid(&s, @intCast(t_uid)) orelse continue;
                         s.ai_prev_target[a] = @intCast(t);
                     }
                     for (cands_raw.array.items) |cl| {
@@ -584,11 +615,13 @@ fn candidates(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
                             inc_actions = l.out;
                         };
                         var inc: ai.Decision = .{};
-                        if (inc_actions == null or !lv8.fromActions(&inc, inc_actions.?)) continue;
+                        var inc_buf: [8]rec.Action = undefined;
+                        if (inc_actions == null or inc_actions.?.len > inc_buf.len or !lv8.fromActions(&inc, loggedToSlots(&s, inc_actions.?, &inc_buf))) continue;
+                        const cui = slotOfUid(&s, step.action.decide.unit) orelse continue;
                         var copy = s;
                         copy.rng.state = step.r0;
                         var c: ai.Ctx = undefined;
-                        ai.initCtxInto(&c, &copy, step.action.decide.unit);
+                        ai.initCtxInto(&c, &copy, cui);
                         var set: cand.Set = .{};
                         cand.enumerate(&c, &inc, if (boundary) cand.BOUNDARY else cand.FINISH, &set);
                         compared += 1;
@@ -601,10 +634,11 @@ fn candidates(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
                                 const raw_actions = rec.get(e, "actions").array.items;
                                 const parsed = try da.alloc(rec.Action, raw_actions.len);
                                 for (raw_actions, 0..) |o, j| parsed[j] = try rec.parseAction(da, game.ids, "apply", o);
-                                if (!sameActions(parsed, m.d.slice())) ok = false;
+                                if (!sameAsLogged(&s, m.d.slice(), parsed)) ok = false;
                                 const tid = rec.get(e, "targetId");
                                 const t: i16 = if (tid == .string) @intCast(rec.unitIndex(game.ids, tid.string) catch 255) else -1;
-                                if (t != m.target) ok = false;
+                                const mine_uid: i16 = if (m.target >= 0) s.units[@intCast(m.target)].uid else -1;
+                                if (t != mine_uid) ok = false;
                                 if (!cellEq(optCell(rec.get(e, "standCell")), m.stand)) ok = false;
                                 if (!cellEq(optCell(rec.get(e, "targetCell")), m.tcell)) ok = false;
                                 const ed_raw = rec.get(e, "ed");
@@ -645,7 +679,7 @@ fn candidates(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
             }
             s.rng.state = step.r0;
             events.len = 0;
-            const ok = engine.apply(&s, step.action, &events);
+            const ok = engine.apply(&s, engine.actionToSlots(&s, step.action), &events);
             var m: compare.Mismatch = .{};
             if (ok != step.ok or s.rng.state != step.r1 or !compare.eventsMatch(events.slice(), step.events) or
                 !compare.state(&s, game.ids, step.digest.?, &m)) break;
