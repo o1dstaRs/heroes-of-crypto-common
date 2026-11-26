@@ -382,15 +382,23 @@ fn singleHealValue(s: *const st.State, ti: u8, raw: f64) f64 {
 /// incumbentGuaranteedKill: candidate 0 is a priced direct attack that kills, on a target that cannot absorb it
 /// (util.canAbsorbPrimary: a Water Shield the striker cannot pass, a Flesh Shield Aura), and with a melee strike only
 /// when the target can neither answer it nor burn the striker with Fire Shield (a striker without Fire Element and
-/// magic resist below 100). V08_MAGE_DAMAGE_KILL_PRIORITY is unset, so a damage spell never counts.
+/// magic resist below 100). With V08_MAGE_DAMAGE_KILL_PRIORITY_<SIDE>=1 (util.Switches.mage_damage_kill_priority) a
+/// priced kill by an offensive spell of the unit's (UNIT_AMOUNT_DAMAGE) counts too, its target's absorb unchecked.
 fn incumbentGuaranteedKill(c: *const ai.Ctx, set: *const cand.Set) bool {
     if (set.n == 0) return false;
     const inc = &set.items[0];
-    if (!isDirectCombat(inc.d.slice()) or inc.ek != 1 or !(inc.ed > 0)) return false;
+    const u = c.unit();
+    var damage_spell = false;
+    if (util.battle.switches[u.team].mage_damage_kill_priority and inc.spell >= 0) {
+        const raw: u8 = @intCast(inc.spell);
+        for (u.spells[0..u.n_spells]) |b| {
+            if (b.spell == raw and c.s.spell_cfg[raw].multiplier == st.SpellMultiplier.UNIT_AMOUNT_DAMAGE) damage_spell = true;
+        }
+    }
+    if (!(isDirectCombat(inc.d.slice()) or damage_spell) or inc.ek != 1 or !(inc.ed > 0)) return false;
     if (inc.target >= 0) {
-        const u = c.unit();
         const t = &c.s.units[@intCast(inc.target)];
-        if (util.canAbsorbPrimary(u, t)) return false;
+        if (!damage_spell and util.canAbsorbPrimary(u, t)) return false;
         if (util.has(&inc.d, .melee_attack)) {
             if (util.canRespondToMelee(c.s, c.ui, @intCast(inc.target))) return false;
             if (t.has(.fire_shield) and !u.has(.fire_element) and engine.getMagicResist(u) < 100) return false;

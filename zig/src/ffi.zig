@@ -1081,7 +1081,11 @@ test "policy switches: production values pass, unread ones refuse, read ones app
     try std.testing.expect(try switchCase("{}", &rollout.V08_SCOPE, &out, &buf) == null);
     try std.testing.expect(std.meta.eql(out, v08util.Switches{}));
     try std.testing.expect(try switchCase("{\"decoy_aware\":true,\"role_release\":[],\"mage_damage_kill_priority\":false,\"engine_reachable_routes\":true}", &rollout.V08_SCOPE, &out, &buf) == null);
-    try ex("decoy_aware is not ported (only its production value)", (try switchCase("{\"decoy_aware\":false}", &rollout.V08_SCOPE, &out, &buf)).?);
+    try ex("coherent_melee is not ported (only its production value)", (try switchCase("{\"coherent_melee\":false}", &rollout.V08_SCOPE, &out, &buf)).?);
+    out = .{};
+    // decoy_aware and mage_damage_kill_priority are read (src/v08 cand.zig, lv8.zig), so their other values apply.
+    try std.testing.expect(try switchCase("{\"decoy_aware\":false,\"mage_damage_kill_priority\":true}", &rollout.V08_SCOPE, &out, &buf) == null);
+    try std.testing.expect(!out.decoy_aware and out.mage_damage_kill_priority and out.coherent_melee);
     out = .{};
     try ex("support_roles is not ported (only its production value)", (try switchCase("{\"support_roles\":false}", &rollout.V08_SCOPE, &out, &buf)).?);
     try ex("unknown switch nope for v0.8", (try switchCase("{\"nope\":true}", &rollout.V08_SCOPE, &out, &buf)).?);
@@ -1107,7 +1111,7 @@ test "policy switches: production values pass, unread ones refuse, read ones app
     const pol = parsed.value.object.get("scope").?.object.get("policies").?.object.get("v0.8").?.object;
     try ex("v0.8s", pol.get("aliases").?.array.items[0].string);
     try std.testing.expectEqual(rollout.SWITCH_NAMES.len, pol.get("switches").?.array.items.len);
-    try std.testing.expectEqual(@as(usize, 0), pol.get("switchesRead").?.array.items.len);
+    try std.testing.expectEqual(rollout.SWITCHES_READ.len, pol.get("switchesRead").?.array.items.len);
 }
 
 test "the engine request field: match plays, server waits for its build, anything else is malformed" {

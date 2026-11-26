@@ -1957,13 +1957,13 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
     g.addAreaThrows();
     g.addSpells();
     g.addMoves();
-    // a19-decoy-aware-v1 (on unless A19_DECOY_AWARE_<SIDE>=0): no challenger strikes a one-model decoy while another
-    // candidate strikes a real stack. Candidate 0 always stays.
+    // a19-decoy-aware-v1 (on unless A19_DECOY_AWARE_<SIDE>=0: util.Switches.decoy_aware): no challenger strikes a
+    // one-model decoy while another candidate strikes a real stack. Candidate 0 always stays.
     var real = false;
-    for (out.slice()) |*cand| {
+    if (util.battle.switches[c.unit().team].decoy_aware) for (out.slice()) |*cand| {
         const t = meleeTargetOf(&cand.d);
         if (t >= 0 and !isOneModelDecoy(c.s, t)) real = true;
-    }
+    };
     if (real) {
         var k: usize = 1;
         for (1..out.n) |i| {
