@@ -5955,6 +5955,12 @@ export class SearchDriver {
         const complementaryR2 = this.complementaryR2 && this.rollouts === 2 && horizonMode === "turns";
         // As the TypeScript loop: a full-budget reference never reuses the complementary R2 prefix.
         const cache = complementaryR2 && rolloutCount > 2 ? undefined : rolloutCache;
+        // A driver without a native harness (every live bot seat) never asks for the library: no load, no git call, no
+        // notice.
+        if (!this.deps.nativeHarness) {
+            countNativeReason(stats.fallback, "no_native_harness");
+            return typeScript();
+        }
         const native = getNativeRolloutBackend();
         const bankRefusal = native ? this.nativeBankRefusal(root, cache) : "no_library";
         if (!native || bankRefusal) {

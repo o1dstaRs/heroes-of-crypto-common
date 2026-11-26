@@ -105,6 +105,10 @@ export function nativeRolloutModeFromEnv(
  * policy keeps TypeScript rollouts unless it forces native ones (1). `git` runs a git command in the common root and
  * returns its trimmed output, or null when it fails.
  *
+ * The tree counts as a git checkout only at that checkout's top level (`git rev-parse --show-prefix` is empty, as for a
+ * clone or the client's submodule). Common installed inside another checkout (the server's node_modules) would
+ * otherwise report that checkout's HEAD as its own commit.
+ *
  * A tree that is not a git checkout but an installed package (bun's GitHub install, whose `.bun-tag` ends in the
  * commit's short sha; `bunTag` reads it, null when absent) gives that commit as a prefix (`shaPrefix`): the library's
  * own commit must start with it. Any other tree (a copied or archived research tree) keeps TypeScript rollouts.
@@ -113,10 +117,12 @@ export function nativeDefaultTree(
     git: (args: string[]) => string | null,
     bunTag: () => string | null = () => null,
 ): { sha: string } | { shaPrefix: string } | { reason: string } {
-    const sha = git(["rev-parse", "HEAD"]);
+    const prefix = git(["rev-parse", "--show-prefix"]);
+    const sha = prefix === "" ? git(["rev-parse", "HEAD"]) : null;
     if (sha === null || !/^[0-9a-f]{40}$/.test(sha)) {
         const tag = /-([0-9a-f]{7,40})$/.exec(bunTag()?.trim() ?? "");
         if (tag) return { shaPrefix: tag[1] };
+        if (prefix) return { reason: `the TypeScript tree is not its own git checkout (it is ${prefix} in another)` };
         return { reason: "the TypeScript tree is not a git checkout" };
     }
     const changes = git(["status", "--porcelain", "--untracked-files=no", "--", "src", "zig"]);
@@ -349,6 +355,11 @@ function loadNativeRolloutBackend(load: (specifier: string) => unknown): INative
         exportState: (battle: INativeExportBattle, harness: INativeExportHarness) =>
             exportWithoutSideEffects(exportBattleState, (board) => boardDigest(battleDigest, board), battle, harness),
     });
+}
+
+/** Tests: whether this process has asked for the backend since lazy loading was last restored. */
+export function nativeRolloutBackendRequested(): boolean {
+    return backend !== undefined;
 }
 
 /** Tests: install a backend (or null for "no library"); undefined restores lazy loading. */

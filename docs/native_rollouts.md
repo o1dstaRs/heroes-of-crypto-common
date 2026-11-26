@@ -4,10 +4,12 @@
 v0.8 policy port under `zig/`, ABI 3, `zig/BRIDGE.md`) instead of TypeScript. A native bank leaves the driver exactly as
 the TypeScript loop leaves it, so searched decisions are identical; only the time changes. The switch is on by default
 where the library is current: built from this tree's own commit (`zig build` embeds `git rev-parse HEAD`, "-dirty" with
-local changes under zig/) while the tree has no local changes under src/ or zig/. Otherwise, and with `0`, every bank
-runs in TypeScript (the TypeScript loop is the same code). A research arm that edits the TypeScript search or policy
-therefore keeps TypeScript rollouts unless it forces native ones with `1`; an arm that changes an AI switch stays in
-TypeScript anyway (below).
+local changes under zig/) while the tree has no local changes under src/ or zig/. Only a tree at its checkout's top
+level counts as a git checkout: common installed inside another one (the server's node_modules) is checked against its
+`.bun-tag`, or against `HOC_SIM_COMMON_SHA` when set. Otherwise, and with `0`, every bank runs in TypeScript (the
+TypeScript loop is the same code). A research arm that edits the TypeScript search or policy therefore keeps TypeScript
+rollouts unless it forces native ones with `1`; an arm that changes an AI switch stays in TypeScript unless the library
+reads that switch (below).
 
 The adapter is `src/simulation/native_rollouts.ts` with its seam in `src/simulation/search_driver.ts`
 (`scoreCandidatesWithNative`); the integration design is the coordinator's `design.md` (sections 2 to 7).
@@ -25,7 +27,9 @@ The adapter is `src/simulation/native_rollouts.ts` with its seam in `src/simulat
 | `HOC_NATIVE_SENTINELS`       | `count` or `throw`: reads a native bank does not reproduce (a draw from the stream a TypeScript bank leaves installed, the active unit between banks)                                                                                                                |
 
 The library is loaded once per process on first use through `zig/ffi/bridge.ts`'s fail-safe loader (self-test included,
-about 150 ms). A missing library, another ABI or commit, a failed self-test, or a runtime without Bun's
+about 150 ms). A driver without a native harness (`ILookaheadDeps.nativeHarness`: every live bot seat unless the server
+builds one) never asks for it: no load, no git call, no notice. A missing library, another ABI or commit, a failed
+self-test, or a runtime without Bun's
 `import.meta.require` logs one line and every bank runs in TypeScript. An unexpected native error turns the backend off
 for the rest of the process. Nothing imports the bridge or `bun:ffi` at module load, so browser bundles and `tsc` never
 see it.
@@ -38,8 +42,11 @@ Per root (one `chooseSearchDecision`; refusals are counted by reason in `nativeR
   place) or exactly `StrategyV0_1`;
 - the AI environment is the A19 profile's: every variable in the policy namespaces (`A19_`, `B2_`, `Q2_`, `V0n_`,
   `AI_AURA_ZONE_EXACT`) holds the profile's value or is unset where the profile unsets it, as the bot seat scopes it
-  around each decision (the library implements the production values only; a research arm with a changed switch stays
-  in TypeScript). The root-only flyer backline priority and the search routing variables are exempt;
+  around each decision. The library implements the production values only, except the switches its v0.8 scope lists
+  in `switchesRead` that the adapter can compute (`NATIVE_SWITCHES`: decoy_aware, mage_damage_kill_priority,
+  coherent_melee, wild_regen_gift). Their per-seat values go with each request (`nativeRequestPolicies`), so a research
+  arm that changes one stays native; any other changed switch keeps the root in TypeScript. The root-only flyer
+  backline priority and the search routing variables are exempt;
 - the library's scope manifest (`zig/ffi/precheck.ts`: creatures, cards, spells, artifacts, terrain) passes, and the
   export and the loader accept the board.
 

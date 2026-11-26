@@ -31,7 +31,9 @@ import {
     nativeExportSideEffects,
     nativeLeafKind,
     nativeDefaultTree,
+    nativeRolloutBackendRequested,
     nativeRolloutLog,
+    NativeRootScope,
     nativeRolloutModeFromEnv,
     nativeShadowRateFromEnv,
     nativeTeamPolicy,
@@ -166,10 +168,41 @@ describe("native rollout switch", () => {
         }
     });
 
+    test("a driver without a native harness (a live bot seat) never asks for the library", async () => {
+        const { SearchDriver } = await import("../../src/simulation/search_driver");
+        const mode = process.env.HOC_NATIVE_ROLLOUTS;
+        try {
+            delete process.env.HOC_NATIVE_ROLLOUTS;
+            const bank = (deps: object) => {
+                const driver = new SearchDriver(deps as never, {});
+                const internals = driver as unknown as {
+                    nativeRoot: NativeRootScope | undefined;
+                    scoreCandidatesInTypeScript(): number[];
+                    scoreCandidatesWithNative(...args: unknown[]): number[];
+                };
+                internals.nativeRoot = new NativeRootScope("v0.8");
+                internals.scoreCandidatesInTypeScript = () => [0.5];
+                expect(internals.scoreCandidatesWithNative({}, [{}], 1, "turns", 2, null, 40, false)).toEqual([0.5]);
+                return driver.nativeRolloutStatistics.fallback;
+            };
+            setNativeRolloutBackendForTests(undefined);
+            expect(bank({})).toEqual({ no_native_harness: 1 });
+            expect(nativeRolloutBackendRequested()).toBe(false);
+            // with a harness the driver asks for the library (here: none)
+            setNativeRolloutBackendForTests(null);
+            expect(bank({ nativeHarness: { summonIds: "match", summonScope: "rollout" } })).toEqual({ no_library: 1 });
+        } finally {
+            setNativeRolloutBackendForTests(undefined);
+            if (mode === undefined) delete process.env.HOC_NATIVE_ROLLOUTS;
+            else process.env.HOC_NATIVE_ROLLOUTS = mode;
+        }
+    });
+
     test("the default needs a library built from this tree's own clean commit", () => {
         const sha = "0123456789abcdef0123456789abcdef01234567";
+        // a clone's top level: --show-prefix is empty
         const tree = (head: string | null, status: string | null) => (args: string[]) =>
-            args[0] === "rev-parse" ? head : status;
+            args[1] === "--show-prefix" ? "" : args[0] === "rev-parse" ? head : status;
         expect(nativeDefaultTree(tree(sha, ""))).toEqual({ sha });
         expect(nativeDefaultTree(tree(sha, " M src/ai/versions/v0_5.ts"))).toEqual({
             reason: "the TypeScript tree has local changes under src/ or zig/",
@@ -194,10 +227,28 @@ describe("native rollout switch", () => {
         const sha = "0123456789abcdef0123456789abcdef01234567";
         expect(
             nativeDefaultTree(
-                (args) => (args[0] === "rev-parse" ? sha : ""),
+                (args) => (args[1] === "--show-prefix" ? "" : args[0] === "rev-parse" ? sha : ""),
                 () => "x-1234567",
             ),
         ).toEqual({ sha });
+    });
+
+    test("common installed inside another checkout (the server's node_modules) never takes that checkout's HEAD", () => {
+        const serverHead = "fedcba9876543210fedcba9876543210fedcba98";
+        const asked: string[][] = [];
+        const insideServer = (args: string[]): string | null => {
+            asked.push(args);
+            if (args[1] === "--show-prefix") return "node_modules/@heroesofcrypto/common/";
+            return args[0] === "rev-parse" ? serverHead : "";
+        };
+        expect(nativeDefaultTree(insideServer, () => "o1dstaRs-heroes-of-crypto-common-6e13087\n")).toEqual({
+            shaPrefix: "6e13087",
+        });
+        expect(nativeDefaultTree(insideServer)).toEqual({
+            reason: "the TypeScript tree is not its own git checkout (it is node_modules/@heroesofcrypto/common/ in another)",
+        });
+        // only the prefix is asked: neither the server's HEAD nor its status
+        expect(asked.every((args) => args[1] === "--show-prefix")).toBe(true);
     });
 });
 

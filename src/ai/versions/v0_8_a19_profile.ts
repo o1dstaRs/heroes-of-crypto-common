@@ -660,7 +660,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         // correction (lastBankFiniteRollouts) in place of its rollout patch; decision traces identical 0 / 1 / shadow.
         // Re-pinned 2026-11-26: v0.9 and the A19 neural correction removed by owner decision ("yeah lets do it so it
         // is all clean"; "Remove it" for the sandbox correction). Bot seats and Premium decisions are unchanged.
-        sha256: "f8136ee979ee8566d3c1de05f40dee65eaeafa199bf545e81c3425b71a7446d2" as const,
+        // Re-pinned: a driver without a native harness (a live bot seat) never asks for the library; only the order of
+        // the bank's fallback checks changes.
+        sha256: "3ebd4c0b400bf7fcfe4ad355b30af919f5b6a983814744a1d41eafe41eb5e029" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
