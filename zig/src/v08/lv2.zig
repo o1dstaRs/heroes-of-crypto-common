@@ -13,6 +13,7 @@ const pathing = @import("../path.zig");
 const ai = @import("../ai.zig");
 const util = @import("util.zig");
 const policy = @import("policy.zig");
+const spells = @import("../spells.zig");
 const weights = @import("weights.zig");
 
 const Cell = st.Cell;
@@ -33,7 +34,7 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
         meleeFallback(c, out);
     } else if (ranged) {
         decideRangedTurn(c, out);
-    } else {
+    } else if (!creatureOpener(c, out)) {
         policy.v01(c, out);
         preferNoCounterMeleeTarget(c, out);
         withAura(c, out);
@@ -301,9 +302,27 @@ fn counterMatters(s: *const State, t: u8) bool {
 /// withAura (v0_2.ts): an aura emitter that would only move repositions to the reachable cell covering the most targets,
 /// else hourglasses while more targets can still come into range and nothing threatens it, else refuses an advance that
 /// would drag its auras off targets it covers now. Attacks pass straight through; non-emitters are untouched.
+/// decideCreatureOpener: a Behemoth casts Battle Roar (an all-allies buff) while the mass cast is legal (canMassCastSpell,
+/// the engine's own gate). The Ogre Mage's Mass Riot is wave 2: no book in scope holds it.
+fn creatureOpener(c: *ai.Ctx, out: *ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    if (!u.canCastSpells()) return false;
+    if (util.creature(s, c.ui) != .behemoth) return false;
+    const spell = st.CastSpell.battle_roar;
+    const raw: u8 = @intFromEnum(spell);
+    const b = u.bookSpell(raw) orelse return false;
+    const cfg = &s.spell_cfg[raw];
+    if (!cfg.loaded or !spells.usable(u, b, cfg)) return false;
+    if (!spells.canMassCastSpell(s, c.ui, spell, cfg)) return false;
+    out.* = .{};
+    out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = raw } });
+    return true;
+}
+
 fn withAura(c: *ai.Ctx, out: *ai.Decision) void {
     for (out.slice()) |a| switch (a) {
-        .melee_attack, .range_attack => return,
+        .melee_attack, .range_attack, .cast_spell => return,
         else => {},
     };
     const plan = util.planAuraMove(c, .flat) orelse return;

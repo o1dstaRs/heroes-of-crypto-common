@@ -160,7 +160,7 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         if (util.livingOf(s, i, team) and i != c.ui) {
             allies[n_allies] = engine.unitCells(a);
             n_allies += 1;
-        } else if (util.livingOf(s, i, opp)) {
+        } else if (util.livingOf(s, i, opp) and !a.isHidden()) {
             enemies[n_enemies] = @intCast(i);
             enemy_cells[n_enemies] = engine.unitCells(a);
             n_enemies += 1;
@@ -221,10 +221,12 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
             const knight_answers = t.has(.dulling_defense) and util.canRespondToMelee(self.s, self.ui, target);
             const punish: f64 = if (!killed and knight_answers) 1 else 0;
             const dulling: f64 = if (!killed and self.u.has(.dulling_defense) and t.base_attack > 1) 1 else 0;
+            // Target-caster: enemy spellcasters (getCanCastSpells: a spellbook) are force multipliers.
+            const target_caster: f64 = if (t.canCastSpells()) 1 else 0;
             return W[14] * dmg + W[15] * kill + W[16] * retal_free + W[17] * threat + W[18] * stand_threat +
                 W[19] * incumbent + W[20] * counter + W[21] * focus_fire + W[22] * stand_support +
-                W[23] * target_wounded + W[25] * counter * self.fm + W[50] * punish + W[57] * target_ranged +
-                DULLING_OWN_SWING_SCORE * dulling;
+                W[23] * target_wounded + W[25] * counter * self.fm + W[50] * punish + W[51] * target_caster +
+                W[57] * target_ranged + DULLING_OWN_SWING_SCORE * dulling;
         }
     };
     const scorer = Scorer{ .s = s, .u = u, .m = &c.m, .opp = opp, .allies = allies[0..n_allies], .my_hp = my_hp, .fm = fm, .v4target = v4target, .v4from = v4from, .ui = c.ui, .atk_mul = util.meleeAttacks(u) };
@@ -238,7 +240,7 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     };
     // The anchor: v0.4's own (target, stand cell).
     const vt = &s.units[v4target];
-    if (vt.in_holder and !vt.isDead()) {
+    if (vt.in_holder and !vt.isDead() and !vt.isHidden()) {
         const fp = ai.footprintForAnchor(u, v4from);
         const tc = engine.unitCells(vt);
         Consider.f(&best, v4target, v4from, null, scorer.score(v4target, tc.slice(), v4from, fp.slice()));
@@ -623,6 +625,7 @@ fn takeAdjacentAttack(c: *ai.Ctx, out: *ai.Decision) void {
         const i: usize = i_slot;
         const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
+        if (e.isHidden() or u.cannotAttack(e.uid)) continue; // Hidden, or the Terrifying Gaze gazer
         if (u.target >= 0 and u.target != @as(i8, @intCast(i))) continue;
         const ec = engine.unitCells(e);
         if (!util.footprintsNear(ec.slice(), dest_fp.slice())) continue;

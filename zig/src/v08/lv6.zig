@@ -24,10 +24,11 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     finalizeDecision(c, out);
 }
 
-/// StrategyV0_7.finalizeDecision. No casts in scope; a meleeMagicAnchor army (2+ MELEE_MAGIC stacks at the start, no
-/// Resurrection or Wind Flow) keeps v0.6's decision.
+/// StrategyV0_7.finalizeDecision: a cast is kept (the caster routing already compared it with combat), and so is the
+/// decision of a meleeMagicAnchor army (2+ MELEE_MAGIC stacks at the start, no Resurrection or Wind Flow).
 fn finalizeDecision(c: *ai.Ctx, out: *ai.Decision) void {
     const u = c.unit();
+    if (util.has(out, .cast_spell)) return;
     if (util.battle.melee_magic[u.team] >= 2) return;
     applyWaitScorer(c, out);
 }

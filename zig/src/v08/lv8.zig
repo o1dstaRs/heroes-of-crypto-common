@@ -1127,11 +1127,8 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) bool {
 /// best direct attack, else a stone strike, else the decision.
 pub fn cemetery(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
     const t = &c.s.grid.terrain;
-    var protected = false;
-    for (in.slice()) |a| switch (a) {
-        .melee_attack, .range_attack, .obstacle_attack => protected = true,
-        else => {},
-    };
+    // V08_POSTURE_PROTECTED_ACTION_TYPES: a strike, a cast or an obstacle attack (Area Throw is not in scope).
+    const protected = util.combatAction(in);
     if (t.n_layout == 0 or t.standing == 0 or protected) {
         util.copyDecision(out, in);
         return true;

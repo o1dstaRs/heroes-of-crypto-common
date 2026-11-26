@@ -489,13 +489,13 @@ pub fn has(d: *const ai.Decision, comptime tag: std.meta.Tag(rec.Action)) bool {
     return false;
 }
 
-/// The decision strikes or casts (melee_attack, range_attack; cast_spell is out of scope).
+/// The decision strikes or casts (melee_attack, range_attack, cast_spell).
 pub fn strikes(d: *const ai.Decision) bool {
-    return has(d, .melee_attack) or has(d, .range_attack);
+    return has(d, .melee_attack) or has(d, .range_attack) or has(d, .cast_spell);
 }
 
-/// v0.5's COMBAT_ACTIONS and v0.8's posture-protected types: a strike or an obstacle attack (casts and Area Throw are
-/// out of scope).
+/// v0.5's COMBAT_ACTIONS and v0.8's posture-protected types: a strike, a cast or an obstacle attack (Area Throw is not
+/// in scope).
 pub fn combatAction(d: *const ai.Decision) bool {
     return strikes(d) or has(d, .obstacle_attack);
 }

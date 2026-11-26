@@ -466,6 +466,7 @@ const Gen = struct {
             const i: usize = i_slot;
             const e = &s.units[i_slot];
             if (!util.livingOf(s, i, opp)) continue;
+            if (e.isHidden() or u.cannotAttack(e.uid)) continue; // a Hidden unit or the gazer is no legal shot
             const ei: u8 = @intCast(i);
             const to = [2]f64{ e.pos_x, e.pos_y };
             const e_small = engine.isSmall(e);
@@ -479,6 +480,7 @@ const Gen = struct {
                     if (hits.len == 0) continue;
                     const primary = hits.units[0];
                     if (s.units[primary].isDead() or s.units[primary].team != opp) continue;
+                    if (s.units[primary].isHidden() or u.cannotAttack(s.units[primary].uid)) continue;
                     if (forced >= 0 and forced != @as(i32, primary)) continue;
                     if (primary != ei) continue; // a plain shot never advertises a rear stack behind the first hit
                     var dup = false;
@@ -542,6 +544,9 @@ const Gen = struct {
             const i: usize = i_slot;
             const e = &s.units[i_slot];
             if (!e.in_holder or e.isDead() or e.team == team) continue;
+            // meleeTargets: not Hidden (Disguise), the forced target only, not the Terrifying Gaze gazer (Cowardice is
+            // not in scope).
+            if (e.isHidden() or u.cannotAttack(e.uid)) continue;
             if (forced >= 0 and forced != @as(i32, @intCast(i))) continue;
             targets[nt] = @intCast(i);
             nt += 1;

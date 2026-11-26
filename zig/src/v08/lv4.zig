@@ -19,6 +19,7 @@ const ai = @import("../ai.zig");
 const util = @import("util.zig");
 const policy = @import("policy.zig");
 const lv3 = @import("lv3.zig");
+const spells = @import("../spells.zig");
 
 const Cell = st.Cell;
 const State = st.State;
@@ -31,6 +32,8 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     defer policy.note("v0.4", out, s, rin);
     // (2) Out-gunning them at range, a shooter that cannot fire yet holds.
     if (u.attack_type == AT.RANGE and engine.getRangeShots(u) > 0 and u.canMove() and holdWhenRangedSuperior(c, out)) return;
+    // (8) The Troll's Wild Regeneration gift (V04_TROLL on).
+    if (util.creature(s, c.ui) == .troll and trollWildRegen(c, out)) return;
     lv3.decide(c, out);
     var base: ai.Decision = undefined;
     util.copyDecision(&base, out);
@@ -77,6 +80,60 @@ fn holdWhenRangedSuperior(c: *ai.Ctx, out: *ai.Decision) bool {
 fn firstMelee(out: *const ai.Decision) ?usize {
     for (out.slice(), 0..) |a, i| if (a == .melee_attack) return i;
     return null;
+}
+
+/// (8) trollWildRegen: the Troll gifts Wild Regeneration (V04_TROLL on) when it cannot strike an adjacent enemy and its
+/// side out-guns theirs at range (v0.8's ranged output): it hourglasses on lap 1, then casts on the living ally of at
+/// most the gift level that the gift is worth more to (a19-wild-regen-gift-v1: no own Wild Regeneration, more max HP
+/// per creature than the caster; Holy Cross is not in scope), the most max HP first, then cumulative HP, first legal
+/// cast in getAllAllies order. As TypeScript, the "already gifted" test reads a buff that never exists, so it never
+/// stops the gift.
+fn trollWildRegen(c: *ai.Ctx, out: *ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    if (u.target >= 0) return false;
+    const spell = st.CastSpell.wild_regeneration;
+    const raw: u8 = @intFromEnum(spell);
+    if (u.bookSpell(raw) == null) return false;
+    const mine = engine.unitCells(u);
+    const opp = engine.opposite(u.team);
+    for (s.holderOrder()) |k| {
+        if (!util.livingOf(s, k, opp)) continue;
+        const ec = engine.unitCells(&s.units[k]);
+        if (util.footprintsNear(ec.slice(), mine.slice())) return false;
+    }
+    if (util.teamRangedOutput(s, u.team) <= util.teamRangedOutput(s, opp)) return false;
+    if (s.fight.lap <= 1 and util.canHourglass(s, c.ui)) {
+        util.setWait(out, c.ui);
+        return true;
+    }
+    const cfg = &s.spell_cfg[raw];
+    if (!cfg.loaded) return false;
+    var cand: [st.MAX_UNITS]u8 = undefined;
+    var n: usize = 0;
+    for (s.holderOrder()) |k| {
+        const a = &s.units[k];
+        if (!util.livingOf(s, k, u.team) or k == c.ui) continue;
+        if (@as(f64, @floatFromInt(a.level)) > cfg.max_gift_level) continue;
+        if (a.has(.wild_regeneration) or !(a.max_hp > u.max_hp)) continue; // isWorthwhileWildRegenerationGift
+        cand[n] = k;
+        n += 1;
+    }
+    std.sort.insertion(u8, cand[0..n], s, struct {
+        fn lt(st_: *const State, p: u8, q: u8) bool {
+            const a = &st_.units[p];
+            const b = &st_.units[q];
+            if (a.max_hp != b.max_hp) return a.max_hp > b.max_hp;
+            return util.cumulativeHp(a) > util.cumulativeHp(b);
+        }
+    }.lt);
+    for (cand[0..n]) |t| {
+        if (!spells.canCastSpell(s, c.ui, t, spell, cfg)) continue;
+        out.* = .{};
+        out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = raw, .target = t, .has_target = true } });
+        return true;
+    }
+    return false;
 }
 
 /// IWeightedRoute.route.length: the route's cells, its start included.
@@ -502,8 +559,9 @@ fn enforceMeleeLegality(c: *ai.Ctx, out: *ai.Decision) void {
     }
 }
 
-/// waitForMassBuff (V04_BUFFWAIT, on): on lap 1 a unit without a strike waits while its army's Behemoth roar or Ogre
-/// Mage riot is still pending. No buff can land in scope, so a pending one stays pending.
+/// waitForMassBuff (V04_BUFFWAIT, on; the Ogre and Behemoth self-delays are off): on lap 1 a unit without a strike or cast
+/// waits while its army's Behemoth roar (no living ally carries Battle Roar yet, unless range-heavy) or Ogre Mage riot is
+/// still pending. Mass Riot and Riot are wave 2: no buff of theirs can land, so a pending riot stays pending.
 fn waitForMassBuff(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     if (s.fight.lap > 1) return;
@@ -512,18 +570,20 @@ fn waitForMassBuff(c: *ai.Ctx, out: *ai.Decision) void {
     var ranged: usize = 0;
     var behemoth = false;
     var ogre = false;
+    var roared = false;
     for (s.holderOrder()) |i_slot| {
         const i: usize = i_slot;
         const a = &s.units[i_slot];
         if (!util.livingOf(s, i, team)) continue;
         if (a.attack_type == AT.RANGE) ranged += 1;
+        if (a.buffs.find(.battle_roar) != null) roared = true;
         switch (util.creature(s, @intCast(i))) {
             .behemoth => behemoth = true,
             .ogre_mage => ogre = true,
             else => {},
         }
     }
-    const roar_pending = ranged < 3 and behemoth; // no Battle Roar buff in scope
+    const roar_pending = ranged < 3 and behemoth and !roared;
     const riot_pending = ogre; // no Mass Riot / Riot buff in scope
     const me = util.creature(c.s, c.ui);
     const wait = (roar_pending and me != .behemoth) or (riot_pending and me != .ogre_mage);
