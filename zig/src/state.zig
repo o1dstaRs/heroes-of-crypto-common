@@ -150,6 +150,7 @@ pub const SpellId = enum(u8) {
     last_fuse,
     rime_charm,
     gravechain,
+    quiver_of_echoes,
     aegis_of_the_arcane,
     // not artifact rows (outside the isArtifact range): the System "Made of Fire" buff a lava route gives a unit
     // that can traverse lava (Lava Striders; Borrowed Grace may copy it), and Gravechain's Death debuff Gravebound
@@ -232,6 +233,7 @@ pub const SpellId = enum(u8) {
             .last_fuse => "Last Fuse",
             .rime_charm => "Rime Charm",
             .gravechain => "Gravechain",
+            .quiver_of_echoes => "Quiver of Echoes",
             .gravebound => "Gravebound",
             .made_of_fire => "Made of Fire",
             .aegis_of_the_arcane => "Aegis of the Arcane",

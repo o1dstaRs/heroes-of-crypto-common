@@ -39,7 +39,7 @@ pub fn supportedT1(id: i64) bool {
 /// Archmage's Ring 13, Aegis of the Arcane 14, Last Fuse 17.
 pub fn supportedT2(id: i64) bool {
     return switch (id) {
-        0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17 => true,
+        0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 => true,
         else => false,
     };
 }
@@ -656,4 +656,17 @@ pub fn gravechain(s: *st.State, att_i: u8, tgt_i: u8, active_i: u8, attempted: *
         const extend: f64 = if (li == active_i) 1 else 0;
         abilities.pushChecked(s, &e.debuffs, .{ .id = .gravebound, .laps = laps + extend, .power = s.gravebound_power });
     }
+}
+
+// =====================================================================================================================
+// Quiver of Echoes (attack_handler.ts handleRangeAttack, handleObstacleAttack): the volley itself is combat.echo.
+// =====================================================================================================================
+
+/// Unit.getBonusRangedAttackChance: a native shooter (attack_type RANGE) holding the Quiver of Echoes row rolls an extra
+/// volley at clamp(power + luck, 0, 100) (power: the row's, else its first stored property, else 35); 0 otherwise.
+pub fn echoChance(s: *const st.State, u: *const Unit) f64 {
+    if (!s.artifacts or u.attack_type != AT.RANGE or u.buffs.len == 0) return 0;
+    const q = u.buffs.get(.quiver_of_echoes) orelse return 0;
+    const power: f64 = if (q.power != 0) q.power else if (q.src_x > 0) prop(q.src_x) else 35;
+    return @max(0, @min(100, power + engine.getLuck(u)));
 }

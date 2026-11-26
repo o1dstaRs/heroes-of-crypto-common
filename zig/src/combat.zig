@@ -1222,7 +1222,10 @@ fn shoot(s: *State, ai: u8, ti: u8, free: ?[2]f64, aim_cell: ?Cell, aim_side: u8
 
     var died: Died = .{};
     var out: Outcome = .{};
+    // Quiver of Echoes: the chance is read before the shot (handleRangeAttack).
+    const echo_chance = artifacts.echoChance(s, att);
     if (!resolveShot(s, ai, &g, if (have_resp) resp.group(0) else null, resp_div, to, false, suppress_double, &died, &out)) return error.Rejected;
+    if (echo_chance > 0) echo(s, ai, &g, &out, to, false, echo_chance, &died);
     if (terrain.hasScatteredMountains(s)) {
         if (splash) clearStones(s, &g);
         if (out.response_thrown and resp_blast) clearStones(s, &resp);
@@ -1295,7 +1298,9 @@ fn areaStrikeAtCell(s: *State, ai: u8, aimed: Cell, events: *Events) Reject!void
     }
     var died: Died = .{};
     var out: Outcome = .{};
+    const echo_chance = artifacts.echoChance(s, att);
     if (!resolveShot(s, ai, &g, null, 1, pos, true, false, &died, &out)) return error.Rejected;
+    if (echo_chance > 0) echo(s, ai, &g, &out, pos, true, echo_chance, &died);
     var cleared: u32 = 0;
     if (terrain.hasScatteredMountains(s)) {
         for (cells[0..n_cells]) |c| {
@@ -1314,6 +1319,11 @@ fn areaStrikeAtCell(s: *State, ai: u8, aimed: Cell, events: *Events) Reject!void
 const Outcome = struct {
     /// The counter-shot flew (its animation from the primary exists): a splash responder's blast clears its stones.
     response_thrown: bool = false,
+    /// targetUnits[0] after the Chakram grew it in place (attack_handler.ts ~1424): group 0, then the bounce victims it
+    /// did not hold, up to the first dodge. Set only when a Chakram flew (head_len 0 otherwise); Quiver of Echoes' volley
+    /// aims at its survivors.
+    head: [st.MAX_UNITS]u8 = undefined,
+    head_len: u8 = 0,
 };
 
 /// resolveRangeAttack's finalizeRangeAttack: Predatory Assimilation's response steal (the primary robs the counter-shot's
@@ -1410,7 +1420,11 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
     if (aoeAbility(att) != null) {
         var flight: Flight = .{};
         for (g.group(0)) |v| flight.add(v, 1, .roll);
-        if (has_chakram) chakramFlight(s, ai, target_ui, missed, &flight);
+        if (has_chakram) {
+            chakramFlight(s, ai, target_ui, missed, &flight);
+            @memcpy(out.head[0..flight.len], flight.slots[0..flight.len]);
+            out.head_len = flight.len;
+        }
         damage_from_attack = luckyStrike(s, att, aoeTail(s, ai, &flight, divisor, ai, died));
         tail_landed = true;
     } else if (!missed) {
@@ -1594,6 +1608,41 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
     fin.run(s, ai);
     engine.refreshStackPowerForAllUnits(s);
     return true;
+}
+
+/// handleRangeAttack's Quiver of Echoes after a completed shot: a living shooter that is not stunned and still has arrows,
+/// facing a surviving target group (each group's living members: group 0 as the Chakram grew it), draws getRandomInt(0,
+/// 100); under `chance` (read before the shot) one more ordinary volley flies at the surviving groups with their
+/// original divisors, the same aim and AOE flag, no counter-shot and no Double Shot (resolveShot: its own rolls, riders,
+/// arrow and refresh). A volley that does not complete keeps the draw and changes nothing. Its deaths join `died` after
+/// the shot's, each once.
+fn echo(s: *State, ai: u8, g: *const Groups, out: *const Outcome, to: [2]f64, is_aoe: bool, chance: f64, died: *Died) void {
+    const att = &s.units[ai];
+    if (att.isDead() or att.isStunned() or engine.getRangeShots(att) <= 0) return;
+    var live: Groups = undefined;
+    live.reset();
+    for (0..g.n) |k| {
+        const members: []const u8 = if (k == 0 and out.head_len != 0) out.head[0..out.head_len] else g.group(k);
+        const first = live.n_members;
+        for (members) |m| {
+            if (s.units[m].isDead() or live.n_members >= live.members.len) continue;
+            live.members[live.n_members] = m;
+            live.n_members += 1;
+        }
+        if (live.n_members == first) continue;
+        live.divisors[live.n] = g.divisors[k];
+        live.entry[live.n] = g.entry[k];
+        live.n += 1;
+        live.start[live.n] = live.n_members;
+    }
+    if (live.n == 0) return;
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) >= chance) return; // attack_handler.ts:956
+    var echo_died: Died = .{};
+    var echo_out: Outcome = .{};
+    if (!resolveShot(s, ai, &live, null, 1, to, is_aoe, true, &echo_died, &echo_out)) return;
+    for (echo_died.items[0..echo_died.len]) |d| {
+        if (!died.includes(d)) died.push(d);
+    }
 }
 
 const Second = struct { applied: bool = false, tail: bool = false, absorbed: bool = false, damage: f64 = 0, morale: f64 = 0 };
@@ -2106,8 +2155,8 @@ fn pierceStoneBehind(s: *State, ai: u8, from: Cell, target: Cell, died: *Died) v
 /// AttackHandler.handleObstacleAttack's range branch (a shooter with RANGE selected that can land a shot): on a
 /// scattered board the shot breaks the first stone on its ray, a Double Shot holder's the first TWO
 /// (getObstacleIntersections, collected before any falls); on the classic board it spends the aimed mountain's hit;
-/// either way one arrow is spent (a plain decrement). No miss or damage roll, and no Quiver of Echoes (an artifact)
-/// volley. Returns rangeLanded.
+/// either way one arrow is spent (a plain decrement). No miss or damage roll; then Quiver of Echoes' extra hit
+/// (obstacleEcho). Returns rangeLanded.
 fn rangedObstacleShot(s: *State, ai: u8, tx: f64, ty: f64) bool {
     const att = &s.units[ai];
     var landed = false;
@@ -2126,7 +2175,36 @@ fn rangedObstacleShot(s: *State, ai: u8, tx: f64, ty: f64) bool {
     att.range_shots -= 1;
     if (att.range_shots < 0) att.range_shots = 0;
     att.range_shots = @floor(att.range_shots);
+    if (landed and s.artifacts) obstacleEcho(s, ai, tx, ty);
     return landed;
+}
+
+/// handleObstacleAttack's Quiver of Echoes (attack_handler.ts:3940): the chance read after the shot; the echo's stone is,
+/// on a scattered board, the first one still standing on the segment to the aim, on the classic board the aimed
+/// mountain while it stands. With one there and arrows left, getRandomInt(0, 100) under the chance spends one more hit
+/// on it (the classic side only while it has hits left, checked after the draw) and one more arrow.
+fn obstacleEcho(s: *State, ai: u8, tx: f64, ty: f64) void {
+    const att = &s.units[ai];
+    const chance = artifacts.echoChance(s, att);
+    if (chance <= 0) return;
+    const scattered = terrain.hasScatteredMountains(s);
+    var cell: Cell = undefined;
+    if (scattered) {
+        var stones: [1]Cell = undefined;
+        if (obstacleIntersections(s, att.pos_x, att.pos_y, tx, ty, stones[0..1]) == 0) return;
+        cell = stones[0];
+    } else {
+        if (!terrain.obstacleStillStands(s)) return;
+        cell = engine.cellForPosition(tx, ty);
+    }
+    if (engine.getRangeShots(att) <= 0) return;
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) >= chance) return; // attack_handler.ts:3951
+    const right = cell.x >= st.GRID >> 1;
+    if (!scattered and (if (right) s.fight.hits_right else s.fight.hits_left) <= 0) return;
+    terrain.spendObstacleHit(s, cell, right);
+    att.range_shots -= 1;
+    if (att.range_shots < 0) att.range_shots = 0;
+    att.range_shots = @floor(att.range_shots);
 }
 
 /// AttackHandler.handleObstacleAttack: the range branch when the attacker can shoot (rangedObstacleShot), else the

@@ -16,8 +16,8 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
 - the abilities of the creatures ported so far (batches 1 to 5, below), including the units Infest and Summon Wolves
   summon and the abilities Predatory Assimilation and the Wild Regeneration gift move between units; every other
   creature's abilities stripped;
-- the artifacts ported so far (below; `src/artifacts.zig`): 27 of the 28 in the live pools, played as runMatch applies
-  them (once, at setup); a team holding Quiver of Echoes (or the disabled Broken Aegis or Holy Cross) is refused;
+- the artifacts (below; `src/artifacts.zig`): all 28 in the live pools, played as runMatch applies them (once, at
+  setup); a team holding the disabled Broken Aegis or Holy Cross is refused;
 - the wave-1 spells (below): Heal, Blessing, Lightning Strike, Fire Strike, Meteor Shower, Meteorite, Ring of Fire, Summon
   Wolves and Vine Throw, with the casters' spellbooks (Healer, Battle Mage, Satyr, Magic Dragon, Trent, and a Queen that
   stole one), the MAGIC attack type, the vines and the Wolves they summon; a book holding any other spell is refused;
@@ -533,6 +533,7 @@ per hook (`State.artifacts`).
 | Last Fuse | the killing hit's record (`Unit.fuse`: combat.hit, spell kills) and the corpse's blast in the death cleanup, before the Infest spawn, then the depth-first chain |
 | Rime Charm | the striker's landed-hit rider (`getRandomInt(0, 100)` against `clamp(power + luck)`, a full-resist target skipped, an existing Quagmire kept after the draw): Spit Ball's Quagmire (laps from the second stored property, + 1 on the active unit) at every melee, shot, counter-shot, second-shot, Through Shot and splash site; its holder turns the Spit Ball hooks on |
 | Gravechain | the army's -1 step, and the landed-hit rider: the chance once per call, the links (the target and its living teammates touching it, three hops, getCells order, each cell's ring), one attempted set per exchange (melee spin, skewer and blow share one; a splash or Through Shot volley one), Gravebound (steps x 0.75 after Quagmire, a flyer grounded in `canFly`) |
+| Quiver of Echoes | the chance (a native shooter's row: `clamp(power + luck)`, read before the shot); after a completed shot by a living, unstunned shooter with arrows left, one `getRandomInt(0, 100)` when a target group survives, and under the chance one more ordinary volley (`resolveShot` on the surviving groups, their original divisors, no counter-shot, no Double Shot, one arrow; group 0 as a Chakram grew it, `Outcome.head`), its deaths after the shot's; on `range_attack` and `areaStrikeAtCell`; the obstacle shot's extra hit on the next standing stone (classic: the aimed mountain while its side has hits) |
 | Barrel Barricade | two barrels per owning team at start_fight (LEFT first, before the fight starts): its Placement augment's zone sorted by (on a friendly shooter's file in front of it, screen rank, inward edge, x, y), the pair rule; each a standing scattered stone appended to the layout on any map, so the stone gates (`hasScatteredMountains`, `centerCells`, `groundRouteCrossesObstacle`, the loader's standing cells) open on NORMAL and LAVA_CENTER too; per-team records deleted with the stone |
 | Lava Striders | walking and standing on the undried lava square (`canTraverseLava`: the pather's `made_of_fire`, occupancy, the restore of a vacated centre cell, v0.1's landing check) and Made of Fire after a lava route (laps 3) with its immediate boost, the `+init/power` refresh terms and the ability-formula terms |
 
@@ -644,8 +645,8 @@ The framework the army setup added (exact in both modes, coverage below):
   - Artifacts: `RECORD_ARTIFACTS` already records them (`init.setup.perTeam.artifactT1/T2`; the loader refuses their
     buffs). Their stored properties may not fit `src_x/src_y` (i8, integers: Pendant of Vitality's 12.5 is
     `parseFloat`ed), the buff list may need more room, Broken Aegis adds +20 to the recorded break chance and a self
-    miss chance, Quiver of Echoes adds a roll to every landed shot and to the ranged obstacle shot (the branch skips it
-    now), Barrel Barricade places barrels inside `start_fight` (after the supply, before `fightProperties.startFight`),
+    miss chance, Quiver of Echoes adds a roll to every completed shot and to the ranged obstacle shot (both ported,
+    `combat.echo` and `combat.obstacleEcho`), Barrel Barricade places barrels inside `start_fight` (after the supply, before `fightProperties.startFight`),
     and Cursed Ward / Crown of Command move luck and morale in `adjustBaseStats`.
 - Batch 2 lessons:
   - Inert is not absent: Trent's abilities change nothing in scope, but the loader must still know their names.
@@ -1360,10 +1361,10 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 
 - the abilities of every creature outside batches 1 to 5 and the wave-1 casters, the spells outside wave 1 (Spiritual
   Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Fireball, Smoke, Craft, Wind Flow, Resurrection, Castling, the
-  runes and the rest: a book holding one is refused by name), the artifact Quiver of Echoes, the disabled Broken Aegis
+  runes and the rest: a book holding one is refused by name), the disabled Broken Aegis
   (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and mirror rolls of debuff
   spells), Crafted Double Shot; the revealed-ranged delivery layer of production's augment plan (it needs the live
-  draft); WATER_CENTER (never played); on the maps, Quiver of Echoes' extra obstacle shot, Fire Breath through stones,
+  draft); WATER_CENTER (never played); on the maps, Fire Breath through stones,
   and `forceStalledLap` / the recovery net (never reached: 0 rejected engine calls in every map recording). The ported
   code leaves out what no battle in scope can reach: the Made of Fire ability (no creature in scope holds it; the
   Lava Striders buff is ported), Paralysis, Water Shield and Water Element, Flesh Shield, Dense Flesh
