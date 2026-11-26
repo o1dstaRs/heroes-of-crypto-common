@@ -99,6 +99,8 @@ pub const SpellId = enum(u8) {
     misfortune,
     /// The Healer's cast buff (wave 2): armor_mod becomes a share of base armor, (power / 100) x (1 + the flyer share).
     spiritual_armor,
+    /// The Magic Dragon's debuff (wave 2): the holder skips its next activation and cannot move (it still replies).
+    whirlpool,
     /// The Blacksmith's runes (wave 2): never-ticking buff rows (laps 15) whose first stored property is the stacked
     /// bonus N, added flat to armor_mod / attack_mod.
     armor_rune,
@@ -233,6 +235,7 @@ pub const SpellId = enum(u8) {
             .fireforged_sword => "Fireforged Sword",
             .misfortune => "Misfortune",
             .spiritual_armor => "Spiritual Armor",
+            .whirlpool => "Whirlpool",
             .armor_rune => "Armor Rune",
             .weapon_rune => "Weapon Rune",
             .freeze => "Freeze",
@@ -658,7 +661,7 @@ pub const AbilityId = enum(u8) {
             .book_of_healing => spell == .heal or spell == .blessing or spell == .spiritual_armor or spell == .mass_heal,
             .forest_spellbook => spell == .summon_wolves,
             .basic_tome_of_battle_magic => spell == .fire_strike or spell == .meteorite,
-            .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower,
+            .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower or spell == .whirlpool,
             .book_of_chaos => spell == .fireball or spell == .fireforged_sword or spell == .misfortune or spell == .smoke,
             .blacksmith_tools => spell == .craft,
             .enchants => spell == .armor_rune or spell == .weapon_rune,
@@ -755,6 +758,8 @@ pub const CastSpell = enum(u8) {
     // wave 2a: the Healer's Book of Healing
     spiritual_armor,
     mass_heal,
+    // wave 2a: the Magic Dragon's Tome of Elements
+    whirlpool,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -780,6 +785,7 @@ pub const CastSpell = enum(u8) {
             .weapon_rune => "Weapon Rune",
             .spiritual_armor => "Spiritual Armor",
             .mass_heal => "Mass Heal",
+            .whirlpool => "Whirlpool",
         };
     }
 
@@ -803,6 +809,7 @@ pub const CastSpell = enum(u8) {
             .armor_rune => .armor_rune,
             .weapon_rune => .weapon_rune,
             .spiritual_armor => .spiritual_armor,
+            .whirlpool => .whirlpool,
             else => null,
         };
     }
@@ -1242,7 +1249,12 @@ pub const Unit = struct {
 
     /// canMove(): no Paralysis (read live) and no Web lock (taken at activation); no Whirlpool in scope.
     pub inline fn canMove(self: *const Unit) bool {
-        return !self.web_locked and !(self.effects.len != 0 and self.effects.find(.paralysis) != null);
+        return !self.web_locked and !(self.effects.len != 0 and self.effects.find(.paralysis) != null) and !self.whirlpooled();
+    }
+
+    /// hasStatusApplied("Whirlpool"): isSkippingThisTurn's debuff term and canMove's (canRespond does not read it).
+    pub inline fn whirlpooled(self: *const Unit) bool {
+        return self.debuffs.len != 0 and self.debuffs.find(.whirlpool) != null;
     }
 
     /// The first buff of an augment name among the rows that still have an object (getBuff / statBuffs: a revive's

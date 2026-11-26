@@ -89,7 +89,7 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
         if (u.ability_mask & (st.AbilityId.crafted_double_punch.bit() | st.AbilityId.crafted_double_shot.bit() |
             st.AbilityId.crafted_frozen_sword.bit() | st.AbilityId.crafted_frozen_bow.bit()) != 0) return "a crafted card";
         if (u.buffs.len != 0 and (u.buffs.find(.fireforged_sword) != null or u.buffs.find(.armor_rune) != null or u.buffs.find(.weapon_rune) != null)) return "a wave-2 buff";
-        if (u.debuffs.len != 0 and u.debuffs.find(.misfortune) != null) return "a Misfortune debuff";
+        if (u.debuffs.len != 0 and (u.debuffs.find(.misfortune) != null or u.debuffs.find(.whirlpool) != null)) return "a wave-2 debuff";
         if (u.effects.len != 0 and u.effects.find(.freeze) != null) return "a Freeze effect";
     }
     return null;

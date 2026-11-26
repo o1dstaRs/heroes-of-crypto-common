@@ -36,7 +36,9 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   skipping turns and replies like Stun) and its runes (one roll, the stacked bonus N + 1 in the row's first property,
   added flat to armor_mod / attack_mod); the Healer's Spiritual Armor (armor_mod becomes (power / 100) x (1 + the flyer
   share) of the base armor, Shatter Armor subtracted twice) and Mass Heal (every ally with magic resist other than 100
-  and no active Mechanism heals floor(2.5 x caster alive), no morale factor; the gate ignores Mechanism); batch 6a's
+  and no active Mechanism heals floor(2.5 x caster alive), no morale factor; the gate ignores Mechanism); the Magic
+  Dragon's Whirlpool (the debuff branch: the save on the target, the redirect, the always-drawn mirror roll; laps 1, the
+  holder skips its next activation and cannot move but still replies); batch 6a's
   castables, the Valkyrie's Wind Flow (a
   mass buff on every flyer) and the Angel's Resurrection (on a wounded ally stack); a book holding any other spell is
   refused;
@@ -124,7 +126,7 @@ Wave-1 spells (`spells.zig`), exact in both modes:
 | Healer (L2, MAGIC) | Book of Healing | Heal x4, Spiritual Armor x2, Blessing x2, Mass Heal x3 (the whole book) |
 | Battle Mage (L2, MELEE_MAGIC) | Basic Tome of Battle Magic | Fire Strike x3, Meteorite x1 |
 | Satyr (L2, MAGIC) | Forest Spellbook, Sylvan Focus Blessing | Summon Wolves x2 (Courage and Helping Hand are wave 2) |
-| Magic Dragon (L4, MELEE_MAGIC) | Tome of Elements, Magic Reflection | Lightning Strike x4, Ring of Fire x2, Meteor Shower x1 (Whirlpool is wave 2) |
+| Magic Dragon (L4, MELEE_MAGIC) | Tome of Elements, Magic Reflection | Whirlpool x1, Lightning Strike x4, Ring of Fire x2, Meteor Shower x1 (the whole book) |
 | Trent (L2) | Vine Throw (castable) | Vine Throw x1 |
 | Wandering Mage (L1, MELEE) | Book of Chaos | Smoke x1, Misfortune x1, Fireforged Sword x2, Fireball x1 (wave 2, the whole book) |
 | Blacksmith (L1, MELEE) | Blacksmith Tools, Enchants | Craft x1, Armor Rune x5, Weapon Rune x5 (wave 2, the whole book) |
@@ -1574,7 +1576,7 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 - the abilities of every creature outside batches 1 to 5 and 6a and the wave-1 casters (batch 6b: Harpy, Mermaid,
   Efreet, Black Dragon, Abomination, Thunderbird), the spells outside wave 1, the Book of Chaos, the Blacksmith's book and
   batch 6a's castables
-  (Courage, Helping Hand, Whirlpool, Castling and the rest: a book holding one is refused by
+  (Courage, Helping Hand, Castling and the rest: a book holding one is refused by
   name), the disabled Broken Aegis (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and
   mirror rolls of debuff spells); the revealed-ranged delivery layer of
   production's augment plan (it needs the live draft); WATER_CENTER (never played); on the maps, Fire Breath through

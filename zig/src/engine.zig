@@ -1805,7 +1805,8 @@ fn activateNextUnit(s: *State, ui: u8) Activation {
     }
     refreshPossibleAttackTypes(u, canLandRangeAttack(s, u));
     s.fight.first_turn_made = true;
-    return if (u.isSkipping()) .skipped else .ready;
+    // isSkippingThisTurn: Stun, Blindness or Freeze, or a Whirlpool debuff.
+    return if (u.isSkipping() or u.whirlpooled()) .skipped else .ready;
 }
 
 /// One list's pass of Unit.minusLap: each entry loses a lap (sentinel counts excepted) and is deleted at 0.
