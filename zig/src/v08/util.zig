@@ -115,6 +115,57 @@ pub const Creature = enum(u8) {
 
 /// Per-battle facts the engine state does not carry (until Unit has a creature id): each unit's creature, and v0.7's
 /// immutable initial-army profile per team (primeArmyProfile at placement: the stacks a team starts the fight with).
+/// One team's switches of the v0.8 rollout policy, at their production values. The native adapter
+/// (src/simulation/native_rollouts.ts) evaluates each from the environment for that team: the version scopes with the
+/// team's version string (strategyVersionMatchesExperimentScope), the seat switches from `<KNOB>_<LEFT|RIGHT>`
+/// (seatEnvName). It sends them as `policies.<team>.switches` ({name: bool}, the two release sets as string lists).
+pub const Switches = struct {
+    // Version scopes.
+    /// V08_RANGED_POSITION_VERSIONS (default ["v0.8"]).
+    ranged_positioning: bool = true,
+    /// V08_SUPPORT_ROLE_VERSIONS: the Wandering Mage and Healer role routers.
+    support_roles: bool = true,
+    /// V08_BLACKSMITH_ROLE_VERSIONS: the Blacksmith's Craft routing.
+    blacksmith_role: bool = true,
+    /// V08_NIGHTMARE_ROLE_VERSIONS: the Nightmare's Fire Wall roadblock.
+    nightmare_role: bool = true,
+    /// V08_CASTLING_ROUTER_VERSIONS: Castling in the caster router (else v0.7's router policy).
+    castling_router: bool = true,
+    // Seat switches.
+    /// A19_COHERENT_MELEE_APPROACH_<SIDE> (on unless "0").
+    coherent_melee: bool = true,
+    /// A19_DECOY_AWARE_<SIDE> (on unless "0").
+    decoy_aware: bool = true,
+    /// A19_WILD_REGEN_GIFT_<SIDE> (on unless "0").
+    wild_regen_gift: bool = true,
+    /// V08_THROUGH_SHOT_LINE (one variable for both seats: unset on, "off" off, "green" / "red" that seat only).
+    through_shot_line: bool = true,
+    /// V08_MAGE_DAMAGE_KILL_PRIORITY_<SIDE> ("1": a damage spell counts as a guaranteed kill).
+    mage_damage_kill_priority: bool = false,
+    /// V08_ABOMINATION_GUARD_<SIDE> ("1": the Abomination's old guard duty).
+    abomination_guard: bool = false,
+    /// V08_ROLE_RELEASE_<SIDE>: the released v0.8 roles.
+    role_release: RoleRelease = .{},
+    /// V08_PROTECTOR_RELEASE_<SIDE>: the released backline protector kinds.
+    protector_release: ProtectorRelease = .{},
+    /// A19_ENGINE_REACHABLE_ROUTES_<SIDE> (on unless "0"), read by the v0.1 level (ai.zig).
+    engine_reachable_routes: bool = true,
+};
+
+/// V08_RELEASABLE_ROLES (v0_8_role_release.ts).
+pub const RoleRelease = struct {
+    blacksmith_craft: bool = false,
+    healer_sustain: bool = false,
+    wandering_mage_smoke: bool = false,
+};
+
+/// The protector kinds V08_PROTECTOR_RELEASE names.
+pub const ProtectorRelease = struct {
+    abomination: bool = false,
+    angel: bool = false,
+    arachna_queen: bool = false,
+};
+
 pub const Battle = struct {
     creature: [st.MAX_UNITS]Creature = .{.other} ** st.MAX_UNITS,
     /// MELEE_MAGIC stacks per team at the start; two or more make v0.7's meleeMagicAnchor army, which keeps v0.6's
@@ -131,6 +182,9 @@ pub const Battle = struct {
     /// v0.8's ranged positioning runs (V08_RANGED_POSITION_VERSIONS, default "v0.8": production). False for the
     /// v0.8s alias outside that scope, as the plain v0.8s recordings ran.
     ranged_positioning: bool = true,
+    /// Each team's rollout-policy switches (index: the team; production defaults). The rollout loop fills them from
+    /// the request's `policies.<team>.switches`; nothing in src/v08 reads them yet.
+    switches: [3]Switches = .{ .{}, .{}, .{} },
 
     /// The profile from the fight's start state (every holder unit).
     pub fn primeProfile(self: *Battle, s: *const State) void {
