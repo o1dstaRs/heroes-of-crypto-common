@@ -59,6 +59,9 @@ fn attackDamage(s: *State, att: *Unit, tgt: *const Unit, attack_type: u8, diviso
         if (spend) spendShot(att);
     }
     const roll: f64 = @floatFromInt(s.rng.int(@intFromFloat(lo), @intFromFloat(hi)));
+    // The chain's Deep Wounds factor (calculateActiveDeepWoundsEffect), before Lucky Strike; the elemental factor is 1.
+    const dw = abilities.activeDeepWounds(att, tgt);
+    if (dw != 0) return @floor(roll * type_mult * ability_multiplier * (1 + dw / 100) * 1);
     return @floor(roll * type_mult * ability_multiplier * 1 * 1);
 }
 
@@ -268,6 +271,9 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     if (forcedTarget(s, att)) |f| {
         if (f != ti) return error.Rejected;
     }
+    // Terrifying Gaze bars the gazer; a Hidden (Disguise) target cannot be struck.
+    if (s.forbids(att, tgt.uid)) return error.Rejected;
+    if (s.disguise and tgt.isHidden()) return error.Rejected;
     const current = engine.baseCell(att);
     const from_cells = engine.cellsForAnchor(from, att.fw, att.fh);
     const tgt_cells = engine.unitCells(tgt);
@@ -400,14 +406,18 @@ pub fn forcedTarget(s: *const State, u: *const Unit) ?u8 {
 }
 
 /// The on-hit riders of a landed, unabsorbed melee blow or second punch from `from_i` (the active unit) on `to_i`, in
-/// handleMeleeAttack's order: Miner, Stun, Dulling Defense, Aggr, Pegasus Light, Shatter Armor, Venom Cloud poison,
-/// and on the blow (`assimilation_poison`) Predatory Assimilation's poison.
+/// handleMeleeAttack's order: Miner, Stun, Dulling Defense, Boar Saliva, Aggr, Terrifying Gaze (its roll the blow's
+/// last), Deep Wounds, Pegasus Light, Shatter Armor, Venom Cloud poison, and on the blow (`assimilation_poison`)
+/// Predatory Assimilation's poison.
 fn meleeRiders(s: *State, from_i: u8, to_i: u8, damage: f64, assimilation_poison: bool) void {
     if (s.units[from_i].ability_mask != 0) {
         abilities.miner(s, from_i, to_i);
         abilities.stun(s, from_i, to_i, from_i);
         abilities.dullingDefense(&s.units[from_i], &s.units[to_i]);
+        abilities.boarSaliva(s, from_i, to_i, from_i);
         abilities.aggr(s, from_i, to_i, from_i);
+        abilities.terrifyingGaze(s, from_i, to_i, from_i);
+        abilities.deepWounds(s, from_i, to_i, from_i);
         abilities.pegasusLight(s, from_i, to_i, from_i);
         abilities.shatterArmor(s, from_i, to_i, from_i);
     }
@@ -422,6 +432,7 @@ fn canRespondToMelee(s: *const State, att: *const Unit, ai: u8, ti: u8) bool {
     if (abilities.skipsResponse(att)) return false;
     if (tgt.isStunned()) return false; // canRespond: a Stun blocks the reply without spending it
     if (tgt.target >= 0 and tgt.target != @as(i8, @intCast(ai))) return false;
+    if (s.forbids(tgt, att.uid)) return false; // a frightened unit never answers its gazer (nothing spent)
     return !tgt.responded and s.fight.replied & engine.unitBit(ti) == 0;
 }
 
@@ -448,13 +459,16 @@ fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell, died: *Died, decrease: *
         s.damage_lap = s.fight.lap;
         if (!absorbed) {
             target_plus.* += abilities.pegasusLightMorale(att);
-            // The responder's riders: Miner, Stun, Dulling Defense, Aggr, Venom Cloud and Predatory Assimilation
-            // poison, Pegasus Light (Shatter Armor rides only the attacker's blows).
+            // The responder's riders: Miner, Stun, Dulling Defense, Boar Saliva, Aggr, Deep Wounds, Venom Cloud and
+            // Predatory Assimilation poison, Pegasus Light (no Terrifying Gaze; Shatter Armor rides only the
+            // attacker's blows).
             if (tgt.ability_mask != 0) {
                 abilities.miner(s, ti, ai);
                 abilities.stun(s, ti, ai, ai);
                 abilities.dullingDefense(tgt, att);
+                abilities.boarSaliva(s, ti, ai, ai);
                 abilities.aggr(s, ti, ai, ai);
+                abilities.deepWounds(s, ti, ai, ai);
             }
             abilities.poisonAura(s, ti, ai, damage_from_response);
             if (tgt.ability_mask != 0) {
@@ -521,8 +535,13 @@ pub fn enemiesAround(s: *const State, ui: u8, first: Cell, out: *engine.UnitList
 fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: u8, rapid_cells: f64, died: *Died) bool {
     const from = &s.units[from_i];
     const a = from.ability(.lightning_spin) orelse return false; // none while Broken
-    var ring: engine.UnitList = undefined;
-    enemiesAround(s, from_i, first, &ring); // no Terrifying Gaze lock or Flesh Shield owners in scope
+    var around: engine.UnitList = undefined;
+    enemiesAround(s, from_i, first, &around); // no Flesh Shield owners in scope
+    // A unit Terrifying Gaze forbids the spinner to attack is left out of the ring.
+    var ring: engine.UnitList = .{};
+    for (around.slice()) |e| {
+        if (!s.forbids(from, s.units[e].uid)) ring.push(e);
+    }
     const common = abilities.rapidCharge(from, rapid_cells);
     var dead: Died = .{};
     var morale: f64 = 0;
@@ -531,7 +550,13 @@ fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: 
         const enemy = &s.units[ei];
         if (enemy.isDead()) continue;
         if (missRoll(s, from, enemy)) continue;
-        const ability_multiplier = abilities.abilityMultiplier(from, a) * common;
+        var ability_multiplier = abilities.abilityMultiplier(from, a) * common;
+        // Deep Wounds is folded in here AND in the damage chain: the spin squares it.
+        if (enemy.effects.len != 0) {
+            if (enemy.effects.get(.deep_wounds)) |dw| {
+                if (abilities.holdsDeepWounds(from)) ability_multiplier *= 1 + dw.power / 100;
+            }
+        }
         var damage = luckyStrike(s, from, calculateAttackDamage(s, from, enemy, AT.MELEE, 1, ability_multiplier)) +
             abilities.penetratingBite(from, enemy);
         damage = @floor(damage * 1); // getPhysicalAoeDamageMultiplier
@@ -546,7 +571,9 @@ fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: 
             abilities.miner(s, from_i, ei);
             abilities.stun(s, from_i, ei, active_i);
             abilities.dullingDefense(from, enemy);
+            abilities.boarSaliva(s, from_i, ei, active_i);
             abilities.aggr(s, from_i, ei, active_i);
+            abilities.deepWounds(s, from_i, ei, active_i);
             abilities.pegasusLight(s, from_i, ei, active_i);
             if (is_attack) abilities.shatterArmor(s, from_i, ei, active_i);
         }
@@ -601,7 +628,9 @@ fn strikeSkewerTarget(s: *State, from_i: u8, vi: u8, is_attack: bool, died: *Die
         abilities.miner(s, from_i, vi);
         abilities.stun(s, from_i, vi, from_i);
         abilities.dullingDefense(from, next);
+        abilities.boarSaliva(s, from_i, vi, from_i);
         abilities.aggr(s, from_i, vi, from_i); // A3
+        abilities.deepWounds(s, from_i, vi, from_i);
         abilities.pegasusLight(s, from_i, vi, from_i);
         if (is_attack) abilities.shatterArmor(s, from_i, vi, from_i);
     }
@@ -859,10 +888,14 @@ pub fn rangeAttack(s: *State, ai: u8, ti: u8, aim_cell: ?Cell, aim_side: u8, eve
     var target_ui = hits.units[0];
     var tgt = &s.units[target_ui];
     if (tgt.team == att.team or tgt.isDead()) return error.Rejected;
+    // A single-group shot at a Hidden (Disguise) unit is refused; a ray holding two enemies is not.
+    if (s.disguise and hits.len == 1 and tgt.isHidden()) return error.Rejected;
     // An Aggr'd shooter's shot must land first on its live forced target.
     if (forcedTarget(s, att)) |f| {
         if (f != target_ui) return error.Rejected;
     }
+    // Terrifying Gaze bars the gazer as the shot's first hit.
+    if (s.forbids(att, tgt.uid)) return error.Rejected;
     var idx: usize = 1;
 
     // Absolving Arrow: the shot cleanses the shooter's allies on its whole ray, before the miss roll.
@@ -875,7 +908,7 @@ pub fn rangeAttack(s: *State, ai: u8, ti: u8, aim_cell: ?Cell, aim_side: u8, eve
         // An Aggr'd target counter-shoots only its forced attacker (the raw target id); a stunned one cannot respond.
         const aggr_ok = tgt.target < 0 or tgt.target == @as(i8, @intCast(ai));
         if (!abilities.skipsResponse(att) and s.fight.replied & engine.unitBit(target_ui) == 0 and !tgt.isStunned() and
-            engine.canLandRangeAttack(s, tgt) and aggr_ok)
+            engine.canLandRangeAttack(s, tgt) and aggr_ok and !s.forbids(tgt, att.uid))
         {
             response_missed = missRoll(s, tgt, &s.units[rv]);
             responder_target = rv;

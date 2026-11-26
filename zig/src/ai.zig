@@ -220,19 +220,20 @@ pub fn enemiesAround(s: *const State, ui: u8, out: *engine.UnitList) void {
     combat.enemiesAround(s, ui, engine.baseCell(&s.units[ui]), out);
 }
 
-/// canSelectMeleeTarget (ai.ts): a living enemy, and the live forced target only while the unit is Aggr'd (no Hidden
-/// or Cowardice in scope).
+/// canSelectMeleeTarget (ai.ts): a living enemy that is not Hidden, and the live forced target only while the unit is
+/// Aggr'd (no Cowardice in scope). The Terrifying Gaze lock is not read here (findTarget keeps the gazer).
 pub fn canSelectMeleeTarget(s: *const State, ui: u8, t: u8) bool {
     const target = &s.units[t];
     if (target.isDead() or target.team == s.units[ui].team) return false;
+    if (s.disguise and target.isHidden()) return false;
     if (combat.forcedTarget(s, &s.units[ui])) |f| return f == t;
     return true;
 }
 
 /// isLegalMeleeTargetAtHp (v0_1.ts): canSelectMeleeTarget's checks on a holder unit (the forced target read the same
-/// way: present and alive).
+/// way: present and alive), and not the gazer that frightened the unit (cannotAttackUnitId).
 pub fn isLegalMeleeTarget(s: *const State, ui: u8, t: u8) bool {
-    return s.units[t].in_holder and canSelectMeleeTarget(s, ui, t);
+    return s.units[t].in_holder and !s.forbids(&s.units[ui], s.units[t].uid) and canSelectMeleeTarget(s, ui, t);
 }
 
 /// isLineBlockedByFriendlyUnit: walk the line on accumulated f64 steps; the first friendly that is not the
@@ -294,6 +295,8 @@ pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
     const s = c.s;
     const u = c.unit();
     if (engine.getRangeShots(u) <= 0) return null;
+    // A shooter inside an enemy's Range Null Field cannot fire (no Rangebane in scope): no target, no memory write.
+    if (engine.nullFielded(s, u)) return null;
     const unit_cell = engine.baseCell(u);
     const enemy: i8 = @intCast(engine.opposite(u.team));
     const body = engine.unitCells(u);
@@ -313,6 +316,12 @@ pub fn findRangeAttackAction(c: *Ctx) ?AIAction {
             if (d > max_range) continue;
             if (lineBlockedByObstacle(&c.m, unit_cell, t)) continue;
             if (lineBlockedByFriendly(&c.m, unit_cell, t, u.team, body.slice())) continue;
+            // A Hidden enemy can never be the shot's primary target.
+            if (s.disguise) {
+                if (occupant(s, t)) |o| {
+                    if (s.units[o].isHidden()) continue;
+                }
+            }
             var divisor: f64 = 1;
             if (band > 0) {
                 var dd = d;
@@ -1005,8 +1014,13 @@ pub fn completeMoveWithMelee(c: *Ctx, mp: *const MovePath, r: *const Route, pref
     out.push(.{ .melee_attack = .{ .attacker = c.ui, .target = victim, .attack_from = r.cell, .path = &.{} } });
 }
 
+/// idleTurn: an ordinary unit ends its turn; a mindless one ("AI Driven", Break-aware) waits when canWaitOnHourglass
+/// passes, else defends.
 pub fn idleTurn(c: *const Ctx, out: *Decision) void {
-    out.push(.{ .end_turn = .{ .unit = c.ui, .reason = .manual } });
+    const u = c.unit();
+    if (!u.has(.ai_driven)) return out.push(.{ .end_turn = .{ .unit = c.ui, .reason = .manual } });
+    if (engine.canWaitOnHourglass(c.s, c.ui)) return out.push(.{ .wait_turn = .{ .unit = c.ui } });
+    out.push(.{ .defend_turn = .{ .unit = c.ui } });
 }
 
 /// fallbackTurn
@@ -1049,12 +1063,14 @@ pub fn rangeShotLandable(s: *const State, ui: u8, ti: u8, aim_cell: ?Cell, aim_s
     const u = &s.units[ui];
     const t = &s.units[ti];
     if (!t.in_holder or t.isDead() or t.team == u.team) return false;
+    if ((s.disguise and t.isHidden()) or s.forbids(u, t.uid)) return false;
     if (!engine.canLandRangeAttack(s, u)) return false;
     const to = combat.aimEdge(s, u, t, aim_cell, aim_side) orelse return false;
     const hits = combat.evaluateRange(s, ui, u.pos_x, u.pos_y, to[0], to[1]);
     if (hits.len == 0) return false;
     const first = &s.units[hits.units[0]];
-    if (first.isDead() or first.team == u.team) return false;
+    if (first.isDead() or first.team == u.team or s.forbids(u, first.uid)) return false;
+    if (s.disguise and hits.len == 1 and first.isHidden()) return false;
     // An Aggr'd shooter's first hit must be its live forced target.
     if (combat.forcedTarget(s, u)) |forced| return hits.units[0] == forced;
     return true;
@@ -1066,14 +1082,18 @@ pub fn findLegalRangeAttack(c: *const Ctx, preferred: u8) ?rec.Action {
     const u = c.unit();
     var order: engine.UnitList = .{};
     var has_preferred = false;
+    // The candidates: living enemies that are not Hidden and not the gazer that frightened the shooter.
+    const Candidate = struct {
+        fn ok(st_: *const State, shooter: *const Unit, e: *const Unit) bool {
+            return e.team != shooter.team and !e.isDead() and !(st_.disguise and e.isHidden()) and !st_.forbids(shooter, e.uid);
+        }
+    };
     for (s.holderOrder()) |i| {
-        const e = &s.units[i];
-        if (e.team != u.team and !e.isDead() and i == preferred) has_preferred = true;
+        if (Candidate.ok(s, u, &s.units[i]) and i == preferred) has_preferred = true;
     }
     if (has_preferred) order.push(preferred);
     for (s.holderOrder()) |i| {
-        const e = &s.units[i];
-        if (e.team == u.team or e.isDead()) continue;
+        if (!Candidate.ok(s, u, &s.units[i])) continue;
         if (has_preferred and i == preferred) continue;
         order.push(i);
     }
@@ -1172,7 +1192,9 @@ pub fn decideWith(c: *Ctx, out: *Decision) void {
             completeMoveWithMelee(c, mp, r, null, out);
         },
         .obstacle => {
-            // No select_attack_type prefix and no route legality check; no mindless ("AI Driven") unit in scope.
+            // A mindless ("AI Driven") unit never mines: it charges instead (findTarget's side effects stand).
+            if (u.has(.ai_driven)) return fallbackTurn(c, out);
+            // No select_attack_type prefix and no route legality check.
             const struck = a.attack orelse return fallbackTurn(c, out);
             const from = a.move orelse return fallbackTurn(c, out);
             const pos = engine.positionForCell(@floatFromInt(struck.x), @floatFromInt(struck.y));
@@ -1229,6 +1251,20 @@ pub fn playMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *const fn
     return continueMatchWith(s, max_laps, obs, decide);
 }
 
+/// One decision of unit `ui` into `decision`, reported to the observer (units named by uid). True when the observer
+/// stops the loop.
+fn decideStep(s: *State, ui: u8, decide: *const fn (*State, u8, *Decision) void, decision: *Decision, obs: ?Observer) bool {
+    const r0 = s.rng.state;
+    decide(s, ui, decision);
+    if (obs) |o| {
+        var named: [3]rec.Action = undefined;
+        for (decision.slice(), 0..) |a, k| named[k] = engine.actionToUids(s, a);
+        const d = rec.Action{ .decide = .{ .unit = s.units[ui].uid, .out = named[0..decision.n] } };
+        if (!o.step(o.ctx, .decide, d, r0, s, true, &.{})) return true;
+    }
+    return false;
+}
+
 /// The runMatchInner loop after start_fight, from any point it reaches: a fight start, or a battle loaded mid-fight
 /// (snapshot.zig) at a decision boundary (`State.active` set, its decision not taken) or with no active unit.
 pub fn continueMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *const fn (*State, u8, *Decision) void) EndReason {
@@ -1254,14 +1290,9 @@ pub fn continueMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *cons
             s.active = -1;
             continue;
         }
-        const r0 = s.rng.state;
-        decide(s, ui, &decision);
-        if (obs) |o| {
-            var named: [3]rec.Action = undefined;
-            for (decision.slice(), 0..) |a, k| named[k] = engine.actionToUids(s, a);
-            const d = rec.Action{ .decide = .{ .unit = s.units[ui].uid, .out = named[0..decision.n] } };
-            if (!o.step(o.ctx, .decide, d, r0, s, true, &.{})) return .observer_stop;
-        }
+        // isMindlessAiUnit, read at the turn's start (runMatch's mindlessUnit).
+        const mindless = s.units[ui].has(.ai_driven);
+        if (decideStep(s, ui, decide, &decision, obs)) return .observer_stop;
         var did_something = false;
         for (decision.slice()) |a| {
             const r = call(s, a, .apply, obs, &events);
@@ -1269,7 +1300,17 @@ pub fn continueMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *cons
             if (r.ok and a != .select_attack_type) did_something = true;
             if (s.fight.finished) break;
         }
-        if (!s.fight.finished and s.active == ui and !did_something) return .unsupported; // recovery net not ported
+        if (!s.fight.finished and s.active == ui and !did_something) {
+            // The recovery net: a mindless unit decides once more with its pinned policy and applies what it can
+            // (runMatch's "v0.1_retry"); the generic advance / defend net for the others is not ported.
+            if (!mindless) return .unsupported;
+            if (decideStep(s, ui, decide, &decision, obs)) return .observer_stop;
+            for (decision.slice()) |a| {
+                if (s.fight.finished or s.active != ui) break;
+                const r = call(s, a, .apply, obs, &events);
+                if (r.stop) return .observer_stop;
+            }
+        }
         if (!s.fight.finished and s.active == ui) {
             const r = call(s, .{ .end_turn = .{ .unit = ui, .reason = .manual } }, .apply, obs, &events);
             if (r.stop) return .observer_stop;

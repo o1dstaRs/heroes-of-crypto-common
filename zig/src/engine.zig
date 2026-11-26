@@ -467,11 +467,17 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
 
     // resetTarget unless the Aggr status is still applied
     if (s.stat_hooks and u.target >= 0 and u.effects.find(.aggr) == null and u.debuffs.find(.aggr) == null) u.target = -1;
+    // resetForbiddenTarget unless the Terrifying Gaze status is still applied (the gazer's death never clears it)
+    if (s.gaze and u.forbidden != st.NO_UID and u.effects.find(.terrifying_gaze) == null and u.debuffs.find(.terrifying_gaze) == null) u.forbidden = st.NO_UID;
 
     // HP
-    const was_full = u.hp >= u.max_hp;
-    u.max_hp = u.init.max_hp;
-    if (was_full or u.max_hp < u.hp) u.hp = u.max_hp;
+    if (s.unit_hooks and u.has(.unyielding_power)) {
+        unyieldingPower(f, u, lap_adjusted);
+    } else {
+        const was_full = u.hp >= u.max_hp;
+        u.max_hp = u.init.max_hp;
+        if (was_full or u.max_hp < u.hp) u.hp = u.max_hp;
+    }
 
     // LUCK
     u.luck = u.init.luck;
@@ -542,6 +548,8 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
         if (u.ability(.wardguard)) |wg| no_resist = no_resist * (1 - abilities.abilityMultiplier(u, wg));
     }
     if (s.blessings) {
+        // Warding Mane is folded before Arcane Ward (re-granted after it): the order matters under toFixed(2).
+        if (u.buffs.get(.warding_mane_blessing)) |wm| no_resist = no_resist * (1 - @max(0, wm.power) / 100);
         if (u.buffs.get(.arcane_ward_blessing)) |aw| no_resist = no_resist * (1 - @max(0, aw.power) / 100);
     }
     u.magic_resist = js.roundUnitStat((1 - no_resist) * 100, 2);
@@ -552,10 +560,20 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     // STEPS
     u.steps_mod = js.roundUnitStat(f.steps_morale_multiplier * getMorale(u), 1) + syn.movement_steps;
     u.steps = u.init.steps;
+    // Sky Runner: calculateAbilityCount's ADDITIONAL_STEPS share (this refresh's luck), before the Movement augment.
+    if (s.unit_hooks) {
+        if (u.ability(.sky_runner)) |sr| u.steps += abilities.abilityCount(u, sr);
+    }
     if (augmentBuff(s, u, .movement_augment)) |ma| u.steps += ma.power;
-    // Vine Throw: the snare cuts the base steps (the first debuff of the name), floored at 1.
-    if (s.spell_hooks and u.debuffs.len != 0) {
-        if (u.debuffs.get(.vine_throw)) |vt| u.steps = @max(1, u.steps - vt.power);
+    if (s.spell_hooks) {
+        // Battle Roar: the cast's power in steps_mod (the first buff of the name).
+        if (u.buffs.len != 0) {
+            if (u.buffs.get(.battle_roar)) |br| u.steps_mod += br.power;
+        }
+        // Vine Throw: the snare cuts the base steps (the first debuff of the name), floored at 1.
+        if (u.debuffs.len != 0) {
+            if (u.debuffs.get(.vine_throw)) |vt| u.steps = @max(1, u.steps - vt.power);
+        }
     }
     u.steps = js.roundUnitStat(u.steps * 1, 1);
     u.steps_mod = js.roundUnitStat(u.steps_mod * 1, 1);
@@ -565,8 +583,8 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     u.shot_distance = u.init.shot_distance;
     u.attack_damage_min = u.init.attack_damage_min;
     u.attack_damage_max = u.init.attack_damage_max;
-    // Blessing: every roll is the maximum (no Battle Roar or Curse in scope).
-    if (s.spell_hooks and u.buffs.find(.blessing) != null) u.attack_damage_min = u.attack_damage_max;
+    // Blessing and Battle Roar: every roll is the maximum (no Curse in scope).
+    if (s.spell_hooks and (u.buffs.find(.blessing) != null or u.buffs.find(.battle_roar) != null)) u.attack_damage_min = u.attack_damage_max;
     var base_attack_multiplier: f64 = 1;
     if (u.buffs.power(.sharpened_weapons_blessing)) |sw| base_attack_multiplier = base_attack_multiplier * (1 + sw / 100);
     if (pegasus_might) |pm| u.base_attack += pm;
@@ -592,6 +610,20 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     if (f.started and !lap_adjusted) u.adjusted_laps |= lap_bit;
 }
 
+/// Unyielding Power in adjustBaseStats (hasAbilityActive, read once: Break-aware): max hp = initial + 5 per lap, and on the
+/// lap's first refresh after the start +5 hp (the top creature), +1 initial step and +2 initial base attack (the two
+/// initial stats are first read after this step, by the STEPS and ATTACK copies), then the full-hp refill or the cap.
+noinline fn unyieldingPower(f: *const st.Fight, u: *Unit, lap_adjusted: bool) void {
+    const was_full = u.hp >= u.max_hp;
+    u.max_hp = u.init.max_hp + @as(f64, @floatFromInt(f.lap)) * 5;
+    if (f.started and !lap_adjusted) {
+        u.hp += 5;
+        u.init.steps += 1;
+        u.init.base_attack += 2;
+    }
+    if (was_full or u.max_hp < u.hp) u.hp = u.max_hp;
+}
+
 /// FightProperties.setUnitsCalculatedStacksPower
 fn setStackPowers(s: *State) void {
     var max_total: f64 = -MAX_SAFE_INTEGER;
@@ -609,9 +641,9 @@ fn setStackPowers(s: *State) void {
     }
 }
 
-/// UnitsHolder.refreshStackPowerForAllUnits (no Water Shield or Disguise in scope): stack powers, the aura refresh
-/// (reading the new stack power and the luck left by the previous refresh), the blessings, then every unit's stats.
-/// getUnitAuraAttackMod is 0 (no War Anger).
+/// UnitsHolder.refreshStackPowerForAllUnits (no Water Shield in scope): stack powers, the aura refresh (reading the new
+/// stack power and the luck left by the previous refresh), the blessings, then every unit's stats, each followed by the
+/// Disguise swap. getUnitAuraAttackMod is 0 (no War Anger).
 pub fn refreshStackPowerForAllUnits(s: *State) void {
     setStackPowers(s);
     if (s.auras) abilities.refreshAuras(s);
@@ -621,6 +653,55 @@ pub fn refreshStackPowerForAllUnits(s: *State) void {
         if (!cellWithinGrid(baseCell(u))) continue;
         adjustBaseStats(s, u);
     }
+    if (s.disguise) disguisePass(s);
+}
+
+/// The Disguise swaps of refreshStackPowerForAllUnits' stat loop: the swap after each unit's stats touches only that
+/// unit's lists, and adjustBaseStats reads only its own unit, so running them after the whole pass gives the same state.
+noinline fn disguisePass(s: *State) void {
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (!cellWithinGrid(baseCell(u))) continue;
+        if (abilities.appliedAuraPower(u, .disguise_aura) != null) disguiseSwap(s, i);
+    }
+}
+
+/// The Disguise swap of refreshStackPowerForAllUnits for a unit carrying the "Disguise Aura" row: Visible (Hidden
+/// deleted) when an enemy holder unit stands within the configured range plus the team's aura range of any body cell
+/// (getNumberOfEnemiesWithinRange: board occupants, dead ones included), else Hidden (Visible deleted); a marker
+/// already carried is kept where it is, a new one is appended.
+fn disguiseSwap(s: *State, ui: u8) void {
+    const u = &s.units[ui];
+    const range = s.disguise_range + s.setup[u.team].aura_range;
+    if (enemyWithin(s, ui, range)) {
+        u.buffs.delete(.hidden);
+        if (u.debuffs.find(.visible) == null) abilities.pushChecked(s, &u.debuffs, .{ .id = .visible, .laps = s.visible_laps, .power = s.visible_power });
+    } else {
+        u.debuffs.delete(.visible);
+        if (u.buffs.find(.hidden) == null) abilities.pushChecked(s, &u.buffs, .{ .id = .hidden, .laps = s.hidden_laps, .power = s.hidden_power });
+    }
+}
+
+/// countEnemiesWithinRange(unit, unit.getCells(), range) > 0: a board occupant of the other team inside the clipped
+/// Chebyshev ball of `range` around any body cell.
+fn enemyWithin(s: *const State, ui: u8, range: f64) bool {
+    if (!(range >= 0)) return false;
+    const r: i32 = @intFromFloat(@min(range, st.GRID));
+    const u = &s.units[ui];
+    const body = unitCells(u);
+    for (body.slice()) |c| {
+        var x = @max(0, c.x - r);
+        while (x <= @min(st.GRID - 1, c.x + r)) : (x += 1) {
+            var y = @max(0, c.y - r);
+            while (y <= @min(st.GRID - 1, c.y + r)) : (y += 1) {
+                const o = s.grid.board[@intCast(x)][@intCast(y)];
+                if (!st.isUnitCode(o)) continue;
+                const e = &s.units[o - 1];
+                if (e.in_holder and e.team != u.team) return true;
+            }
+        }
+    }
+    return false;
 }
 
 // =====================================================================================================================
@@ -1222,7 +1303,8 @@ pub fn maxCellsForStepBudget(s: *const State, u: *const Unit) f64 {
     return @max(1, @ceil(getSteps(u)));
 }
 
-/// AttackHandler.canLandRangeAttack(unit, grid.getEnemyAggrMatrixByUnitId(id))
+/// AttackHandler.canLandRangeAttack(unit, grid.getEnemyAggrMatrixByUnitId(id)): range capable, not pinned by melee,
+/// shots left, and no Range Null Field Aura row (the debuff list, not Break-aware; no Rangebane in scope).
 pub fn canLandRangeAttack(s: *const State, u: *const Unit) bool {
     if (!isRangeCapable(u)) return false;
     const aggr = enemyAggr(s, u);
@@ -1231,7 +1313,13 @@ pub fn canLandRangeAttack(s: *const State, u: *const Unit) bool {
         if (c.x < 0 or c.x >= st.GRID or c.y < 0 or c.y >= st.GRID) continue;
         if (aggr[@intCast(c.x)][@intCast(c.y)] > 1) return false;
     }
-    return getRangeShots(u) > 0;
+    if (getRangeShots(u) <= 0) return false;
+    return !nullFielded(s, u);
+}
+
+/// hasDebuffActive("Range Null Field Aura"), only on battles where a field can stand.
+pub inline fn nullFielded(s: *const State, u: *const Unit) bool {
+    return s.null_field and u.debuffs.len != 0 and u.debuffs.find(.range_null_field_aura) != null;
 }
 
 /// Unit.refreshPossibleAttackTypes (no No Melee in scope): a MAGIC creature with charges (and not Broken) leads with
@@ -1283,8 +1371,10 @@ fn activateNextUnit(s: *State, ui: u8) Activation {
         }
         s.fight.team_units_alive[side] = n;
     }
-    // refreshPreTurnState: the Web lock is snapshotted now (no Wild Regeneration in scope).
+    // refreshPreTurnState: the Web lock is snapshotted now, then Wild Regeneration refills the top creature (before
+    // the poison tick; a stunned or re-activated unit too).
     u.web_locked = canFly(u) and u.debuffs.len != 0 and u.debuffs.find(.web_aura) != null;
+    if (u.ability_mask & st.AbilityId.wild_regeneration.bit() != 0 and u.hp != u.max_hp and !u.isBroken()) u.hp = u.max_hp;
     if (u.effects.len != 0) {
         if (u.effects.power(.poison)) |poison| {
             if (poison > 0) {
@@ -1435,12 +1525,12 @@ fn endTurn(s: *State, ui: u8, reason: rec.EndReason, events: *Events) Reject!voi
     completeTurn(s, ui, false, forced or did_nothing, events);
 }
 
-fn waitTurn(s: *State, ui: u8, events: *Events) Reject!void {
-    try validateTurnAction(s, ui);
+/// canWaitOnHourglass (src/engine/hourglass.ts; no Time Denial in scope): a LEFT or RIGHT unit that has not moved, with an
+/// unacted living teammate (hasUnactedTeammate), not on the hourglass, queued, done or already waited this lap.
+pub fn canWaitOnHourglass(s: *const State, ui: u8) bool {
     const u = &s.units[ui];
-    if (u.moved_this_turn) return error.Rejected;
-    // canWaitOnHourglass
-    if (u.team != Team.LEFT and u.team != Team.RIGHT) return error.Rejected;
+    if (u.team != Team.LEFT and u.team != Team.RIGHT) return false;
+    if (u.moved_this_turn) return false;
     var unacted = false;
     if (s.fight.team_units_alive[u.team] > 1) {
         for (s.holderOrder()) |i| {
@@ -1448,7 +1538,14 @@ fn waitTurn(s: *State, ui: u8, events: *Events) Reject!void {
             if (i != ui and !x.isDead() and x.team == u.team and s.fight.made & unitBit(i) == 0) unacted = true;
         }
     }
-    if (!unacted or u.on_hourglass or s.fight.hourglass_q.includes(ui) or s.fight.made & unitBit(ui) != 0 or s.fight.hourglass_set & unitBit(ui) != 0) return error.Rejected;
+    return unacted and !u.on_hourglass and !s.fight.hourglass_q.includes(ui) and s.fight.made & unitBit(ui) == 0 and s.fight.hourglass_set & unitBit(ui) == 0;
+}
+
+fn waitTurn(s: *State, ui: u8, events: *Events) Reject!void {
+    try validateTurnAction(s, ui);
+    const u = &s.units[ui];
+    if (u.moved_this_turn) return error.Rejected;
+    if (!canWaitOnHourglass(s, ui)) return error.Rejected;
     changeMorale(u, MORALE_CHANGE_FOR_CLOCK, false);
     u.on_hourglass = true;
     s.fight.hourglass_set |= unitBit(ui);
@@ -1763,6 +1860,11 @@ fn internAura(init: std.json.Value, s: *State, name: []const u8) !u8 {
     };
     switch (def.power_type) {
         st.PowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR, st.PowerType.POISON_ON_HIT, st.PowerType.ABSORB_DEBUFF, st.PowerType.DISABLE_FLY_MOVEMENT => {},
+        // power 0 (calculateAuraPower is never called): the Range Null Field and Disguise
+        st.PowerType.DISABLE_RANGE_ATTACK, st.PowerType.UNTARGETABLE => if (def.power != 0) {
+            unsupported_name = name;
+            return error.UnsupportedAura;
+        },
         else => {
             unsupported_name = name;
             return error.UnsupportedAura;
@@ -1798,14 +1900,20 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     s.stat_hooks = false;
     s.augments = false;
     s.spell_hooks = false;
+    s.null_field = false;
+    s.disguise = false;
+    s.unit_hooks = false;
+    s.gaze = false;
     var poisons = false;
     var covenant = false;
     var breaks = false;
+    // A unit can swap Disguise markers: it holds the card (natively or stolen later) or carries the aura row.
+    var swaps = false;
     for (s.setup) |row| {
         if (row.break_chance > 0) breaks = true;
     }
     const AB = st.AbilityId;
-    const blessing_mask = AB.luck_blessing.bit() | AB.sharpened_weapons_blessing.bit() | AB.arcane_ward_blessing.bit() | AB.rallying_volley_blessing.bit() | AB.sylvan_focus_blessing.bit();
+    const blessing_mask = AB.luck_blessing.bit() | AB.sharpened_weapons_blessing.bit() | AB.arcane_ward_blessing.bit() | AB.rallying_volley_blessing.bit() | AB.sylvan_focus_blessing.bit() | AB.warding_mane_blessing.bit();
     var templates: [st.N_SUMMONS]?*const Unit = .{null} ** st.N_SUMMONS;
     if (s.summons) |sm| {
         for (0..st.N_SUMMONS) |k| {
@@ -1831,6 +1939,12 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         if (mask & (AB.aggr.bit() | AB.wardguard.bit()) != 0 or u.target >= 0) s.stat_hooks = true;
         if (mask & AB.ember_covenant_blessing.bit() != 0) covenant = true;
         if (mask & AB.predatory_assimilation.bit() != 0) poisons = true;
+        if (mask & AB.range_null_field_aura.bit() != 0) s.null_field = true;
+        if (mask & (AB.unyielding_power.bit() | AB.sky_runner.bit()) != 0) s.unit_hooks = true;
+        if (mask & AB.terrifying_gaze.bit() != 0 or u.forbidden != st.NO_UID) s.gaze = true;
+        if (mask & AB.disguise_aura.bit() != 0) swaps = true;
+        // Battle Roar's row is read where Blessing's is (the castable card holds a charge, the loop below sees it).
+        if (mask & AB.battle_roar.bit() != 0) s.spell_hooks = true;
         if (u.effects.find(.break_) != null) breaks = true;
         // A template's aura links hold SpellId values (loadSummons): only the battle's units index aura_defs.
         const aura_def = struct {
@@ -1851,11 +1965,16 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.laps == st.LAPS_AURA) s.auras = true;
             if (b.id == .ember_covenant_blessing) covenant = true;
             if (b.id.isAugment()) s.augments = true;
-            if (b.id == .blessing) s.spell_hooks = true;
+            if (b.id == .blessing or b.id == .battle_roar) s.spell_hooks = true;
+            if (b.id == .warding_mane_blessing) s.blessings = true;
+            if (b.id == .hidden) s.disguise = true;
+            if (b.id == .disguise_aura) swaps = true;
         }
         for (u.debuffs.items[0..u.debuffs.len]) |b| {
             if (b.laps == st.LAPS_AURA) s.auras = true;
             if (b.id == .vine_throw) s.spell_hooks = true;
+            if (b.id == .range_null_field_aura) s.null_field = true;
+            if (b.id == .visible) s.disguise = true;
         }
         // Spells move only with Predatory Assimilation, so the board's books cover every later holder.
         if (u.n_book != 0 or u.n_spells != 0) s.spell_hooks = true;
@@ -1877,6 +1996,25 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         if (cfg == .null) return error.MissingEffectConfig;
         s.break_laps = rec.num(rec.get(cfg, "laps"));
         s.break_power = rec.num(rec.get(cfg, "power"));
+    }
+    // Disguise: the aura's configured range and the System markers (recorded `spellConfigs`: Hidden, Visible).
+    s.disguise_range = 0;
+    s.hidden_laps = 1;
+    s.hidden_power = 0;
+    s.visible_laps = 1;
+    s.visible_power = 0;
+    if (swaps) s.disguise = true;
+    if (swaps) {
+        const acfg = rec.get(rec.get(init, "auraEffectConfigs"), "Disguise");
+        if (acfg == .null) return error.MissingAuraConfig;
+        s.disguise_range = rec.num(rec.get(acfg, "range"));
+        const hcfg = rec.get(rec.get(init, "spellConfigs"), "Hidden");
+        const vcfg = rec.get(rec.get(init, "spellConfigs"), "Visible");
+        if (hcfg == .null or vcfg == .null) return error.MissingSpellConfig;
+        s.hidden_laps = rec.num(rec.get(hcfg, "laps"));
+        s.hidden_power = rec.num(rec.get(hcfg, "power"));
+        s.visible_laps = rec.num(rec.get(vcfg, "laps"));
+        s.visible_power = rec.num(rec.get(vcfg, "power"));
     }
     s.ember_seeded = false;
     s.ember_teams = 0;
@@ -1965,6 +2103,8 @@ pub fn spellConfigOf(cfg: std.json.Value) st.SpellConfig {
         .element = @intCast(rec.int(rec.get(cfg, "element"))),
         .is_buff = rec.get(cfg, "is_buff") == .bool and rec.get(cfg, "is_buff").bool,
         .self_cast = rec.get(cfg, "self_cast_allowed") == .bool and rec.get(cfg, "self_cast_allowed").bool,
+        .is_giftable = rec.get(cfg, "is_giftable") == .bool and rec.get(cfg, "is_giftable").bool,
+        .max_gift_level = rec.num(rec.get(cfg, "maximum_gift_level")),
         .loaded = true,
     };
     const conflicts = rec.get(cfg, "conflicts_with");
@@ -2207,6 +2347,8 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
         try loadAuras(init, props, &s, unit);
         const target = rec.get(props, "target");
         if (target == .string and target.string.len > 0) unit.target = @intCast(try rec.unitIndex(ids, target.string));
+        const forbidden = rec.get(props, "forbidden_target");
+        if (forbidden == .string and forbidden.string.len > 0) unit.forbidden = try rec.unitIndex(ids, forbidden.string);
         unit.buffs = try loadSpells(@TypeOf(unit.buffs), props, "buffs");
         unit.debuffs = try loadSpells(@TypeOf(unit.debuffs), props, "debuffs");
         unit.effects = try loadSpells(@TypeOf(unit.effects), props, "effects");

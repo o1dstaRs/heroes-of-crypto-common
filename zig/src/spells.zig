@@ -21,7 +21,7 @@ const abilities = @import("abilities.zig");
 const Cell = st.Cell;
 const State = st.State;
 const Unit = st.Unit;
-const CS = st.CastSpell;
+pub const CS = st.CastSpell;
 const ST = st.SpellTarget;
 const SP = st.SpellPower;
 const EL = st.Element;
@@ -34,8 +34,8 @@ const MAX_UNIT_STACK_POWER: f64 = 5;
 // Gates (spell_helper.ts isSpellUsableByCaster, canCastSpell)
 // =====================================================================================================================
 
-/// isSpellUsableByCaster: not Broken, laps > 0, a charge left, enough stack power.
-fn usable(u: *const Unit, b: *const st.BookSpell, cfg: *const st.SpellConfig) bool {
+/// isSpellUsableByCaster (spell_helper.ts): not Broken, laps > 0, a charge left, enough stack power.
+pub fn usable(u: *const Unit, b: *const st.BookSpell, cfg: *const st.SpellConfig) bool {
     return !u.isBroken() and cfg.laps > 0 and b.amount > 0 and cfg.min_stack_power <= engine.getStackPower(u);
 }
 
@@ -67,9 +67,10 @@ fn notAlreadyApplied(t: *const Unit, spell: CS, cfg: *const st.SpellConfig) bool
     return true;
 }
 
-/// SpellHelper.canCastSpell for a unit target (the engine never passes targetGridCell, so FREE_CELL is false), in the
-/// shapes wave 1 casts: HEAL (not giftable), ANY_ALLY and ANY_ENEMY. `spell`'s first Spell object is the one tested.
-fn canCastSpell(s: *const State, ci: u8, ti: u8, spell: CS, cfg: *const st.SpellConfig) bool {
+/// SpellHelper.canCastSpell (spell_helper.ts) for a unit target (the engine never passes targetGridCell, so FREE_CELL is
+/// false), in the shapes in scope: HEAL (giftable: Wild Regeneration; or not), ANY_ALLY and ANY_ENEMY. `spell`'s first
+/// Spell object is the one tested.
+pub fn canCastSpell(s: *const State, ci: u8, ti: u8, spell: CS, cfg: *const st.SpellConfig) bool {
     const caster = &s.units[ci];
     const t = &s.units[ti];
     const b = caster.bookSpell(@intFromEnum(spell)) orelse return false;
@@ -83,6 +84,11 @@ fn canCastSpell(s: *const State, ci: u8, ti: u8, spell: CS, cfg: *const st.Spell
     const mr = engine.getMagicResist(t);
     if (cfg.power_type == SP.RESURRECT) return false; // not in scope
     if (cfg.power_type == SP.HEAL) {
+        if (cfg.is_giftable) {
+            // The gift: an ally of at most the gift level that does not hold the ability active (Break-aware).
+            const id = spell.gifted() orelse return false;
+            return !t.has(id) and caster.team == t.team and @as(f64, @floatFromInt(t.level)) <= cfg.max_gift_level and (cfg.self_cast or !self_cast);
+        }
         // !Mechanism: every unit in scope can be healed
         return t.hp < t.max_hp and mr != 100 and caster.team == t.team and (cfg.self_cast or !self_cast);
     }
@@ -229,13 +235,14 @@ fn endpointCells(s: *const State, base: Cell) Body {
 }
 
 /// The best candidate of interceptedThrowTrajectory: 0 unobstructed, 1 a body intercepts (`blocker`, a slot), 2 terrain.
-const Trajectory = struct { obstruction: u2, blocker: u8 = 0 };
+pub const Trajectory = struct { obstruction: u2, blocker: u8 = 0 };
 
 /// interceptedThrowTrajectory (Fire Strike): every observable edge of the target's body, the pixel ray from the
 /// caster's body centre to its centre (traceGridRayCells), the first cell that is neither empty, lava, the caster nor
 /// one of its allies stopping it (the target's own cell ends it cleanly); the lowest obstruction wins, then the
-/// shortest distance, then enumeration order. Null when no edge is observable.
-fn trajectory(s: *const State, ci: u8, ti: u8) ?Trajectory {
+/// shortest distance, then enumeration order. Null when no edge is observable. Mirrors resolveThrownSpellImpact /
+/// thrownSpellReachesAimedTarget for the intercepted throws (isInterceptedThrownSpell).
+pub fn trajectory(s: *const State, ci: u8, ti: u8) ?Trajectory {
     const caster = &s.units[ci];
     const from_base = engine.baseCell(caster);
     const to_base = engine.baseCell(&s.units[ti]);
@@ -278,8 +285,9 @@ fn trajectory(s: *const State, ci: u8, ti: u8) ?Trajectory {
 }
 
 /// isTargetedSpellLineOfSightClear: Vine Throw's creatures-only walk, Ring of Fire's walk with terrain, Fire Strike's
-/// visible edge and trajectory (a body intercepts, terrain refuses); every other spell needs no line.
-fn lineOfSightClear(s: *const State, ci: u8, ti: u8, spell: CS) bool {
+/// visible edge and trajectory (a body intercepts, terrain refuses); every other spell needs no line. Mirrors
+/// SpellHelper.isTargetedSpellLineOfSightClear.
+pub fn lineOfSightClear(s: *const State, ci: u8, ti: u8, spell: CS) bool {
     const from = engine.baseCell(&s.units[ci]);
     const to = engine.baseCell(&s.units[ti]);
     switch (spell) {
@@ -307,8 +315,8 @@ fn lineOfSightClear(s: *const State, ci: u8, ti: u8, spell: CS) bool {
 // The damage tail (spell_cast_projection.ts, spell_damage.ts, magic_mirror_damage.ts; applySpellDamageToUnits)
 // =====================================================================================================================
 
-/// MORALE_SCALED_SPELLS (spell_damage.ts) among the ported ones.
-inline fn moraleScaled(spell: CS) bool {
+/// MORALE_SCALED_SPELLS (spell_damage.ts) among the ported ones: isOffensiveSpellMultiplier's set.
+pub inline fn moraleScaled(spell: CS) bool {
     return switch (spell) {
         .lightning_strike, .ring_of_fire, .meteor_shower, .meteorite, .fire_strike, .heal => true,
         else => false,
@@ -316,7 +324,7 @@ inline fn moraleScaled(spell: CS) bool {
 }
 
 /// getSpellMoraleMultiplier(spell, caster.getAttackMultiplier())
-inline fn moraleMultiplier(spell: CS, attack_multiplier: f64) f64 {
+pub inline fn moraleMultiplier(spell: CS, attack_multiplier: f64) f64 {
     if (!moraleScaled(spell)) return 1;
     return if (std.math.isFinite(attack_multiplier)) @max(0, attack_multiplier) else 1;
 }
@@ -336,7 +344,7 @@ fn magicDamageBonus(u: *const Unit) f64 {
 
 /// spellRawDamage -> calculateSpellDamage: floor(alive * power * empowerMultiplier(bonus) * morale), UNIT_AMOUNT_DAMAGE
 /// only.
-fn rawDamage(caster: *const Unit, spell: CS, cfg: *const st.SpellConfig) f64 {
+pub fn rawDamage(caster: *const Unit, spell: CS, cfg: *const st.SpellConfig) f64 {
     if (cfg.multiplier != st.SpellMultiplier.UNIT_AMOUNT_DAMAGE) return 0;
     const alive = @max(0, @floor(caster.amount_alive));
     const bonus = magicDamageBonus(caster);
@@ -359,8 +367,9 @@ fn elementAndResist(raw: f64, element_multiplier: f64, magic_resist: f64) f64 {
     return @max(0, @floor(scaled * (1 - resist / 100)));
 }
 
-/// spellDamageAgainstUnit: Heavy Armor first, then the element, then the unit's magic resist.
-fn damageAgainst(raw: f64, element: u8, u: *const Unit) f64 {
+/// spellDamageAgainstUnit (projectSpellDamageAgainstUnit): Heavy Armor first, then the element, then the unit's magic
+/// resist.
+pub fn damageAgainst(raw: f64, element: u8, u: *const Unit) f64 {
     const m = magicDamageTakenMultiplier(u);
     return elementAndResist(if (m == 1) raw else @floor(raw * m), elementMultiplier(element, u), engine.getMagicResist(u));
 }
@@ -374,13 +383,13 @@ fn mirroredShare(u: *const Unit) f64 {
     return @max(0, @min(100, @floor((a.power / MAX_UNIT_STACK_POWER) * sp + engine.getLuck(u))));
 }
 
-const Victim = struct { slot: u8, damage: f64, rebounded: bool };
+pub const Victim = struct { slot: u8, damage: f64, rebounded: bool };
 
-const Victims = struct {
+pub const Victims = struct {
     items: [2 * st.MAX_UNITS]Victim = undefined,
     len: u8 = 0,
 
-    fn push(self: *Victims, v: Victim) void {
+    pub fn push(self: *Victims, v: Victim) void {
         if (self.len < self.items.len) {
             self.items[self.len] = v;
             self.len += 1;
@@ -389,8 +398,8 @@ const Victims = struct {
 };
 
 /// resolveSpellVictims: each target's landed damage, followed by its rebound row onto the caster (projectSpellRebound:
-/// the share of what landed, through the caster's own Heavy Armor, element and magic resist).
-fn resolveVictims(s: *const State, ci: u8, element: u8, raw: f64, targets: []const u8, out: *Victims) void {
+/// the share of what landed, through the caster's own Heavy Armor, element and magic resist). Mirrors resolveSpellVictims.
+pub fn resolveVictims(s: *const State, ci: u8, element: u8, raw: f64, targets: []const u8, out: *Victims) void {
     const caster = &s.units[ci];
     for (targets) |ti| {
         const u = &s.units[ti];
@@ -466,21 +475,21 @@ fn damageTail(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, targets:
 // Areas (aoe_range_ability.ts evaluateAffectedUnits, grid_math.ts getCellsAroundCell / getCellsAroundFootprint)
 // =====================================================================================================================
 
-const Cells = struct {
+pub const Cells = struct {
     items: [24]Cell = undefined,
     len: u8 = 0,
 
-    fn has(self: *const Cells, c: Cell) bool {
+    pub fn has(self: *const Cells, c: Cell) bool {
         for (self.items[0..self.len]) |x| if (x.x == c.x and x.y == c.y) return true;
         return false;
     }
-    fn push(self: *Cells, c: Cell) void {
+    pub fn push(self: *Cells, c: Cell) void {
         if (self.len < self.items.len) {
             self.items[self.len] = c;
             self.len += 1;
         }
     }
-    fn slice(self: *const Cells) []const Cell {
+    pub fn slice(self: *const Cells) []const Cell {
         return self.items[0..self.len];
     }
 };
@@ -505,7 +514,7 @@ fn cellsAroundCell(c: Cell, out: *Cells) void {
 }
 
 /// getCellsAroundFootprint: the ring around a body, its own cells excluded, first-seen order over the body cells.
-fn cellsAroundFootprint(body: []const Cell, out: *Cells) void {
+pub fn cellsAroundFootprint(body: []const Cell, out: *Cells) void {
     out.len = 0;
     for (body) |b| {
         var around: Cells = .{};
@@ -585,12 +594,14 @@ pub fn castSpell(s: *State, ci: u8, spell_raw: u8, target: ?u8, cell: ?Cell, eve
             const base = engine.baseCell(&s.units[t]);
             if (base.x != c.x or base.y != c.y) return error.Rejected;
         }
-        // No Hidden (Disguise Aura) in scope.
-        if (!lineOfSightClear(s, ci, t, spell) or !canCastSpell(s, ci, t, spell, cfg)) return error.Rejected;
+        // A Hidden (Disguise) enemy cannot be targeted; a Hidden ally can.
+        const hidden_enemy = s.disguise and s.units[t].team != caster.team and s.units[t].isHidden();
+        if (hidden_enemy or !lineOfSightClear(s, ci, t, spell) or !canCastSpell(s, ci, t, spell, cfg)) return error.Rejected;
     }
     if (ti == null and spell == .summon_wolves and cfg.target == ST.RANDOM_CLOSE_TO_CASTER) return summonSpell(s, ci, spell, cfg, cell, events);
+    if (ti == null and cfg.target == ST.ALL_ALLIES and cfg.power_type != SP.HEAL) return massCastSpell(s, ci, spell, cfg, events);
     if (ti == null and (cfg.target == ST.ALL_FLYING or cfg.target == ST.ALL_ALLIES or cfg.target == ST.ALL_ENEMIES or cfg.target == ST.ALLIES_AREA)) {
-        s.overflow = true; // massCastSpell / craftCast: not in wave 1
+        s.overflow = true; // the other mass casts (flyers, enemies, Mass Heal) and craftCast: wave 2
         return error.Rejected;
     }
     if (ti) |t| switch (spell) {
@@ -606,17 +617,35 @@ pub fn castSpell(s: *State, ci: u8, spell_raw: u8, target: ?u8, cell: ?Cell, eve
     return magicAttack(s, ci, ti, spell, cfg, events);
 }
 
-/// AttackHandler.handleMagicAttack for the spells that reach it in scope (Heal, Blessing): canCastSpell again, then the
-/// heal (floor(power * caster alive * morale multiplier), capped at the front creature's max hp) or the buff (appended,
-/// a lap longer on a self-cast); the charge; completeTurn. No draw (the resist roll is the debuff spells').
+/// AttackHandler.handleMagicAttack for the spells that reach it in scope (Heal, Blessing, the Wild Regeneration gift):
+/// canCastSpell again, then the heal (floor(power * caster alive * morale multiplier), capped at the front creature's
+/// max hp), the gift or the buff (appended, a lap longer on a self-cast); the charge; completeTurn. No draw (the resist
+/// roll is the debuff spells').
 fn magicAttack(s: *State, ci: u8, target: ?u8, spell: CS, cfg: *const st.SpellConfig, events: *Events) Reject!void {
     const ti = target orelse return error.Rejected; // a spell aimed without its target
+    if (s.disguise and s.units[ti].team != s.units[ci].team and s.units[ti].isHidden()) return error.Rejected;
     if (!canCastSpell(s, ci, ti, spell, cfg)) return error.Rejected;
     const caster = &s.units[ci];
     const t = &s.units[ti];
     if (!cfg.is_buff or cfg.power_type == SP.RESURRECT) {
         s.overflow = true; // a debuff spell (the resist and mirror rolls) or Resurrection: not in wave 1
         return error.Rejected;
+    }
+    if (cfg.power_type == SP.HEAL and cfg.is_giftable) {
+        // The gift (no Holy Cross in scope): the caster deletes the ability (its card, charge and re-parsed book);
+        // the target gains it unless it already holds it (the card list minus its stolen marks: the active list) or
+        // lost that card to Predatory Assimilation. A lost gift leaves the battle.
+        const id = spell.gifted() orelse {
+            s.overflow = true;
+            return error.Rejected;
+        };
+        const deleted = abilities.deleteAbility(s, caster, id);
+        if (t.activeAbility(id) == null) {
+            if (deleted) |a| _ = abilities.addAbility(s, t, a);
+        }
+        useSpell(caster, spell); // a no-op: the re-parsed book no longer holds the spell
+        engine.completeTurn(s, ci, false, false, events);
+        return;
     }
     if (cfg.power_type == SP.HEAL) {
         // Unit.applyHeal (no Holy Cross in scope; every unit can be healed)
@@ -633,6 +662,56 @@ fn magicAttack(s: *State, ci: u8, target: ?u8, spell: CS, cfg: *const st.SpellCo
         };
         const laps = cfg.laps + @as(f64, if (ci == ti) 1 else 0);
         abilities.pushChecked(s, &t.buffs, .{ .id = id, .laps = laps, .power = cfg.power });
+    }
+    useSpell(caster, spell);
+    engine.completeTurn(s, ci, false, false, events);
+}
+
+/// SpellHelper.canMassCastSpell for an ALL_ALLIES non-HEAL spell: some unit of the caster's team (holder order) with
+/// magic resist other than 100 that carries no buff of the spell's name or a conflicting one.
+pub fn canMassCastSpell(s: *const State, ci: u8, spell: CS, cfg: *const st.SpellConfig) bool {
+    if (cfg.target != ST.ALL_ALLIES or cfg.power_type == SP.HEAL) return false;
+    const team = s.units[ci].team;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.team != team) continue;
+        if (engine.getMagicResist(u) == 100) continue;
+        if (!alreadyAppliedBuff(u, spell, cfg)) return true;
+    }
+    return false;
+}
+
+/// hasAlreadyAppliedSpell for a buff spell: the unit carries a buff of the spell's name or of a conflicting one.
+fn alreadyAppliedBuff(u: *const Unit, spell: CS, cfg: *const st.SpellConfig) bool {
+    if (spell.applied()) |id| {
+        if (u.buffs.find(id) != null) return true;
+    }
+    if (cfg.conflict) |id| {
+        if (u.buffs.find(id) != null) return true;
+    }
+    return false;
+}
+
+/// GameActionEngine.massCastSpell -> massCastOnAllies for an ALL_ALLIES non-HEAL spell (Battle Roar): canMassCastSpell,
+/// then every ally in holder order (the caster included) with magic resist other than 100 that does not carry it yet
+/// gets the buff appended: power = the caster's creatures alive for UNIT_AMOUNT (else the config's), laps + 1 on the
+/// caster; then the charge and completeTurn. No draw.
+fn massCastSpell(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, events: *Events) Reject!void {
+    if (!canMassCastSpell(s, ci, spell, cfg)) return error.Rejected; // spell_not_available
+    const id = spell.applied() orelse {
+        s.overflow = true; // a mass buff without a row in scope
+        return error.Rejected;
+    };
+    const caster = &s.units[ci];
+    const team = caster.team;
+    const power = if (cfg.multiplier == st.SpellMultiplier.UNIT_AMOUNT) caster.amount_alive else cfg.power;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.team != team) continue;
+        if (engine.getMagicResist(u) == 100) continue;
+        if (alreadyAppliedBuff(u, spell, cfg)) continue;
+        // applyBuff(amplifyCastBuffForTarget(...)): no Tome of Amplification in scope
+        abilities.pushChecked(s, &u.buffs, .{ .id = id, .laps = cfg.laps + @as(f64, if (i == ci) 1 else 0), .power = power });
     }
     useSpell(caster, spell);
     engine.completeTurn(s, ci, false, false, events);
@@ -723,8 +802,9 @@ fn meteor(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, target_cell:
     damageTail(s, ci, spell, cfg, enemies.slice(), events);
 }
 
-/// canCastSummon for the summoned body anchored at `anchor`: every cell on the board and empty (matrix 0).
-fn seatFree(s: *const State, anchor: Cell, w: u8, h: u8) bool {
+/// canCastSummon for the summoned body anchored at `anchor`: every cell on the board and empty (matrix 0). The test
+/// firstSummonableAnchor / summonableAnchors apply to each candidate anchor.
+pub fn seatFree(s: *const State, anchor: Cell, w: u8, h: u8) bool {
     const fp = engine.cellsForAnchor(anchor, w, h);
     for (fp.slice()) |c| {
         if (!engine.cellWithinGrid(c) or boardAt(s, c) != st.EMPTY) return false;

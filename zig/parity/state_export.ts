@@ -247,7 +247,8 @@ const SPELL_SUMMON_CREATURES = ["Wolf"];
 /** The configs the engine reads by name, as record.ts writes them into a recording's start state, and the summon
  * templates (createUnitFromSpec's fresh props) of the creatures the board can raise: Infest's when a unit holds Infest,
  * the Wolf when a unit holds a summon spell entry or a summoned Wolf stands. With vines on the board the System "Vine
- * Throw" config joins spellConfigs (the snare on arrival reads it; a book spell's config travels in its Spell object). */
+ * Throw" config joins spellConfigs (the snare on arrival reads it; a book spell's config travels in its Spell object),
+ * and with a Disguise Aura card the System "Hidden" and "Visible" markers the stat refresh writes. */
 function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Record<string, Record<string, unknown>> {
     const abilityConfigs: Record<string, any> = {};
     const effectConfigs: Record<string, unknown> = {};
@@ -265,9 +266,11 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
     };
     let summons = false;
     let spellSummons = false;
+    let disguise = false;
     for (const unit of unitsHolder.getAllUnits().values()) {
         const props = unit.getUnitProperties();
         addProps(props);
+        if ((props.abilities ?? []).includes("Disguise Aura")) disguise = true;
         if ((props.abilities ?? []).includes("Infest")) summons = true;
         if ((props.spells ?? []).some((entry: string) => entry.includes(":Summon "))) spellSummons = true;
         if (unit.summoned && SPELL_SUMMON_CREATURES.includes(unit.getName())) spellSummons = true;
@@ -310,6 +313,9 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
     };
     if (fightProperties?.getVines?.()?.size?.()) {
         spellConfigs["Vine Throw"] = plainConfig(getSpellConfig("System", "Vine Throw"));
+    }
+    if (disguise) {
+        for (const name of ["Hidden", "Visible"]) spellConfigs[name] = plainConfig(getSpellConfig("System", name));
     }
     return {
         abilityConfigs,

@@ -56,7 +56,7 @@ pub const ArmyProfile = struct {
     present: bool = false,
     /// MELEE_MAGIC stacks at the fight's start.
     melee_magic: u8 = 0,
-    /// Every stack emits an aura: v0.7 routes it through v0.4's archetype anchor, which the port does not have.
+    /// Every stack emits an aura: v0.7 routes it through v0.4's archetype anchor (Request.aura_saturated).
     aura_saturated: bool = false,
 };
 
@@ -466,19 +466,17 @@ fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []
             // v0.7's army profile comes from the strategy instance that models the team in the rollouts. One that never
             // placed this army (a late takeover, or the server's createAIStrategy model of a human seat) has none and
             // keeps v0.6's decision: the port's melee-magic-anchor path (melee_magic >= 2) is exactly that. An
-            // aura-saturated army takes v0.4's archetype anchor, which is not ported.
+            // aura-saturated army takes v0.4's archetype anchor (src/v08 plays it where it equals the v0.4 level and
+            // refuses the rest itself).
             const pr = profile[team];
-            if (pr.present and pr.aura_saturated) {
-                e.fail("unsupported request: team {s} is aura-saturated (v0.7's v0.4 anchor is not ported)", .{k});
-                return null;
-            }
             req.melee_magic[team] = if (pr.present) pr.melee_magic else rollout.NO_ARMY_PROFILE;
+            req.aura_saturated[team] = pr.present and pr.aura_saturated;
         }
     }
     if (req.policies[st.Team.LEFT] == rollout.policyFor("v0.8") or req.policies[st.Team.RIGHT] == rollout.policyFor("v0.8")) {
         var why_buf: [96]u8 = undefined;
         if (rollout.v08Scope(&h.state, &e.ident, &why_buf)) |why| {
-            e.fail("unsupported request: the v0.8 port covers boards without spells or vines ({s})", .{why});
+            e.fail("unsupported request: the v0.8 port covers boards without spells, vines or batch-4 abilities ({s})", .{why});
             return null;
         }
     }

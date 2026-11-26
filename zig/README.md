@@ -13,8 +13,9 @@ plain or actor-antithetic chance stream and the material, v1 or v2 leaf.
 Zig plays whole battles that match the TypeScript `runMatch` step for step, for battles with:
 
 - every creature's stats, sizes (1x1, 2x1, 2x2), walking and flying, melee and ranged;
-- the abilities of the creatures ported so far (batches 1, 2 and 3, below), including the units Infest summons and the
-  abilities Predatory Assimilation moves between units; every other creature's abilities stripped; no artifacts;
+- the abilities of the creatures ported so far (batches 1 to 4, below), including the units Infest and Summon Wolves
+  summon and the abilities Predatory Assimilation and the Wild Regeneration gift move between units; every other
+  creature's abilities stripped; no artifacts;
 - the wave-1 spells (below): Heal, Blessing, Lightning Strike, Fire Strike, Meteor Shower, Meteorite, Ring of Fire, Summon
   Wolves and Vine Throw, with the casters' spellbooks (Healer, Battle Mage, Satyr, Magic Dragon, Trent, and a Queen that
   stole one), the MAGIC attack type, the vines and the Wolves they summon; a book holding any other spell is refused;
@@ -25,11 +26,13 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   (production is side-oriented on every map, and its BLOCK_CENTER boards carry the seeded scattered stones; the classic
   2x2 mountains of non-side BLOCK_CENTER are ported too), including board narrowing (holes, shoves, crushes) and the
   Armageddon waves;
-- the v0.1 AI on both sides, with its BLOCK_CENTER mountain strategy.
+- the v0.1 AI on both sides, with its BLOCK_CENTER mountain strategy, and on mindless ("AI Driven") units whatever
+  their seat.
 
 The engine also replays (`hoc-sim parity`) the actions later AI versions emit on these boards: move-then-strike
 (`melee_attack` with a `path`), `wait_turn`, `defend_turn`, aimed shots, refused `select_attack_type`, ranged
-obstacle shots (`obstacle_attack` without `attackFrom`, which v0.8 sends) and the wave-1 casts (`cast_spell`).
+obstacle shots (`obstacle_attack` without `attackFrom`, which v0.8 sends), the wave-1 casts (`cast_spell`) and batch 4's
+casts (Battle Roar, the Wild Regeneration gift).
 
 Ported:
 
@@ -50,7 +53,7 @@ Ported:
 
 ### Abilities
 
-Batches 1, 2 and 3, exact in both modes:
+Batches 1 to 4, exact in both modes:
 
 | Creature | Abilities |
 | --- | --- |
@@ -73,6 +76,14 @@ Batches 1, 2 and 3, exact in both modes:
 | Squire (L1) | Stun, Arcane Ward Blessing |
 | Troglodyte (L1) | Madness, Blind Fury, Miner |
 | Monk (L3) | Magic Shield, Borrowed Grace (live since the cast Blessing: the only takeable buff), Absolving Arrow |
+| Wolf (L1, also the Summon Wolves summon) | Double Punch, Deep Wounds Level 1 |
+| Berserker (L1) | AI Driven, Double Punch |
+| White Tiger (L2) | Disguise Aura (the Hidden / Visible markers), Deep Wounds Level 2 |
+| Manticore (L2) | Warding Mane Blessing, Terrifying Gaze, Deep Wounds Level 2 |
+| Troll (L2) | Wild Regeneration (the regeneration, and a giftable castable charge) |
+| Griffin (L3) | Range Null Field Aura, Sky Runner, Deep Wounds Level 2 |
+| Frenzied Boar (L4) | AI Driven, Magic Shield, Boar Saliva |
+| Behemoth (L4) | Unyielding Power, Battle Roar (a castable mass buff), Deep Wounds Level 3 |
 
 Wave-1 spells (`spells.zig`), exact in both modes:
 
@@ -83,7 +94,7 @@ Wave-1 spells (`spells.zig`), exact in both modes:
 | Satyr (L2, MAGIC) | Forest Spellbook, Sylvan Focus Blessing | Summon Wolves x2 (Courage and Helping Hand are wave 2) |
 | Magic Dragon (L4, MELEE_MAGIC) | Tome of Elements, Magic Reflection | Lightning Strike x4, Ring of Fire x2, Meteor Shower x1 (Whirlpool is wave 2) |
 | Trent (L2) | Vine Throw (castable) | Vine Throw x1 |
-| Wolf (summoned) | stripped (Double Punch, Deep Wounds Level 1 unported: never keep "Wolf") | none |
+| Wolf (summoned) | its creature's cards when "Wolf" is kept (Double Punch, Deep Wounds Level 1; batch 4), else stripped | none |
 
 The framework later batches build on:
 
@@ -226,6 +237,68 @@ Added by batch 3:
   liftable entry (effects, then non-aura, non-marker debuffs; `first / 2^i`), deleting a lifted name from both lists.
 - **Lists**: buffs 14, debuffs 5, effects 7, abilities 10, stolen 6, auras 4 per unit, aura defs 6 per battle (wave 1:
   buffs 16, debuffs 6).
+
+Added by batch 4 (references in the session's `scratchpad/ref/batch4/`):
+
+- **The mindless pin** (`AbilityId.ai_driven`, no engine reader): `Unit.has(.ai_driven)` (Break-aware, stealable) is
+  isMindlessAiUnit. v0.1 differs for such a unit in two branches: findTarget's `OBSTACLE_ATTACK` becomes `fallbackTurn`
+  (its draws and memory writes stand), and `idleTurn` is `wait_turn` when `engine.canWaitOnHourglass` passes (the
+  engine's own gate, now shared with `waitTurn`), else `defend_turn`, instead of `end_turn`. `ai.continueMatchWith` runs
+  runMatch's mindless retry (decide again, apply what lands while still active, then end the turn) when a mindless
+  turn landed nothing; never reached. In rollouts `rollout.isMindless` pins the unit to v0.1 whatever its seat.
+- **Deep Wounds** (`abilities.deepWounds`, `activeDeepWounds`, `holdsDeepWounds`; `st.AbilityId.DEEP_WOUNDS` in level
+  order): the rider sums the holder's active cards (`(power / 5) * stack power` per card, then luck and the team's
+  ability power once, floored at 0, toFixed(1)) into the victim's "Deep Wounds" row (toFixed(1), delete + append, laps 3,
+  4 on the active unit). The damage chain multiplies by `1 + p / 100` before Lucky Strike (`combat.attackDamage`) when the
+  striker holds a card; Lightning Spin folds the factor into its ability multiplier too (squared). Never consumed; it
+  ticks, and Absolving Arrow lifts it. No draw.
+- **Boar Saliva** (`abilities.boarSaliva`): an un-Saliva'd victim gets the effect (`toFixed(((30 + luck + syn) / 100 / 5)
+  * stack power * 100, 2)`, laps 3 or 4, Madness resists after the power is set); `abilities.missChance` reads the
+  striker's own Saliva first, then the enemy's Dodge and Small Specie. No draw (the save needs an artifact).
+- **Terrifying Gaze** (`abilities.terrifyingGaze`, `Unit.forbidden`, `State.forbids`): the roll `getRandomInt(0, 100) <
+  applyChance` on the gazer's landed blow and second punch (the last draw of the blow, drawn on a frightened or Madness
+  target and when the response just killed the gazer); a frightened target is re-pointed, Madness resists, else the
+  effect (laps 1) and `forbidden` = the gazer's uid (an id, never a slot: TypeScript keeps it after the gazer dies). The
+  lock bars the melee strike, the shot's first hit, the melee response, the counter-shot and the Lightning Spin ring;
+  adjustBaseStats resets it once no Terrifying Gaze status is applied. v0.1 reads it in `isLegalMeleeTarget`,
+  `rangeShotLandable` and `findLegalRangeAttack`, not in `canSelectMeleeTarget` (findTarget keeps the gazer).
+- **Riders**, in handleMeleeAttack's order: Miner, Stun, Dulling Defense, Boar Saliva, Aggr, Terrifying Gaze (blow and
+  second punch only), Deep Wounds, Pegasus Light, Shatter Armor; the response, the spin and the skewer take Boar Saliva
+  before Aggr and Deep Wounds after it.
+- **Range Null Field** (`PowerType.DISABLE_RANGE_ATTACK`, a zero-power debuff aura on enemy RANGE creatures):
+  `engine.canLandRangeAttack` (and `nullFielded`) refuses a fielded shooter, so it has no RANGE type at activation, its
+  shot is refused and its counter-shot (miss, damage and break rolls) never happens; v0.1's `findRangeAttackAction`
+  returns nothing for it (no memory write).
+- **Disguise** (`PowerType.UNTARGETABLE`, a zero-power buff aura on its own holders; `State.disguise`): after the stat
+  pass, a unit carrying the "Disguise Aura" row gets Hidden (no enemy board occupant within the configured range plus the
+  team's aura range of its body) or Visible, the other deleted, a carried marker kept in place (`engine.disguisePass`:
+  the swap reads only that unit, so it runs after the whole pass). Hidden refuses a melee strike, a single-group shot
+  (a ray holding two enemies still lands on the Hidden front unit) and an enemy cast; responses, spins, skewers, the
+  chakram, area spells and poison still hit. v0.1 filters Hidden enemies in `canSelectMeleeTarget`, the range scan,
+  `findLegalRangeAttack` and `rangeShotLandable`. Hidden, Visible and Warding Mane are marker names.
+- **Stat hooks**: Unyielding Power (`engine.unyieldingPower`: max hp `initial + 5 * lap`, and at a lap's first refresh
+  after the start +5 hp, +1 initial step, +2 initial base attack; Break loses that lap's gains), Sky Runner (the
+  ADDITIONAL_STEPS count after the steps copy, before the Movement augment), Warding Mane in the magic-resist fold
+  between Wardguard and Arcane Ward (toFixed(2) makes the order load-bearing), Battle Roar's power in `steps_mod` and its
+  maximum damage rolls (as Blessing). `State.unit_hooks`, `gaze`, `null_field` and `disguise` keep the ability-free path
+  free of them.
+- **Warding Mane Blessing**: one more census source (`toFixed((25 / 5) * stack power * max(0, 1 + luck / 100), 2)`,
+  luck-dependent card), re-granted after Arcane Ward.
+- **Wild Regeneration**: at every activation, before the poison tick, a hurt holder's top creature refills (Break-aware).
+  The gift (`spells.canCastSpell`'s giftable HEAL branch, `magicAttack`'s gift: `abilities.deleteAbility` on the
+  caster, `abilities.addAbility` on an ally of at most `SpellConfig.max_gift_level` that does not hold it active nor lost
+  the card to a steal; otherwise the gift leaves the battle). The castable card's ":Wild Regeneration" charge moves with
+  steals and with the gift.
+- **Battle Roar** (`spells.massCastSpell`, `canMassCastSpell`): castSpell's ALL_ALLIES non-HEAL mass cast. Every ally in
+  holder order (the caster included) with magic resist other than 100 and no Battle Roar row gets the buff (power = the
+  caster's creatures alive for `SpellMultiplier.UNIT_AMOUNT`, laps + 1 on the caster); then the charge and completeTurn.
+  Borrowed Grace copies it. The other mass casts stay wave 2 (overflow).
+- **State**: `Unit.forbidden`; buffs 20, debuffs 8, effects 10 per unit (worst cases 19, 7 and 9). A state is 60,784
+  bytes (Unit 1,776).
+- **Spells API for src/v08**: `spells.usable`, `canCastSpell`, `trajectory`, `lineOfSightClear`, `moraleScaled`,
+  `moraleMultiplier`, `rawDamage`, `damageAgainst`, `resolveVictims`, `cellsAroundFootprint`, `seatFree`,
+  `canMassCastSpell` and the types in their signatures (`CS`, `Trajectory`, `Victim`, `Victims`, `Cells`) are public with
+  stable signatures: the v0.8 port calls them.
 
 ### Spells (wave 1)
 
@@ -487,6 +560,44 @@ The framework the army setup added (exact in both modes, coverage below):
   - Summon templates and harness fields are recorded data, not recomputed: a new summoned creature needs its template
     in `init.summonTemplates` / `configs.summonTemplates` and the id parts in the harness.
 
+- Batch-4 lessons (for batch 5, the shooters: Arbalester, Elf, Medusa, Beholder, Cyclops, Tsar Cannon, Gargantuan,
+  Centaur):
+  - The shooters already shoot in scope with their cards stripped; porting a card means the ranged riders. Deep Wounds,
+    Boar Saliva and the gaze have no ranged call site today because no shooter holds a card: the Wounding Charm or a
+    shooter card that applies an effect makes `attack_handler.ts:1966/2086/2336` live (`combat.rangeAttack` has the
+    Stun / Absorb Penalties / Borrowed Grace rider block to extend), and the chain's ranged `priorHits` term stays a
+    preview-only input (0 in the engine).
+  - A shooting gazer would make the counter-shot's forbidden gate live (ported: `!s.forbids(tgt, att.uid)`); a frightened
+    shooter's shot at its gazer as the first hit is refused (ported).
+  - Every new receiver filter of an aura goes in `refreshAuras` beside DISABLE_FLY_MOVEMENT / DISABLE_RANGE_ATTACK /
+    UNTARGETABLE, and every zero-power aura type needs the loader's `internAura` acceptance; a new debuff aura row needs
+    the batch-3 columns (its source cell is only in `debuffs_sources`).
+  - Range Null Field already gates every shot through `engine.canLandRangeAttack`; Rangebane (Dryad's Spit Ball) shares
+    the gates (`hasStatusApplied`): add it beside `nullFielded`.
+  - Hidden's single-group rule reads the ray's group count (`Hits.len`): Through Shot and the AOE shooters (Large
+    Caliber, Area Throw) change the group shapes, and v0.1's range scan skips Hidden cells for every attack kind.
+  - Tsar Cannon's No Melee and Gargantuan's / Cyclops's splashes touch stones (`areaStrikeAtCell`, `spendObstacleHit`);
+    check `combat.obstacleAttackAt` and the AOE tail (`aoeTail`) for both.
+  - Mind effects: every MIND card goes through `Ability.ty == st.AbilityKind.MIND` and Madness (`to.has(.madness)`)
+    after the power is set; the mind-resist save (Amulet of Resolve) is the artifact batch's.
+  - Perf: Zig's auto layout reshuffles `Unit` when it grows; keep new per-unit reads behind a `State` flag (`gaze`,
+    `unit_hooks`, `null_field`, `disguise`) and rare work in `noinline` helpers. The first draft of batch 4 cost 2.8% of
+    the engine replay with fewer retired instructions; gating and moving the hooks out of the loop recovered most of it.
+- Notes for the v0.8 owner (batch 4 in src/v08):
+  - `rollout.v08Scope` refuses a v0.8 seat when any holder unit holds a batch-4 card other than AI Driven or carries
+    batch-4 state (Deep Wounds, Boar Saliva, Terrifying Gaze effects; Disguise Aura, Hidden, Warding Mane, Battle Roar
+    buffs; Range Null Field, Visible debuffs; a forbidden target). AI Driven holders are dispatched to v0.1
+    (`rollout.isMindless`), and v0.8 rollouts with Berserkers are identical to TypeScript.
+  - v0.4's `trollWildRegen` tests `hasBuffActive("Wild Regeneration")` on allies (a name that is never a buff), so its
+    "already gifted" check never fires; the a19 gift filter (`a19-wild-regen-gift-v1`) gives only to allies whose
+    creatures have more max hp than the caster's. v0.2's `decideCreatureOpener` casts Battle Roar (lap-1 self-delay
+    from v0.4); a Behemoth below stack power 3 cannot.
+  - v0.8 reads Hidden in many places (`candidates.ts`, `v0_2.ts`, `v0_5.ts`, `v0_8_ranged_positioning.ts`, ...), the
+    Range Null Field in `pinnedRetreat`, the gaze in `repairV07/V08ForbiddenTargetDecision`, Deep Wounds through the
+    damage projection (`deepWoundsMultiplier`, ranged `priorHits`) and Boar Saliva through `calculateMissChance`
+    (`abilities.missChance` has it).
+  - In v0.8s recordings mindless decisions are decide steps marked `v: "v0.1"` (`rec.Step.mindless`): a v0.8 layer
+    checker skips them or dispatches them to `ai.decideTurn`.
 - Wave-1 lessons (for wave 2 and the artifacts):
   - A spell's two views must move together: the raw entries (the digest and `useSpell`'s last-entry splice) and the
     parsed book (a spent Spell lingers at 0 until a re-parse). Mass Heal, Courage, Spiritual Armor, Helping Hand,
@@ -594,8 +705,9 @@ Batch-3 options (off unless a batch-3 creature is kept; then the default output 
 - Keeping any of Zena, Arachna Queen, Arachna Spider, Squire, Troglodyte or Monk adds five unit digest columns after
   the setup columns: `abilities` (the active list, steals included, Break ignored), `stolen_abilities`, `web_locked`,
   `debuffs_sources` (each debuff's stored properties: the Web row's source cell) and `rallying_volley_granted`; with
-  setup the start state's units gain `debuffsSources`. `compare.state` tells the layouts apart by row length (47, 50
-  setup, 52 batch 3, 55 both).
+  setup the start state's units gain `debuffsSources`. `compare.state` tells the layouts apart by column 47 (a number:
+  the setup columns) and the number of columns after the setup columns (5 batch 3, 6 batch 3 and 4, 7 spells, 8 spells
+  and batch 4).
 - A start state holding an Infest unit gains `init.summonTemplates` (createUnitFromSpec's props of "Arachna Spider" and
   "Arachna Queen", stripped as every creature is); the game line gains `summonIds` (the summoned ids in creation order)
   and each resume point `summonSequence` and `summonsCreated`, with the export's harness carrying `seed` and
@@ -639,6 +751,30 @@ RECORD_VERSION=v0.8s V08_RANGED_POSITION_VERSIONS=v0.8,v0.8s RECORD_ORIGIN=rollo
   bun zig/parity/record.ts 100 13000000 /tmp/w1.jsonl && zig/zig-out/bin/hoc-sim parity /tmp/w1.jsonl
 ```
 
+Batch-4 options (off unless a batch-4 creature is kept or `RECORD_STRIP_ABILITIES` is set; then the default output above
+is unchanged otherwise):
+
+- Keeping any of Wolf, Berserker, Frenzied Boar, Griffin, White Tiger, Manticore, Behemoth or Troll turns on the batch-3
+  columns (gifts and steals move the active list; `debuffs_sources` names the Range Null Field row's source) and adds
+  `forbidden_target` (Terrifying Gaze's lock: the gazer's id, or "") as the last unit column. A kept Behemoth or Troll
+  counts as a kept spellbook (its castable card holds a charge): the spellbook columns and `spellConfigs` follow.
+- `RECORD_STRIP_ABILITIES="Deep Wounds Level 2,AI Driven"` strips those cards from the kept creatures (a stripped castable
+  card takes its charge along), so each card can be checked alone. The `.meta.json` gains `strip`.
+- A start state holding a Disguise Aura card gains the System `Hidden` and `Visible` configs in `spellConfigs` (the laps
+  and powers of the markers the stat refresh writes); the `Disguise` aura config is in `auraEffectConfigs` as usual.
+- Under a `RECORD_VERSION` other than v0.1 a mindless unit's decisions, which runMatch makes with StrategyV0_1 whatever
+  the seat, are recorded too: decide steps marked `v: "v0.1"` (no resume point or layer log; `rec.Step.mindless`). A
+  checker of another version dispatches those units to v0.1 (`rollout.isMindless`) and expects these steps.
+
+```bash
+# batch 4 kept at keep rate 1, production-like, with resume points; Manticore without its Deep Wounds card
+RECORD_GRID=mix RECORD_SIDE=1 RECORD_AUGMENTS=production RECORD_DOCTRINE=random RECORD_SYNERGIES=1 \
+  RECORD_SYNERGY_VARIANTS=seed RECORD_DISTINCT_RED=1 RECORD_PLACEMENT_TIMING=setup-before-placement RECORD_RESUME=random:2 \
+  RECORD_AMOUNTS=expBudget RECORD_KEEP_RATE=1 \
+  RECORD_KEEP_ABILITIES="Wolf,Berserker,Frenzied Boar,Griffin,White Tiger,Manticore,Behemoth,Troll" zig/parity/check.sh 150
+RECORD_KEEP_RATE=1 RECORD_KEEP_ABILITIES=Manticore RECORD_STRIP_ABILITIES="Deep Wounds Level 2" zig/parity/check.sh 50
+```
+
 `hoc-sim parity` and `native` report a game they cannot parse (an action or event outside the port) as "recording not
 supported" with its seed and step and go on, as they do for an unsupported start state.
 
@@ -661,6 +797,41 @@ cd zig && zig build test         # unit tests (random stream, JS number rounding
 ```
 
 Run `check.sh` after changing any rules or v0.1 AI code the port covers, both with and without the batch kept.
+
+Batch 4, checked on 2026-11-25 against common `6998c2dd` (every battle identical; every run on side-oriented
+production-mix maps with the production-like setup, `RECORD_AMOUNTS=expBudget` and `RECORD_RESUME=random:2`; the
+wave-1 `RECORD_SPELLS` list wherever casters are kept):
+
+- native v0.1 and engine replay (`check.sh`'s two modes) on the final code: 1,210 battles, 218,970 steps, and 2,420
+  resume points equal to their digests with 212,018 remaining steps identical in both modes: each creature alone at keep
+  rate 1 (40 each, seeds 30000000 + 100000 * k for Wolf, Berserker, Frenzied Boar, Griffin, White Tiger, Manticore,
+  Behemoth, Troll), the cards isolated with `RECORD_STRIP_ABILITIES` (no Deep Wounds on Griffin, Tiger, Manticore,
+  Behemoth and Wolf, 31000000; no AI Driven on Boar and Berserker beside Monk, Troglodyte and Hydra, 31100000; 60 each),
+  the whole batch at keep rate 1 (150, 31200000), batch 4 with batches 1 to 3 and the wave-1 casters at the default rate
+  (200, 31300000 and 31400000), Queen steals (80, 31500000), Manticore with Troglodyte, Monk, Squire, Behemoth and Troll
+  (60, 31600000), spins and Chaos break with Might ability power (variants `Life:2,Chaos:2,Might:2,Nature:2`, 60,
+  31700000), range-heavy rosters against the Griffin, Tiger and Manticore (`ROSTER_RANGED_MIN=5` / `4`, 140, 34000000
+  and 34100000), and 80 battles with a Debug build (34200000, 34300000); plus 1,880 battles of the same scopes during
+  development (seeds 20000001-20000720, 21000000-21700049, 22000000-22700099, 26700000-27100099);
+- engine replay of v0.8s battles (casts of Battle Roar and the Wild Regeneration gift, Borrowed Grace copies of Battle
+  Roar, Hidden against wave-1 spells, summoned Wolves with their cards, mindless decisions marked `v0.1`): 320 battles,
+  77,377 steps, 640 resume replays identical (32000000-32400079), and 580 during development;
+- reached (digest and trace tallies of the final runs; the v0.1 runs first): 14,024 Deep Wounds applications; 4,754 gaze
+  rolls (`terrifying_gaze_ability.ts:45`), 1,061 gazes landed or re-pointed and 803 frightened decisions; 1,017 Boar
+  Saliva applications; 1,605 regenerations; 1,159 Unyielding Power lap gains; 5,472 mindless decisions (7 waits, 2
+  defends); 7,094 decisions facing a Hidden enemy; 614 decisions of a shooter under a Range Null Field and 29 shots at
+  one (its counter-shot suppressed); steals of every batch-4 card but Unyielding Power (stolen during development). In
+  the v0.8s replays (360 battles with the Debug one): 321 Battle Roar casts (1,947 recipient rows), 153 gifts (about 4
+  lost to a Broken or robbed recipient), 1,260 regenerations and 1,453 mindless decisions, all recorded as marked
+  `v0.1` decide steps;
+- unchanged: the default recorder output byte-identical to HEAD's (classic 1001-1020, batches 1+2 kept on the side mix
+  2001-2020, production-like batches 1-3 kept with resume points 3001-3020, v0.8s layers and candidates 4001-4012, wave 1
+  in v0.8s 5001-5010 and with resume points 6001-6010), and those recordings identical in every mode; classic
+  `check.sh 300 32500000`; production-like batches 1-3 kept `check.sh 300 32600000` with 600 resume points; the wave-1
+  replay recipe 200/200 (32700000); `ffi/smoke.ts 12 9100` and 30 battles each with batch 4 and batches 1-4 kept;
+  `zig build test`;
+- the rollout oracle (`BRIDGE.md`): v0.1 rollouts on batch-4 roots 725 roots, 696,000 values identical; v0.8 with
+  Berserkers 209 roots identical; ability-free v0.8 604 roots identical; v0.8 on batch-4 boards refused.
 
 Wave-1 spells, checked on 2026-11-25 against common `2f222cc0` (every battle identical; every run on side-oriented
 production-mix maps with the production-like setup, `RECORD_AMOUNTS=expBudget` and the wave-1 `RECORD_SPELLS` list):
@@ -936,12 +1107,20 @@ pather's unchanged first pass (a refactor that shared its geometry with the stri
 (Unit 1,552: the spellbook; Fight 928: the vines) and a decision context 42,816 (MovePath 21,000: room for the vine
 merge's ancestors).
 
+Batch 4 kept the classic path within noise for whole battles: ten alternated pairs of `native-bench --reps 5` (load 5
+to 9) gave medians of 250.95 µs (old) and 252.05 µs (new) per battle, pairwise +0.6%, and eight pairs of the engine-only
+bench 506.5 and 514.5 ns per step, pairwise +1.4%, with the same run checksums; retired instructions per pass went down
+(883 to 838 million per engine pass, 4.10 to 4.05 billion per 1,000 battles). A first draft cost 2.8% of the engine
+replay with fewer instructions: Zig's auto layout reshuffled `Unit`, and the new reads sat in `adjustBaseStats`' hot
+loop; gating them behind `State` flags and moving Unyielding Power and the Disguise swaps into `noinline` helpers
+recovered most of it. A state is now 60,784 bytes (Unit 1,776: buffs 20, debuffs 8, effects 10).
+
 Where Zig spends battle time (sampled, before the layer bitmap): `getMovePath` 31%, `doFindTarget` 14%, the melee
 target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the layers.
 
 ## Not covered yet
 
-- the abilities of every creature outside batches 1, 2 and 3 and the wave-1 casters, the spells outside wave 1
+- the abilities of every creature outside batches 1 to 4 and the wave-1 casters, the spells outside wave 1
   (Spiritual Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Fireball, Smoke, Craft, Wind Flow, Resurrection,
   Castling, the runes and the rest: a book holding one is refused by name) and artifacts (and so Broken Aegis's +20
   break chance and self-miss, resurrection, the magic-resist and mirror rolls of debuff spells); the revealed-ranged
@@ -949,14 +1128,18 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
   WATER_CENTER (never played); on the maps, Area Throw / Large Caliber on stones (`areaStrikeAtCell`), Quiver of
   Echoes' extra obstacle shot, Fire Breath through stones, artifact barrels, and `forceStalledLap` / the recovery net
   (never reached: 0 rejected engine calls in every map recording). The ported code leaves out what no battle in scope
-  can reach: Made of Fire, Mechanism, Paralysis, the
-  forbidden target (Terrifying Gaze), Water Shield and Water Element, Flesh Shield, the Dual Strike Charm, the aura
-  power types outside the four in scope, the Wind Element (Thunderbird is not ported), Infest from a ranged kill (no
-  shooter can hold it), the Castling hook's getMovePath (it draws nothing), a Wolf with its abilities kept (Deep
-  Wounds), and runs of more stunned activations than the advance attempts allow (`forceStalledLap`, never seen);
+  can reach: Made of Fire, Mechanism, Paralysis, Water
+  Shield and Water Element, Flesh Shield, the Dual Strike Charm, the aura power types outside the six in scope, the
+  Wind Element (Thunderbird is not ported), Infest from a ranged kill (no shooter can hold it), the Castling hook's
+  getMovePath (it draws nothing), runs of more stunned activations than the advance attempts allow (`forceStalledLap`,
+  never seen), the mass casts other than Battle Roar's ALL_ALLIES buff (Mass Heal, the flyer and enemy casts), Holy
+  Cross (a gift the caster keeps), the mind-resist saves of Boar Saliva and Terrifying Gaze (Amulet of Resolve), Deep
+  Wounds on a shot (no shooter holds a card) and Rangebane; the recovery net is ported only for mindless units
+  (runMatch's retry, never reached);
 - the AI versions the research uses (v0.8 with the a19 search). The production rollout policy is the v0.8 chain, about
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and
   `compare.NativeCheck`. The bridge's rollouts take each unit's decide function from `rollout.policies` (v0.1 and
-  v0.8); the v0.8 port covers ability-free boards only, so a v0.8 request on a board with abilities is refused (the
-  known gaps and what the search still needs are in `BRIDGE.md`).
+  v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers the abilities of batches 1 to 3, so a v0.8
+  request on a board with spells, vines or a batch-4 card other than AI Driven is refused (the known gaps and what the
+  search still needs are in `BRIDGE.md`).

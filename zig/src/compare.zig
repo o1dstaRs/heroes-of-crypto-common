@@ -309,9 +309,14 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
             }
         }
         // Setup columns (recordings with augments or synergies): the Sniper shot distance and the two bases Bitter
-        // Experience moves. Then the batch-3 columns (digest.ts), then the spellbook columns: rows of 47 columns have
-        // none, 50 setup, 52 batch 3, 55 setup and batch 3, 54 batch 3 and spells, 57 all three.
-        const has_setup = row.len == 50 or row.len == 55 or row.len == 57;
+        // Experience moves (column 47 is a number: shot_distance; the batch-3 columns start with a string). Then the
+        // batch-3 columns (digest.ts: 5), the spellbook columns (2) and the batch-4 forbidden target (1): after the
+        // setup columns a row has 0, 5 (batch 3), 6 (batch 3 and 4), 7 (spells) or 8 (spells and batch 4) more.
+        const has_setup = row.len >= 50 and row[47] != .string;
+        const extra: usize = row.len -| @as(usize, if (has_setup) 50 else 47);
+        const has_b3 = extra >= 5;
+        const has_spells = extra == 7 or extra == 8;
+        const has_b4 = extra == 6 or extra == 8;
         const setup_cols = [_]struct { []const u8, f64, usize }{
             .{ "shot_distance", u.shot_distance, 47 },
             .{ "base_armor_init", u.init.base_armor, 48 },
@@ -324,7 +329,7 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
                 return false;
             }
         };
-        if (row.len == 52 or row.len == 55 or row.len == 54 or row.len == 57) {
+        if (has_b3) {
             const b: usize = if (has_setup) 50 else 47;
             if (!abilityNamesMatch(blk: {
                 var list: [st.MAX_ABILITIES]st.AbilityId = undefined;
@@ -350,7 +355,18 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
                 m.set("unit {d} rallying_volley_granted: zig {d}, ts {d}", .{ idx, u.rallying_volley_granted, rec.num(row[b + 4]) });
                 return false;
             }
-            if (row.len == 54 or row.len == 57) {
+            if (has_b4) {
+                const t = column(row, b + @as(usize, if (has_spells) 7 else 5)) orelse "";
+                const want: u8 = if (t.len == 0) st.NO_UID else (uidOf(s, ids, t) orelse {
+                    m.set("unit {d} forbidden_target: unknown ts id {s}", .{ idx, t });
+                    return false;
+                });
+                if (want != u.forbidden) {
+                    m.set("unit {d} forbidden_target: zig {d}, ts {d}", .{ idx, u.forbidden, want });
+                    return false;
+                }
+            }
+            if (has_spells) {
                 if (!bookEntriesMatch(u, column(row, b + 5) orelse "")) {
                     m.set("unit {d} spell_entries: ts '{s}' (zig has {d})", .{ idx, column(row, b + 5) orelse "", u.n_book });
                     return false;

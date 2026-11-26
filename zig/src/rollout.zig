@@ -64,21 +64,37 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
         if (u.n_book > 0 or u.n_spells > 0) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
+        // Batch 4 is not in src/v08 yet: its abilities (but AI Driven, whose holders play v0.1 here) and their state.
+        if (u.ability_mask & BATCH4_MASK != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-4 ability", .{i}) catch "batch 4";
+        if (u.forbidden != st.NO_UID) return std.fmt.bufPrint(buf, "slot {d} is frightened (Terrifying Gaze)", .{i}) catch "batch 4";
+        for ([_]st.SpellId{ .deep_wounds, .boar_saliva, .terrifying_gaze }) |id| {
+            if (u.effects.find(id) != null) return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 4";
+        }
+        for ([_]st.SpellId{ .disguise_aura, .hidden, .warding_mane_blessing, .battle_roar }) |id| {
+            if (u.buffs.find(id) != null) return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 4";
+        }
+        for ([_]st.SpellId{ .range_null_field_aura, .visible }) |id| {
+            if (u.debuffs.find(id) != null) return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 4";
+        }
     }
     if (s.fight.n_vines != 0) return "vines on the board";
     return null;
 }
 
+/// The batch-4 abilities src/v08 does not read yet (AI Driven is the mindless pin: its holders play v0.1).
+const BATCH4_MASK: st.AbilityMask = blk: {
+    var m: st.AbilityMask = 0;
+    for ([_]st.AbilityId{ .deep_wounds_level_0, .deep_wounds_level_1, .deep_wounds_level_2, .deep_wounds_level_3, .boar_saliva, .range_null_field_aura, .sky_runner, .disguise_aura, .warding_mane_blessing, .terrifying_gaze, .unyielding_power, .battle_roar, .wild_regeneration }) |id| m |= id.bit();
+    break :blk m;
+};
+
 /// MINDLESS_AI_VERSION: an "AI Driven" unit plays v0.1 whatever its seat (aiVersionForUnit).
 pub const mindless_policy: DecideFn = decideV01;
 
-/// isMindlessAiUnit: the unit has "AI Driven" active (a Broken one is steered by its owner again). The port has no
-/// "AI Driven" ability: the loader refuses a unit that carries it, so no unit in scope is mindless; when the ability is
-/// ported, test it here.
+/// isMindlessAiUnit: the unit has "AI Driven" active (Break-aware: a Broken one is steered by its owner again; a thief
+/// that stole it is mindless, the robbed unit no longer). Read at every turn.
 pub fn isMindless(s: *const State, ui: u8) bool {
-    _ = s;
-    _ = ui;
-    return false;
+    return s.units[ui].has(.ai_driven);
 }
 
 /// The decide function of unit `ui`: the mindless pin, else its team's policy.
@@ -158,6 +174,9 @@ pub const Request = struct {
     /// fight's start, read by the v0.8 policy (util.Battle.melee_magic); NO_ARMY_PROFILE for a team whose rollout
     /// strategy has none.
     melee_magic: [3]u8 = .{ 0, 0, 0 },
+    /// v0.7's isAuraSaturatedArmy per team from the same profile (util.Battle.aura_saturated): every starting stack
+    /// emits an aura, so v0.7 plays its standalone v0.4 anchor. False for a team without a profile.
+    aura_saturated: [3]bool = .{ false, false, false },
     /// The summon counters the first rollout starts from (runMatch's createSummonedUnit counter, lib.ts
     /// deterministicUuidSequence) and the summon id scheme; null = the root state's.
     summon_sequence: ?u32 = null,
@@ -306,6 +325,7 @@ const Tables = struct {
     on: bool = false,
     ident: *const Identity = undefined,
     melee_magic: [3]u8 = .{ 0, 0, 0 },
+    aura_saturated: [3]bool = .{ false, false, false },
     root: v08util.Battle = .{},
     root_uid: u8 = 0,
     built_uid: u8 = 0,
@@ -318,7 +338,8 @@ const Tables = struct {
         if (!self.on) return;
         self.ident = req.identity.?;
         self.melee_magic = req.melee_magic;
-        self.root = battleTable(root, self.ident, self.melee_magic);
+        self.aura_saturated = req.aura_saturated;
+        self.root = battleTable(root, self.ident, self.melee_magic, self.aura_saturated);
         self.root_uid = root.next_uid;
         self.built_uid = root.next_uid;
         v08util.battle = self.root;
@@ -332,13 +353,13 @@ const Tables = struct {
 
     fn sync(self: *Tables, s: *const State) void {
         if (!self.on or s.next_uid == self.built_uid) return;
-        v08util.battle = battleTable(s, self.ident, self.melee_magic);
+        v08util.battle = battleTable(s, self.ident, self.melee_magic, self.aura_saturated);
         self.built_uid = s.next_uid;
     }
 };
 
 /// util.Battle.fromUnits over the state's slots (each slot's creature name and unit id).
-pub fn battleTable(s: *const State, ident: *const Identity, melee_magic: [3]u8) v08util.Battle {
+pub fn battleTable(s: *const State, ident: *const Identity, melee_magic: [3]u8, aura_saturated: [3]bool) v08util.Battle {
     var names: [st.MAX_UNITS][]const u8 = undefined;
     var ids: [st.MAX_UNITS][]const u8 = undefined;
     var bufs: [st.MAX_UNITS][36]u8 = undefined;
@@ -347,7 +368,9 @@ pub fn battleTable(s: *const State, ident: *const Identity, melee_magic: [3]u8) 
         names[i] = ident.nameOf(&s.units[i]);
         ids[i] = ident.idOf(s, i, &bufs[i]);
     }
-    return v08util.Battle.fromUnits(names[0..n], ids[0..n], melee_magic);
+    var b = v08util.Battle.fromUnits(names[0..n], ids[0..n], melee_magic);
+    b.aura_saturated = aura_saturated;
+    return b;
 }
 
 // =====================================================================================================================

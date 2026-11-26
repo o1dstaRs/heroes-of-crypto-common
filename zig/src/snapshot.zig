@@ -204,8 +204,9 @@ fn cellOf(v: Value, why: *Why, what: []const u8) Error!st.Cell {
 // =====================================================================================================================
 
 /// The snapshot's unit ids (the index order a caller without a recording uses): the holder's units in insertion order,
-/// then the ids of units already removed from the holder that the fight's turn sets, the AI target memory or the
-/// holder's distances still name (TypeScript keeps them), in order of first mention. Slices into `root`.
+/// then the ids of units already removed from the holder that the fight's turn sets, the AI target memory, the holder's
+/// distances or a unit's forbidden target (a dead gazer's id stays until the fright ends) still name (TypeScript keeps
+/// them), in order of first mention. Slices into `root`.
 pub fn unitIds(arena: std.mem.Allocator, root: Value, why: *Why) Error![]const []const u8 {
     var out: std.ArrayList([]const u8) = .empty;
     const units = try items(get(root, "units"), why, "units");
@@ -223,6 +224,10 @@ pub fn unitIds(arena: std.mem.Allocator, root: Value, why: *Why) Error![]const [
     }
     for (try mapEntries(get(get(root, "holder"), "distancesToClosestEnemies"), why, "distancesToClosestEnemies")) |e| {
         try mentioned.append(arena, e.array.items[0]);
+    }
+    for (units) |u| {
+        const f = get(get(get(u, "fields"), "unitProperties"), "forbidden_target");
+        if (f == .string and f.string.len > 0) try mentioned.append(arena, f);
     }
     for (mentioned.items) |m| {
         const id = try string(m, why, "unit id");
@@ -288,6 +293,7 @@ pub fn load(root: Value, ids: []const []const u8, harness: Harness, why: *Why) E
         u.* = std.mem.zeroes(Unit);
         u.in_holder = false;
         u.target = -1;
+        u.forbidden = st.NO_UID;
         u.uid = slot_uids[i];
         if (i < n_holder) s.holder[i] = @intCast(i);
         if (uuid.parse(ids[slot_uids[i]])) |b| {
@@ -401,7 +407,6 @@ fn checkUnitScope(uv: Value, fields: Value, props: Value, why: *Why) Error!void 
     const unit_type = get(uv, "unitType");
     if (unit_type != .integer or unit_type.integer != 1) return why.unsupported("unit type is not a creature", .{});
     try requireEmpty(get(props, "artifact_granted_abilities"), why, "artifact-granted abilities");
-    try requireEmpty(get(props, "forbidden_target"), why, "forbidden target");
     try requireEmpty(get(props, "helping_hand_caster_id"), why, "Helping Hand caster");
     try requireEmpty(get(props, "helping_hand_penalty_id"), why, "Helping Hand penalty");
     if (props == .object) {
@@ -689,6 +694,10 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
 
     const target = get(props, "target");
     if (target == .string and target.string.len > 0) u.target = @intCast(try requireSlot(s, ids, target.string, why, "target"));
+    // Terrifying Gaze's lock names the gazer by id (a removed one too): kept as its uid.
+    const forbidden = get(props, "forbidden_target");
+    u.forbidden = st.NO_UID;
+    if (forbidden == .string and forbidden.string.len > 0) u.forbidden = try unitIndexOf(ids, forbidden.string, why, "forbidden_target");
     try loadLists(u, fields, props, why);
     try loadBook(s, u, fields, props, why);
     u.summoned = get(uv, "summoned") == .bool and get(uv, "summoned").bool;

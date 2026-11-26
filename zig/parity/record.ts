@@ -23,6 +23,7 @@ import { GameActionEngine } from "../../src/engine/action_engine";
 import { TurnEngine } from "../../src/engine/turn_engine";
 import { getAIStrategy } from "../../src/ai";
 import { captureAITargetMemory } from "../../src/ai/ai";
+import { StrategyV0_1 } from "../../src/ai/versions/v0_1";
 import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { PathHelper } from "../../src/grid/path_helper";
 import { creatureIdForName } from "../../src/ai/setup/creature_score";
@@ -84,16 +85,44 @@ const SPELL_KEEP = process.env.RECORD_SPELLS
               .filter(Boolean),
       )
     : undefined;
+// RECORD_STRIP_ABILITIES="Deep Wounds Level 2,AI Driven" strips those cards from the kept creatures (a stripped castable
+// card takes its charge with it), so each ported card of a creature can be checked alone.
+const STRIP = new Set(
+    (process.env.RECORD_STRIP_ABILITIES ?? "")
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean),
+);
 const AMOUNT_MODE = (process.env.RECORD_AMOUNTS ?? "levelTable").trim() as "levelTable" | "expBudget";
 if (AMOUNT_MODE !== "levelTable" && AMOUNT_MODE !== "expBudget") {
     throw new Error(`RECORD_AMOUNTS: expected levelTable or expBudget, got ${AMOUNT_MODE}`);
 }
-/** A kept creature with a spellbook (or RECORD_SPELLS set): the spellbook digest columns and spell configs are written. */
+/** The batch-4 creatures: keeping any turns on the batch-3 digest columns and the batch-4 `forbidden_target` column. */
+const BATCH4_CREATURES = [
+    "Wolf",
+    "Berserker",
+    "Frenzied Boar",
+    "Griffin",
+    "White Tiger",
+    "Manticore",
+    "Behemoth",
+    "Troll",
+];
+const BATCH4 = BATCH4_CREATURES.some((name) => KEEP.has(name));
+/** A kept creature with a spellbook (or RECORD_SPELLS set): the spellbook digest columns and spell configs are written.
+ * A kept batch-4 creature with a castable card (Behemoth's Battle Roar, Troll's Wild Regeneration) holds a charge too. */
 let keptSpellbook = false;
 for (const [faction, creatures] of Object.entries(creaturesJson as Record<string, any>)) {
     if (faction === "version" || typeof creatures !== "object") continue;
     for (const [name, creature] of Object.entries(creatures as Record<string, any>)) {
         if (KEEP.has(name)) {
+            if (STRIP.size) creature.abilities = creature.abilities.filter((card: string) => !STRIP.has(card));
+            if (
+                BATCH4_CREATURES.includes(name) &&
+                creature.abilities.some((card: string) => getAbilityConfig(card)?.can_be_cast)
+            ) {
+                keptSpellbook = true;
+            }
             if (SPELL_KEEP) {
                 creature.spells = creature.spells.filter((entry: string) =>
                     SPELL_KEEP.has(entry.slice(entry.indexOf(":") + 1)),
@@ -456,13 +485,19 @@ const SUMMON_CREATURES = ["Arachna Spider", "Arachna Queen"];
 // the "Wolf" summon template. A Trent-only battle (Vine Throw is a castable ability, not a book) sets RECORD_SPELLS to
 // get the columns.
 const SPELLS = keptSpellbook || SPELL_KEEP !== undefined;
-const BATCH3_COLUMNS = BATCH3 || SPELLS;
+// ---- batch 4 ----
+// Keeping any batch-4 creature turns on the batch-3 columns (the active and stolen lists move with gifts and steals;
+// `debuffs_sources` names the Range Null Field row's source) and adds `forbidden_target` (Terrifying Gaze's lock, the
+// gazer's id or "") as the last unit column. A start state holding Disguise Aura gains the System "Hidden" and
+// "Visible" configs in `spellConfigs`. Under a RECORD_VERSION other than v0.1, a mindless unit's ("AI Driven")
+// decisions, which runMatch makes with StrategyV0_1, are recorded as decide steps marked `v: "v0.1"`.
+const BATCH3_COLUMNS = BATCH3 || SPELLS || BATCH4;
 const SPELL_SUMMON_CREATURES = ["Wolf"];
 
-const DIGEST_FIELDS = digestFields(SETUP, BATCH3, SPELLS);
+const DIGEST_FIELDS = digestFields(SETUP, BATCH3 || BATCH4, SPELLS, BATCH4);
 
 function digest(ctx: Ctx): { units: unknown[][]; fight: Record<string, unknown> } {
-    return battleDigest(ctx, { setup: SETUP, terrain: TERRAIN, batch3: BATCH3, spells: SPELLS });
+    return battleDigest(ctx, { setup: SETUP, terrain: TERRAIN, batch3: BATCH3, spells: SPELLS, batch4: BATCH4 });
 }
 
 /** Whether a unit of the holder can ever cast a summon spell (Summon Wolves). */
@@ -623,6 +658,16 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
         }
         if (!("Vine Throw" in spellConfigs)) {
             spellConfigs["Vine Throw"] = JSON.parse(JSON.stringify(getSpellConfig("System", "Vine Throw")));
+        }
+    }
+    // The Disguise markers the stat refresh writes (laps and power of the System spells).
+    let disguise = false;
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        if (u.getUnitProperties().abilities.includes("Disguise Aura")) disguise = true;
+    }
+    if (disguise) {
+        for (const name of ["Hidden", "Visible"]) {
+            spellConfigs[name] = JSON.parse(JSON.stringify(getSpellConfig("System", name)));
         }
     }
     const templates = canSummon(ctx)
@@ -869,6 +914,39 @@ function main(): void {
     // AI decisions: the unit, the random state around the call and the actions it returned. Engine calls made
     // inside a decision (none are expected for v0.1) are not recorded as steps.
     const decideTurn = strategyClass.prototype.decideTurn;
+    // Mindless units ("AI Driven") are decided by runMatch with the shared StrategyV0_1 whatever the seat's version: under
+    // another RECORD_VERSION those top-level calls (a version's own super chain runs inside the wrapper below, at
+    // depth > 0) are recorded too, marked `v: "v0.1"` (no resume point, no layer log).
+    if (VERSION !== "v0.1" && strategyClass !== StrategyV0_1) {
+        const v01DecideTurn = StrategyV0_1.prototype.decideTurn;
+        StrategyV0_1.prototype.decideTurn = function (this: unknown, unit: any, context: any) {
+            if (!recording || depth > 0 || !rng) return v01DecideTurn.call(this, unit, context);
+            const r0 = rng.state;
+            const d0 = rng.draws;
+            const site0 = siteLog.length;
+            depth += 1;
+            let actions: unknown[];
+            const t0 = process.hrtime.bigint();
+            try {
+                actions = v01DecideTurn.call(this, unit, context);
+            } finally {
+                decideNanos += process.hrtime.bigint() - t0;
+                decisions += 1;
+                depth -= 1;
+            }
+            steps.push({
+                k: "decide",
+                a: { unitId: unit.getId() },
+                v: "v0.1",
+                r0,
+                r1: rng.state,
+                draws: rng.draws - d0,
+                out: JSON.parse(JSON.stringify(actions)),
+                ...(TRACE ? { ds: siteLog.slice(site0) } : {}),
+            });
+            return actions;
+        };
+    }
     strategyClass.prototype.decideTurn = function (this: unknown, unit: any, context: any) {
         if (ROLLOUT_ORIGIN) context = { ...context, decisionOrigin: "rollout" };
         if (!recording || depth > 0 || !rng) return decideTurn.call(this, unit, context);
@@ -1059,6 +1137,7 @@ function main(): void {
         gridTypes: gridCounts,
         ...(AMOUNT_MODE !== "levelTable" ? { amounts: AMOUNT_MODE } : {}),
         ...(SPELL_KEEP ? { spells: [...SPELL_KEEP] } : {}),
+        ...(STRIP.size ? { strip: [...STRIP] } : {}),
         ...(SETUP
             ? {
                   setup: {

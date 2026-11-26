@@ -73,11 +73,17 @@ pub fn skipsResponse(u: *const Unit) bool {
     return false;
 }
 
-/// Unit.calculateMissChance(enemy): the enemy's Dodge, and its Small Specie against a level-4 attacker.
+/// Unit.calculateMissChance(enemy): the striker's own Boar Saliva effect first, then the enemy's Dodge, and its Small
+/// Specie against a level-4 attacker.
 pub fn missChance(att: *const Unit, enemy: *const Unit) f64 {
-    if (enemy.ability_mask & (st.AbilityId.dodge.bit() | st.AbilityId.small_specie.bit()) == 0) return 0;
-    var chances: [2]f64 = undefined;
+    const saliva: ?f64 = if (att.effects.len != 0) att.effects.power(.boar_saliva) else null;
+    if (saliva == null and enemy.ability_mask & (st.AbilityId.dodge.bit() | st.AbilityId.small_specie.bit()) == 0) return 0;
+    var chances: [3]f64 = undefined;
     var n: usize = 0;
+    if (saliva) |p| {
+        chances[n] = p / 100;
+        n += 1;
+    }
     if (enemy.ability(.dodge)) |a| {
         chances[n] = applyChance(enemy, a) / 100;
         n += 1;
@@ -169,6 +175,7 @@ pub fn dullingDefense(from: *const Unit, to: *Unit) void {
 // =====================================================================================================================
 
 const ARCANE_WARD_BLESSING_BIT: u32 = 2;
+const WARDING_MANE_BLESSING_BIT: u32 = 4;
 const SHARPENED_WEAPONS_BLESSING_BIT: u32 = 32;
 const RALLYING_VOLLEY_BLESSING_BIT: u32 = 64;
 const LUCK_BLESSING_BIT: u32 = 128;
@@ -180,6 +187,7 @@ inline fn blessingBit(id: st.SpellId) u32 {
         .sylvan_focus_blessing => SYLVAN_FOCUS_BLESSING_BIT,
         .sharpened_weapons_blessing => SHARPENED_WEAPONS_BLESSING_BIT,
         .arcane_ward_blessing => ARCANE_WARD_BLESSING_BIT,
+        .warding_mane_blessing => WARDING_MANE_BLESSING_BIT,
         .rallying_volley_blessing => RALLYING_VOLLEY_BLESSING_BIT,
         else => 0,
     };
@@ -204,6 +212,7 @@ const Census = struct {
     sylvan: TeamPowers = .{},
     sharpened: TeamPowers = .{},
     arcane: TeamPowers = .{},
+    mane: TeamPowers = .{},
     rally: TeamPowers = .{},
     /// Per unit index: the blessing bits it carries.
     carriers: [st.MAX_UNITS]u32 = undefined,
@@ -228,6 +237,14 @@ inline fn onGrid(u: *const Unit) bool {
 /// Unit.calculateArcaneWardBlessingPower: Number((power + getLuck()).toFixed(2)).
 fn arcaneWardPower(u: *const Unit, a: *const Ability) f64 {
     return js.toFixed(a.power + engine.getLuck(u), 2);
+}
+
+/// Unit.calculateWardingManeBlessingPower: toFixed((power / 5) * clamp(stack power, 0, 5) * max(0, 1 + luck / 100), 2).
+fn wardingManePower(u: *const Unit, a: *const Ability) f64 {
+    const sp = @max(0, @min(MAX_UNIT_STACK_POWER, engine.getStackPower(u)));
+    const scaled = (a.power / MAX_UNIT_STACK_POWER) * sp;
+    const luck_multiplier = @max(0, 1 + engine.getLuck(u) / 100);
+    return js.toFixed(scaled * luck_multiplier, 2);
 }
 
 /// UnitsHolder.captureBlessingCensus (holder order; dead and off-board units are carriers, never sources).
@@ -263,6 +280,10 @@ fn captureCensus(s: *const State) Census {
         if (u.ability(.arcane_ward_blessing)) |a| {
             c.arcane.v[team] = js.max(if (c.arcane.set[team]) c.arcane.v[team] else 0, arcaneWardPower(u, a));
             c.arcane.set[team] = true;
+        }
+        if (u.ability(.warding_mane_blessing)) |a| {
+            c.mane.v[team] = js.max(if (c.mane.set[team]) c.mane.v[team] else 0, wardingManePower(u, a));
+            c.mane.set[team] = true;
         }
         if (u.ability(.rallying_volley_blessing)) |a| {
             c.rally.v[team] = js.max(if (c.rally.set[team]) c.rally.v[team] else 0, a.power);
@@ -344,6 +365,7 @@ pub fn refreshBlessings(s: *State) void {
     // The other STACK_BLESSINGS after Luck Blessing (Sylvan Focus; Tie up the Horses and Wolf Trail are not in scope).
     reapply(s, &c, &c.sylvan, SYLVAN_FOCUS_BLESSING_BIT, .sylvan_focus_blessing, .all, false);
     reapply(s, &c, &c.arcane, ARCANE_WARD_BLESSING_BIT, .arcane_ward_blessing, .all, false);
+    reapply(s, &c, &c.mane, WARDING_MANE_BLESSING_BIT, .warding_mane_blessing, .all, false);
     reapply(s, &c, &c.sharpened, SHARPENED_WEAPONS_BLESSING_BIT, .sharpened_weapons_blessing, .melee_or_magic, true);
     reapply(s, &c, &c.rally, RALLYING_VOLLEY_BLESSING_BIT, .rallying_volley_blessing, .ranged, false);
 }
@@ -355,7 +377,7 @@ pub fn refreshBlessings(s: *State) void {
 /// Unit.calculateAuraPower(auraEffect, the emitter's team ability power), for the power types the loader accepts.
 pub fn auraPower(u: *const Unit, def: *const st.AuraDef) f64 {
     return switch (def.power_type) {
-        PT.ADDITIONAL_BASE_ATTACK_AND_ARMOR, PT.POISON_ON_HIT, PT.DISABLE_FLY_MOVEMENT => def.power,
+        PT.ADDITIONAL_BASE_ATTACK_AND_ARMOR, PT.POISON_ON_HIT, PT.DISABLE_FLY_MOVEMENT, PT.DISABLE_RANGE_ATTACK, PT.UNTARGETABLE => def.power,
         PT.ABSORB_DEBUFF => blk: {
             var coeff: f64 = 1;
             coeff += (def.power / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + (engine.getLuck(u) + u.syn_power) / 100 +
@@ -364,6 +386,12 @@ pub fn auraPower(u: *const Unit, def: *const st.AuraDef) f64 {
         },
         else => unreachable, // refused at load
     };
+}
+
+/// hasAuraEffect(name): the unit's aura list holds that def (not Break-aware).
+inline fn holdsAura(u: *const Unit, def: u8) bool {
+    for (u.auras[0..u.n_auras]) |d| if (d == def) return true;
+    return false;
 }
 
 /// Unit.cleanAuraEffects: every row whose laps are MAX_SAFE_INTEGER goes, with every other row of its name
@@ -466,12 +494,15 @@ pub fn refreshAuras(s: *State) void {
             }
             for (cell_rows.em[0..cell_rows.len]) |ei| rows.offer(ems[0..n_ems], ei);
         }
-        // applyAuraEffectToUnit -> canApplyAuraEffect (the Web lands on flyers only; true for the other power types
+        // applyAuraEffectToUnit -> canApplyAuraEffect (the Web lands on flyers only, the Range Null Field on RANGE
+        // creatures, Disguise on units that hold the aura and an active Disguise Aura; true for the other power types
         // in scope) -> applyAuraEffect (a buff row, or a debuff row for an is_buff false aura)
         for (rows.em[0..rows.len]) |ei| {
             const e = ems[ei];
             const def = &s.aura_defs[e.def];
             if (def.power_type == PT.DISABLE_FLY_MOVEMENT and !engine.canFly(u)) continue;
+            if (def.power_type == PT.DISABLE_RANGE_ATTACK and u.attack_type != AT.RANGE) continue;
+            if (def.power_type == PT.UNTARGETABLE and !(holdsAura(u, e.def) and u.has(.disguise_aura))) continue;
             const row = st.AppliedSpell{
                 .id = def.buff,
                 .laps = st.LAPS_AURA,
@@ -545,6 +576,85 @@ pub fn stun(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     replaceChecked(s, &to.effects, .{ .id = .stun, .laps = laps, .power = a.effect_power });
 }
 
+/// processDeepWoundsAbility(from, target, currentActiveUnit): the holder's active cards (Level 0 to 3, in that order,
+/// Break-aware) sum (power / 5) * stack power, then luck and the team's ability power once, floored at 0 and toFixed(1);
+/// a positive sum is added to the target's "Deep Wounds" row (delete + append, toFixed(1)), laps 3 or 4 on the active
+/// unit. A killing hit wounds nobody. No roll.
+pub fn deepWounds(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    const to = &s.units[to_i];
+    if (to.isDead()) return;
+    const from = &s.units[from_i];
+    if (from.ability_mask & st.AbilityId.DEEP_WOUNDS_MASK == 0) return;
+    var stacked: f64 = 0;
+    var laps: f64 = 0;
+    var held = false;
+    inline for (st.AbilityId.DEEP_WOUNDS) |id| {
+        if (from.ability(id)) |a| {
+            stacked += (a.power / MAX_UNIT_STACK_POWER) * engine.getStackPower(from) + 0;
+            if (!held) laps = a.effect_laps;
+            held = true;
+        }
+    }
+    if (!held) return;
+    const sum = js.toFixed(@max(0, stacked + engine.getLuck(from) + from.syn_power), 1);
+    if (sum == 0) return;
+    const total = js.toFixed((to.effects.power(.deep_wounds) orelse 0) + sum, 1);
+    replaceChecked(s, &to.effects, .{ .id = .deep_wounds, .laps = if (to_i == active_i) extendLaps(laps) else laps, .power = total });
+}
+
+/// hasAnyDeepWoundsAbility / calculateActiveDeepWoundsEffect's holder test: any of the four cards, Break-aware.
+pub inline fn holdsDeepWounds(u: *const Unit) bool {
+    if (u.ability_mask & st.AbilityId.DEEP_WOUNDS_MASK == 0 or u.isBroken()) return false;
+    return true;
+}
+
+/// calculateActiveDeepWoundsEffect(attacker, target): the target's row power when the attacker holds a card, else 0.
+pub inline fn activeDeepWounds(att: *const Unit, tgt: *const Unit) f64 {
+    if (tgt.effects.len == 0) return 0;
+    const p = tgt.effects.power(.deep_wounds) orelse return 0;
+    if (p == 0 or !holdsDeepWounds(att)) return 0;
+    return p;
+}
+
+/// processBoarSalivaAbility(from, target, currentActiveUnit): an un-Saliva'd living target gets the effect, power
+/// toFixed(1 * ((max(1 if < 0, 30 + luck + syn) / 100 / 5) * stack power) * 100, 2) of the holder, laps 3 (4 on the
+/// active unit), unless Madness resists it (after the power is set). No roll in scope (the mind-resist save needs an
+/// artifact).
+pub fn boarSaliva(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    const to = &s.units[to_i];
+    if (to.isDead()) return;
+    const from = &s.units[from_i];
+    const a = from.ability(.boar_saliva) orelse return;
+    if (to.effects.find(.boar_saliva) != null) return;
+    var combined = @as(f64, a.effect_power) + engine.getLuck(from) + from.syn_power;
+    if (combined < 0) combined = 1;
+    var coeff: f64 = 1;
+    coeff *= (combined / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(from);
+    const power = js.toFixed(coeff * 100, 2);
+    const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
+    if (a.ty == st.AbilityKind.MIND and to.has(.madness)) return; // hasMindAttackResistance (no Mechanism in scope)
+    replaceChecked(s, &to.effects, .{ .id = .boar_saliva, .laps = laps, .power = power });
+}
+
+/// processTerrifyingGazeAbility(from, target, currentActiveUnit): the roll getRandomInt(0, 100) < applyChance (drawn on
+/// a frightened or Madness target too); a frightened target is re-pointed at this gazer (its laps unchanged), Madness
+/// resists, else the effect (laps 1, extended on the active unit) and the forbidden gazer's uid.
+pub fn terrifyingGaze(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    const to = &s.units[to_i];
+    if (to.isDead()) return;
+    const from = &s.units[from_i];
+    const a = from.ability(.terrifying_gaze) orelse return;
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) >= applyChance(from, a) * 1) return; // terrifying_gaze_ability.ts:45
+    if (to.effects.find(.terrifying_gaze) != null) {
+        to.forbidden = from.uid;
+        return;
+    }
+    const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
+    if (a.ty == st.AbilityKind.MIND and to.has(.madness)) return;
+    replaceChecked(s, &to.effects, .{ .id = .terrifying_gaze, .laps = laps, .power = a.effect_power });
+    to.forbidden = from.uid;
+}
+
 /// processMinerAbility(attacker, target): Number(calculateAbilityCount(...).toFixed(2)) base armor moves from the
 /// target's INITIAL base armor (floored at 1) to the attacker's; the live values follow at the next stat refresh. The
 /// target's "Miner" debuff (laps 15) holds the running total. No roll.
@@ -581,7 +691,7 @@ pub fn assimilationPoison(s: *State, att_i: u8, tgt_i: u8, damage: f64) void {
 
 /// LUCK_DEPENDENT_BLESSINGS (units_holder.ts) among the ported abilities: the early luck pass reads card names.
 pub inline fn isLuckDependentCard(id: st.AbilityId) bool {
-    return id == .sharpened_weapons_blessing or id == .arcane_ward_blessing;
+    return id == .sharpened_weapons_blessing or id == .arcane_ward_blessing or id == .warding_mane_blessing;
 }
 
 /// Unit.removeAbilityMechanics for an ability leaving the active list: its aura effect goes unless another active
@@ -755,11 +865,83 @@ pub fn assimilate(s: *State, thief_i: u8, target_i: u8) void {
     grantStolen(s, thief, ability, &entries);
 }
 
+/// Unit.deleteAbility for a giftable card leaving its caster: the active ability (if it is in the list), the stolen mark
+/// and removeAbilityMechanics (its aura, its castable spell's direct entries and a re-parse). Returns the ability as it
+/// was, or null when the unit does not hold it.
+pub fn deleteAbility(s: *State, u: *Unit, id: st.AbilityId) ?Ability {
+    var idx: ?usize = null;
+    for (u.abilities[0..u.n_abilities], 0..) |a, k| {
+        if (a.id == id) idx = k;
+    }
+    var k: usize = 0;
+    while (k < u.n_stolen) {
+        if (u.stolen[k] == id) {
+            var j = k;
+            while (j + 1 < u.n_stolen) : (j += 1) u.stolen[j] = u.stolen[j + 1];
+            u.n_stolen -= 1;
+        } else k += 1;
+    }
+    const i = idx orelse return null;
+    const ability = u.abilities[i];
+    var j = i;
+    while (j + 1 < u.n_abilities) : (j += 1) u.abilities[j] = u.abilities[j + 1];
+    u.n_abilities -= 1;
+    u.ability_mask &= ~id.bit();
+    removeAbilityMechanics(s, u, &ability);
+    return ability;
+}
+
+/// Unit.addAbility (a gift): nothing when the unit already has it active or lost the card to Predatory Assimilation;
+/// else registerAbility: the ability appended, its aura, and for a castable card one ":X" entry unless a direct entry
+/// exists, then a re-parse. Returns whether the ability arrived.
+pub fn addAbility(s: *State, u: *Unit, a: Ability) bool {
+    if (u.activeAbility(a.id) != null) return false;
+    for (u.stolen[0..u.n_stolen]) |x| if (x == a.id) return false;
+    if (u.n_abilities >= st.MAX_ABILITIES) {
+        s.overflow = true;
+        return false;
+    }
+    u.abilities[u.n_abilities] = a;
+    u.n_abilities += 1;
+    u.ability_mask |= a.id.bit();
+    if (isLuckDependentCard(a.id)) u.luck_dependent = true;
+    if (a.aura != st.NO_AURA) {
+        var present = false;
+        for (u.auras[0..u.n_auras]) |x| if (x == a.aura) {
+            present = true;
+        };
+        if (!present) {
+            if (u.n_auras >= st.MAX_UNIT_AURAS) {
+                s.overflow = true;
+            } else {
+                u.auras[u.n_auras] = a.aura;
+                u.n_auras += 1;
+            }
+        }
+    }
+    if (a.id.castable()) |spell| {
+        var direct = false;
+        for (u.book[0..u.n_book]) |e| if (isDirectEntry(e, spell)) {
+            direct = true;
+        };
+        if (!direct) {
+            if (u.n_book >= st.MAX_BOOK) {
+                s.overflow = true;
+            } else {
+                u.book[u.n_book] = .{ .spell = @intFromEnum(spell), .prefix = st.BookEntry.NO_FACTION };
+                u.n_book += 1;
+            }
+        }
+        if (!engine.parseBook(u)) s.overflow = true;
+    }
+    return true;
+}
+
 /// isEquipmentOrMarkerSpellName for the names in scope: augments, Morale/Dismorale and the army blessings (the stack
 /// blessings included).
 pub fn isMarkerSpell(id: st.SpellId) bool {
     return id.isAugment() or switch (id) {
-        .morale, .dismorale, .luck_blessing, .sylvan_focus_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .ember_covenant_blessing => true,
+        .morale, .dismorale, .luck_blessing, .sylvan_focus_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .ember_covenant_blessing, .hidden, .visible, .warding_mane_blessing => true,
         else => false,
     };
 }
@@ -961,4 +1143,44 @@ test "Break turns abilities, auras and skip-response off while it lasts" {
     try std.testing.expect(!u.has(.dodge)); // absent stays absent
     u.effects.delete(.break_);
     try std.testing.expect(u.has(.lightning_spin));
+}
+
+test "Boar Saliva is the striker's first miss term, Dodge and Small Specie follow" {
+    var att = std.mem.zeroes(Unit);
+    var enemy = std.mem.zeroes(Unit);
+    att.stack_power = 1;
+    enemy.stack_power = 1;
+    try std.testing.expectEqual(@as(f64, 0), missChance(&att, &enemy));
+    att.effects.replace(.{ .id = .boar_saliva, .laps = 3, .power = 7.8 });
+    try std.testing.expectEqual(@as(f64, 7), missChance(&att, &enemy)); // floor(0.078 * 100)
+    enemy.abilities[0] = .{ .id = .dodge, .power = 20, .power_type = PT.APPLY_EFFECT, .ty = 0, .stack_powered = true, .skip_response = false };
+    enemy.n_abilities = 1;
+    enemy.ability_mask = st.AbilityId.dodge.bit();
+    // 1 - (1 - 0.078) * (1 - 0.04) = 0.11488
+    try std.testing.expectEqual(@as(f64, 11), missChance(&att, &enemy));
+}
+
+test "Deep Wounds sums the held cards in level order, then luck and ability power once" {
+    var s = std.mem.zeroes(State);
+    s.n_units = 2;
+    const from = &s.units[0];
+    from.stack_power = 3;
+    from.luck = -1;
+    from.syn_power = 0.5;
+    from.abilities[0] = .{ .id = .deep_wounds_level_2, .power = 10, .effect_laps = 3, .power_type = PT.APPLY_EFFECT, .ty = 0, .stack_powered = true, .skip_response = false };
+    from.abilities[1] = .{ .id = .deep_wounds_level_1, .power = 6, .effect_laps = 3, .power_type = PT.APPLY_EFFECT, .ty = 0, .stack_powered = true, .skip_response = false };
+    from.n_abilities = 2;
+    from.ability_mask = st.AbilityId.deep_wounds_level_1.bit() | st.AbilityId.deep_wounds_level_2.bit();
+    s.units[1].amount_alive = 1;
+    deepWounds(&s, 0, 1, 0);
+    // (6/5)*3 + (10/5)*3 - 1 + 0.5 = 9.1, laps 3 off the active unit
+    try std.testing.expectEqual(@as(f64, 9.1), s.units[1].effects.power(.deep_wounds).?);
+    try std.testing.expectEqual(@as(f64, 3), s.units[1].effects.items[0].laps);
+    deepWounds(&s, 0, 1, 1);
+    try std.testing.expectEqual(@as(f64, 18.2), s.units[1].effects.power(.deep_wounds).?);
+    try std.testing.expectEqual(@as(f64, 4), s.units[1].effects.items[0].laps);
+    try std.testing.expectEqual(@as(f64, 18.2), activeDeepWounds(from, &s.units[1]));
+    s.units[1].amount_alive = 0;
+    deepWounds(&s, 0, 1, 0); // a killing hit wounds nobody
+    try std.testing.expectEqual(@as(f64, 18.2), s.units[1].effects.power(.deep_wounds).?);
 }

@@ -6,8 +6,8 @@
 //! names the stored properties of aura rows and augments only ("x;y"); other rows print ";" (TypeScript prints a
 //! blessing's power there, which the port keeps as the row's power). The batch-3 columns follow the setup columns
 //! (abilities, stolen abilities, the Web lock, `debuffs_sources` with the same rule as `buffs_sources`, the Rallying
-//! Volley arrows), then the spellbook columns (`spell_entries`, `spellbook`); the fight block carries the vines. Ids come
-//! from `ids` by uid; a unit summoned after the table was built prints its UUID.
+//! Volley arrows), then the spellbook columns (`spell_entries`, `spellbook`), then the batch-4 `forbidden_target`; the
+//! fight block carries the vines. Ids come from `ids` by uid; a unit summoned after the table was built prints its UUID.
 
 const std = @import("std");
 const st = @import("state.zig");
@@ -62,6 +62,14 @@ fn idOf(s: *const State, ids: []const []const u8, slot: usize, buf: *[36]u8) []c
     const u = &s.units[slot];
     if (u.uid < ids.len) return ids[u.uid];
     return uuid.format(&u.uuid, buf);
+}
+
+/// The id of uid `uid` without an entry in the id table: the UUID of the slot holding it ("?" when none does).
+fn uidText(s: *const State, uid: u8, buf: *[36]u8) []const u8 {
+    for (s.units[0..s.n_units]) |*x| {
+        if (x.uid == uid and x.uuid_ok) return uuid.format(&x.uuid, buf);
+    }
+    return "?";
 }
 
 fn idList(w: *Writer, s: *const State, ids: []const []const u8, items: []const u8) Writer.Error!void {
@@ -198,7 +206,10 @@ pub fn write(w: *Writer, s: *const State, ids: []const []const u8) Writer.Error!
             if (i > 0) try w.writeByte(',');
             try w.print("{s}:{d}", .{ spellName(b.spell), b.amount });
         }
-        try w.writeAll("\"]");
+        // Batch-4 column: Terrifying Gaze's forbidden target (the gazer's id, "" for none).
+        try w.writeAll("\",");
+        try str(w, if (u.forbidden != st.NO_UID and u.forbidden < ids.len) ids[u.forbidden] else if (u.forbidden != st.NO_UID) uidText(s, u.forbidden, &id_buf) else "");
+        try w.writeByte(']');
     }
     const f = &s.fight;
     try w.print("],\"fight\":{{\"lap\":{d},\"started\":{d},\"finished\":{d},\"firstTurnMade\":{d},\"previousTurnTeam\":{d},\"highestInitiative\":", .{

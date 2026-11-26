@@ -48,7 +48,7 @@ throws at export). Tags: `{$map: [[k, v]...]}`, `{$set: [...]}`, `{$denque: [...
 | `holder` | UnitsHolder's: distances, Ember Covenant, the aura refresh caches |
 | `aiTargetMemory` | `[[attackerId, targetId]...]` (ai.ts previousTargetsByBattle) |
 | `damageStatLaps` | the laps of the damage-statistic entries (runMatch's `damageDealtThisLap` reads them) |
-| `configs` | `{abilityConfigs, effectConfigs, auraEffectConfigs, spellConfigs, summonTemplates?}`: the configs of every ability and aura on the board, Poison, Break and the Ember Covenant spell, in the shape of a recording's start state (`spellConfigs` gains the System "Vine Throw" while vines stand; a book spell's config travels in its Spell object); with an Infest unit on the board, the summon templates (createUnitFromSpec's props of "Arachna Spider" and "Arachna Queen") and their abilities' and auras' configs; with a summon spell entry or a summoned Wolf, the "Wolf" template |
+| `configs` | `{abilityConfigs, effectConfigs, auraEffectConfigs, spellConfigs, summonTemplates?}`: the configs of every ability and aura on the board, Poison, Break and the Ember Covenant spell, in the shape of a recording's start state (`spellConfigs` gains the System "Vine Throw" while vines stand; a book spell's config travels in its Spell object); with an Infest unit on the board, the summon templates (createUnitFromSpec's props of "Arachna Spider" and "Arachna Queen") and their abilities' and auras' configs; with a summon spell entry or a summoned Wolf, the "Wolf" template; with a Disguise Aura card, the System "Hidden" and "Visible" configs (the markers the stat refresh writes) |
 | `setup` | `{lapsTillNarrowing, perTeam: {"2": {...}, "1": {...}}}`: getAdditionalAbilityPower / MovementSteps / FlyArmor / Morale / Luck / Supply / AuraRange PerTeam and getBreakChancePerTeam |
 | `harness` | optional `{rng, activeUnitId, uuidSequence, seed?, summonSequence?, armyProfile?}`: the mulberry32 state, runMatch's currentActiveUnitId ("" = none), lib.ts deterministicUuidSequence, the parts of a summon's id (the battle seed and runMatch's createSummonedUnit counter; without them a summon cannot be named, and the play-out reports the overflow), and v0.7's army profile per team (below) |
 
@@ -85,6 +85,8 @@ Read into the Zig `State` (`snapshot.zig`):
 | `State.summons`, `summon_seq`, `uuid_seq`, `seed`, `next_uid` | `configs.summonTemplates` (interned), `harness.summonSequence`, `harness.uuidSequence`, `harness.seed`; the caller's next uid (default: the id list's length) |
 | the handle's creature names (by `name_id`) and army profiles | `units[].name` and the summon templates' names; `harness.armyProfile` |
 | `target` | `props.target` |
+| `forbidden` | `props.forbidden_target` (Terrifying Gaze's lock: the gazer's id as its uid, a removed gazer's too) |
+| `State.disguise_range`, `hidden_*`, `visible_*` | `configs.auraEffectConfigs.Disguise`, `configs.spellConfigs.Hidden` / `.Visible` |
 | `name_id`, `creature_id` | `name`, `creatureId` |
 | `reg`, `grid.board`, `grid.aggr` | `cellsByUnitId`, `boardCoord` ("" / id / "H" / "B" / "L"), `boardAggrPerTeam` |
 | `grid.terrain`, `fight.hits_*` | `scatteredMountainLayout`, `scatteredMountainsStanding` (packed `(x << 8) \| y`), the cleared sides, `cleanedUpCenter`, `obstacleHitsLeft*`; every "B" and "L" must be where the terrain says |
@@ -97,8 +99,8 @@ Read into the Zig `State` (`snapshot.zig`):
 
 Unit ids and slots: a unit's uid is its index in the id list: with a recording, the recording's ids (start units, then
 `summonIds`; `hoc-sim resume` passes the next uid from the point's `summonsCreated`); without one (the C ABI), the
-holder's units in order, then the ids of removed units that the turn sets, the AI target memory or the distances still
-name (at most 255). The holder's units take slots 0.. in holder order; removed units named by the turn sets are kept by
+holder's units in order, then the ids of removed units that the turn sets, the AI target memory, the distances or a
+unit's forbidden target still name (at most 255). The holder's units take slots 0.. in holder order; removed units named by the turn sets are kept by
 uid (`Fight.removed_*`); AI memory and distance entries of removed units are dropped (a removed id matches no living
 unit again). The handle keeps the id strings: requests and digests speak ids, and `hoc_play_v01` appends the ids of
 the units it summons (`rollout.SummonIds`).
@@ -113,10 +115,10 @@ maps (their effect arrives through the buffs and `setup`), `teamsAuraEffects`, `
 
 Refused as an unsupported state (the loader names what it found): summoned units other than the creatures Infest and
 Summon Wolves raise, and non-creature units; a spell outside wave 1 (by name, in the raw entries or the Spell objects),
-more spell entries or spells than the book holds (16/6); artifact-granted abilities; a forbidden target; Helping Hand;
+more spell entries or spells than the book holds (16/6); artifact-granted abilities; Helping Hand;
 ranked `*_authoritative` stats; a spent Water Shield; Last Fuse; Warlord's Edge or a War Anger attack increase; an
 unported ability, aura, buff, debuff or effect; effect stacks other than Poison's; more buffs, debuffs, effects, active
-or stolen abilities than the lists hold (16/6/7/10/6); WATER_CENTER or a water cell; artifact barrels; artifacts;
+or stolen abilities than the lists hold (20/8/10/10/6); WATER_CENTER or a water cell; artifact barrels; artifacts;
 legacy-axis seats; smoke clouds or fire walls; more than 96 vines; a unit on lava or terrain the board lost; more than
 32 units in the holder or 255 ids; units out of holder order. Malformed input (a missing field, a wrong type, an id no
 list knows, vines without the Vine Throw config) is reported as a malformed state.
@@ -159,7 +161,7 @@ struct RolloutStats { uint64_t turns; uint32_t written; int32_t stop;
   swap names. A refused state reads "unsupported state: ...", a refused request "unsupported request: ...", a rollout that
   reached unported code "unsupported rollout: ..."; the caller falls back to TypeScript for that decision.
 - `hoc_state_digest_json` writes `{units, fight, active, rng}` with the record.ts digest columns (setup, terrain,
-  batch-3 and spellbook columns and the fight's `vines` always on; `buffs_sources` and `debuffs_sources` name aura and
+  batch-3, spellbook and batch-4 `forbidden_target` columns and the fight's `vines` always on; `buffs_sources` and `debuffs_sources` name aura and
   augment rows only). `hoc_state_check_digest` takes a `parity/digest.ts` `battleDigest` and runs `compare.state`.
 
 ### `hoc_rollouts`: SearchDriver.rollout and leafValue
@@ -201,8 +203,8 @@ exact doubles.
   requires (`rng.Keyed` in `rng.zig` switches the source; `rollout.ActorChance`).
 - `policies`: `v0.1` (StrategyV0_1) or `v0.8` (the A19 composite's combat decideTurn: native StrategyV0_8 through
   src/v08's `decideV08`, production switches only; non-empty `switches` are refused). The policy is chosen per unit: a
-  mindless ("AI Driven") unit plays v0.1 whatever its seat (aiVersionForUnit; `rollout.isMindless`); no such unit is
-  in scope, since the loader refuses the unported "AI Driven" ability.
+  mindless ("AI Driven") unit plays v0.1 whatever its seat (aiVersionForUnit; `rollout.isMindless`: Berserker, Frenzied
+  Boar, a thief of the card; Break-aware, read at every turn), with the rollout's catalog like every rollout turn.
 - `leaf.kind`: `material` (no learned leaf), `v1` (the 20-feature DEFAULT_V07_VALUE_WEIGHTS logistic leaf) or `v2`
   (V08_A13_VALUE_LEAF over the 60 V2 features, what the A19 profile loads; src/v08's `util.leafV2`); `exactTerminal`
   (SEARCH_A19_EXACT_TERMINAL_RESULTS, on in production) scores a finished fight 1, 0 or 0.5 first. The research logit
@@ -211,7 +213,9 @@ exact doubles.
   team's last stack, an Abomination facing a lone enemy Abomination that some upcoming Armageddon wave kills first,
   defends instead of asking its policy (`isV08SoleAbominationArmageddonDefendOpportunity`; off by default, as for a
   SearchDriver built outside the profile).
-- `armyProfile` overrides the export's `harness.armyProfile` per team.
+- `armyProfile` overrides the export's `harness.armyProfile` per team. An aura-saturated profile is passed to src/v08
+  (`Request.aura_saturated`, `util.Battle.aura_saturated`): v0.7's v0.4 anchor is played where it equals the v0.4 level
+  (common `6998c2dd`), not refused.
 - Summons: the counters carry over from one rollout to the next and come back in `hoc_rollout_stats`, because
   TypeScript restores neither runMatch's createSummonedUnit counter nor lib.ts deterministicUuidSequence per rollout
   (later rollouts' summons get later ids, and the ids key the antithetic stream). `summonSequence` / `uuidSequence`
@@ -229,10 +233,11 @@ slot). A team without a profile is passed as melee_magic 255 (v0.7's finalizeDec
 port's anchor-army path; nothing else reads the count).
 
 Scope of the v0.8 policy (`rollout.v08Scope`, checked on the root; no ability can appear inside a rollout from a root
-without one): src/v08 is checked on ability-free battles and treats every ability, aura and ability-born buff as
-absent, so a request with a v0.8 seat is refused when any holder unit carries an ability, a stolen ability, an aura,
-ability state (a Web lock, Rallying Volley arrows, a forced target), a spell entry, or a buff, debuff or effect other
-than morale, dismorale, Break and the augments, or when an Ember Covenant ring or a vine stands. The two refusals for
+without one): src/v08 covers the abilities of batches 1 to 3 (common `4f5152ba` on), so a request with a v0.8 seat is
+refused when any holder unit holds a spell entry, when a vine stands, or when a unit holds a batch-4 card other than
+AI Driven (whose holders play v0.1) or carries batch-4 state (Deep Wounds, Boar Saliva or Terrifying Gaze effects;
+Disguise Aura, Hidden, Warding Mane or Battle Roar buffs; Range Null Field or Visible debuffs; a forbidden target),
+until src/v08 ports batch 4. The two refusals for
 src/v08 gaps (a removed unit in alreadyMadeTurn, an Angel or Queen with a synergy aura range) are gone: its owner fixed
 them (common `d5fddea9`, `6e6aff54`), and the holder-ordered copy the learned leaves were scored on went with them.
 
@@ -299,6 +304,24 @@ of the port (unit slots, ids, lists, 1,024 antithetic keys per rollout). Not mod
   calls with a unit digest, each v0.8 layer's output, the wait scorer's features, each decision; with `--digests` the
   digest.zig state at each decision), the format the scratch harness writes for the TypeScript side, so the first
   differing step shows where a rollout leaves TypeScript's.
+
+Results with batch 4 on 2026-11-25 (common `6998c2dd` plus this change; production-like setup, side boards, maps mixed
+by seed; the oracle's battles play native v0.8, so the roots carry Battle Roar rows, gifts, Hidden markers, forbidden
+targets, Deep Wounds and summoned Wolves with their cards):
+
+- v0.1 rollouts on roots with batch 4 kept: 350 battles, 725 roots, 696,000 values identical to `SearchDriver.rollout`,
+  the same 5,453,472 rollout turns, summon counters and turn-budget banks: batch 4 at keep rate 1 (seeds 24000000, 24800000, 33000000:
+  100 battles, 181 roots), with the Arachna Queen and Spider (and Monk, Squire; 24100000, 25600000, 33100000), with
+  batches 1 to 3 at the default rate (24200000, 24900000, 33200000), Griffin, White Tiger, Manticore, Troglodyte and
+  Monk (24300000), and with the server's summon ids (`SUMMON_IDS=uuid`, 24400000, 33300000).
+- v0.8 on both seats with Berserkers (AI Driven and Double Punch: the mindless pin live) and Arachna Queens that steal
+  it: 90 battles, 209 roots, 200,640 values and 2,238,300 rollout turns identical (seeds 24700000, 25900000, 33600000).
+- v0.8 ability-free (`KEEP=" "`): 260 battles, 604 roots, 579,840 values and 5,732,790 rollout turns identical, 0
+  refused (seeds 24500000, 24600000, 26000000, 33400000, 33500000).
+- v0.8 on batch-4 boards: refused at the request (60 battles, 110 roots; 3 roots compared and identical at keep rate
+  0.3, where no batch-4 card stood).
+- `ffi/smoke.ts`: 30 battles with batch 4 kept (26100000), 30 with batches 1 to 4 (26200000, 32800000), and the default
+  12 (9100), every check passing.
 
 Results with the wave-1 spells on 2026-11-25 (common `2f222cc0` plus this change; production-like setup, side boards,
 maps mixed by seed):

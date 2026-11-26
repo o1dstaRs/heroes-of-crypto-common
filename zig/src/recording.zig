@@ -50,6 +50,9 @@ pub const Step = struct {
     events: []const Event,
     /// Expected digest after the step (parity mode only).
     digest: ?std.json.Value,
+    /// A decide step of a mindless ("AI Driven") unit recorded under another RECORD_VERSION (`v: "v0.1"`): runMatch
+    /// decided it with StrategyV0_1 whatever the seat's version.
+    mindless: bool = false,
 };
 
 pub const Game = struct {
@@ -278,6 +281,7 @@ pub fn parseGameValue(arena: std.mem.Allocator, root: std.json.Value, keep_diges
             .ok = get(s, "ok") == .null or int(get(s, "ok")) == 1,
             .events = events,
             .digest = if (keep_digests and get(s, "s") != .null) get(s, "s") else null,
+            .mindless = get(s, "v") == .string and std.mem.eql(u8, get(s, "v").string, "v0.1"),
         };
     }
     return .{ .seed = int(get(root, "seed")), .ids = ids, .n_start = units.len, .init = init, .steps = steps };

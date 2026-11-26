@@ -11,15 +11,19 @@ const Rng = @import("rng.zig").Rng;
 pub const MAX_UNITS = 32;
 /// Distinct unit ids one battle can name (start units and summons): `Unit.uid` and recorded unit indices are u8.
 pub const MAX_UIDS = 255;
+/// No unit (uids are 0..MAX_UIDS-1).
+pub const NO_UID: u8 = 0xff;
 pub const GRID = 16;
-/// Buffs a unit can carry in scope: Morale, Luck Blessing, Sylvan Focus, Arcane Ward, Sharpened Weapons (melee or magic
-/// units) or Rallying Volley (shooters), Ember Covenant, three aura rows, the five augments and a cast Blessing (15),
-/// with one to spare. A push past a capacity sets State.overflow (the checks report it).
-pub const MAX_SPELLS = 16;
-/// Debuffs (Dismorale, Dulling Defense, Miner, the Web Aura row, the Vine Throw snare) and effects (Stun, Break, Poison,
-/// Aggr, Shatter Armor, Pegasus Light), one to spare each.
-pub const MAX_DEBUFFS = 6;
-pub const MAX_EFFECTS = 7;
+/// Buffs a unit can carry in scope: Morale, Luck Blessing, Sylvan Focus, Arcane Ward, Warding Mane, Sharpened Weapons
+/// (melee or magic units) or Rallying Volley (shooters), Ember Covenant, four aura rows (Disguise among them), the five
+/// augments, a cast Blessing, Battle Roar and the Hidden marker (19), with one to spare. A push past a capacity sets
+/// State.overflow (the checks report it).
+pub const MAX_SPELLS = 20;
+/// Debuffs (Dismorale, Dulling Defense, Miner, the Web Aura and Range Null Field Aura rows, the Vine Throw snare, the
+/// Visible marker) and effects (Stun, Break, Poison, Aggr, Shatter Armor, Pegasus Light, Deep Wounds, Boar Saliva,
+/// Terrifying Gaze), one to spare each.
+pub const MAX_DEBUFFS = 8;
+pub const MAX_EFFECTS = 10;
 
 pub const Team = struct {
     pub const NO_TEAM: u8 = 0;
@@ -84,6 +88,24 @@ pub const SpellId = enum(u8) {
     vine_throw,
     /// The Satyr's stack blessing: a magic-damage bonus percentage on every ally.
     sylvan_focus_blessing,
+    // batch 4
+    /// The stacking Deep Wounds effect (Wolf, Tiger, Griffin, Manticore, Behemoth): a holder's strikes deal power% more.
+    deep_wounds,
+    /// Frenzied Boar's effect on its victim: the first term of the victim's own miss chance.
+    boar_saliva,
+    /// Manticore's effect: the frightened unit may not attack or answer its gazer (Unit.forbidden).
+    terrifying_gaze,
+    /// The Griffin's debuff aura row on enemy shooters: no ranged attack while it stands.
+    range_null_field_aura,
+    /// The White Tiger's own buff aura row (it lands only on Disguise holders).
+    disguise_aura,
+    /// The Disguise markers (System spells, 1 lap): Hidden (a buff: untargetable) or Visible (a debuff).
+    hidden,
+    visible,
+    /// Manticore's census blessing: a magic-resist term on every ally.
+    warding_mane_blessing,
+    /// Behemoth's mass cast: +power steps_mod and maximum damage rolls.
+    battle_roar,
 
     pub fn name(self: SpellId) []const u8 {
         return switch (self) {
@@ -114,6 +136,15 @@ pub const SpellId = enum(u8) {
             .blessing => "Blessing",
             .vine_throw => "Vine Throw",
             .sylvan_focus_blessing => "Sylvan Focus Blessing",
+            .deep_wounds => "Deep Wounds",
+            .boar_saliva => "Boar Saliva",
+            .terrifying_gaze => "Terrifying Gaze",
+            .range_null_field_aura => "Range Null Field Aura",
+            .disguise_aura => "Disguise Aura",
+            .hidden => "Hidden",
+            .visible => "Visible",
+            .warding_mane_blessing => "Warding Mane Blessing",
+            .battle_roar => "Battle Roar",
         };
     }
 
@@ -266,6 +297,24 @@ pub const AbilityId = enum(u8) {
     tome_of_elements,
     magic_reflection,
     sylvan_focus_blessing,
+    // batch 4
+    /// The mindless pin: the unit plays v0.1 whatever its seat (no engine reader).
+    ai_driven,
+    deep_wounds_level_0,
+    deep_wounds_level_1,
+    deep_wounds_level_2,
+    deep_wounds_level_3,
+    boar_saliva,
+    range_null_field_aura,
+    sky_runner,
+    disguise_aura,
+    warding_mane_blessing,
+    terrifying_gaze,
+    unyielding_power,
+    /// Castable: one ":Battle Roar" charge, a mass cast on every ally.
+    battle_roar,
+    /// Castable and giftable: the regeneration at activation, and the ":Wild Regeneration" charge that gives it away.
+    wild_regeneration,
 
     pub fn name(self: AbilityId) []const u8 {
         return switch (self) {
@@ -316,6 +365,20 @@ pub const AbilityId = enum(u8) {
             .tome_of_elements => "Tome of Elements",
             .magic_reflection => "Magic Reflection",
             .sylvan_focus_blessing => "Sylvan Focus Blessing",
+            .ai_driven => "AI Driven",
+            .deep_wounds_level_0 => "Deep Wounds Level 0",
+            .deep_wounds_level_1 => "Deep Wounds Level 1",
+            .deep_wounds_level_2 => "Deep Wounds Level 2",
+            .deep_wounds_level_3 => "Deep Wounds Level 3",
+            .boar_saliva => "Boar Saliva",
+            .range_null_field_aura => "Range Null Field Aura",
+            .sky_runner => "Sky Runner",
+            .disguise_aura => "Disguise Aura",
+            .warding_mane_blessing => "Warding Mane Blessing",
+            .terrifying_gaze => "Terrifying Gaze",
+            .unyielding_power => "Unyielding Power",
+            .battle_roar => "Battle Roar",
+            .wild_regeneration => "Wild Regeneration",
         };
     }
 
@@ -337,10 +400,24 @@ pub const AbilityId = enum(u8) {
         };
     }
 
-    /// The spell a castable ability carries (`can_be_cast`, makeAbility's System spell): Vine Throw only in scope.
+    /// The spell a castable ability carries (`can_be_cast`, makeAbility's System spell): Vine Throw, Battle Roar and
+    /// Wild Regeneration in scope.
     pub inline fn castable(self: AbilityId) ?CastSpell {
-        return if (self == .vine_throw) .vine_throw else null;
+        return switch (self) {
+            .vine_throw => .vine_throw,
+            .battle_roar => .battle_roar,
+            .wild_regeneration => .wild_regeneration,
+            else => null,
+        };
     }
+
+    /// DEEP_WOUNDS_ABILITY_NAMES (deep_wounds_ability.ts), the order processDeepWoundsAbility sums the cards in.
+    pub const DEEP_WOUNDS = [_]AbilityId{ .deep_wounds_level_0, .deep_wounds_level_1, .deep_wounds_level_2, .deep_wounds_level_3 };
+    pub const DEEP_WOUNDS_MASK: AbilityMask = blk: {
+        var m: AbilityMask = 0;
+        for (DEEP_WOUNDS) |id| m |= id.bit();
+        break :blk m;
+    };
 
     pub fn fromName(n: []const u8) ?AbilityId {
         inline for (std.meta.fields(AbilityId)) |f| {
@@ -371,6 +448,9 @@ pub const CastSpell = enum(u8) {
     summon_wolves,
     vine_throw,
     ring_of_fire,
+    // batch 4: castable abilities
+    battle_roar,
+    wild_regeneration,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -383,6 +463,8 @@ pub const CastSpell = enum(u8) {
             .summon_wolves => "Summon Wolves",
             .vine_throw => "Vine Throw",
             .ring_of_fire => "Ring of Fire",
+            .battle_roar => "Battle Roar",
+            .wild_regeneration => "Wild Regeneration",
         };
     }
 
@@ -399,8 +481,14 @@ pub const CastSpell = enum(u8) {
         return switch (self) {
             .blessing => .blessing,
             .vine_throw => .vine_throw,
+            .battle_roar => .battle_roar,
             else => null,
         };
+    }
+
+    /// The ability a giftable spell hands over (handleMagicAttack's giftable HEAL branch: the spell's own name).
+    pub fn gifted(self: CastSpell) ?AbilityId {
+        return if (self == .wild_regeneration) .wild_regeneration else null;
     }
 };
 
@@ -429,6 +517,8 @@ pub const SpellPower = struct {
 };
 pub const SpellMultiplier = struct {
     pub const NO_MULTIPLIER: u8 = 1;
+    /// The mass buff's power is the caster's creatures alive (Battle Roar).
+    pub const UNIT_AMOUNT: u8 = 2;
     pub const UNIT_AMOUNT_POWER: u8 = 3;
     pub const UNIT_AMOUNT_DAMAGE: u8 = 6;
 };
@@ -456,6 +546,9 @@ pub const SpellConfig = struct {
     self_cast: bool = false,
     /// conflicts_with names in scope (a SpellId a target can carry); names outside the port can never be carried.
     conflict: ?SpellId = null,
+    /// is_giftable / maximum_gift_level: a HEAL spell that hands its ability to an ally of at most that level.
+    is_giftable: bool = false,
+    max_gift_level: f64 = 0,
     loaded: bool = false,
 };
 
@@ -535,6 +628,16 @@ pub const PowerType = struct {
     pub const DISABLE_FLY_MOVEMENT: u8 = 51;
     pub const GAIN_ATTACK_AND_ARMOR_EACH_STEP: u8 = 44;
     pub const REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK: u8 = 47;
+    /// The Range Null Field aura (Griffin): it lands only on RANGE creatures and carries no power.
+    pub const DISABLE_RANGE_ATTACK: u8 = 17;
+    /// The Disguise aura (White Tiger): it lands only on its holders and carries no power.
+    pub const UNTARGETABLE: u8 = 46;
+};
+
+/// AbilityType values the ported processors branch on.
+pub const AbilityKind = struct {
+    /// A MIND ability (Aggr, Boar Saliva, Terrifying Gaze): Madness resists its effect.
+    pub const MIND: u8 = 13;
 };
 
 /// One configured ability (getAbilityConfig(name)), plus the default of the effect it applies, if any (effects.json
@@ -702,6 +805,9 @@ pub const Unit = struct {
     n_spells: u8 = 0,
     /// Unit.summoned: created by a summon (Infest, Summon Wolves); the merge target of a Summon Wolves cast.
     summoned: bool = false,
+    /// unitProperties.forbidden_target (Terrifying Gaze): the uid of the gazer this unit may not attack or answer
+    /// (NO_UID = ""). An id, not a slot: TypeScript keeps it after the gazer dies, until the effect is gone.
+    forbidden: u8 = NO_UID,
 
     pub fn isDead(self: *const Unit) bool {
         return self.amount_alive <= 0;
@@ -756,6 +862,16 @@ pub const Unit = struct {
     /// canMove(): no Paralysis or Whirlpool in scope, so only the Web lock taken at activation.
     pub inline fn canMove(self: *const Unit) bool {
         return !self.web_locked;
+    }
+
+    /// cannotAttackUnitId(id): the raw forbidden id (no liveness check, not Break-aware).
+    pub inline fn cannotAttack(self: *const Unit, target_uid: u8) bool {
+        return self.forbidden != NO_UID and self.forbidden == target_uid;
+    }
+
+    /// hasBuffActive("Hidden")
+    pub inline fn isHidden(self: *const Unit) bool {
+        return self.buffs.len != 0 and self.buffs.find(.hidden) != null;
     }
 
     /// The active ability of that id, Break ignored (the `abilities` array as TypeScript holds it).
@@ -1017,6 +1133,26 @@ pub const State = struct {
     summon_name_id: [N_SUMMONS]u16 = .{0xffff} ** N_SUMMONS,
     /// The configs of the spells the battle can cast (by CastSpell), and whether any unit holds a spell entry.
     spell_cfg: [N_CAST_SPELLS]SpellConfig = .{SpellConfig{}} ** N_CAST_SPELLS,
+    /// Batch-4 gates (loadScopeFlags): some unit can hold the Range Null Field aura (or carries its row), and some unit
+    /// can hold Disguise (or carries a Hidden / Visible marker). They keep the ability-free path free of the scans.
+    null_field: bool = false,
+    disguise: bool = false,
+    /// Some unit can hold Unyielding Power or Sky Runner: adjustBaseStats runs their hooks.
+    unit_hooks: bool = false,
+    /// Some unit can hold Terrifying Gaze (or is frightened at load): the forbidden-target gates and reset run.
+    gaze: bool = false,
+    /// The Disguise aura's configured range (the swap reads AuraEffect.getRange() of the config) and the System
+    /// "Hidden" / "Visible" markers' laps and powers (recorded `spellConfigs`).
+    disguise_range: f64 = 0,
+    hidden_laps: f64 = 1,
+    hidden_power: f64 = 0,
+    visible_laps: f64 = 1,
+    visible_power: f64 = 0,
+
+    /// cannotAttackUnitId on battles where a gaze can land (Unit.forbidden is never set otherwise).
+    pub inline fn forbids(self: *const State, u: *const Unit, target_uid: u8) bool {
+        return self.gaze and u.cannotAttack(target_uid);
+    }
 
     /// The holder's units in TypeScript's insertion order (`unitsHolder.getAllUnits()`): slot indices into `units`.
     /// Dead units stay until cleanupDeadUnits removes them. Without summons slots are never reused, so this is every

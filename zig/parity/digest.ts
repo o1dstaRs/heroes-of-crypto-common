@@ -5,7 +5,8 @@
  *
  * `setup` adds the setup columns (shot distance, initial base armor and steps), `terrain` the terrain block of the
  * fight digest (written on any board that is not the classic NORMAL one), `spells` the spellbook columns (after the
- * batch-3 columns, which it turns on) and the fight digest's vines.
+ * batch-3 columns, which it turns on) and the fight digest's vines, `batch4` the forbidden target (Terrifying Gaze's
+ * lock) as the last column (it turns the batch-3 columns on too).
  */
 
 export interface IDigestOptions {
@@ -15,9 +16,11 @@ export interface IDigestOptions {
     batch3?: boolean;
     /** The spellbook columns (the raw entries and the parsed book) and the fight's vines; implies `batch3`. */
     spells?: boolean;
+    /** The forbidden target column (the gazer's id or ""), after every other column; implies `batch3`. */
+    batch4?: boolean;
 }
 
-export function unitDigest(u: any, setup: boolean, batch3 = false, spells = false): unknown[] {
+export function unitDigest(u: any, setup: boolean, batch3 = false, spells = false, batch4 = false): unknown[] {
     const p = u.getUnitProperties();
     const c = u.getBaseCell();
     return [
@@ -76,7 +79,7 @@ export function unitDigest(u: any, setup: boolean, batch3 = false, spells = fals
         // Batch-3 columns: the active ability list (stolen ones included, Break ignored), the names the unit lost to
         // Predatory Assimilation, the Web movement lock, each debuff's stored properties (the Web row's source cell)
         // and the once-only Rallying Volley arrows.
-        ...(batch3 || spells
+        ...(batch3 || spells || batch4
             ? [
                   u.abilities.map((a: any) => a.getName()).join(","),
                   (p.stolen_abilities ?? []).join(","),
@@ -99,11 +102,13 @@ export function unitDigest(u: any, setup: boolean, batch3 = false, spells = fals
                       .join(","),
               ]
             : []),
+        // Batch-4 column: Terrifying Gaze's lock (the gazer's id; TypeScript keeps it after the gazer dies).
+        ...(batch4 ? [p.forbidden_target ?? ""] : []),
     ];
 }
 
 /** The column names of unitDigest, in order. */
-export function digestFields(setup: boolean, batch3 = false, spells = false): string[] {
+export function digestFields(setup: boolean, batch3 = false, spells = false, batch4 = false): string[] {
     return [
         "id",
         "amount_alive",
@@ -153,10 +158,11 @@ export function digestFields(setup: boolean, batch3 = false, spells = false): st
         "magic_resist",
         "buffs_sources",
         ...(setup ? ["shot_distance", "base_armor_init", "steps_init"] : []),
-        ...(batch3 || spells
+        ...(batch3 || spells || batch4
             ? ["abilities", "stolen_abilities", "web_locked", "debuffs_sources", "rallying_volley_granted"]
             : []),
         ...(spells ? ["spell_entries", "spellbook"] : []),
+        ...(batch4 ? ["forbidden_target"] : []),
     ];
 }
 
@@ -212,7 +218,7 @@ export function battleDigest(
 ): { units: unknown[][]; fight: Record<string, unknown> } {
     const units: unknown[][] = [];
     for (const u of ctx.unitsHolder.getAllUnits().values()) {
-        units.push(unitDigest(u, opts.setup, opts.batch3, opts.spells));
+        units.push(unitDigest(u, opts.setup, opts.batch3, opts.spells, opts.batch4));
     }
     const emberTeams = [...(ctx.unitsHolder.emberCovenantTeams ?? [])].sort();
     const fight: Record<string, unknown> = { ...fightDigest(ctx.fightProperties), emberTeams };
