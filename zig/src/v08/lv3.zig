@@ -24,12 +24,12 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     const u = c.unit();
     const rin = s.rng.state;
     defer policy.note("v0.3", out, s, rin);
-    // canMove() is true in scope.
-    if (u.attack_type == AT.RANGE and engine.getRangeShots(u) > 0 and !engine.canLandRangeAttack(s, u) and !meleeIsClearlyRight(c)) {
+    // No Melee is not in scope; a Handyman shooter melees without penalty, so it never retreats.
+    if (u.attack_type == AT.RANGE and engine.getRangeShots(u) > 0 and u.canMove() and !u.has(.handyman) and !engine.canLandRangeAttack(s, u) and !meleeIsClearlyRight(c)) {
         if (rangedRetreat(c, out)) return;
     }
     lv2.decide(c, out);
-    if (u.attack_type == AT.MELEE and shouldCohere(c)) _ = cohesionAdvance(c, out);
+    if (u.attack_type == AT.MELEE and u.canMove() and shouldCohere(c)) _ = cohesionAdvance(c, out);
 }
 
 /// StrategyV0_4.shouldCohere: no living enemy is an AoE unit.

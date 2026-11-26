@@ -1,15 +1,15 @@
 //! The v0.5 level of the v0.8 chain (src/ai/versions/v0_5.ts StrategyV0_5.decideTurn), default environment, with
 //! v0.8's learned weight vector (weights.zig: v0.6's weights with v0.8's melee dims).
 //!
-//! In scope (no spells or abilities) the pipeline is: v0.4, the learned mountain mining (mineByPolicy, BLOCK_CENTER),
-//! the learned melee re-rank (meleeByPolicy),
-//! the learned move re-rank (repositionByPolicy), the charge hourglass (hourglassByPolicy), the blocked-move guard
-//! (dropBlockedMove) and the free adjacent attack (takeAdjacentAttack). Identity in scope, so not ported:
-//! healerPolicy (no Healer spells), noMeleeRetreat (only No-Melee shooters can move: an ordinary shooter's score
-//! never beats its +Infinity start), aoeMeleeByPolicy (abilities),
-//! excludeHiddenAttack (no Hidden), auraFlyerSupport (no auras), meleeAuraSupport (V05_AURASUPPORT off) and
-//! repairUnavailableMovePrefixedAttack (no Fire Wall, no Cowardice). Zero-weight or always-zero score terms (War
-//! Anger, punish-melee, target caster, Rapid Charge, bait, Armageddon, Dulling swing, hazard, aura) add exactly 0.
+//! In scope (no spells; the abilities of batches 1-3) the pipeline is: v0.4, the learned mountain mining
+//! (mineByPolicy, BLOCK_CENTER), the learned melee re-rank (meleeByPolicy), the learned AoE stand (aoeMeleeByPolicy:
+//! Lightning Spin, Skewer Strike), the learned move re-rank (repositionByPolicy), the aura flyer's support
+//! (auraFlyerSupport), the charge hourglass (hourglassByPolicy), the blocked-move guard (dropBlockedMove) and the free
+//! adjacent attack (takeAdjacentAttack). Identity in scope, so not ported: healerPolicy (no Healer spells),
+//! noMeleeRetreat (only No-Melee shooters can move: an ordinary shooter's score never beats its +Infinity start),
+//! excludeHiddenAttack (no Hidden), meleeAuraSupport (V05_AURASUPPORT off) and repairUnavailableMovePrefixedAttack (no
+//! Fire Wall, no Cowardice). Zero-weight or always-zero score terms (War Anger, target caster, Rapid Charge (weight 0),
+//! bait, Armageddon, hazard, aura) add exactly 0.
 
 const std = @import("std");
 const rec = @import("../recording.zig");
@@ -35,7 +35,9 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     lv4.decide(c, out);
     mineByPolicy(c, out);
     meleeByPolicy(c, out);
+    aoeMeleeByPolicy(c, out);
     repositionByPolicy(c, out);
+    auraFlyerSupport(c, out);
     hourglassByPolicy(c, out);
     dropBlockedMove(c, out);
     takeAdjacentAttack(c, out);
@@ -75,7 +77,7 @@ const MAX_HITS_MOUNTAIN: f64 = 5;
 fn mineByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
-    if (u.attack_type == AT.RANGE) return; // canMove() is true in scope
+    if (u.attack_type == AT.RANGE or !u.canMove()) return;
     if (u.target >= 0) {
         const f = &s.units[@intCast(u.target)];
         if (f.in_holder and !f.isDead()) return;
@@ -138,6 +140,9 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     const u = c.unit();
     const si = firstIndex(out, .melee_attack) orelse return;
     if (u.target >= 0) return;
+    // Multi-hit melee is positioned for coverage by v0.4 and aoeMeleeByPolicy (Fire Breath and Chain Lightning are not
+    // in scope).
+    if (u.has(.lightning_spin) or u.has(.skewer_strike)) return;
     const strike = out.actions[si].melee_attack;
     const team = u.team;
     const opp = engine.opposite(team);
@@ -178,11 +183,13 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         fm: f64,
         v4target: u8,
         v4from: Cell,
+        ui: u8,
+        atk_mul: f64,
 
         fn score(self: *const @This(), target: u8, target_cells: []const Cell, cell: Cell, fp: []const Cell) f64 {
             const t = &self.s.units[target];
-            const lo = util.damageMin(self.u, t, false, 1);
-            const hi = util.damageMax(self.u, t, false, 1);
+            const lo = self.atk_mul * util.damageMin(self.u, t, false, 1);
+            const hi = self.atk_mul * util.damageMax(self.u, t, false, 1);
             const hp = util.cumulativeHp(t);
             const effective = @min((lo + hi) / 2, hp);
             const dmg = effective / @max(1, t.max_hp);
@@ -209,12 +216,18 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
             const t_alive = t.amount_alive;
             const target_wounded = if (t_dead + t_alive > 0) t_dead / (t_dead + t_alive) else 0;
             const target_ranged: f64 = if (t.attack_type == AT.RANGE) 1 else 0;
+            // Punish-melee: a Dulling Defense knight that will answer this blow costs permanent attack (Fire Shield is
+            // not in scope). His own swing permanently cuts a survivor's base attack.
+            const knight_answers = t.has(.dulling_defense) and util.canRespondToMelee(self.s, self.ui, target);
+            const punish: f64 = if (!killed and knight_answers) 1 else 0;
+            const dulling: f64 = if (!killed and self.u.has(.dulling_defense) and t.base_attack > 1) 1 else 0;
             return W[14] * dmg + W[15] * kill + W[16] * retal_free + W[17] * threat + W[18] * stand_threat +
                 W[19] * incumbent + W[20] * counter + W[21] * focus_fire + W[22] * stand_support +
-                W[23] * target_wounded + W[25] * counter * self.fm + W[57] * target_ranged;
+                W[23] * target_wounded + W[25] * counter * self.fm + W[50] * punish + W[57] * target_ranged +
+                DULLING_OWN_SWING_SCORE * dulling;
         }
     };
-    const scorer = Scorer{ .s = s, .u = u, .m = &c.m, .opp = opp, .allies = allies[0..n_allies], .my_hp = my_hp, .fm = fm, .v4target = v4target, .v4from = v4from };
+    const scorer = Scorer{ .s = s, .u = u, .m = &c.m, .opp = opp, .allies = allies[0..n_allies], .my_hp = my_hp, .fm = fm, .v4target = v4target, .v4from = v4from, .ui = c.ui, .atk_mul = util.meleeAttacks(u) };
 
     const Best = struct { target: u8, cell: Cell, route: ?*const pathing.Route, score: f64 };
     var best: ?Best = null;
@@ -236,10 +249,11 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
             Consider.f(&best, e, base, null, scorer.score(e, ec.slice(), base, mine.slice()));
         }
     }
-    // Move-and-strike (canMove() is true in scope; no Fire Wall, so moving cannot kill the actor).
+    // Move-and-strike, when the unit can move (no Fire Wall, so moving cannot kill the actor).
     const mp = c.actualPath();
     var buf: [64]Cell = undefined;
-    for (mp.known()) |*r| {
+    const routes = if (u.canMove()) mp.known() else mp.known()[0..0];
+    for (routes) |*r| {
         if (mp.routeCells(r, &buf) == 0) continue;
         const fp = ai.footprintForAnchor(u, r.cell);
         if (!engine.cellsFreeFor(s, c.ui, fp.slice())) continue;
@@ -262,6 +276,208 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         }
     }
     out.push(.{ .melee_attack = .{ .attacker = c.ui, .target = b.target, .attack_from = b.cell, .path = &.{} } });
+}
+
+// =====================================================================================================================
+// AoE melee: aoeMeleeByPolicy and the hourglass's meleeAoeHitCount (Lightning Spin and Skewer Strike; Fire Breath and
+// Chain Lightning are not in scope)
+// =====================================================================================================================
+
+/// A landed melee by a Dulling Defense unit permanently cuts a survivor's base attack (DULLING_OWN_SWING_SCORE).
+const DULLING_OWN_SWING_SCORE: f64 = 0.7;
+
+fn livingEnemies(s: *const State, team: u8, buf: *[st.MAX_UNITS]u8) []const u8 {
+    const opp = engine.opposite(team);
+    var n: usize = 0;
+    for (s.holderOrder()) |k| {
+        if (!util.livingOf(s, k, opp)) continue;
+        buf[n] = k;
+        n += 1;
+    }
+    return buf[0..n];
+}
+
+/// The enemies next to the unit's footprint at `cell`, in order.
+fn ringAt(c: *ai.Ctx, enemies: []const u8, cell: Cell, buf: *[st.MAX_UNITS]u8) []const u8 {
+    const s = c.s;
+    const fp = ai.footprintForAnchor(c.unit(), cell);
+    var n: usize = 0;
+    for (enemies) |e| {
+        const ec = engine.unitCells(&s.units[e]);
+        if (!util.footprintsNear(ec.slice(), fp.slice())) continue;
+        buf[n] = e;
+        n += 1;
+    }
+    return buf[0..n];
+}
+
+/// A Skewer Strike line from `from` through `t`: the target, then the living enemy stack on the cell beyond its base cell.
+fn skewerLine(s: *const State, opp: u8, from: Cell, t: u8, buf: *[2]u8) []const u8 {
+    const tc = engine.baseCell(&s.units[t]);
+    buf[0] = t;
+    var n: usize = 1;
+    const beyond = Cell{ .x = tc.x + std.math.sign(tc.x - from.x), .y = tc.y + std.math.sign(tc.y - from.y) };
+    if (beyond.x >= 0 and beyond.y >= 0) {
+        if (ai.occupant(s, beyond)) |o| {
+            if (o != t and !s.units[o].isDead() and s.units[o].team == opp) {
+                buf[1] = o;
+                n = 2;
+            }
+        }
+    }
+    return buf[0..n];
+}
+
+/// meleeAoeHitCount: the enemy stacks the decision's strike catches (the Lightning Spin ring at its stand cell, or the
+/// Skewer line through its target); 1 for any other strike, 0 without one.
+fn meleeAoeHitCount(c: *ai.Ctx, out: *const ai.Decision) usize {
+    const s = c.s;
+    const u = c.unit();
+    const si = firstIndex(out, .melee_attack) orelse return 0;
+    const strike = out.actions[si].melee_attack;
+    var ebuf: [st.MAX_UNITS]u8 = undefined;
+    const enemies = livingEnemies(s, u.team, &ebuf);
+    if (u.has(.lightning_spin)) {
+        var rbuf: [st.MAX_UNITS]u8 = undefined;
+        return ringAt(c, enemies, strike.attack_from, &rbuf).len;
+    }
+    const opp = engine.opposite(u.team);
+    const t = &s.units[strike.target];
+    if (!t.in_holder or t.isDead() or t.team != opp) return 0;
+    if (u.has(.skewer_strike)) {
+        var lbuf: [2]u8 = undefined;
+        return skewerLine(s, opp, strike.attack_from, strike.target, &lbuf).len;
+    }
+    return 1;
+}
+
+fn routeLen(mp: *const pathing.MovePath, r: *const pathing.Route) usize {
+    var len: usize = 0;
+    var cur: ?*const pathing.Route = r;
+    while (cur) |x| {
+        len += 1;
+        cur = if (x.parent < 0) null else &mp.routes[@intCast(x.parent)];
+    }
+    return len;
+}
+
+/// aoeMeleeByPolicy: the learned AoE stand. Every stand (in place, then each landable known route) with, for the spin
+/// [33..40], its first adjacent enemy and the whole ring, or, for the skewer [41..48], each adjacent enemy and its
+/// line, scored over the hit set (coverage, value, kills, threat, exposure, move cost, wounds, incumbency); the best
+/// (first on ties) replaces v0.4's strike unless it is v0.4's own pick. The trained blocks are never dormant.
+fn aoeMeleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    const spin = u.has(.lightning_spin);
+    if (!spin and !u.has(.skewer_strike)) return;
+    const off: usize = if (spin) 33 else 41;
+    const si = firstIndex(out, .melee_attack) orelse return;
+    if (u.target >= 0 or !u.canMove()) return;
+    const strike = out.actions[si].melee_attack;
+    var ebuf: [st.MAX_UNITS]u8 = undefined;
+    const enemies = livingEnemies(s, u.team, &ebuf);
+    if (enemies.len == 0) return;
+    const opp = engine.opposite(u.team);
+    const bc = engine.baseCell(u);
+    const v4from = strike.attack_from;
+    const v4target = strike.target;
+    const dmg_max = @max(1, u.attack_damage_max);
+    const steps = @max(1, engine.getSteps(u));
+    const mp = c.actualPath();
+
+    const Best = struct { cell: Cell, route: ?*const pathing.Route, target: u8, score: f64 };
+    var best: ?Best = null;
+    const Score = struct {
+        fn of(st_: *const State, m: *const pathing.Matrix, o: u8, w: []const f64, hits: []const u8, cell: Cell, cost: f64, inc: f64, dmax: f64) f64 {
+            var val: f64 = 0;
+            var kills: f64 = 0;
+            var threat: f64 = 0;
+            var wound: f64 = 0;
+            for (hits) |h| {
+                const e = &st_.units[h];
+                const hp = util.cumulativeHp(e);
+                val += @min(dmax, hp) / @max(1, e.max_hp);
+                if (dmax >= hp) kills += 1;
+                threat += firepowerOf(e) / 1000;
+                const total = @max(1, e.amount_alive + e.amount_died);
+                wound += 1 - e.amount_alive / total;
+            }
+            const expo = @as(f64, @floatFromInt(ai.countThreats(m, cell, o))) / 3;
+            const cov: f64 = @floatFromInt(hits.len);
+            return w[0] * cov + w[1] * val + w[2] * kills + w[3] * threat + w[4] * expo + w[5] * cost + w[6] * wound + w[7] * inc;
+        }
+    };
+    const w = W[off .. off + 8];
+    var k: usize = 0;
+    const known = mp.known();
+    while (k <= known.len) : (k += 1) {
+        // Stand k: 0 is in place; k >= 1 is known route k-1, when landable.
+        const route: ?*const pathing.Route = if (k == 0) null else &known[k - 1];
+        const cell = if (route) |r| r.cell else bc;
+        if (route) |r| {
+            if (routeLen(mp, r) == 0 or !ai.canLandAt(s, c.ui, r.cell)) continue;
+        }
+        const cost: f64 = if (route) |r| @max(0, 1 - @as(f64, @floatFromInt(routeLen(mp, r))) / steps) else 1;
+        var rbuf: [st.MAX_UNITS]u8 = undefined;
+        if (spin) {
+            const ring = ringAt(c, enemies, cell, &rbuf);
+            if (ring.len == 0) continue; // the primary is the first of the ring (no Cowardice in scope)
+            const inc: f64 = if (ai.sameCell(cell, v4from)) 1 else 0;
+            const v = Score.of(s, &c.m, opp, w, ring, cell, cost, inc, dmg_max);
+            if (best == null or v > best.?.score) best = .{ .cell = cell, .route = route, .target = ring[0], .score = v };
+            continue;
+        }
+        const ring = ringAt(c, enemies, cell, &rbuf);
+        for (ring) |e| {
+            var lbuf: [2]u8 = undefined;
+            const line = skewerLine(s, opp, cell, e, &lbuf);
+            const inc: f64 = if (ai.sameCell(cell, v4from) and e == v4target) 1 else 0;
+            const v = Score.of(s, &c.m, opp, w, line, cell, cost, inc, dmg_max);
+            if (best == null or v > best.?.score) best = .{ .cell = cell, .route = route, .target = e, .score = v };
+        }
+    }
+    const b = best orelse return;
+    if (ai.sameCell(b.cell, v4from) and (spin or b.target == v4target)) return;
+    var d: ai.Decision = .{};
+    if (u.attack_type_selected != AT.MELEE) d.push(.{ .select_attack_type = .{ .unit = c.ui, .attack_type = AT.MELEE } });
+    var len: usize = 0;
+    var lava = false;
+    if (b.route) |r| {
+        lava = r.has_lava;
+        if (!ai.sameCell(b.cell, bc)) len = mp.routeCells(r, &d.path);
+    }
+    d.push(.{ .melee_attack = .{ .attacker = c.ui, .target = b.target, .attack_from = b.cell, .path = d.path[0..len], .has_lava = lava } });
+    util.copyDecision(out, &d);
+}
+
+// =====================================================================================================================
+// auraFlyerSupport
+// =====================================================================================================================
+
+/// auraFlyerSupport (V05_AURAFLY, on): an aura-emitting flyer's marginal melee strike (not a sure kill by its minimum
+/// damage, not a retaliation-free hit) becomes support while its aura covers anyone: the reachable cell covering more
+/// targets (v0.6's relevance weight), else a hold (hourglass, else stay).
+fn auraFlyerSupport(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (!engine.canFly(u) or u.auraCount() == 0) return;
+    const si = firstIndex(out, .melee_attack) orelse return;
+    const strike = out.actions[si].melee_attack;
+    const t = &s.units[strike.target];
+    if (!t.in_holder) return;
+    const kill = util.meleeAttacks(u) * util.damageMin(u, t, false, 1) >= util.cumulativeHp(t);
+    if (kill or util.repliedAttack(s, strike.target)) return;
+    const base = engine.baseCell(u);
+    if (util.auraCoverageScore(s, c.ui, base, .relevance) < 1) return;
+    if (util.planAuraMove(c, .relevance)) |plan| {
+        if (plan.best_score > plan.current and u.canMove() and !ai.sameCell(plan.best, base)) {
+            const mp = c.actualPath();
+            if (mp.get(pathing.key(plan.best.x, plan.best.y))) |r| {
+                return util.setMove(out, s, c.ui, mp, r);
+            }
+        }
+    }
+    if (util.canHourglass(s, c.ui)) util.setWait(out, c.ui) else util.setEndTurn(out, c.ui);
 }
 
 // =====================================================================================================================
@@ -362,6 +578,8 @@ fn hourglassByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         if (a == .melee_attack and a.melee_attack.path.len > 0) charge = true;
     }
     if (!charge or !util.canHourglass(c.s, c.ui)) return;
+    // A multi-stack AoE line or ring is a transient opportunity: keep it.
+    if (meleeAoeHitCount(c, out) >= 2) return;
     if (fmExposure(c) < 0.67) return;
     util.setWait(out, c.ui);
 }
@@ -390,7 +608,7 @@ fn takeAdjacentAttack(c: *ai.Ctx, out: *ai.Decision) void {
         lava = out.actions[i].move_unit.has_lava;
         pure_move = path.len > 0;
     }
-    const idle_end = mi == null and util.has(out, .end_turn); // no Stun / Blindness / Freeze in scope
+    const idle_end = mi == null and util.has(out, .end_turn) and !u.isStunned(); // isSkippingThisTurn (Stun)
     if (!pure_move and !idle_end) return;
     const base = engine.baseCell(u);
     const dest = if (pure_move) path[path.len - 1] else base;
@@ -406,7 +624,7 @@ fn takeAdjacentAttack(c: *ai.Ctx, out: *ai.Decision) void {
         if (u.target >= 0 and u.target != @as(i8, @intCast(i))) continue;
         const ec = engine.unitCells(e);
         if (!util.footprintsNear(ec.slice(), dest_fp.slice())) continue;
-        const kill = util.damageMax(u, e, false, 1) >= util.cumulativeHp(e);
+        const kill = util.meleeAttacks(u) * util.damageMax(u, e, false, 1) >= util.cumulativeHp(e);
         const fire = firepowerOf(e);
         if (best == null or (kill and !best_kill) or (kill == best_kill and fire > best_fire)) {
             best = @intCast(i);

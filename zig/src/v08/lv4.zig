@@ -3,11 +3,11 @@
 //!
 //! In scope (no spells or abilities) the pipeline is: hold when out-gunning at range, v0.3, the Goblin Knight's
 //! low-level victim, the flyer's patient hunt, the landing guard, the melee legality guard, the lap-1 mass-buff
-//! wait, the front move, the range legality guard. Identity in scope, so not ported: retargetHeal (heal casts),
-//! auraRepositionMelee (no buff auras: every cover is 0), rapidChargeReposition, aoeMeleeReposition,
-//! hydraSpinReposition and chainLightningTarget (abilities), and the Ogre Mage Riot, Healer and Troll Wild
-//! Regeneration plays (spells). Off by default: the siege mute (MUTE_SIEGE_ENABLED), the boxed-shooter hold
-//! (V04_BOXHOLD), the caster self-delays (V04_OGRESELF / V04_BEHESELF).
+//! wait, the front move, the range legality guard, plus the ability repositions of batches 1-3: auraRepositionMelee,
+//! rapidChargeReposition, aoeMeleeReposition (Skewer Strike; Fire Breath is not in scope) and hydraSpinReposition.
+//! Identity in scope, so not ported: retargetHeal (heal casts), chainLightningTarget (Chain Lightning), and the Ogre
+//! Mage Riot, Healer and Troll Wild Regeneration plays (spells). Off by default: the siege mute (MUTE_SIEGE_ENABLED),
+//! the boxed-shooter hold (V04_BOXHOLD), the caster self-delays (V04_OGRESELF / V04_BEHESELF).
 
 const std = @import("std");
 const rec = @import("../recording.zig");
@@ -29,13 +29,17 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     const u = c.unit();
     const rin = s.rng.state;
     defer policy.note("v0.4", out, s, rin);
-    // (2) Out-gunning them at range, a shooter that cannot fire yet holds (canMove() is true in scope).
-    if (u.attack_type == AT.RANGE and engine.getRangeShots(u) > 0 and holdWhenRangedSuperior(c, out)) return;
+    // (2) Out-gunning them at range, a shooter that cannot fire yet holds.
+    if (u.attack_type == AT.RANGE and engine.getRangeShots(u) > 0 and u.canMove() and holdWhenRangedSuperior(c, out)) return;
     lv3.decide(c, out);
     var base: ai.Decision = undefined;
     util.copyDecision(&base, out);
     preferLowLevelMelee(c, out);
+    auraRepositionMelee(c, out);
+    rapidChargeReposition(c, out);
+    aoeMeleeReposition(c, out);
     flyerPatientHunt(c, out);
+    hydraSpinReposition(c, out);
     preferValidMove(c, out, &base);
     enforceMeleeLegality(c, out);
     waitForMassBuff(c, out);
@@ -75,6 +79,264 @@ fn firstMelee(out: *const ai.Decision) ?usize {
     return null;
 }
 
+/// IWeightedRoute.route.length: the route's cells, its start included.
+fn routeLen(mp: *const pathing.MovePath, r: *const pathing.Route) usize {
+    var len: usize = 0;
+    var cur: ?*const pathing.Route = r;
+    while (cur) |x| {
+        len += 1;
+        cur = if (x.parent < 0) null else &mp.routes[@intCast(x.parent)];
+    }
+    return len;
+}
+
+/// v0.4's isAdjacentCell from one of `cells` to `c` (|dx| <= 1 and |dy| <= 1, the cell itself included).
+fn nearAny(cells: []const Cell, c: Cell) bool {
+    for (cells) |x| if (util.near(x, c)) return true;
+    return false;
+}
+
+/// `{ ...strike, attackFrom: r.cell, path: r's cells, hasLavaCell }` for action `i`: the other actions keep theirs, so
+/// the route goes after every other action's cells in the path buffer.
+fn setStrikeRoute(d: *ai.Decision, i: usize, mp: *const pathing.MovePath, r: *const pathing.Route) void {
+    const lo = @intFromPtr(&d.path[0]);
+    var end: usize = 0;
+    for (d.actions[0..d.n], 0..) |a, k| {
+        if (k == i) continue;
+        const sl: []const Cell = switch (a) {
+            .move_unit => |m| m.path,
+            .melee_attack => |m| m.path,
+            .obstacle_attack => |o| o.path,
+            else => &.{},
+        };
+        if (sl.len == 0) continue;
+        const p = @intFromPtr(sl.ptr);
+        if (p < lo or p >= lo + d.path.len * @sizeOf(Cell)) continue;
+        end = @max(end, (p - lo) / @sizeOf(Cell) + sl.len);
+    }
+    var tmp: [64]Cell = undefined;
+    const len = mp.routeCells(r, &tmp);
+    @memcpy(d.path[end .. end + len], tmp[0..len]);
+    d.actions[i].melee_attack.attack_from = r.cell;
+    d.actions[i].melee_attack.path = d.path[end .. end + len];
+    d.actions[i].melee_attack.has_lava = r.has_lava;
+}
+
+/// A whole new decision: select melee when another type is selected, then strike `target` from `from` along `r` (in
+/// place, with no path, when null).
+fn setStrike(c: *ai.Ctx, out: *ai.Decision, target: u8, from: Cell, r: ?*const pathing.Route) void {
+    const u = c.unit();
+    var d: ai.Decision = .{};
+    if (u.attack_type_selected != AT.MELEE) d.push(.{ .select_attack_type = .{ .unit = c.ui, .attack_type = AT.MELEE } });
+    var len: usize = 0;
+    var lava = false;
+    if (r) |route| {
+        len = c.actualPath().routeCells(route, &d.path);
+        lava = route.has_lava;
+    }
+    d.push(.{ .melee_attack = .{ .attacker = c.ui, .target = target, .attack_from = from, .path = d.path[0..len], .has_lava = lava } });
+    util.copyDecision(out, &d);
+}
+
+/// friendlyAuraCover: living allies (but the unit) with a buff aura whose range reaches `cell` from the ally's base
+/// cell by Euclidean distance, each counted once; a Broken ally emits none.
+fn friendlyAuraCover(s: *const State, ui: u8, cell: Cell) u32 {
+    const u = &s.units[ui];
+    var n: u32 = 0;
+    for (s.holderOrder()) |k| {
+        const a = &s.units[k];
+        if (a.team != u.team or a.isDead() or k == ui) continue;
+        for (a.auras[0..a.auraCount()]) |d| {
+            const def = &s.aura_defs[d];
+            if (def.is_buff and ai.cellDistance(cell, engine.baseCell(a)) <= def.range) {
+                n += 1;
+                break;
+            }
+        }
+    }
+    return n;
+}
+
+/// (4) auraRepositionMelee: a strike moves its stand cell to a reachable cell also next to the target inside more
+/// allies' buff auras (ties: the cheaper route); only the strike action changes.
+fn auraRepositionMelee(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (u.target >= 0) return;
+    const i = firstMelee(out) orelse return;
+    if (!u.canMove()) return;
+    const strike = out.actions[i].melee_attack;
+    const target = &s.units[strike.target];
+    if (!target.in_holder) return;
+    const current = friendlyAuraCover(s, c.ui, strike.attack_from);
+    const mp = c.actualPath();
+    const tc = engine.unitCells(target);
+    var best: ?*const pathing.Route = null;
+    var best_cover: u32 = 0;
+    for (mp.known()) |*r| {
+        if (!nearAny(tc.slice(), r.cell)) continue;
+        const cover = friendlyAuraCover(s, c.ui, r.cell);
+        if (best == null or cover > best_cover or (cover == best_cover and r.weight < best.?.weight)) {
+            best = r;
+            best_cover = cover;
+        }
+    }
+    const b = best orelse return;
+    if (best_cover <= current) return;
+    setStrikeRoute(out, i, c.actualPath(), b);
+}
+
+/// (8) rapidChargeReposition: a Rapid Charge strike runs the longest reachable approach that still ends next to the
+/// same target (the run-up adds damage); only the strike action changes.
+fn rapidChargeReposition(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (!u.has(.rapid_charge) or u.target >= 0 or !u.canMove()) return;
+    const i = firstMelee(out) orelse return;
+    const strike = out.actions[i].melee_attack;
+    const target = &s.units[strike.target];
+    if (!target.in_holder) return;
+    const mp = c.actualPath();
+    const tc = engine.unitCells(target);
+    var best: ?*const pathing.Route = null;
+    var best_len: usize = strike.path.len;
+    for (mp.known()) |*r| {
+        if (!nearAny(tc.slice(), r.cell)) continue;
+        const len = routeLen(mp, r);
+        if (len > best_len) {
+            best_len = len;
+            best = r;
+        }
+    }
+    const b = best orelse return;
+    setStrikeRoute(out, i, mp, b);
+}
+
+/// The living enemies in getAllAllies(enemy team) order.
+fn livingEnemies(s: *const State, team: u8, buf: *[st.MAX_UNITS]u8) []const u8 {
+    const opp = engine.opposite(team);
+    var n: usize = 0;
+    for (s.holderOrder()) |k| {
+        const e = &s.units[k];
+        if (e.team != opp or e.isDead()) continue;
+        buf[n] = k;
+        n += 1;
+    }
+    return buf[0..n];
+}
+
+/// aoeMeleeReposition's lineHits for Skewer Strike (line depth 1; Fire Breath is not in scope): the target plus the
+/// living enemy stack on the cell beyond its base cell, seen from `from`.
+fn lineHits(s: *const State, opp: u8, from: Cell, t: u8) u32 {
+    const tc = engine.baseCell(&s.units[t]);
+    const dx = std.math.sign(tc.x - from.x);
+    const dy = std.math.sign(tc.y - from.y);
+    var hits: u32 = 1;
+    const beyond = Cell{ .x = tc.x + dx, .y = tc.y + dy };
+    if (beyond.x >= 0 and beyond.y >= 0) {
+        if (ai.occupant(s, beyond)) |o| {
+            const e = &s.units[o];
+            if (o != t and !e.isDead() and e.team == opp) hits += 1;
+        }
+    }
+    return hits;
+}
+
+const Cand = struct { cell: Cell, route: ?*const pathing.Route };
+
+/// The stand cells v0.4's AoE repositions try: in place, then every known route's cell (insertion order).
+fn standCandidates(c: *ai.Ctx, buf: []Cand) []const Cand {
+    const u = c.unit();
+    buf[0] = .{ .cell = engine.baseCell(u), .route = null };
+    var n: usize = 1;
+    const mp = c.actualPath();
+    for (mp.known()) |*r| {
+        if (routeLen(mp, r) == 0) continue;
+        buf[n] = .{ .cell = r.cell, .route = r };
+        n += 1;
+    }
+    return buf[0..n];
+}
+
+fn candLen(c: *ai.Ctx, k: Cand) usize {
+    return if (k.route) |r| routeLen(c.actualPath(), r) else 0;
+}
+
+/// (8) aoeMeleeReposition (Skewer Strike): the stand cell and target whose line catches the most enemy stacks (ties:
+/// the shorter route), when that beats the current strike's line and catches two or more; the decision becomes that
+/// strike alone.
+fn aoeMeleeReposition(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (!u.has(.skewer_strike) or u.target >= 0 or !u.canMove()) return;
+    const i = firstMelee(out) orelse return;
+    const strike = out.actions[i].melee_attack;
+    var ebuf: [st.MAX_UNITS]u8 = undefined;
+    const enemies = livingEnemies(s, u.team, &ebuf);
+    if (enemies.len < 2) return;
+    const opp = engine.opposite(u.team);
+    const base_hits: u32 = if (s.units[strike.target].in_holder) lineHits(s, opp, strike.attack_from, strike.target) else 1;
+    var cbuf: [pathing.MAX_ROUTES]Cand = undefined;
+    const cands = standCandidates(c, &cbuf);
+    var best: ?struct { k: Cand, target: u8, hits: u32 } = null;
+    for (cands) |k| {
+        const fp = ai.footprintForAnchor(u, k.cell);
+        for (enemies) |e| {
+            const ec = engine.unitCells(&s.units[e]);
+            if (!util.footprintsNear(ec.slice(), fp.slice())) continue;
+            const hits = lineHits(s, opp, k.cell, e);
+            if (best == null or hits > best.?.hits or (hits == best.?.hits and candLen(c, k) < candLen(c, best.?.k))) {
+                best = .{ .k = k, .target = e, .hits = hits };
+            }
+        }
+    }
+    const b = best orelse return;
+    if (b.hits < 2 or b.hits <= base_hits) return;
+    setStrike(c, out, b.target, b.k.cell, b.k.route);
+}
+
+/// Enemy stacks next to the unit's footprint at `cell` (the Lightning Spin zone): the count and the first of them.
+fn spinZone(c: *ai.Ctx, enemies: []const u8, cell: Cell) struct { count: u32, first: u8 } {
+    const s = c.s;
+    const fp = ai.footprintForAnchor(c.unit(), cell);
+    var n: u32 = 0;
+    var first: u8 = 0;
+    for (enemies) |e| {
+        const ec = engine.unitCells(&s.units[e]);
+        if (!util.footprintsNear(ec.slice(), fp.slice())) continue;
+        if (n == 0) first = e;
+        n += 1;
+    }
+    return .{ .count = n, .first = first };
+}
+
+/// (9) hydraSpinReposition (Lightning Spin): the reachable stand cell next to the most enemy stacks (ties: the shorter
+/// route), when that is two or more and beats the current stand; the decision becomes a strike on the first of them.
+fn hydraSpinReposition(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (!u.has(.lightning_spin) or u.target >= 0 or !u.canMove()) return;
+    const i = firstMelee(out) orelse return;
+    const strike = out.actions[i].melee_attack;
+    var ebuf: [st.MAX_UNITS]u8 = undefined;
+    const enemies = livingEnemies(s, u.team, &ebuf);
+    if (enemies.len < 2) return;
+    const base_count = spinZone(c, enemies, strike.attack_from).count;
+    var cbuf: [pathing.MAX_ROUTES]Cand = undefined;
+    const cands = standCandidates(c, &cbuf);
+    var best: ?struct { k: Cand, target: u8, count: u32 } = null;
+    for (cands) |k| {
+        const z = spinZone(c, enemies, k.cell);
+        if (z.count == 0) continue;
+        if (best == null or z.count > best.?.count or (z.count == best.?.count and candLen(c, k) < candLen(c, best.?.k))) {
+            best = .{ .k = k, .target = z.first, .count = z.count };
+        }
+    }
+    const b = best orelse return;
+    if (b.count < 2 or b.count <= base_count) return;
+    setStrike(c, out, b.target, b.k.cell, b.k.route);
+}
+
 /// (7) The Goblin Knight swaps an in-place strike to the lowest-level adjacent enemy below the target's level.
 fn preferLowLevelMelee(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
@@ -110,7 +372,7 @@ fn preferLowLevelMelee(c: *ai.Ctx, out: *ai.Decision) void {
 fn flyerPatientHunt(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
-    if (!engine.canFly(u) or u.attack_type != AT.MELEE) return;
+    if (!engine.canFly(u) or u.attack_type != AT.MELEE or !u.canMove()) return;
     if (util.strikes(out)) return;
     const opp = engine.opposite(u.team);
     var ranges: [st.MAX_UNITS]Cell = undefined;
@@ -226,14 +488,15 @@ fn enforceMeleeLegality(c: *ai.Ctx, out: *ai.Decision) void {
             return ai.fallbackTurn(c, out);
         }
     }
+    // The target is gone, or the strike needs a move the unit cannot make (a web-locked flyer): hit a legal adjacent
+    // enemy instead (getAllAllies order), else fall back. Hidden and Cowardice are not in scope.
     const t = &s.units[strike.target];
-    if (!t.in_holder or t.isDead()) {
+    const moves = !ai.sameCell(strike.attack_from, engine.baseCell(u));
+    if (!t.in_holder or t.isDead() or (moves and !u.canMove())) {
         if (u.target >= 0) return ai.fallbackTurn(c, out);
         const opp = engine.opposite(u.team);
-        for (0..s.n_units) |k| {
-            if (s.units[k].in_holder and s.units[k].team == opp and Strikable.ok(s, @intCast(k), mine.slice())) {
-                return inPlaceStrike(c, out, @intCast(k));
-            }
+        for (s.holderOrder()) |k| {
+            if (s.units[k].team == opp and Strikable.ok(s, k, mine.slice())) return inPlaceStrike(c, out, k);
         }
         return ai.fallbackTurn(c, out);
     }
@@ -277,7 +540,7 @@ fn isPureAdvance(d: *const ai.Decision) bool {
 fn hasStrongerRangedPosture(c: *const ai.Ctx, d: *const ai.Decision) bool {
     const s = c.s;
     const u = c.unit();
-    if (u.attack_type != AT.MELEE or engine.isRangeCapable(u)) return false;
+    if (u.attack_type != AT.MELEE or engine.isRangeCapable(u) or !u.canMove()) return false;
     if (util.combatAction(d)) return false;
     if (util.dominantFinishState(s, u.team).active) return false;
     return util.teamRangedOutput(s, u.team) > util.teamRangedOutput(s, engine.opposite(u.team));
@@ -290,7 +553,7 @@ const Front = union(enum) { keep, wait, move: *const pathing.Route };
 fn v04FrontMove(c: *ai.Ctx, d: *const ai.Decision) Front {
     const s = c.s;
     const u = c.unit();
-    if (u.attack_type != AT.MELEE) return .keep;
+    if (u.attack_type != AT.MELEE or !u.canMove()) return .keep;
     const opp = engine.opposite(u.team);
     var my_ranged: usize = 0;
     var enemies: [st.MAX_UNITS]Cell = undefined;

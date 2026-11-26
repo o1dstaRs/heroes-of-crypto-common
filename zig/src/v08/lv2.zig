@@ -36,6 +36,7 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     } else {
         policy.v01(c, out);
         preferNoCounterMeleeTarget(c, out);
+        withAura(c, out);
     }
     policy.note("v0.2", out, s, rin);
 }
@@ -250,12 +251,13 @@ const Approach = struct { route: *const pathing.Route, target: u8 };
 fn meleeApproach(c: *ai.Ctx) ?Approach {
     const s = c.s;
     const u = c.unit();
+    if (!u.canMove()) return null;
     const opp = engine.opposite(u.team);
     var any = false;
     for (0..s.n_units) |i| {
         if (util.livingOf(s, i, opp)) any = true;
     }
-    if (!any) return null; // canMove() is true in scope
+    if (!any) return null;
     const mp = c.actualPath();
     if (mp.size() == 0) return null;
     var best: ?Approach = null;
@@ -296,6 +298,47 @@ fn counterMatters(s: *const State, t: u8) bool {
 
 /// An in-place strike on a stack that would counter moves to the most threatening equally adjacent enemy that
 /// would not (it already responded), never overriding a forced target or a move-and-strike.
+/// withAura (v0_2.ts): an aura emitter that would only move repositions to the reachable cell covering the most targets,
+/// else hourglasses while more targets can still come into range and nothing threatens it, else refuses an advance that
+/// would drag its auras off targets it covers now. Attacks pass straight through; non-emitters are untouched.
+fn withAura(c: *ai.Ctx, out: *ai.Decision) void {
+    for (out.slice()) |a| switch (a) {
+        .melee_attack, .range_attack => return,
+        else => {},
+    };
+    const plan = util.planAuraMove(c, .flat) orelse return;
+    const s = c.s;
+    const u = c.unit();
+    const base = engine.baseCell(u);
+    // 1) A reachable cell covers more targets: move there.
+    if (plan.best_score > plan.current and !(plan.best.x == base.x and plan.best.y == base.y) and u.canMove()) {
+        const mp = c.actualPath();
+        if (mp.get(pathing.key(plan.best.x, plan.best.y))) |r| {
+            var d: ai.Decision = .{};
+            const len = mp.routeCells(r, &d.path);
+            if (len > 0) {
+                const body = ai.footprintForAnchor(u, plan.best);
+                @memcpy(d.targets[0..body.slice().len], body.slice());
+                d.push(.{ .move_unit = .{ .unit = c.ui, .path = d.path[0..len], .target_cells = d.targets[0..body.slice().len], .has_lava = r.has_lava } });
+                util.copyDecision(out, &d);
+                return;
+            }
+        }
+    }
+    // 2) Hourglass first: nothing better to cover yet, targets still out of range, no melee pressure.
+    if (plan.best_score <= plan.current and plan.best_score < plan.coverable and plan.threats == 0 and util.canHourglass(s, c.ui)) {
+        util.setWait(out, c.ui);
+        return;
+    }
+    // 3) The default advance would drag the aura off targets: hold instead.
+    for (out.slice()) |a| {
+        if (a != .move_unit) continue;
+        const m = a.move_unit;
+        if (m.path.len > 0 and util.auraCoverageScore(s, c.ui, m.path[m.path.len - 1], .flat) < plan.current) util.setEndTurn(out, c.ui);
+        break;
+    }
+}
+
 fn preferNoCounterMeleeTarget(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();

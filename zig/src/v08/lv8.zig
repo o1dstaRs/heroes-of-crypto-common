@@ -357,7 +357,14 @@ fn wardValue(u: *const st.Unit) f64 {
 /// v08BacklineProtectorCoverageRange: Angel's screen 2; Abomination's and Queen's aura range, 1 without the aura in
 /// scope; plus the team's synergy aura range (getAdditionalAuraRangePerTeam), floored, at least 0.
 fn coverageRange(s: *const st.State, pi: u8) i32 {
-    const base: f64 = if (protectorKind(pi) == .angel) 2 else 1;
+    // getAuraEffect("Web")?.getRange() ?? 1 for the Queen (batch 3 carries her Web aura); Flesh Shield is not in scope.
+    var base: f64 = if (protectorKind(pi) == .angel) 2 else 1;
+    if (protectorKind(pi) == .arachna_queen) {
+        const u = &s.units[pi];
+        for (u.auras[0..u.n_auras]) |d| {
+            if (s.aura_defs[d].power_type == st.PowerType.DISABLE_FLY_MOVEMENT) base = s.aura_defs[d].range;
+        }
+    }
     return @intFromFloat(@max(0, @floor(base + s.setup[s.units[pi].team].aura_range)));
 }
 

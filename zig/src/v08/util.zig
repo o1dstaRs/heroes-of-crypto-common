@@ -6,6 +6,7 @@ const rec = @import("../recording.zig");
 const st = @import("../state.zig");
 const engine = @import("../engine.zig");
 const combat = @import("../combat.zig");
+const abilities = @import("../abilities.zig");
 const pathing = @import("../path.zig");
 const ai = @import("../ai.zig");
 
@@ -155,6 +156,22 @@ pub fn cumulativeHp(u: *const Unit) f64 {
     if (u.isDead()) return 0;
     const hp = if (u.hp < 0) 0 else u.hp;
     return (u.amount_alive - 1) * u.max_hp + hp;
+}
+
+/// canUnitRespondToMelee (src/handlers/melee_response.ts), as the engine's combat.zig canRespondToMelee: nobody answers
+/// a Shadow Touch or Lightning Spin attacker, a Stun blocks the reply, an Aggr'd target answers only its forced
+/// attacker, and the reply is spent once (No Melee, Terrifying Gaze and Cowardice are not in scope).
+pub fn canRespondToMelee(s: *const State, att: u8, ti: u8) bool {
+    const tgt = &s.units[ti];
+    if (abilities.skipsResponse(&s.units[att])) return false;
+    if (tgt.isStunned()) return false;
+    if (tgt.target >= 0 and tgt.target != @as(i8, @intCast(att))) return false;
+    return !tgt.responded and s.fight.replied & engine.unitBit(ti) == 0;
+}
+
+/// StrategyV0_5.meleeAttacks: 2 for Double Punch (a second hit at 100%), else 1.
+pub inline fn meleeAttacks(u: *const Unit) f64 {
+    return if (u.has(.double_punch)) 2 else 1;
 }
 
 /// calculateAttackDamageMin(getAttack(), target, isRange, 0, divisor) (no Warlord's Edge, no synergy power).
@@ -556,6 +573,101 @@ pub fn valueFeatures(s: *const State, team: u8, out: *[VALUE_FEATURES]f64) void 
     out[17] = averageSpread(enemy_cells[0..n_enemy], span);
     out[18] = averageCenterDistance(our_cells[0..n_our], span);
     out[19] = averageCenterDistance(enemy_cells[0..n_enemy], span);
+}
+
+// ---- auras (ai.ts auraCoverageScore / planAuraMove, default anchor-ball pricing) ----
+
+/// The covered-target weight: v0.2-v0.5 count each covered target once; v0.6's auraRelevanceWeight counts a Range Null
+/// Field target by its shooter stack size (0 for a non-shooter) and every other aura flat.
+pub const AuraWeight = enum { flat, relevance };
+
+/// AbilityPowerType.DISABLE_RANGE_ATTACK (ability_properties.ts; the Range Null Field aura is not in the engine yet).
+const PT_DISABLE_RANGE_ATTACK: u8 = 17;
+
+/// auraCoverageScore: per emitted aura, the targets (living allies but the emitter for a buff aura, living enemies for a
+/// debuff aura) whose BASE cell lies within the aura range (plus the team's synergy aura range) of `from`: one Chebyshev
+/// ball at the anchor, the shipped pricing (AI_AURA_ZONE_EXACT off).
+pub fn auraCoverageScore(s: *const State, ui: u8, from: Cell, weight: AuraWeight) f64 {
+    const u = &s.units[ui];
+    const n = u.auraCount();
+    if (n == 0) return 0;
+    const bonus = s.setup[u.team].aura_range;
+    var score: f64 = 0;
+    for (u.auras[0..n]) |d| {
+        const def = &s.aura_defs[d];
+        const range = def.range + bonus;
+        if (range < 0) continue;
+        for (s.holderOrder()) |ti| {
+            const t = &s.units[ti];
+            if (t.isDead()) continue;
+            if (def.is_buff) {
+                if (t.team != u.team or ti == ui) continue;
+            } else if (t.team == u.team) continue;
+            const b = engine.baseCell(t);
+            const dist: f64 = @floatFromInt(@max(@abs(b.x - from.x), @abs(b.y - from.y)));
+            if (dist > range) continue;
+            score += switch (weight) {
+                .flat => 1,
+                .relevance => if (def.power_type == PT_DISABLE_RANGE_ATTACK) (if (t.attack_type == AT.RANGE) t.amount_alive else 0) else 1,
+            };
+        }
+    }
+    return score;
+}
+
+pub const AuraPlan = struct { best: Cell, best_score: f64, current: f64, coverable: f64, threats: u32 };
+
+/// countMeleeThreatsToCell: living enemy-coded cells among the eight neighbours of `cell` in the decision matrix.
+pub fn countMeleeThreatsToCell(m: *const pathing.Matrix, cell: Cell, enemy_team: u8) u32 {
+    var n: u32 = 0;
+    var dy: i32 = -1;
+    while (dy <= 1) : (dy += 1) {
+        var dx: i32 = -1;
+        while (dx <= 1) : (dx += 1) {
+            if (dx == 0 and dy == 0) continue;
+            const x = cell.x + dx;
+            const y = cell.y + dy;
+            if (x < 0 or y < 0 or x >= st.GRID or y >= st.GRID) continue;
+            if (pathing.at(m, x, y) == @as(i8, @intCast(enemy_team))) n += 1;
+        }
+    }
+    return n;
+}
+
+/// planAuraMove over the unit's actual move path: the reachable cell covering the most targets (ties: nearest the base
+/// by distance), the current coverage, the coverable total and the melee threats at the base. Null without auras.
+pub fn planAuraMove(c: *ai.Ctx, weight: AuraWeight) ?AuraPlan {
+    const s = c.s;
+    const u = c.unit();
+    const n = u.auraCount();
+    if (n == 0) return null;
+    const enemy_team = engine.opposite(u.team);
+    const base = engine.baseCell(u);
+    const current = auraCoverageScore(s, c.ui, base, weight);
+    var allies: f64 = 0;
+    var enemies: f64 = 0;
+    for (s.holderOrder()) |ti| {
+        const t = &s.units[ti];
+        if (t.isDead()) continue;
+        if (t.team == u.team) {
+            if (ti != c.ui) allies += 1;
+        } else enemies += 1;
+    }
+    var coverable: f64 = 0;
+    for (u.auras[0..n]) |d| coverable += if (s.aura_defs[d].is_buff) allies else enemies;
+    var best = base;
+    var best_score = current;
+    const mp = c.actualPath();
+    for (mp.known()) |*r| {
+        const v = pathing.at(&c.m, r.cell.x, r.cell.y);
+        if (v == pathing.BLOCK or v == pathing.HOLE or v == pathing.LAVA or v == @as(i8, @intCast(enemy_team))) continue;
+        const score = auraCoverageScore(s, c.ui, r.cell, weight);
+        if (score > best_score or (score == best_score and ai.cellDistance(r.cell, base) < ai.cellDistance(best, base))) {
+            best_score = score;
+            best = r.cell;
+        }
+    }
+    return .{ .best = best, .best_score = best_score, .current = current, .coverable = coverable, .threats = countMeleeThreatsToCell(&c.m, base, enemy_team) };
 }
 
 pub const VALUE_FEATURES_V2 = 60;

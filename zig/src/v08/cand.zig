@@ -178,7 +178,7 @@ const Gen = struct {
     // ---- shared move pieces ----
 
     fn movePath(self: *Gen) ?*const path.MovePath {
-        // canMove() is true in scope (no stun or root effects).
+        if (!self.unit().canMove()) return null;
         return self.c.actualPath();
     }
 
@@ -241,7 +241,7 @@ const Gen = struct {
             self.push(&cand);
             return;
         }
-        if (u.attack_type_selected == AT.RANGE or !self.canMelee()) return;
+        if (!u.canMove() or u.attack_type_selected == AT.RANGE or !self.canMelee()) return;
         // mountainMeleeStrike: the stationary strike if a stone touches the body, else the cheapest reachable stand
         // touching one (weight, stand x, y, stone x, y; one route per cell in scope).
         var sorted: [st.MAX_STONES]Cell = undefined;
@@ -382,7 +382,8 @@ const Gen = struct {
         const u = self.unit();
         const t = &self.c.s.units[ti];
         const atk_mul: f64 = if (u.ability(.double_punch) != null) 2 else 1;
-        const ranged_mul: f64 = if (u.attack_type == AT.RANGE) 0.5 else 1;
+        // Native shooters deal half melee damage unless Handyman removes the penalty.
+        const ranged_mul: f64 = if (u.attack_type == AT.RANGE and !u.has(.handyman)) 0.5 else 1;
         const lo = atk_mul * @floor(combat.damageBound(u, t, u.attack_damage_min, false, 1) * ranged_mul);
         const hi = atk_mul * @floor(combat.damageBound(u, t, u.attack_damage_max, false, 1) * ranged_mul);
         const hp = util.cumulativeHp(t);
