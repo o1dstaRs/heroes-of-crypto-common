@@ -16,13 +16,17 @@ import { StrategyV0_7 } from "../../src/ai/versions/v0_7";
 import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { V08_A13_VALUE_LEAF } from "../../src/ai/versions/v0_8_a13_profile";
 import { buildV08A19SearchEnvironment } from "../../src/ai/versions/v0_8_a19_profile";
+import { creaturesByLevel, type IArmyUnitSpec, makeRng } from "../../src/simulation/army";
+import { runMatch } from "../../src/simulation/battle_engine";
 import {
     compareNativeShadowBank,
+    exportWithoutSideEffects,
     type INativeBankInput,
     type INativePairFlags,
     type INativePairRecord,
     type INativeRolloutBackend,
     nativeEnvironmentRefusal,
+    nativeExportSideEffects,
     nativeLeafKind,
     nativeRolloutModeFromEnv,
     nativeShadowRateFromEnv,
@@ -30,6 +34,11 @@ import {
     runNativeBank,
 } from "../../src/simulation/native_rollouts";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
+import {
+    captureDeterministicRandomState,
+    createSecureUuid,
+    restoreDeterministicRandomState,
+} from "../../src/utils/lib";
 
 const FLAGS: INativePairFlags = { played: 0, skippedIllegal: 1, aborted: 2, notReached: 3, skippedTail: 4 };
 
@@ -324,5 +333,139 @@ describe("native bank bookkeeping", () => {
         );
         expect(other.rolloutMismatches).toBe(1);
         expect(other.fails.length).toBeGreaterThan(0);
+    });
+
+    test("shadow comparison under uuid naming: the library's own summon count is not compared", () => {
+        // The server's harness names summons from the uuid sequence and keeps no summon counter, so TypeScript's
+        // records hold the bank's start value while the library counts the summons its rollouts made.
+        const records = [
+            pair(0.25, 3, { summonSequence: 2 }),
+            pair(0.75, 3, { summonSequence: 3 }),
+            pair(0.5),
+            pair(0.5),
+        ];
+        const rollouts = [0.25, 0.75, 0.5, 0.5].map((value, i) => ({
+            candidate: undefined,
+            r: i % 2,
+            value,
+            aborted: false,
+            turns: 3,
+            uuid: 0,
+            summon: 0,
+            winner: -1,
+        }));
+        const ts = { means: [0.5, 0.5], threw: false, turns: 12, uuid: 8, rollouts };
+        const server = runNativeBank(
+            scriptedBackend([{ records }]).native,
+            { free: () => undefined },
+            bankInput({ harness: { summonIds: "uuidSequence", summonScope: "call" } }),
+        );
+        expect(server.uuidNamed).toBe(true);
+        expect(compareNativeShadowBank(FLAGS, ts, server, { summon: 0 }, false).fails).toEqual([]);
+        const match = runNativeBank(scriptedBackend([{ records }]).native, { free: () => undefined }, bankInput());
+        expect(match.uuidNamed).toBe(false);
+        expect(compareNativeShadowBank(FLAGS, ts, match, { summon: 0 }, false).rolloutMismatches).toBe(2);
+    });
+});
+
+describe("native root export", () => {
+    const spec = (creatureName: string, level: number, amount: number): IArmyUnitSpec => {
+        const entry = creaturesByLevel(level).find((candidate) => candidate.creatureName === creatureName);
+        if (!entry) throw new Error(`no ${creatureName} at level ${level}`);
+        return {
+            faction: entry.faction,
+            creatureName: entry.creatureName,
+            level: entry.level,
+            size: entry.size,
+            ...(entry.footprintWidth === undefined || entry.footprintHeight === undefined
+                ? {}
+                : { footprintWidth: entry.footprintWidth, footprintHeight: entry.footprintHeight }),
+            amount,
+        };
+    };
+
+    test("the state export only reads: a board that can summon leaves the random state as it was and exports again identically", async () => {
+        // The exporter lives beside the library's parity tools, outside the type-checked tree, as the adapter loads it.
+        const exporterPath = "../../zig/parity/state_export.ts";
+        const { exportBattleState } = (await import(exporterPath)) as {
+            exportBattleState(battle: object, harness?: object): unknown;
+        };
+        let checked = false;
+        runMatch({
+            greenVersion: "v0.1",
+            redVersion: "v0.1",
+            // Infest (Arachna Queen) and Summon Wolves (Satyr): the export builds the Spider, Queen and Wolf templates.
+            roster: [spec("Arachna Queen", 4, 1), spec("Satyr", 2, 4)],
+            redRoster: [spec("Peasant", 1, 20)],
+            seed: 7,
+            maxLaps: 1,
+            headlessEvents: true,
+            beforeFightStart: (context) => {
+                const before = captureDeterministicRandomState();
+                const source = before.source;
+                if (!source) throw new Error("expected runMatch's seeded source");
+                let draws = 0;
+                restoreDeterministicRandomState({
+                    source: () => {
+                        draws += 1;
+                        return source();
+                    },
+                    uuidSequence: before.uuidSequence,
+                });
+                const harness = { uuidSequence: before.uuidSequence };
+                const first = JSON.stringify(exportBattleState(context, harness));
+                const second = JSON.stringify(exportBattleState(context, harness));
+                const after = captureDeterministicRandomState();
+                restoreDeterministicRandomState({ source, uuidSequence: after.uuidSequence });
+                expect(first).toContain("summonTemplates");
+                expect(second).toBe(first);
+                expect(after.uuidSequence).toBe(before.uuidSequence);
+                expect(draws).toBe(0);
+                checked = true;
+            },
+        });
+        expect(checked).toBe(true);
+    });
+
+    test("the export check catches a draw, a uuid step or a board change under HOC_NATIVE_SENTINELS", () => {
+        const saved = captureDeterministicRandomState();
+        const sentinels = process.env.HOC_NATIVE_SENTINELS;
+        const battle = { unitsHolder: {}, grid: {}, fightProperties: {}, attackHandler: {} };
+        const harness = { rng: 0, activeUnitId: "", uuidSequence: 0, summonSequence: 0, armyProfile: {} };
+        let board = 0;
+        const digest = (): string => String(board);
+        try {
+            restoreDeterministicRandomState({ source: makeRng(3), uuidSequence: 40 });
+            // Without sentinels a failed export leaves the uuid sequence where it found it.
+            delete process.env.HOC_NATIVE_SENTINELS;
+            const failing = (): unknown => {
+                createSecureUuid();
+                throw new Error("export failed");
+            };
+            expect(() => exportWithoutSideEffects(failing, digest, battle, harness)).toThrow("export failed");
+            expect(captureDeterministicRandomState().uuidSequence).toBe(40);
+
+            process.env.HOC_NATIVE_SENTINELS = "throw";
+            expect(exportWithoutSideEffects(() => ({ ok: 1 }), digest, battle, harness)).toBe('{"ok":1}');
+            expect(() => exportWithoutSideEffects(() => createSecureUuid(), digest, battle, harness)).toThrow(
+                "moved the uuid sequence 40 -> 41",
+            );
+            const draw = (): unknown => captureDeterministicRandomState().source?.();
+            expect(() => exportWithoutSideEffects(draw, digest, battle, harness)).toThrow(
+                "drew 1 values from the seeded source",
+            );
+            const mutate = (): unknown => (board += 1);
+            expect(() => exportWithoutSideEffects(mutate, digest, battle, harness)).toThrow("changed the board");
+
+            // "count" counts it and still returns the export.
+            process.env.HOC_NATIVE_SENTINELS = "count";
+            const counted = nativeExportSideEffects();
+            expect(exportWithoutSideEffects(mutate, digest, battle, harness)).toBe(String(board));
+            expect(nativeExportSideEffects()).toBe(counted + 1);
+        } finally {
+            if (sentinels === undefined) delete process.env.HOC_NATIVE_SENTINELS;
+            else process.env.HOC_NATIVE_SENTINELS = sentinels;
+            restoreDeterministicRandomState(saved);
+        }
     });
 });

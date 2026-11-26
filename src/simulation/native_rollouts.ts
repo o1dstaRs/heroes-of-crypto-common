@@ -38,7 +38,8 @@ import { V08A19CompactPlacementStrategy } from "../ai/versions/v0_8_a19_compact_
 import { V08A19F184LowerHumanPlacementStrategy } from "../ai/versions/v0_8_a19_f184_lower_human_placement";
 import { V08A19RankedPlacementStrategy } from "../ai/versions/v0_8_a19_ranked_placement";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { captureDeterministicRandomState } from "../utils/lib";
+import { FightStateManager } from "../fights/fight_state_manager";
+import { captureDeterministicRandomState, restoreDeterministicRandomState } from "../utils/lib";
 import type { INativeHarness } from "./lookahead";
 import type { SearchSelectionBounds } from "./search_selection_bounds";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "./v0_7_value_weights";
@@ -197,6 +198,9 @@ export function getNativeRolloutBackend(): INativeRolloutBackend | null {
         const { exportBattleState } = load("../../zig/parity/state_export.ts") as {
             exportBattleState(battle: INativeExportBattle, harness: INativeExportHarness): unknown;
         };
+        const { battleDigest } = load("../../zig/parity/digest.ts") as {
+            battleDigest(battle: INativeExportBattle, options: Record<string, boolean>): { fight: unknown };
+        };
         const prechecks: Record<NativePolicyVersion, INativePrecheck> = {
             "v0.1": compileHocPrecheck(engine.scopeManifest("v0.1")),
             "v0.8": compileHocPrecheck(engine.scopeManifest("v0.8")),
@@ -215,7 +219,12 @@ export function getNativeRolloutBackend(): INativeRolloutBackend | null {
             refusal: (policy: NativePolicyVersion, battle: Omit<INativeExportBattle, "attackHandler">) =>
                 prechecks[policy].refusal(battle),
             exportState: (battle: INativeExportBattle, harness: INativeExportHarness) =>
-                JSON.stringify(exportBattleState(battle, harness)),
+                exportWithoutSideEffects(
+                    exportBattleState,
+                    (board) => boardDigest(battleDigest, board),
+                    battle,
+                    harness,
+                ),
         });
     } catch (error) {
         nativeRolloutLog("load-error", `native rollouts off: ${(error as Error).message}`);
@@ -469,6 +478,11 @@ export interface INativeBankResult {
     requests: object[];
     /** a rollout ran (rolloutEnemyTeam is set) */
     played: boolean;
+    /**
+     * the harness names summons from the uuid sequence (summonIds "uuidSequence", the server's): the records'
+     * summonSequence is then the library's own count, which TypeScript does not keep (zig/BRIDGE.md)
+     */
+    uuidNamed?: boolean;
 }
 
 /**
@@ -523,6 +537,7 @@ export function runNativeBank(
         records,
         requests,
         played,
+        uuidNamed: input.harness.summonIds === "uuidSequence",
     });
     const tails = input.tails;
     const groups: number[][] = tails
@@ -679,7 +694,9 @@ export function compareNativeShadowBank(
             (t.aborted ? n.flags === flags.aborted : n.flags === flags.played && Object.is(n.value, t.value)) &&
             n.turns === t.turns &&
             n.uuidSequence === t.uuid &&
-            n.summonSequence === t.summon &&
+            // Under uuid naming TypeScript keeps no summon counter (the record holds the bank's start value), while
+            // the library still counts its summons; the uuid sequence above already names every summon.
+            (native.uuidNamed === true || n.summonSequence === t.summon) &&
             n.winner === t.winner &&
             (!captureMaterial ||
                 (Number.isNaN(tsMaterial) ? Number.isNaN(n.material) : Object.is(n.material, tsMaterial)));
@@ -771,6 +788,89 @@ export function enterNativeRoot(root: NativeRootScope | undefined): NativeRootSc
 }
 
 export const nativeSentinelsThrow = (): boolean => process.env[NATIVE_SENTINELS_ENV] === "throw";
+
+let exportSideEffects = 0;
+/** Exports this process found changing the state they read (HOC_NATIVE_SENTINELS only). */
+export const nativeExportSideEffects = (): number => exportSideEffects;
+
+const DIGEST_EVERYTHING = { setup: true, terrain: true, batch3: true, spells: true, batch4: true, helpingHand: true };
+
+/** The board's parity digest (zig/parity/digest.ts), with the fight FightStateManager holds when it is another one. */
+export function boardDigest(
+    battleDigest: (battle: INativeExportBattle, options: Record<string, boolean>) => { fight: unknown },
+    battle: INativeExportBattle,
+): string {
+    const bound: unknown = FightStateManager.getInstance().getFightProperties();
+    return JSON.stringify([
+        battleDigest(battle, DIGEST_EVERYTHING),
+        bound && bound !== battle.fightProperties
+            ? battleDigest({ ...battle, fightProperties: bound }, DIGEST_EVERYTHING).fight
+            : null,
+    ]);
+}
+
+/**
+ * The root's export, which may only read: the TypeScript search goes on from the same state after it, so an export
+ * that drew from the seeded source, moved the deterministic uuid sequence (the server names its summons from it, and
+ * unit ids seed the rollouts) or changed the board would shift every later TypeScript rollout of the search. A failed
+ * export leaves the random state as it found it. Under HOC_NATIVE_SENTINELS the export is checked: the seeded source's
+ * draws (counted through a forwarding source), the uuid sequence, and the board's digest with FightStateManager's fight,
+ * before and after; "throw" throws on a difference, "count" counts it (nativeExportSideEffects) and logs it once.
+ */
+export function exportWithoutSideEffects(
+    exportBattleState: (battle: INativeExportBattle, harness: INativeExportHarness) => unknown,
+    digest: (battle: INativeExportBattle) => string,
+    battle: INativeExportBattle,
+    harness: INativeExportHarness,
+): string {
+    const random = captureDeterministicRandomState();
+    const sentinels = process.env[NATIVE_SENTINELS_ENV];
+    const run = (): string => {
+        try {
+            return JSON.stringify(exportBattleState(battle, harness));
+        } catch (error) {
+            restoreDeterministicRandomState(random);
+            throw error;
+        }
+    };
+    if (!sentinels) return run();
+    // The check never refuses a root itself: a board the digest cannot read is checked without it.
+    const digestOrNull = (): string | null => {
+        try {
+            return digest(battle);
+        } catch (error) {
+            nativeRolloutLog("export-digest", `the export check skips the board digest: ${(error as Error).message}`);
+            return null;
+        }
+    };
+    const before = digestOrNull();
+    const { source } = random;
+    let draws = 0;
+    if (source) {
+        restoreDeterministicRandomState({
+            source: () => {
+                draws += 1;
+                return source();
+            },
+            uuidSequence: random.uuidSequence,
+        });
+    }
+    const json = run();
+    const { uuidSequence } = captureDeterministicRandomState();
+    restoreDeterministicRandomState({ source, uuidSequence });
+    const moved: string[] = [];
+    if (draws) moved.push(`drew ${draws} values from the seeded source`);
+    if (uuidSequence !== random.uuidSequence)
+        moved.push(`moved the uuid sequence ${random.uuidSequence} -> ${uuidSequence}`);
+    if (before !== null && digestOrNull() !== before) moved.push("changed the board");
+    if (moved.length) {
+        exportSideEffects += 1;
+        const message = `the state export ${moved.join(", ")}`;
+        if (sentinels === "throw") throw new Error(`native rollouts: ${message}`);
+        nativeRolloutLog("export-side-effect", `${message} (HOC_NATIVE_SENTINELS counts every one)`);
+    }
+    return json;
+}
 
 const sentinelDeps = new WeakSet<object>();
 

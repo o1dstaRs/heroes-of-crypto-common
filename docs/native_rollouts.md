@@ -47,6 +47,18 @@ would correct (`a19NeuralCorrectionEngages`), since it was measured on TypeScrip
 A request the library refuses ("unsupported request") marks the root; a rollout it cannot play refuses that bank only;
 either way the bank runs in TypeScript from the untouched state.
 
+The root's export only reads: the TypeScript search goes on from the same state, so an export that drew from the seeded
+source, moved the deterministic uuid sequence or changed the board would shift every later TypeScript rollout, in shadow
+mode too. The summon templates (Infest, Summon Wolves) are throwaway units built without moving the uuid sequence; the
+server names its summons from it and unit ids seed the rollouts, so before that fix (2026-11-26) a board that could
+summon changed the server's own decisions. A failed export leaves the random state as it found it, and under
+`HOC_NATIVE_SENTINELS` every export is checked (the source's draws, the uuid sequence, and the board's parity digest
+with FightStateManager's fight, before and after): `throw` throws, `count` counts it (`nativeExportSideEffects`).
+
+A shadow comparison checks each rollout's value, turns, uuid sequence, winner and material, and its summon counter
+only under `summonIds: "match"`: the server's harness (`"uuidSequence"`) keeps no summon counter, so its records hold
+the bank's start value while the library counts its own summons.
+
 The harness also names the engine path the rollouts reproduce (`INativeHarness.engine`): runMatch's (`"match"`, the
 default, which the request then leaves out) or the server's bot-seat deps (`"server"`, with summon ids
 `"uuidSequence"`). Until a library lists `"server"` in `supportedEngines`, it refuses such a request, so those roots stay

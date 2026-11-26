@@ -26,6 +26,7 @@ import {
     getEffectConfig,
     getSpellConfig,
 } from "../../src/configuration/config_provider";
+import { captureDeterministicRandomState, restoreDeterministicRandomState } from "../../src/utils/lib";
 
 const UNIT_FIELDS = [
     "unitProperties",
@@ -310,6 +311,10 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
         if (unit.summoned && SPELL_SUMMON_CREATURES.includes(unit.getName())) spellSummons = true;
     }
     let summonTemplates: Record<string, unknown> | undefined;
+    // The templates are throwaway units, and building one takes a value of the deterministic UUID sequence. The search
+    // goes on from this state after the export, and the server names its summons from that sequence (unit ids seed the
+    // rollouts), so the sequence is put back (native_rollouts.ts exportWithoutSideEffects checks the whole export).
+    const random = captureDeterministicRandomState();
     if (summons || spellSummons) {
         const { abilityFactory, effectFactory } = createCombatFactories();
         summonTemplates = {};
@@ -339,6 +344,7 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
             };
         }
     }
+    restoreDeterministicRandomState(random);
     for (const effect of ["Poison", "Break"]) {
         if (!(effect in effectConfigs)) effectConfigs[effect] = plainConfig(getEffectConfig(effect));
     }

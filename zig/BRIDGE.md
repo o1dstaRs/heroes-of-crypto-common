@@ -264,7 +264,9 @@ exact doubles.
   runMatch's createSummonedUnit does (`deterministicSimulationId("summon", seed, ..., sequence)`); `uuidSequence` keeps
   the id createSecureUuid gives under a seeded source, the "sim" UUID of deterministicUuidSequence, as the server's
   createSummonedUnit does inside its search. Every summon takes one value of each counter (UnitProperties' id is
-  allocated in both cases).
+  allocated in both cases). A pair record's `summonSequence` is the library's own count; it is comparable with
+  TypeScript only under `match` naming, since the server's harness keeps no summon counter (the adapter's shadow
+  comparison skips it under `uuidSequence`).
 - `engine`: `match` (default) reproduces runMatch's engine path; `server` the server's bot-seat deps
   (play_session.ts createBotSearchDeps: the known-paths provider, a full stat refresh and an aggression rebuild before
   every move and approach, the server's routes, damage laps marked by damage > 0 only). `server` needs
