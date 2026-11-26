@@ -132,6 +132,12 @@ export interface INativeHarness {
     summonScope: "rollout" | "call";
     seed?: number;
     getSummonSequence?: () => number;
+    /**
+     * The engine path the native rollouts reproduce: runMatch's ("match", the default when absent) or the server's
+     * bot-seat deps ("server", which needs summonIds "uuidSequence"). A library that does not list the engine in its
+     * build info refuses the request, so the root's banks stay in TypeScript (zig/BRIDGE.md).
+     */
+    engine?: "match" | "server";
 }
 
 interface ICandidate {

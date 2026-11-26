@@ -47,6 +47,11 @@ would correct (`a19NeuralCorrectionEngages`), since it was measured on TypeScrip
 A request the library refuses ("unsupported request") marks the root; a rollout it cannot play refuses that bank only;
 either way the bank runs in TypeScript from the untouched state.
 
+The harness also names the engine path the rollouts reproduce (`INativeHarness.engine`): runMatch's (`"match"`, the
+default, which the request then leaves out) or the server's bot-seat deps (`"server"`, with summon ids
+`"uuidSequence"`). Until a library lists `"server"` in `supportedEngines`, it refuses such a request, so those roots stay
+in TypeScript; the bot seat's deps set the field when the server builds its native harness.
+
 ## What a native bank leaves
 
 Rollout turns (an aborted rollout included) and the turn-budget throw, the deterministic uuid counter, `rolloutEnemyTeam`,

@@ -215,6 +215,22 @@ describe("native bank bookkeeping", () => {
         expect(requests[0].bank).toEqual({ skipAfterIllegal: true, summonScope: "rollout", material: false });
     });
 
+    test("the request names the engine path only when the harness does", () => {
+        const plain = scriptedBackend([{ records: [pair(0.5), pair(0.5), pair(0.5), pair(0.5)] }]);
+        runNativeBank(plain.native, { free: () => undefined }, bankInput());
+        expect("engine" in plain.requests[0]).toBe(false);
+        expect(plain.requests[0].summonIds).toBe("match");
+
+        const server = scriptedBackend([{ records: [pair(0.5), pair(0.5), pair(0.5), pair(0.5)] }]);
+        runNativeBank(
+            server.native,
+            { free: () => undefined },
+            bankInput({ harness: { summonIds: "uuidSequence", summonScope: "call", engine: "server" } }),
+        );
+        expect(server.requests[0].engine).toBe("server");
+        expect(server.requests[0].summonIds).toBe("uuidSequence");
+    });
+
     test("materials: the mean of the finite rollouts, -Infinity when a rollout was illegal", () => {
         const { native } = scriptedBackend([
             {

@@ -494,6 +494,8 @@ export function runNativeBank(
         policies: input.policies,
         soleAbominationDefend: input.soleAbominationDefend,
         summonIds: input.harness.summonIds,
+        // Named only when the harness names it, so a "match" harness sends the request it always sent.
+        ...(input.harness.engine !== undefined ? { engine: input.harness.engine } : {}),
     };
     const deadlineNs = (): bigint =>
         input.deadlineAt === null
