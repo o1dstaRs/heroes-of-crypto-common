@@ -368,18 +368,40 @@ fn footprintDistance(a: []const rec.Cell, b: []const rec.Cell) i32 {
     return best;
 }
 
+const Intent = struct {
+    kind: Protector,
+    ward: u8,
+    wards: [st.MAX_UNITS]u8 = undefined,
+    nw: usize = 0,
+
+    fn wardSlice(self: *const Intent) []const u8 {
+        return self.wards[0..self.nw];
+    }
+};
+
 /// The ward the protector `pi` is assigned to (buildV08BacklineProtectorIntent), or null. Abomination is released by
 /// default (V08_ABOMINATION_GUARD unset); no summons in scope.
 fn protectorWard(s: *const st.State, pi: u8) ?u8 {
+    const intent = protectorIntent(s, pi) orelse return null;
+    return intent.ward;
+}
+
+/// buildV08BacklineProtectorIntent: the protector's wards (every living ranged ally) and its primary ward (the most
+/// valuable, then by id). Angel needs two wards facing a live shooter; Queen needs a live enemy flyer; the finish
+/// window releases every role.
+fn protectorIntent(s: *const st.State, pi: u8) ?Intent {
     const kind = protectorKind(pi) orelse return null;
     if (kind == .abomination) return null;
     const p = &s.units[pi];
+    var intent = Intent{ .kind = kind, .ward = 0 };
     var best: ?u8 = null;
     var count: usize = 0;
     for (s.units[0..s.n_units], 0..) |*w, i| {
         if (!w.in_holder or i == pi or w.team != p.team or !isBeneficiary(w)) continue;
         count += 1;
         const wi: u8 = @intCast(i);
+        intent.wards[intent.nw] = wi;
+        intent.nw += 1;
         if (best) |b| {
             const vb = wardValue(&s.units[b]);
             const vw = wardValue(w);
@@ -403,7 +425,193 @@ fn protectorWard(s: *const st.State, pi: u8) ?u8 {
         }
         if (!flyer) return null;
     }
-    return ward;
+    intent.ward = ward;
+    return intent;
+}
+
+fn cellsOf(s: *const st.State, ui: u8) engine.Cells {
+    return engine.unitCells(&s.units[ui]);
+}
+
+fn coversWard(s: *const st.State, cells: []const rec.Cell, ward: u8, pi: u8) bool {
+    return footprintDistance(cells, cellsOf(s, ward).slice()) <= coverageRange(pi);
+}
+
+/// totalWardValue of the intent's wards that `cells` covers.
+fn coveredValue(s: *const st.State, intent: *const Intent, cells: []const rec.Cell, pi: u8) f64 {
+    var total: f64 = 0;
+    for (intent.wardSlice()) |w| {
+        if (coversWard(s, cells, w, pi)) total = @min(9007199254740991.0, total + wardValue(&s.units[w]));
+    }
+    return total;
+}
+
+/// preservesCurrentlyCoveredWards: every ward the protector covers now is still covered at `dest` (one permitted loss).
+fn keepsCovered(s: *const st.State, intent: *const Intent, pi: u8, dest: []const rec.Cell, permitted: ?u8) bool {
+    const current = cellsOf(s, pi);
+    for (intent.wardSlice()) |w| {
+        if (!coversWard(s, current.slice(), w, pi)) continue;
+        if (permitted != null and permitted.? == w) continue;
+        if (!coversWard(s, dest, w, pi)) return false;
+    }
+    return true;
+}
+
+/// catchUpDestinationAllowed: an uncovered primary ward may be approached when no covered ward is lost, or when the
+/// step restores the primary and raises the covered value.
+fn catchUpAllowed(s: *const st.State, intent: *const Intent, pi: u8, dest: []const rec.Cell) bool {
+    const current = cellsOf(s, pi);
+    const ward = cellsOf(s, intent.ward);
+    const range = coverageRange(pi);
+    const now = footprintDistance(current.slice(), ward.slice());
+    const after = footprintDistance(dest, ward.slice());
+    if (now <= range or after >= now) return false;
+    if (keepsCovered(s, intent, pi, dest, null)) return true;
+    return coversWard(s, dest, intent.ward, pi) and coveredValue(s, intent, dest, pi) > coveredValue(s, intent, current.slice(), pi);
+}
+
+fn lastAttackTarget(actions: []const rec.Action) ?u8 {
+    var i = actions.len;
+    while (i > 0) {
+        i -= 1;
+        switch (actions[i]) {
+            .melee_attack => |m| return m.target,
+            .range_attack => |r| return r.target,
+            else => {},
+        }
+    }
+    return null;
+}
+
+/// queenInterceptsLocalDiver: the Queen strikes an enemy already touching the primary ward, one ring out at most.
+fn queenIntercepts(s: *const st.State, intent: *const Intent, pi: u8, actions: []const rec.Action, dest: []const rec.Cell) bool {
+    if (intent.kind != .arachna_queen) return false;
+    const ti = lastAttackTarget(actions) orelse return false;
+    const t = &s.units[ti];
+    if (t.isDead()) return false;
+    const ward = cellsOf(s, intent.ward);
+    return footprintDistance(engine.unitCells(t).slice(), ward.slice()) <= 1 and footprintDistance(dest, ward.slice()) <= coverageRange(pi) + 1;
+}
+
+/// preservesV08BacklineProtectorIntent.
+fn preservesProtector(s: *const st.State, intent: *const Intent, pi: u8, actions: []const rec.Action) bool {
+    var buf: engine.Cells = .{};
+    const dest = destinationCells(s, pi, actions, &buf);
+    if (intent.kind == .angel and isDirectCombat(actions) and !coversWard(s, dest, intent.ward, pi)) return false;
+    if (catchUpAllowed(s, intent, pi, dest)) return true;
+    const intercept = queenIntercepts(s, intent, pi, actions, dest);
+    if (!keepsCovered(s, intent, pi, dest, if (intercept) intent.ward else null)) return false;
+    if (coversWard(s, dest, intent.ward, pi)) return true;
+    return intercept;
+}
+
+fn pureMove(actions: []const rec.Action) bool {
+    if (actions.len == 0) return false;
+    for (actions) |a| if (a != .move_unit) return false;
+    return true;
+}
+
+fn sameFootprint(a: []const rec.Cell, b: []const rec.Cell) bool {
+    if (a.len != b.len) return false;
+    for (a) |x| {
+        var found = false;
+        for (b) |y| if (x.x == y.x and x.y == y.y) {
+            found = true;
+        };
+        if (!found) return false;
+    }
+    return true;
+}
+
+/// The closest distance from `cells` to an enemy (the Queen's: a flyer) touching a ward the protector covers now.
+fn closestLocalThreat(s: *const st.State, intent: *const Intent, pi: u8, cells: []const rec.Cell) ?i32 {
+    const current = cellsOf(s, pi);
+    const team = s.units[pi].team;
+    var best: ?i32 = null;
+    for (s.units[0..s.n_units]) |*e| {
+        if (!e.in_holder or e.isDead() or e.team == team) continue;
+        if (intent.kind == .arachna_queen and !engine.canFly(e)) continue;
+        const ecells = engine.unitCells(e);
+        var local = false;
+        for (intent.wardSlice()) |w| {
+            if (coversWard(s, current.slice(), w, pi) and footprintDistance(ecells.slice(), cellsOf(s, w).slice()) <= 1) local = true;
+        }
+        if (!local) continue;
+        const d = footprintDistance(cells, ecells.slice());
+        best = if (best) |b| @min(b, d) else d;
+    }
+    return best;
+}
+
+/// isV08BacklineProtectorPureMoveMeaningful: closer to the primary, more covered value, or closer to a local threat.
+fn pureMoveMeaningful(s: *const st.State, intent: *const Intent, pi: u8, actions: []const rec.Action) bool {
+    if (!pureMove(actions)) return false;
+    const current = cellsOf(s, pi);
+    var buf: engine.Cells = .{};
+    const dest = destinationCells(s, pi, actions, &buf);
+    if (sameFootprint(current.slice(), dest) or !preservesProtector(s, intent, pi, actions)) return false;
+    const ward = cellsOf(s, intent.ward);
+    if (footprintDistance(dest, ward.slice()) < footprintDistance(current.slice(), ward.slice())) return true;
+    if (coveredValue(s, intent, dest, pi) > coveredValue(s, intent, current.slice(), pi)) return true;
+    const now = closestLocalThreat(s, intent, pi, current.slice()) orelse return false;
+    const after = closestLocalThreat(s, intent, pi, dest) orelse return false;
+    return after < now;
+}
+
+/// followWard: the closest catch-up route toward the uncovered primary ward that loses no covered ward (else the best
+/// value swap); by distance, route weight, then cell y and x.
+fn followWard(c: *ai.Ctx, intent: *const Intent, out: *ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    const ward = cellsOf(s, intent.ward);
+    const now = footprintDistance(engine.unitCells(u).slice(), ward.slice());
+    const mp = c.actualPath();
+    const Best = struct { ri: usize, d: i32, w: f64, cell: rec.Cell };
+    var preserving: ?Best = null;
+    var swap: ?Best = null;
+    for (mp.known(), 0..) |*r, ri| {
+        const body = ai.footprintForAnchor(u, r.cell);
+        const dest = body.slice();
+        if (!ai.canLandAt(s, c.ui, r.cell)) continue;
+        const d = footprintDistance(dest, ward.slice());
+        if (d >= now or !catchUpAllowed(s, intent, c.ui, dest)) continue;
+        const cand_ = Best{ .ri = ri, .d = d, .w = r.weight, .cell = r.cell };
+        const slot = if (keepsCovered(s, intent, c.ui, dest, null)) &preserving else &swap;
+        if (slot.*) |b| {
+            const better = if (cand_.d != b.d) cand_.d < b.d else if (cand_.w != b.w) cand_.w < b.w else (cand_.cell.y < b.cell.y or (cand_.cell.y == b.cell.y and cand_.cell.x < b.cell.x));
+            if (better) slot.* = cand_;
+        } else slot.* = cand_;
+    }
+    const best = preserving orelse swap orelse return false;
+    const r = &mp.known()[best.ri];
+    out.* = .{};
+    const len = mp.routeCells(r, &out.path);
+    const body = ai.footprintForAnchor(u, r.cell);
+    @memcpy(out.targets[0..body.slice().len], body.slice());
+    out.push(.{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..body.slice().len], .has_lava = r.has_lava } });
+    return true;
+}
+
+/// prioritizeV08BacklineProtector: an Angel or Queen with a ward keeps protection-compatible work, follows a displaced
+/// primary ward, or holds the screen (wait, else defend). Abomination's hard-risk rule is unused: it is released.
+pub fn backlineProtector(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    const s = c.s;
+    const intent = protectorIntent(s, c.ui) orelse return util.copyDecision(out, in);
+    const current = cellsOf(s, c.ui);
+    if (!coversWard(s, current.slice(), intent.ward, c.ui)) {
+        var buf: engine.Cells = .{};
+        const dest = destinationCells(s, c.ui, in.slice(), &buf);
+        if (catchUpAllowed(s, &intent, c.ui, dest) and keepsCovered(s, &intent, c.ui, dest, null)) return util.copyDecision(out, in);
+        if (followWard(c, &intent, out)) return;
+        if (catchUpAllowed(s, &intent, c.ui, dest)) return util.copyDecision(out, in);
+        if (sameFootprint(dest, current.slice())) return util.copyDecision(out, in);
+    } else if (preservesProtector(s, &intent, c.ui, in.slice())) {
+        if (!pureMove(in.slice()) or pureMoveMeaningful(s, &intent, c.ui, in.slice())) return util.copyDecision(out, in);
+    }
+    if (util.canHourglass(s, c.ui)) util.setWait(out, c.ui) else {
+        out.* = .{};
+        out.push(.{ .defend_turn = .{ .unit = c.ui } });
+    }
 }
 
 /// buildV08BacklineWardIntent: the protector (Abomination first, then by id) whose assigned ward is this unit.
@@ -697,6 +905,7 @@ pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision
         .prioritize => prioritize(c, in, out),
         .finish => return finish(c, in, out),
         .backline_ward => backlineWard(c, in, out),
+        .backline_protector => backlineProtector(c, in, out),
         .ranged_positioning => return rangedPositioning(c, in, out),
         else => return false,
     }
