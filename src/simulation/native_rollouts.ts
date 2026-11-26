@@ -30,11 +30,13 @@
  */
 
 import type { IAIStrategy } from "../ai/ai_strategy";
+import { A19_COHERENT_MELEE_APPROACH_ENV, a19CoherentMeleeApproachEnabled } from "../ai/coherent_melee_approach";
 import { A19_DECOY_AWARE_ENV, a19DecoyAwareEnabled } from "../ai/decoy_aware";
 import { seatEnvName } from "../ai/seat_env";
 import { StrategyV0_1 } from "../ai/versions/v0_1";
 import { StrategyV0_8 } from "../ai/versions/v0_8";
 import { V08_MAGE_DAMAGE_KILL_PRIORITY_ENV } from "../ai/versions/v0_8_support_roles";
+import { A19_WILD_REGEN_GIFT_ENV, a19WildRegenGiftEnabled } from "../ai/wild_regeneration_gift";
 import { V08_A13_VALUE_LEAF } from "../ai/versions/v0_8_a13_profile";
 import { buildV08A19SearchEnvironment } from "../ai/versions/v0_8_a19_profile";
 import { V08A19BoarBattleMageFlankPlacementStrategy } from "../ai/versions/v0_8_a19_boar_battle_mage_flank_placement";
@@ -471,6 +473,16 @@ const NATIVE_SWITCHES: Readonly<
     mage_damage_kill_priority: {
         keys: [`${V08_MAGE_DAMAGE_KILL_PRIORITY_ENV}_LEFT`, `${V08_MAGE_DAMAGE_KILL_PRIORITY_ENV}_RIGHT`],
         value: (team, env) => env[seatEnvName(V08_MAGE_DAMAGE_KILL_PRIORITY_ENV, team)] === "1",
+    },
+    // v0_8.ts's final a19-coherent-melee-approach pass (on unless A19_COHERENT_MELEE_APPROACH_<SIDE>=0)
+    coherent_melee: {
+        keys: [`${A19_COHERENT_MELEE_APPROACH_ENV}_LEFT`, `${A19_COHERENT_MELEE_APPROACH_ENV}_RIGHT`],
+        value: (team) => a19CoherentMeleeApproachEnabled(team),
+    },
+    // the a19-wild-regen-gift rule in candidates.ts and v0_4.ts's Troll (on unless A19_WILD_REGEN_GIFT_<SIDE>=0)
+    wild_regen_gift: {
+        keys: [`${A19_WILD_REGEN_GIFT_ENV}_LEFT`, `${A19_WILD_REGEN_GIFT_ENV}_RIGHT`],
+        value: (team) => a19WildRegenGiftEnabled(team),
     },
 };
 

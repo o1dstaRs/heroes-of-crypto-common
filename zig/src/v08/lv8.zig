@@ -1506,13 +1506,15 @@ fn gridFootprint(u: *const st.Unit, a: rec.Cell) engine.Cells {
     return out;
 }
 
-/// a19CoherentMeleeApproach (on unless A19_COHERENT_MELEE_APPROACH_<SIDE>=0): a move followed by a strike from a cell
+/// a19CoherentMeleeApproach (on unless A19_COHERENT_MELEE_APPROACH_<SIDE>=0: util.Switches.coherent_melee; off, the
+/// decision passes unchanged): a move followed by a strike from a cell
 /// the move does not reach (an aura or Rapid Charge reposition replaced the strike, not the move) is repaired: the move
 /// is rebuilt to the strike's stand cell and the strike made stationary; a strike from the current cell drops the stale
 /// move; an approach the engine would not allow keeps the actions up to the move and drops the strike. Hidden, No
 /// Melee, Terrifying Gaze, Cowardice and Fire Walls (repairUnavailableMovePrefixedAttack) are not in scope.
 pub fn coherentMelee(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
     util.copyDecision(out, in);
+    if (!util.battle.switches[c.unit().team].coherent_melee) return true;
     const s = c.s;
     const acts = in.slice();
     var strike: ?usize = null;

@@ -1066,7 +1066,8 @@ const Gen = struct {
                     }
                     for (order[0..n]) |k| {
                         const a = &s.units[k];
-                        if (spell == .wild_regeneration and (a.has(.wild_regeneration) or !(a.max_hp > u.max_hp))) continue;
+                        // a19-wild-regen-gift-v1 (util.Switches.wild_regen_gift): the gift only to an ally it is worth more to.
+                        if (spell == .wild_regeneration and util.battle.switches[team].wild_regen_gift and (a.has(.wild_regeneration) or !(a.max_hp > u.max_hp))) continue;
                         if (spells.canCastSpell(s, self.c.ui, k, spell, cfg)) self.pushSpell(b.spell, k, null, 0, 0);
                     }
                 },

@@ -264,24 +264,31 @@ fn trollWildRegen(c: *ai.Ctx, out: *ai.Decision) bool {
     }
     const cfg = &s.spell_cfg[raw];
     if (!cfg.loaded) return false;
+    // a19-wild-regen-gift-v1 (util.Switches.wild_regen_gift). Off, every ally of at most the gift level qualifies, the
+    // most max HP x living creatures first.
+    const gift_rule = util.battle.switches[u.team].wild_regen_gift;
     var cand: [st.MAX_UNITS]u8 = undefined;
     var n: usize = 0;
     for (s.holderOrder()) |k| {
         const a = &s.units[k];
         if (!util.livingOf(s, k, u.team) or k == c.ui) continue;
         if (@as(f64, @floatFromInt(a.level)) > cfg.max_gift_level) continue;
-        if (a.has(.wild_regeneration) or !(a.max_hp > u.max_hp)) continue; // isWorthwhileWildRegenerationGift
+        if (gift_rule and (a.has(.wild_regeneration) or !(a.max_hp > u.max_hp))) continue; // isWorthwhileWildRegenerationGift
         cand[n] = k;
         n += 1;
     }
-    std.sort.insertion(u8, cand[0..n], s, struct {
-        fn lt(st_: *const State, p: u8, q: u8) bool {
-            const a = &st_.units[p];
-            const b = &st_.units[q];
+    const Order = struct {
+        s: *const State,
+        gift_rule: bool,
+        fn lt(o: @This(), p: u8, q: u8) bool {
+            const a = &o.s.units[p];
+            const b = &o.s.units[q];
+            if (!o.gift_rule) return a.max_hp * a.amount_alive > b.max_hp * b.amount_alive;
             if (a.max_hp != b.max_hp) return a.max_hp > b.max_hp;
             return util.cumulativeHp(a) > util.cumulativeHp(b);
         }
-    }.lt);
+    };
+    std.sort.insertion(u8, cand[0..n], Order{ .s = s, .gift_rule = gift_rule }, Order.lt);
     for (cand[0..n]) |t| {
         if (!spells.canCastSpell(s, c.ui, t, spell, cfg)) continue;
         out.* = .{};
