@@ -900,7 +900,9 @@ fn loadGrid(s: *State, grid: Value, fight: Value, ids: []const []const u8, why: 
             const e = expect[x][y];
             // Lava Striders: a unit that can traverse lava stands on the square, and a death there leaves ground
             // (grid.cleanupAll writes no "L" back).
-            const lava_ok = e == st.LAVA and (v == st.EMPTY or (st.isUnitCode(v) and artifacts.canTraverseLava(s, &s.units[v - 1])));
+            // Any unit may stand on a lava cell: besides lava traversers, Infest spawns a Spider on its corpse's cells as
+            // they are, so a Lava Striders corpse on lava leaves a non-traverser there (TS does the same).
+            const lava_ok = e == st.LAVA and (v == st.EMPTY or st.isUnitCode(v));
             if (!lava_ok and (v == st.BLOCK or v == st.LAVA or e != st.EMPTY) and v != e) {
                 return why.unsupported("terrain cell ({d},{d}) is {s}", .{ x, y, if (code.len == 0) "empty" else code });
             }

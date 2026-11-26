@@ -969,8 +969,11 @@ pub const BookSpell = struct {
 };
 
 /// Raw entries a unit can hold (Healer's Heal x4 + Blessing x2 is the largest wave-1 book; a Queen may steal two).
-pub const MAX_BOOK = 16;
-pub const MAX_BOOK_SPELLS = 6;
+/// 24: a Queen that steals castable cards takes their book entries (Predatory Assimilation); up to 19 seen on 200
+/// production-like battles (server-35's capacity census, 2026-11-26), so 24 leaves margin. An overflow still refuses.
+pub const MAX_BOOK = 24;
+/// 10: up to 8 distinct spells seen on a thief's parsed book (same census).
+pub const MAX_BOOK_SPELLS = 10;
 
 /// One vined cell (src/spells/vines.ts Vine): laps remaining and the thrower's team.
 pub const Vine = struct {
