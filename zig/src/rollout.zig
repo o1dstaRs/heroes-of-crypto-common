@@ -59,22 +59,12 @@ pub fn policyFor(version: []const u8) ?DecideFn {
 /// rollout from such a root (no Infest, no theft, no spells), so checking the root covers every state of the call.
 pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 {
     _ = ident; // the src/v08 gap checks that named creatures are gone (common 6e6aff54, d5fddea9)
+    // src/v08 covers the abilities of batches 1-3 (common 4f5152ba), which is everything the loader accepts; its
+    // casting passes are not ported yet, so a board where a unit can cast, or vines lie, stays out of scope.
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
-        if (u.n_abilities > 0) return std.fmt.bufPrint(buf, "slot {d} has ability {s}", .{ i, u.abilities[0].id.name() }) catch "an ability";
-        if (u.n_auras > 0 or u.n_stolen > 0 or u.web_locked or u.rallying_volley_granted != 0 or u.target >= 0)
-            return std.fmt.bufPrint(buf, "slot {d} carries ability state", .{i}) catch "ability state";
         if (u.n_book > 0 or u.n_spells > 0) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
-        for ([_][]const st.AppliedSpell{ u.buffs.items[0..u.buffs.len], u.debuffs.items[0..u.debuffs.len], u.effects.items[0..u.effects.len] }) |list| {
-            for (list) |sp| {
-                switch (sp.id) {
-                    .morale, .dismorale, .break_, .armor_augment, .might_augment, .sniper_augment, .movement_augment, .empower_augment => {},
-                    else => return std.fmt.bufPrint(buf, "slot {d} has {s}", .{ i, sp.id.name() }) catch "an ability buff",
-                }
-            }
-        }
     }
-    if (s.ember_teams != 0) return "an Ember Covenant ring";
     if (s.fight.n_vines != 0) return "vines on the board";
     return null;
 }

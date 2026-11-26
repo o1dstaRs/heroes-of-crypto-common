@@ -478,7 +478,7 @@ fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []
     if (req.policies[st.Team.LEFT] == rollout.policyFor("v0.8") or req.policies[st.Team.RIGHT] == rollout.policyFor("v0.8")) {
         var why_buf: [96]u8 = undefined;
         if (rollout.v08Scope(&h.state, &e.ident, &why_buf)) |why| {
-            e.fail("unsupported request: the v0.8 port covers boards without abilities ({s})", .{why});
+            e.fail("unsupported request: the v0.8 port covers boards without spells or vines ({s})", .{why});
             return null;
         }
     }
