@@ -16,10 +16,11 @@ import {
     A19_CLOSING_PICK_POLICY,
     a19ClosingPickCreature,
     a19ClosingPickSynergyBonus,
-    type IA19ClosingPickInput,
 } from "../../src/ai/setup/a19_closing_pick";
 import { a19CounterDraftGateOpen } from "../../src/ai/setup/a19_counter_draft";
 import { creatureIdForName, creatureInfo } from "../../src/ai/setup/creature_score";
+
+import { CPC_GAMES } from "./fixtures/cpc_closing_pick_games";
 
 const id = (name: string): number => {
     const found = creatureIdForName(name);
@@ -27,86 +28,28 @@ const id = (name: string): number => {
     return found;
 };
 
-/**
- * The level-4 picks of the six human games of confirmation CPC (docs/closing_pick_adoption.md), as the AI seat met them
- * in the production re-draft: offers, the earlier layers' choice, its five creatures, the opposing creatures it could
- * see and the game's bans. `expected` is the pick the research hook made there.
- */
-const CPC_GAMES: (IA19ClosingPickInput & { game: string; expected: number })[] = [
-    {
-        game: "1a785955",
-        seed: "1a785955-68f1-478a-8e0d-d633728c4701:1",
-        level: 4,
-        available: [19, 29, 39, 40, 41, 57],
-        current: 40,
-        ownCreatureIds: [2, 22, 4, 14, 37],
-        knownOpponentCreatureIds: [33, 47, 26, 52, 28],
-        bannedCreatureIds: [49, 21, 46, 23, 48, 11, 51, 25, 34, 53, 16, 5, 18, 7, 27, 42, 9, 43, 10, 20],
-        expected: 57,
-    },
-    {
-        game: "9208870e",
-        seed: "9208870e-10ae-4432-92d3-728c41f483a1:1",
-        level: 4,
-        available: [20, 39, 41, 42, 43, 44],
-        current: 42,
-        ownCreatureIds: [21, 2, 16, 51, 37],
-        knownOpponentCreatureIds: [47, 22, 34, 27],
-        bannedCreatureIds: [31, 1, 23, 46, 13, 48, 14, 4, 6, 52, 15, 36, 28, 18, 30, 40, 19, 29, 9, 10],
-        expected: 44,
-    },
-    {
-        game: "76f5f3d5",
-        seed: "76f5f3d5-7326-4949-8b28-4dfb96f10794:2",
-        level: 4,
-        available: [19, 39, 40, 41, 42, 43],
-        current: 40,
-        ownCreatureIds: [48, 22, 14, 6, 38],
-        knownOpponentCreatureIds: [3, 26, 4, 29],
-        bannedCreatureIds: [31, 49, 1, 32, 23, 46, 25, 53, 34, 55, 51, 24, 54, 27, 8, 9, 20, 10, 57, 44],
-        expected: 19,
-    },
-    {
-        game: "909e7898",
-        seed: "909e7898-ba42-4f8e-a9f4-14ea8bdd8e1d:1",
-        level: 4,
-        available: [9, 19, 39, 40, 42, 44],
-        current: 40,
-        ownCreatureIds: [32, 22, 51, 14, 37],
-        knownOpponentCreatureIds: [1, 36, 8],
-        bannedCreatureIds: [46, 48, 47, 2, 21, 49, 4, 55, 35, 6, 25, 53, 28, 38, 18, 41, 43, 29, 10, 57],
-        expected: 44,
-    },
-    {
-        game: "3fd7b865",
-        seed: "3fd7b865-579d-4c28-b2cd-cd18c153cc01:1",
-        level: 4,
-        available: [9, 19, 20, 29, 42, 57],
-        current: 42,
-        ownCreatureIds: [13, 23, 15, 25, 38],
-        knownOpponentCreatureIds: [31, 50],
-        bannedCreatureIds: [32, 22, 49, 2, 12, 3, 51, 16, 4, 35, 6, 52, 56, 17, 8, 44, 10, 41, 43, 40],
-        expected: 19,
-    },
-    {
-        game: "974d9737",
-        seed: "974d9737-0f79-4f5e-965c-66e1216c1e39:1",
-        level: 4,
-        available: [10, 19, 29, 40, 41, 57],
-        current: 40,
-        ownCreatureIds: [21, 22, 35, 14, 37],
-        knownOpponentCreatureIds: [1, 24],
-        bannedCreatureIds: [47, 3, 32, 48, 2, 23, 5, 15, 25, 4, 52, 51, 17, 18, 38, 44, 9, 20, 43, 42],
-        expected: 19,
-    },
-];
-
 describe(A19_CLOSING_PICK_POLICY, () => {
-    test("reproduces the research hook's level-4 picks in the six human games of confirmation CPC", () => {
-        for (const { game, expected, ...input } of CPC_GAMES) {
-            expect([game, a19ClosingPickCreature(input)]).toEqual([game, expected]);
-            expect(creatureInfo(expected)?.level).toBe(4);
+    test("with counter model v2 (the default) makes the recorded level-4 picks in the six human games of confirmation CPC", () => {
+        for (const { game, expectedV2, ...input } of CPC_GAMES) {
+            expect([game, a19ClosingPickCreature(input)]).toEqual([game, expectedV2]);
+            if (expectedV2 !== undefined) expect(creatureInfo(expectedV2)?.level).toBe(4);
         }
+    });
+
+    test("A19_COUNTER_MODEL=v1 restores the research hook's picks of confirmation CPC", () => {
+        const script = `
+            const { a19ClosingPickCreature } = await import(${JSON.stringify(`${import.meta.dir}/../../src/ai/setup/a19_closing_pick.ts`)});
+            const { A19_COUNTER_MODEL_ID } = await import(${JSON.stringify(`${import.meta.dir}/../../src/ai/setup/a19_counter_draft.ts`)});
+            const { CPC_GAMES } = await import(${JSON.stringify(`${import.meta.dir}/fixtures/cpc_closing_pick_games.ts`)});
+            console.log(JSON.stringify({ model: A19_COUNTER_MODEL_ID, picks: CPC_GAMES.map(({ expected, expectedV2, game, ...input }) => [game, a19ClosingPickCreature(input) ?? null]) }));
+        `;
+        const result = Bun.spawnSync([process.execPath, "-e", script], {
+            env: { ...process.env, A19_COUNTER_MODEL: "v1" },
+        });
+        expect(result.exitCode).toBe(0);
+        const out = JSON.parse(result.stdout.toString().trim().split("\n").pop()!);
+        expect(out.model).toBe("a19-counter-draft-v1");
+        expect(out.picks).toEqual(CPC_GAMES.map(({ game, expected }) => [game, expected]));
     });
 
     test("stays silent off level 4, with nothing seen, without a current choice and once the counter draft's gate opens", () => {
@@ -120,8 +63,9 @@ describe(A19_CLOSING_PICK_POLICY, () => {
     });
 
     test("keeps the current choice when it is already the best offer or the only one", () => {
-        for (const { game, expected, ...input } of CPC_GAMES) {
-            expect([game, a19ClosingPickCreature({ ...input, current: expected })]).toEqual([game, undefined]);
+        for (const { game, expectedV2, ...input } of CPC_GAMES) {
+            const best = expectedV2 ?? input.current;
+            expect([game, a19ClosingPickCreature({ ...input, current: best })]).toEqual([game, undefined]);
             expect([game, a19ClosingPickCreature({ ...input, available: [input.current!] })]).toEqual([
                 game,
                 undefined,

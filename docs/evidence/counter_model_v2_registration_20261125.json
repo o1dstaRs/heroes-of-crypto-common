@@ -1,0 +1,89 @@
+{
+    "id": "counter-model-v2-MV3-20261125",
+    "question": "On the deploying tree, does the refit counter model (counter_model_v2.json in place of a19-counter-draft-v1's strengths and counters, for the counter draft and the closing pick) gain points for a Spymaster seat where it changes the seat's army, without costing a Scout seat or the human-history guard?",
+    "decisionRule": [
+        "Confirmation MV3 of the refit counter model on the deploying tree (AI against AI) and its human guard MV3G. Written",
+        "before any game of MV3 or MV3G ran and before MV1's final result was read (MV1's Spymaster stratum is still running;",
+        "an interim look at 961 of its changed cases was +7.09 per changed draft, and one candidate game hit a placement bug),",
+        "November 25, 2026, 19:15Z.",
+        "",
+        "Why a new test: MV1 (sha e7bee2f1) has a 0-quality-errors bar and already has one quality error: in candidate game",
+        "sim-2611252701-42-1 the v35 split re-place left no 2x2 cell for Magic Dragon, which fight start then deleted. That is a",
+        "production placement bug (it strands any large stack), fixed by the client session in server 20aea77 (\"Never let an AI",
+        "seat's re-place strand a stack\"). MV1 stays recorded with its quality gate failed. MV2 (registered to count only if MV1",
+        "passed) decides nothing. MV3 runs only if MV1's Spymaster strength bar holds (its lower bound per changed draft above",
+        "0); otherwise it is not run.",
+        "",
+        "Tree: server 20aea77e627db252a0374c36930942dda24fab14 (origin main) with common b60b2ab6 (0.1.8, as pinned), plus",
+        "research-only files: the draft harness, the game-id override in ranked_adapter.ts and the research seam in",
+        "a19_counter_draft.ts that swaps the counter model's strengths and counters (draft_guard.ts sha256 a62027cbc869db2c...,",
+        "a19_counter_draft.ts 679c1eedf8dec6cd...). Candidate: hook model_v2 with counter_model_v2.json (07c56c687e635814...; unchanged from MV1).",
+        "",
+        "MV3 populations (fresh seeds, the opponent's doctrine drawn live, both seats, production everywhere else):",
+        "  S3 (primary): 1,000 drafted families from seed 2611253201, the candidate seat forced to Spymaster.",
+        "  C3 (secondary): 400 drafted families from seed 2611253301, the candidate seat forced to Scout.",
+        "Stage 1 drafts production and the candidate (each host runs all of it); stage 2 plays both drafts of every changed case",
+        "(deep fit, same seeds) in 48 shards: this Mac 0-13, x3d 14-27, basenode 28-47 (the client session runs basenode).",
+        "",
+        "MV3G: the owner-history games re-drafted with the hook on this tree against production's re-draft; each changed army",
+        "plays the human's replayed setup on the batteries' seeds of production's own level-4 option, paired with production's",
+        "army; life-run15k on this tree, spec or-prod; reported as MV1G.",
+        "",
+        "Reported as MV1 per stratum (analyze.py: per changed case, families weighted equally, 95% from 10,000 family",
+        "resamples; the split by the opponent's doctrine as a report). Bars: S3's lower bound per changed draft above 0; C3's",
+        "lower bound at least -3; 0 quality errors in MV3 and MV3G; MV3G's estimate at least -2 per game. All met makes the",
+        "refit model (a19-counter-draft-v2: counter_model_v2.json in place of v1 for the counter draft and the closing pick) an",
+        "adoption candidate for every default AI seat and Premium draft advice."
+    ],
+    "decisionRuleSha256": "e62c89868e8b201c2417282a8178fe7703e3cd46e9f3f4d98196085330ed7235",
+    "registeredAt": "2026-11-25T19:15:00Z",
+    "tree": {
+        "server": "20aea77e627db252a0374c36930942dda24fab14",
+        "common": "b60b2ab6c9516b1eaa5c8f286522dac4e4f797d4",
+        "harness": "mv3-bundle.tgz sha256 aeed224f70ad2a62dbb5cd359c484d26d68c0b268b6f710d013faead50716409"
+    },
+    "inputsSha256": {
+        "counter_model_v2.json": "07c56c687e63581421b8dd29222702ddeab35fa4da7995e09a76cf9764215277",
+        "rg_stage1.ts": "9c34220f56585bce1eee5ed1da8d01ee1fc395116a029d214c2349088e5645e8",
+        "stage2.ts": "21b862e9197b7b1e1c61d42e706b1ad7ab373c1e45ce94688df3b94da2cb407c",
+        "analyze.py": "28ec6dc0333aa55ff0025fa6e85af4ba3b539f065c596452eb8dd5bb52daabe3",
+        "run_mv3.sh": "a17ef0a613711928540e32f0ac2d08262da909354e8d9efd11129b27a0f74f08",
+        "guard/hook_model_v2.ts": "fa2a855b8334b0f3c6bc853e4abdf418eb184fbc5928f539091c0e75592bdb7e",
+        "guard/build_guard_bank_mv3.ts": "29eb2ca92be8000428aee9ce3b70710b49f30e3d9894714e4bb1e50037d9846f",
+        "guard/run_mv3g.sh": "6cc4fe32c06410f1d020d0fed730aa8f4412e93a6d91ebb0ac3715f1862bc10d",
+        "guard/analyze_guard_mv3.py": "13abde68c388eaff548a59e47f3076d3314a7155030a2ed3e54f05c3f9abea34",
+        "guard/hooked-10.json": "4a9ee8864806c98a3c3e513165fdd84896f94d9cc7170028298bc7dda17062d5",
+        "guard/hooked-49.json": "9e53bbe0cbf853ef1cd17da9ac51bba5438011519579427cdc277c30a1ceb604",
+        "guard/hooked-0c1e.json": "4c80547ac3a9dbaaa5b0f1199cd2a69e5fdd412e2acf5c7f81d6c8e95fc878a7",
+        "src/simulation/ai_iteration/draft_guard.ts (MV3 tree)": "a62027cbc869db2cd762eefb90692ff4ac4a2c3e3bf2d7cd26e1bd689645dc9a",
+        "src/simulation/ai_iteration/ranked_adapter.ts (MV3 tree)": "e91e1733aa55563527d9afdee5dcce03ac07bd70a47aeb2d6d47a3e6fcff8525",
+        "src/ai/setup/a19_counter_draft.ts (research seam on the MV3 tree)": "679c1eedf8dec6cda3e40e7a618a34ef241e0156abf5833a5d415ab4dc1a5079",
+        "bank-guard-mv3.json": "1db6913c4e683f9c4d876ffb853170834268ce8b9896cdee117941c6377476e6",
+        "bank-guard-mv3-prod.json": "defbce0537197f04ef46e79797acc460219e1b2fa7d95268267ec81810261133",
+        "mv3-bundle.tgz": "aeed224f70ad2a62dbb5cd359c484d26d68c0b268b6f710d013faead50716409"
+    },
+    "populations": {
+        "S3": {
+            "families": 1000,
+            "seed": 2611253201,
+            "candidateDoctrine": "Spymaster",
+            "role": "primary"
+        },
+        "C3": {
+            "families": 400,
+            "seed": 2611253301,
+            "candidateDoctrine": "Scout",
+            "role": "secondary"
+        },
+        "MV3G": {
+            "games": 29,
+            "tasksPerArm": 264,
+            "role": "human guard (owner-history re-drafts)"
+        }
+    },
+    "screen": {
+        "id": "MV1",
+        "decisionRuleSha256": "e7bee2f15a88bca52bb274d744e0405e2503108276b29c8a6deefbb812a000de",
+        "note": "MV1's quality gate failed (one placement-bug game, fixed in server 20aea77); MV1 stays recorded as failed and MV3 decides."
+    }
+}

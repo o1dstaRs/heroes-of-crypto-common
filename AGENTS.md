@@ -9,9 +9,25 @@ drawn a third of the time and its information used. Synergies should be planned,
 picked. Artifacts and upgrades should be chosen for the army's strategy, and units placed well. Every such change
 names the goals it advances and reports the scorecard metric before and after.
 
+## Counter model v2 — November 26, 2026
+
+**The current default is profile v37.** `a19-counter-model-v2` replaces the strengths and counters of the counter
+draft's matchup model (a19-counter-draft-v1, fitted on 40,040 production games before profile v26) with a refit toward
+v1 on 6,549 AI-vs-AI games of profiles v34 and v35 (`src/ai/setup/draft_models/a19_counter_draft_v2.json`). The counter
+draft (v26) and the closing pick (v34) score with it; their rules are unchanged, and Premium draft advice goes through
+the same decider. Adopted under the owner's standing instruction ("Make sure we lock in wins"), for the goal that every
+doctrine use its information. Registered confirmation MV3 (server 20aea77, profile v35 with the placement fix):
+Spymaster seat +9.18 points per changed draft (95% +5.96 to +12.47; 84% of its drafts change), Scout seat +4.88 (−0.46
+to +10.29), human guard MV3G +2.16 per game (−5.60 to +10.13), 0 quality errors; all four gates passed. It is a gain
+against the v1 default AI, not a win rate against people. The switch is `A19_COUNTER_MODEL` (`v2` unless `v1`, read once
+per process); `v1` restores the old model for every seat. Read `docs/counter_model_v2_adoption.md`; keep
+`a19_closing_pick.test.ts` and `a19_counter_draft.test.ts` passing.
+
+Profile v36 is retained inside v37.
+
 ## Shield screen — November 25, 2026
 
-**The current default is profile v36.** `a19-shield-screen-v1` refines v35's split screen at the owner's request ("it
+At that date the default was profile v36. `a19-shield-screen-v1` refines v35's split screen at the owner's request ("it
 is always better to split mermaid if we have it, because it takes two shots to kill her"). In screen mode a splittable
 Water Shield stack (Mermaid, the only one) is the screen body before any other, so every spare slot becomes a one-model
 Mermaid. Its shield absorbs the first attack, so each split takes two attacks to kill. The owner chose "Both now": AI

@@ -1,0 +1,171 @@
+{
+    "id": "counter-model-v2-MV3-20261125",
+    "registration": {
+        "file": "docs/evidence/counter_model_v2_registration_20261125.json",
+        "sha256": "054c80d7361aaa9e8533e7c25d53b5a2911952e4259b56159df0d93c4995a360",
+        "decisionRuleSha256": "e62c89868e8b201c2417282a8178fe7703e3cd46e9f3f4d98196085330ed7235",
+        "registeredAt": "2026-11-25T19:15:00Z"
+    },
+    "analysisScriptSha256": "28ec6dc0333aa55ff0025fa6e85af4ba3b539f065c596452eb8dd5bb52daabe3",
+    "guardAnalysisScriptSha256": "13abde68c388eaff548a59e47f3076d3314a7155030a2ed3e54f05c3f9abea34",
+    "runs": {
+        "stage1": "every host drafted all of stage 1 itself (S3 2,000 cases, C3 800); the stage-2 rows of all three hosts pair with this Mac's stage-1 cases: every changed case played exactly once in both arms, none missing, none foreign",
+        "stage2": [
+            {
+                "host": "Mac Studio",
+                "shards": "0-13",
+                "start": "2026-11-25T21:22:14Z",
+                "end": "2026-11-25T23:26:46Z"
+            },
+            {
+                "host": "x3d",
+                "shards": "14-27",
+                "start": "2026-11-25T20:01:06Z",
+                "end": "2026-11-25T21:57:25Z"
+            },
+            {
+                "host": "basenode",
+                "shards": "28-47",
+                "start": "2026-11-25T20:09:16Z",
+                "end": "2026-11-26T01:31:13Z"
+            }
+        ],
+        "guard": {
+            "host": "Mac Studio",
+            "start": "2026-11-25T21:21:21Z",
+            "end": "2026-11-25T22:37:21Z"
+        },
+        "rowsSha256": {
+            "method": "sha256 of the rows sorted as text, one JSON line each, newline-terminated",
+            "stage1S": {
+                "rows": 2000,
+                "sha256": "e5c0a2ba52a3ccaddb9dc4e57cce66d4e00934b0eb6ce029b97e0a73e553830a"
+            },
+            "stage1C": {
+                "rows": 800,
+                "sha256": "eefb148e0804301cc56f4ce12ef55868efaf101c1cd4086590f276c8dc2a3fe6"
+            },
+            "stage2S": {
+                "rows": 3368,
+                "sha256": "756224b30877152743bf7a791eb620912aa1b3c763f0f169f3ee45ee91057e9a"
+            },
+            "stage2C": {
+                "rows": 1294,
+                "sha256": "ae11d42a7121ed35383741d4d70e9e4401de26a534135f015a12612fec5e9428"
+            },
+            "guardCandidate": {
+                "rows": 264,
+                "sha256": "2d089797d2d8e522d575f48fc27e653dc0e639df535f83f7d83bb590b780af9e"
+            },
+            "guardProduction": {
+                "rows": 264,
+                "sha256": "add911281d56ebd1b1c6dc2d6d6e2770199763c2ba55539a507ed9fbce9e32a4"
+            }
+        }
+    },
+    "S3": {
+        "cases": 2000,
+        "changedCases": 1684,
+        "changedFamilies": 978,
+        "activation": 0.842,
+        "estimatePerChangedCase": 9.18,
+        "ci95": [5.96, 12.47],
+        "better": 448,
+        "worse": 282,
+        "equal": 954,
+        "populationEstimatePerGame": 8.3,
+        "qualityErrors": 0,
+        "byOpponentDoctrine": {
+            "Scout": {
+                "changedCases": 545,
+                "families": 482,
+                "estimate": 5.29,
+                "ci95": [-0.21, 11.0]
+            },
+            "Spymaster": {
+                "changedCases": 551,
+                "families": 474,
+                "estimate": 14.08,
+                "ci95": [8.54, 19.67]
+            },
+            "Battle Trance": {
+                "changedCases": 588,
+                "families": 514,
+                "estimate": 10.55,
+                "ci95": [5.45, 15.9]
+            }
+        }
+    },
+    "C3": {
+        "cases": 800,
+        "changedCases": 647,
+        "changedFamilies": 384,
+        "activation": 0.809,
+        "estimatePerChangedCase": 4.88,
+        "ci95": [-0.46, 10.29],
+        "better": 155,
+        "worse": 117,
+        "equal": 375,
+        "populationEstimatePerGame": 4.62,
+        "qualityErrors": 0,
+        "byOpponentDoctrine": {
+            "Scout": {
+                "changedCases": 216,
+                "families": 189,
+                "estimate": 6.61,
+                "ci95": [-2.12, 15.34]
+            },
+            "Spymaster": {
+                "changedCases": 229,
+                "families": 207,
+                "estimate": 3.5,
+                "ci95": [-4.59, 11.59]
+            },
+            "Battle Trance": {
+                "changedCases": 202,
+                "families": 178,
+                "estimate": 5.76,
+                "ci95": [-3.37, 15.03]
+            }
+        }
+    },
+    "MV3G": {
+        "pairs": 264,
+        "games": 29,
+        "estimatePerGame": 2.16,
+        "ci95": [-5.6, 10.13],
+        "better": 7,
+        "worse": 6,
+        "owner": {
+            "games": 18,
+            "estimatePerGame": 1.04,
+            "ci95": [-9.38, 11.81]
+        },
+        "others": {
+            "games": 11,
+            "estimatePerGame": 3.98,
+            "ci95": [-6.82, 16.48]
+        },
+        "qualityErrors": 0
+    },
+    "method": "per changed case, the candidate seat's score with model v2 minus production (v1), in points; families weighted equally (the mean over a family's changed cases); 95% from 10,000 family resamples, random.Random(2611246001). The split by the opponent's doctrine is a report, not a gate (split_doctrine.py sha256 924c6b8de6be5e11157a4c962ce973e7fb3858c9cdfe3a9433b786793cbb1087).",
+    "gates": {
+        "S3 lower bound above 0": {
+            "value": 5.96,
+            "passed": true
+        },
+        "C3 lower bound at least -3": {
+            "value": -0.46,
+            "passed": true
+        },
+        "0 quality errors in MV3 and MV3G": {
+            "value": 0,
+            "passed": true
+        },
+        "MV3G estimate at least -2 per game": {
+            "value": 2.16,
+            "passed": true
+        }
+    },
+    "verdict": "all gates passed: model v2 (a19-counter-model-v2) is the adoption candidate for every default AI seat and Premium draft advice; adopted as profile v37"
+}

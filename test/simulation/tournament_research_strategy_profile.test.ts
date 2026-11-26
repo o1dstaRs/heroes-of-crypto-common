@@ -61,7 +61,7 @@ describe("tournament entrant-A research strategy profile", () => {
         expect(summary.entrantAResearchProfile).toEqual(records[0].entrantAResearchProfile);
         expect(records[0].entrantAResearchProfile).toMatchObject({
             selector: TOURNAMENT_RESEARCH_A19,
-            schema: "hoc.v0_8_a19_production_profile.v36",
+            schema: "hoc.v0_8_a19_production_profile.v37",
             candidateId: "a19",
             searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
         });
@@ -129,6 +129,7 @@ describe("tournament entrant-A research strategy profile", () => {
             "decoy-aware-redirect",
             "counter-draft",
             "counter-draft-model",
+            "counter-draft-model-v2",
             "lava-map-artifact",
             "valkyrie-striker",
             "carrier-cohesion",

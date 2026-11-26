@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v36",
+            schema: "hoc.v0_8_a19_production_profile.v37",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -278,6 +278,14 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "owner-explicit-decision",
                 registrationSha256: "e50024247b049178de58d092acca14ac93433c405e843647b7b6b20799bf3ddc",
                 qualification: "owner-decision-check-pending",
+            },
+            // Profile v37: the counter draft and the closing pick score with counter model v2 (MV1, MV3).
+            counterModel: {
+                policyId: "a19-counter-model-v2",
+                adoptedAt: "2026-11-26",
+                adoption: "standing-user-instruction",
+                registrationSha256: "e62c89868e8b201c2417282a8178fe7703e3cd46e9f3f4d98196085330ed7235",
+                qualification: "strength-confirmed",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({
@@ -594,6 +602,7 @@ describe("v0.8+A19 production profile", () => {
             "decoy-aware-redirect",
             "counter-draft",
             "counter-draft-model",
+            "counter-draft-model-v2",
             "lava-map-artifact",
             "valkyrie-striker",
             "carrier-cohesion",

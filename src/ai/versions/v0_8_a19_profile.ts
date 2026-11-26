@@ -190,8 +190,14 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     splittable Water Shield stack (Mermaid) is the screen body before any other, so every spare slot becomes a
  *     one-model Mermaid that takes two attacks to kill (ai/split_screen.ts, ai/tactical_split_placement.ts). A
  *     registered non-inferiority check follows (docs/shield_screen_adoption.md).
+ *   - Counter model v2 (profile v37) adopted on 2026-11-26 under the owner's standing instruction ("Make sure we lock in
+ *     wins"; goal: Scout and Spymaster use their view of the opponent's picks): the counter draft and the closing pick
+ *     score with a19-counter-model-v2, v1's strengths and counters refit on November 25 AI-vs-AI games
+ *     (ai/setup/draft_models/a19_counter_draft_v2.json; A19_COUNTER_MODEL=v1 restores v1). Screen MV1 +5.65 per changed
+ *     Spymaster draft and +10.12 per changed Scout draft; registered confirmation MV3 on the fixed tree
+ *     (docs/counter_model_v2_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v36" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v37" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -523,6 +529,19 @@ export const V08_A19_SHIELD_SCREEN_POLICY = Object.freeze({
     adoption: "owner-explicit-decision",
     registrationSha256: "e50024247b049178de58d092acca14ac93433c405e843647b7b6b20799bf3ddc",
     qualification: "owner-decision-check-pending",
+} as const);
+
+/**
+ * Counter model v2 (profile v37): ai/setup/a19_counter_draft.ts scores with draft_models/a19_counter_draft_v2.json, the
+ * counter draft's and the closing pick's model refit on November 25 games; A19_COUNTER_MODEL=v1 restores v1. The
+ * registration is confirmation MV3's decision rule. See docs/counter_model_v2_adoption.md.
+ */
+export const V08_A19_COUNTER_MODEL_POLICY = Object.freeze({
+    policyId: "a19-counter-model-v2" as const,
+    adoptedAt: "2026-11-26",
+    adoption: "standing-user-instruction",
+    registrationSha256: "e62c89868e8b201c2417282a8178fe7703e3cd46e9f3f4d98196085330ed7235",
+    qualification: "strength-confirmed",
 } as const);
 
 /**
@@ -908,12 +927,18 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "counter-draft" as const,
         source: "src/ai/setup/a19_counter_draft.ts" as const,
-        sha256: "577b77596c18c2c94bac5f6d068d9c8704064973a0c84b79034d6d0674333d30" as const,
+        // Profile v37 selects counter model v2 by default (A19_COUNTER_MODEL=v1 restores v1).
+        sha256: "6d26aa83b40406b69a6ca6294e1554c3717ae60358f20fc4f74a78e8a11556a0" as const,
     }),
     Object.freeze({
         role: "counter-draft-model" as const,
         source: "src/ai/setup/draft_models/a19_counter_draft_v1.json" as const,
         sha256: "444c5cf85a25f3ef5231c99424f2c77ef1486e56b982f22f0eda7a059044734d" as const,
+    }),
+    Object.freeze({
+        role: "counter-draft-model-v2" as const,
+        source: "src/ai/setup/draft_models/a19_counter_draft_v2.json" as const,
+        sha256: "251c34930f17c58cafdaeb3fd0c9daae34fccff0cadf57667655cffa7e499040" as const,
     }),
     Object.freeze({
         role: "lava-map-artifact" as const,
@@ -1001,6 +1026,7 @@ export const V08_A19_PROFILE = Object.freeze({
     closingPick: V08_A19_CLOSING_PICK_POLICY,
     splitScreen: V08_A19_SPLIT_SCREEN_POLICY,
     shieldScreen: V08_A19_SHIELD_SCREEN_POLICY,
+    counterModel: V08_A19_COUNTER_MODEL_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

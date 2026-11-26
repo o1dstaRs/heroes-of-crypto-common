@@ -11,7 +11,8 @@
 
 import { a19OpponentMeleeProbability } from "./a19_striker_matchup";
 import { creatureInfo } from "./creature_score";
-import MODEL from "./draft_models/a19_counter_draft_v1.json";
+import MODEL_V1 from "./draft_models/a19_counter_draft_v1.json";
+import MODEL_V2 from "./draft_models/a19_counter_draft_v2.json";
 import { assertNoLegacySeatEnv, seatEnvName } from "../seat_env";
 
 /**
@@ -25,6 +26,32 @@ import { assertNoLegacySeatEnv, seatEnvName } from "../seat_env";
  * Against shooter armies the gate stays closed and the striker draft keeps the rush. See docs/counter_draft_adoption.md.
  */
 export const A19_COUNTER_DRAFT_ID = "a19-counter-draft-v1";
+/**
+ * The model the counter draft and the closing pick score with. Profile v37 refits it on November 25 games
+ * (a19-counter-model-v2, draft_models/a19_counter_draft_v2.json; docs/counter_model_v2_adoption.md);
+ * A19_COUNTER_MODEL=v1 restores the v1 model for every seat of the process.
+ */
+export const A19_COUNTER_MODEL_ENV = "A19_COUNTER_MODEL";
+export const A19_COUNTER_MODEL_IDS = Object.freeze({ v1: "a19-counter-draft-v1", v2: "a19-counter-model-v2" } as const);
+type CounterModelVersion = keyof typeof A19_COUNTER_MODEL_IDS;
+/** The fields the counter draft reads from a model file. */
+interface IA19CounterModel {
+    readonly policyId: string;
+    readonly creatureIds: readonly number[];
+    readonly strength: readonly number[];
+    readonly counter: readonly (readonly number[])[];
+    readonly prior: readonly number[];
+}
+/** The counter model for a selection ("v1" or "v2"; empty means the default, v2). */
+export function a19CounterModelFor(selection: string | undefined): { id: string; model: IA19CounterModel } {
+    const version = (selection?.trim().toLowerCase() || "v2") as CounterModelVersion;
+    if (!(version in A19_COUNTER_MODEL_IDS)) throw new Error(`invalid_a19_counter_model:${selection}`);
+    return { id: A19_COUNTER_MODEL_IDS[version], model: version === "v1" ? MODEL_V1 : MODEL_V2 };
+}
+const selected = a19CounterModelFor(typeof process === "undefined" ? undefined : process.env[A19_COUNTER_MODEL_ENV]);
+/** The counter model this process scores with. */
+export const A19_COUNTER_MODEL_ID: string = selected.id;
+const MODEL = selected.model;
 export const A19_COUNTER_DRAFT_ENV = "A19_COUNTER_DRAFT";
 export const A19_COUNTER_DRAFT_MELEE_GATE = 0.5;
 export const A19_COUNTER_DRAFT_MIN_SEEN = 2;
