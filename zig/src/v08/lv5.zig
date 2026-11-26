@@ -173,10 +173,11 @@ const Ranked = struct {
 };
 
 /// healerPolicy, V05_HEALPOLICY "smart" (the default): a Healer with stack power 1 or more (1) heals the living level-4
-/// ally down more than 20% whose top creature is hurt (magic resist below 100), the most wounded it can heal; else (2)
-/// keeps an inherited Heal; else (3) blesses the living ranged ally (not itself) with shots left, no Blessing and a
-/// relative damage spread of at least 0.33, the biggest gain (spread x alive x shots) it can bless. Mass Heal and
-/// Spiritual Armor are not in scope.
+/// ally down more than 20% whose top creature is hurt (canBeHealed: no active Mechanism; magic resist below 100), the
+/// most wounded it can heal; else (2) keeps an inherited Heal or Mass Heal; else (3) blesses the living ranged ally (not
+/// itself) with shots left, no Blessing and a relative damage spread of at least 0.33, the biggest gain (spread x alive
+/// x shots) it can bless; else (4) casts Spiritual Armor on the living ally (not itself) without it whose max damage x
+/// alive is biggest, the first it can (castBlessRanged ?? castArmor ?? the decision).
 fn healerPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
@@ -186,7 +187,7 @@ fn healerPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         for (s.holderOrder()) |k| {
             const a = &s.units[k];
             if (!util.livingOf(s, k, u.team)) continue;
-            if (engine.getMagicResist(a) == 100 or !(a.hp < a.max_hp) or a.level < 4) continue;
+            if (a.has(.mechanism) or engine.getMagicResist(a) == 100 or !(a.hp < a.max_hp) or a.level < 4) continue;
             const lost = lv4.woundFraction(a);
             if (lost > 0.2) r.add(k, lost);
         }
@@ -199,25 +200,41 @@ fn healerPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     }
     for (out.slice()) |a| {
         if (a == .cast_spell) {
-            if (a.cast_spell.spell == @intFromEnum(st.CastSpell.heal)) return;
+            const spell = a.cast_spell.spell;
+            if (spell == @intFromEnum(st.CastSpell.heal) or spell == @intFromEnum(st.CastSpell.mass_heal)) return;
             break;
         }
     }
-    const cfg = lv4.usableSpell(s, u, .blessing) orelse return;
+    if (lv4.usableSpell(s, u, .blessing)) |cfg| {
+        var r: Ranked = .{};
+        for (s.holderOrder()) |k| {
+            const a = &s.units[k];
+            if (!util.livingOf(s, k, u.team) or k == c.ui) continue;
+            if (a.attack_type != AT.RANGE or !(engine.getRangeShots(a) > 0) or a.buffs.find(.blessing) != null) continue;
+            const mx = a.attack_damage_max;
+            const rel: f64 = if (mx > 0) (mx - a.attack_damage_min) / mx else 0;
+            if (!(rel >= 0.33)) continue;
+            r.add(k, (a.attack_damage_max - a.attack_damage_min) * @max(1, a.amount_alive) * @max(1, engine.getRangeShots(a)));
+        }
+        for (r.slot[0..r.n]) |t| {
+            if (!spells.canCastSpell(s, c.ui, t, .blessing, cfg)) continue;
+            out.* = .{};
+            out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = @intFromEnum(st.CastSpell.blessing), .target = t, .has_target = true } });
+            return;
+        }
+    }
+    // castArmor: the ally with the most max damage x alive (not itself, no Spiritual Armor) the book can reach.
+    const armor = lv4.usableSpell(s, u, .spiritual_armor) orelse return;
     var r: Ranked = .{};
     for (s.holderOrder()) |k| {
         const a = &s.units[k];
-        if (!util.livingOf(s, k, u.team) or k == c.ui) continue;
-        if (a.attack_type != AT.RANGE or !(engine.getRangeShots(a) > 0) or a.buffs.find(.blessing) != null) continue;
-        const mx = a.attack_damage_max;
-        const rel: f64 = if (mx > 0) (mx - a.attack_damage_min) / mx else 0;
-        if (!(rel >= 0.33)) continue;
-        r.add(k, (a.attack_damage_max - a.attack_damage_min) * @max(1, a.amount_alive) * @max(1, engine.getRangeShots(a)));
+        if (!util.livingOf(s, k, u.team) or k == c.ui or a.buffs.find(.spiritual_armor) != null) continue;
+        r.add(k, a.attack_damage_max * a.amount_alive);
     }
     for (r.slot[0..r.n]) |t| {
-        if (!spells.canCastSpell(s, c.ui, t, .blessing, cfg)) continue;
+        if (!spells.canCastSpell(s, c.ui, t, .spiritual_armor, armor)) continue;
         out.* = .{};
-        out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = @intFromEnum(st.CastSpell.blessing), .target = t, .has_target = true } });
+        out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = @intFromEnum(st.CastSpell.spiritual_armor), .target = t, .has_target = true } });
         return;
     }
 }

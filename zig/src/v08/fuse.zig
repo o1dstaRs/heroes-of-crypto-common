@@ -11,6 +11,7 @@ const abilities = @import("../abilities.zig");
 const artifacts = @import("../artifacts.zig");
 const js = @import("../jsnum.zig");
 const util = @import("util.zig");
+const ai = @import("../ai.zig");
 const spells = @import("../spells.zig");
 const AT = st.AttackType;
 const Cell = rec.Cell;
@@ -113,15 +114,16 @@ const Landed = struct {
 /// (a lava move, Lightning Spin, Double Punch, Skewer Strike; Fire Breath and Chain Lightning are not in the engine)
 /// or a malformed band. The chain: Rapid Charge over the charge distance, Paralysis, then the position abilities
 /// (Backstab) from `from`, the ranged unit's half-strength swing unless Handyman, the target's Deep Wounds, Lucky
-/// Strike's chance and multiplier, and Penetrating Bite's bonus. War Anger's stand-cell aura is batch 6a (refused by
-/// v08Scope): the rate is the unit's attack without its current aura increase. A band too wide for the landed map sets
-/// util.unsupported (TypeScript prices up to 10,000 rolls).
+/// Strike's chance and multiplier, and Penetrating Bite's bonus. The rate is the unit's attack without its current aura
+/// increase plus the War Anger aura it would have on its footprint at `from` (getUnitAuraAttackMod over standCells). A
+/// band too wide for the landed map sets util.unsupported (TypeScript prices up to 10,000 rolls).
 pub fn primaryMelee(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape, from: Cell) ?MeleeEstimate {
     const u = &s.units[ai_];
     const t = &s.units[ti];
     if (t.isDead() or shape.lava) return null;
     if (u.has(.lightning_spin) or u.has(.double_punch) or u.has(.skewer_strike)) return null;
-    const rate = @max(u.base_attack, engine.getAttack(u) - u.attack_mod_increase);
+    const stand = ai.footprintForAnchor(u, from);
+    const rate = @max(u.base_attack, engine.getAttack(u) - u.attack_mod_increase) + warAngerModAt(s, ai_, stand.slice());
     var handler: f64 = 1;
     if (u.ability(.rapid_charge)) |rc| {
         const base = abilities.abilityMultiplier(u, rc);
@@ -355,4 +357,37 @@ pub fn lastFuseSpell(s: *const st.State, u: *const st.Unit, ti: u8, damage: f64,
     const fatal = damage >= hp and !engine.canSelfResurrect(t);
     const splash = if (fatal) (enemyBlastDamage(s, u, ti) orelse return null) else 0;
     return .{ .net = @min(damage, hp) + splash, .fatal = if (fatal) 1 else 0, .secure = fatal };
+}
+
+/// UnitsHolder.getUnitAuraAttackMod(unit, cells): engine.warAngerMod over `cells` instead of the unit's body. A unit
+/// holding the War Anger AuraEffect and not Broken gains getBaseAttack() * ((power * enemies) / 100), the enemies the
+/// distinct holder units of the other team standing in the clipped Chebyshev ball of the aura's range plus the team's
+/// aura range around any of the cells; 0 otherwise.
+fn warAngerModAt(s: *const st.State, ui: u8, cells: []const Cell) f64 {
+    const u = &s.units[ui];
+    const def = s.war_anger_def;
+    if (def == st.NO_AURA or u.n_auras == 0 or u.isBroken()) return 0;
+    var holds = false;
+    for (u.auras[0..u.n_auras]) |d| {
+        if (d == def) holds = true;
+    }
+    if (!holds) return 0;
+    const range = s.aura_defs[def].range + s.setup[u.team].aura_range;
+    if (!(range >= 0)) return 0;
+    const r: i32 = @intFromFloat(@min(range, st.GRID));
+    var seen: st.UnitSet = 0;
+    for (cells) |c| {
+        if (!engine.cellWithinGrid(c)) continue;
+        var x = @max(0, c.x - r);
+        while (x <= @min(st.GRID - 1, c.x + r)) : (x += 1) {
+            var y = @max(0, c.y - r);
+            while (y <= @min(st.GRID - 1, c.y + r)) : (y += 1) {
+                const o = s.grid.board[@intCast(x)][@intCast(y)];
+                if (!st.isUnitCode(o)) continue;
+                const e = &s.units[o - 1];
+                if (e.in_holder and e.team != u.team) seen |= engine.unitBit(o - 1);
+            }
+        }
+    }
+    return u.base_attack * ((u.war_anger_power * @as(f64, @floatFromInt(@popCount(seen)))) / 100);
 }
