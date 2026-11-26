@@ -71,7 +71,7 @@ fn repairForbiddenTarget(c: *ai.Ctx, out: *ai.Decision) void {
     var inc: ai.Decision = .{};
     inc.push(.{ .end_turn = .{ .unit = c.ui, .reason = .manual } });
     var set: cand.Set = .{};
-    cand.enumerate(c, &inc, cand.BOUNDARY, &set);
+    cand.enumerate(c, &inc, cand.REPAIR_V07, &set);
     if (set.incomplete) {
         util.unsupported = true;
         return;

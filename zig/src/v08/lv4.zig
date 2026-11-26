@@ -32,11 +32,15 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     defer policy.note("v0.4", out, s, rin);
     // (2) Out-gunning them at range, a shooter that cannot fire yet holds.
     if (u.attack_type == AT.RANGE and engine.getRangeShots(u) > 0 and u.canMove() and holdWhenRangedSuperior(c, out)) return;
+    // (6) The Ogre Mage's single Riot is not in scope (no Riot spell).
+    // (7) The Healer's spell policy.
+    if (util.creature(s, c.ui) == .healer and healerSpell(c, out)) return;
     // (8) The Troll's Wild Regeneration gift (V04_TROLL on).
     if (util.creature(s, c.ui) == .troll and trollWildRegen(c, out)) return;
     lv3.decide(c, out);
     var base: ai.Decision = undefined;
     util.copyDecision(&base, out);
+    retargetHeal(c, out);
     preferLowLevelMelee(c, out);
     auraRepositionMelee(c, out);
     rapidChargeReposition(c, out);
@@ -48,6 +52,86 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     waitForMassBuff(c, out);
     frontMove(c, out);
     enforceRangeLegality(c, out);
+}
+
+/// The unit's first book spell `spell` that it may cast now (isSpellUsableByCaster), with its config.
+pub fn usableSpell(s: *const st.State, u: *const st.Unit, spell: st.CastSpell) ?*const st.SpellConfig {
+    const raw: u8 = @intFromEnum(spell);
+    for (u.spells[0..u.n_spells]) |*b| {
+        if (b.spell != raw) continue;
+        const cfg = &s.spell_cfg[raw];
+        return if (cfg.loaded and spells.usable(u, b, cfg)) cfg else null;
+    }
+    return null;
+}
+
+/// fullCap: max HP x max(1, alive + died); the wounded fraction is 1 - cumulative HP / fullCap (0 for no cap).
+pub fn woundFraction(u: *const st.Unit) f64 {
+    const cap = u.max_hp * @max(1, u.amount_alive + u.amount_died);
+    return if (cap > 0) 1 - util.cumulativeHp(u) / cap else 0;
+}
+
+/// (7) decideHealerSpell: with stack power 1 or more, Heal the most wounded living level-3+ ally that the engine would
+/// heal (its top creature hurt, magic resist below 100) and that has lost over 30% (first of the most wounded), when
+/// canCastSpell allows it. Mass Heal and Spiritual Armor are not in scope.
+fn healerSpell(c: *ai.Ctx, out: *ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    if (engine.getStackPower(u) < 1) return false;
+    var best: ?u8 = null;
+    var best_lost: f64 = 0;
+    for (s.holderOrder()) |k| {
+        const a = &s.units[k];
+        if (!util.livingOf(s, k, u.team)) continue;
+        // healEligible (canBeHealed: every unit in scope can be healed)
+        if (engine.getMagicResist(a) == 100 or !(a.hp < a.max_hp)) continue;
+        if (a.level < 3) continue;
+        const lost = woundFraction(a);
+        if (!(lost > 0.3)) continue;
+        if (best == null or lost > best_lost) {
+            best = k;
+            best_lost = lost;
+        }
+    }
+    const t = best orelse return false;
+    const cfg = usableSpell(s, u, .heal) orelse return false;
+    if (!spells.canCastSpell(s, c.ui, t, .heal, cfg)) return false;
+    out.* = .{};
+    out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = @intFromEnum(st.CastSpell.heal), .target = t, .has_target = true } });
+    return true;
+}
+
+/// (1) retargetHeal: a lone single-target ally heal (a HEAL spell aimed at ANY_ALLY) goes to the living ally with the
+/// biggest full HP cap among those down more than 25% that the engine would heal (first on ties).
+fn retargetHeal(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (out.n != 1 or out.actions[0] != .cast_spell) return;
+    const cast = out.actions[0].cast_spell;
+    if (!cast.has_target) return;
+    var found = false;
+    for (u.spells[0..u.n_spells]) |b| {
+        if (b.spell == cast.spell) found = true;
+    }
+    if (!found) return;
+    const spell = std.meta.intToEnum(st.CastSpell, cast.spell) catch return;
+    const cfg = &s.spell_cfg[cast.spell];
+    if (cfg.power_type != st.SpellPower.HEAL or cfg.target != st.SpellTarget.ANY_ALLY) return;
+    var best: ?u8 = null;
+    var best_cap: f64 = 0;
+    for (s.holderOrder()) |k| {
+        const a = &s.units[k];
+        if (!util.livingOf(s, k, u.team)) continue;
+        if (!(woundFraction(a) > 0.25) or !spells.canCastSpell(s, c.ui, k, spell, cfg)) continue;
+        const cap = a.max_hp * @max(1, a.amount_alive + a.amount_died);
+        if (best == null or cap > best_cap) {
+            best = k;
+            best_cap = cap;
+        }
+    }
+    const t = best orelse return;
+    if (t == cast.target) return;
+    out.actions[0].cast_spell.target = t;
 }
 
 fn enemyAdjacent(c: *const ai.Ctx) bool {

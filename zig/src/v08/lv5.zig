@@ -21,6 +21,7 @@ const util = @import("util.zig");
 const policy = @import("policy.zig");
 const weights = @import("weights.zig");
 const lv4 = @import("lv4.zig");
+const spells = @import("../spells.zig");
 
 const Cell = st.Cell;
 const State = st.State;
@@ -33,6 +34,7 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     const rin = s.rng.state;
     defer policy.note("v0.5", out, s, rin);
     lv4.decide(c, out);
+    healerPolicy(c, out);
     mineByPolicy(c, out);
     meleeByPolicy(c, out);
     aoeMeleeByPolicy(c, out);
@@ -41,6 +43,75 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     hourglassByPolicy(c, out);
     dropBlockedMove(c, out);
     takeAdjacentAttack(c, out);
+}
+
+/// Slots with a sort key, ordered by the key descending, stably (JavaScript's sort with `(p, q) => key(q) - key(p)`).
+const Ranked = struct {
+    slot: [st.MAX_UNITS]u8 = undefined,
+    key: [st.MAX_UNITS]f64 = undefined,
+    n: usize = 0,
+
+    fn add(self: *Ranked, slot: u8, key: f64) void {
+        var i = self.n;
+        // insert after every entry whose key is not smaller (stable descending)
+        while (i > 0 and self.key[i - 1] < key) : (i -= 1) {
+            self.slot[i] = self.slot[i - 1];
+            self.key[i] = self.key[i - 1];
+        }
+        self.slot[i] = slot;
+        self.key[i] = key;
+        self.n += 1;
+    }
+};
+
+/// healerPolicy, V05_HEALPOLICY "smart" (the default): a Healer with stack power 1 or more (1) heals the living level-4
+/// ally down more than 20% whose top creature is hurt (magic resist below 100), the most wounded it can heal; else (2)
+/// keeps an inherited Heal; else (3) blesses the living ranged ally (not itself) with shots left, no Blessing and a
+/// relative damage spread of at least 0.33, the biggest gain (spread x alive x shots) it can bless. Mass Heal and
+/// Spiritual Armor are not in scope.
+fn healerPolicy(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (util.creature(s, c.ui) != .healer or engine.getStackPower(u) < 1) return;
+    if (lv4.usableSpell(s, u, .heal)) |cfg| {
+        var r: Ranked = .{};
+        for (s.holderOrder()) |k| {
+            const a = &s.units[k];
+            if (!util.livingOf(s, k, u.team)) continue;
+            if (engine.getMagicResist(a) == 100 or !(a.hp < a.max_hp) or a.level < 4) continue;
+            const lost = lv4.woundFraction(a);
+            if (lost > 0.2) r.add(k, lost);
+        }
+        for (r.slot[0..r.n]) |t| {
+            if (!spells.canCastSpell(s, c.ui, t, .heal, cfg)) continue;
+            out.* = .{};
+            out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = @intFromEnum(st.CastSpell.heal), .target = t, .has_target = true } });
+            return;
+        }
+    }
+    for (out.slice()) |a| {
+        if (a == .cast_spell) {
+            if (a.cast_spell.spell == @intFromEnum(st.CastSpell.heal)) return;
+            break;
+        }
+    }
+    const cfg = lv4.usableSpell(s, u, .blessing) orelse return;
+    var r: Ranked = .{};
+    for (s.holderOrder()) |k| {
+        const a = &s.units[k];
+        if (!util.livingOf(s, k, u.team) or k == c.ui) continue;
+        if (a.attack_type != AT.RANGE or !(engine.getRangeShots(a) > 0) or a.buffs.find(.blessing) != null) continue;
+        const mx = a.attack_damage_max;
+        const rel: f64 = if (mx > 0) (mx - a.attack_damage_min) / mx else 0;
+        if (!(rel >= 0.33)) continue;
+        r.add(k, (a.attack_damage_max - a.attack_damage_min) * @max(1, a.amount_alive) * @max(1, engine.getRangeShots(a)));
+    }
+    for (r.slot[0..r.n]) |t| {
+        if (!spells.canCastSpell(s, c.ui, t, .blessing, cfg)) continue;
+        out.* = .{};
+        out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = @intFromEnum(st.CastSpell.blessing), .target = t, .has_target = true } });
+        return;
+    }
 }
 
 inline fn firepowerOf(u: *const Unit) f64 {

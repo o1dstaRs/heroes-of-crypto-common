@@ -60,6 +60,9 @@ pub const Options = struct {
     /// of an uncapped list gets them in the same order (no other class shares a cast signature, and the incumbent it
     /// passes is not a cast), without the MAX overflow the uncapped moves and melee pairs could hit.
     spells_only: bool = false,
+    /// preserveMeteoriteTargetCoverage (battleMageTargetsEnabled, on for a Battle Mage): a Battle Mage's Meteorite keeps
+    /// every distinct visible impact after the best one.
+    meteor_coverage: bool = false,
 };
 
 pub const MAX = 64;
@@ -119,6 +122,48 @@ pub fn sigEqual(a: []const rec.Action, b: []const rec.Action) bool {
         }
     }
     return true;
+}
+
+/// thrownSpellReachesAimedTarget (the AI's gate, stricter than the engine's): a Fire Strike must reach the aimed target
+/// itself (an observable edge and an unobstructed trajectory: a screening body would take it instead); Vine Throw and
+/// Ring of Fire keep the engine's lane; other spells need no line.
+pub fn reachesAimedTarget(s: *const st.State, ci: u8, ti: u8, spell: spells.CS) bool {
+    if (spell == .fire_strike) {
+        const t = spells.trajectory(s, ci, ti) orelse return false;
+        return t.obstruction == 0;
+    }
+    return spells.lineOfSightClear(s, ci, ti, spell);
+}
+
+/// Unit slots in first-seen order (evaluateAffectedUnits' list).
+const Slots = struct {
+    items: [st.MAX_UNITS]u8 = undefined,
+    len: u8 = 0,
+
+    fn push(self: *Slots, x: u8) void {
+        if (self.len < self.items.len) {
+            self.items[self.len] = x;
+            self.len += 1;
+        }
+    }
+    fn slice(self: *const Slots) []const u8 {
+        return self.items[0..self.len];
+    }
+};
+
+/// evaluateAffectedUnits(cells, rangedAreaAttack = false): the holder units standing on the cells, each once, at its
+/// first cell in `cells` order.
+fn affectedUnits(s: *const st.State, cells: []const Cell, out: *Slots) void {
+    var seen: [st.MAX_UNITS]bool = .{false} ** st.MAX_UNITS;
+    for (cells) |cell| {
+        if (!engine.cellWithinGrid(cell)) continue;
+        const code = s.grid.board[@intCast(cell.x)][@intCast(cell.y)];
+        if (!st.isUnitCode(code)) continue;
+        const v: u8 = code - 1;
+        if (!s.units[v].in_holder or seen[v]) continue;
+        seen[v] = true;
+        out.push(v);
+    }
 }
 
 // ---- generator ---------------------------------------------------------------------------------------------------
@@ -343,17 +388,11 @@ const Gen = struct {
         const body = engine.unitCells(&s.units[ti]);
         var ring: spells.Cells = .{};
         spells.cellsAroundFootprint(body.slice(), &ring);
-        var seen: [st.MAX_UNITS]bool = .{false} ** st.MAX_UNITS;
+        var caught: Slots = .{};
+        affectedUnits(s, ring.slice(), &caught);
         var any = false;
         var out: Damage = .{ .value = 0, .kill = 0 };
-        // evaluateAffectedUnits: each holder unit once, at its first ring cell.
-        for (ring.slice()) |cell| {
-            if (!engine.cellWithinGrid(cell)) continue;
-            const code = s.grid.board[@intCast(cell.x)][@intCast(cell.y)];
-            if (!st.isUnitCode(code)) continue;
-            const v: u8 = code - 1;
-            if (!s.units[v].in_holder or seen[v]) continue;
-            seen[v] = true;
+        for (caught.slice()) |v| {
             if (s.units[v].isDead() or v == self.c.ui or v == ti) continue;
             any = true;
             const d = self.spellDamage(spell, cfg, v);
@@ -363,6 +402,165 @@ const Gen = struct {
             } else out.value -= d.value;
         }
         return if (any) out else null;
+    }
+
+    const Impact = struct { cell: Cell, value: f64, kill: u8, victims: Slots = .{} };
+
+    /// addMeteoriteCastCandidates: every block that can catch an enemy body (Meteor Shower's 3x3 about its centre anchor,
+    /// Meteorite's 2x2 up and right of its corner anchor, anchors off every enemy cell, each once) on the board, valued at
+    /// the overkill-capped damage it lands on enemies (projectSpellDamageAgainstUnit; a kill flags it); the best block
+    /// (first on ties) is the candidate. With the Battle Mage's coverage, Hidden stacks are ignored and every distinct
+    /// visible victim list adds its first block after it. Water Shield is not in scope.
+    fn addMeteors(self: *Gen, spell: spells.CS, raw: u8, cfg: *const st.SpellConfig) void {
+        const s = self.c.s;
+        const u = self.unit();
+        const raw_damage = spells.rawDamage(u, spell, cfg);
+        if (raw_damage <= 0) return;
+        const shower = spell == .meteor_shower;
+        const spread: []const i32 = if (shower) &.{ -1, 0, 1 } else &.{ 0, 1 };
+        const offsets: []const i32 = if (shower) &.{ -1, 0, 1 } else &.{ 0, -1 };
+        const preserve = self.opt.meteor_coverage and spell == .meteorite and util.creature(s, self.c.ui) == .battle_mage;
+        const opp = engine.opposite(u.team);
+        var seen: [st.GRID + 2][st.GRID + 2]bool = .{.{false} ** (st.GRID + 2)} ** (st.GRID + 2);
+        var impacts: [64]Impact = undefined;
+        var n_impacts: usize = 0;
+        var best: ?Impact = null;
+        for (s.holderOrder()) |k| {
+            if (!util.livingOf(s, k, opp)) continue;
+            if (preserve and s.units[k].isHidden()) continue;
+            const ec = engine.unitCells(&s.units[k]);
+            for (ec.slice()) |cell| for (offsets) |ox| for (offsets) |oy| {
+                const anchor = Cell{ .x = cell.x + ox, .y = cell.y + oy };
+                const sx: usize = @intCast(anchor.x + 1);
+                const sy: usize = @intCast(anchor.y + 1);
+                if (seen[sx][sy]) continue;
+                seen[sx][sy] = true;
+                var cells: spells.Cells = .{};
+                var inside = true;
+                for (spread) |dx| for (spread) |dy| {
+                    const c = Cell{ .x = anchor.x + dx, .y = anchor.y + dy };
+                    if (!engine.cellWithinGrid(c)) inside = false;
+                    cells.push(c);
+                };
+                if (!inside) continue;
+                var caught: Slots = .{};
+                affectedUnits(s, cells.slice(), &caught);
+                var impact = Impact{ .cell = anchor, .value = 0, .kill = 0 };
+                for (caught.slice()) |v| {
+                    const t = &s.units[v];
+                    if (t.team == u.team or t.isDead()) continue;
+                    if (preserve and t.isHidden()) continue;
+                    impact.victims.push(v);
+                    const dealt: f64 = if (abilities.absorbsHit(t)) 0 else spells.damageAgainst(raw_damage, cfg.element, t);
+                    const hp = util.cumulativeHp(t);
+                    impact.value += @min(dealt, hp);
+                    if (dealt >= hp) impact.kill = 1;
+                }
+                if (impact.value <= 0) continue;
+                if (best == null or impact.value > best.?.value) best = impact;
+                if (preserve) {
+                    var dup = false;
+                    for (impacts[0..n_impacts]) |*have| {
+                        if (std.mem.eql(u8, have.victims.slice(), impact.victims.slice())) dup = true;
+                    }
+                    if (!dup) {
+                        if (n_impacts == impacts.len) {
+                            self.out.incomplete = true;
+                        } else {
+                            impacts[n_impacts] = impact;
+                            n_impacts += 1;
+                        }
+                    }
+                }
+            };
+        }
+        const b = best orelse return;
+        self.pushSpell(raw, null, b.cell, b.value, b.kill);
+        for (impacts[0..n_impacts]) |*impact| {
+            if (sameCell(impact.cell, b.cell)) continue;
+            self.pushSpell(raw, null, impact.cell, impact.value, impact.kill);
+        }
+    }
+
+    /// The summon branch of addSpells (Summon Wolves): with a body to summon, the first anchor around the caster that
+    /// fits (summonableAnchors), and, with no Wolf of the team on the board yet, the fitting anchor whose whole body lies
+    /// ahead of every caster cell and nearest the caster's lane (strictly; side boards read y) when it differs; with no
+    /// fitting anchor, an existing Wolf is reinforced by an anchorless cast.
+    fn addSummon(self: *Gen, raw: u8, cfg: *const st.SpellConfig) void {
+        const s = self.c.s;
+        const u = self.unit();
+        const amount = @floor(u.amount_alive * cfg.power);
+        if (amount <= 0) return;
+        const sm = s.summons orelse {
+            self.out.incomplete = true;
+            return;
+        };
+        if (!sm.present[st.Summons.WOLF]) {
+            self.out.incomplete = true;
+            return;
+        }
+        const fw = sm.units[st.Summons.WOLF].fw;
+        const fh = sm.units[st.Summons.WOLF].fh;
+        const caster = engine.unitCells(u);
+        var ring: spells.Cells = .{};
+        spells.cellsAroundFootprint(caster.slice(), &ring);
+        var anchors: [96]Cell = undefined;
+        var n: usize = 0;
+        var tried: [96]Cell = undefined;
+        var nt: usize = 0;
+        for (0..fw) |dx| for (0..fh) |dy| for (ring.slice()) |r| {
+            const a = Cell{ .x = r.x + @as(i32, @intCast(dx)), .y = r.y + @as(i32, @intCast(dy)) };
+            var dup = false;
+            for (tried[0..nt]) |t| {
+                if (sameCell(t, a)) dup = true;
+            }
+            if (dup) continue;
+            if (nt < tried.len) {
+                tried[nt] = a;
+                nt += 1;
+            }
+            if (spells.seatFree(s, a, fw, fh) and n < anchors.len) {
+                anchors[n] = a;
+                n += 1;
+            }
+        };
+        var existing = false;
+        for (s.holderOrder()) |k| {
+            const w = &s.units[k];
+            if (w.summoned and w.name_id == s.summon_name_id[st.Summons.WOLF] and w.team == u.team) existing = true;
+        }
+        if (n == 0) {
+            if (existing) self.pushSpell(raw, null, null, 0, 0);
+            return;
+        }
+        self.pushSpell(raw, null, anchors[0], 0, 0);
+        if (existing) return;
+        const side = s.fight.side_oriented;
+        var lane: f64 = 0;
+        for (caster.slice()) |cc| lane += @floatFromInt(if (side) cc.y else cc.x);
+        lane /= @floatFromInt(caster.len);
+        var forward: ?Cell = null;
+        var lane_distance = std.math.inf(f64);
+        for (anchors[0..n]) |a| {
+            const body = engine.cellsForAnchor(a, fw, fh);
+            var ahead = true;
+            for (body.slice()) |bc| for (caster.slice()) |from| {
+                const delta: i32 = if (side) bc.x - from.x else bc.y - from.y;
+                const adv = if (u.team == st.Team.LEFT) delta else -delta;
+                if (!(adv > 0)) ahead = false;
+            };
+            if (!ahead) continue;
+            var sum: f64 = 0;
+            for (body.slice()) |bc| sum += @floatFromInt(if (side) bc.y else bc.x);
+            const distance = @abs(sum / @as(f64, @floatFromInt(body.len)) - lane);
+            if (distance < lane_distance) {
+                forward = a;
+                lane_distance = distance;
+            }
+        }
+        if (forward) |f| {
+            if (!sameCell(f, anchors[0])) self.pushSpell(raw, null, f, 0, 0);
+        }
     }
 
     /// addSpells: every usable spell in book order. Mass casts (canMassCastSpell), ally spells over the caster then its
@@ -386,8 +584,15 @@ const Gen = struct {
                 continue;
             }
             if (!spells.usable(u, b, cfg)) continue;
+            if (spell == .summon_wolves and cfg.target == st.SpellTarget.RANDOM_CLOSE_TO_CASTER) {
+                self.addSummon(b.spell, cfg);
+                continue;
+            }
             switch (cfg.target) {
-                st.SpellTarget.RANDOM_CLOSE_TO_CASTER, st.SpellTarget.FREE_CELL, st.SpellTarget.ALLIES_AREA, st.SpellTarget.ENEMY_WITHIN_MOVEMENT_RANGE => self.out.incomplete = true,
+                st.SpellTarget.FREE_CELL => {
+                    if (spell == .meteorite or spell == .meteor_shower) self.addMeteors(spell, b.spell, cfg) else self.out.incomplete = true;
+                },
+                st.SpellTarget.RANDOM_CLOSE_TO_CASTER, st.SpellTarget.ALLIES_AREA, st.SpellTarget.ENEMY_WITHIN_MOVEMENT_RANGE => self.out.incomplete = true,
                 st.SpellTarget.ALL_ALLIES, st.SpellTarget.ALL_ENEMIES, st.SpellTarget.ALL_FLYING => {
                     if (spells.canMassCastSpell(s, self.c.ui, spell, cfg)) self.pushSpell(b.spell, null, null, 0, 0);
                 },
@@ -412,7 +617,7 @@ const Gen = struct {
                     for (s.holderOrder()) |k| {
                         if (!util.livingOf(s, k, opp) or s.units[k].isHidden()) continue;
                         if (!spells.canCastSpell(s, self.c.ui, k, spell, cfg)) continue;
-                        if (!spells.lineOfSightClear(s, self.c.ui, k, spell)) continue;
+                        if (!reachesAimedTarget(s, self.c.ui, k, spell)) continue;
                         if (cfg.multiplier == st.SpellMultiplier.UNIT_AMOUNT_DAMAGE) {
                             const d = if (spell == .ring_of_fire) (self.ringDamage(spell, cfg, k) orelse continue) else self.spellDamage(spell, cfg, k);
                             self.pushSpell(b.spell, k, null, d.value, d.kill);
@@ -855,8 +1060,12 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
 }
 
 /// The boundary options (enumerateV08BoundaryCandidates without mountain strikes).
-pub const BOUNDARY = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true };
+pub const BOUNDARY = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true, .meteor_coverage = true };
+/// The boundary census without the Battle Mage's Meteorite coverage: repairV07ForbiddenTargetDecision's options and
+/// v0.8's support roles' (enumerateSupportCandidates).
+pub const REPAIR_V07 = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true };
+pub const SUPPORT = REPAIR_V07;
 /// enumerateV08BoundaryCandidates with mountain strikes (the cemetery pass).
-pub const BOUNDARY_MOUNTAINS = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true, .mountains = true };
+pub const BOUNDARY_MOUNTAINS = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true, .mountains = true, .meteor_coverage = true };
 /// prioritizeV08A13FinishDecision's options.
 pub const FINISH = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true, .coverage = true };

@@ -34,6 +34,8 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
         meleeFallback(c, out);
     } else if (ranged) {
         decideRangedTurn(c, out);
+    } else if (u.attack_type == AT.MAGIC and spellTurn(c, out)) {
+        // a MAGIC unit's beneficial cast
     } else if (!creatureOpener(c, out) and !griffinDive(c, out)) {
         policy.v01(c, out);
         preferNoCounterMeleeTarget(c, out);
@@ -322,6 +324,162 @@ fn creatureOpener(c: *ai.Ctx, out: *ai.Decision) bool {
     out.* = .{};
     out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = raw } });
     return true;
+}
+
+/// decideSpellTurn: a MAGIC unit with stack power 1 or more casts its most valuable beneficial spell (strictly positive,
+/// first wins ties, spells in book order). A summon is worth amount x 60 while the team out-shoots the enemy, else x 3,
+/// at the getRandomGridCellAroundPosition cell (an RNG draw per summon considered) when the body fits there, else the
+/// first anchor around the caster that fits. A mass heal or buff is worth 200 per beneficiary (a buff only while an
+/// enemy that is not Hidden stands within half the board); an ally heal goes to the ally missing the most HP on its top
+/// creature, an ally buff (fighting soon) to the most threatening ally without it, each through canCastSpell.
+/// Debuffs and damage spells are never cast here.
+fn spellTurn(c: *ai.Ctx, out: *ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    if (u.n_spells == 0 or engine.getStackPower(u) < 1) return false;
+    const team = u.team;
+    const opp = engine.opposite(team);
+    var any_ally = false;
+    for (s.holderOrder()) |k| {
+        if (util.livingOf(s, k, team)) any_ally = true;
+    }
+    if (!any_ally) return false;
+    const base = engine.baseCell(u);
+    var nearest = std.math.inf(f64);
+    for (s.holderOrder()) |k| {
+        if (!util.livingOf(s, k, opp) or s.units[k].isHidden()) continue;
+        nearest = @min(nearest, ai.cellDistance(base, engine.baseCell(&s.units[k])));
+    }
+    const fighting_soon = nearest <= @as(f64, @floatFromInt(st.GRID)) / 2;
+    const ranged_superior = util.teamRangedOutput(s, team) > util.teamRangedOutput(s, opp);
+    var best_value: f64 = 0;
+    var best_spell: ?u8 = null;
+    var best_target: ?u8 = null;
+    var best_cell: ?Cell = null;
+    for (u.spells[0..u.n_spells]) |*b| {
+        const spell = std.meta.intToEnum(st.CastSpell, b.spell) catch {
+            util.unsupported = true;
+            return false;
+        };
+        const cfg = &s.spell_cfg[b.spell];
+        if (!cfg.loaded) {
+            util.unsupported = true;
+            return false;
+        }
+        if (!spells.usable(u, b, cfg)) continue;
+        const is_heal = cfg.power_type == st.SpellPower.HEAL;
+        if (spell == .summon_wolves and cfg.target == st.SpellTarget.RANDOM_CLOSE_TO_CASTER) {
+            const amount = @floor(u.amount_alive * cfg.power);
+            const sm = s.summons orelse {
+                util.unsupported = true; // no Wolf template: the summoned body's footprint is unknown
+                return false;
+            };
+            if (!sm.present[st.Summons.WOLF]) {
+                util.unsupported = true;
+                return false;
+            }
+            const fw = sm.units[st.Summons.WOLF].fw;
+            const fh = sm.units[st.Summons.WOLF].fh;
+            var cell: ?Cell = null;
+            if (util.randomGridCellAroundPosition(c, team, u.pos_x, u.pos_y)) |rc| {
+                if (spells.seatFree(s, rc, fw, fh)) cell = rc;
+            }
+            if (cell == null) cell = firstSummonableAnchor(s, c.ui, fw, fh);
+            if (amount > 0) {
+                if (cell) |sc| {
+                    const value = amount * @as(f64, if (ranged_superior) 60 else 3);
+                    if (value > best_value) {
+                        best_value = value;
+                        best_spell = b.spell;
+                        best_target = null;
+                        best_cell = sc;
+                    }
+                }
+            }
+            continue;
+        }
+        if (!cfg.is_buff and !is_heal) continue;
+        const applied = spell.applied();
+        if (cfg.target == st.SpellTarget.ALL_ALLIES or cfg.target == st.SpellTarget.ALL_FLYING) {
+            var beneficiaries: f64 = 0;
+            for (s.holderOrder()) |k| {
+                const a = &s.units[k];
+                if (!util.livingOf(s, k, team) or (!cfg.self_cast and k == c.ui)) continue;
+                if (cfg.target == st.SpellTarget.ALL_FLYING and !engine.canFly(a)) continue;
+                const benefits = if (is_heal) a.hp < a.max_hp and engine.getMagicResist(a) != 100 else !(if (applied) |id| a.buffs.find(id) != null else false);
+                if (benefits) beneficiaries += 1;
+            }
+            if (beneficiaries > 0 and (is_heal or fighting_soon)) {
+                const value = beneficiaries * 200;
+                if (value > best_value) {
+                    best_value = value;
+                    best_spell = b.spell;
+                    best_target = null;
+                    best_cell = null;
+                }
+            }
+        } else if (cfg.target == st.SpellTarget.ANY_ALLY) {
+            var target: ?u8 = null;
+            var value: f64 = 0;
+            if (is_heal or fighting_soon) {
+                for (s.holderOrder()) |k| {
+                    const a = &s.units[k];
+                    if (!util.livingOf(s, k, team) or (!cfg.self_cast and k == c.ui)) continue;
+                    var v: f64 = undefined;
+                    if (is_heal) {
+                        v = a.max_hp - a.hp;
+                    } else {
+                        if (applied) |id| if (a.buffs.find(id) != null) continue;
+                        v = ai.threat(a); // meleeThreat (no Helping Hand in scope)
+                    }
+                    if (v > value) {
+                        value = v;
+                        target = k;
+                    }
+                }
+            }
+            if (target) |t| {
+                if (spells.canCastSpell(s, c.ui, t, spell, cfg) and value > best_value) {
+                    best_value = value;
+                    best_spell = b.spell;
+                    best_target = t;
+                    best_cell = null;
+                }
+            }
+        }
+    }
+    const raw = best_spell orelse return false;
+    out.* = .{};
+    out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = raw, .target = best_target orelse 0, .has_target = best_target != null, .cell = best_cell orelse .{ .x = 0, .y = 0 }, .has_cell = best_cell != null } });
+    return true;
+}
+
+/// firstSummonableAnchor over getCellsAroundFootprint(caster cells): for every offset inside the summoned body (dx outer,
+/// then dy) and every ring cell, the first new anchor whose whole body is on the board and free.
+fn firstSummonableAnchor(s: *const st.State, ci: u8, fw: u8, fh: u8) ?Cell {
+    var ring: spells.Cells = .{};
+    const body = engine.unitCells(&s.units[ci]);
+    spells.cellsAroundFootprint(body.slice(), &ring);
+    var tried: [96]Cell = undefined;
+    var n: usize = 0;
+    for (0..fw) |dx| {
+        for (0..fh) |dy| {
+            for (ring.slice()) |r| {
+                const a = Cell{ .x = r.x + @as(i32, @intCast(dx)), .y = r.y + @as(i32, @intCast(dy)) };
+                var seen = false;
+                for (tried[0..n]) |t| {
+                    if (t.x == a.x and t.y == a.y) seen = true;
+                }
+                if (seen) continue;
+                if (n < tried.len) {
+                    tried[n] = a;
+                    n += 1;
+                }
+                if (spells.seatFree(s, a, fw, fh)) return a;
+            }
+        }
+    }
+    return null;
 }
 
 /// decideGriffinDive: a Range Null Field emitter that can move, facing living enemy shooters, with another living flyer

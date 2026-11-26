@@ -218,6 +218,222 @@ fn forbiddenTarget(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
     return true;
 }
 
+/// The unit's book spell `raw`, when it may cast it now (isSpellUsableByCaster), with its config.
+fn usableBookSpell(s: *const st.State, u: *const st.Unit, raw: u8) ?*const st.SpellConfig {
+    for (u.spells[0..u.n_spells]) |*b| {
+        if (b.spell != raw) continue;
+        const cfg = &s.spell_cfg[raw];
+        return if (cfg.loaded and spells.usable(u, b, cfg)) cfg else null;
+    }
+    return null;
+}
+
+/// immediateDamagePrecedes: a kill first, then more damage.
+inline fn damagePrecedes(a: *const cand.Candidate, b: *const cand.Candidate) bool {
+    return a.ek > b.ek or (a.ek == b.ek and a.ed > b.ed);
+}
+
+/// selectV08DamageSpellCandidate: among candidates casting an offensive spell (UNIT_AMOUNT_DAMAGE) the unit may cast
+/// now, with finite positive damage, the first kill, else the most damage.
+fn selectDamageSpell(s: *const st.State, u: *const st.Unit, set: *const cand.Set) ?usize {
+    var best: ?usize = null;
+    for (set.slice(), 0..) |*cd, i| {
+        var cast: ?u8 = null;
+        for (cd.d.slice()) |a| if (a == .cast_spell) {
+            cast = a.cast_spell.spell;
+            break;
+        };
+        const raw = cast orelse continue;
+        if (!std.math.isFinite(cd.ed) or cd.ed <= 0) continue;
+        const cfg = usableBookSpell(s, u, raw) orelse continue;
+        if (cfg.multiplier != st.SpellMultiplier.UNIT_AMOUNT_DAMAGE) continue;
+        if (best == null or damagePrecedes(cd, &set.items[best.?])) best = i;
+    }
+    return best;
+}
+
+/// prioritizeV08DamageSpell: a unit holding a usable damage spell casts the best one (the boundary candidates) unless
+/// the decision is a priced direct attack that it does not beat (a kill first, then damage).
+fn damageSpell(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    var any = false;
+    for (u.spells[0..u.n_spells]) |b| {
+        const cfg = usableBookSpell(s, u, b.spell) orelse continue;
+        if (cfg.multiplier == st.SpellMultiplier.UNIT_AMOUNT_DAMAGE) any = true;
+    }
+    if (!any) return util.copyDecision(out, in);
+    var set: cand.Set = .{};
+    cand.enumerate(c, in, cand.BOUNDARY, &set);
+    const b = selectDamageSpell(s, u, &set) orelse return util.copyDecision(out, in);
+    const inc = &set.items[0];
+    const priced_direct = isDirectCombat(inc.d.slice()) and std.math.isFinite(inc.ed) and inc.ed > 0;
+    if (!priced_direct or damagePrecedes(&set.items[b], inc)) return take(out, &set, b);
+    util.copyDecision(out, in);
+}
+
+/// v08VineTargetPressure: alive x max damage x steps (each finite and at least 0).
+fn vinePressure(t: *const st.Unit) f64 {
+    const f = struct {
+        fn nn(x: f64) f64 {
+            return if (std.math.isFinite(x)) @max(0, x) else 0;
+        }
+    };
+    return f.nn(t.amount_alive) * f.nn(t.attack_damage_max) * f.nn(engine.getSteps(t));
+}
+
+/// prioritizeV08VineThrow: a unit with a usable Vine Throw, on a turn that neither waits, attacks nor casts, outside
+/// the dominant-finish window, throws at the boundary candidate's living target with the most pressure (then a grounded
+/// one, then the lower magic resist; first on ties).
+fn vineThrow(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    const vine: u8 = @intFromEnum(st.CastSpell.vine_throw);
+    if (usableBookSpell(s, u, vine) == null) return util.copyDecision(out, in);
+    for (in.slice()) |a| switch (a) {
+        .wait_turn, .melee_attack, .range_attack, .cast_spell => return util.copyDecision(out, in),
+        else => {},
+    };
+    if (util.dominantFinishState(s, u.team).active) return util.copyDecision(out, in);
+    var set: cand.Set = .{};
+    cand.enumerate(c, in, cand.BOUNDARY, &set);
+    var best: ?usize = null;
+    for (set.slice(), 0..) |*cd, i| {
+        if (cd.kind != .spell or cd.spell != vine or cd.target < 0) continue;
+        const t = &s.units[@intCast(cd.target)];
+        if (t.isDead()) continue;
+        const bi = best orelse {
+            best = i;
+            continue;
+        };
+        const bt = &s.units[@intCast(set.items[bi].target)];
+        const pressure = vinePressure(t) - vinePressure(bt);
+        const grounded = @as(i32, @intFromBool(!engine.canFly(t))) - @as(i32, @intFromBool(!engine.canFly(bt)));
+        const resistance = engine.getMagicResist(bt) - engine.getMagicResist(t);
+        if (pressure > 0 or (pressure == 0 and (grounded > 0 or (grounded == 0 and resistance > 0)))) best = i;
+    }
+    if (best) |i| return take(out, &set, i);
+    util.copyDecision(out, in);
+}
+
+// ---- the Healer's sustain role (v0_8_support_roles.ts prioritizeV08HealerSustain) ----
+
+/// isV08DurableHealAnchor: an Abomination, Frenzied Boar or Goblin Knight, or an Angel doing its ranged-line job (its
+/// backline protector intent is the Angel's).
+fn durableHealAnchor(s: *const st.State, ui: u8) bool {
+    return switch (util.creature(s, ui)) {
+        .abomination, .frenzied_boar, .goblin_knight => true,
+        .angel => if (protectorIntent(s, ui)) |it| it.kind == .angel else false,
+        else => false,
+    };
+}
+
+/// effectiveFrontHeal: what a heal of `raw` restores on the top creature.
+inline fn frontHeal(t: *const st.Unit, raw: f64) f64 {
+    return @max(0, @min(raw, t.max_hp - t.hp));
+}
+
+/// singleHealValue: the restored HP (x3 on a durable anchor) times 1 + the missing fraction of the top creature; 0 for
+/// nothing to restore, a trivial heal, or a body below level 3 that is not an anchor and misses under 60%.
+fn singleHealValue(s: *const st.State, ti: u8, raw: f64) f64 {
+    const t = &s.units[ti];
+    const effective = frontHeal(t, raw);
+    const trivial = effective < raw * 0.05 and t.max_hp - t.hp < t.max_hp * 0.05;
+    if (effective <= 0 or trivial) return 0;
+    const missing = @max(0, t.max_hp - t.hp) / @max(1, t.max_hp);
+    const anchor = durableHealAnchor(s, ti);
+    if (!(anchor or t.level >= 3) and missing < 0.6) return 0;
+    return effective * @as(f64, if (anchor) 3 else 1) * (1 + missing);
+}
+
+/// incumbentGuaranteedKill: candidate 0 is a priced direct attack that kills (a melee one only when the target cannot
+/// answer it; Water Shield, Flesh Shield and Fire Shield are not in scope, V08_MAGE_DAMAGE_KILL_PRIORITY is unset).
+fn incumbentGuaranteedKill(c: *const ai.Ctx, set: *const cand.Set) bool {
+    if (set.n == 0) return false;
+    const inc = &set.items[0];
+    if (!isDirectCombat(inc.d.slice()) or inc.ek != 1 or !(inc.ed > 0)) return false;
+    if (inc.target >= 0 and util.has(&inc.d, .melee_attack)) {
+        if (util.canRespondToMelee(c.s, c.ui, @intCast(inc.target))) return false;
+    }
+    return true;
+}
+
+/// The power of the unit's first book spell `raw` (0 without it).
+fn bookSpellPower(s: *const st.State, u: *const st.Unit, raw: u8) ?*const st.SpellConfig {
+    for (u.spells[0..u.n_spells]) |b| {
+        if (b.spell == raw) return &s.spell_cfg[raw];
+    }
+    return null;
+}
+
+/// prioritizeV08HealerSustain: unless the decision is a guaranteed kill, a Healer casts the Blessing worth more than
+/// its best Heal, else that Heal (SUPPORT candidates). A Heal is priced by singleHealValue at the caster's healing
+/// power (no Holy Cross); a Blessing by the target's best direct attack (its own candidates from an empty incumbent,
+/// the most expected damage first) x (max - min) / (max + min) x min(2, the spell's laps) turns (a shooter's capped by
+/// its shots), skipping a target that is Blessed or Stunned. Mass Heal and Spiritual Armor are not in scope;
+/// V08_ROLE_RELEASE is unset.
+fn healerSustain(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (util.creature(s, c.ui) != .healer) return util.copyDecision(out, in);
+    var set: cand.Set = .{};
+    cand.enumerate(c, in, cand.SUPPORT, &set);
+    if (incumbentGuaranteedKill(c, &set)) return util.copyDecision(out, in);
+    const heal_raw: u8 = @intFromEnum(st.CastSpell.heal);
+    const heal_power: f64 = if (bookSpellPower(s, u, heal_raw)) |cfg| cfg.power else 0;
+    const raw = @floor(heal_power * @max(0, u.amount_alive) * 1 * spells.moraleMultiplier(.heal, u.attack_multiplier));
+    var single: ?usize = null;
+    var single_value: f64 = 0;
+    for (set.slice(), 0..) |*cd, i| {
+        if (cd.spell != heal_raw or cd.target < 0) continue;
+        const t: u8 = @intCast(cd.target);
+        const v = singleHealValue(s, t, raw);
+        if (!(v > 0)) continue;
+        if (single) |b| {
+            const bt: u8 = @intCast(set.items[b].target);
+            if (!(v > single_value or (v == single_value and durableHealAnchor(s, t) and !durableHealAnchor(s, bt)))) continue;
+        }
+        single = i;
+        single_value = v;
+    }
+    const bless_raw: u8 = @intFromEnum(st.CastSpell.blessing);
+    const laps: f64 = @min(2, if (bookSpellPower(s, u, bless_raw)) |cfg| cfg.laps else 0);
+    var bless: ?usize = null;
+    var bless_value: f64 = 0;
+    for (set.slice(), 0..) |*cd, i| {
+        if (cd.spell != bless_raw or cd.target < 0) continue;
+        const ti: u8 = @intCast(cd.target);
+        const t = &s.units[ti];
+        if (t.buffs.find(.blessing) != null or t.isStunned()) continue; // Blindness is not in scope
+        const mn = t.attack_damage_min;
+        const mx = t.attack_damage_max;
+        if (mx <= mn or mx + mn <= 0) continue;
+        var tc: ai.Ctx = undefined;
+        ai.initCtxInto(&tc, s, ti);
+        const empty: ai.Decision = .{};
+        var attacks: cand.Set = .{};
+        cand.enumerate(&tc, &empty, cand.SUPPORT, &attacks);
+        var best_attack: ?usize = null;
+        for (attacks.slice(), 0..) |*a, j| {
+            if (!isDirectCombat(a.d.slice()) or util.has(&a.d, .cast_spell)) continue;
+            if (best_attack == null or a.ed > attacks.items[best_attack.?].ed) best_attack = j;
+        }
+        const j = best_attack orelse continue;
+        const attack = &attacks.items[j];
+        const turns = if (util.has(&attack.d, .range_attack)) @min(laps, engine.getRangeShots(t)) else laps;
+        const value = ((attack.ed * (mx - mn)) / (mx + mn)) * turns;
+        if (value > 0 and (bless == null or value > bless_value)) {
+            bless = i;
+            bless_value = value;
+        }
+    }
+    if (bless) |i| {
+        if (bless_value > (if (single != null) single_value else 0)) return take(out, &set, i);
+    }
+    if (single) |i| return take(out, &set, i);
+    util.copyDecision(out, in);
+}
+
 /// bestV08WardSpell: the spell candidate with a kill first, then the most damage, then the spell name (first on ties).
 fn bestWardSpell(set: *const cand.Set) ?usize {
     var best: ?usize = null;
@@ -1254,10 +1470,12 @@ fn runPassInner(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decisio
         .backline_protector => backlineProtector(c, in, out),
         .coherent_melee => return coherentMelee(c, in, out),
         .forbidden_target => return forbiddenTarget(c, in, out),
-        // Identity in scope: splash shooters, damage spells, Vine Throw, Smoke, Nightmare's Fire Wall, the Healer and
-        // the Blacksmith need abilities or spells the engine does not carry yet; ranked-replay tactics are an
-        // off-by-default research scope.
-        .splash, .damage_spell, .vine, .smoke, .nightmare, .healer, .blacksmith, .ranked_replay => util.copyDecision(out, in),
+        .damage_spell => damageSpell(c, in, out),
+        .vine => vineThrow(c, in, out),
+        .healer => healerSustain(c, in, out),
+        // Identity in scope: splash shooters, Smoke, Nightmare's Fire Wall and the Blacksmith need abilities or spells
+        // the engine does not carry yet; ranked-replay tactics are an off-by-default research scope.
+        .splash, .smoke, .nightmare, .blacksmith, .ranked_replay => util.copyDecision(out, in),
         .cemetery => return cemetery(c, in, out),
         .ranged_positioning => return rangedPositioning(c, in, out),
     }

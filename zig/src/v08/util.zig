@@ -238,12 +238,14 @@ pub fn cumulativeHp(u: *const Unit) f64 {
 
 /// canUnitRespondToMelee (src/handlers/melee_response.ts), as the engine's combat.zig canRespondToMelee: nobody answers
 /// a Shadow Touch or Lightning Spin attacker, a Stun blocks the reply, an Aggr'd target answers only its forced
-/// attacker, and the reply is spent once (No Melee, Terrifying Gaze and Cowardice are not in scope).
+/// attacker, a unit frightened by Terrifying Gaze never answers its gazer, and the reply is spent once (No Melee and
+/// Cowardice are not in scope).
 pub fn canRespondToMelee(s: *const State, att: u8, ti: u8) bool {
     const tgt = &s.units[ti];
     if (abilities.skipsResponse(&s.units[att])) return false;
     if (tgt.isStunned()) return false;
     if (tgt.target >= 0 and tgt.target != @as(i8, @intCast(att))) return false;
+    if (s.forbids(tgt, s.units[att].uid)) return false;
     return !tgt.responded and s.fight.replied & engine.unitBit(ti) == 0;
 }
 
