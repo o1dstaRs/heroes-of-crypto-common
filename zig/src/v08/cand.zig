@@ -156,7 +156,8 @@ pub fn sigEqual(a: []const rec.Action, b: []const rec.Action) bool {
 /// itself (an observable edge and an unobstructed trajectory: a screening body would take it instead); Vine Throw and
 /// Ring of Fire keep the engine's lane; other spells need no line.
 pub fn reachesAimedTarget(s: *const st.State, ci: u8, ti: u8, spell: spells.CS) bool {
-    if (spell == .fire_strike) {
+    // isInterceptedThrownSpell: Fire Strike and Fireball arc over the caster's allies and must reach the aimed body.
+    if (spell == .fire_strike or spell == .fireball) {
         const t = spells.trajectory(s, ci, ti) orelse return false;
         return t.obstruction == 0;
     }
@@ -434,6 +435,35 @@ const Gen = struct {
         const landed = if (absorbed) 0 else spells.damageAgainst(spells.rawDamage(self.unit(), spell, cfg), cfg.element, t);
         if (fuse.lastFuseSpell(self.c.s, self.unit(), ti, landed, absorbed)) |est| return .{ .value = est.net, .kill = if (est.secure) 1 else 0 };
         return self.spellDamage(spell, cfg, ti);
+    }
+
+    /// fireballDamage: the aimed target's offensiveSpellDamage, plus the blast over [impact, ring(impact)]
+    /// (fireballBlastCells; the impact is the target-body cell the throw entered, reachesAimedTarget having excluded an
+    /// interception): every other living unit there, first-seen order, the caster spared; an enemy's damage adds and its
+    /// kill counts, an ally's subtracts. No Last Fuse estimate (TypeScript prices Fireball before it).
+    fn fireballDamage(self: *const Gen, spell: spells.CS, cfg: *const st.SpellConfig, ti: u8) Damage {
+        const s = self.c.s;
+        const aimed = self.spellDamage(spell, cfg, ti);
+        const t = spells.trajectory(s, self.c.ui, ti) orelse return aimed;
+        var cells: spells.Cells = .{};
+        cells.push(t.impact);
+        var ring: spells.Cells = .{};
+        spells.cellsAroundCell(t.impact, &ring);
+        for (ring.slice()) |c| cells.push(c);
+        var list: Slots = .{};
+        affectedUnits(s, cells.slice(), &list, false);
+        const opp = engine.opposite(self.unit().team);
+        var value = aimed.value;
+        var kill = aimed.kill;
+        for (list.slice()) |v| {
+            if (s.units[v].isDead() or v == self.c.ui or v == ti) continue;
+            const d = self.spellDamage(spell, cfg, v);
+            if (s.units[v].team == opp) {
+                value += d.value;
+                if (d.kill == 1) kill = 1;
+            } else value -= d.value;
+        }
+        return .{ .value = value, .kill = kill };
     }
 
     /// ringOfFireDamage: every other living stack touching the target's body (the caster and the target spared), enemy
@@ -861,7 +891,12 @@ const Gen = struct {
                         if (!spells.canCastSpell(s, self.c.ui, k, spell, cfg)) continue;
                         if (!reachesAimedTarget(s, self.c.ui, k, spell)) continue;
                         if (cfg.multiplier == st.SpellMultiplier.UNIT_AMOUNT_DAMAGE) {
-                            const d = if (spell == .ring_of_fire) (self.ringDamage(spell, cfg, k) orelse continue) else self.directSpellDamage(spell, cfg, k);
+                            const d = if (spell == .ring_of_fire)
+                                (self.ringDamage(spell, cfg, k) orelse continue)
+                            else if (spell == .fireball)
+                                self.fireballDamage(spell, cfg, k)
+                            else
+                                self.directSpellDamage(spell, cfg, k);
                             self.pushSpell(b.spell, k, null, d.value, d.kill);
                         } else self.pushSpell(b.spell, k, null, 0, 0);
                     }
