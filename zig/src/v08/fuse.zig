@@ -111,7 +111,7 @@ const Landed = struct {
 };
 
 /// estimatePrimaryMeleeDamage for unit `ai_` striking `ti` from `from` with `shape`: null for an unsupported sequence
-/// (a lava move, Lightning Spin, Double Punch, Skewer Strike; Fire Breath and Chain Lightning are not in the engine)
+/// (a lava move; Lightning Spin, Double Punch, Fire Breath, Skewer Strike or Chain Lightning on the striker)
 /// or a malformed band. The chain: Rapid Charge over the charge distance, Paralysis, then the position abilities
 /// (Backstab) from `from`, the ranged unit's half-strength swing unless Handyman, the target's Deep Wounds, Lucky
 /// Strike's chance and multiplier, and Penetrating Bite's bonus. The rate is the unit's attack without its current aura
@@ -121,7 +121,7 @@ pub fn primaryMelee(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape, from
     const u = &s.units[ai_];
     const t = &s.units[ti];
     if (t.isDead() or shape.lava) return null;
-    if (u.has(.lightning_spin) or u.has(.double_punch) or u.has(.skewer_strike)) return null;
+    if (u.has(.lightning_spin) or u.has(.double_punch) or u.has(.fire_breath) or u.has(.skewer_strike) or u.has(.chain_lightning)) return null;
     const stand = ai.footprintForAnchor(u, from);
     const rate = @max(u.base_attack, engine.getAttack(u) - u.attack_mod_increase) + warAngerModAt(s, ai_, stand.slice());
     var handler: f64 = 1;

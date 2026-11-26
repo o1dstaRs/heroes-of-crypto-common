@@ -271,6 +271,44 @@ pub fn projectSpell(s: *const State, caster: *const Unit, t: *const Unit, landed
     return .{ .damage = if (covenant or shield) 0 else landed, .shield = shield };
 }
 
+/// The AI's Chain Lightning arc (v0.4 chainLightningTarget's chainReach, v0.5's chainHits and meleeAoeHitCount): from
+/// `target` (always hit) breadth first through the chainable enemies (of `enemies`, in order: no active Wind Element,
+/// magic resist below 100) whose cells touch a stack of the previous layer, up to 4 layers. The hit stacks in discovery
+/// order (for each stack of a layer in order, each chainable enemy in order), the target first. Not the engine's own
+/// target order (getChainLightningTargets walks per parent).
+pub fn chainHits(s: *const State, enemies: []const u8, target: u8, buf: *[st.MAX_UNITS]u8) []const u8 {
+    var chainable: [st.MAX_UNITS]u8 = undefined;
+    var nc: usize = 0;
+    for (enemies) |e| {
+        const u = &s.units[e];
+        if (u.has(.wind_element) or !(engine.getMagicResist(u) < 100)) continue;
+        chainable[nc] = e;
+        nc += 1;
+    }
+    var hit: st.UnitSet = engine.unitBit(target);
+    buf[0] = target;
+    var n: usize = 1;
+    var start: usize = 0; // buf[start..end] is the frontier
+    var end: usize = 1;
+    var layer: usize = 0;
+    while (layer < 4 and start < end) : (layer += 1) {
+        for (start..end) |fi| {
+            const fc = engine.unitCells(&s.units[buf[fi]]);
+            for (chainable[0..nc]) |e| {
+                if (hit & engine.unitBit(e) != 0) continue;
+                const ec = engine.unitCells(&s.units[e]);
+                if (!footprintsNear(ec.slice(), fc.slice())) continue;
+                hit |= engine.unitBit(e);
+                buf[n] = e;
+                n += 1;
+            }
+        }
+        start = end;
+        end = n;
+    }
+    return buf[0..n];
+}
+
 /// targetCanAbsorbPrimary (support roles) / the Blacksmith's guaranteed-kill gate: the target holds a Water Shield row
 /// the striker cannot pass (no Fire Element; a Broken holder still counts) or a Flesh Shield Aura row.
 pub fn canAbsorbPrimary(u: *const Unit, t: *const Unit) bool {

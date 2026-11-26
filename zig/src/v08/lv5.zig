@@ -336,9 +336,8 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     const u = c.unit();
     const si = firstIndex(out, .melee_attack) orelse return;
     if (u.target >= 0) return;
-    // Multi-hit melee is positioned for coverage by v0.4 and aoeMeleeByPolicy (Fire Breath and Chain Lightning are not
-    // in scope).
-    if (u.has(.lightning_spin) or u.has(.skewer_strike)) return;
+    // Multi-hit melee is positioned for coverage by v0.4 and aoeMeleeByPolicy.
+    if (u.has(.lightning_spin) or u.has(.fire_breath) or u.has(.skewer_strike) or u.has(.chain_lightning)) return;
     const strike = out.actions[si].melee_attack;
     const team = u.team;
     const opp = engine.opposite(team);
@@ -510,8 +509,8 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
 }
 
 // =====================================================================================================================
-// AoE melee: aoeMeleeByPolicy and the hourglass's meleeAoeHitCount (Lightning Spin and Skewer Strike; Fire Breath and
-// Chain Lightning are not in scope)
+// AoE melee: aoeMeleeByPolicy and the hourglass's meleeAoeHitCount (Lightning Spin, Skewer Strike and Chain Lightning;
+// Fire Breath is not in scope)
 // =====================================================================================================================
 
 /// A landed melee by a Dulling Defense unit permanently cuts a survivor's base attack (DULLING_OWN_SWING_SCORE).
@@ -559,8 +558,8 @@ fn skewerLine(s: *const State, opp: u8, from: Cell, t: u8, buf: *[2]u8) []const 
     return buf[0..n];
 }
 
-/// meleeAoeHitCount: the enemy stacks the decision's strike catches (the Lightning Spin ring at its stand cell, or the
-/// Skewer line through its target); 1 for any other strike, 0 without one.
+/// meleeAoeHitCount: the enemy stacks the decision's strike catches (the Lightning Spin ring at its stand cell, the
+/// Skewer line through its target, or the Chain Lightning arc from it); 1 for any other strike, 0 without one.
 fn meleeAoeHitCount(c: *ai.Ctx, out: *const ai.Decision) usize {
     const s = c.s;
     const u = c.unit();
@@ -579,6 +578,10 @@ fn meleeAoeHitCount(c: *ai.Ctx, out: *const ai.Decision) usize {
         var lbuf: [2]u8 = undefined;
         return skewerLine(s, opp, strike.attack_from, strike.target, &lbuf).len;
     }
+    if (u.has(.chain_lightning)) {
+        var hbuf: [st.MAX_UNITS]u8 = undefined;
+        return util.chainHits(s, enemies, strike.target, &hbuf).len;
+    }
     return 1;
 }
 
@@ -593,14 +596,15 @@ fn routeLen(mp: *const pathing.MovePath, r: *const pathing.Route) usize {
 }
 
 /// aoeMeleeByPolicy: the learned AoE stand. Every stand (in place, then each landable known route) with, for the spin
-/// [33..40], its first adjacent enemy and the whole ring, or, for the skewer [41..48], each adjacent enemy and its
-/// line, scored over the hit set (coverage, value, kills, threat, exposure, move cost, wounds, incumbency); the best
+/// [33..40], its first adjacent enemy and the whole ring, or, for the skewer and Chain Lightning [41..48], each adjacent
+/// enemy and its line or arc (util.chainHits), scored over the hit set (coverage, value, kills, threat, exposure, move cost, wounds, incumbency); the best
 /// (first on ties) replaces v0.4's strike unless it is v0.4's own pick. The trained blocks are never dormant.
 fn aoeMeleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
     const spin = u.has(.lightning_spin);
-    if (!spin and !u.has(.skewer_strike)) return;
+    const chain = u.has(.chain_lightning);
+    if (!spin and !u.has(.skewer_strike) and !chain) return;
     const off: usize = if (spin) 33 else 41;
     const si = firstIndex(out, .melee_attack) orelse return;
     if (u.target >= 0 or !u.canMove()) return;
@@ -668,7 +672,8 @@ fn aoeMeleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         for (ring) |e| {
             if (engine.cowardBarred(s, u, &s.units[e])) continue; // an aim Cowardice bars
             var lbuf: [2]u8 = undefined;
-            const line = skewerLine(s, opp, cell, e, &lbuf);
+            var hbuf: [st.MAX_UNITS]u8 = undefined;
+            const line = if (chain) util.chainHits(s, enemies, e, &hbuf) else skewerLine(s, opp, cell, e, &lbuf);
             const inc: f64 = if (ai.sameCell(cell, v4from) and e == v4target) 1 else 0;
             const v = Score.of(s, &c.m, opp, w, line, cell, cost, inc, dmg_max);
             if (best == null or v > best.?.score) best = .{ .cell = cell, .route = route, .target = e, .score = v };

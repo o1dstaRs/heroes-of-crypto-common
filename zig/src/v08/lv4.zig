@@ -4,9 +4,9 @@
 //! In scope (no spells or abilities) the pipeline is: hold when out-gunning at range, v0.3, the Goblin Knight's
 //! low-level victim, the flyer's patient hunt, the landing guard, the melee legality guard, the lap-1 mass-buff
 //! wait, the front move, the range legality guard, plus the ability repositions of batches 1-3: auraRepositionMelee,
-//! rapidChargeReposition, aoeMeleeReposition (Skewer Strike; Fire Breath is not in scope) and hydraSpinReposition.
-//! Identity in scope, so not ported: retargetHeal (heal casts), chainLightningTarget (Chain Lightning), and the Ogre
-//! Mage Riot, Healer and Troll Wild Regeneration plays (spells). Off by default: the siege mute (MUTE_SIEGE_ENABLED),
+//! rapidChargeReposition, aoeMeleeReposition (Skewer Strike; Fire Breath is not in scope), hydraSpinReposition and
+//! chainLightningTarget (batch 6b), and the casts of the later waves (retargetHeal, the Ogre Mage Riot, the Healer's
+//! spell policy, the Troll's Wild Regeneration). Off by default: the siege mute (MUTE_SIEGE_ENABLED),
 //! the boxed-shooter hold (V04_BOXHOLD), the caster self-delays (V04_OGRESELF / V04_BEHESELF).
 
 const std = @import("std");
@@ -48,6 +48,7 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     aoeMeleeReposition(c, out);
     flyerPatientHunt(c, out);
     hydraSpinReposition(c, out);
+    chainLightningTarget(c, out);
     preferValidMove(c, out, &base);
     enforceMeleeLegality(c, out);
     waitForMassBuff(c, out);
@@ -545,6 +546,39 @@ fn hydraSpinReposition(c: *ai.Ctx, out: *ai.Decision) void {
     }
     const b = best orelse return;
     if (b.count < 2 or b.count <= base_count) return;
+    setStrike(c, out, b.target, b.k.cell, b.k.route);
+}
+
+/// (10) chainLightningTarget (Chain Lightning): the reachable stand and adjacent enemy whose arc (util.chainHits) reaches
+/// the most stacks (ties: the shorter route), when that is two or more and beats the current strike's arc (1 when its
+/// target has left the holder); the decision becomes that strike.
+fn chainLightningTarget(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (!u.has(.chain_lightning) or u.target >= 0 or !u.canMove()) return;
+    const i = firstMelee(out) orelse return;
+    const strike = out.actions[i].melee_attack;
+    var ebuf: [st.MAX_UNITS]u8 = undefined;
+    const enemies = livingEnemies(s, u.team, &ebuf);
+    if (enemies.len < 2) return;
+    var hbuf: [st.MAX_UNITS]u8 = undefined;
+    const base_reach: usize = if (s.units[strike.target].in_holder) util.chainHits(s, enemies, strike.target, &hbuf).len else 1;
+    var cbuf: [pathing.MAX_ROUTES]Cand = undefined;
+    const cands = standCandidates(c, &cbuf);
+    var best: ?struct { k: Cand, target: u8, reach: usize } = null;
+    for (cands) |k| {
+        const fp = ai.footprintForAnchor(u, k.cell);
+        for (enemies) |e| {
+            const ec = engine.unitCells(&s.units[e]);
+            if (!util.footprintsNear(ec.slice(), fp.slice())) continue;
+            const reach = util.chainHits(s, enemies, e, &hbuf).len;
+            if (best == null or reach > best.?.reach or (reach == best.?.reach and candLen(c, k) < candLen(c, best.?.k))) {
+                best = .{ .k = k, .target = e, .reach = reach };
+            }
+        }
+    }
+    const b = best orelse return;
+    if (b.reach < 2 or b.reach <= base_reach) return;
     setStrike(c, out, b.target, b.k.cell, b.k.route);
 }
 
