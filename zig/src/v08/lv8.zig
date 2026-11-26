@@ -205,12 +205,131 @@ pub fn prioritize(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     productiveAction(c, in, out);
 }
 
+const DELIVERY_EPSILON = 1e-9;
+
+const Delivery = struct {
+    cand: usize,
+    incumbent: bool,
+    ed: f64,
+    ek: u8,
+    stationary: bool,
+    target: u8,
+    remaining: f64,
+    work: f64,
+};
+
+/// deliveryPrecedes without Dulling Defense (out of scope): kill, the incumbent, damage, stationary, stable order.
+fn deliveryPrecedes(l: *const Delivery, r: *const Delivery) bool {
+    if (l.ek != r.ek) return l.ek > r.ek;
+    if (l.incumbent != r.incumbent) return l.incumbent;
+    if (l.ed != r.ed) return l.ed > r.ed;
+    if (l.stationary != r.stationary) return l.stationary;
+    return l.cand < r.cand;
+}
+
+/// selectV08STargetPressureCandidate: a kill now first; else finish an already wounded stack (the least remaining
+/// first); else the target with the most remaining attack-work. Null when Dulling Defense or Wild Regeneration is on
+/// the board (not ported).
+fn targetPressure(s: *const st.State, actor: u8, set: *const cand.Set, ok: *bool) ?usize {
+    const team = s.units[actor].team;
+    if (s.units[actor].ability(.dulling_defense) != null) ok.* = false;
+    var by_target: [st.MAX_UNITS]i32 = .{-1} ** st.MAX_UNITS;
+    var order: [st.MAX_UNITS]u8 = undefined;
+    var nt: usize = 0;
+    var deliveries: [st.MAX_UNITS]Delivery = undefined;
+    for (set.slice(), 0..) |*c, i| {
+        if (c.target < 0 or !isDirectCombat(c.d.slice())) continue;
+        const ti: u8 = @intCast(c.target);
+        const t = &s.units[ti];
+        const ed = if (std.math.isFinite(c.ed) and c.ed > 0) c.ed else 0;
+        if (t.isDead() or t.team == team or ed <= 0) continue;
+        if (t.ability(.dulling_defense) != null) ok.* = false;
+        const original = @max(0, t.amount_alive + t.amount_died) * @max(0, t.max_hp);
+        const remaining = if (original > 0) @min(1, util.cumulativeHp(t) / original) else 1;
+        // Wild Regeneration's reserve (max HP per remaining pre-Armageddon activation): no creature in scope regenerates.
+        const work = @max(0, util.cumulativeHp(t)) / @max(ed, DELIVERY_EPSILON);
+        const d = Delivery{ .cand = i, .incumbent = c.kind == .incumbent, .ed = ed, .ek = c.ek, .stationary = !moves(c.d.slice()), .target = ti, .remaining = remaining, .work = work };
+        if (by_target[ti] < 0) {
+            by_target[ti] = @intCast(nt);
+            order[nt] = ti;
+            deliveries[nt] = d;
+            nt += 1;
+        } else if (deliveryPrecedes(&d, &deliveries[@intCast(by_target[ti])])) deliveries[@intCast(by_target[ti])] = d;
+    }
+    if (nt == 0) return null;
+    var kills = false;
+    for (deliveries[0..nt]) |*d| if (d.ek == 1) {
+        kills = true;
+    };
+    // eligible: the immediate kills, else every delivery (no Dulling Defense in scope).
+    var focused: [st.MAX_UNITS]Delivery = undefined;
+    var nf: usize = 0;
+    for (deliveries[0..nt]) |d| if (!kills or d.ek == 1) {
+        focused[nf] = d;
+        nf += 1;
+    };
+    var wounded = kills;
+    if (!kills) {
+        var nw: usize = 0;
+        for (focused[0..nf]) |d| if (d.remaining < 1 - DELIVERY_EPSILON) {
+            focused[nw] = d;
+            nw += 1;
+        };
+        if (nw > 0) {
+            nf = nw;
+            wounded = true;
+        } else {
+            nf = 0;
+            for (deliveries[0..nt]) |d| {
+                focused[nf] = d;
+                nf += 1;
+            }
+        }
+    }
+    const Cmp = struct { wounded: bool, kills: bool };
+    std.sort.insertion(Delivery, focused[0..nf], Cmp{ .wounded = wounded, .kills = kills }, struct {
+        fn lt(k: Cmp, l: Delivery, r: Delivery) bool {
+            if (k.wounded and l.remaining != r.remaining) return l.remaining < r.remaining;
+            if (!k.kills and l.work != r.work) return l.work > r.work;
+            if (l.ed != r.ed) return l.ed > r.ed;
+            if (l.stationary != r.stationary) return l.stationary;
+            return l.cand < r.cand;
+        }
+    }.lt);
+    return focused[0].cand;
+}
+
+/// prioritizeV08A13FinishDecision: from the final sprint (lap 9), the target-pressure attack, else the advance.
+/// False when the board needs an unported term.
+pub fn finish(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
+    if (c.s.fight.lap < util.URGENT_FINISH_START_LAP) {
+        util.copyDecision(out, in);
+        return true;
+    }
+    var set: cand.Set = .{};
+    cand.enumerate(c, in, cand.FINISH, &set);
+    var ok = true;
+    const attack = targetPressure(c.s, c.ui, &set, &ok);
+    if (!ok) return false;
+    if (attack) |i| {
+        take(out, &set, i);
+        return true;
+    }
+    for (set.slice(), 0..) |*cd, i| if (cd.kind == .move) {
+        take(out, &set, i);
+        return true;
+    };
+    util.copyDecision(out, in);
+    return true;
+}
+
 /// Runs one ported pass on `in`; false when the pass is not ported yet.
 pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision) bool {
     switch (pass) {
         .explicit => explicit(c.ui, in, out),
         .defend_to_wait => defendToWait(c.s, c.ui, in, out),
         .prioritize => prioritize(c, in, out),
+        .finish => return finish(c, in, out),
         else => return false,
     }
     return true;
