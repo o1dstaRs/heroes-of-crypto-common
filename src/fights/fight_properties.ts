@@ -999,6 +999,25 @@ export class FightProperties {
     public restoreAlreadyHourglass(unitIds: Iterable<string>): void {
         this.alreadyHourglass = new Set(unitIds);
     }
+    /**
+     * Authoritatively rebuild "already made a turn this lap" (ranked), the companion of restoreAlreadyHourglass.
+     * The ranked client adds a unit here whenever its local re-apply of an action completes a turn, but it never
+     * runs flipLap(), so the set only grew: a unit that acted in lap 1 still read as done in lap 2, and Wait
+     * stayed disabled for it (owner, game d6d7ee8b, 2026-11-26: Gargantuan's lap-2 turn). The client derives the
+     * entries from each snapshot (every living unit that is not active, not queued in upNext and not waiting
+     * on the hourglass) and replaces both the set and its per-team view.
+     */
+    public restoreAlreadyMadeTurn(entries: Iterable<{ unitId: string; team: TeamType }>): void {
+        this.alreadyMadeTurn = new Set();
+        this.alreadyMadeTurnByTeam = new Map();
+        for (const { unitId, team } of entries) {
+            if (team === PBTypes.TeamVals.NO_TEAM) continue;
+            this.alreadyMadeTurn.add(unitId);
+            const teamSet = this.alreadyMadeTurnByTeam.get(team) ?? new Set<string>();
+            teamSet.add(unitId);
+            this.alreadyMadeTurnByTeam.set(team, teamSet);
+        }
+    }
     public enqueueMoraleMinus(unitId: string) {
         this.moraleMinusQueue.push(unitId);
     }

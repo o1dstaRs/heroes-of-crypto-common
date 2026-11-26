@@ -28,6 +28,7 @@ import {
 import { FightProperties } from "../../src/fights/fight_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PlacementType } from "../../src/grid/placement_properties";
+import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import {
     ChaosSynergy,
     LifeSynergy,
@@ -39,6 +40,22 @@ import type { Unit } from "../../src/units/unit";
 import { createTestUnit, testGridSettings } from "../helpers/combat";
 
 describe("FightProperties", () => {
+    it("restoreAlreadyMadeTurn replaces the lap's made-turn set, so a unit that acted last lap can act and wait again", () => {
+        const fp = new FightProperties();
+        const left = PBTypes.TeamVals.LEFT as TeamType;
+        const right = PBTypes.TeamVals.RIGHT as TeamType;
+        fp.addAlreadyMadeTurn(left, "gargantuan", 0);
+        fp.addAlreadyMadeTurn(right, "wolf", 0);
+        expect(fp.hasAlreadyMadeTurn("gargantuan")).toBe(true);
+        // Lap 2 per the server: only the wolf has acted; the Gargantuan's turn is pending again.
+        fp.restoreAlreadyMadeTurn([{ unitId: "wolf", team: right }]);
+        expect(fp.hasAlreadyMadeTurn("gargantuan")).toBe(false);
+        expect(fp.hasAlreadyMadeTurn("wolf")).toBe(true);
+        expect(fp.getAlreadyMadeTurnSize()).toBe(1);
+        fp.restoreAlreadyMadeTurn([{ unitId: "nobody", team: PBTypes.TeamVals.NO_TEAM as TeamType }]);
+        expect(fp.getAlreadyMadeTurnSize()).toBe(0);
+    });
+
     describe("lifecycle and queues", () => {
         it("tracks fight lifecycle, map state, and lap resets", () => {
             const fightProperties = new FightProperties();
