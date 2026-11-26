@@ -20,12 +20,14 @@ pub const REFUSED_UNIT_FIELDS = [_]Field{};
 /// Batch 6b lands creature by creature. st.AbilityId names every batch-6b card and the engine code behind them is in
 /// place, but only the checked slices are taken: the Harpy's Castling (slice 1; Shadow Touch is batch 1's), the
 /// Mermaid's Water Element and Water Shield (slice 2), the Abomination's Dense Flesh and Flesh Shield Aura and the
-/// Thunderbird's Wind Element and Chain Lightning (slice 3, landed side by side). The loader refuses the other cards by
-/// name, active or stolen (snapshot.loadUnit), and the manifest leaves them out of `abilities`, as for a name the port
-/// does not know. Each later slice adds its creature's cards here.
+/// Thunderbird's Wind Element and Chain Lightning (slice 3, landed side by side), and the Efreet's and Black Dragon's
+/// Fire Element, Made of Fire, Fire Shield, Enchanted Skin and Fire Breath (slice 4): every batch-6b card, so the loader
+/// refuses none (REFUSED_ABILITIES is empty). The manifest lists each card the loader takes.
 pub const CHECKED_6B: st.AbilityMask = st.AbilityId.castling.bit() | st.AbilityId.water_element.bit() |
     st.AbilityId.water_shield.bit() | st.AbilityId.dense_flesh.bit() | st.AbilityId.flesh_shield_aura.bit() |
-    st.AbilityId.wind_element.bit() | st.AbilityId.chain_lightning.bit();
+    st.AbilityId.wind_element.bit() | st.AbilityId.chain_lightning.bit() | st.AbilityId.fire_element.bit() |
+    st.AbilityId.made_of_fire.bit() | st.AbilityId.fire_shield.bit() | st.AbilityId.enchanted_skin.bit() |
+    st.AbilityId.fire_breath.bit();
 pub const REFUSED_ABILITIES: st.AbilityMask = st.AbilityId.BATCH6B_MASK & ~CHECKED_6B;
 
 /// The applied rows of the refused batch-6b cards, refused by name in the applied lists and left out of the manifest's
@@ -526,6 +528,8 @@ test "the manifest names the loader's tables and hashes stably" {
         }
     }
     try std.testing.expect(abilityLoaded(.castling) and abilityLoaded(.water_shield) and abilityLoaded(.flesh_shield_aura) and abilityLoaded(.chain_lightning));
+    try std.testing.expect(abilityLoaded(.fire_element) and abilityLoaded(.made_of_fire) and abilityLoaded(.fire_shield) and abilityLoaded(.enchanted_skin) and abilityLoaded(.fire_breath));
+    try std.testing.expectEqual(@as(st.AbilityMask, 0), REFUSED_ABILITIES);
     for (REFUSED_ROWS) |r| {
         const rn = r.name();
         if (!std.mem.endsWith(u8, rn, " Aura")) continue;
