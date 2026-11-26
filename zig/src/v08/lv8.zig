@@ -8,6 +8,7 @@ const rec = @import("../recording.zig");
 const st = @import("../state.zig");
 const ai = @import("../ai.zig");
 const util = @import("util.zig");
+const cand = @import("cand.zig");
 
 /// The recorder's pass names, in decideTurn's order (zig/parity/v08/layers.ts).
 pub const Pass = enum {
@@ -122,11 +123,94 @@ pub fn defendToWait(s: *const st.State, ui: u8, in: *const ai.Decision, out: *ai
     util.copyDecision(out, in);
 }
 
+/// isV08DirectCombatDecision: a melee or ranged attack (area throws are out of scope).
+fn isDirectCombat(actions: []const rec.Action) bool {
+    for (actions) |a| switch (a) {
+        .melee_attack, .range_attack => return true,
+        else => {},
+    };
+    return false;
+}
+
+fn moves(actions: []const rec.Action) bool {
+    for (actions) |a| if (a == .move_unit) return true;
+    return false;
+}
+
+/// selectV08DirectCombatCandidate: among melee and shot candidates with positive expected damage, a kill first, then
+/// the most damage, then one that does not move (first wins ties).
+fn selectDirectCombat(set: *const cand.Set) ?usize {
+    var best: ?usize = null;
+    for (set.slice(), 0..) |*c, i| {
+        if (c.kind != .melee and c.kind != .shot and c.kind != .throw) continue;
+        if (!isDirectCombat(c.d.slice())) continue;
+        if (!std.math.isFinite(c.ed) or c.ed <= 0) continue;
+        if (best) |b| {
+            const bb = &set.items[b];
+            if (c.ek > bb.ek or (c.ek == bb.ek and (c.ed > bb.ed or (c.ed == bb.ed and moves(bb.d.slice()) and !moves(c.d.slice()))))) best = i;
+        } else best = i;
+    }
+    return best;
+}
+
+/// selectV08ProductiveCandidate: direct combat, else the first move (spells are out of scope).
+fn selectProductive(set: *const cand.Set) ?usize {
+    if (selectDirectCombat(set)) |i| return i;
+    for (set.slice(), 0..) |*c, i| if (c.kind == .move) return i;
+    return null;
+}
+
+fn take(out: *ai.Decision, set: *const cand.Set, i: usize) void {
+    util.copyDecision(out, &set.items[i].d);
+}
+
+/// prioritizeV08ProductiveAction: a passive turn (defend, obstacle strike, end turn) becomes the best productive
+/// candidate; an already productive decision without an obstacle strike stays.
+fn productiveAction(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    var passive = false;
+    var productive = false;
+    var obstacle = false;
+    for (in.slice()) |a| switch (a) {
+        .defend_turn, .end_turn => passive = true,
+        .obstacle_attack => {
+            passive = true;
+            obstacle = true;
+        },
+        .move_unit, .melee_attack, .range_attack => productive = true,
+        else => {},
+    };
+    if (!passive or (productive and !obstacle)) return util.copyDecision(out, in);
+    var set: cand.Set = .{};
+    cand.enumerate(c, in, cand.BOUNDARY, &set);
+    if (selectProductive(&set)) |i| return take(out, &set, i);
+    util.copyDecision(out, in);
+}
+
+/// prioritizeV08Decision: in the dominant-finish window or the final sprint, deal damage now (a commanding army may
+/// retarget to more damage; otherwise only a stack kill bypasses the incumbent) or, commanding, advance; at every lap
+/// repair a passive incumbent.
+pub fn prioritize(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    const fs = util.dominantFinishState(c.s, c.unit().team);
+    if (fs.active) {
+        var set: cand.Set = .{};
+        cand.enumerate(c, in, cand.BOUNDARY, &set);
+        if (selectDirectCombat(&set)) |i| {
+            if (fs.dominant or set.items[i].ek == 1) return take(out, &set, i);
+        }
+        if (isDirectCombat(in.slice())) return util.copyDecision(out, in);
+        if (fs.dominant) {
+            for (set.slice(), 0..) |*cd, i| if (cd.kind == .move) return take(out, &set, i);
+        }
+    }
+    productiveAction(c, in, out);
+}
+
 /// Runs one ported pass on `in`; false when the pass is not ported yet.
 pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision) bool {
     switch (pass) {
         .explicit => explicit(c.ui, in, out),
         .defend_to_wait => defendToWait(c.s, c.ui, in, out),
+        .prioritize => prioritize(c, in, out),
         else => return false,
     }
     return true;
