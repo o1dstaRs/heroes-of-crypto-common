@@ -6,6 +6,7 @@ const rec = @import("../recording.zig");
 const st = @import("../state.zig");
 const engine = @import("../engine.zig");
 const js = @import("../jsnum.zig");
+const artifacts = @import("../artifacts.zig");
 const combat = @import("../combat.zig");
 const abilities = @import("../abilities.zig");
 const pathing = @import("../path.zig");
@@ -982,9 +983,11 @@ pub fn waitFeatures(s: *const State, ui: u8, incumbent: []const rec.Action, out:
 
 /// AttackHandler.getRangeAttackDivisor (combat.zig rangeDivisor / shotCellDistance, copied: they are file-private).
 pub fn rangeDivisorAt(att: *const st.Unit, hx: f64, hy: f64, ax: f64, ay: f64) f64 {
+    // An active Sniper ability shoots without falloff; a Farsight Quiver (the marker buff) skips the bands.
+    if (att.ability_mask & st.AbilityId.sniper.bit() != 0 and att.has(.sniper)) return 1;
     var divisor: f64 = 1;
     const band = if (att.shot_distance > 0 and std.math.isFinite(att.shot_distance)) @floor(att.shot_distance) else 0;
-    if (band > 0) {
+    if (band > 0 and !artifacts.farsight(att)) {
         const tc = engine.cellForPosition(hx, hy);
         const t = engine.positionForCell(@floatFromInt(tc.x), @floatFromInt(tc.y));
         const hfx = ((@as(f64, @floatFromInt(att.fw)) - 1) / 2) * engine.CELL;
@@ -995,5 +998,7 @@ pub fn rangeDivisorAt(att: *const st.Unit, hx: f64, hy: f64, ax: f64, ay: f64) f
             divisor *= 2;
         }
     }
-    return @max(1, divisor);
+    if (divisor < 1) divisor = 1;
+    if (divisor > 8) divisor = 8;
+    return @floor(divisor);
 }
