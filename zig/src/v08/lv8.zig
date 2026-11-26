@@ -379,14 +379,22 @@ fn singleHealValue(s: *const st.State, ti: u8, raw: f64) f64 {
     return effective * @as(f64, if (anchor) 3 else 1) * (1 + missing);
 }
 
-/// incumbentGuaranteedKill: candidate 0 is a priced direct attack that kills (a melee one only when the target cannot
-/// answer it; Water Shield, Flesh Shield and Fire Shield are not in scope, V08_MAGE_DAMAGE_KILL_PRIORITY is unset).
+/// incumbentGuaranteedKill: candidate 0 is a priced direct attack that kills, on a target that cannot absorb it
+/// (util.canAbsorbPrimary: a Water Shield the striker cannot pass, a Flesh Shield Aura), and with a melee strike only
+/// when the target can neither answer it nor burn the striker with Fire Shield (a striker without Fire Element and
+/// magic resist below 100). V08_MAGE_DAMAGE_KILL_PRIORITY is unset, so a damage spell never counts.
 fn incumbentGuaranteedKill(c: *const ai.Ctx, set: *const cand.Set) bool {
     if (set.n == 0) return false;
     const inc = &set.items[0];
     if (!isDirectCombat(inc.d.slice()) or inc.ek != 1 or !(inc.ed > 0)) return false;
-    if (inc.target >= 0 and util.has(&inc.d, .melee_attack)) {
-        if (util.canRespondToMelee(c.s, c.ui, @intCast(inc.target))) return false;
+    if (inc.target >= 0) {
+        const u = c.unit();
+        const t = &c.s.units[@intCast(inc.target)];
+        if (util.canAbsorbPrimary(u, t)) return false;
+        if (util.has(&inc.d, .melee_attack)) {
+            if (util.canRespondToMelee(c.s, c.ui, @intCast(inc.target))) return false;
+            if (t.has(.fire_shield) and !u.has(.fire_element) and engine.getMagicResist(u) < 100) return false;
+        }
     }
     return true;
 }
@@ -498,8 +506,8 @@ fn finitePositive(v: f64) f64 {
 }
 
 /// isV08BlacksmithImmediateGuaranteedKill: a stationary strike from the base cell (no move in the decision) on a living
-/// enemy that cannot miss and whose minimum damage (the team's synergy power) covers the stack's health. Water Shield and
-/// Flesh Shield are not in scope.
+/// enemy that cannot absorb it (util.canAbsorbPrimary), cannot miss, and whose minimum damage (the team's synergy power)
+/// covers the stack's health.
 fn blacksmithGuaranteedKill(c: *const ai.Ctx, d: *const ai.Decision) bool {
     const s = c.s;
     const u = c.unit();
@@ -515,6 +523,7 @@ fn blacksmithGuaranteedKill(c: *const ai.Ctx, d: *const ai.Decision) bool {
     const ti = target orelse return false;
     const t = &s.units[ti];
     if (!t.in_holder or t.isDead() or t.team == u.team) return false;
+    if (util.canAbsorbPrimary(u, t)) return false;
     if (abilities.missChance(u, t) > 0) return false;
     const minimum = combat.damageBoundSyn(u, t, u.attack_damage_min, false, 1, s.setup[u.team].ability_power);
     return minimum >= util.cumulativeHp(t);

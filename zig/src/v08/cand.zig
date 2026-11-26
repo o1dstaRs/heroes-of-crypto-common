@@ -422,22 +422,24 @@ const Gen = struct {
 
     const Damage = struct { value: f64, kill: u8 };
 
-    /// offensiveSpellDamage: projectSpellDamageAgainstUnit's damage (an Ember Covenant holder blocks it; Water Shield
-    /// is not in scope), capped at the target's cumulative HP, and whether it kills the stack.
+    /// offensiveSpellDamage: projectSpellDamageAgainstUnit's damage (util.projectSpell: the Ember Covenant blocks a hit
+    /// that is not water, a Water Shield absorbs one that is not fire), capped at the target's cumulative HP, and whether
+    /// it kills the stack.
     fn spellDamage(self: *const Gen, spell: spells.CS, cfg: *const st.SpellConfig, ti: u8) Damage {
         const t = &self.c.s.units[ti];
         const landed = spells.damageAgainst(spells.rawDamage(self.unit(), spell, cfg), cfg.element, t);
-        const damage: f64 = if (abilities.absorbsHit(t)) 0 else landed;
+        const damage = util.projectSpell(self.c.s, self.unit(), t, landed, cfg.element).damage;
         const hp = util.cumulativeHp(t);
         return .{ .value = @min(damage, hp), .kill = if (damage >= hp) 1 else 0 };
     }
 
-    /// A direct offensive cast: estimateLastFuseSpellDamage where it prices the cast, else offensiveSpellDamage.
+    /// A direct offensive cast: estimateLastFuseSpellDamage (given the cast's projection) where it prices the cast, else
+    /// offensiveSpellDamage.
     fn directSpellDamage(self: *const Gen, spell: spells.CS, cfg: *const st.SpellConfig, ti: u8) Damage {
         const t = &self.c.s.units[ti];
-        const absorbed = abilities.absorbsHit(t);
-        const landed = if (absorbed) 0 else spells.damageAgainst(spells.rawDamage(self.unit(), spell, cfg), cfg.element, t);
-        if (fuse.lastFuseSpell(self.c.s, self.unit(), ti, landed, absorbed)) |est| return .{ .value = est.net, .kill = if (est.secure) 1 else 0 };
+        const landed = spells.damageAgainst(spells.rawDamage(self.unit(), spell, cfg), cfg.element, t);
+        const p = util.projectSpell(self.c.s, self.unit(), t, landed, cfg.element);
+        if (fuse.lastFuseSpell(self.c.s, self.unit(), ti, p.damage, p.shield)) |est| return .{ .value = est.net, .kill = if (est.secure) 1 else 0 };
         return self.spellDamage(spell, cfg, ti);
     }
 
@@ -499,7 +501,8 @@ const Gen = struct {
     /// Meteorite's 2x2 up and right of its corner anchor, anchors off every enemy cell, each once) on the board, valued at
     /// the overkill-capped damage it lands on enemies (projectSpellDamageAgainstUnit; a kill flags it); the best block
     /// (first on ties) is the candidate. With the Battle Mage's coverage, Hidden stacks are ignored and every distinct
-    /// visible victim list adds its first block after it. Water Shield is not in scope.
+    /// visible victim list adds its first block after it, a block that lands nothing included when it breaks a Water
+    /// Shield.
     /// addAlliesAreaCastCandidates (the Blacksmith's Craft): every 2x2 anchor short of the last row and column (x outer,
     /// y inner) whose cells hold a living ally of the caster, the first anchor of each distinct recipient set only, with
     /// no valuation.
@@ -885,17 +888,19 @@ const Gen = struct {
                 var caught: Slots = .{};
                 affectedUnits(s, cells.slice(), &caught, false);
                 var impact = Impact{ .cell = anchor, .value = 0, .kill = 0 };
+                var breaks_shield = false;
                 for (caught.slice()) |v| {
                     const t = &s.units[v];
                     if (t.team == u.team or t.isDead()) continue;
                     if (preserve and t.isHidden()) continue;
                     impact.victims.push(v);
-                    const dealt: f64 = if (abilities.absorbsHit(t)) 0 else spells.damageAgainst(raw_damage, cfg.element, t);
+                    const p = util.projectSpell(s, u, t, spells.damageAgainst(raw_damage, cfg.element, t), cfg.element);
+                    if (p.shield) breaks_shield = true;
                     const hp = util.cumulativeHp(t);
-                    impact.value += @min(dealt, hp);
-                    if (dealt >= hp) impact.kill = 1;
+                    impact.value += @min(p.damage, hp);
+                    if (p.damage >= hp) impact.kill = 1;
                 }
-                if (impact.value <= 0) continue;
+                if (impact.value <= 0 and !(preserve and breaks_shield)) continue;
                 if (best == null or impact.value > best.?.value) best = impact;
                 if (preserve) {
                     var dup = false;
@@ -1444,7 +1449,8 @@ const Gen = struct {
                     }
                 }
             }
-            const shield = abilities.absorbsHit(t);
+            // target.willAbsorbIncomingHit(unit): the covenant or the Water Shield.
+            const shield = abilities.absorbsBy(s, t, u);
             if (shield or prep.wounds_per_hit > 0) {
                 effective = shieldedDamage(u, hp, hit, first_c, second_c, prep, shield, if (prep.wounds_per_hit > 0) &mods else null);
             }

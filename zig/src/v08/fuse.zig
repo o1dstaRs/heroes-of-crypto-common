@@ -145,11 +145,13 @@ pub fn primaryMelee(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape, from
     }
     const bite = abilities.penetratingBite(u, t);
     const wounds = 1 + abilities.activeDeepWounds(u, t) / 100;
+    // getElementalDamageMultiplier: the physical element pair (Fire on Water, Water on Fire, Wind on Earth, Earth on Wind).
+    const elem = combat.physicalElement(u, t);
     var landed: Landed = .{};
     const raw_end = if (hi == lo) lo + 1 else hi;
     var raw = lo;
     while (raw < raw_end) : (raw += 1) {
-        const ordinary = @floor(raw * type_mult * handler * wounds * 1);
+        const ordinary = @floor(raw * type_mult * handler * wounds * elem);
         const p = 1 / rolls;
         if (lucky_chance > 0) {
             landed.add(0, ordinary + bite, p * (1 - lucky_chance));
@@ -237,7 +239,7 @@ fn enemyBlastDamage(s: *const st.State, u: *const st.Unit, target: u8) ?f64 {
     for (s.holderOrder()) |i| {
         const e = &s.units[i];
         if (e.team == u.team or i == target or e.isDead() or !e.in_holder) continue;
-        b.enemies[b.n] = .{ .slot = i, .hp = engine.cumulativeHp(e), .shielded = abilities.absorbsHit(e), .resurrects = engine.canSelfResurrect(e) };
+        b.enemies[b.n] = .{ .slot = i, .hp = engine.cumulativeHp(e), .shielded = abilities.absorbsBy(s, e, null), .resurrects = engine.canSelfResurrect(e) };
         b.n += 1;
     }
     const t = &s.units[target];
@@ -272,6 +274,7 @@ pub fn lastFuseRanged(s: *const st.State, u: *const st.Unit, ti: u8, divisor: f6
     if (rolls > 10_000) return null;
     const ability_mult = abilities.paralysisFactor(u) orelse 1;
     const wounds = 1 + abilities.activeDeepWounds(u, t) / 100;
+    const elem = combat.physicalElement(u, t);
     var lucky_chance: f64 = 0;
     var lucky_mult: f64 = 1;
     if (u.ability(.lucky_strike)) |a| {
@@ -285,8 +288,8 @@ pub fn lastFuseRanged(s: *const st.State, u: *const st.Unit, ti: u8, divisor: f6
     var minimum = std.math.inf(f64);
     var raw = lo;
     while (raw < lo + rolls) : (raw += 1) {
-        // applyAttackDamageChain: one floor over the roll, the ability multiplier, Deep Wounds and the elemental factor (1).
-        const ordinary = @floor(raw * 1 * ability_mult * wounds * 1);
+        // applyAttackDamageChain: one floor over the roll, the ability multiplier, Deep Wounds and the element pair.
+        const ordinary = @floor(raw * 1 * ability_mult * wounds * elem);
         for ([_][2]f64{ .{ ordinary, (1 - lucky_chance) / rolls }, .{ @floor(ordinary * lucky_mult), lucky_chance / rolls } }) |o| {
             if (o[1] <= 0) continue;
             minimum = @min(minimum, o[0]);
@@ -294,7 +297,7 @@ pub fn lastFuseRanged(s: *const st.State, u: *const st.Unit, ti: u8, divisor: f6
             if (o[0] >= hp) conditional_fatal += o[1];
         }
     }
-    const absorbed = abilities.absorbsHit(t);
+    const absorbed = abilities.absorbsBy(s, t, u);
     const first_kills = hit == 1 and minimum >= hp and !absorbed;
     const may_follow = combat.doubleShotAbility(u) != null or artifacts.echoChance(s, u) > 0;
     if (may_follow and !first_kills and !(hit == 1 and shotsAfter(u, 1) <= 0)) return null;
@@ -316,7 +319,7 @@ fn canProjectMeleeResponse(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShap
     if ((shape.moved and t.has(.backstab)) or t.has(.rapid_charge) or t.buffs.find(.fireforged_sword) != null or secondaryRider(t) or
         s.setup[t.team].break_chance > 0) return false;
     const response = primaryMelee(s, ti, ai_, .{}, engine.baseCell(t)) orelse return false;
-    if (response.hit <= 0 or abilities.absorbsHit(u)) return true;
+    if (response.hit <= 0 or abilities.absorbsBy(s, u, t)) return true;
     return response.max_damage < util.cumulativeHp(u);
 }
 
@@ -338,7 +341,7 @@ pub fn lastFuseMelee(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape, fro
     const resurrects = engine.canSelfResurrect(t);
     if (resurrects and s.setup[u.team].break_chance > 0) return null;
     const damage = primaryMelee(s, ai_, ti, shape, from) orelse return null;
-    if (abilities.absorbsHit(t)) return .{ .net = 0, .fatal = 0, .secure = false };
+    if (abilities.absorbsBy(s, t, u)) return .{ .net = 0, .fatal = 0, .secure = false };
     const fatal = if (resurrects) 0 else damage.hit * damage.fatal;
     if (fatal > 0 and !canProjectMeleeResponse(s, ai_, ti, shape)) return null;
     const splash = if (fatal > 0) (enemyBlastDamage(s, u, ti) orelse return null) else 0;

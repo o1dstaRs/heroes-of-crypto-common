@@ -7,6 +7,7 @@ const rec = @import("../recording.zig");
 const st = @import("../state.zig");
 const engine = @import("../engine.zig");
 const spells = @import("../spells.zig");
+const abilities = @import("../abilities.zig");
 const artifacts = @import("../artifacts.zig");
 const ai = @import("../ai.zig");
 
@@ -76,7 +77,8 @@ fn footprintOnly(u: *const st.Unit, path: []const Cell, target: []const Cell, ba
 /// of Fire's max hp (ceil(max hp + max hp / power), not lower). Then each burning cell the body enters
 /// (fireWallCellsForTraversal + enteredFireWallCells: a flyer or a footprint-only move only its landing cells) burns the
 /// projected stack for fireWallBurnDamage at that cell's share (the unit's element, magic resist and magic damage taken
-/// as they are now); a 0 burn or a death stops it. Water Shield is not in the engine (batch 6b), so nothing absorbs. A
+/// as they are now); a 0 burn or a death stops it. An intact Water Shield on an unbroken holder (willWaterShieldAbsorb, no
+/// attacker or element) absorbs the first burn that does damage. A
 /// stack the fire kills that can resurrect itself revives min(died, max(1, floor(died / 2))) creatures. Available when
 /// creatures stand.
 pub fn projectPostMove(s: *const st.State, ui: u8, path: []const Cell, target: []const Cell, has_lava: bool) PostMove {
@@ -97,9 +99,14 @@ pub fn projectPostMove(s: *const st.State, ui: u8, path: []const Cell, target: [
         const elem: f64 = if (u.buffs.len != 0 and u.buffs.find(.ember_covenant_blessing) != null) 0 else spells.elementMultiplier(st.Element.FIRE, u);
         const mr = @max(0, @min(100, engine.getMagicResist(u)));
         const heavy = spells.magicDamageTakenMultiplier(u);
+        var shield = abilities.waterShieldAbsorbs(s, u, null, st.Element.UNSET);
         for (burning.slice()) |c| {
             const requested = engine.fireBurnDamage(stack.alive * stack.max_hp, s.fight.firePct(c.x, c.y), elem, mr, heavy);
             if (requested <= 0) break;
+            if (shield) {
+                shield = false;
+                continue;
+            }
             const d = stackDamage(stack, requested);
             stack = d.state;
             if (d.dead) break;

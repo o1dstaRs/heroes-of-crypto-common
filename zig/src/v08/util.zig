@@ -250,6 +250,34 @@ pub fn cumulativeHp(u: *const Unit) f64 {
     return (u.amount_alive - 1) * u.max_hp + hp;
 }
 
+/// Unit.willEmberCovenantBlock(attacker, damageElement): the covenant ring blocks a hit that is not water
+/// (isEmberCovenantWaterHit: an element given is water only when WATER; without one (st.Element.UNSET), the attacker's
+/// active Water Element makes it water).
+pub fn covenantBlocks(t: *const Unit, striker: ?*const Unit, element: u8) bool {
+    if (!abilities.absorbsHit(t)) return false;
+    if (element != st.Element.UNSET) return element != st.Element.WATER;
+    const a = striker orelse return true;
+    return !a.has(.water_element);
+}
+
+pub const SpellProjection = struct { damage: f64, shield: bool };
+
+/// projectSpellDamageAgainstUnit given the landed damage (spellDamageAgainstUnit): the covenant blocks a hit that is
+/// not water; else an intact Water Shield absorbs a hit with damage (willWaterShieldAbsorb: an unbroken holder, a hit
+/// that is not FIRE from a caster without Fire Element). Either way the damage is 0; `shield` is absorbedByWaterShield.
+pub fn projectSpell(s: *const State, caster: *const Unit, t: *const Unit, landed: f64, element: u8) SpellProjection {
+    const covenant = covenantBlocks(t, caster, element);
+    const shield = !covenant and landed > 0 and abilities.waterShieldAbsorbs(s, t, caster, element);
+    return .{ .damage = if (covenant or shield) 0 else landed, .shield = shield };
+}
+
+/// targetCanAbsorbPrimary (support roles) / the Blacksmith's guaranteed-kill gate: the target holds a Water Shield row
+/// the striker cannot pass (no Fire Element; a Broken holder still counts) or a Flesh Shield Aura row.
+pub fn canAbsorbPrimary(u: *const Unit, t: *const Unit) bool {
+    if (t.buffs.len == 0) return false;
+    return (t.buffs.find(.water_shield) != null and !u.has(.fire_element)) or t.buffs.find(.flesh_shield_aura) != null;
+}
+
 /// canUnitRespondToMelee (src/handlers/melee_response.ts), as the engine's combat.zig canRespondToMelee: nobody answers
 /// a Shadow Touch or Lightning Spin attacker, a No Melee target never answers, nor a Cowardice-barred one (less
 /// cumulative HP than its attacker), a Stun, Blindness or Freeze blocks the reply (isSkipping, as the engine reads it),
