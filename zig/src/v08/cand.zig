@@ -1320,19 +1320,20 @@ const Gen = struct {
     };
 
     /// estimateShieldedRangedDamage: the volley outcomes in order (a miss, then a hit), an absorbing shield taking the
-    /// first positive hit, a hit spending an arrow (an ordinary miss only when arrows spend on any shot), Deep Wounds
-    /// repricing later hits, and Quiver of Echoes' bonus volley (the first volley again, at its chance).
-    fn shieldedDamage(u: *const st.Unit, hp: f64, hit: f64, first: f64, second: f64, prep: *const Prepared, shield: bool, mods: ?*const Mods) f64 {
+    /// first positive hit, a hit spending an arrow (an ordinary miss only when arrows spend on any shot) at the cost of
+    /// a volley at `ammo`, Deep Wounds repricing later hits, and Quiver of Echoes' bonus volley (the first volley again,
+    /// at its chance).
+    fn shieldedDamage(u: *const st.Unit, ammo: ?*const st.Unit, hp: f64, hit: f64, first: f64, second: f64, prep: *const Prepared, shield: bool, mods: ?*const Mods) f64 {
         const State = struct { damage: f64, shield: bool, spent: f64, p: f64, landed: f64 };
         var states: [32]State = undefined;
         var n: usize = 1;
         states[0] = .{ .damage = 0, .shield = shield, .spent = 0, .p = 1, .landed = 0 };
         const Volley = struct {
-            fn run(st_: *[32]State, n_: *usize, uu: *const st.Unit, hp_: f64, hit_: f64, base: f64, second_volley: bool, chance: f64, spends: bool, on_hit_only: bool, m: ?*const Mods) void {
+            fn run(st_: *[32]State, n_: *usize, uu: *const st.Unit, ammo_: ?*const st.Unit, hp_: f64, hit_: f64, base: f64, second_volley: bool, chance: f64, spends: bool, on_hit_only: bool, m: ?*const Mods) void {
                 var next: [32]State = undefined;
                 var k: usize = 0;
                 for (st_[0..n_.*]) |state| {
-                    if (state.damage >= hp_ or fuse.shotsAfter(uu, state.spent) <= 0) {
+                    if (state.damage >= hp_ or fuse.shotsAfter(uu, ammo_, state.spent) <= 0) {
                         next[k] = state;
                         k += 1;
                         continue;
@@ -1361,9 +1362,9 @@ const Gen = struct {
                 n_.* = k;
             }
         };
-        Volley.run(&states, &n, u, hp, hit, first, false, 1, true, prep.on_hit_only, mods);
-        if (prep.second > 0) Volley.run(&states, &n, u, hp, hit, second, true, 1, !prep.through, prep.on_hit_only, mods);
-        if (prep.echo > 0) Volley.run(&states, &n, u, hp, hit, first, false, prep.echo, true, prep.on_hit_only, mods);
+        Volley.run(&states, &n, u, ammo, hp, hit, first, false, 1, true, prep.on_hit_only, mods);
+        if (prep.second > 0) Volley.run(&states, &n, u, ammo, hp, hit, second, true, 1, !prep.through, prep.on_hit_only, mods);
+        if (prep.echo > 0) Volley.run(&states, &n, u, ammo, hp, hit, first, false, prep.echo, true, prep.on_hit_only, mods);
         var sum: f64 = 0;
         for (states[0..n]) |state| sum += state.p * state.damage;
         return sum;
@@ -1378,8 +1379,6 @@ const Gen = struct {
         const s = self.c.s;
         const u = self.unit();
         const opp = engine.opposite(u.team);
-        const ammo_any = true; // shotsAfter does not read the ammunition target (Dense Flesh is not in scope)
-        _ = ammo_any;
         // A stationary ordinary shot whose ray holds one enemy stack: estimateLastFuseRangedDamage, when it prices it.
         if (!prep.physical_aoe and g.n == 1 and g.group(0).len == 1) {
             const only = g.group(0)[0];
@@ -1391,9 +1390,11 @@ const Gen = struct {
                 }
             }
         }
-        const second_mul: f64 = if (fuse.shotsAfter(u, 1) > 0) prep.second else 0;
+        // The arrows spend against the first impact (Through Shot's one arrow pays for the line): Dense Flesh's cost.
+        const ammo: ?*const st.Unit = if (prep.through or g.n == 0 or g.group(0).len == 0) null else &s.units[g.first(0)];
+        const second_mul: f64 = if (fuse.shotsAfter(u, ammo, 1) > 0) prep.second else 0;
         const spent_volleys: f64 = if (prep.through or second_mul == 0) 1 else 2;
-        const bonus_available = fuse.shotsAfter(u, spent_volleys) > 0;
+        const bonus_available = fuse.shotsAfter(u, ammo, spent_volleys) > 0;
         const groups: usize = if (prep.through) g.n else @min(1, g.n);
         var value: f64 = 0;
         var kill: u8 = 0;
@@ -1429,12 +1430,12 @@ const Gen = struct {
                 effective = 0;
                 for ([_][3]f64{ .{ 0, miss, 0 }, .{ first_c, hit, 1 } }) |o1| {
                     if (o1[1] == 0) continue;
-                    const follow = prep.second > 0 and fuse.shotsAfter(u, o1[2]) > 0;
+                    const follow = prep.second > 0 and fuse.shotsAfter(u, ammo, o1[2]) > 0;
                     const seconds: []const [3]f64 = if (follow) &[_][3]f64{ .{ 0, miss, o1[2] }, .{ second_c, hit, o1[2] + 1 } } else &[_][3]f64{.{ 0, 1, o1[2] }};
                     for (seconds) |o2| {
                         if (o2[1] == 0) continue;
                         const native = @min(o1[0] + o2[0], hp);
-                        const echo_damage = if (prep.echo > 0 and fuse.shotsAfter(u, o2[2]) > 0)
+                        const echo_damage = if (prep.echo > 0 and fuse.shotsAfter(u, ammo, o2[2]) > 0)
                             prep.echo * hit * (@min(o1[0] + o2[0] + first_c, hp) - native)
                         else
                             0;
@@ -1452,7 +1453,7 @@ const Gen = struct {
             // target.willAbsorbIncomingHit(unit): the covenant or the Water Shield.
             const shield = abilities.absorbsBy(s, t, u);
             if (shield or prep.wounds_per_hit > 0) {
-                effective = shieldedDamage(u, hp, hit, first_c, second_c, prep, shield, if (prep.wounds_per_hit > 0) &mods else null);
+                effective = shieldedDamage(u, ammo, hp, hit, first_c, second_c, prep, shield, if (prep.wounds_per_hit > 0) &mods else null);
             }
             if (t.team == opp) {
                 value += effective;

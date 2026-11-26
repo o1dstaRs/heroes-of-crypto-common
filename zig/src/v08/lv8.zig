@@ -931,15 +931,18 @@ fn wardValue(s: *const st.State, u: *const st.Unit) f64 {
     return @min(9007199254740991.0, ranged + spell_output);
 }
 
-/// v08BacklineProtectorCoverageRange: Angel's screen 2; Abomination's and Queen's aura range, 1 without the aura in
-/// scope; plus the team's synergy aura range (getAdditionalAuraRangePerTeam), floored, at least 0.
+/// v08BacklineProtectorCoverageRange: Angel's screen 2; Abomination's and Queen's aura range, 1 without the aura;
+/// plus the team's synergy aura range (getAdditionalAuraRangePerTeam), floored, at least 0. The Abomination's is read
+/// only under V08_ABOMINATION_GUARD (unset: it is released, protectorIntent).
 fn coverageRange(s: *const st.State, pi: u8) i32 {
-    // getAuraEffect("Web")?.getRange() ?? 1 for the Queen (batch 3 carries her Web aura); Flesh Shield is not in scope.
-    var base: f64 = if (protectorKind(s, pi) == .angel) 2 else 1;
-    if (protectorKind(s, pi) == .arachna_queen) {
+    // getAuraEffect("Flesh Shield" / "Web")?.getRange() ?? 1 (getAuraEffect reads a Broken unit's auras too).
+    const kind = protectorKind(s, pi);
+    var base: f64 = if (kind == .angel) 2 else 1;
+    if (kind == .arachna_queen or kind == .abomination) {
         const u = &s.units[pi];
         for (u.auras[0..u.n_auras]) |d| {
-            if (s.aura_defs[d].power_type == st.PowerType.DISABLE_FLY_MOVEMENT) base = s.aura_defs[d].range;
+            const aura = if (kind == .abomination) d == s.flesh_def else s.aura_defs[d].power_type == st.PowerType.DISABLE_FLY_MOVEMENT;
+            if (aura) base = s.aura_defs[d].range;
         }
     }
     return @intFromFloat(@max(0, @floor(base + s.setup[s.units[pi].team].aura_range)));
