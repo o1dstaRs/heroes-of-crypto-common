@@ -86,7 +86,8 @@ pub const Battle = struct {
     /// The profile from the fight's start state (every holder unit).
     pub fn primeProfile(self: *Battle, s: *const State) void {
         self.melee_magic = .{ 0, 0, 0 };
-        for (s.units[0..s.n_units]) |*u| {
+        for (s.holderOrder()) |u_slot| {
+            const u = &s.units[u_slot];
             if (u.in_holder and u.team < 3 and u.attack_type == AT.MELEE_MAGIC) self.melee_magic[u.team] += 1;
         }
     }
@@ -288,7 +289,9 @@ pub fn sideSelectable(s: *const State, cell: Cell, side: u8, from: [2]f64, to: [
 pub fn hasUnactedTeammate(s: *const State, ui: u8) bool {
     const team = s.units[ui].team;
     if (s.fight.team_units_alive[team] <= 1) return false;
-    for (s.units[0..s.n_units], 0..) |*u, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const u = &s.units[i_slot];
         if (i != ui and u.in_holder and !u.isDead() and u.team == team and !madeTurn(s, @intCast(i))) return true;
     }
     return false;
@@ -325,7 +328,9 @@ inline fn nonnegativeFinite(v: f64) f64 {
 /// v08TeamRangedOutput: living range-capable stacks' shots x max damage x amount (StrategyV0_8.rangedOutput).
 pub fn teamRangedOutput(s: *const State, team: u8) f64 {
     var output: f64 = 0;
-    for (s.units[0..s.n_units], 0..) |*u, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const u = &s.units[i_slot];
         if (!livingOf(s, i, team) or !engine.isRangeCapable(u)) continue;
         const stack = nonnegativeFinite(engine.getRangeShots(u)) * nonnegativeFinite(u.attack_damage_max) * nonnegativeFinite(u.amount_alive);
         output = @min(9007199254740991, output + stack);
@@ -343,7 +348,8 @@ pub const FinishState = struct { own_hp: f64, enemy_hp: f64, dominant: bool, urg
 pub fn dominantFinishState(s: *const State, team: u8) FinishState {
     var own: f64 = 0;
     var enemy: f64 = 0;
-    for (s.units[0..s.n_units]) |*u| {
+    for (s.holderOrder()) |u_slot| {
+        const u = &s.units[u_slot];
         if (!u.in_holder or u.isDead()) continue;
         const hp = nonnegativeFinite(cumulativeHp(u));
         if (u.team == team) own += hp else enemy += hp;
@@ -492,7 +498,9 @@ pub fn valueFeatures(s: *const State, team: u8, out: *[VALUE_FEATURES]f64) void 
     var enemy_cells: [st.MAX_UNITS]Cell = undefined;
     var n_enemy: usize = 0;
     const span: f64 = st.GRID - 1;
-    for (s.units[0..s.n_units], 0..) |*u, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const u = &s.units[i_slot];
         if (!u.in_holder or u.isDead()) continue;
         const ui: u8 = @intCast(i);
         const hp = cumulativeHp(u);
@@ -572,7 +580,8 @@ pub fn valueFeaturesV2(s: *const State, team: u8, out: *[VALUE_FEATURES_V2]f64) 
     var enemy_ranged_hp: f64 = 0;
     var own_shots: f64 = 0;
     var enemy_shots: f64 = 0;
-    for (s.units[0..s.n_units]) |*u| {
+    for (s.holderOrder()) |u_slot| {
+        const u = &s.units[u_slot];
         if (!u.in_holder or u.isDead()) continue;
         const ranged = u.attack_type == AT.RANGE;
         const caster = u.attack_type == AT.MAGIC or u.attack_type == AT.MELEE_MAGIC;
@@ -655,7 +664,9 @@ pub fn waitFeatures(s: *const State, ui: u8, incumbent: []const rec.Action, out:
     var enemy_init_max: f64 = 0;
     var enemies: f64 = 0;
     var enemies_yet: f64 = 0;
-    for (s.units[0..s.n_units], 0..) |*o, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const o = &s.units[i_slot];
         if (!o.in_holder or o.isDead()) continue;
         const oi: u8 = @intCast(i);
         const own = o.team == u.team;

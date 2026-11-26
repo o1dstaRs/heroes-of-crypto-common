@@ -48,7 +48,9 @@ fn enemyAdjacent(c: *const ai.Ctx) bool {
     const u = c.unit();
     const mine = engine.unitCells(u);
     const opp = engine.opposite(u.team);
-    for (s.units[0..s.n_units], 0..) |*e, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
         const ec = engine.unitCells(e);
         if (util.footprintsNear(ec.slice(), mine.slice())) return true;
@@ -88,7 +90,9 @@ fn preferLowLevelMelee(c: *ai.Ctx, out: *ai.Decision) void {
     const opp = engine.opposite(u.team);
     var best: ?u8 = null;
     var best_level: u8 = 0;
-    for (s.units[0..s.n_units], 0..) |*e, k| {
+    for (s.holderOrder()) |k_slot| {
+        const k: usize = k_slot;
+        const e = &s.units[k_slot];
         if (!util.livingOf(s, k, opp) or e.level >= current.level) continue;
         const ec = engine.unitCells(e);
         if (!util.footprintsNear(ec.slice(), mine.slice())) continue;
@@ -111,7 +115,9 @@ fn flyerPatientHunt(c: *ai.Ctx, out: *ai.Decision) void {
     const opp = engine.opposite(u.team);
     var ranges: [st.MAX_UNITS]Cell = undefined;
     var n_ranges: usize = 0;
-    for (s.units[0..s.n_units], 0..) |*e, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
         if (e.attack_type == AT.RANGE or e.attack_type == AT.MAGIC) {
             ranges[n_ranges] = engine.baseCell(e);
@@ -120,10 +126,14 @@ fn flyerPatientHunt(c: *ai.Ctx, out: *ai.Decision) void {
     }
     if (n_ranges == 0) return;
     var clash = false;
-    outer: for (s.units[0..s.n_units], 0..) |*a, i| {
+    outer: for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const a = &s.units[i_slot];
         if (!util.livingOf(s, i, u.team) or i == c.ui) continue;
         const ac = engine.unitCells(a);
-        for (s.units[0..s.n_units], 0..) |*e, k| {
+        for (s.holderOrder()) |k_slot| {
+            const k: usize = k_slot;
+            const e = &s.units[k_slot];
             if (!util.livingOf(s, k, opp)) continue;
             const ec = engine.unitCells(e);
             if (util.footprintsNear(ec.slice(), ac.slice())) {
@@ -239,7 +249,9 @@ fn waitForMassBuff(c: *ai.Ctx, out: *ai.Decision) void {
     var ranged: usize = 0;
     var behemoth = false;
     var ogre = false;
-    for (s.units[0..s.n_units], 0..) |*a, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const a = &s.units[i_slot];
         if (!util.livingOf(s, i, team)) continue;
         if (a.attack_type == AT.RANGE) ranged += 1;
         switch (util.creature(@intCast(i))) {
@@ -283,7 +295,9 @@ fn v04FrontMove(c: *ai.Ctx, d: *const ai.Decision) Front {
     var my_ranged: usize = 0;
     var enemies: [st.MAX_UNITS]Cell = undefined;
     var n_enemies: usize = 0;
-    for (s.units[0..s.n_units], 0..) |*a, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const a = &s.units[i_slot];
         if (util.livingOf(s, i, u.team) and a.attack_type == AT.RANGE) my_ranged += 1;
         if (util.livingOf(s, i, opp)) {
             enemies[n_enemies] = engine.baseCell(a);

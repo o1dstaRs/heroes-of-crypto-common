@@ -355,9 +355,10 @@ fn wardValue(u: *const st.Unit) f64 {
 }
 
 /// v08BacklineProtectorCoverageRange: Angel's screen 2; Abomination's and Queen's aura range, 1 without the aura in
-/// scope; no synergy aura range in scope.
-fn coverageRange(pi: u8) i32 {
-    return if (protectorKind(pi) == .angel) 2 else 1;
+/// scope; plus the team's synergy aura range (getAdditionalAuraRangePerTeam), floored, at least 0.
+fn coverageRange(s: *const st.State, pi: u8) i32 {
+    const base: f64 = if (protectorKind(pi) == .angel) 2 else 1;
+    return @intFromFloat(@max(0, @floor(base + s.setup[s.units[pi].team].aura_range)));
 }
 
 fn footprintDistance(a: []const rec.Cell, b: []const rec.Cell) i32 {
@@ -396,7 +397,9 @@ fn protectorIntent(s: *const st.State, pi: u8) ?Intent {
     var intent = Intent{ .kind = kind, .ward = 0 };
     var best: ?u8 = null;
     var count: usize = 0;
-    for (s.units[0..s.n_units], 0..) |*w, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const w = &s.units[i_slot];
         if (!w.in_holder or i == pi or w.team != p.team or !isBeneficiary(w)) continue;
         count += 1;
         const wi: u8 = @intCast(i);
@@ -412,7 +415,8 @@ fn protectorIntent(s: *const st.State, pi: u8) ?Intent {
     if (kind == .angel) {
         if (count < 2) return null;
         var shooter = false;
-        for (s.units[0..s.n_units]) |*e| {
+        for (s.holderOrder()) |e_slot| {
+            const e = &s.units[e_slot];
             if (e.in_holder and !e.isDead() and e.team != p.team and engine.isRangeCapable(e) and engine.getRangeShots(e) > 0) shooter = true;
         }
         if (!shooter) return null;
@@ -420,7 +424,8 @@ fn protectorIntent(s: *const st.State, pi: u8) ?Intent {
     if (util.dominantFinishState(s, p.team).active) return null;
     if (kind == .arachna_queen) {
         var flyer = false;
-        for (s.units[0..s.n_units]) |*e| {
+        for (s.holderOrder()) |e_slot| {
+            const e = &s.units[e_slot];
             if (e.in_holder and !e.isDead() and e.team != p.team and engine.canFly(e)) flyer = true;
         }
         if (!flyer) return null;
@@ -434,7 +439,7 @@ fn cellsOf(s: *const st.State, ui: u8) engine.Cells {
 }
 
 fn coversWard(s: *const st.State, cells: []const rec.Cell, ward: u8, pi: u8) bool {
-    return footprintDistance(cells, cellsOf(s, ward).slice()) <= coverageRange(pi);
+    return footprintDistance(cells, cellsOf(s, ward).slice()) <= coverageRange(s, pi);
 }
 
 /// totalWardValue of the intent's wards that `cells` covers.
@@ -462,7 +467,7 @@ fn keepsCovered(s: *const st.State, intent: *const Intent, pi: u8, dest: []const
 fn catchUpAllowed(s: *const st.State, intent: *const Intent, pi: u8, dest: []const rec.Cell) bool {
     const current = cellsOf(s, pi);
     const ward = cellsOf(s, intent.ward);
-    const range = coverageRange(pi);
+    const range = coverageRange(s, pi);
     const now = footprintDistance(current.slice(), ward.slice());
     const after = footprintDistance(dest, ward.slice());
     if (now <= range or after >= now) return false;
@@ -490,7 +495,7 @@ fn queenIntercepts(s: *const st.State, intent: *const Intent, pi: u8, actions: [
     const t = &s.units[ti];
     if (t.isDead()) return false;
     const ward = cellsOf(s, intent.ward);
-    return footprintDistance(engine.unitCells(t).slice(), ward.slice()) <= 1 and footprintDistance(dest, ward.slice()) <= coverageRange(pi) + 1;
+    return footprintDistance(engine.unitCells(t).slice(), ward.slice()) <= 1 and footprintDistance(dest, ward.slice()) <= coverageRange(s, pi) + 1;
 }
 
 /// preservesV08BacklineProtectorIntent.
@@ -528,7 +533,8 @@ fn closestLocalThreat(s: *const st.State, intent: *const Intent, pi: u8, cells: 
     const current = cellsOf(s, pi);
     const team = s.units[pi].team;
     var best: ?i32 = null;
-    for (s.units[0..s.n_units]) |*e| {
+    for (s.holderOrder()) |e_slot| {
+        const e = &s.units[e_slot];
         if (!e.in_holder or e.isDead() or e.team == team) continue;
         if (intent.kind == .arachna_queen and !engine.canFly(e)) continue;
         const ecells = engine.unitCells(e);
@@ -620,7 +626,9 @@ fn wardProtector(s: *const st.State, ui: u8) ?u8 {
     if (!isBeneficiary(u)) return null;
     var order: [st.MAX_UNITS]u8 = undefined;
     var n: usize = 0;
-    for (s.units[0..s.n_units], 0..) |*p, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const p = &s.units[i_slot];
         if (!p.in_holder or i == ui or p.isDead() or p.team != u.team or protectorKind(@intCast(i)) == null) continue;
         order[n] = @intCast(i);
         n += 1;
@@ -683,7 +691,7 @@ fn preservesWard(s: *const st.State, ui: u8, pi: u8, actions: []const rec.Action
     var buf: engine.Cells = .{};
     const dest = destinationCells(s, ui, actions, &buf);
     const pcells = engine.unitCells(&s.units[pi]);
-    const range = coverageRange(pi);
+    const range = coverageRange(s, pi);
     const current = footprintDistance(pcells.slice(), engine.unitCells(&s.units[ui]).slice());
     const after = footprintDistance(pcells.slice(), dest);
     return if (current <= range) after <= range else after <= current;
@@ -729,7 +737,8 @@ fn meleeSecureKill(s: *const st.State, ai_: u8, ti: u8, actions: []const rec.Act
     for (actions) |a| if (a == .move_unit and a.move_unit.has_lava) return null;
     if (u.ability(.lightning_spin) != null or u.ability(.double_punch) != null or u.ability(.skewer_strike) != null) return null;
     if (u.ability(.rapid_charge) != null or u.ability(.backstab) != null or u.ability(.lucky_strike) != null or u.ability(.penetrating_bite) != null) ok.* = false;
-    for (s.units[0..s.n_units]) |*o| {
+    for (s.holderOrder()) |o_slot| {
+        const o = &s.units[o_slot];
         if (o.in_holder and !o.isDead() and (o.ability(.pegasus_might_aura) != null or o.ability(.absorb_penalties_aura) != null or o.ability(.venom_cloud_aura) != null)) ok.* = false;
     }
     if (!ok.*) return null;
@@ -829,7 +838,9 @@ fn pinnedRetreat(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision, ok: *boo
     var ne: usize = 0;
     var front: [st.MAX_UNITS]u8 = undefined;
     var nfr: usize = 0;
-    for (s.units[0..s.n_units], 0..) |*o, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const o = &s.units[i_slot];
         if (!o.in_holder or o.isDead()) continue;
         if (o.team != u.team) {
             enemies[ne] = @intCast(i);

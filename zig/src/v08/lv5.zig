@@ -97,7 +97,9 @@ fn mineByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     const f_progress = (MAX_HITS_MOUNTAIN - hits) / MAX_HITS_MOUNTAIN;
     var nearest: ?Cell = null;
     var nearest_d = std.math.inf(f64);
-    for (s.units[0..s.n_units], 0..) |*e, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
         const ec = engine.baseCell(e);
         const d = ai.cellDistance(base, ec);
@@ -147,7 +149,9 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     var enemies: [st.MAX_UNITS]u8 = undefined;
     var enemy_cells: [st.MAX_UNITS]engine.Cells = undefined;
     var n_enemies: usize = 0;
-    for (s.units[0..s.n_units], 0..) |*a, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const a = &s.units[i_slot];
         if (util.livingOf(s, i, team) and i != c.ui) {
             allies[n_allies] = engine.unitCells(a);
             n_allies += 1;
@@ -277,7 +281,9 @@ fn repositionByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     var n_allies: f64 = 0;
     var sum_x: f64 = 0;
     var sum_y: f64 = 0;
-    for (s.units[0..s.n_units], 0..) |*a, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const a = &s.units[i_slot];
         if (util.livingOf(s, i, opp)) {
             enemies[n_enemies] = engine.baseCell(a);
             n_enemies += 1;
@@ -393,7 +399,9 @@ fn takeAdjacentAttack(c: *ai.Ctx, out: *ai.Decision) void {
     var best: ?u8 = null;
     var best_kill = false;
     var best_fire: f64 = 0;
-    for (s.units[0..s.n_units], 0..) |*e, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
         if (u.target >= 0 and u.target != @as(i8, @intCast(i))) continue;
         const ec = engine.unitCells(e);

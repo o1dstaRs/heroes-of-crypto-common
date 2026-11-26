@@ -353,7 +353,8 @@ const Gen = struct {
         const team = self.unit().team;
         var best: f64 = std.math.inf(f64);
         var any = false;
-        for (s.units[0..s.n_units]) |*e| {
+        for (s.holderOrder()) |e_slot| {
+            const e = &s.units[e_slot];
             if (!e.in_holder or e.isDead() or e.team == team) continue;
             any = true;
             const b = engine.baseCell(e);
@@ -460,7 +461,9 @@ const Gen = struct {
         const forced: i32 = if (u.target >= 0 and u.target < s.n_units and !s.units[@intCast(u.target)].isDead()) @as(i32, u.target) else -1;
         var found: [128]Shot = undefined;
         var nf: usize = 0;
-        for (s.units[0..s.n_units], 0..) |*e, i| {
+        for (s.holderOrder()) |i_slot| {
+            const i: usize = i_slot;
+            const e = &s.units[i_slot];
             if (!util.livingOf(s, i, opp)) continue;
             const ei: u8 = @intCast(i);
             const to = [2]f64{ e.pos_x, e.pos_y };
@@ -534,7 +537,9 @@ const Gen = struct {
         var targets: [st.MAX_UNITS]u8 = undefined;
         var nt: usize = 0;
         const forced: i32 = if (u.target >= 0 and u.target < s.n_units and !s.units[@intCast(u.target)].isDead()) @as(i32, u.target) else -1;
-        for (s.units[0..s.n_units], 0..) |*e, i| {
+        for (s.holderOrder()) |i_slot| {
+            const i: usize = i_slot;
+            const e = &s.units[i_slot];
             if (!e.in_holder or e.isDead() or e.team == team) continue;
             if (forced >= 0 and forced != @as(i32, @intCast(i))) continue;
             targets[nt] = @intCast(i);
@@ -661,7 +666,9 @@ fn isOneModelDecoy(s: *const st.State, ti: i16) bool {
     if (ti < 0) return false;
     const t = &s.units[@intCast(ti)];
     if (t.isDead() or t.amount_alive > 1) return false;
-    for (s.units[0..s.n_units], 0..) |*o, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const o = &s.units[i_slot];
         if (i == @as(usize, @intCast(ti)) or !o.in_holder or o.isDead() or o.team != t.team) continue;
         if (o.creature_id == t.creature_id and o.amount_alive > 1) return true;
     }

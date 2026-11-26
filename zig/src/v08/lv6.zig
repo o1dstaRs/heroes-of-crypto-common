@@ -44,7 +44,8 @@ fn inSupport(c: *const ai.Ctx) bool {
     if (!melee(u.attack_type)) return false;
     var own: u32 = 0;
     var m: u32 = 0;
-    for (s.units[0..s.n_units]) |*o| {
+    for (s.holderOrder()) |o_slot| {
+        const o = &s.units[o_slot];
         if (!o.in_holder or o.isDead() or o.team != u.team) continue;
         own += 1;
         if (melee(o.attack_type)) m += 1;

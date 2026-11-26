@@ -176,7 +176,9 @@ fn printActions(label: []const u8, actions: []const rec.Action) void {
 
 fn dumpUnits(s: *const st.State, actor: u8) void {
     std.debug.print("      actor {d} prev_target {d}; replied {b}; made {b}\n", .{ actor, s.ai_prev_target[actor], s.fight.replied, s.fight.made });
-    for (s.units[0..s.n_units], 0..) |*u, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const u = &s.units[i_slot];
         if (!u.in_holder) continue;
         const b = engine.baseCell(u);
         std.debug.print("      #{d} team {d} base ({d},{d}) {d}x{d} alive {d} dmax {d} resp {} target {d} hp {d} att_sel {d} type {d}\n", .{ i, u.team, b.x, b.y, u.fw, u.fh, u.amount_alive, u.attack_damage_max, u.responded, u.target, u.hp, u.attack_type_selected, u.attack_type });
@@ -400,7 +402,9 @@ fn censusPins(gpa: std.mem.Allocator, path: []const u8) !void {
                     ai.initCtxInto(&c, &copy, ui);
                     var shooters: [st.MAX_UNITS]u8 = undefined;
                     var ns: usize = 0;
-                    for (copy.units[0..copy.n_units], 0..) |*e, i| {
+                    for (copy.holderOrder()) |i_slot| {
+                        const i: usize = i_slot;
+                        const e = &copy.units[i_slot];
                         if (!e.in_holder or e.isDead() or e.team == u.team or !engine.isRangeCapable(e) or engine.getRangeShots(e) <= 0) continue;
                         shooters[ns] = @intCast(i);
                         ns += 1;

@@ -48,7 +48,9 @@ fn meleeIsClearlyRight(c: *const ai.Ctx) bool {
     const u = c.unit();
     const mine = engine.unitCells(u);
     const opp = engine.opposite(u.team);
-    for (s.units[0..s.n_units], 0..) |*e, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
         const ec = engine.unitCells(e);
         if (!util.footprintsNear(ec.slice(), mine.slice())) continue;
@@ -78,7 +80,9 @@ fn rangedRetreat(c: *ai.Ctx, out: *ai.Decision) bool {
     var n_enemies: usize = 0;
     var allies: [st.MAX_UNITS]Cell = undefined;
     var n_allies: usize = 0;
-    for (s.units[0..s.n_units], 0..) |*a, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const a = &s.units[i_slot];
         if (util.livingOf(s, i, opp)) {
             enemies[n_enemies] = engine.baseCell(a);
             n_enemies += 1;
@@ -137,7 +141,9 @@ fn cohesionAdvance(c: *ai.Ctx, out: *ai.Decision) bool {
     var n: f64 = 0;
     var sum_x: f64 = 0;
     var sum_y: f64 = 0;
-    for (s.units[0..s.n_units], 0..) |*a, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const a = &s.units[i_slot];
         if (!util.livingOf(s, i, u.team) or i == c.ui) continue;
         const b = engine.baseCell(a);
         sum_x += @floatFromInt(b.x);

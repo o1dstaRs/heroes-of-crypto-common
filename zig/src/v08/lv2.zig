@@ -64,7 +64,9 @@ fn findBestShot(c: *ai.Ctx) ?Shot {
     const from = [2]f64{ u.pos_x, u.pos_y };
     const small = engine.isSmall(u);
     var best: ?Shot = null;
-    for (s.units[0..s.n_units], 0..) |*e, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
         const ei: u8 = @intCast(i);
         const to = [2]f64{ e.pos_x, e.pos_y };
@@ -111,7 +113,9 @@ fn scoreShot(c: *const ai.Ctx, hits: *const combat.Hits) f64 {
     var allies: [st.MAX_UNITS]engine.Cells = undefined;
     var n_allies: usize = 0;
     if (w_focus != 0) {
-        for (s.units[0..s.n_units], 0..) |*a, i| {
+        for (s.holderOrder()) |i_slot| {
+            const i: usize = i_slot;
+            const a = &s.units[i_slot];
             if (!util.livingOf(s, i, team) or i == c.ui) continue;
             allies[n_allies] = engine.unitCells(a);
             n_allies += 1;
@@ -179,7 +183,9 @@ fn canThreatenThisTurn(c: *const ai.Ctx, ei: u8) bool {
     if (e.attack_type == AT.RANGE) return engine.getRangeShots(e) > 0;
     const reach = engine.getSteps(e) + 1;
     const ec = engine.baseCell(e);
-    for (s.units[0..s.n_units], 0..) |*a, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const a = &s.units[i_slot];
         if (!util.livingOf(s, i, c.unit().team)) continue;
         if (ai.cellDistance(ec, engine.baseCell(a)) <= reach) return true;
     }
@@ -227,7 +233,9 @@ fn adjacentEnemy(c: *const ai.Ctx) ?u8 {
     const u = c.unit();
     const mine = engine.unitCells(u);
     const opp = engine.opposite(u.team);
-    for (s.units[0..s.n_units], 0..) |*e, i| {
+    for (s.holderOrder()) |i_slot| {
+        const i: usize = i_slot;
+        const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
         const ec = engine.unitCells(e);
         if (util.footprintsNear(ec.slice(), mine.slice())) return @intCast(i);
@@ -257,7 +265,9 @@ fn meleeApproach(c: *ai.Ctx) ?Approach {
         const len = mp.routeCells(r, &buf);
         if (len == 0) continue;
         const fp = ai.footprintForAnchor(u, r.cell);
-        for (s.units[0..s.n_units], 0..) |*e, i| {
+        for (s.holderOrder()) |i_slot| {
+            const i: usize = i_slot;
+            const e = &s.units[i_slot];
             if (!util.livingOf(s, i, opp)) continue;
             const ec = engine.unitCells(e);
             if (util.footprintsNear(ec.slice(), fp.slice())) {
@@ -307,7 +317,9 @@ fn preferNoCounterMeleeTarget(c: *ai.Ctx, out: *ai.Decision) void {
     const opp = engine.opposite(u.team);
     var best: ?u8 = null;
     var best_threat: f64 = 0;
-    for (s.units[0..s.n_units], 0..) |*e, k| {
+    for (s.holderOrder()) |k_slot| {
+        const k: usize = k_slot;
+        const e = &s.units[k_slot];
         const ek: u8 = @intCast(k);
         if (!util.livingOf(s, k, opp) or ek == cur) continue;
         if (!(engine.getStackPower(e) > NEGLIGIBLE_COUNTER_STACK_POWER) or counterMatters(s, ek)) continue;
