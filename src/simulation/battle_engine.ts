@@ -89,6 +89,7 @@ import {
     requirePhaseBRunFingerprint,
 } from "./phase_b_dataset";
 import {
+    type ISearchMatchInfo,
     SearchDriver,
     type SearchPassiveProductiveProbeObserver,
     type SearchScoredDecisionObserver,
@@ -397,6 +398,15 @@ export interface IMatchConfig {
     redSetupPlacementPolicy?: PlacementPolicyVariant;
     /** Optional simulation instrumentation. Unset by default; observers must not mutate the live unit/context. */
     decisionObserver?: (observation: IDecisionObservation) => void;
+    /**
+     * Research hook: the searched seats' driver (e.g. the bot seat's createV08A19DeepFitSearchDriver) in place of the
+     * default `search`, for the decisions `search` would have taken. Native rollout identity checks run the
+     * production bot-seat driver through it.
+     */
+    searchDriverFactory?: (
+        deps: ILookaheadDeps,
+        match: ISearchMatchInfo,
+    ) => Pick<SearchDriver, "chooseDecision" | "onFightReady" | "onMatchEnd">;
     /** Research-only deployment intervention after normal setup, before the authoritative start action. */
     beforeFightStart?: (
         context: Pick<IGameActionEngineContext, "grid" | "fightProperties" | "unitsHolder" | "attackHandler">,
@@ -1007,6 +1017,14 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 summonedUnitSequence = savedSummonedUnitSequence;
             };
         },
+        // createSummonedUnit names summons from the match seed and summonedUnitSequence, which
+        // captureAuxiliaryState restores after every rollout.
+        nativeHarness: {
+            summonIds: "match",
+            summonScope: "rollout",
+            seed: config.seed,
+            getSummonSequence: () => summonedUnitSequence,
+        },
     };
     const lookahead = new LookaheadDriver(driverDeps);
     // B2/RAWS wide-candidate rollout SEARCH driver. Plain v0.8 uses promoted A19; explicit A19/a13 switches
@@ -1042,6 +1060,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     if (withheldSearchEnvOverrides !== undefined) {
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = withheldSearchEnvOverrides;
     }
+    const searchedSeatDriver = config.searchDriverFactory?.(driverDeps, searchMatch);
     const searchEnvOverrideTeams = new Set(config.searchEnvOverrideTeams ?? []);
     const searchEnvOverrideSearch =
         searchEnvOverrideTeams.size &&
@@ -1430,6 +1449,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const startResult = applyCommittedAction({ type: "start_fight" });
     applyEvents(startResult.events);
     search.onFightReady();
+    searchedSeatDriver?.onFightReady();
     v08A13TrajectorySearch?.onFightReady();
 
     const advance = (): void => {
@@ -1603,7 +1623,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const shadowDecision = envOverrideSearchApplies
             ? searchEnvOverrideSearch!.chooseDecision(unit, strategy.version, decided0, decisionContext)
             : searchApplies
-              ? search.chooseDecision(unit, strategy.version, decided0, decisionContext)
+              ? (searchedSeatDriver ?? search).chooseDecision(unit, strategy.version, decided0, decisionContext)
               : lookaheadApplies
                 ? lookahead.chooseDecision(unit, decided0)
                 : decided0;
@@ -2000,6 +2020,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     }
     // SEARCH_AUDIT: flush the per-game search/ablation counters (no-op unless the driver is enabled).
     search.onMatchEnd(matchResult.winner, matchResult.endReason);
+    searchedSeatDriver?.onMatchEnd(matchResult.winner, matchResult.endReason);
     v08A13TrajectorySearch?.onMatchEnd(matchResult.winner, matchResult.endReason);
     // The env-override research arm buffers its audit / IL rows per game and appends them ONLY here.
     // Until this call existed the arm ran every decision and then discarded every row at match end, so a

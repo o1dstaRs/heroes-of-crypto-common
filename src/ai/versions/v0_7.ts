@@ -120,7 +120,7 @@ export const shouldUseArchetypePlacementAnchor = (units: readonly Unit[], enemie
     isAuraSaturatedArmy(units) ||
     (isPureRangedArmy(units) && enemies.some((unit) => !unit.isDead() && unit.hasAbilityActive("Area Throw")));
 
-interface IV07ArmyProfile {
+export interface IV07ArmyProfile {
     auraSaturated: boolean;
     denseMeleeMagic: boolean;
     meleeMagicAnchor: boolean;
@@ -246,6 +246,10 @@ export class StrategyV0_7 extends StrategyV0_6 {
         // A late AI takeover may first see the army after casualties. Do not infer a permanent initial-roster
         // profile from survivors; placement primes normal simulation and persistent-bot fights.
         return this.armyProfiles.get(holder)?.get(team);
+    }
+    /** The army profile placement primed for `team` on `holder` (undefined when this instance never placed that army). */
+    public getArmyProfile(holder: object, team: number): Readonly<IV07ArmyProfile> | undefined {
+        return this.armyProfile(holder, team);
     }
     /** v0.6's learned fight policy is out-of-distribution when every stack emits an aura. */
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {

@@ -27,6 +27,34 @@ export interface IA19NeuralState {
     modelErrors: number;
 }
 const states = new WeakMap<SearchDriver, IA19NeuralState>();
+const offlineOf = new WeakMap<SearchDriver, boolean>();
+
+/**
+ * The correction was measured inside the A19 profile's 1,000 ms native allowance and 1,500 ms breaker; a live driver on
+ * any other budget (the deep-fit stock search's 2,500 / 3,750 ms since profile v30) plays the native choice. Offline
+ * follows live wherever the budget names a live deadline, so offline research measures the AI that bot seats run. An
+ * offline driver with no deadline (deterministic-work tools) keeps the correction.
+ */
+const correctionEngages = (budget: INeuralBudget, version: string, offline: boolean): boolean => {
+    const otherBudget = budget.decisionDeadlineMs !== 1000 || budget.circuitBreakerMs !== 1500;
+    return !(
+        version !== "v0.8" ||
+        budget.horizon !== 64 ||
+        budget.rollouts !== 2 ||
+        !budget.complementaryR2 ||
+        budget.a19MaterialArbitration !== "ties" ||
+        (otherBudget && (!offline || budget.decisionDeadlineMs !== null))
+    );
+};
+
+/**
+ * Whether attachA19NeuralCorrection's wrapper corrects `driver`'s choice for `version`: the wrapper's own gate. A native
+ * rollout backend keeps such a driver's banks in TypeScript (native_rollouts.ts), so the two can never disagree.
+ */
+export function a19NeuralCorrectionEngages(driver: SearchDriver, version: string): boolean {
+    const offline = offlineOf.get(driver);
+    return offline !== undefined && correctionEngages(driver as unknown as INeuralBudget, version, offline);
+}
 export const getA19NeuralState = (driver: SearchDriver): Readonly<IA19NeuralState> | undefined => {
     const state = states.get(driver);
     return state ? { ...state } : undefined;
@@ -49,6 +77,11 @@ export function attachA19NeuralCorrection(
         modelErrors: 0,
     };
     states.set(driver, state);
+    offlineOf.set(driver, options.offline);
+    // Native rollout banks keep this driver's banks in TypeScript wherever the correction engages (native_rollouts.ts).
+    driver.vetoNativeRollouts("neural_on", (version) =>
+        correctionEngages(driver as unknown as INeuralBudget, version, options.offline),
+    );
     const ownChoose = Object.getOwnPropertyDescriptor(driver, "chooseDecision")?.value as
         SearchDriver["chooseDecision"] | undefined;
     const model = options.model ?? { predict: (observation) => getA19NeuralModel().predict(observation) };
@@ -60,20 +93,7 @@ export function attachA19NeuralCorrection(
         context?: IDecisionContext,
     ): GameAction[] {
         const nativeChoose = ownChoose ?? (Object.getPrototypeOf(this) as SearchDriver).chooseDecision;
-        const budget = this as unknown as INeuralBudget;
-        // The correction was measured inside the A19 profile's 1,000 ms native allowance and 1,500 ms breaker; a live
-        // driver on any other budget (the deep-fit stock search's 2,500 / 3,750 ms since profile v30) plays the native
-        // choice. Offline follows live wherever the budget names a live deadline, so offline research measures the AI
-        // that bot seats run. An offline driver with no deadline (deterministic-work tools) keeps the correction.
-        const otherBudget = budget.decisionDeadlineMs !== 1000 || budget.circuitBreakerMs !== 1500;
-        if (
-            version !== "v0.8" ||
-            budget.horizon !== 64 ||
-            budget.rollouts !== 2 ||
-            !budget.complementaryR2 ||
-            budget.a19MaterialArbitration !== "ties" ||
-            (otherBudget && (!options.offline || budget.decisionDeadlineMs !== null))
-        )
+        if (!correctionEngages(this as unknown as INeuralBudget, version, options.offline))
             return nativeChoose.call(this, unit, version, incumbent, context);
         const descriptor = Object.getOwnPropertyDescriptor(this, "chooseDecision");
         Object.defineProperty(this, "chooseDecision", { value: nativeChoose, writable: true, configurable: true });

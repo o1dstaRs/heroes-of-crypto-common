@@ -104,10 +104,41 @@ import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import type { Unit } from "../units/unit";
 import {
     captureDeterministicRandomState,
+    getDeterministicRandomSource,
+    type RandomSource,
     restoreDeterministicRandomState,
     setDeterministicRandomSource,
 } from "../utils/lib";
 import { hashSimulationParts, makeRng } from "./army";
+import {
+    compareNativeShadowBank,
+    countNativeReason,
+    disableNativeRollouts,
+    emptyNativeRolloutStatistics,
+    enterNativeRoot,
+    getNativeRolloutBackend,
+    type INativeArmyProfile,
+    type INativeBankInput,
+    type INativeBankResult,
+    type INativeRolloutBackend,
+    type INativeRolloutStatistics,
+    type INativeShadowRollout,
+    installNativeActiveUnitSentinel,
+    nativeArmyProfile,
+    nativeEnvironmentRefusal,
+    nativeFixtureExpected,
+    nativeLeafKind,
+    nativeReason,
+    NativeRootScope,
+    type NativeRolloutMode,
+    nativeRolloutModeFromEnv,
+    nativeSentinelsThrow,
+    nativeShadowRateFromEnv,
+    nativeTeamPolicy,
+    offerNativeFixtureBank,
+    reportNativeShadowMismatch,
+    runNativeBank,
+} from "./native_rollouts";
 import { makeSearchChanceStream } from "./search_chance_sampling";
 import { BattleRollbackJournal, restoreBattle, snapshotBattle } from "./battle_snapshot";
 import {
@@ -1573,6 +1604,24 @@ export class SearchDriver {
     private finishedSim = false;
     private finishedWinningTeam: TeamType | null = null;
     private circuitOpen = false;
+    /** HOC_NATIVE_ROLLOUTS when the driver was built (./native_rollouts.ts); "off" keeps every bank in TypeScript. */
+    private readonly nativeMode: NativeRolloutMode = nativeRolloutModeFromEnv();
+    private readonly nativeShadowRate = nativeShadowRateFromEnv();
+    private nativeShadowTick = 0;
+    private readonly nativeStats: INativeRolloutStatistics = emptyNativeRolloutStatistics(this.nativeMode);
+    /** The current chooseSearchDecision's native root (export and loaded board, or why it stays in TypeScript). */
+    private nativeRoot: NativeRootScope | undefined;
+    /** Shadow mode: TypeScript's rollouts of the bank being compared. */
+    private nativeShadowRollouts: INativeShadowRollout[] | undefined;
+    private readonly nativeVetoes: { reason: string; engages: (version: string) => boolean }[] = [];
+    /** Native rollout banks of this driver (HOC_NATIVE_ROLLOUTS): native and TypeScript banks, fallbacks, shadow checks. */
+    public get nativeRolloutStatistics(): Readonly<INativeRolloutStatistics> {
+        return this.nativeStats;
+    }
+    /** Keep a decision's banks in TypeScript while `engages(version)` holds (the neural correction, a19_neural.ts). */
+    public vetoNativeRollouts(reason: string, engages: (version: string) => boolean): void {
+        this.nativeVetoes.push({ reason, engages });
+    }
     public constructor(
         deps: ILookaheadDeps,
         match: ISearchMatchInfo = {},
@@ -2521,7 +2570,29 @@ export class SearchDriver {
     private resetA19MaterialEvidence(): void {
         this.a19MaterialEvidence = undefined;
     }
+    /** One root: native banks share its loaded board (HOC_NATIVE_ROLLOUTS), freed when the search ends. */
     private chooseSearchDecision(
+        unit: Unit,
+        version: string,
+        incumbent: GameAction[],
+        rootDecisionContext?: IDecisionContext,
+    ): GameAction[] {
+        if (this.nativeMode === "off")
+            return this.chooseSearchDecisionAtRoot(unit, version, incumbent, rootDecisionContext);
+        const outer = this.nativeRoot;
+        const root = new NativeRootScope(version);
+        this.nativeRoot = root;
+        const outerActive = enterNativeRoot(root);
+        this.nativeStats.roots += 1;
+        try {
+            return this.chooseSearchDecisionAtRoot(unit, version, incumbent, rootDecisionContext);
+        } finally {
+            root.close();
+            this.nativeRoot = outer;
+            enterNativeRoot(outerActive);
+        }
+    }
+    private chooseSearchDecisionAtRoot(
         unit: Unit,
         version: string,
         incumbent: GameAction[],
@@ -5639,6 +5710,42 @@ export class SearchDriver {
         boundHopelessTails: boolean | ISearchSelectionBoundPlan = false,
         rolloutCache?: SearchRolloutCache,
     ): number[] {
+        if (this.nativeMode !== "off") {
+            return this.scoreCandidatesWithNative(
+                unit,
+                candidates,
+                seedBase,
+                horizonMode,
+                rolloutCount,
+                deadlineAt,
+                turnHorizon,
+                boundHopelessTails,
+                rolloutCache,
+            );
+        }
+        return this.scoreCandidatesInTypeScript(
+            unit,
+            candidates,
+            seedBase,
+            horizonMode,
+            rolloutCount,
+            deadlineAt,
+            turnHorizon,
+            boundHopelessTails,
+            rolloutCache,
+        );
+    }
+    private scoreCandidatesInTypeScript(
+        unit: Unit,
+        candidates: readonly ISearchCandidate[],
+        seedBase: number,
+        horizonMode: HorizonMode,
+        rolloutCount: number,
+        deadlineAt: number | null,
+        turnHorizon: number,
+        boundHopelessTails: boolean | ISearchSelectionBoundPlan,
+        rolloutCache?: SearchRolloutCache,
+    ): number[] {
         this.assertBeforeDecisionDeadline(deadlineAt);
         const complementaryR2 = this.complementaryR2 && this.rollouts === 2 && horizonMode === "turns";
         // A full-budget reference must not reuse samples from the complementary R2 prefix.
@@ -5703,16 +5810,27 @@ export class SearchDriver {
                 let checkpoint;
                 try {
                     checkpoint = journal?.checkpoint();
-                    score = this.rollout(
-                        unit,
-                        cand,
-                        seedBase,
-                        r,
-                        horizonMode,
-                        deadlineAt,
-                        turnHorizon,
-                        complementaryR2 && rolloutCount <= 2,
-                    );
+                    score = this.nativeShadowRollouts
+                        ? this.rolloutRecordedForShadow(
+                              unit,
+                              cand,
+                              seedBase,
+                              r,
+                              horizonMode,
+                              deadlineAt,
+                              turnHorizon,
+                              complementaryR2 && rolloutCount <= 2,
+                          )
+                        : this.rollout(
+                              unit,
+                              cand,
+                              seedBase,
+                              r,
+                              horizonMode,
+                              deadlineAt,
+                              turnHorizon,
+                              complementaryR2 && rolloutCount <= 2,
+                          );
                     if (captureMaterial && Number.isFinite(score)) {
                         let ours = 0,
                             enemy = 0;
@@ -5790,6 +5908,414 @@ export class SearchDriver {
         if (captureMaterial)
             this.a19MaterialEvidence = { unitId: unit.getId(), candidates, means, materials, rolloutCount };
         return means;
+    }
+    /**
+     * scoreCandidates with HOC_NATIVE_ROLLOUTS on or shadow (./native_rollouts.ts). "on": the bank plays natively when
+     * this driver and its root are in the library's scope, and the driver is left as the TypeScript loop leaves it
+     * (rollout turns and the budget throw, the uuid counter, rolloutEnemyTeam, the material evidence); any refusal plays
+     * the bank in TypeScript from the untouched state. "shadow": TypeScript plays the bank, and a sampled bank is then
+     * replayed natively on the same inputs and compared rollout by rollout; it never changes a decision.
+     */
+    private scoreCandidatesWithNative(
+        unit: Unit,
+        candidates: readonly ISearchCandidate[],
+        seedBase: number,
+        horizonMode: HorizonMode,
+        rolloutCount: number,
+        deadlineAt: number | null,
+        turnHorizon: number,
+        boundHopelessTails: boolean | ISearchSelectionBoundPlan,
+        rolloutCache?: SearchRolloutCache,
+    ): number[] {
+        const stats = this.nativeStats;
+        stats.banks += 1;
+        const typeScript = (): number[] => {
+            stats.tsBanks += 1;
+            const startedAt = performance.now();
+            const turnsBefore = this.counters.rolloutTurnsTotal;
+            try {
+                return this.scoreCandidatesInTypeScript(
+                    unit,
+                    candidates,
+                    seedBase,
+                    horizonMode,
+                    rolloutCount,
+                    deadlineAt,
+                    turnHorizon,
+                    boundHopelessTails,
+                    rolloutCache,
+                );
+            } finally {
+                stats.tsBankMs += performance.now() - startedAt;
+                stats.tsTurns += this.counters.rolloutTurnsTotal - turnsBefore;
+            }
+        };
+        const root = this.nativeRoot;
+        if (!root) {
+            countNativeReason(stats.fallback, "no_root");
+            return typeScript();
+        }
+        this.assertBeforeDecisionDeadline(deadlineAt);
+        const complementaryR2 = this.complementaryR2 && this.rollouts === 2 && horizonMode === "turns";
+        // As the TypeScript loop: a full-budget reference never reuses the complementary R2 prefix.
+        const cache = complementaryR2 && rolloutCount > 2 ? undefined : rolloutCache;
+        const native = getNativeRolloutBackend();
+        const bankRefusal = native ? this.nativeBankRefusal(root, cache) : "no_library";
+        if (!native || bankRefusal) {
+            countNativeReason(stats.fallback, bankRefusal ?? "no_library");
+            return typeScript();
+        }
+        let rootRefusal: string | undefined;
+        try {
+            rootRefusal = this.openNativeRoot(native, root, unit);
+        } catch (error) {
+            disableNativeRollouts(error);
+            rootRefusal = "circuit";
+        }
+        if (rootRefusal) {
+            if (!root.counted) {
+                root.counted = true;
+                countNativeReason(stats.rootFallback, rootRefusal);
+            }
+            countNativeReason(stats.fallback, rootRefusal.split(":")[0]);
+            return typeScript();
+        }
+        const captureMaterial = this.captureA19Material && horizonMode === "turns";
+        const harness = this.deps.nativeHarness!;
+        const start = {
+            uuid: captureDeterministicRandomState().uuidSequence,
+            summon: harness.getSummonSequence?.() ?? 0,
+        };
+        const input = this.nativeBankInput(
+            root,
+            unit,
+            candidates,
+            seedBase,
+            horizonMode,
+            rolloutCount,
+            deadlineAt,
+            turnHorizon,
+            boundHopelessTails,
+            captureMaterial,
+            start,
+            complementaryR2,
+        );
+        if (this.nativeMode === "shadow") {
+            return this.shadowNativeBank(native, root, unit, candidates, input, typeScript, captureMaterial);
+        }
+        const startedAt = performance.now();
+        let result: INativeBankResult;
+        try {
+            result = runNativeBank(native, root.handle!, input);
+        } catch (error) {
+            if (!native.isRefusal(error)) {
+                disableNativeRollouts(error);
+                countNativeReason(stats.fallback, "circuit");
+                return typeScript();
+            }
+            const message = (error as Error).message;
+            countNativeReason(stats.fallback, `refused:${nativeReason(message)}`);
+            if (message.startsWith("unsupported request")) {
+                root.refused = `request:${nativeReason(message)}`;
+                stats.precheckMisses += 1;
+            }
+            return typeScript();
+        }
+        if (result.stop !== "done" && result.stop !== "deadline" && result.stop !== "turn_budget") {
+            countNativeReason(stats.fallback, `stop:${result.stop}`);
+            return typeScript();
+        }
+        stats.nativeBanks += 1;
+        stats.nativeCalls += result.calls;
+        stats.nativeBankMs += performance.now() - startedAt;
+        stats.nativeTurns += result.turns;
+        // The state a TypeScript bank leaves behind.
+        this.counters.rolloutTurnsTotal += result.turns;
+        if (result.played) this.rolloutEnemyTeam = otherTeam(unit.getTeam());
+        this.finishedSim = false;
+        this.finishedWinningTeam = null;
+        this.installNativeRandomSentinel(result.uuid);
+        root.afterNative = true;
+        if (result.stop !== "done") {
+            countNativeReason(stats.stops, result.stop);
+            if (result.stop === "turn_budget") this.assertBeforeDecisionDeadline(deadlineAt);
+            throw new SearchDecisionDeadlineExceeded();
+        }
+        if (captureMaterial) {
+            this.a19MaterialEvidence = {
+                unitId: unit.getId(),
+                candidates,
+                means: result.means,
+                materials: result.materials,
+                rolloutCount,
+            };
+        }
+        return result.means;
+    }
+    /** Driver-level reasons a bank stays in TypeScript: research terms the library does not play. */
+    private nativeBankRefusal(root: NativeRootScope, rolloutCache: SearchRolloutCache | undefined): string | undefined {
+        if (rolloutCache !== undefined) return "rollout_cache";
+        if (this.oppModel) return "opp_model";
+        if (this.lateRangedFinishWeight !== 0 || this.pureRangedTerminalWeight !== 0) return "research_leaf";
+        for (const leaf of this.learnedV2ByTeam.values()) if (leaf) return "per_team_leaf";
+        const leaf = nativeLeafKind(this.learnedV2, this.learned);
+        if (leaf.startsWith("leaf:")) return leaf;
+        if (this.teamScope !== null || this.observeOnly) return "team_scope";
+        if (!this.deps.nativeHarness) return "no_native_harness";
+        for (const veto of this.nativeVetoes) if (veto.engages(root.version)) return veto.reason;
+        return undefined;
+    }
+    /**
+     * The root's board, loaded once for every bank of this search: both teams' rollout policies, the AI environment, the
+     * library's pre-check (microseconds), then the export and the loader. A refusal marks the root.
+     */
+    private openNativeRoot(native: INativeRolloutBackend, root: NativeRootScope, unit: Unit): string | undefined {
+        if (root.refused) return root.refused;
+        if (root.handle) return undefined;
+        const policies: Record<string, { version: "v0.1" | "v0.8" }> = {};
+        const profiles: Record<string, INativeArmyProfile | null> = {};
+        for (const team of [1, 2] as TeamType[]) {
+            const policy = nativeTeamPolicy(this.deps.strategyForTeam(team));
+            if (typeof policy === "string") return (root.refused = policy);
+            policies[String(team)] = { version: policy.version };
+            profiles[String(team)] = nativeArmyProfile(policy, this.deps.unitsHolder, team);
+        }
+        const environment = nativeEnvironmentRefusal();
+        if (environment) return (root.refused = environment);
+        const battle = {
+            unitsHolder: this.deps.unitsHolder,
+            grid: this.deps.grid,
+            fightProperties: this.deps.fightProperties,
+        };
+        const policy = Object.values(policies).some(({ version }) => version === "v0.8") ? "v0.8" : "v0.1";
+        const precheck = native.refusal(policy, battle);
+        if (precheck) return (root.refused = `precheck:${precheck}`);
+        const harness = this.deps.nativeHarness!;
+        let json: string;
+        try {
+            json = native.exportState(
+                { ...battle, attackHandler: this.deps.attackHandler },
+                {
+                    rng: 0,
+                    activeUnitId: unit.getId(),
+                    uuidSequence: captureDeterministicRandomState().uuidSequence,
+                    ...(harness.seed === undefined ? {} : { seed: harness.seed }),
+                    summonSequence: harness.getSummonSequence?.() ?? 0,
+                    armyProfile: profiles,
+                },
+            );
+        } catch (error) {
+            this.nativeStats.precheckMisses += 1;
+            return (root.refused = `export:${nativeReason((error as Error).message)}`);
+        }
+        try {
+            root.handle = native.engine.load(json);
+        } catch (error) {
+            if (!native.isRefusal(error)) throw error;
+            this.nativeStats.precheckMisses += 1;
+            return (root.refused = `load:${nativeReason((error as Error).message)}`);
+        }
+        root.json = json;
+        root.policies = policies;
+        this.nativeStats.nativeRoots += 1;
+        installNativeActiveUnitSentinel(this.deps, () => this.nativeStats);
+        return undefined;
+    }
+    /** The bank's request inputs, as the TypeScript loop would play it. */
+    private nativeBankInput(
+        root: NativeRootScope,
+        unit: Unit,
+        candidates: readonly ISearchCandidate[],
+        seedBase: number,
+        horizonMode: HorizonMode,
+        rolloutCount: number,
+        deadlineAt: number | null,
+        turnHorizon: number,
+        boundHopelessTails: boolean | ISearchSelectionBoundPlan,
+        captureMaterial: boolean,
+        start: { uuid: number; summon: number },
+        complementaryR2: boolean,
+    ): INativeBankInput {
+        const boundTails =
+            boundHopelessTails &&
+            (!captureMaterial || (typeof boundHopelessTails === "object" && this.a19MaterialArbitration === "ties"));
+        return {
+            actor: unit.getId(),
+            actingTeam: unit.getTeam(),
+            candidates,
+            seedBase,
+            horizonMode,
+            turnHorizon,
+            rolloutCount,
+            chance: complementaryR2 && rolloutCount <= 2 ? "antithetic" : "plain",
+            leaf: {
+                kind: nativeLeafKind(this.learnedV2, this.learned) as "v2" | "v1" | "material",
+                exactTerminal: this.exactTerminalResults,
+            },
+            policies: root.policies!,
+            soleAbominationDefend: this.soleAbominationArmageddonDefendPolicy,
+            harness: this.deps.nativeHarness!,
+            start,
+            captureMaterial,
+            tails: boundTails
+                ? {
+                      selectionBounds:
+                          typeof boundHopelessTails === "object"
+                              ? new SearchSelectionBounds(boundHopelessTails)
+                              : undefined,
+                      margin:
+                          typeof boundHopelessTails === "object" && boundHopelessTails.tailMargin !== undefined
+                              ? exactSelectionTailMargin(rolloutCount, boundHopelessTails.tailMargin)
+                              : this.hopelessTailMargin(),
+                  }
+                : undefined,
+            turnLimit: this.rolloutTurnLimit,
+            turnsBefore: this.counters.rolloutTurnsTotal,
+            deadlineAt,
+        };
+    }
+    /** Shadow mode: the TypeScript bank decides; a sampled bank is replayed natively and compared. */
+    private shadowNativeBank(
+        native: INativeRolloutBackend,
+        root: NativeRootScope,
+        unit: Unit,
+        candidates: readonly ISearchCandidate[],
+        input: INativeBankInput,
+        typeScript: () => number[],
+        captureMaterial: boolean,
+    ): number[] {
+        const stats = this.nativeStats;
+        const rate = this.nativeShadowRate;
+        const sample = rate >= 1 || (rate > 0 && this.nativeShadowTick++ % Math.max(1, Math.round(1 / rate)) === 0);
+        const turnsBefore = this.counters.rolloutTurnsTotal;
+        const rollouts: INativeShadowRollout[] = [];
+        let means: number[] | undefined;
+        let thrown: unknown;
+        let threw = false;
+        this.nativeShadowRollouts = sample ? rollouts : undefined;
+        try {
+            means = typeScript();
+        } catch (error) {
+            thrown = error;
+            threw = true;
+        } finally {
+            this.nativeShadowRollouts = undefined;
+        }
+        if (sample) {
+            const ts = {
+                means,
+                materials: captureMaterial && !threw ? this.a19MaterialEvidence?.materials : undefined,
+                threw,
+                turns: this.counters.rolloutTurnsTotal - turnsBefore,
+                uuid: captureDeterministicRandomState().uuidSequence,
+                rollouts,
+            };
+            try {
+                const result = runNativeBank(native, root.handle!, { ...input, deadlineAt: null });
+                const verdict = compareNativeShadowBank(native.flags, ts, result, input.start, captureMaterial);
+                stats.shadowBanks += 1;
+                stats.shadowRollouts += verdict.rollouts;
+                stats.shadowRolloutMismatches += verdict.rolloutMismatches;
+                stats.shadowSkipped += verdict.skipped;
+                if (verdict.fails.length) {
+                    stats.shadowMismatches += 1;
+                    reportNativeShadowMismatch(
+                        root,
+                        `seed=${this.match.seed ?? "?"} lap=${this.deps.fightProperties.getCurrentLap()} unit=${unit.getName()} mode=${input.horizonMode} R=${input.rolloutCount} calls=${result.calls}`,
+                        verdict.fails,
+                        result.requests,
+                    );
+                } else if (!threw && result.calls === 1 && input.horizonMode === "turns" && candidates.length >= 3) {
+                    offerNativeFixtureBank(
+                        root,
+                        result.requests[0] as { chance?: string },
+                        nativeFixtureExpected(
+                            native.flags,
+                            ts,
+                            candidates,
+                            input.rolloutCount,
+                            input.start,
+                            input.harness.summonScope,
+                            captureMaterial,
+                        ),
+                    );
+                }
+            } catch (error) {
+                if (native.isRefusal(error)) {
+                    countNativeReason(stats.fallback, `shadow_refused:${nativeReason((error as Error).message)}`);
+                } else {
+                    disableNativeRollouts(error);
+                }
+            }
+        }
+        if (threw) throw thrown;
+        return means!;
+    }
+    /** Shadow mode: one TypeScript rollout with what its native replay must reproduce. */
+    private rolloutRecordedForShadow(
+        unit: Unit,
+        cand: ISearchCandidate,
+        seedBase: number,
+        r: number,
+        horizonMode: HorizonMode,
+        deadlineAt: number | null,
+        turnHorizon: number,
+        complementaryR2: boolean,
+    ): number {
+        const turnsBefore = this.counters.rolloutTurnsTotal;
+        const record: INativeShadowRollout = {
+            candidate: cand,
+            r,
+            aborted: true,
+            turns: 0,
+            uuid: 0,
+            summon: 0,
+            winner: -1,
+        };
+        this.nativeShadowRollouts?.push(record);
+        try {
+            const value = this.rollout(unit, cand, seedBase, r, horizonMode, deadlineAt, turnHorizon, complementaryR2);
+            record.value = value;
+            record.aborted = false;
+            return value;
+        } finally {
+            record.turns = this.counters.rolloutTurnsTotal - turnsBefore;
+            record.uuid = captureDeterministicRandomState().uuidSequence;
+            record.summon = this.deps.nativeHarness?.getSummonSequence?.() ?? 0;
+            record.winner = this.finishedSim ? (this.finishedWinningTeam ?? 0) : -1;
+            if (!record.aborted && Number.isFinite(record.value)) {
+                let ours = 0;
+                let enemy = 0;
+                for (const remaining of this.deps.unitsHolder.getAllUnits().values()) {
+                    if (remaining.isDead()) continue;
+                    const strength =
+                        (remaining.getExp() * remaining.getCumulativeHp()) / Math.max(1, remaining.getMaxHp());
+                    if (remaining.getTeam() === unit.getTeam()) ours += strength;
+                    else enemy += strength;
+                }
+                record.material = 0.5 * (1 + (ours - enemy) / (ours + enemy + 1000));
+            }
+        }
+    }
+    /**
+     * After a native bank TypeScript would leave the last rollout's stream installed; the native bank leaves the stream
+     * it found, behind a sentinel that counts (HOC_NATIVE_SENTINELS=throw: refuses) a draw nothing should make.
+     */
+    private installNativeRandomSentinel(uuidSequence: number): void {
+        const current = getDeterministicRandomSource() as
+            (RandomSource & { nativeSentinelOf?: RandomSource }) | undefined;
+        const underlying = current?.nativeSentinelOf ?? current;
+        const stats = this.nativeStats;
+        const sentinel = Object.assign(
+            (): number => {
+                stats.leftoverDraws += 1;
+                if (nativeSentinelsThrow())
+                    throw new Error("native rollouts: a draw from the stream a TypeScript bank leaves");
+                return underlying ? underlying() : Math.random();
+            },
+            { nativeSentinelOf: underlying },
+        );
+        restoreDeterministicRandomState({ source: sentinel, uuidSequence });
     }
     private effectiveDecisionDeadlineMs(): number | null {
         return this.decisionDeadlineOverrideMs ?? this.decisionDeadlineMs;

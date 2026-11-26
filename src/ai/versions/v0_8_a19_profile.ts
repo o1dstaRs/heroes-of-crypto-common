@@ -649,8 +649,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Carries the neutral cemetery barrel deliberation switch that profile v14 turns on, the keep-attack
-        // switches of profile v21 and the carrier cohesion rule of profile v32.
-        sha256: "4aa58ee987acf7abe3d8656e3343ec87fafa4096fa3a69500c331b65c0ff808c" as const,
+        // switches of profile v21 and the carrier cohesion rule of profile v32. Re-pinned for the native rollout
+        // seam (HOC_NATIVE_ROLLOUTS, off by default: the TypeScript loop is unchanged; docs/native_rollouts.md).
+        sha256: "d7e5844d4e41375e681d26bcb6bc9521fcae3403d83dcda0958f3154c3e04a0b" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
@@ -791,8 +792,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
-        // Offline formation collection is opt-in; omitted callers preserve default routing.
-        sha256: "2378bb71912ecce3eb678c5a97037f943b9f8bfdf688e1c08e38c3e5e0bc8d38" as const,
+        // Offline formation collection is opt-in; omitted callers preserve default routing. Re-pinned for the
+        // native rollout harness facts and the opt-in searched-seat driver hook (docs/native_rollouts.md).
+        sha256: "293f92c19d35c20eb1d81aa22576322837bcc0f1fcf8133ec5933eb9aa2f5de9" as const,
     }),
     Object.freeze({
         role: "neural-policy" as const,
@@ -802,7 +804,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "neural-adapter" as const,
         source: "src/simulation/a19_neural.ts" as const,
-        sha256: "cf00b2ebaba0acc13ff80d7b1dca17fa88a23724bd32501090d55262e1c5c362" as const,
+        // Re-pinned for the exported gate (a19NeuralCorrectionEngages) and its native rollout veto; the gate is unchanged.
+        sha256: "b53660ef52adf25997627f63d871dc88dc210119b8998570b8cbf6d4da8fad5b" as const,
     }),
     Object.freeze({
         role: "neural-model" as const,

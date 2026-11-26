@@ -116,6 +116,22 @@ export interface ILookaheadDeps {
     /** Capture mutable engine-closure state outside the battle snapshot (e.g. summon identity counters).
      * The returned rollback is idempotent and restores the same pre-simulation state on every call. */
     captureAuxiliaryState?: () => () => void;
+    /** What a native rollout backend needs from the harness (./native_rollouts.ts); absent: TypeScript rollouts only. */
+    nativeHarness?: INativeHarness;
+}
+
+/**
+ * The harness facts a native rollout bank must reproduce. `summonIds`: how a summon raised inside a rollout is named
+ * ("match": runMatch's createSummonedUnit sequence; "uuidSequence": the server's createSecureUuid under the search's
+ * seeded source). `summonScope`: "rollout" when captureAuxiliaryState restores that sequence after every rollout
+ * (runMatch), "call" when it carries over. `seed`: the match seed the summon names derive from. `getSummonSequence`:
+ * the sequence now.
+ */
+export interface INativeHarness {
+    summonIds: "match" | "uuidSequence";
+    summonScope: "rollout" | "call";
+    seed?: number;
+    getSummonSequence?: () => number;
 }
 
 interface ICandidate {
