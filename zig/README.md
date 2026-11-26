@@ -529,10 +529,9 @@ Batch 6b lands creature by creature. Slices 1 to 3, exact in both modes (coverag
   dispelled (`engine.dispelSmoke`, attack_handler.ts:787; never reached: every arrival already dispels the smoke under
   its body). TypeScript burns no Fire Wall at the swap (only moves, strike approaches and shoves burn), so neither does
   the port. No mirror roll; the charge; completeTurn. A resisted cast spends the charge and moves nobody.
-- **AI**: v0.1 never casts. src/v08 does not decide Castling yet: `rollout.V08_CASTABLE` leaves it out and
-  `V08_SCOPE.refused_abilities` holds the batch-6b cards, so a v0.8 rollout refuses a board where any unit holds the
-  card (a Queen thief too). `RECORD_FORCE_CASTS="Castling"` passes runMatch's hook to canCastSpell, so a forced cast
-  reaches it in v0.8s recordings.
+- **AI**: v0.1 never casts. src/v08 decides Castling (3193517c: the candidates, the caster router, the destination
+  cells), and v0.8 rollouts take it (`rollout.V08_CASTABLE`, c5974346). `RECORD_FORCE_CASTS="Castling"` passes
+  runMatch's hook to canCastSpell, so a forced cast reaches it in v0.8s recordings.
 - **Water Element** (a Break-aware card, power 50; `combat.physicalElement`, `spells.elementMultiplier`): the physical
   pair on every damage roll (one floor over `roll x type x ability x deep wounds x pair`: a Fire Element striker on a
   Mermaid and a Mermaid on a Fire Element deal x1.5, the defender's card power), the spell table (FIRE x1.5 on her,
@@ -550,7 +549,8 @@ Batch 6b lands creature by creature. Slices 1 to 3, exact in both modes (coverag
   with the striker. The seeding pass (`engine.seedWaterShields`, after the blessings and before the stat loop of every
   stack-power refresh) appends a row to a living holder of the card (Break-aware) that never spent one and carries
   none: a Queen that steals the card (the robbed Mermaid keeps her row), or a holder revived after a death that did not
-  spend it. The v0.1 AI reads neither card; v0.8 rollouts refuse both cards and the row (`V08_SCOPE`).
+  spend it. The v0.1 AI reads neither card; src/v08 reads both (73ffe9a5), and v0.8 rollouts take both cards and the row
+  (1cb08eff).
 - **Wind Element** (Break-aware, power 50): the physical pair with Earth Elements both ways (x1.5, the defender's card
   power), the spell table (AIR 0, EARTH x1.5: Lightning Strike at it is refused, the meteors hit it harder) and it
   earths Chain Lightning.
@@ -566,14 +566,15 @@ Batch 6b lands creature by creature. Slices 1 to 3, exact in both modes (coverag
   synergy's ability power, stack power, then Empower and Sylvan Focus). A Magic Mirror buff on a victim reflects its
   share (`spells.mirrorBuffPower`) as AIR onto the wielder: nothing onto a Thunderbird (its Wind Element), a share onto
   a Queen that stole the card. Kill morale and the same-name losses settle inside the chain. Arrows Wingshield,
-  Range Null Field and Aggr are not read. The v0.1 AI reads neither card; v0.8 rollouts refuse them (`V08_SCOPE`).
-- **The rest of batch 6b is in the tree, refused at load**: Efreet (Fire Element, Made of Fire, Fire Shield) and Black
-  Dragon (Fire Element, Enchanted Skin, Fire Breath). Their engine code (the Fire Element pairs, Fire Shield, Fire Breath
-  and its stones, Enchanted Skin's magic_resist_mod, the Made of Fire card's lava walk and buff) plays v0.1 recordings of each creature alone identically (40 battles each, 2026-11-26), but
-  it is not yet checked beside the casters, the artifacts, Queen steals or in v0.8s replays. `scope.REFUSED_ABILITIES`
-  (active or stolen; `scope.CHECKED_6B` names the cards taken; `scope.REFUSED_ROWS` is empty now) refuses those boards
-  at load, and the manifest leaves the names out; `hoc-sim parity` / `native` still play them from
-  recordings, for the next slices.
+  Range Null Field and Aggr are not read. The v0.1 AI reads neither card; src/v08 reads both (7c89022b), and v0.8
+  rollouts take them (dd613221).
+- **Slice 4, the Efreet (Fire Element, Made of Fire, Fire Shield) and the Black Dragon (Fire Element, Enchanted Skin,
+  Fire Breath)**: the Fire Element pairs, Fire Shield, Fire Breath and its stones, Enchanted Skin's magic_resist_mod,
+  the Made of Fire card's lava walk and buff (f35ac069). The loader takes every batch-6b card (`scope.CHECKED_6B`;
+  `scope.REFUSED_ABILITIES` and `scope.REFUSED_ROWS` are empty). src/v08 decides the Black Dragon's, the Abomination's
+  and the Efreet's cards (the Fire Breath line in v0.4's and v0.5's AoE positioning, the volley cost at a Dense Flesh
+  holder, the punished melee into Fire Shield, the Last Fuse estimates' Flesh Shield and Fire Shield refusals), so v0.8
+  rollouts take them (`V08_SCOPE` refuses no batch-6b card).
 - **Recorder**: keeping a batch-6b creature turns on the batch-3, spellbook and batch-4 columns (a Harpy's charge is a
   spellbook), adds `water_shield_spent` and `magic_resist_mod` after `helping_hand_link` and the fight's `lava` cells,
   and records the System "Water Shield" and "Made of Fire" configs when a unit holds those cards. Two forced-cast aids
@@ -1806,6 +1807,5 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and
   `compare.NativeCheck`. The bridge's rollouts take each unit's decide function from `rollout.policies` (v0.1 and
   v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers batches 1 to 5 and 6a, the artifacts, every
-  cast (the Nightmare's Fire Wall, its burning cells and Time Denial included) and the batch-6b slices src/v08 decides,
-  so a v0.8 request on a board with another batch-6b card is refused (the known
-  gaps and what the search still needs are in `BRIDGE.md`).
+  cast (the Nightmare's Fire Wall, its burning cells and Time Denial included) and every batch-6b card, so a v0.8
+  request takes every board the loader takes (the known gaps and what the search still needs are in `BRIDGE.md`).

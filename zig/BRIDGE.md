@@ -141,11 +141,11 @@ holds Hamstring or carries Wind Flow).
 
 Read for batch 6b: `waterShieldSpent` (`Unit.water_shield_spent`, undefined = false; the seeding pass never re-grants a
 spent shield) and the System `Water Shield` config in `spellConfigs` (`state_export.ts` adds it when a unit holds the
-card: a Queen that steals it is seeded from it). The loader takes only the checked slices' cards: the Harpy's Castling,
-the Mermaid's Water Element and Water Shield with her row, and the Thunderbird's Wind Element and Chain Lightning (no
-state: the cards are on the active list), and the Abomination's Dense Flesh and Flesh Shield Aura with its row; the
-other batch-6b cards (the Efreet's and the Black Dragon's, active or stolen) are refused by name
-(`scope.REFUSED_ABILITIES`).
+card: a Queen that steals it is seeded from it). The loader takes every batch-6b card (`scope.CHECKED_6B`;
+`scope.REFUSED_ABILITIES` is empty): the Harpy's Castling, the Mermaid's Water Element and Water Shield with her row,
+the Thunderbird's Wind Element and Chain Lightning (no state: the cards are on the active list), the Abomination's
+Dense Flesh and Flesh Shield Aura with its row, and the Efreet's and the Black Dragon's Fire Element, Made of Fire, Fire
+Shield, Enchanted Skin and Fire Breath.
 
 Refused as an unsupported state (the loader names what it found; the names and limits are `src/scope.zig`'s tables,
 which `hoc_scope_manifest` exports): summoned units other than the creatures Infest and Summon Wolves raise, and
@@ -321,9 +321,9 @@ appear inside a rollout from a root without one): src/v08 covers batches 1 to 5 
 rows, smoke, and every wave-1 and wave-2 cast, the Nightmare's whole book included (Fire Wall and the burning cells it
 leaves, Empower, Time Denial), so a request with a v0.8 seat is refused when any holder unit holds a book entry or
 parsed spell outside the whitelist `rollout.V08_CASTABLE` (every `st.CastSpell`: a spell added to `st.CastSpell` later
-is refused until it joins the list), or holds a batch-6b card src/v08 does not decide yet (`V08_SCOPE.refused_abilities`:
-the Efreet's Made of Fire and Fire Shield, a Queen thief's too; the other batch-6b cards and their rows, the Flesh Shield
-Aura row included, are taken). A mindless unit (Berserker, Frenzied Boar) plays v0.1 on a board where v0.8 cast walls:
+is refused until it joins the list). src/v08 decides every batch-6b card, a Queen thief's too (the Harpy's Castling,
+the Mermaid's, the Thunderbird's, the Black Dragon's, the Abomination's and the Efreet's), so `V08_SCOPE` refuses none of
+them nor the rows that outlive a card (Water Shield, Flesh Shield Aura). A mindless unit (Berserker, Frenzied Boar) plays v0.1 on a board where v0.8 cast walls:
 `ai.zig`'s completeMoveWithMelee projects the walk before it appends the strike, as v0_1.ts does (`ai.projectPostMove`:
 projectPostMoveActorAvailability on the resolved route, Made of Fire's max hp on a lava route, each burning cell
 entered, a Water Shield's absorb, a self-resurrection), and its idle turn waits only where canWaitOnHourglass (Time
@@ -452,7 +452,7 @@ them, so a porter changes the table and nothing else on the bridge side:
 | The port now plays | Edit |
 | --- | --- |
 | an ability, aura, buff, debuff or effect | its `AbilityId` / `SpellId` (the loader interns by name; the manifest lists the enums) |
-| a batch-6b creature (its slice) | add its cards to `scope.CHECKED_6B` (out of `REFUSED_ABILITIES`) and take its rows out of `REFUSED_ROWS` (done: the Harpy, the Mermaid, the Thunderbird); v0.8 seats stay refused by `V08_SCOPE.refused_abilities` (`BATCH6B_MASK`) and `refused_buffs` until src/v08 covers them |
+| a batch-6b creature (its slice) | add its cards to `scope.CHECKED_6B` (out of `REFUSED_ABILITIES`) and take its rows out of `REFUSED_ROWS`; v0.8 seats stay refused by `V08_SCOPE.refused_abilities` and `refused_buffs` until src/v08 covers them (done for all six: the Harpy, the Mermaid, the Thunderbird, the Black Dragon, the Abomination, the Efreet) |
 | a spell | its `st.CastSpell` entry; for v0.8 seats also `rollout.V08_CASTABLE` once src/v08 decides it |
 | a unit field or prop that was refused | drop it from `REFUSED_UNIT_FIELDS` / `REFUSED_UNIT_PROPS` and read it in snapshot.zig |
 | more names in a limited list (artifact-granted cards) | `LIMITED_UNIT_PROPS[..].accepted` |

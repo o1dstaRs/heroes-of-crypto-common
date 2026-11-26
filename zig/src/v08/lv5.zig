@@ -433,10 +433,10 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
             const t_alive = t.amount_alive;
             const target_wounded = if (t_dead + t_alive > 0) t_dead / (t_dead + t_alive) else 0;
             const target_ranged: f64 = if (t.attack_type == AT.RANGE) 1 else 0;
-            // Punish-melee: a Dulling Defense knight that will answer this blow costs permanent attack (Fire Shield is
-            // not in scope). His own swing permanently cuts a survivor's base attack.
+            // Punish-melee: Fire Shield burns a striker who leaves the target alive, and a Dulling Defense knight that
+            // will answer this blow costs permanent attack. His own swing permanently cuts a survivor's base attack.
             const knight_answers = t.has(.dulling_defense) and util.canRespondToMelee(self.s, self.ui, target);
-            const punish: f64 = if (!killed and knight_answers) 1 else 0;
+            const punish: f64 = if (!killed and (t.has(.fire_shield) or knight_answers)) 1 else 0;
             const dulling: f64 = if (!killed and self.u.has(.dulling_defense) and t.base_attack > 1) 1 else 0;
             // Target-caster: enemy spellcasters (getCanCastSpells: a spellbook) are force multipliers.
             const target_caster: f64 = if (t.canCastSpells()) 1 else 0;

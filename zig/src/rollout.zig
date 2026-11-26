@@ -75,8 +75,8 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
         for (u.spells[0..u.n_spells]) |b| {
             if (!v08Castable(b.spell)) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
         }
-        // The cards and rows V08_SCOPE's tables refuse (stolen cards too: src/v08 does not decide every batch-6b card
-        // yet) and a revive's orphan augment rows.
+        // The cards and rows V08_SCOPE's tables refuse (stolen cards too, and a row that outlives its source; src/v08
+        // decides every batch-6b card, so none is refused) and a revive's orphan augment rows.
         if (u.ability_mask & V08_SCOPE.refused_abilities != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-6b ability", .{i}) catch "batch 6b";
         if (V08_SCOPE.refuse_revived and u.aug_orphans != 0) return std.fmt.bufPrint(buf, "slot {d} was revived", .{i}) catch "batch 6a";
         if (refusedRow(u)) |id| return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 6a";
@@ -123,12 +123,14 @@ pub const V08_CASTABLE = [_]st.CastSpell{
 pub const V08_SCOPE = scope.PolicyScope{
     .name = "v0.8",
     .castable = &V08_CASTABLE,
-    // Batch 6b: the cards (stolen ones too) and rows src/v08 does not cover yet. Covered: Castling (3193517c: candidates,
+    // Batch 6b: src/v08 covers every card (stolen ones too) and row, so none is refused: Castling (3193517c: candidates,
     // the caster router, the destination cells), the Mermaid's Water Element and Water Shield (73ffe9a5), the
     // Thunderbird's Wind Element and Chain Lightning (7c89022b), the Black Dragon's Fire Element, Enchanted Skin and Fire
-    // Breath (the breath's line in v0.4's and v0.5's AoE positioning) and the Abomination's Dense Flesh and Flesh Shield
-    // Aura with its aura row (the volley cost at a Dense Flesh holder, the Last Fuse estimates' Flesh Shield refusals).
-    .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit() & ~st.AbilityId.water_element.bit() & ~st.AbilityId.water_shield.bit() & ~st.AbilityId.wind_element.bit() & ~st.AbilityId.chain_lightning.bit() & ~st.AbilityId.fire_element.bit() & ~st.AbilityId.enchanted_skin.bit() & ~st.AbilityId.fire_breath.bit() & ~st.AbilityId.dense_flesh.bit() & ~st.AbilityId.flesh_shield_aura.bit(),
+    // Breath (the breath's line in v0.4's and v0.5's AoE positioning), the Abomination's Dense Flesh and Flesh Shield
+    // Aura with its aura row (the volley cost at a Dense Flesh holder, the Last Fuse estimates' Flesh Shield refusals) and
+    // the Efreet's Made of Fire and Fire Shield (the punished melee into Fire Shield, the Last Fuse estimates' Fire Shield
+    // refusals).
+    .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit() & ~st.AbilityId.water_element.bit() & ~st.AbilityId.water_shield.bit() & ~st.AbilityId.wind_element.bit() & ~st.AbilityId.chain_lightning.bit() & ~st.AbilityId.fire_element.bit() & ~st.AbilityId.enchanted_skin.bit() & ~st.AbilityId.fire_breath.bit() & ~st.AbilityId.dense_flesh.bit() & ~st.AbilityId.flesh_shield_aura.bit() & ~st.AbilityId.made_of_fire.bit() & ~st.AbilityId.fire_shield.bit(),
     .refused_buffs = &.{},
 };
 
@@ -1008,7 +1010,7 @@ pub fn playHooked(s: *State, max_laps: i32, decide: PlayDecideFn, hook: ?StepHoo
     return result;
 }
 
-test "v08Scope takes the Nightmare's boards (Fire Wall, burning cells, Time Denial) and still refuses the rest of batch 6b" {
+test "v08Scope takes the Nightmare's boards (Fire Wall, burning cells, Time Denial) and every batch-6b card" {
     const snapshot = @import("snapshot.zig");
     const a = std.testing.allocator;
     const parsed = try std.json.parseFromSlice(std.json.Value, a, @embedFile("selftest/state.json"), .{});
@@ -1041,8 +1043,7 @@ test "v08Scope takes the Nightmare's boards (Fire Wall, burning cells, Time Deni
     try std.testing.expect(s.fight.n_fire == 1);
     try std.testing.expect(v08Scope(s, &ident, &buf) == null);
     // A Water Shield or Flesh Shield Aura row on a wall board is in scope too (fire.zig and ai.zig absorb the first burn),
-    // and so are the Black Dragon's and the Abomination's cards; the batch-6b cards src/v08 does not cover yet (the
-    // Efreet's) stay out, on a wall board as anywhere, and so does a spell outside the list.
+    // and so is every batch-6b card (src/v08 decides them all); a spell outside the list stays out.
     const nightmare = s.*;
     s.units[ui].buffs.push(.{ .id = .water_shield, .laps = 3, .power = 1 });
     try std.testing.expect(v08Scope(s, &ident, &buf) == null);
@@ -1050,17 +1051,14 @@ test "v08Scope takes the Nightmare's boards (Fire Wall, burning cells, Time Deni
     s.units[ui].buffs.push(.{ .id = .flesh_shield_aura, .laps = 3, .power = 1 });
     try std.testing.expect(v08Scope(s, &ident, &buf) == null);
     s.* = nightmare;
-    s.units[ui].ability_mask |= st.AbilityId.fire_element.bit() | st.AbilityId.enchanted_skin.bit() | st.AbilityId.fire_breath.bit() |
-        st.AbilityId.dense_flesh.bit() | st.AbilityId.flesh_shield_aura.bit();
+    s.units[ui].ability_mask |= st.AbilityId.BATCH6B_MASK;
     try std.testing.expect(v08Scope(s, &ident, &buf) == null);
-    s.units[ui].ability_mask |= st.AbilityId.made_of_fire.bit();
-    try std.testing.expect(std.mem.indexOf(u8, v08Scope(s, &ident, &buf).?, "batch-6b") != null);
     s.* = nightmare;
     s.units[ui].book[s.units[ui].n_book] = .{ .spell = 0xfe, .prefix = chaos };
     s.units[ui].n_book += 1;
     try std.testing.expect(std.mem.indexOf(u8, v08Scope(s, &ident, &buf).?, "spells") != null);
     // The manifest says the same: every castable (Fire Wall included), no burning-cell refusal, no late rows, Time
-    // Denial loaded, only the uncovered batch-6b cards and rows refused.
+    // Denial loaded, no batch-6b card or row refused.
     var w: std.Io.Writer.Allocating = .init(a);
     defer w.deinit();
     try scope.writePolicy(&w.writer, V08_SCOPE);
@@ -1076,6 +1074,8 @@ test "v08Scope takes the Nightmare's boards (Fire Wall, burning cells, Time Deni
     try std.testing.expect(V08_SCOPE.refused_abilities & ~st.AbilityId.BATCH6B_MASK == 0);
     for (refused) |n| try std.testing.expect(!std.mem.eql(u8, n.string, "Time Denial"));
     try std.testing.expectEqual(V08_SCOPE.refused_buffs.len, m.value.object.get("refusedBuffs").?.array.items.len);
+    try std.testing.expectEqual(@as(usize, 0), refused.len);
+    try std.testing.expectEqual(@as(usize, 0), m.value.object.get("refusedBuffs").?.array.items.len);
 }
 
 test "plain chance seed is (seedBase + r * 0x9e3779b1) >>> 0" {

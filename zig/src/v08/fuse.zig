@@ -318,13 +318,13 @@ pub fn lastFuseRanged(s: *const st.State, u: *const st.Unit, ti: u8, divisor: f6
 /// canProjectMeleeResponse: whether the target's answer to the strike cannot change it. True when the target cannot
 /// answer, or its answer (its own primary melee estimate from its base cell) misses for sure, is absorbed, or never
 /// kills the striker; false for an answer the estimate does not model (a Backstab answer to a moved strike, Rapid Charge,
-/// a striker under a Flesh Shield Aura row, the target's Fireforged Sword, a secondary rider, a target team that can
-/// Break; Fire Shield is not in scope).
+/// a striker under a Flesh Shield Aura row or holding Fire Shield, the target's Fireforged Sword, a secondary rider, a
+/// target team that can Break).
 fn canProjectMeleeResponse(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape) bool {
     const u = &s.units[ai_];
     const t = &s.units[ti];
     if (!util.canRespondToMelee(s, ai_, ti)) return true;
-    if ((shape.moved and t.has(.backstab)) or t.has(.rapid_charge) or u.buffs.find(.flesh_shield_aura) != null or
+    if ((shape.moved and t.has(.backstab)) or t.has(.rapid_charge) or u.buffs.find(.flesh_shield_aura) != null or u.has(.fire_shield) or
         t.buffs.find(.fireforged_sword) != null or secondaryRider(t) or s.setup[t.team].break_chance > 0) return false;
     const response = primaryMelee(s, ti, ai_, .{}, engine.baseCell(t)) orelse return false;
     if (response.hit <= 0 or abilities.absorbsBy(s, u, t)) return true;
@@ -332,15 +332,15 @@ fn canProjectMeleeResponse(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShap
 }
 
 /// estimateLastFuseMeleeDamage: a supported direct strike of a Last Fuse army priced with the corpse's blast at the
-/// strike's fatal chance; null (search decides) for a target under a Flesh Shield Aura row, a striker with a Fireforged
-/// Sword or a secondary rider (Fire Shield is not in scope), a move while a Fire Wall burns or an aura is on the board,
-/// an unsupported primary sequence, a fatal strike whose answer the estimate cannot project, or a blast that destroys a
+/// strike's fatal chance; null (search decides) for a target under a Flesh Shield Aura row or holding Fire Shield, a
+/// striker with a Fireforged Sword or a secondary rider, a move while a Fire Wall burns or an aura is on the board, an
+/// unsupported primary sequence, a fatal strike whose answer the estimate cannot project, or a blast that destroys a
 /// self-resurrecting stack. An absorbed strike buys nothing.
 pub fn lastFuseMelee(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape, from: Cell) ?FuseEstimate {
     const u = &s.units[ai_];
     const t = &s.units[ti];
     if (u.buffs.find(.last_fuse) == null or t.isDead() or t.team == u.team) return null;
-    if (t.buffs.find(.flesh_shield_aura) != null) return null;
+    if (t.buffs.find(.flesh_shield_aura) != null or t.has(.fire_shield)) return null;
     if (u.buffs.find(.fireforged_sword) != null or secondaryRider(u)) return null;
     if (shape.moved) {
         // decisionFireWalls(context).size() > 0, or any unit projecting an aura (getAuraEffects(): none while Broken).
