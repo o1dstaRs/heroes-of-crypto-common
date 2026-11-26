@@ -521,14 +521,15 @@ export const V08_A19_SPLIT_SCREEN_POLICY = Object.freeze({
 /**
  * Shield screen (profile v36): ai/split_screen.ts switches the Water Shield screen body of ai/tactical_split_placement.ts
  * for the server's split plan (AI seats and Premium "Arrange army") and the client's Premium projection. Adopted by the
- * owner's decision before its check; the registration is the frozen decision record. See docs/shield_screen_adoption.md.
+ * owner's decision before its check; the registration is the frozen decision record. Its registered non-inferiority
+ * check SH1 passed on November 26, 2026 (not a strength gain). See docs/shield_screen_adoption.md.
  */
 export const V08_A19_SHIELD_SCREEN_POLICY = Object.freeze({
     policyId: "a19-shield-screen-v1" as const,
     adoptedAt: "2026-11-25",
     adoption: "owner-explicit-decision",
     registrationSha256: "e50024247b049178de58d092acca14ac93433c405e843647b7b6b20799bf3ddc",
-    qualification: "owner-decision-check-pending",
+    qualification: "non-inferiority-confirmed",
 } as const);
 
 /**

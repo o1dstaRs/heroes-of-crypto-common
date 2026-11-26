@@ -277,7 +277,7 @@ describe("v0.8+A19 production profile", () => {
                 adoptedAt: "2026-11-25",
                 adoption: "owner-explicit-decision",
                 registrationSha256: "e50024247b049178de58d092acca14ac93433c405e843647b7b6b20799bf3ddc",
-                qualification: "owner-decision-check-pending",
+                qualification: "non-inferiority-confirmed",
             },
             // Profile v37: the counter draft and the closing pick score with counter model v2 (MV1, MV3).
             counterModel: {

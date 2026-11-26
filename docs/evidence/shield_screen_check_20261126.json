@@ -1,0 +1,68 @@
+{
+    "check": "SH1",
+    "policy": "a19-shield-screen-v1",
+    "kind": "registered non-inferiority check of an owner decision",
+    "registeredAt": "2026-11-26T06:20:11Z",
+    "decisionRuleSha256": "e44d33c45a4bc684d190862416c239a9070293803e2748260187c527b9086f3f",
+    "registrationFileSha256": "58ee5e03762171bad2659d5a0526cc03ecb1b07693879b90db790eec4134f47b",
+    "runnerSha256": "cd6d0216b8ed544b172b8c948c68dadda01da4e0a84b4385381193c7ad963633",
+    "analysisSha256": "3cf790b59dd0704794f165c00304411ce99e8992e14ab4c795e787585292f6b4",
+    "researchTreeSha256": "09d147a43991b75929324b84f9359ba803c39081e42f99e10c3da7b1a10ea3f6",
+    "banDraftSha256": "b0c726a03abe28895913f355a5818c499a7f99336a58f76a26df9e6c646d8257",
+    "ownerWeightsSha256": "81fbfb25b0127da787a1baecc10ce664c4bd9be86f41abaa3eb013dd81c4d44e",
+    "arms": {
+        "sh": "production v37 (A19_SHIELD_SCREEN on)",
+        "ctl": "A19_SHIELD_SCREEN_<candidate seat>=0 (the v35 screen body)"
+    },
+    "populations": {
+        "mir": {
+            "seed": 2611260701,
+            "families": 12000,
+            "host": "basenode",
+            "tasks": 1439,
+            "changedGames": 181,
+            "better": 96,
+            "worse": 85,
+            "estimate": 0.76,
+            "interval": [-1.01, 2.57]
+        },
+        "own": {
+            "seed": 2611260801,
+            "families": 12000,
+            "host": "x3d",
+            "tasks": 1434,
+            "changedGames": 259,
+            "better": 142,
+            "worse": 117,
+            "estimate": 1.64,
+            "interval": [-0.49, 3.8]
+        }
+    },
+    "mermaidTasks": 2873,
+    "differingOpenings": 1755,
+    "pooled": {
+        "estimate": 1.2,
+        "interval": [-0.19, 2.63],
+        "bootstrap": "10,000 replicates, random.Random(20261126), families resampled within each population"
+    },
+    "qualityErrors": {
+        "ctl": 0,
+        "sh": 0
+    },
+    "mermaidStacksInPlayedOpenings": {
+        "ctl": 3463,
+        "sh": 5896
+    },
+    "parity": {
+        "replayedGames": 40,
+        "reproduced": 40
+    },
+    "gates": {
+        "SH1": true,
+        "SH2": true,
+        "SH3": true,
+        "SH4": true,
+        "SH5": true
+    },
+    "decision": "all five gates pass: the rule stays, qualification non-inferiority-confirmed; not a strength gain (pooled lower bound below zero)"
+}
