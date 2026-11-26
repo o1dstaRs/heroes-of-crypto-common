@@ -659,6 +659,10 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     if (s.artifacts) artifacts.armorMod(u, art, titan_bonus);
     // Angelic Host's power (rounded), after the artifacts' armor_mod terms.
     if (host) |ah| u.armor_mod = js.roundUnitStat(u.armor_mod + ah, 2);
+    // Armor Rune: the stacked bonus (getBuffStacks: the row's first stored property), flat, at the end of the chain.
+    if (s.runes) {
+        if (runeStacks(u, .armor_rune)) |n| u.armor_mod = js.roundUnitStat(u.armor_mod + n, 2);
+    }
 
     // MAGIC RESIST
     u.magic_resist = if (mof) |fp| u.init.magic_resist + u.init.magic_resist / fp else u.init.magic_resist;
@@ -771,6 +775,10 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     if (u.has(.blind_fury)) u.attack_mod += (1 - u.amount_alive / (u.amount_alive + u.amount_died)) * u.init.base_attack;
     u.attack_mod = js.roundUnitStat(u.attack_mod + we_bonus, 2);
     if (host) |ah| u.attack_mod = js.roundUnitStat(u.attack_mod + ah, 2);
+    // Weapon Rune: the stacked bonus, flat, after Warlord's Edge's round and before the base-attack multiplier.
+    if (s.runes) {
+        if (runeStacks(u, .weapon_rune)) |n| u.attack_mod = js.roundUnitStat(u.attack_mod + n, 2);
+    }
     u.base_attack = js.roundUnitStat(u.base_attack * base_attack_multiplier, 2);
     u.shot_distance = js.roundUnitStat(u.shot_distance, 2);
     // Arrows Wingshield: the range-armor multiplier 1 x (1 + max(0, power) / 100).
@@ -801,6 +809,14 @@ fn windFlowPower(s: *State) f64 {
         return 0;
     }
     return cfg.power;
+}
+
+/// Unit.getBuffStacks for a rune: the row's first stored property (0 when absent); null when the term is 0.
+inline fn runeStacks(u: *const Unit, id: st.SpellId) ?f64 {
+    if (u.buffs.len == 0) return null;
+    const b = u.buffs.get(id) orelse return null;
+    if (b.src_x <= 0) return null;
+    return @floatFromInt(b.src_x);
 }
 
 /// adjustBaseStats' HP block with the unit hooks (hasAbilityActive, read once: Break-aware): refreshAndGetAdjustedMaxHp's
@@ -2415,6 +2431,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     var breaks = false;
     var fire = false;
     var riders = false;
+    var crafts = false;
     // A unit can swap Disguise markers: it holds the card (natively or stolen later) or carries the aura row.
     var swaps = false;
     for (s.setup) |row| {
@@ -2491,6 +2508,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.id == .made_of_fire) s.artifacts = true; // a copied buff outlives its army's rows
             if (b.id == .rime_charm or b.id == .gravechain) riders = true;
             if (b.id == .fireforged_sword) s.swords = true;
+            if (b.id == .armor_rune or b.id == .weapon_rune) s.runes = true;
             // Rime Charm inflicts Spit Ball's Quagmire: its holder turns the Spit Ball hooks on.
             if (b.id == .rime_charm) s.spit = true;
             if (b.id == .blessing or b.id == .battle_roar) s.spell_hooks = true;
@@ -2517,6 +2535,9 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         if (u.n_book != 0 or u.n_spells != 0) s.spell_hooks = true;
         for (u.spells[0..u.n_spells]) |b| {
             if (b.spell == @intFromEnum(st.CastSpell.fireforged_sword)) s.swords = true;
+            // A spent Craft lingers in the parsed book at 0 (its raw entry is gone, and with it the recorded configs).
+            if (b.spell == @intFromEnum(st.CastSpell.craft) and b.amount > 0) crafts = true;
+            if (b.spell == @intFromEnum(st.CastSpell.armor_rune) or b.spell == @intFromEnum(st.CastSpell.weapon_rune)) s.runes = true;
         }
         if (u.effects.find(.poison) != null) poisons = true;
     }
@@ -2585,6 +2606,21 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         s.hidden_power = rec.num(rec.get(hcfg, "power"));
         s.visible_laps = rec.num(rec.get(vcfg, "laps"));
         s.visible_power = rec.num(rec.get(vcfg, "power"));
+    }
+    // Craft: the four cards it grants and the effects.json Stun it applies by name (recorded `abilityConfigs` /
+    // `effectConfigs` when a book holds a Craft charge).
+    s.crafted_loaded = false;
+    s.craft_stun_laps = 1;
+    s.craft_stun_power = 0;
+    if (crafts) {
+        for ([_][]const u8{ "Crafted Double Punch", "Crafted Double Shot", "Crafted Frozen Sword", "Crafted Frozen Bow" }, 0..) |name, k| {
+            s.crafted[k] = try abilityRecord(init, name);
+        }
+        s.crafted_loaded = true;
+        const stun = rec.get(rec.get(init, "effectConfigs"), "Stun");
+        if (stun == .null) return error.MissingEffectConfig;
+        s.craft_stun_laps = rec.num(rec.get(stun, "laps"));
+        s.craft_stun_power = rec.num(rec.get(stun, "power"));
     }
     // Rime Charm / Gravechain rows: the Death "Quagmire" and "Gravebound" debuffs' powers they apply (recorded
     // `spellConfigs`; a debuff already on a unit carries its own).

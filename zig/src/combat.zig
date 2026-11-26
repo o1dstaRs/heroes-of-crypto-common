@@ -584,8 +584,9 @@ fn meleeRiders(s: *State, from_i: u8, to_i: u8, damage: f64, assimilation_poison
     if (s.units[from_i].ability_mask != 0) {
         abilities.miner(s, from_i, to_i);
         abilities.stun(s, from_i, to_i, from_i);
+        abilities.freeze(s, from_i, to_i, from_i);
     }
-    // A second punch rolls Rime Charm and Gravechain right after Stun (before Aggr); the blow rolls them last.
+    // A second punch rolls Rime Charm and Gravechain right after Stun and Freeze (before Aggr); the blow rolls them last.
     if (!assimilation_poison) {
         artifacts.rimeCharm(s, from_i, to_i, from_i);
         artifacts.gravechain(s, from_i, to_i, from_i, gc);
@@ -665,6 +666,7 @@ fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell, died: *Died, decrease: *
             if (tgt.ability_mask != 0) {
                 abilities.miner(s, ti, ai);
                 abilities.stun(s, ti, ai, ai);
+                abilities.freeze(s, ti, ai, ai);
                 abilities.dullingDefense(tgt, att);
                 abilities.petrifyingGaze(s, ti, ai, damage_from_response, 1);
                 abilities.boarSaliva(s, ti, ai, ai);
@@ -692,8 +694,9 @@ const Punch = struct { applied: bool = false, missed: bool = false, damage: f64 
 fn doublePunch(s: *State, ai: u8, ti: u8) Punch {
     const att = &s.units[ai];
     const tgt = &s.units[ti];
-    const a = att.ability(.double_punch) orelse return .{};
-    if (att.isDead() or att.isSkipping() or tgt.isDead()) return .{}; // a stunned or blinded puncher (isSkippingThisTurn) stops
+    // getAbility("Double Punch") ?? getAbility("Crafted Double Punch")
+    const a = att.ability(.double_punch) orelse att.ability(.crafted_double_punch) orelse return .{};
+    if (att.isDead() or att.isSkipping() or tgt.isDead()) return .{}; // a stunned, blinded or frozen puncher (isSkippingThisTurn) stops
     if (att.target >= 0 and att.target != @as(i8, @intCast(ti))) return .{};
     if (missRoll(s, att, tgt)) return .{ .applied = true, .missed = true };
     // withDualStrikeCharm: the Dual Strike Charm's +power % on the second punch only.
@@ -788,6 +791,7 @@ fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: 
         } else if (!absorbed) {
             abilities.miner(s, from_i, ei);
             abilities.stun(s, from_i, ei, active_i);
+            abilities.freeze(s, from_i, ei, active_i);
             artifacts.rimeCharm(s, from_i, ei, active_i);
             abilities.dullingDefense(from, enemy);
             abilities.petrifyingGaze(s, from_i, ei, damage, 1);
@@ -854,6 +858,7 @@ fn strikeSkewerTarget(s: *State, from_i: u8, vi: u8, is_attack: bool, died: *Die
         abilities.poisonAura(s, from_i, vi, dealt);
         abilities.miner(s, from_i, vi);
         abilities.stun(s, from_i, vi, from_i);
+        abilities.freeze(s, from_i, vi, from_i);
         artifacts.rimeCharm(s, from_i, vi, null); // the skewer passes no active unit: never extended
         abilities.dullingDefense(from, next);
         abilities.petrifyingGaze(s, from_i, vi, damage, 1);
@@ -1166,10 +1171,10 @@ fn aoeAbility(u: *const Unit) ?*const st.Ability {
     return u.ability(.area_throw) orelse u.ability(.large_caliber) orelse u.ability(.chakram);
 }
 
-/// getDoubleShotAbility: the first active of Double Shot and Double Throw (Crafted Double Shot is not in scope).
+/// getDoubleShotAbility: the first active of Double Shot, Crafted Double Shot and Double Throw.
 pub fn doubleShotAbility(u: *const Unit) ?*const st.Ability {
-    if (u.ability_mask & (st.AbilityId.double_shot.bit() | st.AbilityId.double_throw.bit()) == 0) return null;
-    return u.ability(.double_shot) orelse u.ability(.double_throw);
+    if (u.ability_mask & (st.AbilityId.double_shot.bit() | st.AbilityId.crafted_double_shot.bit() | st.AbilityId.double_throw.bit()) == 0) return null;
+    return u.ability(.double_shot) orelse u.ability(.crafted_double_shot) orelse u.ability(.double_throw);
 }
 
 /// Unit.getPhysicalAoeDamageMultiplier: max(0, 1 - (status resist (Amulet of Resolve) - 50 on an active Mechanism) / 100).
@@ -1673,6 +1678,7 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
             if (!tail_landed) {
                 abilities.deepWounds(s, ai, target_ui, ai);
                 abilities.stun(s, ai, target_ui, ai);
+                abilities.freeze(s, ai, target_ui, ai); // attack_handler.ts:1977
                 artifacts.rimeCharm(s, ai, target_ui, ai); // attack_handler.ts:1978
                 abilities.petrifyingGaze(s, ai, target_ui, gaze_attack, divisor);
                 abilities.spitBall(s, ai, target_ui, ai);
@@ -1706,6 +1712,7 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
             if (!victim.isDead() and !response_missed and !response_absorbed) {
                 abilities.deepWounds(s, target_ui, r, ai);
                 abilities.stun(s, target_ui, r, ai);
+                abilities.freeze(s, target_ui, r, ai);
                 artifacts.rimeCharm(s, target_ui, r, ai);
                 abilities.petrifyingGaze(s, target_ui, r, gaze_resp, resp_div);
                 abilities.spitBall(s, target_ui, r, ai);
@@ -1784,6 +1791,7 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
         if (!tgt.isDead() and second.applied and !second.absorbed) {
             abilities.deepWounds(s, ai, target_ui, ai);
             abilities.stun(s, ai, target_ui, ai);
+            abilities.freeze(s, ai, target_ui, ai);
             artifacts.rimeCharm(s, ai, target_ui, ai);
             abilities.petrifyingGaze(s, ai, target_ui, second.damage, divisor);
             abilities.spitBall(s, ai, target_ui, ai);
@@ -1857,11 +1865,19 @@ fn doubleShot(s: *State, ai: u8, target_ui: u8, grp: []const u8, divisor: f64, i
     const to = &s.units[to_ui];
     if (att.isDead() or to.isDead() or att.isSkipping() or engine.getRangeShots(att) <= 0) return .{};
     if ((!is_aoe or has_chakram) and att.target >= 0 and att.target != @as(i8, @intCast(to_ui))) return .{};
+    const missed = missRoll(s, att, to); // double_shot_ability.ts:122
     if (has_chakram) {
-        s.overflow = true; // a second Chakram flight (Crafted Double Shot, or a thief holding both): not ported
-        return .{};
+        // A second Chakram flight (a Crafted Double Shot, or a thief holding both): its own flight from `to` (the
+        // trajectory's misses, the first dodge ending it), every victim's bounce factor times the Double Shot multiplier
+        // and the Dual Strike Charm, then the AOE tail (one more arrow), a missed throw included.
+        var flight: Flight = .{};
+        chakramFlight(s, ai, to_ui, missed, &flight);
+        const factor = abilities.abilityMultiplier(att, a) * artifacts.dualStrikeIn(s, att, 1);
+        for (flight.factors[0..flight.len]) |*f| f.* *= factor;
+        _ = luckyStrike(s, att, aoeTail(s, ai, &flight, divisor, ai, died, hits));
+        return .{ .applied = true, .tail = true };
     }
-    if (missRoll(s, att, to)) return .{}; // double_shot_ability.ts:122: a missed second shot spends no arrow
+    if (missed) return .{}; // a missed second shot spends no arrow
     if (aoeAbility(att) != null) {
         // Dual Strike Charm: every caught unit's factor (double_shot_ability.ts:159).
         const charm = artifacts.dualStrikeIn(s, att, 1);
@@ -1942,6 +1958,7 @@ fn throughShot(s: *State, ai: u8, g: *const Groups, decrease_shots: bool, factor
         } else if (absorbed & engine.unitBit(c) == 0) {
             abilities.deepWounds(s, ai, c, ai);
             abilities.stun(s, ai, c, ai);
+            abilities.freeze(s, ai, c, ai);
             artifacts.rimeCharm(s, ai, c, ai);
             abilities.spitBall(s, ai, c, ai);
             abilities.borrowedGrace(s, ai, c, ai);
@@ -2230,6 +2247,7 @@ fn aoeTail(s: *State, thrower_i: u8, flight: *const Flight, divisor: f64, active
         if (!landed[k]) continue;
         abilities.deepWounds(s, thrower_i, v, active_i);
         abilities.stun(s, thrower_i, v, active_i);
+        abilities.freeze(s, thrower_i, v, active_i);
         artifacts.rimeCharm(s, thrower_i, v, active_i);
         abilities.spitBall(s, thrower_i, v, active_i);
         abilities.borrowedGrace(s, thrower_i, v, active_i);
@@ -2476,7 +2494,7 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, pa
     }
     terrain.spendObstacleHit(s, target, is_right);
     pierceStoneBehind(s, ai, from, target, died);
-    if (terrain.obstacleStillStands(s) and att.has(.double_punch)) terrain.spendObstacleHit(s, target, is_right);
+    if (terrain.obstacleStillStands(s) and (att.has(.double_punch) or att.has(.crafted_double_punch))) terrain.spendObstacleHit(s, target, is_right);
 
     // spinAroundObstacleStrike: the spin lands as off a unit strike (chargedRouteCells ?? 1), then the stones around.
     if (att.has(.lightning_spin)) {

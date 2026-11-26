@@ -82,6 +82,16 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
     if (s.artifacts) return "artifact rows (src/v08 not checked on artifacts)";
     // Smoke halves shots through it; src/v08 does not read the store yet.
     if (s.fight.n_smoke != 0) return "smoke clouds on the board";
+    // Wave-2 rows that outlive their casters (src/v08 does not read them yet): the Sword's burns, Misfortune's luck pin,
+    // the runes, Freeze and the crafted cards.
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.ability_mask & (st.AbilityId.crafted_double_punch.bit() | st.AbilityId.crafted_double_shot.bit() |
+            st.AbilityId.crafted_frozen_sword.bit() | st.AbilityId.crafted_frozen_bow.bit()) != 0) return "a crafted card";
+        if (u.buffs.len != 0 and (u.buffs.find(.fireforged_sword) != null or u.buffs.find(.armor_rune) != null or u.buffs.find(.weapon_rune) != null)) return "a wave-2 buff";
+        if (u.debuffs.len != 0 and u.debuffs.find(.misfortune) != null) return "a Misfortune debuff";
+        if (u.effects.len != 0 and u.effects.find(.freeze) != null) return "a Freeze effect";
+    }
     return null;
 }
 

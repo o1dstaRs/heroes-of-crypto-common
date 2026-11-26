@@ -280,6 +280,8 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
     let spellSummons = false;
     let disguise = false;
     let spitBall = false;
+    // Craft grants four cards mid-fight and stuns by name (craft_ability.ts).
+    let craft = false;
     // Artifacts: a Lava Striders army's lava routes apply the System "Made of Fire" buff (its config travels here).
     let madeOfFire = false;
     // Rime Charm and Gravechain apply the Death "Quagmire" and "Gravebound" debuffs.
@@ -293,6 +295,7 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
         addProps(props);
         if ((props.abilities ?? []).includes("Disguise Aura")) disguise = true;
         if ((props.abilities ?? []).includes("Spit Ball")) spitBall = true;
+        if ((props.spells ?? []).some((entry: string) => entry.endsWith(":Craft"))) craft = true;
         if ((props.applied_buffs ?? []).some((name: string) => name === "Lava Striders" || name === "Made of Fire"))
             madeOfFire = true;
         if (
@@ -351,6 +354,20 @@ function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Recor
     if (spitBall) {
         for (const [faction, name] of SPIT_BALL_DEBUFFS)
             spellConfigs[name] = plainConfig(getSpellConfig(faction, name));
+    }
+    if (craft) {
+        for (const name of [
+            "Crafted Double Punch",
+            "Crafted Double Shot",
+            "Crafted Frozen Sword",
+            "Crafted Frozen Bow",
+        ]) {
+            if (name in abilityConfigs) continue;
+            abilityConfigs[name] = plainConfig(getAbilityConfig(name));
+            const effect = abilityConfigs[name]?.effect;
+            if (effect && !(effect in effectConfigs)) effectConfigs[effect] = plainConfig(getEffectConfig(effect));
+        }
+        if (!("Stun" in effectConfigs)) effectConfigs.Stun = plainConfig(getEffectConfig("Stun"));
     }
     if (madeOfFire) spellConfigs["Made of Fire"] = plainConfig(getSpellConfig("System", "Made of Fire"));
     if (hamstring) spellConfigs.Hamstrung = plainConfig(getSpellConfig("Death", "Hamstrung"));

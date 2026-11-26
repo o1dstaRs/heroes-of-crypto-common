@@ -29,7 +29,12 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   and Luck Shield held) and Smoke (a neutral store of smoked cells: the 3x3 or nothing, laps + 1, re-smoked in place,
   ticked at the lap flip before the vines, dispelled by every arrival on its cells; a shot whose ray crossed smoke at or
   before a group doubles that group's divisor, capped at 8, counter-shots, Through Shot and splash groups included, never
-  the Area Throw at a cell; the digest's `fight.smoke`), which completes the Book of Chaos; batch 6a's castables, the Valkyrie's Wind Flow (a
+  the Area Throw at a cell; the digest's `fight.smoke`), which completes the Book of Chaos; the Blacksmith's Craft (the
+  2x2 from the target cell, one roll per ally against the caster's stun band: Stun, nothing, a crafted second attack or
+  a crafted frozen weapon, granted as permanent cards; the crafted Double Punch and Double Shot read as the natives, a
+  crafted Zena throws a second Chakram flight; the frozen weapons' Freeze rider after Stun at every hit site, Freeze
+  skipping turns and replies like Stun) and its runes (one roll, the stacked bonus N + 1 in the row's first property,
+  added flat to armor_mod / attack_mod); batch 6a's castables, the Valkyrie's Wind Flow (a
   mass buff on every flyer) and the Angel's Resurrection (on a wounded ally stack); a book holding any other spell is
   refused;
 - the army setup `runMatch` applies before the fight: the augments (Armor, Might, Sniper, Movement, Placement; Empower
@@ -119,6 +124,7 @@ Wave-1 spells (`spells.zig`), exact in both modes:
 | Magic Dragon (L4, MELEE_MAGIC) | Tome of Elements, Magic Reflection | Lightning Strike x4, Ring of Fire x2, Meteor Shower x1 (Whirlpool is wave 2) |
 | Trent (L2) | Vine Throw (castable) | Vine Throw x1 |
 | Wandering Mage (L1, MELEE) | Book of Chaos | Smoke x1, Misfortune x1, Fireforged Sword x2, Fireball x1 (wave 2, the whole book) |
+| Blacksmith (L1, MELEE) | Blacksmith Tools, Enchants | Craft x1, Armor Rune x5, Weapon Rune x5 (wave 2, the whole book) |
 | Wolf (summoned) | its creature's cards when "Wolf" is kept (Double Punch, Deep Wounds Level 1; batch 4), else stripped | none |
 
 The framework later batches build on:
@@ -1563,10 +1569,11 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 ## Not covered yet
 
 - the abilities of every creature outside batches 1 to 5 and 6a and the wave-1 casters (batch 6b: Harpy, Mermaid,
-  Efreet, Black Dragon, Abomination, Thunderbird), the spells outside wave 1, the Book of Chaos and batch 6a's castables
-  (Spiritual Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Craft, Castling, the runes and the rest: a book holding
-  one is refused by name), the disabled Broken Aegis (its +20 break chance and self-miss) and Holy Cross (resurrection,
-  the magic-resist and mirror rolls of debuff spells), Crafted Double Shot; the revealed-ranged delivery layer of
+  Efreet, Black Dragon, Abomination, Thunderbird), the spells outside wave 1, the Book of Chaos, the Blacksmith's book and
+  batch 6a's castables
+  (Spiritual Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Castling and the rest: a book holding one is refused by
+  name), the disabled Broken Aegis (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and
+  mirror rolls of debuff spells); the revealed-ranged delivery layer of
   production's augment plan (it needs the live draft); WATER_CENTER (never played); on the maps, Fire Breath through
   stones. The ported code leaves out what no battle in scope can reach: the Made of Fire ability (no creature in scope
   holds it; the Lava Striders buff is ported), Water Shield and Water Element, Flesh Shield, Dense Flesh

@@ -670,6 +670,24 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
             }
         }
     }
+    // Craft grants four cards mid-fight and stuns by name: their configs and the Stun / Freeze effects travel when a book
+    // holds a Craft charge.
+    if (
+        [...ctx.unitsHolder.getAllUnits().values()].some((u: any) =>
+            (u.getUnitProperties().spells ?? []).some((entry: string) => entry.endsWith(":Craft")),
+        )
+    ) {
+        for (const name of CRAFTED_CARDS) {
+            if (name in abilityConfigs) continue;
+            abilityConfigs[name] = JSON.parse(JSON.stringify(getAbilityConfig(name)));
+            const effect = abilityConfigs[name].effect;
+            if (effect && !(effect in effectConfigs)) {
+                effectConfigs[effect] = JSON.parse(JSON.stringify(getEffectConfig(effect) ?? null));
+            }
+        }
+        if (!("Stun" in effectConfigs))
+            effectConfigs.Stun = JSON.parse(JSON.stringify(getEffectConfig("Stun") ?? null));
+    }
     // Configs the engine reads without an ability naming them: aura effects (range, power, recipients), the
     // Poison effect a Venom Cloud hit applies, and the System spell Ember Covenant seeds.
     const auraEffectConfigs: Record<string, unknown> = {};
@@ -834,6 +852,8 @@ const FORCE_CASTS = (process.env.RECORD_FORCE_CASTS ?? "")
     .map((name) => name.trim())
     .filter(Boolean);
 let forcedCastCount = 0;
+/** The cards Craft grants (craft_ability.ts). */
+const CRAFTED_CARDS = ["Crafted Double Punch", "Crafted Double Shot", "Crafted Frozen Sword", "Crafted Frozen Bow"];
 const forceSpellHelper = FORCE_CASTS.length ? await import("../../src/spells/spell_helper") : undefined;
 const leafModule = LEAF_LOG ? (layersModule ?? (await import("./v08/layers"))) : undefined;
 

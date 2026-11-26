@@ -643,7 +643,7 @@ pub fn stun(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     const amplifier: f64 = if (a.ty == st.AbilityKind.STATUS and to.has(.mechanism)) 1.5 else 1;
     const chance = @max(0, @min(100, applyChance(from, a) * amplifier * (1 - artifacts.statusResist(s, to) / 100)));
     if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < chance)) return; // stun_ability.ts:58
-    if (to.isStunned()) return;
+    if (to.effects.find(.stun) != null) return; // hasEffectActive("Stun"): a Freeze row does not dedupe it
     const laps: f64 = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
     replaceChecked(s, &to.effects, .{ .id = .stun, .laps = laps, .power = a.effect_power });
 }
@@ -1296,6 +1296,28 @@ noinline fn spitBallRolls(s: *State, from_i: u8, t_i: u8, active_i: u8, a: *cons
             pushChecked(s, &from.debuffs, .{ .id = id, .laps = if (from_i == active_i) cfg.laps + 1 else cfg.laps, .power = cfg.power });
         }
     }
+}
+
+/// processFreezeAbility(from, target, currentActiveUnit): a holder of a crafted frozen weapon (the Bow, else the Sword;
+/// Break-aware) rolls getRandomInt(0, 100) on every landed hit of a living target, right after Stun, against
+/// clamp(applyChance (power 30) x 1.5 for the STATUS card on a Mechanism target x (1 - status resist / 100), 0, 100),
+/// drawn even at chance 0; a hit adds the card's Freeze effect (a lap longer on the active unit; the row replaced)
+/// unless the target is already Frozen (checked after the roll). Inline: only a holder goes further.
+pub inline fn freeze(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    if (s.units[from_i].ability_mask & (st.AbilityId.crafted_frozen_sword.bit() | st.AbilityId.crafted_frozen_bow.bit()) != 0) freezeHeld(s, from_i, to_i, active_i);
+}
+
+fn freezeHeld(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    const to = &s.units[to_i];
+    if (to.isDead()) return;
+    const from = &s.units[from_i];
+    const a = from.ability(.crafted_frozen_bow) orelse from.ability(.crafted_frozen_sword) orelse return;
+    const amplifier: f64 = if (a.ty == st.AbilityKind.STATUS and to.has(.mechanism)) 1.5 else 1;
+    const chance = @max(0, @min(100, applyChance(from, a) * amplifier * (1 - artifacts.statusResist(s, to) / 100)));
+    if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < chance)) return; // freeze_ability.ts:72
+    if (to.effects.find(.freeze) != null) return;
+    const laps: f64 = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
+    replaceChecked(s, &to.effects, .{ .id = .freeze, .laps = laps, .power = a.effect_power });
 }
 
 /// calculatePetrifyingGazeKillChance's range factor 0.75^log2(divisor) for the divisors in scope (powers of two to 8).

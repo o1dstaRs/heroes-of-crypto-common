@@ -59,8 +59,10 @@ fn notAlreadyApplied(t: *const Unit, spell: CS, cfg: *const st.SpellConfig) bool
             return u.effects.find(id) != null or u.debuffs.find(id) != null;
         }
     };
+    // The runes stack: a holder may take another (spell_helper.ts:993).
+    const stacks = cfg.is_buff and (spell == .armor_rune or spell == .weapon_rune);
     if (spell.applied()) |id| {
-        if (Carries.f(t, cfg.is_buff, id)) return false;
+        if (!stacks and Carries.f(t, cfg.is_buff, id)) return false;
     }
     if (cfg.conflict) |id| {
         if (Carries.f(t, cfg.is_buff, id)) return false;
@@ -615,14 +617,16 @@ pub fn castSpell(s: *State, ci: u8, spell_raw: u8, target: ?u8, cell: ?Cell, eve
     if (ti == null and spell == .summon_wolves and cfg.target == ST.RANDOM_CLOSE_TO_CASTER) return summonSpell(s, ci, spell, cfg, cell, events);
     if (ti == null and cfg.target == ST.ALL_ALLIES and cfg.power_type != SP.HEAL) return massCastSpell(s, ci, spell, cfg, events);
     if (ti == null and cfg.target == ST.ALL_FLYING) return massCastOnFlyers(s, ci, spell, cfg, events);
-    if (ti == null and (cfg.target == ST.ALL_FLYING or cfg.target == ST.ALL_ALLIES or cfg.target == ST.ALL_ENEMIES or cfg.target == ST.ALLIES_AREA)) {
-        s.overflow = true; // the other mass casts (flyers, enemies, Mass Heal) and craftCast: wave 2
+    if (ti == null and cfg.target == ST.ALLIES_AREA) return craftCast(s, ci, spell, cfg, cell, events);
+    if (ti == null and (cfg.target == ST.ALL_ALLIES or cfg.target == ST.ALL_ENEMIES)) {
+        s.overflow = true; // the other mass casts (enemies, Mass Heal): wave 2
         return error.Rejected;
     }
     if (ti) |t| switch (spell) {
         .vine_throw => return vineThrow(s, ci, t, spell, cfg, events),
         .fire_strike => return fireStrike(s, ci, t, spell, cfg, events),
         .fireball => return fireball(s, ci, t, spell, cfg, events),
+        .armor_rune, .weapon_rune => return enchantCast(s, ci, t, spell, cfg, events),
         .lightning_strike => return lightningStrike(s, ci, t, spell, cfg, events),
         .ring_of_fire => return ringOfFire(s, ci, t, spell, cfg, events),
         else => {},
@@ -939,6 +943,75 @@ fn ringOfFire(s: *State, ci: u8, ti: u8, spell: CS, cfg: *const st.SpellConfig, 
         caught.push(x);
     }
     damageTail(s, ci, spell, cfg, caught.slice(), events);
+}
+
+/// craftCast: the 2x2 from `targetCell` (anchor, +x, +y, +x+y; not range- or grid-checked: an off-board cell holds
+/// nobody), the caster's team among the units standing on it (each once, at its first cell; the caster included), then
+/// processCraftAbility: the stun band clamp(10 - caster luck, 0, 20) read once, and per living ally one
+/// getRandomInt(0, 100): under the band Stun (effects.json's, a lap longer on the caster; the row replaced), the next
+/// 40 nothing, the next 40 the crafted second attack (Double Shot for a unit with arrows left, else Double Punch; nothing
+/// when it already strikes twice), else the crafted frozen weapon (Bow / Sword). Then the charge (spent with no ally too)
+/// and completeTurn.
+fn craftCast(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, target_cell: ?Cell, events: *Events) Reject!void {
+    _ = cfg;
+    const c = target_cell orelse return error.Rejected;
+    const cells = [4]Cell{ c, .{ .x = c.x + 1, .y = c.y }, .{ .x = c.x, .y = c.y + 1 }, .{ .x = c.x + 1, .y = c.y + 1 } };
+    var affected: Slots = .{};
+    affectedUnits(s, &cells, &affected);
+    const caster = &s.units[ci];
+    const stun = @max(0, @min(20, 10 - engine.getLuck(caster)));
+    for (affected.slice()) |ai| {
+        const ally = &s.units[ai];
+        if (ally.team != caster.team or ally.isDead()) continue;
+        const roll: f64 = @floatFromInt(s.rng.int(0, 100)); // craft_ability.ts:51
+        const ranged = engine.getRangeShots(ally) > 0;
+        if (roll < stun) {
+            const laps = s.craft_stun_laps + @as(f64, if (ai == ci) 1 else 0);
+            abilities.replaceChecked(s, &ally.effects, .{ .id = .stun, .laps = laps, .power = s.craft_stun_power });
+        } else if (roll < stun + 40) {
+            // nothing
+        } else if (roll < stun + 80) {
+            const twice = if (ranged)
+                ally.has(.double_shot) or ally.has(.crafted_double_shot) or ally.has(.double_throw)
+            else
+                ally.has(.double_punch) or ally.has(.crafted_double_punch);
+            if (!twice) craftGrant(s, ally, if (ranged) 1 else 0);
+        } else {
+            craftGrant(s, ally, if (ranged) 3 else 2);
+        }
+    }
+    useSpell(caster, spell);
+    engine.completeTurn(s, ci, false, false, events);
+}
+
+/// Unit.grantAbility for a crafted card (State.crafted[k]): a no-op when the unit holds it (Broken or not) or lost it
+/// to Predatory Assimilation; else appended last, a permanent ordinary card.
+fn craftGrant(s: *State, u: *Unit, k: usize) void {
+    if (!s.crafted_loaded) {
+        s.overflow = true; // the recording carries no crafted card configs
+        return;
+    }
+    _ = abilities.addAbility(s, u, s.crafted[k]);
+}
+
+/// enchantCast: one getRandomInt(0, 100) (always drawn); under 50 the rune's total N (the row's first stored property,
+/// 0 when absent) goes to N + 1: the row is deleted and re-applied (power 0, laps 15 that never tick, no extra lap on a
+/// self-cast) at the END of the buff list. Then the charge and completeTurn.
+fn enchantCast(s: *State, ci: u8, ti: u8, spell: CS, cfg: *const st.SpellConfig, events: *Events) Reject!void {
+    const t = &s.units[ti];
+    const id: st.SpellId = if (spell == .armor_rune) .armor_rune else .weapon_rune;
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) < 50) { // action_engine.ts:2651
+        const held: i8 = if (t.buffs.get(id)) |b| @max(0, b.src_x) else 0;
+        if (held >= 127) {
+            s.overflow = true;
+            return error.Rejected;
+        }
+        t.buffs.delete(id);
+        abilities.pushChecked(s, &t.buffs, .{ .id = id, .laps = cfg.laps, .power = 0, .src_x = held + 1 });
+        s.runes = true;
+    }
+    useSpell(&s.units[ci], spell);
+    engine.completeTurn(s, ci, false, false, events);
 }
 
 /// smokeCast: the 3x3 centred on `targetCell` (x-major) must all be smokeable (on the board; empty or lava: not a unit,

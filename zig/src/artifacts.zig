@@ -177,9 +177,10 @@ pub noinline fn attackArtifacts(u: *Unit, r: *const Rows) f64 {
 }
 
 /// Rows whose stored properties the port loads, digests and compares: every artifact row but Keen Blade's (its first
-/// property is the power, 1 or 0.7, which does not fit the integer slot and is never read as a property).
+/// property is the power, 1 or 0.7, which does not fit the integer slot and is never read as a property), and the runes
+/// (the stacked bonus).
 pub inline fn storesProperties(id: st.SpellId) bool {
-    return id.isArtifact() and id != .keen_blade;
+    return (id.isArtifact() and id != .keen_blade) or id == .armor_rune or id == .weapon_rune;
 }
 
 // =====================================================================================================================

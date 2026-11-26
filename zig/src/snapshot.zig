@@ -435,7 +435,11 @@ fn checkUnitScope(uv: Value, fields: Value, props: Value, why: *Why) Error!void 
         }
     }
     try requireEmpty(get(fields, "waterShieldSpent"), why, "Water Shield spent");
-    try requireEmpty(get(fields, "lastFuseFatalHit"), why, "Last Fuse");
+    // Last Fuse: TypeScript records a fatal hit on every killing blow; only one with a source (the striker's Last Fuse
+    // row) is pending state the port does not load. A sourceless one (a corpse a step left in the holder) is the port's
+    // empty `fuse`.
+    const fuse_hit = get(fields, "lastFuseFatalHit");
+    if (!isUndefined(fuse_hit) and !isUndefined(get(fuse_hit, "source"))) return why.unsupported("a pending Last Fuse record", .{});
 }
 
 /// The unit's spellbook: the raw entries (props.spells "<Faction>:<Name>", one per charge) and the parsed Spell objects

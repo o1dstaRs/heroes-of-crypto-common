@@ -97,6 +97,12 @@ pub const SpellId = enum(u8) {
     fireforged_sword,
     /// The Wandering Mage's MIND debuff (wave 2): the holder's luck pinned at -10 (0 when luck-buffed), no lap roll.
     misfortune,
+    /// The Blacksmith's runes (wave 2): never-ticking buff rows (laps 15) whose first stored property is the stacked
+    /// bonus N, added flat to armor_mod / attack_mod.
+    armor_rune,
+    weapon_rune,
+    /// The crafted frozen weapons' effect (wave 2): Stun's skip and no-response, laps 2.
+    freeze,
     // batch 4
     /// The stacking Deep Wounds effect (Wolf, Tiger, Griffin, Manticore, Behemoth): a holder's strikes deal power% more.
     deep_wounds,
@@ -224,6 +230,9 @@ pub const SpellId = enum(u8) {
             .sylvan_focus_blessing => "Sylvan Focus Blessing",
             .fireforged_sword => "Fireforged Sword",
             .misfortune => "Misfortune",
+            .armor_rune => "Armor Rune",
+            .weapon_rune => "Weapon Rune",
+            .freeze => "Freeze",
             .deep_wounds => "Deep Wounds",
             .boar_saliva => "Boar Saliva",
             .terrifying_gaze => "Terrifying Gaze",
@@ -458,6 +467,14 @@ pub const AbilityId = enum(u8) {
     sylvan_focus_blessing,
     // spells (wave 2): the casters' spellbook cards
     book_of_chaos,
+    blacksmith_tools,
+    enchants,
+    /// Craft's grants (permanent ordinary cards): the second attacks (Double Punch's and Double Shot's configs) and the
+    /// frozen weapons (Stun's mechanism at power 30 with the Freeze effect).
+    crafted_double_punch,
+    crafted_double_shot,
+    crafted_frozen_sword,
+    crafted_frozen_bow,
     // batch 4
     /// The mindless pin: the unit plays v0.1 whatever its seat (no engine reader).
     ai_driven,
@@ -580,6 +597,12 @@ pub const AbilityId = enum(u8) {
             .forest_spellbook => "Forest Spellbook",
             .tome_of_elements => "Tome of Elements",
             .book_of_chaos => "Book of Chaos",
+            .blacksmith_tools => "Blacksmith Tools",
+            .enchants => "Enchants",
+            .crafted_double_punch => "Crafted Double Punch",
+            .crafted_double_shot => "Crafted Double Shot",
+            .crafted_frozen_sword => "Crafted Frozen Sword",
+            .crafted_frozen_bow => "Crafted Frozen Bow",
             .magic_reflection => "Magic Reflection",
             .sylvan_focus_blessing => "Sylvan Focus Blessing",
             .ai_driven => "AI Driven",
@@ -634,13 +657,15 @@ pub const AbilityId = enum(u8) {
             .basic_tome_of_battle_magic => spell == .fire_strike or spell == .meteorite,
             .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower,
             .book_of_chaos => spell == .fireball or spell == .fireforged_sword or spell == .misfortune or spell == .smoke,
+            .blacksmith_tools => spell == .craft,
+            .enchants => spell == .armor_rune or spell == .weapon_rune,
             else => false,
         };
     }
 
     pub inline fn isSpellbook(self: AbilityId) bool {
         return switch (self) {
-            .book_of_healing, .basic_tome_of_battle_magic, .forest_spellbook, .tome_of_elements, .book_of_chaos => true,
+            .book_of_healing, .basic_tome_of_battle_magic, .forest_spellbook, .tome_of_elements, .book_of_chaos, .blacksmith_tools, .enchants => true,
             else => false,
         };
     }
@@ -720,6 +745,10 @@ pub const CastSpell = enum(u8) {
     // batch 6a: castable abilities
     wind_flow,
     resurrection,
+    // wave 2b: the Blacksmith's Blacksmith Tools and Enchants
+    craft,
+    armor_rune,
+    weapon_rune,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -740,6 +769,9 @@ pub const CastSpell = enum(u8) {
             .smoke => "Smoke",
             .wind_flow => "Wind Flow",
             .resurrection => "Resurrection",
+            .craft => "Craft",
+            .armor_rune => "Armor Rune",
+            .weapon_rune => "Weapon Rune",
         };
     }
 
@@ -760,6 +792,8 @@ pub const CastSpell = enum(u8) {
             .fireforged_sword => .fireforged_sword,
             .misfortune => .misfortune,
             .wind_flow => .wind_flow,
+            .armor_rune => .armor_rune,
+            .weapon_rune => .weapon_rune,
             else => null,
         };
     }
@@ -1192,9 +1226,9 @@ pub const Unit = struct {
         return self.effects.len != 0 and self.effects.find(.stun) != null;
     }
 
-    /// isSkippingThisTurn and canRespond's effect veto: Stun or Blindness (no Freeze or Whirlpool in scope).
+    /// isSkippingThisTurn and canRespond's effect veto: Stun, Blindness or Freeze (no Whirlpool in scope).
     pub inline fn isSkipping(self: *const Unit) bool {
-        return self.effects.len != 0 and (self.effects.find(.stun) != null or self.effects.find(.blindness) != null);
+        return self.effects.len != 0 and (self.effects.find(.stun) != null or self.effects.find(.blindness) != null or self.effects.find(.freeze) != null);
     }
 
     /// canMove(): no Paralysis (read live) and no Web lock (taken at activation); no Whirlpool in scope.
@@ -1525,6 +1559,14 @@ pub const State = struct {
     mof_laps: f64 = 2,
     /// Fireforged Sword: some unit carries the buff or holds the spell, so the hits collect their burn victims.
     swords: bool = false,
+    /// Craft: the four cards it grants (Crafted Double Punch, Double Shot, Frozen Sword, Frozen Bow, from the recorded
+    /// `abilityConfigs`) and the effects.json Stun it applies by name; loaded when a book holds a Craft charge.
+    crafted: [4]Ability = undefined,
+    crafted_loaded: bool = false,
+    craft_stun_laps: f64 = 1,
+    craft_stun_power: f64 = 0,
+    /// The runes: some unit carries a rune row or holds a rune charge, so the stat refresh adds their bonus.
+    runes: bool = false,
     /// The Death "Quagmire" and "Gravebound" spells' powers (recorded `spellConfigs`; the riders set the laps).
     quagmire_power: f64 = 25,
     gravebound_power: f64 = 25,
