@@ -73,6 +73,33 @@ const Fnv = struct {
     }
 };
 
+/// hashSimulationParts(...parts) (src/simulation/army.ts) for string parts (numbers already in their String(x) form;
+/// ASCII, so a byte is a UTF-16 code unit).
+pub fn hashParts(parts: []const []const u8) u32 {
+    var f: Fnv = .{};
+    for (parts) |p| f.part(p);
+    return f.finish();
+}
+
+/// createSecureUuid() while a seeded source is installed (src/utils/lib.ts): the "sim" namespace UUID of the
+/// deterministicUuidSequence value `sequence` (73696d00-0000-4000-80xx-xxxxxxxxxxxx, the counter in bytes 9..15).
+pub fn simUuid(sequence: u64) Uuid {
+    var out: Uuid = .{0} ** 16;
+    out[0] = 0x73;
+    out[1] = 0x69;
+    out[2] = 0x6d;
+    out[3] = 0x00;
+    var value = sequence;
+    var i: usize = 15;
+    while (i >= 9) : (i -= 1) {
+        out[i] = @truncate(value);
+        value >>= 8;
+    }
+    out[6] = (out[6] & 0x0f) | 0x40;
+    out[8] = (out[8] & 0x3f) | 0x80;
+    return out;
+}
+
 /// deterministicSimulationId(...parts) for string parts (numbers already in their String(x) form).
 pub fn simulationId(parts: []const []const u8) Uuid {
     var out: Uuid = undefined;
@@ -113,6 +140,18 @@ pub fn summonId(seed: ?i64, team: u8, faction: u8, name: []const u8, caster: *co
         std.fmt.bufPrint(&seq_buf, "{d}", .{sequence}) catch unreachable,
     };
     return simulationId(&parts);
+}
+
+test "hashParts and simUuid match hashSimulationParts and the seeded createSecureUuid" {
+    // hashSimulationParts("a19-actor-chance-v1", 3, "73696d00-0000-4000-8000-000000000005") and createSecureUuid() at
+    // deterministicUuidSequence 258, from bun.
+    var buf: [36]u8 = undefined;
+    const id = simUuid(5);
+    try std.testing.expectEqualStrings("73696d00-0000-4000-8000-000000000005", format(&id, &buf));
+    const parts = [_][]const u8{ "a19-actor-chance-v1", "3", "73696d00-0000-4000-8000-000000000005" };
+    try std.testing.expectEqual(@as(u32, 3046707665), hashParts(&parts));
+    const big = simUuid(258);
+    try std.testing.expectEqualStrings("73696d00-0000-4000-8000-000000000102", format(&big, &buf));
 }
 
 test "summon id matches deterministicSimulationId" {

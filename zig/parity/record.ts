@@ -225,7 +225,8 @@ const SETUP = !!(
 // RECORD_ORIGIN=rollout passes decisionOrigin "rollout" to every recorded decision (the mode A19 rollouts run the
 // native policy in). RECORD_LAYERS=1 (v0.8 only) installs zig/parity/v08/layers.ts and adds `layers` and `memory`
 // (the AI target memory before the decision) to each decide step. The .meta.json gains version, decisionOrigin and
-// layers whenever one of the three is set.
+// layers whenever one of the three is set. RECORD_LEAF=1 adds `leaf` (layers.ts leafOracle: the production V2 leaf of
+// each team at the decision's board) to each decide step.
 const RESUME_MODE = (process.env.RECORD_RESUME ?? "").trim();
 const VERSION = (process.env.RECORD_VERSION ?? "v0.1").trim();
 const ROLLOUT_ORIGIN = process.env.RECORD_ORIGIN === "rollout";
@@ -621,8 +622,12 @@ function setupState(fp: any): Record<string, unknown> {
     return { variants: fp.getSynergyVariants(), perTeam };
 }
 
-// zig/parity/v08/layers.ts (owned by the v0.8 port) is loaded only for RECORD_LAYERS=1.
+// zig/parity/v08/layers.ts (owned by the v0.8 port) is loaded only for RECORD_LAYERS=1 (the layer log) or
+// RECORD_LEAF=1 (each decide step gains `leaf`: layers.ts leafOracle, the production V2 rollout leaf at the board, which
+// `hoc-sim v08 leaf` reads).
+const LEAF_LOG = process.env.RECORD_LEAF === "1";
 const layersModule = LAYER_LOG ? await import("./v08/layers") : undefined;
+const leafModule = LEAF_LOG ? (layersModule ?? (await import("./v08/layers"))) : undefined;
 
 function main(): void {
     const games = Number(process.argv[2] ?? 50);
@@ -817,6 +822,7 @@ function main(): void {
             out: JSON.parse(JSON.stringify(actions)),
             ...(TRACE ? { ds: siteLog.slice(site0) } : {}),
             ...(layers ? { layers, memory, ...(candidates?.length ? { candidates } : {}) } : {}),
+            ...(leafModule && ctx ? { leaf: leafModule.leafOracle(ctx.unitsHolder, ctx.fightProperties) } : {}),
         });
         return actions;
     };

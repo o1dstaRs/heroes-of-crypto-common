@@ -7,9 +7,27 @@
 
 const std = @import("std");
 
+/// A random source that replaces the stream for a while (the bridge's actor-antithetic rollout chance,
+/// search_chance_sampling.ts): `next` returns each raw draw as the 32-bit integer behind TypeScript's `u / 2^32`.
+pub const Keyed = struct {
+    ctx: *anyopaque,
+    next: *const fn (ctx: *anyopaque) u32,
+};
+
+/// One mulberry32 step on `state` (makeRng's generator).
+pub inline fn mulberry32(state: *u32) u32 {
+    state.* +%= 0x6d2b79f5;
+    var t: u32 = state.*;
+    t = (t ^ (t >> 15)) *% (t | 1);
+    t ^= t +% ((t ^ (t >> 7)) *% (t | 61));
+    return t ^ (t >> 14);
+}
+
 pub const Rng = struct {
     state: u32,
     draws: u64 = 0,
+    /// When set, every draw comes from it instead of `state` (a search rollout's keyed chance stream).
+    keyed: ?*const Keyed = null,
 
     pub fn init(state: u32) Rng {
         return .{ .state = state };
@@ -18,11 +36,8 @@ pub const Rng = struct {
     /// One mulberry32 output as the 32-bit integer behind TypeScript's `u / 4294967296`.
     pub inline fn nextU32(self: *Rng) u32 {
         self.draws += 1;
-        self.state +%= 0x6d2b79f5;
-        var t: u32 = self.state;
-        t = (t ^ (t >> 15)) *% (t | 1);
-        t ^= t +% ((t ^ (t >> 7)) *% (t | 61));
-        return t ^ (t >> 14);
+        if (self.keyed) |k| return k.next(k.ctx);
+        return mulberry32(&self.state);
     }
 
     inline fn nextRaw53(self: *Rng) u64 {

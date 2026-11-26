@@ -554,6 +554,163 @@ fn playState(gpa: std.mem.Allocator, file: []const u8, max_laps: i32) !bool {
     return true;
 }
 
+/// The trace writer of `hoc-sim rollout-trace`: one JSON line per step, units named by their id's first 8 characters.
+const TraceOut = struct {
+    out: *std.Io.Writer,
+    ident: *const rollout.Identity,
+    state: ?*const st.State = null,
+    /// `--digests`: each decide line also carries the state's digest (digest.zig) before the decision's actions.
+    digests: bool = false,
+    prev_text: [1024]u8 = undefined,
+    prev_text_len: usize = 0,
+
+    fn id8(self: *const TraceOut, s: *const st.State, slot: u8, buf: *[36]u8) []const u8 {
+        if (slot >= s.n_units) return "?";
+        return self.ident.idOf(s, slot, buf)[0..8];
+    }
+
+    fn action(self: *const TraceOut, s: *const st.State, a: rec.Action) !void {
+        var b1: [36]u8 = undefined;
+        var b2: [36]u8 = undefined;
+        const w = self.out;
+        switch (a) {
+            .start_fight => try w.writeAll("start_fight"),
+            .advance => try w.writeAll("advance"),
+            .decide => {},
+            .end_turn => |x| try w.print("end_turn {s}", .{self.id8(s, x.unit, &b1)}),
+            .wait_turn => |x| try w.print("wait_turn {s}", .{self.id8(s, x.unit, &b1)}),
+            .defend_turn => |x| try w.print("defend_turn {s}", .{self.id8(s, x.unit, &b1)}),
+            .select_attack_type => |x| try w.print("select_attack_type {s} {d}", .{ self.id8(s, x.unit, &b1), x.attack_type }),
+            .move_unit => |x| {
+                try w.print("move_unit {s} to", .{self.id8(s, x.unit, &b1)});
+                for (x.target_cells) |c| try w.print(" {d},{d}", .{ c.x, c.y });
+            },
+            .melee_attack => |x| try w.print("melee_attack {s} {s} from {d},{d}", .{ self.id8(s, x.attacker, &b1), self.id8(s, x.target, &b2), x.attack_from.x, x.attack_from.y }),
+            .range_attack => |x| {
+                try w.print("range_attack {s} {s}", .{ self.id8(s, x.attacker, &b1), self.id8(s, x.target, &b2) });
+                if (x.aim_cell) |c| try w.print(" aim {d},{d},{d}", .{ c.x, c.y, x.aim_side });
+            },
+            .obstacle_attack => |x| try w.print("obstacle_attack {s} {d},{d}", .{ self.id8(s, x.attacker, &b1), x.target_x, x.target_y }),
+        }
+    }
+
+    /// v08/policy.zig's layer hook: each level's output ("=" when it kept the previous level's).
+    fn layer(ctx: *anyopaque, name: []const u8, actions: []const rec.Action, rin: u32, rout: u32) void {
+        _ = rin;
+        _ = rout;
+        const self: *TraceOut = @ptrCast(@alignCast(ctx));
+        self.writeLayer(name, actions) catch {};
+    }
+
+    fn writeLayer(self: *TraceOut, name: []const u8, actions: []const rec.Action) !void {
+        if (std.mem.eql(u8, name, "v0.5")) {
+            // the wait scorer's inputs (v0.7 finalizeDecision on v0.6's decision, which is v0.5's in scope)
+            const util = @import("v08/util.zig");
+            const st_ = self.state.?;
+            const ui: u8 = @intCast(st_.active);
+            var f: [util.WAIT_FEATURES]f64 = undefined;
+            util.waitFeatures(st_, ui, actions, &f);
+            try self.out.print("{{\"k\":\"wf\",\"a\":\"{} {d}", .{ util.canHourglass(st_, ui), util.battle.melee_magic[st_.units[ui].team] });
+            for (f) |x| try self.out.print(" {d}", .{x});
+            try self.out.writeAll("\"}\n");
+        }
+        var line: std.Io.Writer.Allocating = .init(std.heap.page_allocator);
+        defer line.deinit();
+        const saved = self.out;
+        self.out = &line.writer;
+        for (actions) |a| {
+            try self.out.writeAll(" ");
+            try self.action(self.state.?, a);
+            try self.out.writeAll(";");
+        }
+        self.out = saved;
+        const text = line.written();
+        const unchanged = std.mem.eql(u8, text, self.prev_text[0..self.prev_text_len]);
+        try self.out.print("{{\"k\":\"layer\",\"a\":\"{s}:{s}\"}}\n", .{ name, if (unchanged) " =" else text });
+        const n = @min(text.len, self.prev_text.len);
+        @memcpy(self.prev_text[0..n], text[0..n]);
+        self.prev_text_len = n;
+    }
+
+    fn step(ctx: *anyopaque, kind: rollout.TraceKind, s: *const st.State, a: rec.Action, ok: bool) void {
+        const self: *TraceOut = @ptrCast(@alignCast(ctx));
+        self.write(kind, s, a, ok) catch {};
+    }
+
+    fn write(self: *const TraceOut, kind: rollout.TraceKind, s: *const st.State, a: rec.Action, ok: bool) !void {
+        const w = self.out;
+        var b1: [36]u8 = undefined;
+        try w.print("{{\"k\":\"{s}\",\"a\":\"", .{@tagName(kind)});
+        if (a == .decide) {
+            @constCast(self).prev_text_len = 0;
+            try w.print("{s}:", .{self.id8(s, a.decide.unit, &b1)});
+            for (a.decide.out) |x| {
+                try w.writeAll(" ");
+                try self.action(s, x);
+                try w.writeAll(";");
+            }
+        } else try self.action(s, a);
+        try w.print("\",\"ok\":{},\"lap\":{d},\"u\":\"", .{ ok, s.fight.lap });
+        for (s.holderOrder()) |i| {
+            const u = &s.units[i];
+            const c = engine.baseCell(u);
+            try w.print("{s}:{d}:{d}:{d}:{d},{d} ", .{ self.id8(s, i, &b1), u.hp, u.amount_alive, u.amount_died, c.x, c.y });
+        }
+        try w.writeAll("\",\"h\":\"");
+        for (s.holderOrder()) |i| {
+            const u = &s.units[i];
+            try w.print("{d}/{d}/{d}/{d}/{d}/{d}/{d}/{}/{} ", .{ u.morale, u.luck, u.luck_mod, u.steps, u.steps_mod, u.base_attack, u.attack_mod, u.on_hourglass, u.responded });
+        }
+        try w.writeAll("\"");
+        if (kind == .decide and self.digests) {
+            try w.writeAll(",\"d\":");
+            try digest.write(w, s, self.ident.ids);
+        }
+        try w.writeAll("}\n");
+    }
+};
+
+/// `hoc-sim rollout-trace <state.json> <request.json> [--pair K]`: runs pair K of a hoc_rollouts request on a loaded
+/// export and prints every step (for finding where a rollout leaves TypeScript's), then the value.
+fn rolloutTrace(gpa: std.mem.Allocator, state_file: []const u8, request_file: []const u8, pair: usize, digests: bool) !bool {
+    const ffi = @import("ffi.zig");
+    const state_json = try readAll(gpa, state_file);
+    defer gpa.free(state_json);
+    const req_json = try readAll(gpa, request_file);
+    defer gpa.free(req_json);
+    const e = ffi.hoc_engine_new() orelse return false;
+    defer ffi.hoc_engine_free(e);
+    const h = ffi.hoc_state_load(e, state_json.ptr, state_json.len) orelse {
+        std.debug.print("{s}\n", .{std.mem.span(ffi.hoc_last_error(e))});
+        return false;
+    };
+    defer ffi.hoc_state_free(e, h);
+    var req = ffi.requestFor(e, h, req_json) orelse {
+        std.debug.print("{s}\n", .{std.mem.span(ffi.hoc_last_error(e))});
+        return false;
+    };
+    if (pair >= req.pairs.len) return false;
+    req.pairs = req.pairs[pair .. pair + 1];
+    var out: std.Io.Writer.Allocating = .init(gpa);
+    defer out.deinit();
+    var t: TraceOut = .{ .out = &out.writer, .ident = req.identity.?, .state = &e.scratch, .digests = digests };
+    rollout.trace = .{ .ctx = &t, .f = TraceOut.step };
+    defer rollout.trace = null;
+    const policy = @import("v08/policy.zig");
+    policy.hook = .{ .ctx = &t, .f = TraceOut.layer };
+    defer policy.hook = null;
+    var ctl: rollout.Control = .{ .turn_budget = req.turn_budget };
+    var value: [1]f64 = .{0};
+    const n = rollout.run(&h.state, &e.scratch, &req, &value, &ctl) catch |err| {
+        try out.writer.print("{{\"error\":\"{s}\"}}\n", .{@errorName(err)});
+        try std.fs.File.stdout().writeAll(out.written());
+        return false;
+    };
+    try out.writer.print("{{\"value\":{d},\"written\":{d},\"turns\":{d}}}\n", .{ value[0], n, ctl.turns });
+    try std.fs.File.stdout().writeAll(out.written());
+    return true;
+}
+
 fn nativeBenchWorker(inits: []const st.State, r0s: []const u32, reps: usize, out_games: *u64, out_check: *u64) void {
     var n: u64 = 0;
     var check: u64 = 0;
@@ -615,7 +772,7 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(gpa);
     defer std.process.argsFree(gpa, args);
     if (args.len < 3) {
-        std.debug.print("usage: hoc-sim (parity|native|resume|bench|native-bench|paths) <recording.jsonl> [--max-fail N] [--reps N] [--threads N]\n       hoc-sim play-state <state.json> [--max-laps N]\n", .{});
+        std.debug.print("usage: hoc-sim (parity|native|resume|bench|native-bench|paths) <recording.jsonl> [--max-fail N] [--reps N] [--threads N]\n       hoc-sim play-state <state.json> [--max-laps N]\n       hoc-sim rollout-trace <state.json> <request.json> [--pair K]\n", .{});
         std.process.exit(2);
     }
     const cmd = args[1];
@@ -629,6 +786,10 @@ pub fn main() !void {
         if (!try native(gpa, path_arg, argValue(args, "--max-fail", 10))) std.process.exit(1);
     } else if (std.mem.eql(u8, cmd, "resume")) {
         if (!try resumeCheck(gpa, path_arg, argValue(args, "--max-fail", 10))) std.process.exit(1);
+    } else if (std.mem.eql(u8, cmd, "rollout-trace") and args.len >= 4) {
+        var digests = false;
+        for (args) |a| digests = digests or std.mem.eql(u8, a, "--digests");
+        if (!try rolloutTrace(gpa, path_arg, args[3], argValue(args, "--pair", 0), digests)) std.process.exit(1);
     } else if (std.mem.eql(u8, cmd, "play-state")) {
         if (!try playState(gpa, path_arg, @intCast(argValue(args, "--max-laps", 60)))) std.process.exit(1);
     } else if (std.mem.eql(u8, cmd, "native-bench")) {

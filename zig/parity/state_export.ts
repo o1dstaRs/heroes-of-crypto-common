@@ -17,6 +17,7 @@
 import Denque from "denque";
 
 import { captureAITargetMemory } from "../../src/ai/ai";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { createCombatFactories, createUnitFromSpec } from "../../src/simulation/army";
 import { creatureIdForName } from "../../src/ai/setup/creature_score";
 import {
@@ -211,6 +212,30 @@ export interface IExportHarness {
     /** The battle seed and runMatch's createSummonedUnit counter: the parts of a summoned unit's id (Infest). */
     seed?: number;
     summonSequence?: number;
+    /**
+     * v0.7's immutable army profile per team ("1" RIGHT, "2" LEFT), which the v0.8 policy reads and the strategy
+     * instance that placed the army keeps (StrategyV0_7.primeArmyProfile): MELEE_MAGIC stacks at the fight's start and
+     * whether every stack emits an aura. Absent or null = no profile (a late takeover). A runMatch-based harness can
+     * compute it at start_fight with `armyProfileAtStart`.
+     */
+    armyProfile?: Record<string, { meleeMagic: number; auraSaturated: boolean } | null>;
+}
+
+const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
+
+/** v0.7's army profile of both teams from the holder at the fight's start (isDenseMeleeMagicArmy's count and
+ * isAuraSaturatedArmy), as StrategyV0_7.primeArmyProfile computes it at placement. */
+export function armyProfileAtStart(unitsHolder: any): Record<string, { meleeMagic: number; auraSaturated: boolean }> {
+    const out: Record<string, { meleeMagic: number; auraSaturated: boolean }> = {};
+    for (const team of [1, 2]) {
+        const units = unitsHolder.getAllAllies(team);
+        out[String(team)] = {
+            meleeMagic: units.filter((u: any) => u.getAttackType() === MELEE_MAGIC).length,
+            auraSaturated:
+                units.length > 0 && units.every((u: any) => u.getAuraRanges().some((range: number) => range > 0)),
+        };
+    }
+    return out;
 }
 
 const plainConfig = (value: unknown): unknown => JSON.parse(JSON.stringify(value ?? null));
@@ -339,6 +364,7 @@ export function exportBattleState(ctx: IExportContext, harness?: IExportHarness)
                       uuidSequence: harness.uuidSequence ?? null,
                       ...(harness.seed === undefined ? {} : { seed: harness.seed }),
                       ...(harness.summonSequence === undefined ? {} : { summonSequence: harness.summonSequence }),
+                      ...(harness.armyProfile === undefined ? {} : { armyProfile: harness.armyProfile }),
                   },
               }
             : {}),

@@ -712,6 +712,10 @@ pub const Summons = struct {
     pub const QUEEN = 1;
 };
 
+/// The id a summon gets: runMatch's deterministicSimulationId("summon", seed, ..., summon_seq) (`match`), or the
+/// server's createSecureUuid() under a seeded source, the "sim" UUID of deterministicUuidSequence (`uuid_sequence`).
+pub const IdScheme = enum(u8) { match, uuid_sequence };
+
 pub const State = struct {
     units: [MAX_UNITS]Unit,
     /// The slots in use: every slot below it holds a unit, in the holder or removed (`in_holder` false).
@@ -726,6 +730,11 @@ pub const State = struct {
     summon_seq: u32 = 0,
     seed: f64 = 0,
     has_seed: bool = false,
+    /// lib.ts deterministicUuidSequence: every unit a summon constructs takes one value (UnitProperties' id), and
+    /// under `IdScheme.uuid_sequence` its id is createSecureUuid's "sim" UUID of that value.
+    uuid_seq: u64 = 0,
+    /// How a summon is named (runMatch's createSummonedUnit, or the server's, which keeps createSecureUuid's id).
+    id_scheme: IdScheme = .match,
     /// The summon templates, when a unit can summon (null otherwise).
     summons: ?*const Summons = null,
     /// A capacity of the port was exceeded (unit slots, uids, ability or spell lists): the state no longer follows

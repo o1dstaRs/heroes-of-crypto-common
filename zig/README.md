@@ -5,7 +5,8 @@ could run on a native simulator. It is not wired into the package build, lint, t
 
 A bridge (`BRIDGE.md`) hands a live TypeScript battle to the engine mid-fight: `parity/state_export.ts` exports it,
 `src/snapshot.zig` loads it (refusing what the port does not model), and a C ABI (`zig build lib`, `ffi/bridge.ts`)
-plays it out or runs search rollouts on it.
+plays it out or runs A19 search rollouts on it, with v0.1 or the native v0.8 policy (`src/v08`) on each seat, the
+plain or actor-antithetic chance stream and the material, v1 or v2 leaf.
 
 ## Scope
 
@@ -425,7 +426,8 @@ Resume points and AI options (off by default; the recording is then byte-identic
 - `RECORD_VERSION=<version>` records that strategy version on both seats (the decision wrapper goes on
   `getAIStrategy(version)`'s class; `v0.8s` is StrategyV0_8's), `RECORD_ORIGIN=rollout` passes decisionOrigin
   "rollout", and `RECORD_LAYERS=1` (v0.8 only) adds the v0.8 layer log and the AI target memory to each decision
-  (`parity/v08/layers.ts`); the `.meta.json` then gains `version`, `decisionOrigin` and `layers`. These fold in the v0.8
+  (`parity/v08/layers.ts`); the `.meta.json` then gains `version`, `decisionOrigin` and `layers`. `RECORD_LEAF=1` adds
+  `leaf` (layers.ts `leafOracle`: the production V2 leaf of each team at the decision's board, for `hoc-sim v08 leaf`). These fold in the v0.8
   port's recorder (`parity/v08/record.ts`), whose output they reproduce byte for byte.
 
 ```bash
@@ -548,6 +550,20 @@ side-oriented production-mix maps with the production-like setup above and `RECO
   (8500000); `hoc-sim parity` 100/100 on v0.8s and v0.8sr side-mix layers; `ffi/smoke.ts 12 9100`, and 30 battles each
   with batch 3 and with all three batches kept (`SMOKE_KEEP`); the rollout comparison 6,240 + 4,640 values identical,
   and 6,240 + 6,400 with batch 3 and all batches kept; `zig build test`.
+
+Native v0.8 rollouts through the bridge, checked on 2026-11-25 against common `58d5ae7c` (details, refusals and the
+speed table in `BRIDGE.md`):
+
+- v0.8 on both seats, ability-free production-like battles (src/v08's scope; side boards, maps mixed by seed): 220,800 of
+  220,800 rollout values bit-identical to `SearchDriver.rollout` on 230 roots of 150 battles (seeds
+  11000000-11000149), plain and antithetic chance, horizons turns 12 / 64, lap, reply and leaf, leaves material, v1 and
+  v2 with and without exact terminals, the same rollout turns, turn-budget stops and summon counters; 118 roots refused
+  by two checks for src/v08 gaps, and with the two patches in `BRIDGE.md` applied all 348 roots identical (334,080
+  values);
+- v0.1 rollouts with batches 1 to 3 kept: 48,000 and 49,920 values identical (both summon id schemes, 5,930 summons
+  inside rollouts); v0.8 with abilities on the board is refused (src/v08 covers ability-free boards);
+- per rollout turn with v0.8 and the v2 leaf: TypeScript 320 to 364 us, Zig 8.3 to 13.5 us (28 to 40 times per
+  rollout, load average 150 to 170).
 
 Bridge (mid-battle export and load, resume, the C ABI and rollouts), checked on 2026-11-25 against common `50ae51c2`
 (details and overheads in `BRIDGE.md`):
@@ -686,7 +702,9 @@ cd zig && zig build -Drelease=true                                   # plain `zi
 ./zig-out/bin/hoc-sim native-bench parity/out/bench1000.jsonl --reps 5 --threads 1    # whole battles, AI + engine
 ```
 
-For the 9800X3D: `zig build -Drelease=true -Dtarget=x86_64-linux-musl -Dcpu=znver5` (a static binary).
+For the 9800X3D: `zig build -Drelease=true -Dtarget=x86_64-linux-gnu -Dcpu=znver5` (dynamic, against the system glibc).
+Every artifact links libc: the learned leaves call libc's `exp`, as Bun's `Math.exp` does, and musl's `exp` can differ
+from glibc's in the last bit (the check is in `BRIDGE.md`), so the static musl build is no longer used.
 
 Results on 2026-11-25 for the same 1,000 battles (123,692 engine steps, 49,285 AI decisions). TypeScript is timed inside
 the recorder, warmed up, and counts only the engine and AI calls, not the rest of `runMatch`. Both hosts were shared
@@ -759,5 +777,6 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 - the AI versions the research uses (v0.8 with the a19 search). The production rollout policy is the v0.8 chain, about
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and
-  `compare.NativeCheck`. The bridge's rollouts take a seat's decide function from `rollout.policies` (v0.1 today); what
-  the a19 search port needs from the bridge is listed in `BRIDGE.md`.
+  `compare.NativeCheck`. The bridge's rollouts take each unit's decide function from `rollout.policies` (v0.1 and
+  v0.8); the v0.8 port covers ability-free boards only, so a v0.8 request on a board with abilities is refused (the
+  known gaps and what the search still needs are in `BRIDGE.md`).

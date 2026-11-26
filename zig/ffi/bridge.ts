@@ -3,7 +3,7 @@
  * the state and request formats and the ownership rules are in zig/BRIDGE.md.
  *
  *   const engine = HocEngine.open();                      // one per worker thread
- *   const state = engine.load(exportBattleState(ctx, { rng, activeUnitId }));
+ *   const state = engine.load(exportBattleState(ctx, { rng, activeUnitId, armyProfile }));
  *   const values = engine.rollouts(state, request);       // one f64 per (candidate, r) pair
  *   state.free(); engine.free();
  *
@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Must equal ffi.zig ABI_VERSION. */
-export const HOC_ABI_VERSION = 1;
+export const HOC_ABI_VERSION = 2;
 
 export const HOC_LIB_PATH =
     process.env.HOC_SIM_LIB ??
@@ -82,23 +82,43 @@ export interface IHocCandidate {
     actions: unknown[];
 }
 
+/** v0.7's army profile of one team (StrategyV0_7.primeArmyProfile at placement), as the v0.8 policy needs it. */
+export interface IHocArmyProfile {
+    /** MELEE_MAGIC stacks at the fight's start */
+    meleeMagic: number;
+    /** every stack emits an aura (v0.7's v0.4 anchor; the port refuses it) */
+    auraSaturated?: boolean;
+}
+
 /** hoc_rollouts' request (zig/BRIDGE.md). Unported options fail the call instead of being ignored. */
 export interface IHocRolloutRequest {
     actor: string;
     actingTeam?: number;
     seedBase: number;
-    /** "plain" only (makeRng((seedBase + r * 0x9e3779b1) >>> 0)); "antithetic" is not ported */
-    chance?: "plain";
+    /**
+     * "plain": makeRng((seedBase + r * 0x9e3779b1) >>> 0); "antithetic": SearchDriver's complementary R2 stream,
+     * makeSearchChanceStream(seedBase, r, "actor-antithetic") (r 0..3, a uint32 seedBase)
+     */
+    chance?: "plain" | "antithetic";
     horizon?: { mode: "turns" | "lap" | "reply" | "leaf"; turns?: number };
-    /** "material" only; v1/v2 learned leaves are not ported */
-    leaf?: { kind: "material"; exactTerminal?: boolean };
-    /** per team ("1" RIGHT, "2" LEFT): the policy version ("v0.1") and its switches (none supported yet) */
+    /** "material", "v1" (DEFAULT_V07_VALUE_WEIGHTS) or "v2" (V08_A13_VALUE_LEAF, production's) */
+    leaf?: { kind: "material" | "v1" | "v2"; exactTerminal?: boolean };
+    /** per team ("1" RIGHT, "2" LEFT): the policy version ("v0.1" or "v0.8") and its switches (none supported yet) */
     policies: Record<string, { version: string; switches?: Record<string, unknown> }>;
     candidates: IHocCandidate[];
     /** [candidateIndex, r] in output order */
     pairs: [number, number][];
     /** rollout turns the call may play (rolloutTurnLimit - rolloutTurnsTotal); absent = unbounded */
     turnBudget?: number;
+    /** SearchDriver's sole-Abomination Armageddon defend rule (on in the A19 profile) */
+    soleAbominationDefend?: boolean;
+    /** per team: overrides the export's harness.armyProfile (a v0.8 seat needs one) */
+    armyProfile?: Record<string, IHocArmyProfile | null>;
+    /** the counters the first rollout starts from (default: the export's harness values) */
+    summonSequence?: number;
+    uuidSequence?: number;
+    /** how a summon is named: runMatch's createSummonedUnit ("match", default) or the server's createSecureUuid */
+    summonIds?: "match" | "uuidSequence";
 }
 
 export interface IHocRolloutResult {
@@ -106,6 +126,9 @@ export interface IHocRolloutResult {
     values: Float64Array;
     turns: number;
     stop: (typeof HOC_ROLLOUT_STOPS)[number];
+    /** the summon counters after the call (aborted rollouts included), for the next request */
+    summonSequence: number;
+    uuidSequence: number;
 }
 
 export class HocError extends Error {}
@@ -141,10 +164,16 @@ export class HocEngine {
         const out = new Float64Array(Math.max(1, cap));
         const written = lib.symbols.hoc_rollouts(this.ptr, state.ptr, json, json.length, out, cap, deadlineNs);
         if (written < 0) throw new HocError(this.lastError());
-        const stats = new BigUint64Array(2);
+        const stats = new BigUint64Array(4);
         lib.symbols.hoc_rollout_stats(this.ptr, stats);
         const stop = new Int32Array(stats.buffer, 12, 1)[0];
-        return { values: out.slice(0, written), turns: Number(stats[0]), stop: HOC_ROLLOUT_STOPS[stop] ?? "done" };
+        return {
+            values: out.slice(0, written),
+            turns: Number(stats[0]),
+            stop: HOC_ROLLOUT_STOPS[stop] ?? "done",
+            summonSequence: Number(stats[2]),
+            uuidSequence: Number(stats[3]),
+        };
     }
 
     public free(): void {

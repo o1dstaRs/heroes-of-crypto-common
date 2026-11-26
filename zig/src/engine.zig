@@ -1955,6 +1955,8 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
     s.overflow = false;
     s.summons = null;
     s.summon_seq = 0;
+    s.uuid_seq = 0;
+    s.id_scheme = .match;
     s.n_holder = 0;
     const units = rec.get(init, "units").array.items;
     if (units.len > st.MAX_UNITS) return error.TooManyUnits;
@@ -2104,6 +2106,8 @@ pub fn spawnInfested(s: *State, killer: *const Killer, corpse_level: u8, corpse:
     }
     const sequence = s.summon_seq;
     s.summon_seq += 1;
+    const uuid_sequence = s.uuid_seq;
+    s.uuid_seq += 1;
     var nu = sm.units[which];
     // resolveSummonCells unless the corpse cells already form the footprint (getFootprintAnchorForCells otherwise).
     var cells: Cells = .{};
@@ -2125,7 +2129,7 @@ pub fn spawnInfested(s: *State, killer: *const Killer, corpse_level: u8, corpse:
     for (cells.slice()) |c| {
         if (!cellWithinGrid(c) or occ(s, c) != st.EMPTY) return;
     }
-    if (!killer.uuid_ok or !s.has_seed or s.next_uid >= st.MAX_UIDS) {
+    if ((s.id_scheme == .match and (!killer.uuid_ok or !s.has_seed)) or s.next_uid >= st.MAX_UIDS) {
         s.overflow = true; // no canonical summoner id or battle seed to hash, or out of uids
         return;
     }
@@ -2135,7 +2139,10 @@ pub fn spawnInfested(s: *State, killer: *const Killer, corpse_level: u8, corpse:
     };
     nu.uid = s.next_uid;
     s.next_uid += 1;
-    nu.uuid = @import("uuid.zig").summonId(@intFromFloat(s.seed), killer.team, 3, if (which == st.Summons.QUEEN) "Arachna Queen" else "Arachna Spider", &killer.uuid, "Infest", sequence);
+    nu.uuid = switch (s.id_scheme) {
+        .match => @import("uuid.zig").summonId(@intFromFloat(s.seed), killer.team, 3, if (which == st.Summons.QUEEN) "Arachna Queen" else "Arachna Spider", &killer.uuid, "Infest", sequence),
+        .uuid_sequence => @import("uuid.zig").simUuid(uuid_sequence),
+    };
     nu.uuid_ok = true;
     nu.in_holder = true;
     nu.team = killer.team;

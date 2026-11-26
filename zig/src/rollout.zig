@@ -1,36 +1,52 @@
 //! Native rollouts for the A19 search bridge: `SearchDriver.rollout` and `leafValue` (src/simulation/search_driver.ts)
-//! on a copy of a loaded battle, with the policy of each seat injected as a decide function (v0.1's `ai.decideTurn`
-//! today; the v0.8 port registers its own). Also the plain "play the battle out" helper the bridge and `hoc-sim
-//! play-state` share.
+//! on a copy of a loaded battle, with the policy of each seat injected as a decide function (`rollout.policies`: v0.1's
+//! `ai.decideTurn` and the v0.8 port's `decideV08`; a mindless unit plays v0.1 whatever its seat). Also the plain "play
+//! the battle out" helper the bridge and `hoc-sim play-state` share.
 //!
-//! One rollout: reseed the stream (`plain`: makeRng((seedBase + r * 0x9e3779b1) >>> 0)), make the actor active, apply
-//! the candidate's actions (an incumbent's rejected action is skipped as the real loop does, an enumerated candidate's
-//! rejection is -Infinity, an incumbent that landed nothing is -Infinity), defend when nothing landed, end the turn, then
-//! both seats play their policies forward to the horizon (turns: N unit turns; lap: until the lap flips, at most 64;
-//! reply: until the opponent has played once, at most 12; leaf: none), and score the leaf as P(win) for the acting team
-//! (`material`, with `exactTerminal`). Not ported (the call fails rather than guess): the actor-antithetic chance
-//! stream, the learned v1/v2 leaves and the research logit adjustments, the recovery net (advanceTowardEnemyAction),
-//! forceStalledLap, the sole-Abomination defend rule and an opponent model. See zig/BRIDGE.md.
+//! One rollout: reseed the stream (`plain`: makeRng((seedBase + r * 0x9e3779b1) >>> 0); `antithetic`: the
+//! actor-antithetic stream of search_chance_sampling.ts, one generator per "<lap>:<active id>" key and the exact
+//! complement on odd r), make the actor active, apply the candidate's actions (an incumbent's rejected action is skipped
+//! as the real loop does, an enumerated candidate's rejection is -Infinity, an incumbent that landed nothing is
+//! -Infinity), defend when nothing landed, end the turn, then every unit plays its policy forward to the horizon (turns:
+//! N unit turns; lap: until the lap flips, at most 64; reply: until the opponent has played once, at most 12; leaf:
+//! none), and score the leaf as P(win) for the acting team (`material`, `v1` or `v2`, with `exactTerminal`). Summons
+//! keep counting across the rollouts of one call (TypeScript restores neither runMatch's createSummonedUnit counter nor
+//! lib.ts deterministicUuidSequence per rollout). Not ported (the call fails rather than guess): the research logit
+//! adjustments, the recovery net (advanceTowardEnemyAction), forceStalledLap and an opponent model. See zig/BRIDGE.md.
 
 const std = @import("std");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
 const engine = @import("engine.zig");
 const ai = @import("ai.zig");
-const Rng = @import("rng.zig").Rng;
+const rng_mod = @import("rng.zig");
+const uuid = @import("uuid.zig");
+const v08policy = @import("v08/policy.zig");
+const v08util = @import("v08/util.zig");
+const Rng = rng_mod.Rng;
 
 const State = st.State;
 const Team = st.Team;
 
-/// A seat's policy: decides the active unit's turn into `out` (the signature of ai.decideTurn).
-pub const DecideFn = *const fn (*State, u8, *ai.Decision) void;
+/// A unit's policy: decides the active unit's turn into `out`; false when the policy needs a part of the port that is
+/// missing (the call then fails with error.UnsupportedPolicy instead of guessing).
+pub const DecideFn = *const fn (*State, u8, *ai.Decision) bool;
+
+/// A play-out's decide function (ai.decideTurn's signature, as ai.playMatchWith takes it).
+pub const PlayDecideFn = *const fn (*State, u8, *ai.Decision) void;
 
 pub const Policy = struct { version: []const u8, decide: DecideFn };
 
-/// The policies a request may name. The v0.8 port (src/v08) adds its entry here once its decide function plays whole
-/// battles natively.
+fn decideV01(s: *State, ui: u8, out: *ai.Decision) bool {
+    ai.decideTurn(s, ui, out);
+    return true;
+}
+
+/// The policies a request may name: "v0.1" (StrategyV0_1) and "v0.8" (the A19 composite's combat decideTurn, native
+/// StrategyV0_8 with production switches; it needs `Request.identity` and the army profile, see Tables).
 pub const policies = [_]Policy{
-    .{ .version = "v0.1", .decide = ai.decideTurn },
+    .{ .version = "v0.1", .decide = decideV01 },
+    .{ .version = "v0.8", .decide = v08policy.decideV08 },
 };
 
 pub fn policyFor(version: []const u8) ?DecideFn {
@@ -38,11 +54,94 @@ pub fn policyFor(version: []const u8) ?DecideFn {
     return null;
 }
 
+/// The boards the v0.8 port covers (src/v08 is checked on ability-free battles: its levels treat every ability, aura
+/// and ability-born buff as absent). Null when `s` is one, else what puts it outside. No ability can appear inside a
+/// rollout from such a root (no Infest, no theft, no spells), so checking the root covers every state of the call.
+pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 {
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.n_abilities > 0) return std.fmt.bufPrint(buf, "slot {d} has ability {s}", .{ i, u.abilities[0].id.name() }) catch "an ability";
+        if (u.n_auras > 0 or u.n_stolen > 0 or u.web_locked or u.rallying_volley_granted != 0 or u.target >= 0)
+            return std.fmt.bufPrint(buf, "slot {d} carries ability state", .{i}) catch "ability state";
+        for ([_][]const st.AppliedSpell{ u.buffs.items[0..u.buffs.len], u.debuffs.items[0..u.debuffs.len], u.effects.items[0..u.effects.len] }) |list| {
+            for (list) |sp| {
+                switch (sp.id) {
+                    .morale, .dismorale, .break_, .armor_augment, .might_augment, .sniper_augment, .movement_augment, .empower_augment => {},
+                    else => return std.fmt.bufPrint(buf, "slot {d} has {s}", .{ i, sp.id.name() }) catch "an ability buff",
+                }
+            }
+        }
+    }
+    if (s.ember_teams != 0) return "an Ember Covenant ring";
+    // Two gaps of src/v08 at common 58d5ae7c (patches in zig/BRIDGE.md; drop these checks once applied):
+    // util.waitFeatures counts `Fight.made` only, while getAlreadyMadeTurnSize also counts the removed units a loaded
+    // state keeps in `removed_made` (Fight.madeCount); and lv8.coverageRange leaves out the synergy aura range
+    // (getAdditionalAuraRangePerTeam) of an Angel's or a Queen's screen.
+    if (s.fight.removed_made.count() > 0) return "a removed unit in alreadyMadeTurn (src/v08 waitFeatures)";
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.isDead() or s.setup[u.team].aura_range == 0) continue;
+        const name = ident.nameOf(u);
+        if (std.mem.eql(u8, name, "Angel") or std.mem.eql(u8, name, "Arachna Queen"))
+            return std.fmt.bufPrint(buf, "{s} with a synergy aura range (src/v08 coverageRange)", .{name}) catch "a protector with a synergy aura range";
+    }
+    return null;
+}
+
+/// MINDLESS_AI_VERSION: an "AI Driven" unit plays v0.1 whatever its seat (aiVersionForUnit).
+pub const mindless_policy: DecideFn = decideV01;
+
+/// isMindlessAiUnit: the unit has "AI Driven" active (a Broken one is steered by its owner again). The port has no
+/// "AI Driven" ability: the loader refuses a unit that carries it, so no unit in scope is mindless; when the ability is
+/// ported, test it here.
+pub fn isMindless(s: *const State, ui: u8) bool {
+    _ = s;
+    _ = ui;
+    return false;
+}
+
+/// The decide function of unit `ui`: the mindless pin, else its team's policy.
+pub fn unitPolicy(s: *const State, ui: u8, req: *const Request) ?DecideFn {
+    if (isMindless(s, ui)) return mindless_policy;
+    return req.policies[s.units[ui].team];
+}
+
+/// util.Battle.melee_magic for a team without v0.7's army profile: StrategyV0_7.finalizeDecision then keeps v0.6's
+/// decision, which is the port's anchor-army path (melee_magic >= 2; the count is read nowhere else).
+pub const NO_ARMY_PROFILE: u8 = 0xff;
+
 pub const HorizonMode = enum { turns, lap, reply, leaf };
 
 /// search_driver.ts MAX_LAP_HORIZON_TURNS / MAX_REPLY_HORIZON_TURNS.
 pub const MAX_LAP_HORIZON_TURNS: u32 = 64;
 pub const MAX_REPLY_HORIZON_TURNS: u32 = 12;
+
+/// The rollout's chance stream: `plain` makeRng((seedBase + r * 0x9e3779b1) >>> 0); `antithetic` the SearchDriver's
+/// complementary R2 stream, makeSearchChanceStream(seedBase, r, "actor-antithetic") (r 0..3, seedBase a uint32).
+pub const Chance = enum { plain, antithetic };
+
+/// leafValue's model: `material` (no learned leaf), `v1` (the 20-feature DEFAULT_V07_VALUE_WEIGHTS logistic leaf) or `v2`
+/// (V08_A13_VALUE_LEAF over the 60 V2 features, production's); none with research logit adjustments.
+pub const LeafKind = enum { material, v1, v2 };
+
+/// Names behind the State's indices, for the v0.8 policy's creature and id tables, the actor-antithetic keys and the
+/// sole-Abomination rule: unit ids by uid (a unit summoned inside a rollout, uid >= ids.len, is named by its UUID) and
+/// creature names by Unit.name_id.
+pub const Identity = struct {
+    ids: []const []const u8,
+    names: []const []const u8,
+
+    /// The id string of the unit in slot `slot` (`buf` holds it when it is a rollout's summon).
+    pub fn idOf(self: *const Identity, s: *const State, slot: usize, buf: *[36]u8) []const u8 {
+        const u = &s.units[slot];
+        if (u.uid < self.ids.len) return self.ids[u.uid];
+        return uuid.format(&u.uuid, buf);
+    }
+
+    pub fn nameOf(self: *const Identity, u: *const st.Unit) []const u8 {
+        return if (u.name_id < self.names.len) self.names[u.name_id] else "";
+    }
+};
 
 pub const Candidate = struct {
     /// kind "incumbent": the real loop's semantics (rejected actions are skipped; nothing landed = -Infinity).
@@ -53,9 +152,11 @@ pub const Candidate = struct {
 pub const Request = struct {
     actor: u8,
     seed_base: f64,
+    chance: Chance = .plain,
     horizon: HorizonMode = .turns,
     /// The unit-turn cap of the `turns` horizon (SearchDriver's turnHorizon).
     turns: u32 = 12,
+    leaf: LeafKind = .material,
     /// leafValue's exact terminal result (SEARCH_A19_EXACT_TERMINAL_RESULTS): a finished fight scores 1, 0 or 0.5.
     exact_terminal: bool = false,
     /// The policy of each team (index Team.RIGHT / Team.LEFT).
@@ -66,17 +167,36 @@ pub const Request = struct {
     /// Rollout turns this call may play (TypeScript's rolloutTurnLimit - rolloutTurnsTotal); null = unbounded. The call
     /// stops after the turn that exceeds it, dropping that rollout, as assertBeforeDecisionDeadline does.
     turn_budget: ?u64 = null,
+    /// SearchDriver's sole-Abomination Armageddon defend rule (SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY=1 in
+    /// the A19 profile): the acting team's last stack, an Abomination facing a lone enemy Abomination it outlasts under
+    /// Armageddon, defends instead of asking its policy. Needs `identity`.
+    sole_abomination_defend: bool = false,
+    /// Required by the v0.8 policy, the antithetic stream and the sole-Abomination rule.
+    identity: ?*const Identity = null,
+    /// v0.7's immutable army profile (StrategyV0_7.primeArmyProfile at placement): MELEE_MAGIC stacks per team at the
+    /// fight's start, read by the v0.8 policy (util.Battle.melee_magic); NO_ARMY_PROFILE for a team whose rollout
+    /// strategy has none.
+    melee_magic: [3]u8 = .{ 0, 0, 0 },
+    /// The summon counters the first rollout starts from (runMatch's createSummonedUnit counter, lib.ts
+    /// deterministicUuidSequence) and the summon id scheme; null = the root state's.
+    summon_sequence: ?u32 = null,
+    uuid_sequence: ?u64 = null,
+    id_scheme: st.IdScheme = .match,
 };
 
 pub const Stop = enum(i32) { done = 0, deadline = 1, turn_budget = 2, out_full = 3 };
 
-/// The budget of one call: an absolute CLOCK_MONOTONIC deadline (`nowNs`, 0 = none) and the turn allowance.
+/// The budget of one call: an absolute CLOCK_MONOTONIC deadline (`nowNs`, 0 = none) and the turn allowance; after the
+/// call, the turns played, the stop reason and the summon counters the next call continues from.
 pub const Control = struct {
     deadline_ns: u64 = 0,
     turn_budget: ?u64 = null,
     /// Rollout turns played so far (aborted rollouts included, as TypeScript counts them).
     turns: u64 = 0,
     stop: Stop = .done,
+    /// The counters after the last rollout played (aborted ones included: TypeScript does not restore them).
+    summon_sequence: u32 = 0,
+    uuid_sequence: u64 = 0,
 
     fn expired(self: *Control) bool {
         if (self.turn_budget) |b| {
@@ -98,10 +218,10 @@ pub const Error = error{
     UnsupportedRecovery,
     /// The turn queue stalled with living units: forceStalledLap is not ported.
     UnsupportedStall,
-    /// A seat without a registered policy had to play.
+    /// A unit without a registered policy had to play, or its policy reached a pass the port lacks.
     UnsupportedPolicy,
-    /// A capacity of the port was exceeded (State.overflow: unit slots, ids, list lengths, or a summon without its
-    /// id parts or template).
+    /// A capacity of the port was exceeded (State.overflow: unit slots, ids, list lengths, a summon without its id
+    /// parts or template, the antithetic stream's key table).
     UnsupportedCapacity,
 };
 
@@ -122,6 +242,146 @@ pub fn plainSeed(seed_base: f64, r: u32) u32 {
     return toUint32(seed_base + @as(f64, @floatFromInt(r)) * 2654435761.0);
 }
 
+// =====================================================================================================================
+// The actor-antithetic chance stream (src/simulation/search_chance_sampling.ts)
+// =====================================================================================================================
+
+/// Distinct "<lap>:<active id>" keys one rollout may draw under.
+pub const MAX_CHANCE_KEYS = 1024;
+
+/// makeSearchChanceStream(seed, r, "actor-antithetic", deps): every raw draw reads the current lap and the harness's
+/// active unit (`State.fight.lap`, `State.active`; "" when none), draws from that key's own mulberry32 generator
+/// (seeded `(base ^ hashSimulationParts("a19-actor-chance-v1", lap, id)) >>> 0`, created on first use, private to the
+/// rollout), and on odd r returns the exact complement `1 - v - 2^-32` (the bitwise NOT of the uint32).
+pub const ActorChance = struct {
+    keyed: rng_mod.Keyed = undefined,
+    s: *State = undefined,
+    ident: *const Identity = undefined,
+    base: u32 = 0,
+    negate: bool = false,
+    n: usize = 0,
+    last_key: u64 = NO_KEY,
+    last: usize = 0,
+    keys: [MAX_CHANCE_KEYS]u64 = undefined,
+    gens: [MAX_CHANCE_KEYS]u32 = undefined,
+
+    const NO_KEY: u64 = std.math.maxInt(u64);
+    const NO_UNIT: u64 = 0xffff;
+
+    /// Installs the stream for rollout `r` on `s` (replacing its plain stream for every draw).
+    pub fn begin(self: *ActorChance, s: *State, ident: *const Identity, seed: u32, r: u32) void {
+        self.keyed = .{ .ctx = self, .next = next };
+        self.s = s;
+        self.ident = ident;
+        self.base = plainSeed(@floatFromInt(seed), r / 2);
+        self.negate = r % 2 == 1;
+        self.n = 0;
+        self.last_key = NO_KEY;
+        s.rng.keyed = &self.keyed;
+    }
+
+    fn next(ctx: *anyopaque) u32 {
+        const self: *ActorChance = @ptrCast(@alignCast(ctx));
+        const s = self.s;
+        const unit: u64 = if (s.active >= 0) s.units[@intCast(s.active)].uid else NO_UNIT;
+        const key = (@as(u64, @as(u32, @bitCast(s.fight.lap))) << 16) | unit;
+        if (key != self.last_key) self.select(key);
+        const v = rng_mod.mulberry32(&self.gens[self.last]);
+        return if (self.negate) ~v else v;
+    }
+
+    fn select(self: *ActorChance, key: u64) void {
+        self.last_key = key;
+        for (self.keys[0..self.n], 0..) |k, i| {
+            if (k == key) {
+                self.last = i;
+                return;
+            }
+        }
+        if (self.n >= MAX_CHANCE_KEYS) {
+            self.s.overflow = true; // the rollout fails with UnsupportedCapacity
+            self.last = 0;
+            return;
+        }
+        var lap_buf: [12]u8 = undefined;
+        const lap = std.fmt.bufPrint(&lap_buf, "{d}", .{self.s.fight.lap}) catch unreachable;
+        var id_buf: [36]u8 = undefined;
+        const id: []const u8 = if (self.s.active >= 0) self.ident.idOf(self.s, @intCast(self.s.active), &id_buf) else "";
+        const hash = uuid.hashParts(&.{ "a19-actor-chance-v1", lap, id });
+        self.keys[self.n] = key;
+        self.gens[self.n] = self.base ^ hash;
+        self.last = self.n;
+        self.n += 1;
+    }
+};
+
+// =====================================================================================================================
+// The v0.8 policy's per-battle table (v08/util.zig Battle)
+// =====================================================================================================================
+
+/// util.battle for the state being rolled: each slot's creature and id rank and the army profile. Built once per call
+/// from the root, restored at each rollout's start, and rebuilt after a summon (a new uid, possibly in a reused slot).
+const Tables = struct {
+    on: bool = false,
+    ident: *const Identity = undefined,
+    melee_magic: [3]u8 = .{ 0, 0, 0 },
+    root: v08util.Battle = .{},
+    root_uid: u8 = 0,
+    built_uid: u8 = 0,
+
+    fn init(self: *Tables, root: *const State, req: *const Request) void {
+        self.on = false;
+        for (req.policies) |p| {
+            if (p == v08policy.decideV08) self.on = true;
+        }
+        if (!self.on) return;
+        self.ident = req.identity.?;
+        self.melee_magic = req.melee_magic;
+        self.root = battleTable(root, self.ident, self.melee_magic);
+        self.root_uid = root.next_uid;
+        self.built_uid = root.next_uid;
+        v08util.battle = self.root;
+    }
+
+    fn reset(self: *Tables) void {
+        if (!self.on or self.built_uid == self.root_uid) return;
+        v08util.battle = self.root;
+        self.built_uid = self.root_uid;
+    }
+
+    fn sync(self: *Tables, s: *const State) void {
+        if (!self.on or s.next_uid == self.built_uid) return;
+        v08util.battle = battleTable(s, self.ident, self.melee_magic);
+        self.built_uid = s.next_uid;
+    }
+};
+
+/// util.Battle.fromUnits over the state's slots (each slot's creature name and unit id).
+pub fn battleTable(s: *const State, ident: *const Identity, melee_magic: [3]u8) v08util.Battle {
+    var names: [st.MAX_UNITS][]const u8 = undefined;
+    var ids: [st.MAX_UNITS][]const u8 = undefined;
+    var bufs: [st.MAX_UNITS][36]u8 = undefined;
+    const n = s.n_units;
+    for (0..n) |i| {
+        names[i] = ident.nameOf(&s.units[i]);
+        ids[i] = ident.idOf(s, i, &bufs[i]);
+    }
+    return v08util.Battle.fromUnits(names[0..n], ids[0..n], melee_magic);
+}
+
+// =====================================================================================================================
+// One rollout
+// =====================================================================================================================
+
+/// A debugging observer of every rollout step on this thread (`hoc-sim rollout-trace`): each engine call after it ran
+/// (`apply` / `advance`, units as slots) and each policy decision before its actions apply (`decide`).
+pub const TraceKind = enum { apply, advance, decide };
+pub const Trace = struct {
+    ctx: *anyopaque,
+    f: *const fn (ctx: *anyopaque, kind: TraceKind, s: *const State, a: rec.Action, ok: bool) void,
+};
+pub threadlocal var trace: ?Trace = null;
+
 /// SearchDriver's finishedSim / finishedWinningTeam, fed by the events of every call.
 const Sim = struct {
     finished: bool = false,
@@ -138,8 +398,15 @@ const Sim = struct {
                 self.winner = e.arg;
             }
         }
+        if (trace) |t| t.f(t.ctx, if (a == .advance) .advance else .apply, s, a, ok);
         return ok;
     }
+};
+
+/// The per-call state of `run`: the v0.8 tables and the antithetic stream.
+const Session = struct {
+    tables: Tables = .{},
+    chance: ActorChance = .{},
 };
 
 inline fn productive(a: rec.Action) bool {
@@ -163,11 +430,73 @@ fn simAdvance(s: *State, sim: *Sim) Error!void {
     }
 }
 
-/// SearchDriver.simPlayTurn: the seat's policy decides, its actions apply, then the turn ends.
-fn simPlayTurn(s: *State, ui: u8, req: *const Request, sim: *Sim) Error!void {
-    const decide = req.policies[s.units[ui].team] orelse return error.UnsupportedPolicy;
-    var decision: ai.Decision = undefined;
-    decide(s, ui, &decision);
+/// v08ArmageddonWaveDamage (v0_8_armageddon_endgame.ts): the raw damage one original stack takes from wave `wave`.
+fn armageddonWaveDamage(u: *const st.Unit, wave: i32) f64 {
+    if (wave <= 0 or wave > engine.NUMBER_OF_ARMAGEDDON_WAVES) return 0;
+    const original = @max(0, u.amount_alive + u.amount_died);
+    const max_hp = @max(0, u.max_hp);
+    const waves: f64 = @floatFromInt(engine.NUMBER_OF_ARMAGEDDON_WAVES);
+    const w: f64 = @floatFromInt(wave);
+    if (wave == 1) return @max(engine.MIN_ARMAGEDDON_DAMAGE_FIRST_WAVE, @floor(max_hp * original * w / waves));
+    return @ceil(original * w / waves) * max_hp;
+}
+
+/// v08FirstUpcomingArmageddonWave
+fn firstUpcomingWave(lap: i32) i32 {
+    const applied = @max(0, lap - engine.NUMBER_OF_LAPS_FIRST_ARMAGEDDON + 1);
+    return @max(1, applied + 1);
+}
+
+/// v08UpcomingArmageddonDamageThrough (no Water Shield in scope).
+fn armageddonDamageThrough(u: *const st.Unit, lap: i32, through: i32) f64 {
+    var damage: f64 = 0;
+    var wave = firstUpcomingWave(lap);
+    while (wave <= @min(engine.NUMBER_OF_ARMAGEDDON_WAVES, through)) : (wave += 1) damage += armageddonWaveDamage(u, wave);
+    return damage;
+}
+
+/// isV08SoleAbominationArmageddonDefendOpportunity (search_driver.ts): the unit is its team's only living stack, an
+/// Abomination facing one living enemy Abomination, and some upcoming wave leaves it alive and the enemy dead
+/// (v08ArmageddonPreservationOpportunity, from lap NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 4).
+pub fn soleAbominationOpportunity(s: *const State, ident: *const Identity, ui: u8) bool {
+    const u = &s.units[ui];
+    if (u.isDead() or !std.mem.eql(u8, ident.nameOf(u), "Abomination")) return false;
+    var enemy: ?u8 = null;
+    for (s.holderOrder()) |i| {
+        const o = &s.units[i];
+        if (o.isDead()) continue;
+        if (o.team == u.team) {
+            if (i != ui) return false;
+        } else {
+            if (enemy != null) return false;
+            enemy = i;
+        }
+    }
+    const e = &s.units[enemy orelse return false];
+    if (!std.mem.eql(u8, ident.nameOf(e), "Abomination")) return false;
+    const lap = s.fight.lap;
+    if (lap < engine.NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 4) return false;
+    var wave = firstUpcomingWave(lap);
+    while (wave <= engine.NUMBER_OF_ARMAGEDDON_WAVES) : (wave += 1) {
+        const survives = v08util.cumulativeHp(u) > armageddonDamageThrough(u, lap, wave);
+        const doomed = v08util.cumulativeHp(e) <= armageddonDamageThrough(e, lap, wave);
+        if (survives and doomed) return true;
+    }
+    return false;
+}
+
+/// SearchDriver.simPlayTurn: the unit's policy decides (or the sole-Abomination rule defends), its actions apply, then
+/// the turn ends.
+fn simPlayTurn(s: *State, ui: u8, req: *const Request, sim: *Sim, ses: *Session, enemy_team: u8) Error!void {
+    var decision: ai.Decision = .{};
+    if (req.sole_abomination_defend and s.units[ui].team != enemy_team and soleAbominationOpportunity(s, req.identity.?, ui)) {
+        decision.push(.{ .defend_turn = .{ .unit = ui } });
+    } else {
+        const decide = unitPolicy(s, ui, req) orelse return error.UnsupportedPolicy;
+        if (decide == v08policy.decideV08) ses.tables.sync(s);
+        if (!decide(s, ui, &decision)) return error.UnsupportedPolicy;
+    }
+    if (trace) |t| t.f(t.ctx, .decide, s, .{ .decide = .{ .unit = ui, .out = decision.slice() } }, true);
     var did = false;
     for (decision.slice()) |a| {
         if (sim.finished) break;
@@ -179,13 +508,64 @@ fn simPlayTurn(s: *State, ui: u8, req: *const Request, sim: *Sim) Error!void {
     }
 }
 
+extern "c" fn exp(x: f64) f64;
+
+/// DEFAULT_V07_VALUE_WEIGHTS (src/simulation/v0_7_value_weights.ts), the 20-feature LiveTwin leaf.
+pub const LEAF_V1_B: f64 = 0.13187;
+pub const LEAF_V1_W = [v08util.VALUE_FEATURES]f64{
+    2.72071,  2.62258, 1.29138, 0.00841,  -0.43786, 0.40335, 0.22442, -0.05486, -0.03332, -1.62063,
+    -0.93442, 0.6862,  0,       -0.28796, -0.22985, 0.18385, -0.0938, 0.12553,  0.02072,  0.02444,
+};
+
 /// leafValue: the exact terminal result when asked for, else the material leaf
 /// 0.5 * (1 + (ours - enemy) / (ours + enemy + 1)) over the living units' cumulative HP, in holder order.
 pub fn leafValue(s: *const State, team: u8, finished: bool, winner: i32, exact_terminal: bool) f64 {
+    return leafValueOf(.material, s, team, finished, winner, exact_terminal);
+}
+
+/// The learned leaves on `s`. util.valueFeatures and valueFeaturesV2 walk the slots, while fillValueFeatures walks
+/// unitsHolder.getAllUnits(): the two orders part once a summon takes a reused slot, and the float sums then differ in
+/// the last bit, so such a state is scored on a copy whose slots follow the holder.
+fn learnedLeaf(kind: LeafKind, s: *const State, team: u8) f64 {
+    const order = s.holderOrder();
+    for (order, 0..) |slot, k| {
+        if (k > 0 and slot <= order[k - 1]) return learnedLeafInHolderOrder(kind, s, team);
+    }
+    return learnedLeafOn(kind, s, team);
+}
+
+/// The holder's units in insertion order in a copy (the turn-set bits follow them; nothing else the features read).
+noinline fn learnedLeafInHolderOrder(kind: LeafKind, s: *const State, team: u8) f64 {
+    var buf: State = s.*;
+    buf.fight.made = 0;
+    buf.fight.hourglass_set = 0;
+    for (s.holderOrder(), 0..) |slot, k| {
+        buf.units[k] = s.units[slot];
+        buf.holder[k] = @intCast(k);
+        if (s.fight.made & engine.unitBit(slot) != 0) buf.fight.made |= engine.unitBit(@intCast(k));
+        if (s.fight.hourglass_set & engine.unitBit(slot) != 0) buf.fight.hourglass_set |= engine.unitBit(@intCast(k));
+    }
+    buf.n_units = s.n_holder;
+    return learnedLeafOn(kind, &buf, team);
+}
+
+fn learnedLeafOn(kind: LeafKind, s: *const State, team: u8) f64 {
+    if (kind == .v2) return v08util.leafV2(s, team);
+    var f: [v08util.VALUE_FEATURES]f64 = undefined;
+    v08util.valueFeatures(s, team, &f);
+    var z = LEAF_V1_B;
+    for (0..v08util.VALUE_FEATURES) |i| z += LEAF_V1_W[i] * f[i];
+    return 1 / (1 + exp(-z));
+}
+
+/// leafValue with the request's model: the exact terminal result when asked for, else `kind`'s P(win) for `team`
+/// (the learned leaves' sigmoid takes Math.exp from the C library, as JavaScriptCore does).
+pub fn leafValueOf(kind: LeafKind, s: *const State, team: u8, finished: bool, winner: i32, exact_terminal: bool) f64 {
     if (exact_terminal and finished and winner >= 0) {
         if (winner == Team.NO_TEAM) return 0.5;
         return if (winner == team) 1 else 0;
     }
+    if (kind != .material) return learnedLeaf(kind, s, team);
     var ours: f64 = 0;
     var enemy: f64 = 0;
     for (s.holderOrder()) |i| {
@@ -198,11 +578,29 @@ pub fn leafValue(s: *const State, team: u8, finished: bool, winner: i32, exact_t
     return 0.5 * (1 + (ours - enemy) / (ours + enemy + 1));
 }
 
+/// The v0.8 policy, the antithetic stream and the sole-Abomination rule read names through `Request.identity`.
+fn requireIdentity(req: *const Request) Error!void {
+    if (req.identity != null) return;
+    for (req.policies) |p| {
+        if (p == v08policy.decideV08) return error.UnsupportedPolicy;
+    }
+    if (req.chance == .antithetic or req.sole_abomination_defend) return error.UnsupportedPolicy;
+}
+
 /// One rollout on `s` (a copy of the root state). Returns the leaf value, -Infinity for a rejected candidate, or null
 /// when the deadline or the turn budget cut it (`ctl.stop` says which).
 pub fn rollout(s: *State, req: *const Request, cand: *const Candidate, r: u32, ctl: *Control) Error!?f64 {
+    try requireIdentity(req);
+    var ses: Session = .{};
+    ses.tables.init(s, req);
+    return rolloutIn(s, req, cand, r, ctl, &ses);
+}
+
+fn rolloutIn(s: *State, req: *const Request, cand: *const Candidate, r: u32, ctl: *Control, ses: *Session) Error!?f64 {
     if (ctl.expired()) return null;
     s.rng = Rng.init(plainSeed(req.seed_base, r));
+    if (req.chance == .antithetic) ses.chance.begin(s, req.identity.?, toUint32(req.seed_base), r);
+    ses.tables.reset();
     var sim: Sim = .{};
     const actor = req.actor;
     s.active = @intCast(actor);
@@ -231,7 +629,7 @@ pub fn rollout(s: *State, req: *const Request, cand: *const Candidate, r: u32, c
         }
     }
 
-    // roll forward: both seats play their policies
+    // roll forward: every unit plays its policy
     const enemy_team = engine.opposite(acting);
     const cap: u32 = switch (req.horizon) {
         .leaf => 0,
@@ -253,19 +651,30 @@ pub fn rollout(s: *State, req: *const Request, cand: *const Candidate, r: u32, c
             s.active = -1;
             continue;
         }
-        try simPlayTurn(s, ui, req, &sim);
+        try simPlayTurn(s, ui, req, &sim, ses, enemy_team);
         turns += 1;
         ctl.turns += 1;
         if (req.horizon == .reply and s.units[ui].team == enemy_team) break;
     }
     if (ctl.expired()) return null;
     if (s.overflow) return error.UnsupportedCapacity;
-    return leafValue(s, acting, sim.finished, sim.winner, req.exact_terminal);
+    return leafValueOf(req.leaf, s, acting, sim.finished, sim.winner, req.exact_terminal);
 }
 
-/// Every (candidate, r) pair of the request in order, each on a fresh copy of `root` made in `scratch`; writes one value
-/// per pair into `out` and returns how many it wrote (a prefix when the deadline, the turn budget or `out` stops it).
+/// Every (candidate, r) pair of the request in order, each on a fresh copy of `root` made in `scratch` (the summon
+/// counters carry over from one rollout to the next); writes one value per pair into `out` and returns how many it
+/// wrote (a prefix when the deadline, the turn budget or `out` stops it). `ctl` ends with the counters.
 pub fn run(root: *const State, scratch: *State, req: *const Request, out: []f64, ctl: *Control) Error!usize {
+    try requireIdentity(req);
+    var ses: Session = .{};
+    ses.tables.init(root, req);
+    var summon_seq = req.summon_sequence orelse root.summon_seq;
+    var uuid_seq = req.uuid_sequence orelse root.uuid_seq;
+    defer {
+        ctl.summon_sequence = summon_seq;
+        ctl.uuid_sequence = uuid_seq;
+        scratch.rng.keyed = null;
+    }
     var written: usize = 0;
     for (req.pairs) |p| {
         if (written >= out.len) {
@@ -273,8 +682,13 @@ pub fn run(root: *const State, scratch: *State, req: *const Request, out: []f64,
             break;
         }
         scratch.* = root.*;
-        const v = (try rollout(scratch, req, &req.candidates[p[0]], p[1], ctl)) orelse break;
-        out[written] = v;
+        scratch.summon_seq = summon_seq;
+        scratch.uuid_seq = uuid_seq;
+        scratch.id_scheme = req.id_scheme;
+        const v = rolloutIn(scratch, req, &req.candidates[p[0]], p[1], ctl, &ses);
+        summon_seq = scratch.summon_seq;
+        uuid_seq = scratch.uuid_seq;
+        out[written] = ((try v) orelse break);
         written += 1;
     }
     return written;
@@ -356,12 +770,12 @@ pub const SummonIds = struct {
 
 /// Plays `s` out with `decide` on both seats: from the start (start_fight first) when the fight has not started, else
 /// from where it stands (runMatchInner's loop: a decision boundary or no active unit).
-pub fn play(s: *State, max_laps: i32, decide: DecideFn) PlayResult {
+pub fn play(s: *State, max_laps: i32, decide: PlayDecideFn) PlayResult {
     return playHooked(s, max_laps, decide, null);
 }
 
 /// play, calling `hook` after every step.
-pub fn playHooked(s: *State, max_laps: i32, decide: DecideFn, hook: ?StepHook) PlayResult {
+pub fn playHooked(s: *State, max_laps: i32, decide: PlayDecideFn, hook: ?StepHook) PlayResult {
     var result: PlayResult = .{};
     var obs = PlayObserver{ .result = &result, .hook = hook };
     const observer: ai.Observer = .{ .ctx = &obs, .step = PlayObserver.step };

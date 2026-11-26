@@ -322,6 +322,8 @@ pub fn load(root: Value, ids: []const []const u8, harness: Harness, why: *Why) E
     s.has_seed = get(hv, "seed") == .integer;
     s.seed = if (s.has_seed) @floatFromInt(get(hv, "seed").integer) else 0;
     s.summon_seq = if (get(hv, "summonSequence") == .integer) try intAs(u32, get(hv, "summonSequence"), why, "harness.summonSequence") else 0;
+    s.uuid_seq = if (get(hv, "uuidSequence") == .integer) try intAs(u64, get(hv, "uuidSequence"), why, "harness.uuidSequence") else 0;
+    s.id_scheme = .match;
 
     // ---- flags and configs read without an ability naming them ----
     engine.loadScopeFlags(&s, configs) catch |err| return why.malformed("configs: {s}", .{@errorName(err)});
