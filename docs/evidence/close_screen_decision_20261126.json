@@ -1,0 +1,19 @@
+{
+    "schema": "hoc.owner_decision.v1",
+    "policyId": "a19-close-screen-v1",
+    "profile": "hoc.v0_8_a19_production_profile.v39",
+    "date": "2026-11-26",
+    "request": {
+        "words": "it may would have been better if they split fairy into 1 units splits instead of wolfs in this specific situation to have a chance to close ranges quickly. Wolf split because of larger size generally better in defense",
+        "context": "the owner's local vs-AI game d6d7ee8b (brutal v0.8 seat, Normal map). The AI army held no shooter (Wolf, Fairy, Trent, Pikeman, Pegasus, Hydra) against the owner's corner fort with Gargantuan and Medusa behind five one-model Peasant splits. The profile v35 screen made its five spare slots one-model Wolf splits; they struck the Unicorn and White Tiger for 1-2 damage and died, nothing reached the shooters, and the owner won on lap 4 with both shooters untouched"
+    },
+    "mechanics": "A shooter that can be attacked in melee cannot shoot (AttackHandler.canLandRangeAttack), so one enemy next to it stops its fire. Fairy (level 1) flies with 10 steps; Wolf (level 1, 1x2) walks with 5.8.",
+    "rule": "In the split planner's screen mode, an army that holds no shooter facing a shooter among the opponent creatures this seat may see takes its fastest cheap body as the screen body: the lowest level, a flyer first, then the most steps, with the profile v35 order breaking ties. Every other army plans exactly as in profile v36, so the Wolf screen stays for defence.",
+    "decision": {
+        "question": "How should the Fairy close-range split rule ship?",
+        "options": ["Check first (Recommended)", "Adopt now, check after", "Premium advice only"],
+        "answer": "Adopt now, check after",
+        "meaning": "adopt for the AI seats and Premium \"Arrange army\" as profile v39 at once; a registered non-inferiority check follows, and the rule is rolled back as the next profile if it fails"
+    },
+    "switch": "A19_CLOSE_SCREEN_<LEFT|RIGHT>, on unless 0"
+}

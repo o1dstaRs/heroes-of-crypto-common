@@ -46,3 +46,23 @@ export function a19ShieldScreenEnabled(team: number): boolean {
     assertNoLegacySeatEnv(A19_SHIELD_SCREEN_ENV);
     return process.env[seatEnvName(A19_SHIELD_SCREEN_ENV, team)] !== "0";
 }
+
+/**
+ * a19-close-screen-v1 (profile v39; the owner, November 26, 2026, after game d6d7ee8b: "it may would have been better if
+ * they split fairy into 1 units splits instead of wolfs in this specific situation to have a chance to close ranges
+ * quickly. Wolf split because of larger size generally better in defense"; owner decision "Adopt now, check after": AI
+ * seats and Premium). In screen mode, an army that holds no shooter facing a public opponent shooter takes its fastest
+ * cheap body as the screen body (lowest level, a flyer first, then the most steps) instead of its biggest: a one-model
+ * flyer reaches a shooter early, and one enemy next to a shooter stops it firing. Every other army plans as in profile
+ * v36. The server's split plan (AI seats and Premium "Arrange army") and the client's Premium projection read the seat
+ * switch. See docs/close_screen_adoption.md.
+ */
+export const A19_CLOSE_SCREEN_ID = "a19-close-screen-v1";
+
+/** Per-seat switch (seat_env): on unless `A19_CLOSE_SCREEN_<LEFT|RIGHT>=0`. */
+export const A19_CLOSE_SCREEN_ENV = "A19_CLOSE_SCREEN";
+
+export function a19CloseScreenEnabled(team: number): boolean {
+    assertNoLegacySeatEnv(A19_CLOSE_SCREEN_ENV);
+    return process.env[seatEnvName(A19_CLOSE_SCREEN_ENV, team)] !== "0";
+}

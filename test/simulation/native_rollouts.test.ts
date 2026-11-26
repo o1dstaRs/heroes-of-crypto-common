@@ -292,6 +292,7 @@ describe("native rollout scope", () => {
                 A19_CARRIER_COHESION_LEFT: "0",
                 A19_SPLIT_SCREEN_RIGHT: "0",
                 A19_SHIELD_SCREEN_LEFT: "0",
+                A19_CLOSE_SCREEN_RIGHT: "0",
                 A19_COUNTER_DRAFT: "0",
                 V05_DRAFT_WEIGHTS: "[1,2,3]",
                 V05_PLACEMENT: "learned",

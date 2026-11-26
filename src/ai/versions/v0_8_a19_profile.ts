@@ -199,7 +199,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     Spymaster draft and +10.12 per changed Scout draft; registered confirmation MV3 on the fixed tree
  *     (docs/counter_model_v2_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v37" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v39" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -533,6 +533,20 @@ export const V08_A19_SHIELD_SCREEN_POLICY = Object.freeze({
     adoption: "owner-explicit-decision",
     registrationSha256: "e50024247b049178de58d092acca14ac93433c405e843647b7b6b20799bf3ddc",
     qualification: "non-inferiority-confirmed",
+} as const);
+
+/**
+ * Close screen (profile v39): ai/split_screen.ts switches the close-range screen body of ai/tactical_split_placement.ts
+ * (an army with no shooter facing a public shooter screens with its fastest cheap body) for the server's split plan (AI
+ * seats and Premium "Arrange army") and the client's Premium projection. Adopted by the owner's decision ("Adopt now,
+ * check after") before its check; the registration is the frozen decision record. See docs/close_screen_adoption.md.
+ */
+export const V08_A19_CLOSE_SCREEN_POLICY = Object.freeze({
+    policyId: "a19-close-screen-v1" as const,
+    adoptedAt: "2026-11-26",
+    adoption: "owner-explicit-decision",
+    registrationSha256: "e170fb92d6dae94b86de5df152dc35a58085a2ccf40ed4806286d856ace875a6",
+    qualification: "owner-decision-check-pending",
 } as const);
 
 /**
@@ -949,14 +963,15 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "split-screen" as const,
         source: "src/ai/split_screen.ts" as const,
-        // Profile v36 adds the shield screen switch.
-        sha256: "1da2ce928e8f4483d3b56f5fdf27cea56ffa80441f387b1382b8b42a22e673dd" as const,
+        // Profile v36 adds the shield screen switch, profile v39 the close screen switch.
+        sha256: "ecffc6e5252f415691133fac8e4df680d72d9527658920e901a98a86c313d8fa" as const,
     }),
     Object.freeze({
         role: "tactical-split-placement" as const,
         source: "src/ai/tactical_split_placement.ts" as const,
-        // The split planner; profile v35 adds its screen mode, profile v36 the Water Shield screen body.
-        sha256: "65bd3ad1822330a542871ae3f1fa37f576a40a8535c3e7758ebdec0d203abea8" as const,
+        // The split planner; profile v35 adds its screen mode, profile v36 the Water Shield screen body, profile v39 the
+        // close-range screen body.
+        sha256: "ded8b068d1148167a9833fc70a44eaf5b082fa8986e0d611468e3efe6a2f8240" as const,
     }),
 ] as const);
 
@@ -1007,6 +1022,7 @@ export const V08_A19_PROFILE = Object.freeze({
     splitScreen: V08_A19_SPLIT_SCREEN_POLICY,
     shieldScreen: V08_A19_SHIELD_SCREEN_POLICY,
     counterModel: V08_A19_COUNTER_MODEL_POLICY,
+    closeScreen: V08_A19_CLOSE_SCREEN_POLICY,
     sourceLedger: V08_A19_SOURCE_LEDGER,
 });
 

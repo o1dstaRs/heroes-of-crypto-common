@@ -92,7 +92,7 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v37",
+            schema: "hoc.v0_8_a19_production_profile.v39",
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",
@@ -286,6 +286,15 @@ describe("v0.8+A19 production profile", () => {
                 adoption: "standing-user-instruction",
                 registrationSha256: "e62c89868e8b201c2417282a8178fe7703e3cd46e9f3f4d98196085330ed7235",
                 qualification: "strength-confirmed",
+            },
+            // Profile v39: an army with no shooter facing a public shooter screens with its fastest cheap body (the
+            // owner's decision "Adopt now, check after"; the registration is the decision record).
+            closeScreen: {
+                policyId: "a19-close-screen-v1",
+                adoptedAt: "2026-11-26",
+                adoption: "owner-explicit-decision",
+                registrationSha256: "e170fb92d6dae94b86de5df152dc35a58085a2ccf40ed4806286d856ace875a6",
+                qualification: "owner-decision-check-pending",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({

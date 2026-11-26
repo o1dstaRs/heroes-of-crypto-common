@@ -15,6 +15,7 @@ import { MAX_UNITS_PER_TEAM } from "../constants";
 import { SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { getFootprintCellsForAnchor } from "../grid/grid_math";
 import type { XY } from "../utils/math";
+import { creatureInfo } from "./setup/creature_score";
 
 export type TacticalSplitRole = "aura" | "support" | "shield" | "cover" | "bait";
 
@@ -35,6 +36,8 @@ export interface ITacticalSplitUnit {
     readonly rangedCoverCount: number;
     /** Footprint cells (1 for 1x1, 2 for 1x2/2x1, 4 for 2x2); absent = from `small`. Read by screen splits only. */
     readonly footprintCells?: number;
+    /** The stack flies; absent = it does not. Read by close screens only. */
+    readonly flying?: boolean;
 }
 
 /**
@@ -51,6 +54,16 @@ export interface ITacticalSplitOptions {
      * the screen body: its shield absorbs the first attack, so each one-model split costs the enemy two attacks.
      */
     readonly shieldScreen?: boolean;
+    /**
+     * a19-close-screen-v1 (profile v39, `split_screen.ts`; the owner, November 26, 2026: "split fairy into 1 units splits
+     * instead of wolfs in this specific situation to have a chance to close ranges quickly. Wolf split because of larger
+     * size generally better in defense"). With `screen`, an army that holds no shooter facing a shooter among
+     * `opponentCreatureIds` takes its fastest cheap body as the screen body: the lowest level, a flyer first, then the
+     * most steps (the split-screen order breaks ties). One enemy next to a shooter stops it firing.
+     */
+    readonly closeScreen?: boolean;
+    /** The opponent creature ids this seat may see (public identities only); read by close screens only. */
+    readonly opponentCreatureIds?: readonly number[];
 }
 
 export interface ITacticalSplitPlan {
@@ -100,6 +113,7 @@ export interface ITacticalSplitUnitSource {
     getMaxHp(): number;
     getFootprintWidth?(): number;
     getFootprintHeight?(): number;
+    canFly?(): boolean;
     getAbilities(): readonly { getAuraEffectName(): string | undefined; getName(): string }[];
     getSpells(): readonly {
         isRemaining(): boolean;
@@ -227,16 +241,26 @@ export function planTacticalStackSplits(
 
     if (screen) {
         const ranged = (unit: ITacticalSplitUnit): boolean => unit.rangedCoverCount > 0;
+        const screenOrder = (left: ITacticalSplitUnit, right: ITacticalSplitUnit): number =>
+            left.level - right.level ||
+            cellsOf(right) - cellsOf(left) ||
+            Number(ranged(left)) - Number(ranged(right)) ||
+            right.amount - left.amount ||
+            compareStable(left, right);
+        // a19-close-screen-v1 (profile v39): an army with no shooter of its own that faces a public shooter must close the
+        // range, so its screen body is its fastest cheap one (lowest level, a flyer first, then the most steps).
+        const closing =
+            options.closeScreen === true &&
+            !living.some((unit) => unit.attackType === PBTypes.AttackVals.RANGE) &&
+            (options.opponentCreatureIds ?? []).some((creatureId) => creatureInfo(creatureId)?.ranged === true);
+        const closeOrder = (left: ITacticalSplitUnit, right: ITacticalSplitUnit): number =>
+            left.level - right.level ||
+            Number(right.flying === true) - Number(left.flying === true) ||
+            right.steps - left.steps ||
+            screenOrder(left, right);
         const body = screenEligible
             .filter((candidate) => !splitSources.has(candidate.id) && candidate.auraUtilityCount === 0)
-            .sort(
-                (left, right) =>
-                    left.level - right.level ||
-                    cellsOf(right) - cellsOf(left) ||
-                    Number(ranged(left)) - Number(ranged(right)) ||
-                    right.amount - left.amount ||
-                    compareStable(left, right),
-            )[0];
+            .sort(closing ? closeOrder : screenOrder)[0];
         if (body) {
             for (let child = 0; child < body.amount - 1 && slots > 0; child += 1) take(body, "bait");
         }
@@ -302,6 +326,7 @@ export function tacticalSplitUnitFromUnit(unit: ITacticalSplitUnitSource): ITact
         ...(unit.getFootprintWidth && unit.getFootprintHeight
             ? { footprintCells: unit.getFootprintWidth() * unit.getFootprintHeight() }
             : {}),
+        ...(unit.canFly?.() ? { flying: true } : {}),
     };
 }
 
