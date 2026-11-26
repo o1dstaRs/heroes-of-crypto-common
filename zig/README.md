@@ -14,8 +14,10 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
 
 - every creature's stats, sizes (1x1, 2x1, 2x2), walking and flying, melee and ranged;
 - the abilities of the creatures ported so far (batches 1, 2 and 3, below), including the units Infest summons and the
-  abilities Predatory Assimilation moves between units; every other creature's abilities, and all spells, stripped; no
-  artifacts;
+  abilities Predatory Assimilation moves between units; every other creature's abilities stripped; no artifacts;
+- the wave-1 spells (below): Heal, Blessing, Lightning Strike, Fire Strike, Meteor Shower, Meteorite, Ring of Fire, Summon
+  Wolves and Vine Throw, with the casters' spellbooks (Healer, Battle Mage, Satyr, Magic Dragon, Trent, and a Queen that
+  stole one), the MAGIC attack type, the vines and the Wolves they summon; a book holding any other spell is refused;
 - the army setup `runMatch` applies before the fight: the augments (Armor, Might, Sniper, Movement, Placement; Empower
   is carried but read by nothing in scope), doctrines (their upgrade budget) and synergies (Life, Chaos, Might and
   Nature, both variants, levels 1 to 3), including the Chaos break-on-attack roll and the Break effect;
@@ -26,8 +28,8 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
 - the v0.1 AI on both sides, with its BLOCK_CENTER mountain strategy.
 
 The engine also replays (`hoc-sim parity`) the actions later AI versions emit on these boards: move-then-strike
-(`melee_attack` with a `path`), `wait_turn`, `defend_turn`, aimed shots, refused `select_attack_type`, and ranged
-obstacle shots (`obstacle_attack` without `attackFrom`, which v0.8 sends).
+(`melee_attack` with a `path`), `wait_turn`, `defend_turn`, aimed shots, refused `select_attack_type`, ranged
+obstacle shots (`obstacle_attack` without `attackFrom`, which v0.8 sends) and the wave-1 casts (`cast_spell`).
 
 Ported:
 
@@ -62,7 +64,7 @@ Batches 1, 2 and 3, exact in both modes:
 | Peasant (L1) | Bitter Experience, Absorb Penalties Aura |
 | Wyvern (L2) | Venom Cloud Aura, Wardguard |
 | Pikeman (L2) | Aggr, Skewer Strike, Wardguard |
-| Trent (L2) | Earth Element, Vine Throw, In Its Own World (inert under v0.1: it never casts, so no vines exist, and no Wind Element creature is ported; loaded as ability ids only) |
+| Trent (L2) | Earth Element (Lightning Strike x1.5, meteors 0), Vine Throw (a castable ability: one charge), In Its Own World (the vine stride) |
 | Pegasus (L3) | Pegasus Might Aura, Pegasus Light |
 | Hydra (L4) | Lightning Spin, Devour Essence, Ember Covenant Blessing |
 | Zena (L3) | Handyman, Chakram, Rallying Volley Blessing |
@@ -70,7 +72,18 @@ Batches 1, 2 and 3, exact in both modes:
 | Arachna Spider (summoned) | Infest |
 | Squire (L1) | Stun, Arcane Ward Blessing |
 | Troglodyte (L1) | Madness, Blind Fury, Miner |
-| Monk (L3) | Magic Shield, Borrowed Grace (inert: no buff in scope can be copied), Absolving Arrow |
+| Monk (L3) | Magic Shield, Borrowed Grace (live since the cast Blessing: the only takeable buff), Absolving Arrow |
+
+Wave-1 spells (`spells.zig`), exact in both modes:
+
+| Creature | Abilities | Spells (charges) |
+| --- | --- | --- |
+| Healer (L2, MAGIC) | Book of Healing | Heal x4, Blessing x2 (Spiritual Armor and Mass Heal are wave 2: filter them with `RECORD_SPELLS`) |
+| Battle Mage (L2, MELEE_MAGIC) | Basic Tome of Battle Magic | Fire Strike x3, Meteorite x1 |
+| Satyr (L2, MAGIC) | Forest Spellbook, Sylvan Focus Blessing | Summon Wolves x2 (Courage and Helping Hand are wave 2) |
+| Magic Dragon (L4, MELEE_MAGIC) | Tome of Elements, Magic Reflection | Lightning Strike x4, Ring of Fire x2, Meteor Shower x1 (Whirlpool is wave 2) |
+| Trent (L2) | Vine Throw (castable) | Vine Throw x1 |
+| Wolf (summoned) | stripped (Double Punch, Deep Wounds Level 1 unported: never keep "Wolf") | none |
 
 The framework later batches build on:
 
@@ -211,7 +224,82 @@ Added by batch 3:
 - **Absolving Arrow** (`combat.absolvingArrow`): before the shot's miss roll, and before the counter-shot's damage
   roll for a responding Monk, every live ally on the whole traced ray (past enemies, stones and lava) is rolled per
   liftable entry (effects, then non-aura, non-marker debuffs; `first / 2^i`), deleting a lifted name from both lists.
-- **Lists**: buffs 14, debuffs 5, effects 7, abilities 10, stolen 6, auras 4 per unit, aura defs 6 per battle.
+- **Lists**: buffs 14, debuffs 5, effects 7, abilities 10, stolen 6, auras 4 per unit, aura defs 6 per battle (wave 1:
+  buffs 16, debuffs 6).
+
+### Spells (wave 1)
+
+The framework the spells added (all exact in both modes, coverage below; references in the session's
+`scratchpad/ref/spells/`):
+
+- **The spellbook** (`state.zig`): `Unit.book` holds the raw entries (`unitProperties.spells`, one per remaining
+  charge, `st.BookEntry`: the spell and its faction prefix, `":"` for a castable ability) and `Unit.spells` the parsed
+  book (`Unit.getSpells()`: one `st.BookSpell` per distinct normalized entry, `"System:X"` = `":X"`, first-occurrence
+  order, with its charges). `useSpell` decrements every parsed Spell of the name and splices the LAST raw entry per
+  match; a spent Spell stays at 0 (so a cast answers `spell_not_available`, not `spell_not_found`) until a re-parse
+  (`engine.parseBook`), which only Predatory Assimilation triggers. `can_cast_spells` is `n_book > 0` (every mutator
+  keeps it so). `st.CastSpell` names the nine ported spells; a book entry of any other spell is refused at load by
+  name (`engine.parseBookEntry`), so a cast naming one is necessarily `spell_not_found`.
+- **Configs** (`State.spell_cfg`, `st.SpellConfig`): every number a cast reads (power, laps, minimal stack power,
+  target and power types, multiplier, element, buff and self-cast flags, a conflict in scope) comes from
+  `init.spellConfigs` (record.ts, keyed by name) or, in an export, from the Spell objects' spellProperties (and
+  `configs.spellConfigs["Vine Throw"]` while vines stand). A cast of a spell without a config sets `State.overflow`.
+- **MAGIC** (`engine.refreshPossibleAttackTypes`, `selectAttackType`): a MAGIC creature (Healer, Satyr) with charges and
+  not Broken (`getSpellsCount`) leads with MAGIC (`[MAGIC, MELEE]`, selected MAGIC: it must `select_attack_type`
+  MELEE to strike, as v0.1's melee prefix does); every other caster gets MAGIC last (`[MELEE_MAGIC, MAGIC]`, Trent
+  `[MELEE, MAGIC]`). `castSpell` does not read the selection; Might reads MAGIC as non-RANGE.
+- **`cast_spell`** (`spells.castSpell`, `rec.Action.cast_spell`): the turn checks, moved-this-turn, the caster's first
+  Spell of that name, `isSpellUsableByCaster` (not Broken, laps > 0, a charge, minimal stack power), the target id
+  (`unit_not_found`) and its cell, then the generic unit-target gate (line of sight, `canCastSpell`: HEAL, ANY_ALLY
+  with notAlreadyApplied and the Blessing/Curse conflict, ANY_ENEMY with the raw Aggr lock, magic resist 100, the
+  element immunity) and the dispatch in action_engine.ts order: Summon Wolves, (mass and area spells: wave 2,
+  overflow), Vine Throw, Fire Strike, Meteorite, Lightning Strike, Ring of Fire, Meteor Shower, else
+  `handleMagicAttack` (Heal, Blessing; a debuff spell there is wave 2). The Castling hook's eager `getMovePath` draws
+  nothing and feeds only Castling, so it is skipped.
+- **The damage tail** (`spells.damageTail`): `floor(alive * power * (1 + bonus/100) * morale)` (bonus = Empower
+  Augment + Sylvan Focus Blessing, now read; morale 1.25 / 0.8 for the morale-scaled spells), per victim Heavy Armor's
+  magic multiplier (no synergy term), the element (AIR on an Earth Element x1.5, EARTH on it 0), the magic resist
+  floor; Magic Reflection's rebound row right after its holder (`floor(15 * stack power + luck)`% of what landed,
+  through the caster's own Heavy Armor, element and resist; no roll); `engine.applyDamageElement` (no break roll; a
+  FIRE hit is blocked by an Ember Covenant ring that stays, any other element's block dissolves the team's rings, WATER
+  is never blocked); the damage statistic on non-rebound rows even at 0; the kills' same-name morale losses, then one
+  caster increase of 4 per enemy kill; the charge; `combat.cleanupSpellDeaths` (a killed enemy's corpse infests when
+  the caster holds Infest); completeTurn.
+- **Handlers**: Lightning Strike (any enemy), Fire Strike (the visible-edge gate and `interceptedThrowTrajectory` over
+  the caster's body centre with its allies transparent: terrain refuses, a screening enemy takes the fireball), Ring
+  of Fire (the creatures-and-terrain walk, then every living unit touching the target's body via
+  `getCellsAroundFootprint`, allies too, never caster or target; an empty ring still spends the charge), Meteor
+  Shower / Meteorite (the 3x3 centred / 2x2 cornered block, x-major, on the board, enemies only, first-touched order;
+  a drop catching no enemy is refused), Heal (`floor(5 * alive * morale)`, capped), Blessing (appended, laps + 1 on a
+  self-cast; adjustBaseStats then pins `attack_damage_min = max`, so a Blessed unit's damage roll draws nothing).
+- **Vine Throw** (`spells.vineThrow`, `engine.addVine`, `Fight.vines`): the Bresenham lane (`vinePathCells`) blocked
+  only by a third creature, rooted on every cell that is not "B" or "H" (Map.set: a re-thrown cell keeps its position,
+  takes the new laps and team), then the snare save `getRandomInt(0, 100) < floor(magic resist)` (always drawn), the
+  "Vine Throw" debuff (-1.5 base steps, floored at 1, in adjustBaseStats), the charge. Vines lose a lap at the lap flip
+  (after flipLap) and go at 0; `engine.snareOnVineArrival` snares a mover ending on an ENEMY vine (move_unit, and a
+  move-then-strike whose body changed; laps + 1, no save, never twice); `engine.maxCellsForStepBudget` lifts the cell
+  bound for a vine strider. In the pather (`path.zig`): a walker pays +1 on a vined anchor (after the threat multiplier),
+  a strider nothing; with vines the strider runs the relaxing second pass (only vined cells and first-pass
+  destinations, vined cells free, the neighbour scan ignoring the visited table, a cell re-entered whenever a route
+  leaves strictly more steps) and its vined destinations replace or follow the first pass's keys; the routes the merge
+  orphans keep their ancestors past `MovePath.n` (`MovePath.overflow` past the capacity). `captureRoute`'s random
+  insertion stays unreachable.
+- **Summon Wolves** (`spells.summonSpell`): `floor(alive * 1.5)` Wolves merge into the first living summoned Wolf of the
+  caster's team in holder order (`Unit.summoned`; no id, no counter, no draw), else a new 2x1 stack at the explicit
+  targetCell (or the first free anchor of the caster's ring) through `engine.addSummon` (shared with Infest: both
+  counters, the id with ability `"spell"`, `allocSlot`, the holder append, a covenant team's ring); its first refresh
+  rolls its lap luck last. The Wolf template is `init.summonTemplates.Wolf` (`st.Summons.WOLF`).
+- **Stack blessing and steals**: Sylvan Focus Blessing joins the census (after Luck Blessing, before Arcane Ward; a
+  marker for Borrowed Grace and Absolving Arrow). Predatory Assimilation now moves a card's charges
+  (`takeAbilitySpellEntries`: a spellbook's faction entries of its spells, a castable ability's `":X"`), re-parses the
+  victim's book when charges left and, for a castable ability, again in removeAbilityMechanics, and appends the charges
+  to the thief (which re-parses for a castable card). Borrowed Grace is live: a landed shot or counter-shot copies a
+  takeable buff (the cast Blessing) with its chance and pick rolls.
+- **Rollout decisions** (`ai.catalog_decisions`, `Ctx.elide_melee_layers`): SearchDriver gives every rollout turn a
+  DecisionPathCatalog, under which findTarget's infinite-path pass builds only the first melee layer
+  (`canElideUnconsumedMeleeLayers`); runMatch without search gives none. The two differ only when a first-layer route
+  weighs 0 (a strider's free vine road), so `rollout.run` sets the flag and play-outs and native play do not.
+- **Recording**: `RECORD_AMOUNTS=expBudget`, `RECORD_SPELLS`, the spellbook columns and `vines` (below).
 
 ### Maps and board orientation
 
@@ -399,6 +487,29 @@ The framework the army setup added (exact in both modes, coverage below):
   - Summon templates and harness fields are recorded data, not recomputed: a new summoned creature needs its template
     in `init.summonTemplates` / `configs.summonTemplates` and the id parts in the harness.
 
+- Wave-1 lessons (for wave 2 and the artifacts):
+  - A spell's two views must move together: the raw entries (the digest and `useSpell`'s last-entry splice) and the
+    parsed book (a spent Spell lingers at 0 until a re-parse). Mass Heal, Courage, Spiritual Armor, Helping Hand,
+    Fireball, Smoke, Craft and Wind Flow add only handlers and state on this machinery; their names join
+    `st.CastSpell` (a book holding an unported one is refused, so `NO_SPELL` stays `spell_not_found`).
+  - Wave 2 adds the rolls wave 1 lacks: `handleMagicAttack`'s magic-resist save for debuff spells and the mirror copy
+    (`isMirrored`, drawn for every landed debuff), the Absorb Penalties redirect, MIND resistance (Madness), and the
+    mass casts' own gates (`canMassCastSpell`, `hasAlreadyAppliedSpell` per ally). Smoke and Fire Wall bring their own
+    stores and pather terms (the pather's `terrainAdjustedCost` already has the vine term, the Fire Wall toll sweeps
+    the body); Resurrection needs `deleteUnitById(id, true)` (a corpse kept) and Wind Flow / Castling the Castling
+    hook this port skips (`getEnemiesCellsWithinMovementRange`, the ENEMY_WITHIN_MOVEMENT_RANGE target type).
+  - New cast buffs are takeable by Borrowed Grace unless they are markers (`abilities.isMarkerSpell`): every Courage,
+    Spiritual Armor or Helping Hand row is a copy candidate with its chance and pick rolls, and Absolving Arrow lifts
+    the new debuffs (the snare included).
+  - Configs travel with the data: a new spell needs its `spellConfigs` entry (record.ts adds every book spell) and,
+    for a summon, its template; the loader never reads spells.json.
+  - The TypeScript rollouts decide under a DecisionPathCatalog (cached canonical path, first-layer elision), runMatch
+    without search does not: anything that makes a route weigh 0 or makes two callers share a path object differs
+    between the two, so check a new pather term with both `hoc-sim native` and the rollout oracle.
+  - Artifacts: Tome of Amplification raises a cast buff's power (amplifyCastBuffForTarget), Holy Cross multiplies Heal
+    by 1.5, Mage's Ring / Archmage's Ring add to the magic-damage bonus, Aegis of the Arcane adds a magic-resist term,
+    and their buff names become markers.
+
 ## How parity is checked
 
 `parity/record.ts` runs real headless battles through `runMatch` and records every top-level engine call
@@ -499,6 +610,35 @@ RECORD_GRID=mix RECORD_SIDE=1 RECORD_AUGMENTS=production RECORD_DOCTRINE=random 
   RECORD_KEEP_ABILITIES="Zena,Arachna Queen,Arachna Spider,Squire,Troglodyte,Monk" zig/parity/check.sh 300
 ```
 
+Spell options (off unless a kept creature has a spellbook or `RECORD_SPELLS` is set; then the default output above is
+unchanged otherwise):
+
+- `RECORD_AMOUNTS=expBudget` sizes stacks as the live server does (`buildRoster`'s amountMode, ceil(1000 / exp), and a
+  swapped-in kept creature its own amount); without it most casters miss the stack-power gates (Meteor Shower and
+  Meteorite need 5, Blessing and Vine Throw 3). The `.meta.json` gains `amounts`.
+- `RECORD_SPELLS="Heal,Blessing,..."` keeps only those entries of the kept creatures' books (a castable ability such as
+  Trent's Vine Throw is not a book entry). The wave-1 list is `Heal,Blessing,Fire Strike,Meteorite,Lightning
+  Strike,Meteor Shower,Summon Wolves,Ring of Fire,Vine Throw`; without it Healer, Satyr and Magic Dragon cast wave-2
+  spells and the loader refuses their books. The `.meta.json` gains `spells`.
+- With either, the unit digest gains the batch-3 columns and then `spell_entries` (the raw entries) and `spellbook`
+  (`name:charges` of the parsed book; `compare.state` reads rows of 54 and 57 columns), the fight digest gains `vines`
+  (`[x, y, laps, team]` in Map order), the start state gains `spellConfigs` for every spell a unit holds plus the System
+  Vine Throw, and a start state holding a summon spell gains the `Wolf` summon template (summon tracking then covers
+  spell summons). A Trent-only battle sets `RECORD_SPELLS` to get the columns.
+- `RECORD_PATHS` lines gain `vines` (the store's cells) when the board has any; `hoc-sim paths` replays the vine toll,
+  the strider's second pass and the merge, and reads a call without an aggression board (the Castling hook's) as an
+  all-ones board.
+
+```bash
+# wave 1, v0.8s replays, production-like
+RECORD_VERSION=v0.8s V08_RANGED_POSITION_VERSIONS=v0.8,v0.8s RECORD_ORIGIN=rollout RECORD_GRID=mix RECORD_SIDE=1 \
+  RECORD_AUGMENTS=production RECORD_DOCTRINE=random RECORD_SYNERGIES=1 RECORD_SYNERGY_VARIANTS=seed RECORD_DISTINCT_RED=1 \
+  RECORD_PLACEMENT_TIMING=setup-before-placement RECORD_KEEP_RATE=1 RECORD_AMOUNTS=expBudget \
+  RECORD_KEEP_ABILITIES="Healer,Battle Mage,Satyr,Magic Dragon,Trent" \
+  RECORD_SPELLS="Heal,Blessing,Fire Strike,Meteorite,Lightning Strike,Meteor Shower,Summon Wolves,Ring of Fire,Vine Throw" \
+  bun zig/parity/record.ts 100 13000000 /tmp/w1.jsonl && zig/zig-out/bin/hoc-sim parity /tmp/w1.jsonl
+```
+
 `hoc-sim parity` and `native` report a game they cannot parse (an action or event outside the port) as "recording not
 supported" with its seed and step and go on, as they do for an unsupported start state.
 
@@ -521,6 +661,36 @@ cd zig && zig build test         # unit tests (random stream, JS number rounding
 ```
 
 Run `check.sh` after changing any rules or v0.1 AI code the port covers, both with and without the batch kept.
+
+Wave-1 spells, checked on 2026-11-25 against common `2f222cc0` (every battle identical; every run on side-oriented
+production-mix maps with the production-like setup, `RECORD_AMOUNTS=expBudget` and the wave-1 `RECORD_SPELLS` list):
+
+- engine replay (`hoc-sim parity`) of v0.8s battles (`RECORD_VERSION=v0.8s V08_RANGED_POSITION_VERSIONS=v0.8,v0.8s
+  RECORD_ORIGIN=rollout`): 1,350 battles, 346,664 steps, 15,592 casts: Lightning Strike 4,590, Fire Strike 2,372, Heal
+  1,923, Summon Wolves 1,833, Meteor Shower 1,315, Vine Throw 1,074, Blessing 1,070, Ring of Fire 834, Meteorite 581
+  (0 rejected). The casters alone at keep rate 1 (seeds 13000000-13000399), with batches 1 to 3 kept at keep rate 1
+  (13100000-13100299) and at the default rate (13200000-13200299), Magic Dragon and Trent (13300000-13300199), and
+  Empower plans (`RECORD_AUGMENTS="Placement:1,Armor:3,Empower:3|Empower:2,Might:3"`, Magic Dragon, Battle Mage and
+  Satyr, 13400000-13400149);
+- a Queen battery (Queen and Spider with the casters, keep rate 1, 150 battles from 12160000): steals of all four
+  spellbooks, Vine Throw, Magic Reflection, Sylvan Focus Blessing and In Its Own World, and casts of stolen Fire
+  Strike, Heal, Lightning Strike and Summon Wolves;
+- native v0.1 (`hoc-sim native`, the MAGIC attack type: a Healer or Satyr leads with MAGIC and re-selects MELEE to
+  strike, 174 times in 50 battles): 600 battles, 118,807 steps, with the casters at keep rate 1 (13500000-13500299) and
+  with batches 1 to 3 at the default rate (13600000-13600299); resume on those recordings (`RECORD_RESUME=random:2`):
+  1,200 points loaded equal to their digests and 121,288 remaining steps identical in both modes; resume replays of
+  v0.8s caster recordings (spell state at the points: vines, books, spent charges, Wolves): 300 of 300;
+- `getMovePath` with vines (`hoc-sim paths`): 55,994 calls on v0.8s Trent battles (60 from 12120000, 80 from 12130000),
+  22,415 of them with vines and 7,614 by a strider with vines (23 by a 2x2 Queen that stole In Its Own World), every
+  route, weight and key order identical;
+- the v0.8 rollout oracle (`BRIDGE.md`): all 348 roots, 334,080 values identical; v0.1 rollouts on spell roots 230,400
+  values identical;
+- a Debug build passes the replay, resume and path checks on 40-battle mixes;
+- unchanged: the default recorder output byte-identical to HEAD's (classic 1001-1020, batches 1+2 kept on the side mix
+  2001-2020, production-like batches 1-3 kept with resume points 3001-3020, v0.8s layers and candidates 4001-4012);
+  classic `check.sh 300 8400000`; production-like batches 1-3 kept `check.sh 300 9800000` with 600 resume points;
+  `hoc-sim parity` 100/100 on v0.8s and v0.8sr side-mix layers (regenerated from their meta: 25,206 and 22,816
+  steps); `ffi/smoke.ts 12 9100`; `zig build test`.
 
 Batch 3, checked on 2026-11-25 against common `ec55af8b` (both modes, every battle identical; every run on
 side-oriented production-mix maps with the production-like setup above and `RECORD_RESUME=random:2`):
@@ -758,22 +928,32 @@ bench 576.0 and 561.5 ns per step, pairwise -2.9%, with the same run checksums (
 +1.2% and -2.1%); retired instructions per pass (`/usr/bin/time -l`, the difference of two repetition counts) went
 from 4.23 to 4.11 billion per 1,000 battles and from 938 to 944 million per engine pass.
 
+The wave-1 spells kept the classic path within noise (load 40 to 70): eight alternated pairs of `native-bench --reps 3`
+gave medians of 283.2 µs (old) and 281.8 µs (new) per battle, and five pairs of the engine-only bench 557 and 563 ns per
+step, with the same run checksums. The spell stat hooks are gated by `State.spell_hooks`, a vine-free board walks the
+pather's unchanged first pass (a refactor that shared its geometry with the strider's second pass had cost 8%), and
+`MovePath` is reset field by field (a whole-struct reset copies the larger route array). A state is now 53,408 bytes
+(Unit 1,552: the spellbook; Fight 928: the vines) and a decision context 42,816 (MovePath 21,000: room for the vine
+merge's ancestors).
+
 Where Zig spends battle time (sampled, before the layer bitmap): `getMovePath` 31%, `doFindTarget` 14%, the melee
 target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the layers.
 
 ## Not covered yet
 
-- the abilities of every creature outside batches 1, 2 and 3, spells and artifacts (and so Broken Aegis's +20 break
-  chance and self-miss, spell summons, resurrection, magic-resist rolls and Borrowed Grace's copy, which needs a
-  copyable buff); the revealed-ranged delivery layer of production's augment plan (it needs the live draft);
+- the abilities of every creature outside batches 1, 2 and 3 and the wave-1 casters, the spells outside wave 1
+  (Spiritual Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Fireball, Smoke, Craft, Wind Flow, Resurrection,
+  Castling, the runes and the rest: a book holding one is refused by name) and artifacts (and so Broken Aegis's +20
+  break chance and self-miss, resurrection, the magic-resist and mirror rolls of debuff spells); the revealed-ranged
+  delivery layer of production's augment plan (it needs the live draft);
   WATER_CENTER (never played); on the maps, Area Throw / Large Caliber on stones (`areaStrikeAtCell`), Quiver of
   Echoes' extra obstacle shot, Fire Breath through stones, artifact barrels, and `forceStalledLap` / the recovery net
   (never reached: 0 rejected engine calls in every map recording). The ported code leaves out what no battle in scope
   can reach: Made of Fire, Mechanism, Paralysis, the
   forbidden target (Terrifying Gaze), Water Shield and Water Element, Flesh Shield, the Dual Strike Charm, the aura
-  power types outside the four in scope, the Vine Throw cast (a stolen charge moves, unread), vines and the
-  Earth/Wind element pair (Thunderbird is not ported), Infest from a ranged kill (no shooter can hold it), and runs of
-  more stunned activations than the advance attempts allow (`forceStalledLap`, never seen);
+  power types outside the four in scope, the Wind Element (Thunderbird is not ported), Infest from a ranged kill (no
+  shooter can hold it), the Castling hook's getMovePath (it draws nothing), a Wolf with its abilities kept (Deep
+  Wounds), and runs of more stunned activations than the advance attempts allow (`forceStalledLap`, never seen);
 - the AI versions the research uses (v0.8 with the a19 search). The production rollout policy is the v0.8 chain, about
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and

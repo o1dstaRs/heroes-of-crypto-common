@@ -6,7 +6,8 @@
 //! names the stored properties of aura rows and augments only ("x;y"); other rows print ";" (TypeScript prints a
 //! blessing's power there, which the port keeps as the row's power). The batch-3 columns follow the setup columns
 //! (abilities, stolen abilities, the Web lock, `debuffs_sources` with the same rule as `buffs_sources`, the Rallying
-//! Volley arrows). Ids come from `ids` by uid; a unit summoned after the table was built prints its UUID.
+//! Volley arrows), then the spellbook columns (`spell_entries`, `spellbook`); the fight block carries the vines. Ids come
+//! from `ids` by uid; a unit summoned after the table was built prints its UUID.
 
 const std = @import("std");
 const st = @import("state.zig");
@@ -15,6 +16,10 @@ const uuid = @import("uuid.zig");
 
 const Writer = std.Io.Writer;
 const State = st.State;
+
+fn spellName(spell: u8) []const u8 {
+    return if (spell < st.N_CAST_SPELLS) @as(st.CastSpell, @enumFromInt(spell)).name() else "?";
+}
 
 fn num(w: *Writer, x: f64) Writer.Error!void {
     if (std.math.isNan(x) or std.math.isInf(x)) return w.writeAll("null");
@@ -182,7 +187,18 @@ pub fn write(w: *Writer, s: *const State, ids: []const []const u8) Writer.Error!
         }
         try w.writeAll("\",");
         try num(w, u.rallying_volley_granted);
-        try w.writeByte(']');
+        // Spellbook columns: the raw entries and the parsed book (name:charges).
+        try w.writeAll(",\"");
+        for (u.book[0..u.n_book], 0..) |e, i| {
+            if (i > 0) try w.writeByte(',');
+            try w.print("{s}:{s}", .{ st.BookEntry.PREFIXES[e.prefix], spellName(e.spell) });
+        }
+        try w.writeAll("\",\"");
+        for (u.spells[0..u.n_spells], 0..) |b, i| {
+            if (i > 0) try w.writeByte(',');
+            try w.print("{s}:{d}", .{ spellName(b.spell), b.amount });
+        }
+        try w.writeAll("\"]");
     }
     const f = &s.fight;
     try w.print("],\"fight\":{{\"lap\":{d},\"started\":{d},\"finished\":{d},\"firstTurnMade\":{d},\"previousTurnTeam\":{d},\"highestInitiative\":", .{
@@ -220,6 +236,11 @@ pub fn write(w: *Writer, s: *const State, ids: []const []const u8) Writer.Error!
         if (!first_team) try w.writeByte(',');
         first_team = false;
         try w.print("{d}", .{t});
+    }
+    try w.writeAll("],\"vines\":[");
+    for (f.vines[0..f.n_vines], 0..) |v, i| {
+        if (i > 0) try w.writeByte(',');
+        try w.print("[{d},{d},{d},{d}]", .{ v.x, v.y, v.laps, v.team });
     }
     const t = &s.grid.terrain;
     try w.print("],\"terrain\":{{\"hitsL\":{d},\"hitsR\":{d},\"leftCleared\":{d},\"rightCleared\":{d},\"cleanedUpCenter\":{d},\"standing\":[", .{

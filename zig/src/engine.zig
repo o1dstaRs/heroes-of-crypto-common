@@ -12,6 +12,7 @@ const combat = @import("combat.zig");
 const abilities = @import("abilities.zig");
 const terrain = @import("terrain.zig");
 const pathing = @import("path.zig");
+const spells = @import("spells.zig");
 const Rng = @import("rng.zig").Rng;
 
 const Cell = st.Cell;
@@ -342,6 +343,11 @@ pub inline fn isRangeCapable(u: *const Unit) bool {
     return u.attack_type == AT.RANGE or (getRangeShots(u) > 0 and u.shot_distance > 0);
 }
 
+/// Unit.getMagicResist: magic_resist_mod when set, else magic_resist.
+pub inline fn getMagicResist(u: *const Unit) f64 {
+    return if (u.magic_resist_mod != 0) u.magic_resist_mod else u.magic_resist;
+}
+
 pub inline fn getStackPower(u: *const Unit) f64 {
     return if (u.stack_power > 5) 5 else if (u.stack_power < 1) 1 else js.round(u.stack_power);
 }
@@ -407,11 +413,18 @@ pub fn applyDamage(s: *State, ui: u8, minus_hp: f64) f64 {
 /// Experience (+1 armor and step, live and initial, when creatures died and the stack survived). Returns the
 /// applied damage.
 pub fn applyDamageBreak(s: *State, ui: u8, minus_hp: f64, chance: f64, extend: bool) f64 {
+    return applyDamageElement(s, ui, minus_hp, chance, extend, st.Element.UNSET);
+}
+
+/// Unit.applyDamage with a spell element (`damageElement`; st.Element.UNSET for a creature's hit): a covenant ring
+/// blocks every hit but a WATER one (isEmberCovenantWaterHit; no Water Element attacker in scope), and a FIRE hit
+/// leaves the ring standing (isEmberCovenantFireHit) where any other block dissolves the team's covenant.
+pub fn applyDamageElement(s: *State, ui: u8, minus_hp: f64, chance: f64, extend: bool, element: u8) f64 {
     const u = &s.units[ui];
     if (minus_hp <= 0) return 0;
     // Only a covenant team's units carry the ring (seeded per team, removed team-wide when the team's bit clears).
-    if (s.ember_teams != 0 and abilities.absorbsHit(u)) {
-        abilities.breakEmberCovenant(s, u.team); // notifyEmberCovenantDamage
+    if (s.ember_teams != 0 and element != st.Element.WATER and abilities.absorbsHit(u)) {
+        if (element != st.Element.FIRE) abilities.breakEmberCovenant(s, u.team); // notifyEmberCovenantDamage
         return 0;
     }
     if (chance > 0 and (extend or !u.isBroken())) {
@@ -540,6 +553,10 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     u.steps_mod = js.roundUnitStat(f.steps_morale_multiplier * getMorale(u), 1) + syn.movement_steps;
     u.steps = u.init.steps;
     if (augmentBuff(s, u, .movement_augment)) |ma| u.steps += ma.power;
+    // Vine Throw: the snare cuts the base steps (the first debuff of the name), floored at 1.
+    if (s.spell_hooks and u.debuffs.len != 0) {
+        if (u.debuffs.get(.vine_throw)) |vt| u.steps = @max(1, u.steps - vt.power);
+    }
     u.steps = js.roundUnitStat(u.steps * 1, 1);
     u.steps_mod = js.roundUnitStat(u.steps_mod * 1, 1);
 
@@ -548,6 +565,8 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     u.shot_distance = u.init.shot_distance;
     u.attack_damage_min = u.init.attack_damage_min;
     u.attack_damage_max = u.init.attack_damage_max;
+    // Blessing: every roll is the maximum (no Battle Roar or Curse in scope).
+    if (s.spell_hooks and u.buffs.find(.blessing) != null) u.attack_damage_min = u.attack_damage_max;
     var base_attack_multiplier: f64 = 1;
     if (u.buffs.power(.sharpened_weapons_blessing)) |sw| base_attack_multiplier = base_attack_multiplier * (1 + sw / 100);
     if (pegasus_might) |pm| u.base_attack += pm;
@@ -1094,6 +1113,8 @@ fn handleLapTransition(s: *State, o: *const Ordered, all_made: bool, damage_deal
     if (damage_dealt and f.lap >= 0 and f.lap < 128) f.damage_laps |= @as(u128, 1) << @intCast(f.lap);
     if (f.first_turn_made) {
         flipLap(f);
+        // Vines.minusAllLaps, after the (absent) smoke clouds: each vine loses a lap and goes at 0.
+        if (f.n_vines != 0) vinesMinusAllLaps(f);
         // The lava dries once getLapsNarrowed() (this transition's lap, the additional laps before this
         // transition's increment) reaches the laps till narrowing. runMatch never passes centerAlreadyDried.
         if (f.grid_type == st.GridType.LAVA_CENTER and terrain.lapsNarrowed(f) >= f.laps_till_narrowing) terrain.cleanupCenterObstacle(s);
@@ -1135,6 +1156,72 @@ fn handleLapTransition(s: *State, o: *const Ordered, all_made: bool, damage_deal
 // Activation and turn completion
 // =====================================================================================================================
 
+/// Vines.minusAllLaps: in Map order, laps-- (never below 0), an entry at 0 is deleted (the rest keep their order).
+fn vinesMinusAllLaps(f: *st.Fight) void {
+    var w: usize = 0;
+    for (f.vines[0..f.n_vines]) |v_in| {
+        var v = v_in;
+        if (v.laps > 0) v.laps -= 1;
+        if (v.laps <= 0) {
+            f.vine_cells[v.x] &= ~(@as(u16, 1) << @intCast(v.y));
+            continue;
+        }
+        f.vines[w] = v;
+        w += 1;
+    }
+    f.n_vines = @intCast(w);
+}
+
+/// Vines.add (Map.set): a vined cell is replaced in place (laps and team reset, its position kept), a new one appended.
+pub fn addVine(s: *State, c: Cell, laps: f64, team: u8) void {
+    const f = &s.fight;
+    const l: i16 = @intFromFloat(laps);
+    if (f.hasVine(c.x, c.y)) {
+        for (f.vines[0..f.n_vines]) |*v| {
+            if (v.x == c.x and v.y == c.y) {
+                v.laps = l;
+                v.team = team;
+                return;
+            }
+        }
+    }
+    if (f.n_vines >= st.MAX_VINES) {
+        s.overflow = true;
+        return;
+    }
+    f.vines[f.n_vines] = .{ .x = @intCast(c.x), .y = @intCast(c.y), .laps = l, .team = team };
+    f.n_vines += 1;
+    f.vine_cells[@intCast(c.x)] |= @as(u16, 1) << @intCast(c.y);
+}
+
+/// GameActionEngine.snareOnVineArrival: a unit whose footprint ends a move on an ENEMY vine is snared (no save), unless
+/// it already carries the snare; the debuff lasts a lap longer (the mover is the active unit).
+pub fn snareOnVineArrival(s: *State, ui: u8, cells: []const Cell) void {
+    const f = &s.fight;
+    const u = &s.units[ui];
+    if (f.n_vines == 0 or u.isDead() or u.debuffs.find(.vine_throw) != null) return;
+    var snared = false;
+    for (cells) |c| {
+        if (f.vineTeam(c.x, c.y)) |team| {
+            if (team != u.team) snared = true;
+        }
+    }
+    if (!snared) return;
+    const cfg = &s.spell_cfg[@intFromEnum(st.CastSpell.vine_throw)];
+    if (!cfg.loaded) {
+        s.overflow = true; // the recording carries no Vine Throw config
+        return;
+    }
+    abilities.pushChecked(s, &u.debuffs, .{ .id = .vine_throw, .laps = cfg.laps + 1, .power = cfg.power });
+}
+
+/// maxCellsForStepBudget: a vine strider (In Its Own World) with vines on the board walks vined cells for free, so the
+/// board bounds its walk; everyone else pays at least a step per cell.
+pub fn maxCellsForStepBudget(s: *const State, u: *const Unit) f64 {
+    if (s.fight.n_vines != 0 and u.has(.in_its_own_world)) return st.GRID * st.GRID;
+    return @max(1, @ceil(getSteps(u)));
+}
+
 /// AttackHandler.canLandRangeAttack(unit, grid.getEnemyAggrMatrixByUnitId(id))
 pub fn canLandRangeAttack(s: *const State, u: *const Unit) bool {
     if (!isRangeCapable(u)) return false;
@@ -1147,10 +1234,15 @@ pub fn canLandRangeAttack(s: *const State, u: *const Unit) bool {
     return getRangeShots(u) > 0;
 }
 
-/// Unit.refreshPossibleAttackTypes
+/// Unit.refreshPossibleAttackTypes (no No Melee in scope): a MAGIC creature with charges (and not Broken) leads with
+/// MAGIC, every other caster gets MAGIC last.
 fn refreshPossibleAttackTypes(u: *Unit, can_land_range: bool) void {
     u.n_possible = 0;
-    if (u.attack_type == AT.RANGE and getRangeShots(u) > 0 and can_land_range) {
+    const casts = u.n_book != 0 and u.spellsCount() > 0;
+    if (u.attack_type == AT.MAGIC and casts) {
+        u.possible[u.n_possible] = AT.MAGIC;
+        u.n_possible += 1;
+    } else if (u.attack_type == AT.RANGE and getRangeShots(u) > 0 and can_land_range) {
         u.possible[u.n_possible] = AT.RANGE;
         u.n_possible += 1;
     }
@@ -1158,6 +1250,10 @@ fn refreshPossibleAttackTypes(u: *Unit, can_land_range: bool) void {
     u.n_possible += 1;
     if (!possibleIncludes(u, AT.RANGE) and u.attack_type != AT.RANGE and getRangeShots(u) > 0 and u.shot_distance > 0 and can_land_range) {
         u.possible[u.n_possible] = AT.RANGE;
+        u.n_possible += 1;
+    }
+    if (casts and !possibleIncludes(u, AT.MAGIC)) {
+        u.possible[u.n_possible] = AT.MAGIC;
         u.n_possible += 1;
     }
     u.attack_type_selected = u.possible[0];
@@ -1383,6 +1479,10 @@ fn selectAttackType(s: *State, ui: u8, t: u8) Reject!void {
         u.attack_type_selected = AT.RANGE;
         return;
     }
+    if (t == AT.MAGIC and u.canCastSpells() and possibleIncludes(u, AT.MAGIC)) {
+        u.attack_type_selected = AT.MAGIC;
+        return;
+    }
     return error.Rejected;
 }
 
@@ -1453,7 +1553,7 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) R
     if (footprint_only and (u.fw == 1 or u.fh == 1) and path.len > 1 and path[0].x == anchor.x and path[0].y == anchor.y) footprint_only = false;
     if (footprint_only) return error.Rejected; // never produced by v0.1; not ported
     const travelled = if (path[0].x == anchor.x and path[0].y == anchor.y) path[1..] else path;
-    const max_cells = @max(1, @ceil(getSteps(u)));
+    const max_cells = maxCellsForStepBudget(s, u);
     if (travelled.len == 0 or @as(f64, @floatFromInt(travelled.len)) > max_cells) return error.Rejected;
     var prev = anchor;
     for (travelled) |c| {
@@ -1470,6 +1570,7 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) R
     _ = finishDirectedMove(s, ui, target_cells, to, null) orelse return error.Rejected;
     // applyRouteMoveModifiers: getTravelledRoute strips nothing here; the route is non-empty.
     applyDistanceMorale(s, ui, from, to);
+    snareOnVineArrival(s, ui, target_cells);
     u.moved_this_turn = true;
     u.moved_route_cells = @floatFromInt(path.len); // setMovedRouteCellsThisTurn(action.path.length)
 }
@@ -1696,6 +1797,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     s.auras = false;
     s.stat_hooks = false;
     s.augments = false;
+    s.spell_hooks = false;
     var poisons = false;
     var covenant = false;
     var breaks = false;
@@ -1703,14 +1805,14 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         if (row.break_chance > 0) breaks = true;
     }
     const AB = st.AbilityId;
-    const blessing_mask = AB.luck_blessing.bit() | AB.sharpened_weapons_blessing.bit() | AB.arcane_ward_blessing.bit() | AB.rallying_volley_blessing.bit();
-    var templates: [2]?*const Unit = .{ null, null };
+    const blessing_mask = AB.luck_blessing.bit() | AB.sharpened_weapons_blessing.bit() | AB.arcane_ward_blessing.bit() | AB.rallying_volley_blessing.bit() | AB.sylvan_focus_blessing.bit();
+    var templates: [st.N_SUMMONS]?*const Unit = .{null} ** st.N_SUMMONS;
     if (s.summons) |sm| {
-        for (0..2) |k| {
+        for (0..st.N_SUMMONS) |k| {
             if (sm.present[k]) templates[k] = &sm.units[k];
         }
     }
-    var all: [st.MAX_UNITS + 2]*const Unit = undefined;
+    var all: [st.MAX_UNITS + st.N_SUMMONS]*const Unit = undefined;
     var n_all: usize = 0;
     for (s.units[0..s.n_units]) |*u| {
         all[n_all] = u;
@@ -1749,10 +1851,14 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.laps == st.LAPS_AURA) s.auras = true;
             if (b.id == .ember_covenant_blessing) covenant = true;
             if (b.id.isAugment()) s.augments = true;
+            if (b.id == .blessing) s.spell_hooks = true;
         }
         for (u.debuffs.items[0..u.debuffs.len]) |b| {
             if (b.laps == st.LAPS_AURA) s.auras = true;
+            if (b.id == .vine_throw) s.spell_hooks = true;
         }
+        // Spells move only with Predatory Assimilation, so the board's books cover every later holder.
+        if (u.n_book != 0 or u.n_spells != 0) s.spell_hooks = true;
         if (u.effects.find(.poison) != null) poisons = true;
     }
     // Configs read without an ability naming them (record.ts: effectConfigs.Poison, spellConfigs).
@@ -1786,9 +1892,103 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
 
 inline fn blessingRow(id: st.SpellId) bool {
     return switch (id) {
-        .luck_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing => true,
+        .luck_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .sylvan_focus_blessing => true,
         else => false,
     };
+}
+
+/// A spell entry's faction prefix ("" for ":Vine Throw").
+fn bookPrefix(faction: []const u8) ?u8 {
+    for (st.BookEntry.PREFIXES, 0..) |p, k| {
+        if (std.mem.eql(u8, p, faction)) return @intCast(k);
+    }
+    return null;
+}
+
+/// One raw "<Faction>:<Name>" entry (unitProperties.spells). A spell outside the port is refused by name.
+pub fn parseBookEntry(entry: []const u8) !st.BookEntry {
+    const colon = std.mem.indexOfScalar(u8, entry, ':') orelse {
+        unsupported_name = entry;
+        return error.UnsupportedSpellEntry;
+    };
+    const spell = st.CastSpell.fromName(entry[colon + 1 ..]) orelse {
+        unsupported_name = entry;
+        return error.UnsupportedSpellEntry;
+    };
+    const prefix = bookPrefix(entry[0..colon]) orelse {
+        unsupported_name = entry;
+        return error.UnsupportedSpellEntry;
+    };
+    return .{ .spell = @intFromEnum(spell), .prefix = prefix };
+}
+
+/// unitProperties.spells as the unit's raw entries, then parseSpells.
+pub fn loadBook(u: *Unit, entries: []const std.json.Value) !void {
+    u.n_book = 0;
+    if (entries.len > st.MAX_BOOK) return error.TooManySpellEntries;
+    for (entries) |e| {
+        if (e != .string) return error.MalformedSpellEntry;
+        u.book[u.n_book] = try parseBookEntry(e.string);
+        u.n_book += 1;
+    }
+    if (!parseBook(u)) return error.TooManySpellEntries;
+}
+
+/// Unit.parseSpells: one Spell per distinct normalized entry (normalizeSpellEntry: "System:X" is ":X"), in
+/// first-occurrence order, amount = its count; fresh objects, so a spent Spell disappears. False on overflow.
+pub fn parseBook(u: *Unit) bool {
+    u.n_spells = 0;
+    outer: for (u.book[0..u.n_book]) |e| {
+        const prefix = e.normalized();
+        for (u.spells[0..u.n_spells]) |*b| {
+            if (b.spell == e.spell and b.prefix == prefix) {
+                b.amount += 1;
+                continue :outer;
+            }
+        }
+        if (u.n_spells >= st.MAX_BOOK_SPELLS) return false;
+        u.spells[u.n_spells] = .{ .spell = e.spell, .prefix = prefix, .amount = 1 };
+        u.n_spells += 1;
+    }
+    return true;
+}
+
+/// One SpellProperties object (getSpellConfig) as the port's config.
+pub fn spellConfigOf(cfg: std.json.Value) st.SpellConfig {
+    var out: st.SpellConfig = .{
+        .power = rec.num(rec.get(cfg, "power")),
+        .laps = rec.num(rec.get(cfg, "laps")),
+        .min_stack_power = rec.num(rec.get(cfg, "minimal_caster_stack_power")),
+        .target = @intCast(rec.int(rec.get(cfg, "spell_target_type"))),
+        .power_type = @intCast(rec.int(rec.get(cfg, "power_type"))),
+        .multiplier = @intCast(rec.int(rec.get(cfg, "multiplier_type"))),
+        .element = @intCast(rec.int(rec.get(cfg, "element"))),
+        .is_buff = rec.get(cfg, "is_buff") == .bool and rec.get(cfg, "is_buff").bool,
+        .self_cast = rec.get(cfg, "self_cast_allowed") == .bool and rec.get(cfg, "self_cast_allowed").bool,
+        .loaded = true,
+    };
+    const conflicts = rec.get(cfg, "conflicts_with");
+    if (conflicts == .array) {
+        for (conflicts.array.items) |c| {
+            if (c != .string) continue;
+            if (st.SpellId.fromName(c.string)) |id| {
+                if (out.conflict == null) out.conflict = id;
+            }
+        }
+    }
+    return out;
+}
+
+/// The configs of the spells in `cfgs` (an object keyed by spell name: a recording's `init.spellConfigs`, the export's
+/// `configs.spellConfigs`); names outside the port are skipped.
+pub fn loadSpellConfigs(s: *State, cfgs: std.json.Value) void {
+    if (cfgs != .object) return;
+    var it = cfgs.object.iterator();
+    while (it.next()) |e| {
+        const spell = st.CastSpell.fromName(e.key_ptr.*) orelse continue;
+        if (e.value_ptr.* != .object) continue;
+        s.spell_cfg[@intFromEnum(spell)] = spellConfigOf(e.value_ptr.*);
+    }
 }
 
 /// A recorded unit (a start-state unit or a summon template: `name`, `creatureId`, `level`, `size`, `footprintW/H`,
@@ -1903,13 +2103,15 @@ var summons_registry: std.ArrayList(struct { text: []u8, summons: *st.Summons })
 pub fn loadSummons(init: std.json.Value, cfg: std.json.Value, s: *State) !?*const st.Summons {
     if (cfg != .object) return null;
     var sm: st.Summons = std.mem.zeroes(st.Summons);
-    const names = [2][]const u8{ "Arachna Spider", "Arachna Queen" };
-    for (names, 0..) |name, k| {
+    for (st.SUMMON_NAMES, 0..) |name, k| {
         const t = rec.get(cfg, name);
         if (t != .object) continue;
         const props = rec.get(t, "props");
         var u = unitFromRecord(t, 0);
         u.in_holder = false;
+        u.summoned = true;
+        const entries = rec.get(props, "spells");
+        if (entries == .array) try loadBook(&u, entries.array.items);
         const abil = rec.get(props, "abilities").array.items;
         try loadUnitAbilities(init, abil, abil, &.{}, s, &u);
         try loadAuras(init, props, s, &u);
@@ -1938,9 +2140,8 @@ pub fn loadSummons(init: std.json.Value, cfg: std.json.Value, s: *State) !?*cons
 
 /// The name id a summon's creature takes: the board's own when a start unit has that name, else a fresh one.
 pub fn summonNameIds(s: *State, names: []const []const u8) void {
-    const summon_names = [2][]const u8{ "Arachna Spider", "Arachna Queen" };
     var next: u16 = @intCast(names.len);
-    for (summon_names, 0..) |n, k| {
+    for (st.SUMMON_NAMES, 0..) |n, k| {
         s.summon_name_id[k] = next;
         for (names, 0..) |known, i| {
             if (std.mem.eql(u8, known, n)) s.summon_name_id[k] = @intCast(i);
@@ -1958,6 +2159,8 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
     s.uuid_seq = 0;
     s.id_scheme = .match;
     s.n_holder = 0;
+    s.spell_cfg = .{st.SpellConfig{}} ** st.N_CAST_SPELLS;
+    loadSpellConfigs(&s, rec.get(init, "spellConfigs"));
     const units = rec.get(init, "units").array.items;
     if (units.len > st.MAX_UNITS) return error.TooManyUnits;
     s.n_units = @intCast(units.len);
@@ -1999,6 +2202,8 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
         const abil = rec.get(props, "abilities").array.items;
         const stolen = rec.get(props, "stolen_abilities");
         try loadUnitAbilities(init, abil, abil, if (stolen == .array) stolen.array.items else &.{}, &s, unit);
+        const entries = rec.get(props, "spells");
+        if (entries == .array) try loadBook(unit, entries.array.items);
         try loadAuras(init, props, &s, unit);
         const target = rec.get(props, "target");
         if (target == .string and target.string.len > 0) unit.target = @intCast(try rec.unitIndex(ids, target.string));
@@ -2108,7 +2313,7 @@ pub fn spawnInfested(s: *State, killer: *const Killer, corpse_level: u8, corpse:
     s.summon_seq += 1;
     const uuid_sequence = s.uuid_seq;
     s.uuid_seq += 1;
-    var nu = sm.units[which];
+    const nu = sm.units[which];
     // resolveSummonCells unless the corpse cells already form the footprint (getFootprintAnchorForCells otherwise).
     var cells: Cells = .{};
     if (formsFootprint(corpse, nu.fw, nu.fh)) {
@@ -2129,23 +2334,33 @@ pub fn spawnInfested(s: *State, killer: *const Killer, corpse_level: u8, corpse:
     for (cells.slice()) |c| {
         if (!cellWithinGrid(c) or occ(s, c) != st.EMPTY) return;
     }
-    if ((s.id_scheme == .match and (!killer.uuid_ok or !s.has_seed)) or s.next_uid >= st.MAX_UIDS) {
+    _ = addSummon(s, nu, which, killer, "Infest", sequence, uuid_sequence, cells.slice(), pos);
+}
+
+/// The tail of runMatch's createSummonedUnit and UnitsHolder.addUnit shared by Infest and Summon Wolves: the id
+/// (deterministicSimulationId("summon", seed, team, 3, name, summoner id, `ability`, sequence), or the "sim" UUID of
+/// `uuid_sequence`), a fresh uid and slot, the grid registration on `cells` (already checked free) at `pos`, the holder
+/// append, the AI memory reset of the slot and a covenant team's ring. Returns the slot, or null (State.overflow).
+pub fn addSummon(s: *State, template: Unit, which: usize, summoner: *const Killer, ability: []const u8, sequence: u32, uuid_sequence: u64, cells: []const Cell, pos: [2]f64) ?u8 {
+    var nu = template;
+    if ((s.id_scheme == .match and (!summoner.uuid_ok or !s.has_seed)) or s.next_uid >= st.MAX_UIDS) {
         s.overflow = true; // no canonical summoner id or battle seed to hash, or out of uids
-        return;
+        return null;
     }
     const slot = allocSlot(s) orelse {
         s.overflow = true;
-        return;
+        return null;
     };
     nu.uid = s.next_uid;
     s.next_uid += 1;
     nu.uuid = switch (s.id_scheme) {
-        .match => @import("uuid.zig").summonId(@intFromFloat(s.seed), killer.team, 3, if (which == st.Summons.QUEEN) "Arachna Queen" else "Arachna Spider", &killer.uuid, "Infest", sequence),
+        .match => @import("uuid.zig").summonId(@intFromFloat(s.seed), summoner.team, 3, st.SUMMON_NAMES[which], &summoner.uuid, ability, sequence),
         .uuid_sequence => @import("uuid.zig").simUuid(uuid_sequence),
     };
     nu.uuid_ok = true;
     nu.in_holder = true;
-    nu.team = killer.team;
+    nu.summoned = true;
+    nu.team = summoner.team;
     nu.syn_power = s.setup[nu.team].ability_power;
     nu.name_id = s.summon_name_id[which];
     nu.pos_x = pos[0];
@@ -2157,7 +2372,7 @@ pub fn spawnInfested(s: *State, killer: *const Killer, corpse_level: u8, corpse:
     }
     for (nu.auras[0..nu.n_auras]) |*d| d.* = auraDefFor(s, d.*);
     s.units[slot] = nu;
-    _ = occupyCells(s, slot, cells.slice());
+    _ = occupyCells(s, slot, cells);
     s.holder[s.n_holder] = slot;
     s.n_holder += 1;
     // A slot carries no AI target memory from a previous occupant (TypeScript's memory names the dead id).
@@ -2170,6 +2385,7 @@ pub fn spawnInfested(s: *State, killer: *const Killer, corpse_level: u8, corpse:
     if (s.ember_teams & (@as(u8, 1) << @intCast(u.team)) != 0 and !u.isDead() and cellWithinGrid(baseCell(u))) {
         abilities.pushChecked(s, &u.buffs, .{ .id = .ember_covenant_blessing, .laps = s.ember_laps, .power = s.ember_power });
     }
+    return slot;
 }
 
 /// The aura def of a template aura (a SpellId value) in this battle.
@@ -2211,6 +2427,10 @@ pub fn actionToSlots(s: *const State, a: rec.Action) rec.Action {
         },
         .obstacle_attack => |*x| x.attacker = slotOrNone(s, x.attacker),
         .decide => |*x| x.unit = slotOrNone(s, x.unit),
+        .cast_spell => |*x| {
+            x.caster = slotOrNone(s, x.caster);
+            if (x.has_target) x.target = slotOrNone(s, x.target);
+        },
     }
     return out;
 }
@@ -2240,6 +2460,10 @@ pub fn actionToUids(s: *const State, a: rec.Action) rec.Action {
         },
         .obstacle_attack => |*x| x.attacker = uidOf(s, x.attacker),
         .decide => |*x| x.unit = uidOf(s, x.unit),
+        .cast_spell => |*x| {
+            x.caster = uidOf(s, x.caster);
+            if (x.has_target) x.target = uidOf(s, x.target);
+        },
     }
     return out;
 }
@@ -2262,6 +2486,7 @@ pub fn apply(s: *State, action: rec.Action, events: *Events) bool {
         .range_attack => |a| if (combat.rangeAttack(s, a.attacker, a.target, a.aim_cell, a.aim_side, events)) true else |_| false,
         .obstacle_attack => |a| if (combat.obstacleAttackAt(s, a.attacker, a.target_x, a.target_y, if (a.has_from) a.attack_from else null, a.path, events)) true else |_| false,
         .decide => true, // AI decisions are not engine calls
+        .cast_spell => |a| if (spells.castSpell(s, a.caster, a.spell, if (a.has_target) a.target else null, if (a.has_cell) a.cell else null, events)) true else |_| false,
     };
     for (events.slice()) |e| {
         const active_uid: i32 = if (s.active >= 0) s.units[@intCast(s.active)].uid else -1;

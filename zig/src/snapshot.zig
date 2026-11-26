@@ -6,8 +6,9 @@
 //! arrows, turn flags, position, grid registration; summoned units too), the grid (board, aggression boards, terrain
 //! and stones), the fight (laps, queues, sets, flags, hit counters), the units holder (distances, Ember Covenant),
 //! the AI target memory, the damage-statistic laps, the summon templates and the summon id parts (the harness's
-//! battle seed and summon counter). Anything non-empty the port does not model (smoke, vines, fire walls, artifact
-//! barrels, artifacts, spells, unported abilities, buffs or effects, ranked authoritative stats, ...) is refused as an
+//! battle seed and summon counter), the spellbooks and the vines. Anything non-empty the port does not model (smoke, fire
+//! walls, artifact barrels, artifacts, spells outside wave 1, unported abilities, buffs or effects, ranked authoritative
+//! stats, ...) is refused as an
 //! unsupported state, naming what it found: the loader is fail-closed, like the export's coverage check on the
 //! TypeScript side.
 //!
@@ -278,6 +279,8 @@ pub fn load(root: Value, ids: []const []const u8, harness: Harness, why: *Why) E
     s.n_aura_defs = 0;
     s.overflow = false;
     s.summons = null;
+    s.spell_cfg = .{st.SpellConfig{}} ** st.N_CAST_SPELLS;
+    engine.loadSpellConfigs(&s, get(configs, "spellConfigs"));
     for (&s.setup, 0..) |*row, t| row.* = engine.loadTeamSetup(root, @intCast(t));
     for (s.units[0..s.n_units], 0..) |*u, i| {
         // A unit removed from the holder before the snapshot: nothing reads it again (every unit loop goes over the
@@ -386,14 +389,17 @@ pub fn load(root: Value, ids: []const []const u8, harness: Harness, why: *Why) E
 
 /// Fails unless the unit-level fields the port does not model are empty or at their defaults.
 fn checkUnitScope(uv: Value, fields: Value, props: Value, why: *Why) Error!void {
-    // Summoned units: only the creatures Infest raises (spell summons are out of scope).
+    // Summoned units: the creatures Infest and Summon Wolves raise.
     if (get(uv, "summoned") == .bool and get(uv, "summoned").bool) {
         const name = try string(get(uv, "name"), why, "unit name");
-        if (!std.mem.eql(u8, name, "Arachna Spider") and !std.mem.eql(u8, name, "Arachna Queen")) return why.unsupported("summoned {s}", .{name});
+        var known = false;
+        for (st.SUMMON_NAMES) |n| {
+            if (std.mem.eql(u8, name, n)) known = true;
+        }
+        if (!known) return why.unsupported("summoned {s}", .{name});
     }
     const unit_type = get(uv, "unitType");
     if (unit_type != .integer or unit_type.integer != 1) return why.unsupported("unit type is not a creature", .{});
-    try checkSpells(fields, props, why);
     try requireEmpty(get(props, "artifact_granted_abilities"), why, "artifact-granted abilities");
     try requireEmpty(get(props, "forbidden_target"), why, "forbidden target");
     try requireEmpty(get(props, "helping_hand_caster_id"), why, "Helping Hand caster");
@@ -416,36 +422,44 @@ fn checkUnitScope(uv: Value, fields: Value, props: Value, why: *Why) Error!void 
     try requireEmpty(get(fields, "warlordsEdgeAppliedAttackBonus"), why, "Warlord's Edge");
 }
 
-/// Castable abilities the port loads as inert under its policies (they are never cast): their spell entries may be
-/// present. Any other spell is outside the port.
-const INERT_ABILITY_SPELLS = [_][]const u8{"Vine Throw"};
-
-fn inertAbilitySpell(name: []const u8, abilities: Value) bool {
-    var inert = false;
-    for (INERT_ABILITY_SPELLS) |n| {
-        if (std.mem.eql(u8, n, name)) inert = true;
-    }
-    if (!inert or abilities != .array) return false;
-    for (abilities.array.items) |a| {
-        if (a == .string and std.mem.eql(u8, a.string, name)) return true;
-    }
-    return false;
-}
-
-/// The unit's spells (Spell objects and props.spells "faction:name" entries): only the spell entries of its own inert
-/// castable abilities.
-fn checkSpells(fields: Value, props: Value, why: *Why) Error!void {
-    const abilities = get(props, "abilities");
-    for (try items(get(fields, "spells"), why, "spells")) |sp| {
-        const name = try string(get(get(sp, "spellProperties"), "name"), why, "spell name");
-        if (!inertAbilitySpell(name, abilities)) return why.unsupported("spell {s}", .{name});
-    }
+/// The unit's spellbook: the raw entries (props.spells "<Faction>:<Name>", one per charge) and the parsed Spell objects
+/// (`spells`: name, amountRemaining; spent ones included), whose spellProperties give the configs. A spell outside the
+/// port (CastSpell) is refused by name.
+fn loadBook(s: *State, u: *Unit, fields: Value, props: Value, why: *Why) Error!void {
+    u.n_book = 0;
+    u.n_spells = 0;
     const entries = get(props, "spells");
-    if (isUndefined(entries)) return;
-    for (try items(entries, why, "spells")) |e| {
-        const entry = try string(e, why, "spells");
-        const name = if (std.mem.lastIndexOfScalar(u8, entry, ':')) |i| entry[i + 1 ..] else entry;
-        if (!inertAbilitySpell(name, abilities)) return why.unsupported("spell {s}", .{entry});
+    if (!isUndefined(entries)) {
+        const list = try items(entries, why, "spells");
+        if (list.len > st.MAX_BOOK) return why.unsupported("{d} spell entries (at most {d})", .{ list.len, st.MAX_BOOK });
+        for (list) |e| {
+            const entry = try string(e, why, "spells");
+            u.book[u.n_book] = engine.parseBookEntry(entry) catch return why.unsupported("spell {s}", .{entry});
+            u.n_book += 1;
+        }
+    }
+    const objects = try items(get(fields, "spells"), why, "spells");
+    if (objects.len > st.MAX_BOOK_SPELLS) return why.unsupported("{d} spells (at most {d})", .{ objects.len, st.MAX_BOOK_SPELLS });
+    for (objects) |o| {
+        const sp = get(o, "spellProperties");
+        const name = try string(get(sp, "name"), why, "spell name");
+        const spell = st.CastSpell.fromName(name) orelse return why.unsupported("spell {s}", .{name});
+        const amount = try intAs(u8, get(o, "amountRemaining"), why, "amountRemaining");
+        // The parse key's faction (an empty faction is "System": normalizeSpellEntry gives both ":X").
+        const faction = get(sp, "faction");
+        var prefix: u8 = st.BookEntry.NO_FACTION;
+        if (faction == .integer) {
+            prefix = switch (faction.integer) {
+                4 => 2, // Life
+                3 => 3, // Nature
+                1 => 4, // Chaos
+                2 => 5, // Might
+                else => return why.unsupported("spell {s} of faction {d}", .{ name, faction.integer }),
+            };
+        }
+        u.spells[u.n_spells] = .{ .spell = @intFromEnum(spell), .prefix = prefix, .amount = amount };
+        u.n_spells += 1;
+        if (!s.spell_cfg[@intFromEnum(spell)].loaded and sp == .object) s.spell_cfg[@intFromEnum(spell)] = engine.spellConfigOf(sp);
     }
 }
 
@@ -676,6 +690,8 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
     const target = get(props, "target");
     if (target == .string and target.string.len > 0) u.target = @intCast(try requireSlot(s, ids, target.string, why, "target"));
     try loadLists(u, fields, props, why);
+    try loadBook(s, u, fields, props, why);
+    u.summoned = get(uv, "summoned") == .bool and get(uv, "summoned").bool;
 
     for (try items(get(fields, "adjustedBaseStatsLaps"), why, "adjustedBaseStatsLaps")) |l| {
         const lap = try integer(l, why, "adjustedBaseStatsLaps");
@@ -859,8 +875,27 @@ fn loadFight(s: *State, fight: Value, root: Value, ids: []const []const u8, why:
     f.hits_right = try intAs(i32, get(fight, "obstacleHitsLeftRight"), why, "obstacleHitsLeftRight");
     try requireEmpty(get(fight, "legacyAxisPolicyTeams"), why, "legacy-axis policy teams");
     try requireEmpty(get(get(fight, "smokeClouds"), "clouds"), why, "smoke clouds");
-    try requireEmpty(get(get(fight, "vines"), "vines"), why, "vines");
     try requireEmpty(get(get(fight, "fireWalls"), "walls"), why, "fire walls");
+    // Vines: Map entries [key, {cell, lapsRemaining, team}] in insertion order.
+    const vines = get(get(fight, "vines"), "vines");
+    if (!isUndefined(vines)) {
+        for (try mapEntries(vines, why, "vines")) |e| {
+            const v = e.array.items[1];
+            const c = try cellOf(get(v, "cell"), why, "vine cell");
+            if (!engine.cellWithinGrid(c)) return why.malformed("vine off the board", .{});
+            if (f.n_vines >= st.MAX_VINES) return why.unsupported("more than {d} vines", .{st.MAX_VINES});
+            if (f.hasVine(c.x, c.y)) return why.malformed("two vines on ({d},{d})", .{ c.x, c.y });
+            f.vines[f.n_vines] = .{
+                .x = @intCast(c.x),
+                .y = @intCast(c.y),
+                .laps = try intAs(i16, get(v, "lapsRemaining"), why, "lapsRemaining"),
+                .team = try intAs(u8, get(v, "team"), why, "vine team"),
+            };
+            f.n_vines += 1;
+            f.vine_cells[@intCast(c.x)] |= @as(u16, 1) << @intCast(c.y);
+        }
+        if (f.n_vines != 0 and !s.spell_cfg[@intFromEnum(st.CastSpell.vine_throw)].loaded) return why.malformed("vines without the Vine Throw config", .{});
+    }
     for ([_][]const u8{ "artifactTier1PerTeam", "artifactTier2PerTeam" }) |key| {
         for (try mapEntries(get(fight, key), why, key)) |e| try requireEmpty(e.array.items[1], why, "artifacts");
     }

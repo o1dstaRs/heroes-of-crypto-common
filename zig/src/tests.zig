@@ -4,6 +4,8 @@ test {
     _ = @import("jsnum.zig");
     _ = @import("uuid.zig");
     _ = @import("abilities.zig");
+    _ = @import("spells.zig");
+    _ = @import("path.zig");
     _ = @import("snapshot.zig");
     _ = @import("rollout.zig");
     _ = @import("ffi.zig");

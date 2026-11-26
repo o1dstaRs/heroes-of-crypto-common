@@ -48,7 +48,7 @@ throws at export). Tags: `{$map: [[k, v]...]}`, `{$set: [...]}`, `{$denque: [...
 | `holder` | UnitsHolder's: distances, Ember Covenant, the aura refresh caches |
 | `aiTargetMemory` | `[[attackerId, targetId]...]` (ai.ts previousTargetsByBattle) |
 | `damageStatLaps` | the laps of the damage-statistic entries (runMatch's `damageDealtThisLap` reads them) |
-| `configs` | `{abilityConfigs, effectConfigs, auraEffectConfigs, spellConfigs, summonTemplates?}`: the configs of every ability and aura on the board, Poison, Break and the Ember Covenant spell, in the shape of a recording's start state; with an Infest unit on the board, the summon templates (createUnitFromSpec's props of "Arachna Spider" and "Arachna Queen") and their abilities' and auras' configs |
+| `configs` | `{abilityConfigs, effectConfigs, auraEffectConfigs, spellConfigs, summonTemplates?}`: the configs of every ability and aura on the board, Poison, Break and the Ember Covenant spell, in the shape of a recording's start state (`spellConfigs` gains the System "Vine Throw" while vines stand; a book spell's config travels in its Spell object); with an Infest unit on the board, the summon templates (createUnitFromSpec's props of "Arachna Spider" and "Arachna Queen") and their abilities' and auras' configs; with a summon spell entry or a summoned Wolf, the "Wolf" template |
 | `setup` | `{lapsTillNarrowing, perTeam: {"2": {...}, "1": {...}}}`: getAdditionalAbilityPower / MovementSteps / FlyArmor / Morale / Luck / Supply / AuraRange PerTeam and getBreakChancePerTeam |
 | `harness` | optional `{rng, activeUnitId, uuidSequence, seed?, summonSequence?, armyProfile?}`: the mulberry32 state, runMatch's currentActiveUnitId ("" = none), lib.ts deterministicUuidSequence, the parts of a summon's id (the battle seed and runMatch's createSummonedUnit counter; without them a summon cannot be named, and the play-out reports the overflow), and v0.7's army profile per team (below) |
 
@@ -78,6 +78,9 @@ Read into the Zig `State` (`snapshot.zig`):
 | `abilities` (the active list, in order), `ability_mask`, `Ability.aura`, `auras`, `State.aura_defs` | the Ability objects' names and `aura_effects` with `configs` (engine.loadUnitAbilities / loadAuras), checked against the AuraEffect objects |
 | `luck_dependent`, `stolen` | `props.abilities` (the card list: the early luck pass reads card names), `props.stolen_abilities` |
 | `web_locked`, `rallying_volley_granted` | `props.web_movement_locked`, `props.rallying_volley_granted` |
+| `book` (raw entries), `spells` (the parsed book with charges, spent ones included), `State.spell_cfg` | `props.spells`, the `spells` Spell objects (`spellProperties.name`, `amountRemaining`; their spellProperties are the configs), `configs.spellConfigs` |
+| `summoned` | the unit's `summoned` (a summoned "Wolf" is the Summon Wolves merge target) |
+| `fight.vines` | `fight.vines.vines` (`$map` entries `[key, {cell, lapsRemaining, team}]` in insertion order) |
 | `uid`, `uuid` | the unit's index in the id list, its id parsed as a canonical UUID |
 | `State.summons`, `summon_seq`, `uuid_seq`, `seed`, `next_uid` | `configs.summonTemplates` (interned), `harness.summonSequence`, `harness.uuidSequence`, `harness.seed`; the caller's next uid (default: the id list's length) |
 | the handle's creature names (by `name_id`) and army profiles | `units[].name` and the summon templates' names; `harness.armyProfile` |
@@ -108,15 +111,15 @@ maps (their effect arrives through the buffs and `setup`), `teamsAuraEffects`, `
 `harness.uuidSequence` for naming (a summon takes the createSummonedUnit id unless a rollout request asks for
 `summonIds: "uuidSequence"`; the counter itself is loaded and counts every summon).
 
-Refused as an unsupported state (the loader names what it found): summoned units other than the creatures Infest raises
-and non-creature units; spells other than the spell entries of inert castable abilities (Vine Throw, on a Trent or a
-thief); artifact-granted abilities; a forbidden target; Helping Hand; ranked `*_authoritative` stats; a spent Water
-Shield; Last Fuse; Warlord's Edge or a War Anger attack increase; an unported ability, aura, buff, debuff or effect;
-effect stacks other than Poison's; more buffs, debuffs, effects, active or stolen abilities than the lists hold
-(14/5/7/10/6); WATER_CENTER or a water cell; artifact barrels; artifacts; legacy-axis seats; smoke clouds, vines or fire
-walls; a unit on lava or terrain the board lost; more than 32 units in the holder or 255 ids; units out of holder
-order. Malformed input (a missing field, a wrong type, an id no list knows) is
-reported as a malformed state.
+Refused as an unsupported state (the loader names what it found): summoned units other than the creatures Infest and
+Summon Wolves raise, and non-creature units; a spell outside wave 1 (by name, in the raw entries or the Spell objects),
+more spell entries or spells than the book holds (16/6); artifact-granted abilities; a forbidden target; Helping Hand;
+ranked `*_authoritative` stats; a spent Water Shield; Last Fuse; Warlord's Edge or a War Anger attack increase; an
+unported ability, aura, buff, debuff or effect; effect stacks other than Poison's; more buffs, debuffs, effects, active
+or stolen abilities than the lists hold (16/6/7/10/6); WATER_CENTER or a water cell; artifact barrels; artifacts;
+legacy-axis seats; smoke clouds or fire walls; more than 96 vines; a unit on lava or terrain the board lost; more than
+32 units in the holder or 255 ids; units out of holder order. Malformed input (a missing field, a wrong type, an id no
+list knows, vines without the Vine Throw config) is reported as a malformed state.
 
 ## The C ABI (`src/ffi.zig`, ABI version 2)
 
@@ -155,9 +158,9 @@ struct RolloutStats { uint64_t turns; uint32_t written; int32_t stop;
   ability" message comes from a diagnostic global of engine.zig, so two engines refusing states at the same moment can
   swap names. A refused state reads "unsupported state: ...", a refused request "unsupported request: ...", a rollout that
   reached unported code "unsupported rollout: ..."; the caller falls back to TypeScript for that decision.
-- `hoc_state_digest_json` writes `{units, fight, active, rng}` with the record.ts digest columns (setup, terrain and
-  batch-3 columns always on; `buffs_sources` and `debuffs_sources` name aura and augment rows only). `hoc_state_check_digest` takes a
-  `parity/digest.ts` `battleDigest` and runs `compare.state`.
+- `hoc_state_digest_json` writes `{units, fight, active, rng}` with the record.ts digest columns (setup, terrain,
+  batch-3 and spellbook columns and the fight's `vines` always on; `buffs_sources` and `debuffs_sources` name aura and
+  augment rows only). `hoc_state_check_digest` takes a `parity/digest.ts` `battleDigest` and runs `compare.state`.
 
 ### `hoc_rollouts`: SearchDriver.rollout and leafValue
 
@@ -228,10 +231,10 @@ port's anchor-army path; nothing else reads the count).
 Scope of the v0.8 policy (`rollout.v08Scope`, checked on the root; no ability can appear inside a rollout from a root
 without one): src/v08 is checked on ability-free battles and treats every ability, aura and ability-born buff as
 absent, so a request with a v0.8 seat is refused when any holder unit carries an ability, a stolen ability, an aura,
-ability state (a Web lock, Rallying Volley arrows, a forced target) or a buff, debuff or effect other than morale,
-dismorale, Break and the augments, or when an Ember Covenant ring stands. Two further refusals cover gaps of src/v08 at
-common `58d5ae7c`, until its owner applies the patches below: a removed unit still in alreadyMadeTurn, and an Angel or
-Arachna Queen on a team with a synergy aura range.
+ability state (a Web lock, Rallying Volley arrows, a forced target), a spell entry, or a buff, debuff or effect other
+than morale, dismorale, Break and the augments, or when an Ember Covenant ring or a vine stands. The two refusals for
+src/v08 gaps (a removed unit in alreadyMadeTurn, an Angel or Queen with a synergy aura range) are gone: its owner fixed
+them (common `d5fddea9`, `6e6aff54`), and the holder-ordered copy the learned leaves were scored on went with them.
 
 The call stops early, keeping the prefix, when `deadline_ns` passes (checked where `assertBeforeDecisionDeadline` is:
 before each pair, action and turn, and before the leaf), when the rollout turns played exceed `turnBudget`
@@ -257,6 +260,11 @@ of the port (unit slots, ids, lists, 1,024 antithetic keys per rollout). Not mod
   so.
 - Rollouts run the policy in the scoped A19 environment (`withScopedAIEnvironment(buildV08A19SearchEnvironment())`);
   src/v08 bakes that environment's values. In scope the plain process environment gives the same decisions.
+- Every SearchDriver rollout turn decides with a DecisionPathCatalog (cached canonical path; findTarget builds only the
+  first melee layer of its infinite-path pass), and runMatch's decisions without search do not. The port follows
+  (`ai.catalog_decisions`, set by `rollout.run`); the two differ only for a vine strider (a route of weight 0). A harness
+  that wraps `PathHelper.prototype.getMovePath` turns the catalog's cache and elision off (`cacheSafe` checks the
+  method's identity) and then differs from production on such boards.
 
 ## How it is checked
 
@@ -291,6 +299,22 @@ of the port (unit slots, ids, lists, 1,024 antithetic keys per rollout). Not mod
   calls with a unit digest, each v0.8 layer's output, the wait scorer's features, each decision; with `--digests` the
   digest.zig state at each decision), the format the scratch harness writes for the TypeScript side, so the first
   differing step shows where a rollout leaves TypeScript's.
+
+Results with the wave-1 spells on 2026-11-25 (common `2f222cc0` plus this change; production-like setup, side boards,
+maps mixed by seed):
+
+- v0.8 on both seats, ability-free (`KEEP=" "`, seeds 11000000-11000149): all 348 roots compared with the src/v08 gap
+  checks and the leaf copy removed, 334,080 of 334,080 values and 3,183,738 rollout turns identical, the turn-budget bank
+  identical at every root, 0 refused (before: 230 roots compared, 118 refused).
+- v0.1 rollouts on roots with spells (the wave-1 casters and batches 1 to 3 kept at keep rate 1, the live server's stack
+  sizing, wave-1 books; v0.8 played the battles, so the roots carry vines, snares, Blessings, spent charges, summoned
+  Wolves and stolen books): 230,400 of 230,400 values identical (seeds 12200000-12200029 and 12300000-12300059, 240
+  roots, 8,415 summons inside rollouts, incumbent casts among the candidates), the same 2,470,284 rollout turns and
+  summon counters. Before the catalog's first-layer elision was modelled, one battle's two roots (a vine strider)
+  differed.
+- v0.1 rollouts with batches 1 to 3 kept, without the holder-ordered leaf copy: 50,880 of 50,880 (seeds
+  11300000-11300019, 53 roots, 2,572 summons).
+- `ffi/smoke.ts 12 9100` passing; the bridge digest carries the spellbook columns and the vines.
 
 Results with v0.8 rollouts on 2026-11-25 (common `58d5ae7c` plus this change; production-like setup, side boards, maps
 mixed by seed):
@@ -387,8 +411,8 @@ by a flat binary one.
    recorder's digest when the state is observable.
 2. In `snapshot.zig`, read the new field from the export (the raw TypeScript field, or a value added to the export's
    `configs` / `setup` when it needs unported TypeScript to compute), and remove its refusal (`checkUnitScope`,
-   `requireEmpty` in `loadGrid` / `loadFight`, `INERT_ABILITY_SPELLS`). Keep every other refusal: the loader must refuse
-   what the port cannot play.
+   `requireEmpty` in `loadGrid` / `loadFight`, a spell's name in `st.CastSpell`). Keep every other refusal: the loader
+   must refuse what the port cannot play.
 3. When TypeScript gains a field, the export's coverage check throws until `state_export.ts` classifies it; then decide
    here: read it, ignore it (say why in the list above), or refuse non-empty values.
 4. Record with `RECORD_RESUME` in the new scope and run `hoc-sim resume`; it checks the loaded state against the
@@ -398,8 +422,9 @@ by a flat binary one.
 
 ## Known gaps of src/v08 (owner: the v0.8 port)
 
-Found by the v0.8 rollout comparison on ability-free production-like battles. Each is gated in `rollout.v08Scope`
-(the request is refused) until the patch lands; with both patches applied every root compared identical (below).
+Found by the v0.8 rollout comparison on ability-free production-like battles. Gaps 1 to 3 are fixed in src/v08
+(`d5fddea9`: madeCount in waitFeatures; `6e6aff54`: coverageRange with the synergy aura range, every unit loop in holder
+order), their refusals and the leaf copy are removed, and every root compares identical (below). Gap 4 stands.
 
 1. `util.waitFeatures` (the wait scorer's `getAlreadyMadeTurnSize()` term, wait feature 25) counts
    `@popCount(s.fight.made)`; TypeScript's alreadyMadeTurn also holds removed units, which a loaded state (and a slot

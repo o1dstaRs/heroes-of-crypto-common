@@ -58,11 +58,13 @@ pub fn policyFor(version: []const u8) ?DecideFn {
 /// and ability-born buff as absent). Null when `s` is one, else what puts it outside. No ability can appear inside a
 /// rollout from such a root (no Infest, no theft, no spells), so checking the root covers every state of the call.
 pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 {
+    _ = ident; // the src/v08 gap checks that named creatures are gone (common 6e6aff54, d5fddea9)
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
         if (u.n_abilities > 0) return std.fmt.bufPrint(buf, "slot {d} has ability {s}", .{ i, u.abilities[0].id.name() }) catch "an ability";
         if (u.n_auras > 0 or u.n_stolen > 0 or u.web_locked or u.rallying_volley_granted != 0 or u.target >= 0)
             return std.fmt.bufPrint(buf, "slot {d} carries ability state", .{i}) catch "ability state";
+        if (u.n_book > 0 or u.n_spells > 0) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
         for ([_][]const st.AppliedSpell{ u.buffs.items[0..u.buffs.len], u.debuffs.items[0..u.debuffs.len], u.effects.items[0..u.effects.len] }) |list| {
             for (list) |sp| {
                 switch (sp.id) {
@@ -73,18 +75,7 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
         }
     }
     if (s.ember_teams != 0) return "an Ember Covenant ring";
-    // Two gaps of src/v08 at common 58d5ae7c (patches in zig/BRIDGE.md; drop these checks once applied):
-    // util.waitFeatures counts `Fight.made` only, while getAlreadyMadeTurnSize also counts the removed units a loaded
-    // state keeps in `removed_made` (Fight.madeCount); and lv8.coverageRange leaves out the synergy aura range
-    // (getAdditionalAuraRangePerTeam) of an Angel's or a Queen's screen.
-    if (s.fight.removed_made.count() > 0) return "a removed unit in alreadyMadeTurn (src/v08 waitFeatures)";
-    for (s.holderOrder()) |i| {
-        const u = &s.units[i];
-        if (u.isDead() or s.setup[u.team].aura_range == 0) continue;
-        const name = ident.nameOf(u);
-        if (std.mem.eql(u8, name, "Angel") or std.mem.eql(u8, name, "Arachna Queen"))
-            return std.fmt.bufPrint(buf, "{s} with a synergy aura range (src/v08 coverageRange)", .{name}) catch "a protector with a synergy aura range";
-    }
+    if (s.fight.n_vines != 0) return "vines on the board";
     return null;
 }
 
@@ -523,33 +514,9 @@ pub fn leafValue(s: *const State, team: u8, finished: bool, winner: i32, exact_t
     return leafValueOf(.material, s, team, finished, winner, exact_terminal);
 }
 
-/// The learned leaves on `s`. util.valueFeatures and valueFeaturesV2 walk the slots, while fillValueFeatures walks
-/// unitsHolder.getAllUnits(): the two orders part once a summon takes a reused slot, and the float sums then differ in
-/// the last bit, so such a state is scored on a copy whose slots follow the holder.
+/// The learned leaves on `s` (util.valueFeatures and valueFeaturesV2 walk the holder in insertion order, as
+/// fillValueFeatures walks unitsHolder.getAllUnits()).
 fn learnedLeaf(kind: LeafKind, s: *const State, team: u8) f64 {
-    const order = s.holderOrder();
-    for (order, 0..) |slot, k| {
-        if (k > 0 and slot <= order[k - 1]) return learnedLeafInHolderOrder(kind, s, team);
-    }
-    return learnedLeafOn(kind, s, team);
-}
-
-/// The holder's units in insertion order in a copy (the turn-set bits follow them; nothing else the features read).
-noinline fn learnedLeafInHolderOrder(kind: LeafKind, s: *const State, team: u8) f64 {
-    var buf: State = s.*;
-    buf.fight.made = 0;
-    buf.fight.hourglass_set = 0;
-    for (s.holderOrder(), 0..) |slot, k| {
-        buf.units[k] = s.units[slot];
-        buf.holder[k] = @intCast(k);
-        if (s.fight.made & engine.unitBit(slot) != 0) buf.fight.made |= engine.unitBit(@intCast(k));
-        if (s.fight.hourglass_set & engine.unitBit(slot) != 0) buf.fight.hourglass_set |= engine.unitBit(@intCast(k));
-    }
-    buf.n_units = s.n_holder;
-    return learnedLeafOn(kind, &buf, team);
-}
-
-fn learnedLeafOn(kind: LeafKind, s: *const State, team: u8) f64 {
     if (kind == .v2) return v08util.leafV2(s, team);
     var f: [v08util.VALUE_FEATURES]f64 = undefined;
     v08util.valueFeatures(s, team, &f);
@@ -665,6 +632,10 @@ fn rolloutIn(s: *State, req: *const Request, cand: *const Candidate, r: u32, ctl
 /// counters carry over from one rollout to the next); writes one value per pair into `out` and returns how many it
 /// wrote (a prefix when the deadline, the turn budget or `out` stops it). `ctl` ends with the counters.
 pub fn run(root: *const State, scratch: *State, req: *const Request, out: []f64, ctl: *Control) Error!usize {
+    // Every rollout turn decides with a fresh DecisionPathCatalog (search_driver.ts simPlayTurn).
+    const saved_catalog = ai.catalog_decisions;
+    ai.catalog_decisions = true;
+    defer ai.catalog_decisions = saved_catalog;
     try requireIdentity(req);
     var ses: Session = .{};
     ses.tables.init(root, req);

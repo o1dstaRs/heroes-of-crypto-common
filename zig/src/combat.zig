@@ -88,12 +88,12 @@ inline fn missRoll(s: *State, att: *const Unit, tgt: *const Unit) bool {
 // =====================================================================================================================
 
 /// The `moraleDecreaseForTheUnitTeam` record: "<name>:<team>" keys in insertion order.
-const MoraleDecrease = struct {
-    keys: [8]struct { name: u16, team: u8, amount: f64 } = undefined,
+pub const MoraleDecrease = struct {
+    keys: [16]struct { name: u16, team: u8, amount: f64 } = undefined,
     len: u8 = 0,
 
     /// updateMoraleDecreaseForTheUnitTeam with one "<name>:<team>" entry (positive amounts only).
-    fn add(self: *MoraleDecrease, u: *const Unit, amount: f64) void {
+    pub fn add(self: *MoraleDecrease, u: *const Unit, amount: f64) void {
         if (amount <= 0) return;
         for (self.keys[0..self.len]) |*k| {
             if (k.name == u.name_id and k.team == u.team) {
@@ -101,12 +101,13 @@ const MoraleDecrease = struct {
                 return;
             }
         }
+        if (self.len >= self.keys.len) return;
         self.keys[self.len] = .{ .name = u.name_id, .team = u.team, .amount = amount };
         self.len += 1;
     }
 
     /// UnitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam
-    fn apply(self: *const MoraleDecrease, s: *State) void {
+    pub fn apply(self: *const MoraleDecrease, s: *State) void {
         for (self.keys[0..self.len]) |k| {
             for (s.holderOrder()) |i| {
                 const u = &s.units[i];
@@ -116,15 +117,15 @@ const MoraleDecrease = struct {
     }
 };
 
-const Died = struct {
+pub const Died = struct {
     items: [st.MAX_UNITS]u8 = undefined,
     len: u8 = 0,
 
-    fn includes(self: *const Died, u: u8) bool {
+    pub fn includes(self: *const Died, u: u8) bool {
         for (self.items[0..self.len]) |x| if (x == u) return true;
         return false;
     }
-    fn push(self: *Died, u: u8) void {
+    pub fn push(self: *Died, u: u8) void {
         if (!self.includes(u)) {
             self.items[self.len] = u;
             self.len += 1;
@@ -165,6 +166,27 @@ fn cleanupDeadUnits(s: *State, died: *const Died, events: *Events, attribution: 
             if (k.infest) engine.spawnInfested(s, k, level, corpse.slice());
         }
     }
+}
+
+/// cleanupDeadUnits with a spell's kill attributions (createDirectKillAttributions over the caster's enemy victims,
+/// `killed`): each dead unit of `died` leaves the holder in order, and a killed corpse raises a summon when the
+/// caster (`killer`, captured before the cleanup) holds Infest.
+pub fn cleanupSpellDeaths(s: *State, died: *const Died, killed: *const Died, killer: *const engine.Killer, events: *Events) void {
+    for (died.items[0..died.len]) |ui| {
+        const u = &s.units[ui];
+        if (!u.in_holder or !u.isDead()) continue;
+        const corpse = engine.unitCells(u);
+        const level = u.level;
+        engine.deleteUnit(s, ui);
+        events.push(.unit_destroyed, u.uid);
+        if (killer.infest and killed.includes(ui)) engine.spawnInfested(s, killer, level, corpse.slice());
+    }
+}
+
+fn sameCellList(a: []const Cell, b: []const Cell) bool {
+    if (a.len != b.len) return false;
+    for (a, b) |x, y| if (x.x != y.x or x.y != y.y) return false;
+    return true;
 }
 
 fn adjacent(a: []const Cell, b: []const Cell) bool {
@@ -251,6 +273,7 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     const tgt_cells = engine.unitCells(tgt);
     if (!adjacent(from_cells.slice(), tgt_cells.slice())) return error.Rejected;
     const stationary = current.x == from.x and current.y == from.y;
+    const cells_before = engine.unitCells(att); // the snare on arrival compares the body before and after
     try strikeMovePrefix(s, ai, from, from_cells.slice(), path, stationary);
 
     // chargedRouteCells: a stationary strike after this turn's move charges that move's route; a path-bearing strike
@@ -351,6 +374,11 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     engine.refreshStackPowerForAllUnits(s);
     abilities.devourEssence(s, ai, died.items[0..died.len]);
     abilities.devourEssence(s, ti, died.items[0..died.len]);
+    // Walking in to strike ends the walk on those cells: an enemy vine there snares the attacker.
+    if (s.fight.n_vines != 0) {
+        const cells_after = engine.unitCells(att);
+        if (!sameCellList(cells_before.slice(), cells_after.slice())) engine.snareOnVineArrival(s, ai, cells_after.slice());
+    }
 
     const attribution: Attribution = .{
         .attacker = ai,
@@ -608,15 +636,15 @@ inline fn firstStepOutsideCell(start: f64, dir: f64, axis: f64, major: f64, cell
     return firstStepForDisplacement(required, axis, major);
 }
 
-const RayHit = struct { cell: Cell, x: f64, y: f64 };
+pub const RayHit = struct { cell: Cell, x: f64, y: f64 };
 
-const Ray = struct {
+pub const Ray = struct {
     items: [64]RayHit = undefined,
     len: usize = 0,
 };
 
 /// traceGridRayCells: every cell the segment crosses, with the first pixel in it.
-fn traceRay(sx_in: f64, sy_in: f64, ex_in: f64, ey_in: f64) Ray {
+pub fn traceRay(sx_in: f64, sy_in: f64, ex_in: f64, ey_in: f64) Ray {
     var ray: Ray = .{};
     const sx = js.round(sx_in);
     const sy = js.round(sy_in);
@@ -933,6 +961,8 @@ pub fn rangeAttack(s: *State, ai: u8, ti: u8, aim_cell: ?Cell, aim_side: u8, eve
         // After a landed throw the primary is poisoned a second time, from the throw's largest damage.
         abilities.poisonAura(s, ai, target_ui, damage_from_attack);
         abilities.assimilationPoison(s, ai, target_ui, damage_from_attack);
+        // A landed shot copies one takeable buff (Borrowed Grace; not after a splash).
+        if (!throw_landed) abilities.borrowedGrace(s, ai, target_ui, ai);
     }
     var switch_target = false;
     if (tgt.isDead()) {
@@ -971,6 +1001,7 @@ pub fn rangeAttack(s: *State, ai: u8, ti: u8, aim_cell: ?Cell, aim_side: u8, eve
             } else if (!response_missed and !response_absorbed) {
                 abilities.stun(s, target_ui, rv, ai);
                 abilities.spitBall(s, rv); // the counter-shot victim's Absorb Penalties roll
+                abilities.borrowedGrace(s, target_ui, rv, ai); // a Monk shooting back copies just the same
             }
         }
 

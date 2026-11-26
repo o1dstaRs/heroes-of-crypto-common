@@ -209,8 +209,9 @@ fn bench(gpa: std.mem.Allocator, path: []const u8, reps: usize, threads: usize) 
 }
 
 /// Recomputes every recorded getMovePath call and compares knownPaths order, weights, routes and (when recorded) each
-/// route's hasLavaCell exactly. `vine` is accepted and ignored (no vines exist in scope, so a vine strider gets the
-/// normal path); a made-of-fire call is not ported and counts as a mismatch.
+/// route's hasLavaCell exactly, with the recorded vines (`vines`, the store's cells) and the vine stride (`vine`). A
+/// call without an aggression board (the Castling hook's) reads as an all-ones board; a made-of-fire call is not ported
+/// and counts as a mismatch.
 fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
     const buf = try readAll(gpa, file);
     defer gpa.free(buf);
@@ -231,9 +232,14 @@ fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
             for (0..st.GRID) |x| m[x][y] = @intCast(rec.int(rows[y].array.items[x]));
         }
         var aggr: [st.GRID][st.GRID]i16 = undefined;
-        const cols = rec.get(v, "aggr").array.items;
+        const aggr_v = rec.get(v, "aggr");
         for (0..st.GRID) |x| {
-            for (0..st.GRID) |y| aggr[x][y] = @intCast(rec.int(cols[x].array.items[y]));
+            for (0..st.GRID) |y| aggr[x][y] = if (aggr_v == .array) @intCast(rec.int(aggr_v.array.items[x].array.items[y])) else 1;
+        }
+        var vine_cells: [st.GRID]u16 = .{0} ** st.GRID;
+        const vines_v = rec.get(v, "vines");
+        if (vines_v == .array) {
+            for (vines_v.array.items) |c| vine_cells[@intCast(rec.int(c.array.items[0]))] |= @as(u16, 1) << @intCast(rec.int(c.array.items[1]));
         }
         const cell = rec.get(v, "cell").array.items;
         if (rec.get(v, "fire") == .bool and rec.get(v, "fire").bool) {
@@ -248,7 +254,14 @@ fn pathCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool {
             .can_fly = rec.get(v, "canFly").bool,
             .w = @intCast(rec.int(rec.get(v, "w"))),
             .h = @intCast(rec.int(rec.get(v, "h"))),
+            .vines = if (vines_v == .array) &vine_cells else null,
+            .vine_stride = rec.get(v, "vine") == .bool and rec.get(v, "vine").bool,
         }, &mp);
+        if (mp.overflow) {
+            fails += 1;
+            if (fails <= max_fail) std.debug.print("call {d}: a capacity of the vine merge was exceeded\n", .{calls});
+            continue;
+        }
         const known = rec.get(v, "known").array.items;
         var why: ?[]const u8 = null;
         var at_i: usize = 0;
@@ -591,6 +604,12 @@ const TraceOut = struct {
                 if (x.aim_cell) |c| try w.print(" aim {d},{d},{d}", .{ c.x, c.y, x.aim_side });
             },
             .obstacle_attack => |x| try w.print("obstacle_attack {s} {d},{d}", .{ self.id8(s, x.attacker, &b1), x.target_x, x.target_y }),
+            .cast_spell => |x| {
+                const name = if (x.spell < st.N_CAST_SPELLS) @as(st.CastSpell, @enumFromInt(x.spell)).name() else "?";
+                try w.print("cast_spell {s} {s}", .{ self.id8(s, x.caster, &b1), name });
+                if (x.has_target) try w.print(" {s}", .{self.id8(s, x.target, &b2)});
+                if (x.has_cell) try w.print(" at {d},{d}", .{ x.cell.x, x.cell.y });
+            },
         }
     }
 

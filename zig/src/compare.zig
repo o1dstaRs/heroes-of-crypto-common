@@ -122,6 +122,34 @@ fn abilityNamesMatch(ids_: []const st.AbilityId, names: []const u8) bool {
     return i == ids_.len;
 }
 
+/// The "Life:Heal,Life:Heal,:Vine Throw" column (unitProperties.spells) against the raw entries, in order.
+fn bookEntriesMatch(u: *const st.Unit, text: []const u8) bool {
+    var it = std.mem.tokenizeScalar(u8, text, ',');
+    var i: usize = 0;
+    while (it.next()) |e| : (i += 1) {
+        if (i >= u.n_book) return false;
+        const want = engine.parseBookEntry(e) catch return false;
+        if (want.spell != u.book[i].spell or want.prefix != u.book[i].prefix) return false;
+    }
+    return i == u.n_book;
+}
+
+/// The "Heal:3,Blessing:0" column (getSpells(): name and remaining charges) against the parsed book, in order.
+fn bookSpellsMatch(u: *const st.Unit, text: []const u8) bool {
+    var it = std.mem.tokenizeScalar(u8, text, ',');
+    var i: usize = 0;
+    while (it.next()) |e| : (i += 1) {
+        if (i >= u.n_spells) return false;
+        const colon = std.mem.lastIndexOfScalar(u8, e, ':') orelse return false;
+        const b = u.spells[i];
+        if (b.spell >= st.N_CAST_SPELLS) return false;
+        if (!std.mem.eql(u8, e[0..colon], @as(st.CastSpell, @enumFromInt(b.spell)).name())) return false;
+        const amount = std.fmt.parseInt(u32, e[colon + 1 ..], 10) catch return false;
+        if (amount != b.amount) return false;
+    }
+    return i == u.n_spells;
+}
+
 fn column(row: []const std.json.Value, i: usize) ?[]const u8 {
     return if (i < row.len and row[i] == .string) row[i].string else null;
 }
@@ -281,9 +309,9 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
             }
         }
         // Setup columns (recordings with augments or synergies): the Sniper shot distance and the two bases Bitter
-        // Experience moves. Then the batch-3 columns (digest.ts): rows of 47 columns have neither, 50 setup, 52 batch 3,
-        // 55 both.
-        const has_setup = row.len == 50 or row.len == 55;
+        // Experience moves. Then the batch-3 columns (digest.ts), then the spellbook columns: rows of 47 columns have
+        // none, 50 setup, 52 batch 3, 55 setup and batch 3, 54 batch 3 and spells, 57 all three.
+        const has_setup = row.len == 50 or row.len == 55 or row.len == 57;
         const setup_cols = [_]struct { []const u8, f64, usize }{
             .{ "shot_distance", u.shot_distance, 47 },
             .{ "base_armor_init", u.init.base_armor, 48 },
@@ -296,8 +324,8 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
                 return false;
             }
         };
-        if (row.len == 52 or row.len == 55) {
-            const b = row.len - 5;
+        if (row.len == 52 or row.len == 55 or row.len == 54 or row.len == 57) {
+            const b: usize = if (has_setup) 50 else 47;
             if (!abilityNamesMatch(blk: {
                 var list: [st.MAX_ABILITIES]st.AbilityId = undefined;
                 for (u.abilities[0..u.n_abilities], 0..) |a, i| list[i] = a.id;
@@ -321,6 +349,16 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
             if (!eqNum(u.rallying_volley_granted, rec.num(row[b + 4]))) {
                 m.set("unit {d} rallying_volley_granted: zig {d}, ts {d}", .{ idx, u.rallying_volley_granted, rec.num(row[b + 4]) });
                 return false;
+            }
+            if (row.len == 54 or row.len == 57) {
+                if (!bookEntriesMatch(u, column(row, b + 5) orelse "")) {
+                    m.set("unit {d} spell_entries: ts '{s}' (zig has {d})", .{ idx, column(row, b + 5) orelse "", u.n_book });
+                    return false;
+                }
+                if (!bookSpellsMatch(u, column(row, b + 6) orelse "")) {
+                    m.set("unit {d} spellbook: ts '{s}' (zig has {d})", .{ idx, column(row, b + 6) orelse "", u.n_spells });
+                    return false;
+                }
             }
         }
         k += 1;
@@ -370,6 +408,21 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
     if (laps != fs.damage_laps) {
         m.set("fight damageLaps differ", .{});
         return false;
+    }
+    // Vines (recordings with spells): [x, y, laps, team] in Map order.
+    const vines = rec.get(f, "vines");
+    if (vines == .array) {
+        if (vines.array.items.len != fs.n_vines) {
+            m.set("fight vines: zig {d}, ts {d}", .{ fs.n_vines, vines.array.items.len });
+            return false;
+        }
+        for (vines.array.items, fs.vines[0..fs.n_vines], 0..) |e, v, i| {
+            const a = e.array.items;
+            if (rec.int(a[0]) != v.x or rec.int(a[1]) != v.y or rec.int(a[2]) != v.laps or rec.int(a[3]) != v.team) {
+                m.set("fight vine {d}: zig ({d},{d}) laps {d} team {d}, ts ({d},{d}) laps {d} team {d}", .{ i, v.x, v.y, v.laps, v.team, rec.int(a[0]), rec.int(a[1]), rec.int(a[2]), rec.int(a[3]) });
+                return false;
+            }
+        }
     }
     // Terrain (recordings of LAVA_CENTER / BLOCK_CENTER or side boards): hit counters, cleared sides, the dried
     // centre and the standing stones in layout order.
@@ -426,6 +479,13 @@ pub fn actionsEqual(a: rec.Action, b: rec.Action) bool {
             if (x.attacker != y.attacker or x.target != y.target) break :blk false;
             if ((x.aim_cell == null) != (y.aim_cell == null)) break :blk false;
             if (x.aim_cell) |ac| break :blk ac.x == y.aim_cell.?.x and ac.y == y.aim_cell.?.y and x.aim_side == y.aim_side;
+            break :blk true;
+        },
+        .cast_spell => |x| blk: {
+            const y = b.cast_spell;
+            if (x.caster != y.caster or x.spell != y.spell or x.has_target != y.has_target or x.has_cell != y.has_cell) break :blk false;
+            if (x.has_target and x.target != y.target) break :blk false;
+            if (x.has_cell and (x.cell.x != y.cell.x or x.cell.y != y.cell.y)) break :blk false;
             break :blk true;
         },
         .decide => |x| blk: {

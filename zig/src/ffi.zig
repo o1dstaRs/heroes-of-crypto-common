@@ -194,10 +194,9 @@ fn nameTable(arena: std.mem.Allocator, root: std.json.Value, s: *const st.State)
             }
         }
     }
-    const summon_names = [_][]const u8{ "Arachna Spider", "Arachna Queen" };
     for (s.summon_name_id, 0..) |id, k| {
         if (id < MAX_NAMES) {
-            names[id] = summon_names[k];
+            names[id] = st.SUMMON_NAMES[k];
             used = @max(used, id + 1);
         }
     }
@@ -355,7 +354,8 @@ export fn hoc_play_v01(eng: ?*Engine, handle: ?*Handle, max_laps: i32, out: ?*ro
 // ---- hoc_rollouts --------------------------------------------------------------------------------------------------
 
 const SUPPORTED_ACTIONS = [_][]const u8{
-    "end_turn", "wait_turn", "defend_turn", "select_attack_type", "move_unit", "melee_attack", "range_attack", "obstacle_attack",
+    "end_turn",   "wait_turn", "defend_turn", "select_attack_type", "move_unit", "melee_attack", "range_attack", "obstacle_attack",
+    "cast_spell",
 };
 
 fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []const u8) ?rollout.Request {

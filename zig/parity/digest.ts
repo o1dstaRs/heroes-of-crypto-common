@@ -4,7 +4,8 @@
  * it in zig/src/compare.zig (`compare.state`), by column position; `digestFields` names the columns.
  *
  * `setup` adds the setup columns (shot distance, initial base armor and steps), `terrain` the terrain block of the
- * fight digest (written on any board that is not the classic NORMAL one).
+ * fight digest (written on any board that is not the classic NORMAL one), `spells` the spellbook columns (after the
+ * batch-3 columns, which it turns on) and the fight digest's vines.
  */
 
 export interface IDigestOptions {
@@ -12,9 +13,11 @@ export interface IDigestOptions {
     terrain: boolean;
     /** The batch-3 columns (active and stolen abilities, the Web lock, debuff stored properties, Rallying Volley). */
     batch3?: boolean;
+    /** The spellbook columns (the raw entries and the parsed book) and the fight's vines; implies `batch3`. */
+    spells?: boolean;
 }
 
-export function unitDigest(u: any, setup: boolean, batch3 = false): unknown[] {
+export function unitDigest(u: any, setup: boolean, batch3 = false, spells = false): unknown[] {
     const p = u.getUnitProperties();
     const c = u.getBaseCell();
     return [
@@ -73,7 +76,7 @@ export function unitDigest(u: any, setup: boolean, batch3 = false): unknown[] {
         // Batch-3 columns: the active ability list (stolen ones included, Break ignored), the names the unit lost to
         // Predatory Assimilation, the Web movement lock, each debuff's stored properties (the Web row's source cell)
         // and the once-only Rallying Volley arrows.
-        ...(batch3
+        ...(batch3 || spells
             ? [
                   u.abilities.map((a: any) => a.getName()).join(","),
                   (p.stolen_abilities ?? []).join(","),
@@ -85,11 +88,22 @@ export function unitDigest(u: any, setup: boolean, batch3 = false): unknown[] {
                   p.rallying_volley_granted ?? 0,
               ]
             : []),
+        // Spellbook columns: the raw entries (one per remaining charge; useSpell removes the LAST of a name) and the
+        // parsed book with each spell's remaining charges (a spent spell stays at 0 until the book is re-parsed).
+        ...(spells
+            ? [
+                  (p.spells ?? []).join(","),
+                  u
+                      .getSpells()
+                      .map((s: any) => `${s.getName()}:${s.getAmount()}`)
+                      .join(","),
+              ]
+            : []),
     ];
 }
 
 /** The column names of unitDigest, in order. */
-export function digestFields(setup: boolean, batch3 = false): string[] {
+export function digestFields(setup: boolean, batch3 = false, spells = false): string[] {
     return [
         "id",
         "amount_alive",
@@ -139,10 +153,19 @@ export function digestFields(setup: boolean, batch3 = false): string[] {
         "magic_resist",
         "buffs_sources",
         ...(setup ? ["shot_distance", "base_armor_init", "steps_init"] : []),
-        ...(batch3
+        ...(batch3 || spells
             ? ["abilities", "stolen_abilities", "web_locked", "debuffs_sources", "rallying_volley_granted"]
             : []),
+        ...(spells ? ["spell_entries", "spellbook"] : []),
     ];
+}
+
+/** The vines store (FightProperties.vines) in Map order: [x, y, lapsRemaining, team]. */
+export function vinesDigest(fp: any): number[][] {
+    const store = fp.getVines?.();
+    const map: Map<number, any> | undefined = store?.vines;
+    if (!map) return [];
+    return [...map.values()].map((v: any) => [v.cell.x, v.cell.y, v.getLapsRemaining(), v.team]);
 }
 
 export function fightDigest(fp: any): Record<string, unknown> {
@@ -188,9 +211,12 @@ export function battleDigest(
     opts: IDigestOptions,
 ): { units: unknown[][]; fight: Record<string, unknown> } {
     const units: unknown[][] = [];
-    for (const u of ctx.unitsHolder.getAllUnits().values()) units.push(unitDigest(u, opts.setup, opts.batch3));
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        units.push(unitDigest(u, opts.setup, opts.batch3, opts.spells));
+    }
     const emberTeams = [...(ctx.unitsHolder.emberCovenantTeams ?? [])].sort();
     const fight: Record<string, unknown> = { ...fightDigest(ctx.fightProperties), emberTeams };
     if (opts.terrain) fight.terrain = terrainDigest(ctx.grid, ctx.fightProperties);
+    if (opts.spells) fight.vines = vinesDigest(ctx.fightProperties);
     return { units, fight };
 }

@@ -68,6 +68,10 @@ pub const Ctx = struct {
     /// later version's port sets it around its inherited findTarget call.
     prefer_attack_over_mining: bool = false,
     route_buf: [64]Cell = undefined,
+    /// The decision runs with a DecisionPathCatalog (SearchDriver's rollout turns), which lets findTarget build only
+    /// the distance-one melee layer of its infinite-path pass (canElideUnconsumedMeleeLayers). The two differ only
+    /// when a layer-one route weighs 0: a vine strider's free road. Set from `catalog_decisions` by initCtxInto.
+    elide_melee_layers: bool = false,
     /// isFreeAt for the melee layers: on the board and empty, or one of the attacker's own cells. Bit y of free[x].
     free: [st.GRID]u16 = .{0} ** st.GRID,
 
@@ -98,12 +102,16 @@ pub const Ctx = struct {
             .can_fly = engine.canFly(u),
             .w = u.fw,
             .h = u.fh,
+            // The fight's vines, and hasAbilityActive("In Its Own World") (every AI getMovePath passes it).
+            .vines = if (self.s.fight.n_vines != 0) &self.s.fight.vine_cells else null,
+            .vine_stride = u.ability_mask & st.AbilityId.in_its_own_world.bit() != 0 and u.has(.in_its_own_world),
         };
     }
 
     pub fn actualPath(self: *Ctx) *const MovePath {
         if (!self.have_actual) {
             pathing.getMovePath(&self.m, self.params(engine.getSteps(self.unit())), &self.actual);
+            if (self.actual.overflow) self.s.overflow = true;
             self.have_actual = true;
         }
         return &self.actual;
@@ -514,6 +522,7 @@ pub fn doFindTarget(c: *Ctx) ?AIAction {
     const team: i8 = @intCast(u.team);
     const steps = engine.getSteps(u);
     pathing.getMovePath(&c.m, c.params(100 + steps), &c.infinite);
+    if (c.infinite.overflow) c.s.overflow = true;
     _ = c.actualPath();
     const body = engine.unitCells(u);
 
@@ -539,8 +548,10 @@ pub fn doFindTarget(c: *Ctx) ?AIAction {
                 const el = mat(&c.m, x, y);
                 if (el == team or el == 0 or el < 0) continue;
                 const target = selectableTargetAt(s, c.ui, .{ .x = x, .y = y }) orelse continue;
+                // buildFirstMeleeTargetLayers under a catalog: the first layer only.
+                const max_depth: i32 = if (c.elide_melee_layers) 1 else 7;
                 var depth: i32 = 0;
-                while (depth < 7) : (depth += 1) {
+                while (depth < max_depth) : (depth += 1) {
                     var layer_left = INF;
                     buildLayer(c, .{ .x = x, .y = y }, depth + 1, body.slice(), &layer);
                     for (layer.cells[0..layer.n]) |lc| {
@@ -944,7 +955,7 @@ pub fn isLegalMoveRoute(c: *Ctx, target: Cell, mp: *const MovePath, r: *const Ro
     const base = engine.baseCell(u);
     const travelled = if (sameCell(cells[0], base)) cells[1..len] else cells[0..len];
     const steps = engine.getSteps(u);
-    const max_cells = @max(1, @ceil(steps));
+    const max_cells = engine.maxCellsForStepBudget(c.s, u); // maxCellsForStepBudget: a vine strider's board bound
     if (travelled.len == 0 or @as(f64, @floatFromInt(travelled.len)) > max_cells or !std.math.isFinite(r.weight) or r.weight < 0 or r.weight > steps + 1e-9) return false;
     var prev = base;
     for (travelled) |cell| {
@@ -1084,6 +1095,10 @@ pub fn findLegalRangeAttack(c: *const Ctx, preferred: u8) ?rec.Action {
 /// Builds unit `ui`'s decision context in place: the board matrix and the free-cell bitmap the melee layers read
 /// (the two move paths are computed on demand). A Ctx is about 18 KB, so build it where it lives:
 /// `var c: Ctx = undefined; initCtxInto(&c, s, ui);`.
+/// Decisions on this thread run as SearchDriver's rollout turns do, with a DecisionPathCatalog (rollout.run sets it;
+/// runMatch's decisions without search have none).
+pub threadlocal var catalog_decisions: bool = false;
+
 pub fn initCtxInto(c: *Ctx, s: *State, ui: u8) void {
     c.s = s;
     c.ui = ui;
@@ -1091,6 +1106,7 @@ pub fn initCtxInto(c: *Ctx, s: *State, ui: u8) void {
     c.have_actual = false;
     c.prefer_responded = true;
     c.prefer_attack_over_mining = false;
+    c.elide_melee_layers = catalog_decisions;
     c.initFree();
 }
 

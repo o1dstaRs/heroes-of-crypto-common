@@ -24,6 +24,9 @@ pub const Action = union(enum) {
     obstacle_attack: struct { attacker: u8, target_x: f64, target_y: f64, attack_from: Cell, path: []const Cell, has_lava: bool = false, has_from: bool = true },
     /// An AI decision: the unit and the actions `decideTurn` returned (not an engine call).
     decide: struct { unit: u8, out: []const Action },
+    /// A cast (`cast_spell`): the spell (state.CastSpell, or NO_SPELL for a name outside the port), the target unit
+    /// (`has_target`) and the target cell (`has_cell`). targetOrientation (Fire Wall) is not in scope.
+    cast_spell: struct { caster: u8, spell: u8, target: u8 = 0, has_target: bool = false, cell: Cell = .{ .x = 0, .y = 0 }, has_cell: bool = false },
 };
 
 pub const EventKind = enum(u8) {
@@ -169,6 +172,22 @@ pub fn parseAction(arena: std.mem.Allocator, ids: []const []const u8, kind: []co
             .path = try cells(arena, get(a, "path")),
             .has_lava = flag(get(a, "hasLavaCell")),
             .has_from = from != .null,
+        } };
+    }
+    if (std.mem.eql(u8, t, "cast_spell")) {
+        const name = get(a, "spellName");
+        if (name != .string) return error.MissingSpell;
+        const spell = @import("state.zig").CastSpell.fromName(name.string);
+        if (get(a, "targetOrientation") != .null) return error.UnsupportedSpell; // Fire Wall
+        const tid = get(a, "targetId");
+        const tc = get(a, "targetCell");
+        return .{ .cast_spell = .{
+            .caster = try unitArg(ids, get(a, "casterId")),
+            .spell = if (spell) |sp| @intFromEnum(sp) else @import("state.zig").NO_SPELL,
+            .target = if (tid == .string) try unitIndex(ids, tid.string) else 0,
+            .has_target = tid == .string,
+            .cell = if (tc == .object) cell(tc) else .{ .x = 0, .y = 0 },
+            .has_cell = tc == .object,
         } };
     }
     if (std.mem.eql(u8, t, "range_attack")) {

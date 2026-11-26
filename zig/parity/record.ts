@@ -41,7 +41,9 @@ import {
     createCombatFactories,
     createUnitFromSpec,
     creaturesByLevel,
+    DEFAULT_AMOUNT_BY_LEVEL,
     makeRng,
+    resolveStackAmount,
 } from "../../src/simulation/army";
 import {
     DEFAULT_SYNERGY_VARIANTS,
@@ -64,7 +66,10 @@ type Ctx = { grid: any; fightProperties: any; unitsHolder: any };
 // ---- scope: strip abilities and spells from every creature (harness-local mutation of the shared config) ----
 // RECORD_KEEP_ABILITIES="Leprechaun,Nomad" keeps those creatures' abilities and spells, so the ported abilities can be
 // checked batch by batch. RECORD_KEEP_RATE (default 0.6) is the chance each roster slot is swapped for a kept creature
-// of the same level.
+// of the same level. RECORD_SPELLS="Heal,Blessing" keeps only those entries of the kept creatures' spellbooks
+// (creatures.json `spells`; a castable ability such as Trent's Vine Throw is not a book entry and stays), so a battle
+// casts only the spells the port covers. RECORD_AMOUNTS=expBudget sizes every stack as the live server does
+// (buildRoster's amountMode: ceil(STACK_EXPERIENCE_BUDGET / exp)); the default levelTable keeps the 50/30/15/8 table.
 const KEEP = new Set(
     (process.env.RECORD_KEEP_ABILITIES ?? "")
         .split(",")
@@ -72,10 +77,31 @@ const KEEP = new Set(
         .filter(Boolean),
 );
 const KEEP_RATE = Number(process.env.RECORD_KEEP_RATE ?? 0.6);
+const SPELL_KEEP = process.env.RECORD_SPELLS
+    ? new Set(
+          process.env.RECORD_SPELLS.split(",")
+              .map((name) => name.trim())
+              .filter(Boolean),
+      )
+    : undefined;
+const AMOUNT_MODE = (process.env.RECORD_AMOUNTS ?? "levelTable").trim() as "levelTable" | "expBudget";
+if (AMOUNT_MODE !== "levelTable" && AMOUNT_MODE !== "expBudget") {
+    throw new Error(`RECORD_AMOUNTS: expected levelTable or expBudget, got ${AMOUNT_MODE}`);
+}
+/** A kept creature with a spellbook (or RECORD_SPELLS set): the spellbook digest columns and spell configs are written. */
+let keptSpellbook = false;
 for (const [faction, creatures] of Object.entries(creaturesJson as Record<string, any>)) {
     if (faction === "version" || typeof creatures !== "object") continue;
     for (const [name, creature] of Object.entries(creatures as Record<string, any>)) {
-        if (KEEP.has(name)) continue;
+        if (KEEP.has(name)) {
+            if (SPELL_KEEP) {
+                creature.spells = creature.spells.filter((entry: string) =>
+                    SPELL_KEEP.has(entry.slice(entry.indexOf(":") + 1)),
+                );
+            }
+            if (creature.spells.length) keptSpellbook = true;
+            continue;
+        }
         creature.abilities = [];
         creature.spells = [];
     }
@@ -103,7 +129,12 @@ const factionFor = (teamIndex: number): string | undefined =>
 /** buildRoster, then each slot swapped (deterministically per seed) for a kept creature of the same level. */
 function rosterFor(seed: number, teamIndex = 0): ReturnType<typeof buildRoster> {
     const faction = factionFor(teamIndex);
-    const base = faction ? buildRoster(makeRng(seed), undefined, undefined, faction) : buildRoster(makeRng(seed));
+    const base =
+        AMOUNT_MODE === "expBudget"
+            ? buildRoster(makeRng(seed), undefined, undefined, faction, AMOUNT_MODE)
+            : faction
+              ? buildRoster(makeRng(seed), undefined, undefined, faction)
+              : buildRoster(makeRng(seed));
     if (!KEEP.size) return base;
     const rng = makeRng(Math.imul(seed, 7919) >>> 0);
     return base.map((spec) => {
@@ -118,7 +149,11 @@ function rosterFor(seed: number, teamIndex = 0): ReturnType<typeof buildRoster> 
             ...(pick.footprintWidth === undefined || pick.footprintHeight === undefined
                 ? {}
                 : { footprintWidth: pick.footprintWidth, footprintHeight: pick.footprintHeight }),
-            amount: spec.amount,
+            // A swapped-in creature gets its own budget amount, not the replaced one's.
+            amount:
+                AMOUNT_MODE === "expBudget"
+                    ? resolveStackAmount(pick.creatureName, pick.level, DEFAULT_AMOUNT_BY_LEVEL, AMOUNT_MODE)
+                    : spec.amount,
         };
     });
 }
@@ -413,15 +448,40 @@ const num = (v: unknown): number => (typeof v === "number" ? v : Number(v ?? 0))
 const BATCH3_CREATURES = ["Zena", "Arachna Queen", "Arachna Spider", "Squire", "Troglodyte", "Monk"];
 const BATCH3 = BATCH3_CREATURES.some((name) => KEEP.has(name));
 const SUMMON_CREATURES = ["Arachna Spider", "Arachna Queen"];
+// ---- spells (wave 1) ----
+// A kept spellbook (or RECORD_SPELLS) turns on the spell columns: the unit digest gains the batch-3 columns and then
+// `spell_entries` (unitProperties.spells) and `spellbook` (the parsed Spells as name:charges), the fight digest gains
+// `vines` ([x, y, laps, team] in Map order), the start state gains `spellConfigs` for every spell a unit can cast
+// (keyed by name; the System "Vine Throw" config too, which the snare reads) and, when a unit holds a summon spell,
+// the "Wolf" summon template. A Trent-only battle (Vine Throw is a castable ability, not a book) sets RECORD_SPELLS to
+// get the columns.
+const SPELLS = keptSpellbook || SPELL_KEEP !== undefined;
+const BATCH3_COLUMNS = BATCH3 || SPELLS;
+const SPELL_SUMMON_CREATURES = ["Wolf"];
 
-const DIGEST_FIELDS = digestFields(SETUP, BATCH3);
+const DIGEST_FIELDS = digestFields(SETUP, BATCH3, SPELLS);
 
 function digest(ctx: Ctx): { units: unknown[][]; fight: Record<string, unknown> } {
-    return battleDigest(ctx, { setup: SETUP, terrain: TERRAIN, batch3: BATCH3 });
+    return battleDigest(ctx, { setup: SETUP, terrain: TERRAIN, batch3: BATCH3, spells: SPELLS });
 }
 
-/** Whether a unit of the holder can ever summon (Infest; spells are stripped). */
+/** Whether a unit of the holder can ever cast a summon spell (Summon Wolves). */
+function canSummonBySpell(ctx: Ctx): boolean {
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        if (u.getUnitProperties().spells.some((entry: string) => entry.includes(":Summon "))) return true;
+    }
+    return false;
+}
+
+/** Whether a unit of the holder can ever summon (Infest, or a summon spell). */
 function canSummon(ctx: Ctx): boolean {
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        if (u.getUnitProperties().abilities.includes("Infest")) return true;
+    }
+    return canSummonBySpell(ctx);
+}
+
+function canInfest(ctx: Ctx): boolean {
     for (const u of ctx.unitsHolder.getAllUnits().values()) {
         if (u.getUnitProperties().abilities.includes("Infest")) return true;
     }
@@ -438,7 +498,11 @@ function summonTemplates(
 ): Record<string, unknown> {
     const { abilityFactory, effectFactory } = createCombatFactories();
     const out: Record<string, unknown> = {};
-    for (const creatureName of SUMMON_CREATURES) {
+    const creatures = [
+        ...(canInfest(ctx) ? SUMMON_CREATURES : []),
+        ...(canSummonBySpell(ctx) ? SPELL_SUMMON_CREATURES : []),
+    ];
+    for (const creatureName of creatures) {
         const unit = createUnitFromSpec(
             { faction: "Nature", creatureName, level: 0, size: 0, amount: 1 },
             2,
@@ -502,7 +566,7 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
                       buffsSources: u
                           .getBuffs()
                           .map((b: any) => `${b.getFirstSpellProperty() ?? ""};${b.getSecondSpellProperty() ?? ""}`),
-                      ...(BATCH3
+                      ...(BATCH3_COLUMNS
                           ? {
                                 debuffsSources: u
                                     .getDebuffs()
@@ -546,6 +610,21 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
     const spellConfigs: Record<string, unknown> = {
         "Ember Covenant Blessing": JSON.parse(JSON.stringify(getSpellConfig("System", "Ember Covenant Blessing"))),
     };
+    if (SPELLS) {
+        // Every spell a unit's book or castable ability can cast (getSpellConfig of the entry's faction), then the
+        // System Vine Throw the snare on an enemy vine reads.
+        for (const u of ctx.unitsHolder.getAllUnits().values()) {
+            for (const entry of u.getUnitProperties().spells as string[]) {
+                const name = entry.slice(entry.indexOf(":") + 1);
+                if (name in spellConfigs) continue;
+                const faction = entry.slice(0, entry.indexOf(":")) || "System";
+                spellConfigs[name] = JSON.parse(JSON.stringify(getSpellConfig(faction, name)));
+            }
+        }
+        if (!("Vine Throw" in spellConfigs)) {
+            spellConfigs["Vine Throw"] = JSON.parse(JSON.stringify(getSpellConfig("System", "Vine Throw")));
+        }
+    }
     const templates = canSummon(ctx)
         ? summonTemplates(ctx, abilityConfigs, effectConfigs, auraEffectConfigs)
         : undefined;
@@ -719,6 +798,9 @@ function main(): void {
                     const r = routes[0];
                     known.push([key, r.weight, r.route.map((c: any) => [c.x, c.y]), r.hasLavaCell ? 1 : 0]);
                 }
+                // The vines the pather reads (the fight's store), when there are any: the cells in Map order.
+                const vineStore = ctx?.fightProperties?.getVines?.();
+                const vines = vineStore?.size?.() ? vineStore.cells().map((c: any) => [c.x, c.y]) : undefined;
                 pathLines.push(
                     JSON.stringify({
                         cell: [cell.x, cell.y],
@@ -732,6 +814,7 @@ function main(): void {
                         w: w ?? (isSmall === false ? 2 : 1),
                         h: h ?? (isSmall === false ? 2 : 1),
                         known,
+                        ...(vines ? { vines } : {}),
                     }),
                 );
             }
@@ -974,6 +1057,8 @@ function main(): void {
         mapWeights: MAP_WEIGHTS,
         sideOriented: SIDE_ORIENTED,
         gridTypes: gridCounts,
+        ...(AMOUNT_MODE !== "levelTable" ? { amounts: AMOUNT_MODE } : {}),
+        ...(SPELL_KEEP ? { spells: [...SPELL_KEEP] } : {}),
         ...(SETUP
             ? {
                   setup: {

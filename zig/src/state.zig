@@ -12,13 +12,13 @@ pub const MAX_UNITS = 32;
 /// Distinct unit ids one battle can name (start units and summons): `Unit.uid` and recorded unit indices are u8.
 pub const MAX_UIDS = 255;
 pub const GRID = 16;
-/// Buffs a unit can carry in scope: Morale, Luck Blessing, Arcane Ward, Sharpened Weapons (melee or magic units) or
-/// Rallying Volley (shooters), Ember Covenant, three aura rows and the five augments (13), with one to spare. A push
-/// past a capacity sets State.overflow (the checks report it).
-pub const MAX_SPELLS = 14;
-/// Debuffs (Dismorale, Dulling Defense, Miner, the Web Aura row) and effects (Stun, Break, Poison, Aggr, Shatter
-/// Armor, Pegasus Light), one to spare each.
-pub const MAX_DEBUFFS = 5;
+/// Buffs a unit can carry in scope: Morale, Luck Blessing, Sylvan Focus, Arcane Ward, Sharpened Weapons (melee or magic
+/// units) or Rallying Volley (shooters), Ember Covenant, three aura rows, the five augments and a cast Blessing (15),
+/// with one to spare. A push past a capacity sets State.overflow (the checks report it).
+pub const MAX_SPELLS = 16;
+/// Debuffs (Dismorale, Dulling Defense, Miner, the Web Aura row, the Vine Throw snare) and effects (Stun, Break, Poison,
+/// Aggr, Shatter Armor, Pegasus Light), one to spare each.
+pub const MAX_DEBUFFS = 6;
 pub const MAX_EFFECTS = 7;
 
 pub const Team = struct {
@@ -75,8 +75,15 @@ pub const SpellId = enum(u8) {
     might_augment,
     sniper_augment,
     movement_augment,
-    /// Read only by magic-damage abilities (none in scope): carried and digested, never read.
+    /// Read by spell damage (getMagicDamageBonusPercentage).
     empower_augment,
+    // spells (wave 1)
+    /// The Healer's cast buff: every damage roll of its holder is the maximum (adjustBaseStats).
+    blessing,
+    /// The Vine Throw snare (a debuff: -power steps at every refresh), from the cast or an arrival on an enemy vine.
+    vine_throw,
+    /// The Satyr's stack blessing: a magic-damage bonus percentage on every ally.
+    sylvan_focus_blessing,
 
     pub fn name(self: SpellId) []const u8 {
         return switch (self) {
@@ -104,12 +111,15 @@ pub const SpellId = enum(u8) {
             .sniper_augment => "Sniper Augment",
             .movement_augment => "Movement Augment",
             .empower_augment => "Empower Augment",
+            .blessing => "Blessing",
+            .vine_throw => "Vine Throw",
+            .sylvan_focus_blessing => "Sylvan Focus Blessing",
         };
     }
 
     /// An augment buff (UnitsHolder.applyAugments).
     pub inline fn isAugment(self: SpellId) bool {
-        return @intFromEnum(self) >= @intFromEnum(SpellId.armor_augment);
+        return @intFromEnum(self) >= @intFromEnum(SpellId.armor_augment) and @intFromEnum(self) <= @intFromEnum(SpellId.empower_augment);
     }
 
     pub fn fromName(n: []const u8) ?SpellId {
@@ -248,6 +258,14 @@ pub const AbilityId = enum(u8) {
     magic_shield,
     borrowed_grace,
     absolving_arrow,
+    // spells (wave 1): the casters' spellbook cards (INFO, power type SPELLBOOK: read only by Predatory Assimilation,
+    // which moves the card's remaining charges), the Magic Dragon's rebound and the Satyr's stack blessing
+    book_of_healing,
+    basic_tome_of_battle_magic,
+    forest_spellbook,
+    tome_of_elements,
+    magic_reflection,
+    sylvan_focus_blessing,
 
     pub fn name(self: AbilityId) []const u8 {
         return switch (self) {
@@ -292,7 +310,36 @@ pub const AbilityId = enum(u8) {
             .magic_shield => "Magic Shield",
             .borrowed_grace => "Borrowed Grace",
             .absolving_arrow => "Absolving Arrow",
+            .book_of_healing => "Book of Healing",
+            .basic_tome_of_battle_magic => "Basic Tome of Battle Magic",
+            .forest_spellbook => "Forest Spellbook",
+            .tome_of_elements => "Tome of Elements",
+            .magic_reflection => "Magic Reflection",
+            .sylvan_focus_blessing => "Sylvan Focus Blessing",
         };
+    }
+
+    /// A SPELLBOOK card (unit.ts SPELLBOOK_SPELL_NAMES): whether it owns the charges of `spell`.
+    pub fn ownsSpell(self: AbilityId, spell: CastSpell) bool {
+        return switch (self) {
+            .book_of_healing => spell == .heal or spell == .blessing,
+            .forest_spellbook => spell == .summon_wolves,
+            .basic_tome_of_battle_magic => spell == .fire_strike or spell == .meteorite,
+            .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower,
+            else => false,
+        };
+    }
+
+    pub inline fn isSpellbook(self: AbilityId) bool {
+        return switch (self) {
+            .book_of_healing, .basic_tome_of_battle_magic, .forest_spellbook, .tome_of_elements => true,
+            else => false,
+        };
+    }
+
+    /// The spell a castable ability carries (`can_be_cast`, makeAbility's System spell): Vine Throw only in scope.
+    pub inline fn castable(self: AbilityId) ?CastSpell {
+        return if (self == .vine_throw) .vine_throw else null;
     }
 
     pub fn fromName(n: []const u8) ?AbilityId {
@@ -307,6 +354,149 @@ pub const AbilityId = enum(u8) {
         return @as(AbilityMask, 1) << @as(u6, @intCast(@intFromEnum(self)));
     }
 };
+
+// =====================================================================================================================
+// Spells (src/spells: spells.json via getSpellConfig, Spell, the unit's spellbook)
+// =====================================================================================================================
+
+/// The spells the port casts (wave 1). A book entry of any other spell is refused at load, so a cast naming another
+/// spell is necessarily `spell_not_found` (NO_SPELL in an action).
+pub const CastSpell = enum(u8) {
+    heal,
+    blessing,
+    lightning_strike,
+    fire_strike,
+    meteor_shower,
+    meteorite,
+    summon_wolves,
+    vine_throw,
+    ring_of_fire,
+
+    pub fn name(self: CastSpell) []const u8 {
+        return switch (self) {
+            .heal => "Heal",
+            .blessing => "Blessing",
+            .lightning_strike => "Lightning Strike",
+            .fire_strike => "Fire Strike",
+            .meteor_shower => "Meteor Shower",
+            .meteorite => "Meteorite",
+            .summon_wolves => "Summon Wolves",
+            .vine_throw => "Vine Throw",
+            .ring_of_fire => "Ring of Fire",
+        };
+    }
+
+    pub fn fromName(n: []const u8) ?CastSpell {
+        inline for (std.meta.fields(CastSpell)) |f| {
+            const id: CastSpell = @enumFromInt(f.value);
+            if (std.mem.eql(u8, n, id.name())) return id;
+        }
+        return null;
+    }
+
+    /// The buff or debuff of the same name a target can carry (canCastSpell's notAlreadyApplied), if any in scope.
+    pub fn applied(self: CastSpell) ?SpellId {
+        return switch (self) {
+            .blessing => .blessing,
+            .vine_throw => .vine_throw,
+            else => null,
+        };
+    }
+};
+
+pub const N_CAST_SPELLS = @typeInfo(CastSpell).@"enum".fields.len;
+/// A cast or book entry naming a spell outside CastSpell.
+pub const NO_SPELL: u8 = 0xff;
+
+/// SpellTargetType, SpellPowerType, SpellMultiplierType and SpellElement (src/spells/spell_properties.ts).
+pub const SpellTarget = struct {
+    pub const FREE_CELL: u8 = 1;
+    pub const ANY_ALLY: u8 = 2;
+    pub const RANDOM_CLOSE_TO_CASTER: u8 = 3;
+    pub const ALL_ALLIES: u8 = 4;
+    pub const ALL_ENEMIES: u8 = 5;
+    pub const ANY_ENEMY: u8 = 6;
+    pub const ALL_FLYING: u8 = 8;
+    pub const ENEMY_WITHIN_MOVEMENT_RANGE: u8 = 9;
+    pub const ALLIES_AREA: u8 = 11;
+};
+pub const SpellPower = struct {
+    pub const COMMON: u8 = 1;
+    pub const MIND: u8 = 2;
+    pub const HEAL: u8 = 3;
+    pub const POSITION_CHANGE: u8 = 4;
+    pub const RESURRECT: u8 = 5;
+};
+pub const SpellMultiplier = struct {
+    pub const NO_MULTIPLIER: u8 = 1;
+    pub const UNIT_AMOUNT_POWER: u8 = 3;
+    pub const UNIT_AMOUNT_DAMAGE: u8 = 6;
+};
+pub const Element = struct {
+    pub const NONE: u8 = 0;
+    pub const FIRE: u8 = 1;
+    pub const WATER: u8 = 2;
+    pub const AIR: u8 = 3;
+    pub const EARTH: u8 = 4;
+    /// No element argument at all (a creature's hit): Unit.applyDamage's `damageElement` undefined.
+    pub const UNSET: u8 = 0xff;
+};
+
+/// One spell's configuration (getSpellConfig(faction, name): recorded in `init.spellConfigs`, or the export's Spell
+/// objects' spellProperties). Every number the cast reads comes from here.
+pub const SpellConfig = struct {
+    power: f64 = 0,
+    laps: f64 = 0,
+    min_stack_power: f64 = 0,
+    target: u8 = 0,
+    power_type: u8 = 0,
+    multiplier: u8 = 0,
+    element: u8 = 0,
+    is_buff: bool = false,
+    self_cast: bool = false,
+    /// conflicts_with names in scope (a SpellId a target can carry); names outside the port can never be carried.
+    conflict: ?SpellId = null,
+    loaded: bool = false,
+};
+
+/// One raw spell entry (unitProperties.spells "<Faction>:<Name>"): the spell and its faction prefix.
+pub const BookEntry = struct {
+    spell: u8,
+    prefix: u8,
+
+    /// The prefix codes: an empty faction (":Vine Throw", a castable ability), "System:", then the factions.
+    pub const NO_FACTION: u8 = 0;
+    pub const SYSTEM: u8 = 1;
+    pub const PREFIXES = [_][]const u8{ "", "System", "Life", "Nature", "Chaos", "Might" };
+
+    /// normalizeSpellEntry: "System:X" is ":X" (parseSpellData keys and the castable-entry checks).
+    pub inline fn normalized(self: BookEntry) u8 {
+        return if (self.prefix == SYSTEM) NO_FACTION else self.prefix;
+    }
+};
+
+/// One parsed Spell (Unit.getSpells(), parseSpells): one per distinct normalized entry in first-occurrence order, with
+/// its remaining charges. A spent Spell stays (amount 0) until the next re-parse.
+pub const BookSpell = struct {
+    spell: u8,
+    prefix: u8,
+    amount: u8,
+};
+
+/// Raw entries a unit can hold (Healer's Heal x4 + Blessing x2 is the largest wave-1 book; a Queen may steal two).
+pub const MAX_BOOK = 16;
+pub const MAX_BOOK_SPELLS = 6;
+
+/// One vined cell (src/spells/vines.ts Vine): laps remaining and the thrower's team.
+pub const Vine = struct {
+    x: u8,
+    y: u8,
+    laps: i16,
+    team: u8,
+};
+
+/// FightProperties.vines: one entry per cell in Map insertion order (a re-throw replaces the entry in place).
+pub const MAX_VINES = 96;
 
 pub const MAX_AURA_DEFS = 6;
 /// Aura effects one unit emits: its own, plus the ones it stole (a Queen: Web and two stolen ones seen).
@@ -504,9 +694,34 @@ pub const Unit = struct {
     /// props.stolen_abilities: the abilities Predatory Assimilation took from this unit, in order.
     stolen: [MAX_STOLEN]AbilityId = undefined,
     n_stolen: u8 = 0,
+    /// unitProperties.spells: one raw entry per remaining charge, in order (useSpell removes the LAST of a name).
+    book: [MAX_BOOK]BookEntry = undefined,
+    n_book: u8 = 0,
+    /// Unit.getSpells(): the parsed book (parseSpells), spent spells included until the next re-parse.
+    spells: [MAX_BOOK_SPELLS]BookSpell = undefined,
+    n_spells: u8 = 0,
+    /// Unit.summoned: created by a summon (Infest, Summon Wolves); the merge target of a Summon Wolves cast.
+    summoned: bool = false,
 
     pub fn isDead(self: *const Unit) bool {
         return self.amount_alive <= 0;
+    }
+
+    /// unitProperties.can_cast_spells (every mutator keeps it at spells.length > 0).
+    pub inline fn canCastSpells(self: *const Unit) bool {
+        return self.n_book > 0;
+    }
+
+    /// getSpellsCount(): no spells while Broken.
+    pub inline fn spellsCount(self: *const Unit) u8 {
+        if (self.n_book == 0 or self.isBroken()) return 0;
+        return self.n_book;
+    }
+
+    /// The first parsed Spell of that spell (getSpells().find(name)).
+    pub fn bookSpell(self: *const Unit, spell: u8) ?*const BookSpell {
+        for (self.spells[0..self.n_spells]) |*b| if (b.spell == spell) return b;
+        return null;
     }
 
     /// hasEffectActive("Break")
@@ -648,9 +863,29 @@ pub const Fight = struct {
     removed_hourglass: UidSet = .{},
     removed_replied: UidSet = .{},
 
+    /// FightProperties.vines (Vine Throw): the vined cells in Map order, and a bit per cell (bit y of vine_cells[x]).
+    vines: [MAX_VINES]Vine = undefined,
+    n_vines: u8 = 0,
+    vine_cells: [GRID]u16 = .{0} ** GRID,
+
     /// getAlreadyMadeTurnSize: the units in `made` plus the removed ones it still names.
     pub fn madeCount(self: *const Fight) u32 {
         return @as(u32, @popCount(self.made)) + self.removed_made.count();
+    }
+
+    /// Vines.has(cell)
+    pub inline fn hasVine(self: *const Fight, x: i32, y: i32) bool {
+        if (self.n_vines == 0 or x < 0 or y < 0 or x >= GRID or y >= GRID) return false;
+        return self.vine_cells[@intCast(x)] & (@as(u16, 1) << @intCast(y)) != 0;
+    }
+
+    /// Vines.teamAt(cell)
+    pub fn vineTeam(self: *const Fight, x: i32, y: i32) ?u8 {
+        if (!self.hasVine(x, y)) return null;
+        for (self.vines[0..self.n_vines]) |v| {
+            if (v.x == x and v.y == y) return v.team;
+        }
+        return null;
     }
 };
 
@@ -700,17 +935,22 @@ pub const Grid = struct {
     terrain: Terrain = .{},
 };
 
-/// The creatures Infest raises, as createUnitFromSpec builds them (recorded `init.summonTemplates`, or the export's
+/// The creatures summons raise, as createUnitFromSpec builds them (recorded `init.summonTemplates`, or the export's
 /// `configs.summonTemplates`): the props and base stats of a fresh stack of one, its abilities and auras. Shared and
 /// immutable (engine.internSummons), so a State only points at it.
 pub const Summons = struct {
-    /// Index SPIDER: "Arachna Spider" (a level 1-3 corpse), QUEEN: "Arachna Queen" (a level-4 corpse).
-    units: [2]Unit,
-    present: [2]bool = .{ false, false },
+    /// Index SPIDER: "Arachna Spider" (a level 1-3 corpse), QUEEN: "Arachna Queen" (a level-4 corpse), WOLF: "Wolf"
+    /// (Summon Wolves).
+    units: [N_SUMMONS]Unit,
+    present: [N_SUMMONS]bool = .{false} ** N_SUMMONS,
 
     pub const SPIDER = 0;
     pub const QUEEN = 1;
+    pub const WOLF = 2;
 };
+
+pub const N_SUMMONS = 3;
+pub const SUMMON_NAMES = [N_SUMMONS][]const u8{ "Arachna Spider", "Arachna Queen", "Wolf" };
 
 /// The id a summon gets: runMatch's deterministicSimulationId("summon", seed, ..., summon_seq) (`match`), or the
 /// server's createSecureUuid() under a seeded source, the "sim" UUID of deterministicUuidSequence (`uuid_sequence`).
@@ -768,11 +1008,15 @@ pub const State = struct {
     setup: [3]TeamSetup,
     /// Some unit carries an augment buff, so adjustBaseStats looks the augments up.
     augments: bool,
+    /// Some unit holds a spell entry (or a cast row: Blessing, the Vine Throw snare), so adjustBaseStats reads them.
+    spell_hooks: bool = false,
     /// The "Break" effect's configured laps and power (effects.json, recorded in `init.effectConfigs.Break`).
     break_laps: f64,
     break_power: f64,
-    /// The name ids of "Arachna Spider" and "Arachna Queen" (Unit.name_id of a summon).
-    summon_name_id: [2]u16 = .{ 0xffff, 0xffff },
+    /// The name ids of "Arachna Spider", "Arachna Queen" and "Wolf" (Unit.name_id of a summon).
+    summon_name_id: [N_SUMMONS]u16 = .{0xffff} ** N_SUMMONS,
+    /// The configs of the spells the battle can cast (by CastSpell), and whether any unit holds a spell entry.
+    spell_cfg: [N_CAST_SPELLS]SpellConfig = .{SpellConfig{}} ** N_CAST_SPELLS,
 
     /// The holder's units in TypeScript's insertion order (`unitsHolder.getAllUnits()`): slot indices into `units`.
     /// Dead units stay until cleanupDeadUnits removes them. Without summons slots are never reused, so this is every

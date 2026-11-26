@@ -172,10 +172,12 @@ const ARCANE_WARD_BLESSING_BIT: u32 = 2;
 const SHARPENED_WEAPONS_BLESSING_BIT: u32 = 32;
 const RALLYING_VOLLEY_BLESSING_BIT: u32 = 64;
 const LUCK_BLESSING_BIT: u32 = 128;
+const SYLVAN_FOCUS_BLESSING_BIT: u32 = 256;
 
 inline fn blessingBit(id: st.SpellId) u32 {
     return switch (id) {
         .luck_blessing => LUCK_BLESSING_BIT,
+        .sylvan_focus_blessing => SYLVAN_FOCUS_BLESSING_BIT,
         .sharpened_weapons_blessing => SHARPENED_WEAPONS_BLESSING_BIT,
         .arcane_ward_blessing => ARCANE_WARD_BLESSING_BIT,
         .rallying_volley_blessing => RALLYING_VOLLEY_BLESSING_BIT,
@@ -199,6 +201,7 @@ const TeamPowers = struct {
 
 const Census = struct {
     luck: TeamPowers = .{},
+    sylvan: TeamPowers = .{},
     sharpened: TeamPowers = .{},
     arcane: TeamPowers = .{},
     rally: TeamPowers = .{},
@@ -207,7 +210,7 @@ const Census = struct {
     carried: u32 = 0,
 };
 
-/// Unit.calculateStackBlessingPower("Luck Blessing")
+/// Unit.calculateStackBlessingPower (Luck Blessing, Sylvan Focus Blessing)
 fn stackBlessingPower(u: *const Unit, a: *const Ability) f64 {
     const sp = @max(0, @min(MAX_UNIT_STACK_POWER, engine.getStackPower(u)));
     return js.toFixed((a.power * sp) / MAX_UNIT_STACK_POWER, 2);
@@ -243,6 +246,13 @@ fn captureCensus(s: *const State) Census {
             if (power > 0) {
                 c.luck.v[team] = js.max(if (c.luck.set[team]) c.luck.v[team] else 0, power);
                 c.luck.set[team] = true;
+            }
+        }
+        if (u.ability(.sylvan_focus_blessing)) |a| {
+            const power = stackBlessingPower(u, a);
+            if (power > 0) {
+                c.sylvan.v[team] = js.max(if (c.sylvan.set[team]) c.sylvan.v[team] else 0, power);
+                c.sylvan.set[team] = true;
             }
         }
         if (u.ability(.sharpened_weapons_blessing)) |a| {
@@ -331,6 +341,8 @@ pub fn refreshBlessings(s: *State) void {
         if (s.auras) refreshAuras(s);
         c = captureCensus(s);
     }
+    // The other STACK_BLESSINGS after Luck Blessing (Sylvan Focus; Tie up the Horses and Wolf Trail are not in scope).
+    reapply(s, &c, &c.sylvan, SYLVAN_FOCUS_BLESSING_BIT, .sylvan_focus_blessing, .all, false);
     reapply(s, &c, &c.arcane, ARCANE_WARD_BLESSING_BIT, .arcane_ward_blessing, .all, false);
     reapply(s, &c, &c.sharpened, SHARPENED_WEAPONS_BLESSING_BIT, .sharpened_weapons_blessing, .melee_or_magic, true);
     reapply(s, &c, &c.rally, RALLYING_VOLLEY_BLESSING_BIT, .rallying_volley_blessing, .ranged, false);
@@ -573,8 +585,12 @@ pub inline fn isLuckDependentCard(id: st.AbilityId) bool {
 }
 
 /// Unit.removeAbilityMechanics for an ability leaving the active list: its aura effect goes unless another active
-/// ability still provides it (castable spells are not modelled: Vine Throw is never cast in scope).
-fn removeAbilityMechanics(u: *Unit, gone: *const Ability) void {
+/// ability still provides it, and a castable ability's own spell entries go (then the book is re-parsed).
+fn removeAbilityMechanics(s: *State, u: *Unit, gone: *const Ability) void {
+    if (gone.id.castable()) |spell| {
+        removeDirectEntries(u, spell);
+        if (!engine.parseBook(u)) s.overflow = true;
+    }
     if (gone.aura == st.NO_AURA) return;
     for (u.abilities[0..u.n_abilities]) |*a| if (a.aura == gone.aura) return;
     var k: usize = 0;
@@ -585,6 +601,54 @@ fn removeAbilityMechanics(u: *Unit, gone: *const Ability) void {
             u.n_auras -= 1;
         } else k += 1;
     }
+}
+
+/// isDirectAbilitySpellEntry: ":X" or "System:X".
+inline fn isDirectEntry(e: st.BookEntry, spell: st.CastSpell) bool {
+    return e.spell == @intFromEnum(spell) and e.normalized() == st.BookEntry.NO_FACTION;
+}
+
+fn removeDirectEntries(u: *Unit, spell: st.CastSpell) void {
+    var w: usize = 0;
+    for (u.book[0..u.n_book]) |e| {
+        if (isDirectEntry(e, spell)) continue;
+        u.book[w] = e;
+        w += 1;
+    }
+    u.n_book = @intCast(w);
+}
+
+/// The spell charges a card owns (isSpellOwnedBySpellbook for a SPELLBOOK card: a faction entry of one of its spells;
+/// isDirectAbilitySpellEntry for a castable ability).
+fn ownsEntry(id: st.AbilityId, e: st.BookEntry) bool {
+    if (id.isSpellbook()) return e.prefix != st.BookEntry.NO_FACTION and e.spell != st.NO_SPELL and id.ownsSpell(@enumFromInt(e.spell));
+    if (id.castable()) |spell| return isDirectEntry(e, spell);
+    return false;
+}
+
+const Entries = struct {
+    items: [st.MAX_BOOK]st.BookEntry = undefined,
+    len: u8 = 0,
+};
+
+/// Unit.takeAbilitySpellEntries: the card's remaining charges leave the unit (re-parsing its book when any did), as
+/// the thief will hold them (a castable ability's as ":X").
+fn takeAbilitySpellEntries(s: *State, u: *Unit, id: st.AbilityId, out: *Entries) void {
+    out.len = 0;
+    if (u.n_book == 0 or u.activeAbility(id) == null) return;
+    var w: usize = 0;
+    for (u.book[0..u.n_book]) |e| {
+        if (ownsEntry(id, e)) {
+            out.items[out.len] = if (id.isSpellbook()) e else .{ .spell = e.spell, .prefix = st.BookEntry.NO_FACTION };
+            out.len += 1;
+        } else {
+            u.book[w] = e;
+            w += 1;
+        }
+    }
+    if (out.len == 0) return;
+    u.n_book = @intCast(w);
+    if (!engine.parseBook(u)) s.overflow = true;
 }
 
 /// Unit.disableAbilityAsStolen: the name joins props.stolen_abilities, the ability leaves the active list (the card
@@ -610,7 +674,7 @@ fn disableAsStolen(s: *State, u: *Unit, id: st.AbilityId) ?Ability {
     while (j + 1 < u.n_abilities) : (j += 1) u.abilities[j] = u.abilities[j + 1];
     u.n_abilities -= 1;
     u.ability_mask &= ~id.bit();
-    removeAbilityMechanics(u, &ability);
+    removeAbilityMechanics(s, u, &ability);
     return ability;
 }
 
@@ -618,8 +682,9 @@ fn disableAsStolen(s: *State, u: *Unit, id: st.AbilityId) ?Ability {
 /// name leaves the thief's own stolen list; a fresh copy of the configured ability (Ability records hold config values
 /// only) is appended, and its aura effect if the thief does not emit it yet. registerAbility's card data feeds the
 /// early luck pass (`luck_dependent`).
-fn grantStolen(s: *State, u: *Unit, a: Ability) void {
+fn grantStolen(s: *State, u: *Unit, a: Ability, entries: *const Entries) void {
     if (u.activeAbility(a.id) != null) return;
+    defer grantSpellEntries(s, u, a.id, entries);
     var k: usize = 0;
     while (k < u.n_stolen) {
         if (u.stolen[k] == a.id) {
@@ -647,6 +712,22 @@ fn grantStolen(s: *State, u: *Unit, a: Ability) void {
     }
 }
 
+/// grantAbility's spell part for a stolen card: registerAbility re-parses the thief's book for a castable ability (no
+/// default charge), then the moved charges are appended and the book parsed again.
+fn grantSpellEntries(s: *State, u: *Unit, id: st.AbilityId, entries: *const Entries) void {
+    if (id.castable() != null and !engine.parseBook(u)) s.overflow = true;
+    if (entries.len == 0) return;
+    for (entries.items[0..entries.len]) |e| {
+        if (u.n_book >= st.MAX_BOOK) {
+            s.overflow = true;
+            break;
+        }
+        u.book[u.n_book] = e;
+        u.n_book += 1;
+    }
+    if (!engine.parseBook(u)) s.overflow = true;
+}
+
 /// processPredatoryAssimilationAbility(thief, target): the candidates are the target's active abilities (none while
 /// it is Broken; a dead target keeps them) other than Predatory Assimilation and the ones the thief already has. The
 /// chance roll is drawn only when a candidate exists, the pick indexes the active list order (no draw for one).
@@ -667,16 +748,55 @@ pub fn assimilate(s: *State, thief_i: u8, target_i: u8) void {
     if (n == 0) return;
     if (@as(f64, @floatFromInt(s.rng.int(0, 100))) >= chance) return; // predatory_assimilation_ability.ts:51
     const picked = candidates[@intCast(s.rng.int(0, @intCast(n)))]; // :55
+    // The card's remaining charges are captured before it is disabled (takeAbilitySpellEntries).
+    var entries: Entries = .{};
+    takeAbilitySpellEntries(s, target, picked, &entries);
     const ability = disableAsStolen(s, target, picked) orelse return;
-    grantStolen(s, thief, ability);
+    grantStolen(s, thief, ability, &entries);
 }
 
-/// isEquipmentOrMarkerSpellName for the names in scope: augments, Morale/Dismorale and the army blessings.
+/// isEquipmentOrMarkerSpellName for the names in scope: augments, Morale/Dismorale and the army blessings (the stack
+/// blessings included).
 pub fn isMarkerSpell(id: st.SpellId) bool {
     return id.isAugment() or switch (id) {
-        .morale, .dismorale, .luck_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .ember_covenant_blessing => true,
+        .morale, .dismorale, .luck_blessing, .sylvan_focus_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .ember_covenant_blessing => true,
         else => false,
     };
+}
+
+/// processBorrowedGraceAbility(thief, target, currentActiveUnit) on a landed shot or counter-shot: when the target
+/// carries a takeable buff (laps > 0, not an aura row, not a marker: a cast Blessing in scope), the chance roll
+/// getRandomInt(0, 10_000) / 100 < borrowedGraceChance, then the pick (no draw for one candidate), then takeBuffFrom:
+/// the thief's copy (power, stored properties, laps left, +1 when the thief is the active unit without Morale and the
+/// laps are in (0, 15)) replaces any row of that name at the end of its buffs; the target keeps the original.
+pub fn borrowedGrace(s: *State, thief_i: u8, target_i: u8, active_i: u8) void {
+    const thief = &s.units[thief_i];
+    const target = &s.units[target_i];
+    if (thief.isDead() or target.isDead()) return;
+    const a = thief.ability(.borrowed_grace) orelse return;
+    var candidates: [st.MAX_SPELLS]u8 = undefined;
+    var n: usize = 0;
+    for (target.buffs.items[0..target.buffs.len], 0..) |b, i| {
+        if (b.laps <= 0 or b.laps == st.LAPS_AURA or isMarkerSpell(b.id)) continue;
+        candidates[n] = @intCast(i);
+        n += 1;
+    }
+    if (n == 0) return;
+    // borrowedGraceChance (no Made of Fire in scope)
+    const sp = @max(1, @min(MAX_UNIT_STACK_POWER, engine.getStackPower(thief)));
+    const per_stack = (a.power - 20) / (MAX_UNIT_STACK_POWER - 1);
+    const base = 20 + per_stack * (sp - 1);
+    const chance = js.toFixed(@max(0, @min(100, base * (1 + @as(f64, 0) / 100) + engine.getLuck(thief) + thief.syn_power)), 2);
+    if (@as(f64, @floatFromInt(s.rng.int(0, 10_000))) / 100 >= chance) return; // borrowed_grace_ability.ts:110
+    const pick = candidates[@intCast(s.rng.int(0, @intCast(n)))];
+    const id = target.buffs.items[pick].id;
+    const applied = target.buffs.get(id).?.*; // takeBuffFrom reads the first row of the name
+    var laps = applied.laps;
+    if (thief_i == active_i and !engine.hasMoraleBuff(thief) and laps > 0 and laps < st.NUMBER_OF_LAPS_TOTAL) laps += 1;
+    var copy = applied;
+    copy.laps = laps;
+    thief.buffs.delete(id);
+    pushChecked(s, &thief.buffs, copy);
 }
 
 /// processAbsolvingArrowAbility's lifts on one ally: every effect with laps > 0, then every debuff with laps > 0

@@ -240,12 +240,15 @@ export function armyProfileAtStart(unitsHolder: any): Record<string, { meleeMagi
 
 const plainConfig = (value: unknown): unknown => JSON.parse(JSON.stringify(value ?? null));
 
-/** The creatures Infest raises (the only summons in the port's scope). */
+/** The creatures Infest raises, and the one Summon Wolves raises. */
 const SUMMON_CREATURES = ["Arachna Spider", "Arachna Queen"];
+const SPELL_SUMMON_CREATURES = ["Wolf"];
 
-/** The configs the engine reads by name, as record.ts writes them into a recording's start state, and (when a unit
- * holds Infest) the summon templates: createUnitFromSpec's fresh props for each creature Infest raises. */
-function engineConfigs(unitsHolder: any, grid: any): Record<string, Record<string, unknown>> {
+/** The configs the engine reads by name, as record.ts writes them into a recording's start state, and the summon
+ * templates (createUnitFromSpec's fresh props) of the creatures the board can raise: Infest's when a unit holds Infest,
+ * the Wolf when a unit holds a summon spell entry or a summoned Wolf stands. With vines on the board the System "Vine
+ * Throw" config joins spellConfigs (the snare on arrival reads it; a book spell's config travels in its Spell object). */
+function engineConfigs(unitsHolder: any, grid: any, fightProperties: any): Record<string, Record<string, unknown>> {
     const abilityConfigs: Record<string, any> = {};
     const effectConfigs: Record<string, unknown> = {};
     const auraEffectConfigs: Record<string, unknown> = {};
@@ -261,16 +264,22 @@ function engineConfigs(unitsHolder: any, grid: any): Record<string, Record<strin
         }
     };
     let summons = false;
+    let spellSummons = false;
     for (const unit of unitsHolder.getAllUnits().values()) {
         const props = unit.getUnitProperties();
         addProps(props);
         if ((props.abilities ?? []).includes("Infest")) summons = true;
+        if ((props.spells ?? []).some((entry: string) => entry.includes(":Summon "))) spellSummons = true;
+        if (unit.summoned && SPELL_SUMMON_CREATURES.includes(unit.getName())) spellSummons = true;
     }
     let summonTemplates: Record<string, unknown> | undefined;
-    if (summons) {
+    if (summons || spellSummons) {
         const { abilityFactory, effectFactory } = createCombatFactories();
         summonTemplates = {};
-        for (const creatureName of SUMMON_CREATURES) {
+        for (const creatureName of [
+            ...(summons ? SUMMON_CREATURES : []),
+            ...(spellSummons ? SPELL_SUMMON_CREATURES : []),
+        ]) {
             const unit = createUnitFromSpec(
                 { faction: "Nature", creatureName, level: 0, size: 0, amount: 1 },
                 2,
@@ -296,9 +305,12 @@ function engineConfigs(unitsHolder: any, grid: any): Record<string, Record<strin
     for (const effect of ["Poison", "Break"]) {
         if (!(effect in effectConfigs)) effectConfigs[effect] = plainConfig(getEffectConfig(effect));
     }
-    const spellConfigs = {
+    const spellConfigs: Record<string, unknown> = {
         "Ember Covenant Blessing": plainConfig(getSpellConfig("System", "Ember Covenant Blessing")),
     };
+    if (fightProperties?.getVines?.()?.size?.()) {
+        spellConfigs["Vine Throw"] = plainConfig(getSpellConfig("System", "Vine Throw"));
+    }
     return {
         abilityConfigs,
         effectConfigs,
@@ -354,7 +366,7 @@ export function exportBattleState(ctx: IExportContext, harness?: IExportHarness)
         holder: capture(unitsHolder, HOLDER_FIELDS, "holder"),
         aiTargetMemory: [...captureAITargetMemory(unitsHolder).entries()],
         damageStatLaps: [...new Set(damage.map((d: { lap: number }) => d.lap))].sort((a: any, b: any) => a - b),
-        configs: engineConfigs(unitsHolder, grid),
+        configs: engineConfigs(unitsHolder, grid, fightProperties),
         setup: setupValues(fightProperties),
         ...(harness
             ? {
