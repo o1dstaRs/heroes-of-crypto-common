@@ -784,28 +784,57 @@ fn boundAt(att: *const st.Unit, tgt: *const st.Unit, dmg: f64, rate: f64, is_ran
     return @max(1, @ceil(((((dmg * rate * att.amount_alive) / armor) * (1 - luck / 100)) / 1) * att.attack_multiplier * 1));
 }
 
-/// estimatePrimaryMeleeDamage, reduced to what pinnedRetreat reads: null when unsupported, else whether the hit is a
-/// secure kill. `ok` turns false on a board term not ported yet (auras, or an attacker ability that sequences damage).
-fn meleeSecureKill(s: *const st.State, ai_: u8, ti: u8, actions: []const rec.Action, ok: *bool) ?bool {
+/// chargeDistance: the move's path length, else the strike's, else 1.
+fn chargeDistance(actions: []const rec.Action) f64 {
+    for (actions) |a| if (a == .move_unit and a.move_unit.path.len > 0) return @floatFromInt(a.move_unit.path.len);
+    for (actions) |a| if (a == .melee_attack and a.melee_attack.path.len > 0) return @floatFromInt(a.melee_attack.path.len);
+    return 1;
+}
+
+/// estimatePrimaryMeleeDamage(...).secureKill for a strike from `from` (src/ai/melee_damage_estimate.ts): null for an
+/// unsupported sequence (a lava move, Lightning Spin, Double Punch, Skewer Strike), else whether the hit cannot miss
+/// and every landed outcome of the damage chain kills: Rapid Charge over the charge distance and Backstab from `from`
+/// after the roll, the ranged unit's half-strength swing unless Handyman, Lucky Strike's chance and multiplier, and
+/// Penetrating Bite's bonus. War Anger (the aura attack terms), Paralysis, Deep Wounds, elemental affinity, Fire
+/// Breath and Chain Lightning are not in scope.
+fn meleeSecureKill(s: *const st.State, ai_: u8, ti: u8, actions: []const rec.Action, from: rec.Cell) ?bool {
     const u = &s.units[ai_];
     const t = &s.units[ti];
     if (t.isDead()) return null;
     for (actions) |a| if (a == .move_unit and a.move_unit.has_lava) return null;
-    if (u.ability(.lightning_spin) != null or u.ability(.double_punch) != null or u.ability(.skewer_strike) != null) return null;
-    if (u.ability(.rapid_charge) != null or u.ability(.backstab) != null or u.ability(.lucky_strike) != null or u.ability(.penetrating_bite) != null) ok.* = false;
-    for (s.holderOrder()) |o_slot| {
-        const o = &s.units[o_slot];
-        if (o.in_holder and !o.isDead() and (o.ability(.pegasus_might_aura) != null or o.ability(.absorb_penalties_aura) != null or o.ability(.venom_cloud_aura) != null)) ok.* = false;
-    }
-    if (!ok.*) return null;
+    if (u.has(.lightning_spin) or u.has(.double_punch) or u.has(.skewer_strike)) return null;
     const rate = @max(u.base_attack, engine.getAttack(u));
+    var handler: f64 = 1;
+    if (u.ability(.rapid_charge)) |rc| {
+        const base = abilities.abilityMultiplier(u, rc);
+        if (base >= 1) handler *= 1 + (base - 1) * chargeDistance(actions);
+    }
+    handler *= abilities.positionMultiplierOn(u, from, engine.baseCell(t), t.fw, t.fh, s.fight.side_oriented);
     const lo = boundAt(u, t, u.attack_damage_min, rate, false);
     const hi = boundAt(u, t, u.attack_damage_max, rate, false);
-    if (hi < lo or hi - lo > 10_000) return null;
-    const type_mult: f64 = if (u.attack_type == AT.RANGE) 0.5 else 1;
-    const smallest = @floor(lo * type_mult);
+    if (hi < lo or @max(1, hi - lo) > 10_000) return null;
+    const type_mult: f64 = if (u.attack_type == AT.RANGE and !u.has(.handyman)) 0.5 else 1;
+    var lucky_chance: f64 = 0;
+    var lucky_mult: f64 = 1;
+    if (u.ability(.lucky_strike)) |ls| {
+        lucky_chance = @min(100, @max(0, @ceil(abilities.applyChance(u, ls)))) / 100;
+        lucky_mult = abilities.abilityMultiplier(u, ls);
+    }
+    const bite = abilities.penetratingBite(u, t);
+    const hp = util.cumulativeHp(t);
     const hit = 1 - @min(100, @max(0, abilities.missChance(u, t))) / 100;
-    return hit == 1 and smallest >= util.cumulativeHp(t);
+    if (hit != 1) return false;
+    const raw_end = if (hi == lo) lo + 1 else hi;
+    var raw = lo;
+    while (raw < raw_end) : (raw += 1) {
+        const ordinary = @floor(raw * type_mult * handler * 1 * 1);
+        if (lucky_chance > 0) {
+            // addOutcome drops a zero-probability outcome: a certain Lucky Strike leaves only the lucky one.
+            if (1 - lucky_chance > 0 and ordinary + bite < hp) return false;
+            if (@floor(ordinary * lucky_mult) + bite < hp) return false;
+        } else if (ordinary + bite < hp) return false;
+    }
+    return true;
 }
 
 fn cellsDistance(a: []const rec.Cell, b: []const rec.Cell) i32 {
@@ -872,7 +901,7 @@ fn preferRetreat(l: *const RouteView, r: *const RouteView) bool {
 /// pinnedRetreat (legacy selection; the supported-delta catalog is an off-by-default experiment): a shooter that is
 /// pinned in melee reach and would strike a non-securely-killed target in melee, or would not shoot, retreats to the
 /// best reachable cell outside melee reach where every enemy that could reach it is screened by a melee ally.
-fn pinnedRetreat(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision, ok: *bool) void {
+fn pinnedRetreat(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
     util.copyDecision(out, in);
@@ -887,7 +916,7 @@ fn pinnedRetreat(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision, ok: *boo
     if (melee) |m| {
         if (isDirectCombat(in.slice()) and util.dominantFinishState(s, u.team).active) return;
         if (s.fight.lap >= engine.NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 1) return;
-        const secure = meleeSecureKill(s, c.ui, m.melee_attack.target, in.slice(), ok) orelse return;
+        const secure = meleeSecureKill(s, c.ui, m.melee_attack.target, in.slice(), m.melee_attack.attack_from) orelse return;
         if (secure) return;
     }
     var enemies: [st.MAX_UNITS]u8 = undefined;
@@ -959,9 +988,8 @@ pub fn rangedPositioning(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) 
         util.copyDecision(out, in);
         return true;
     }
-    var ok = true;
-    pinnedRetreat(c, in, out, &ok);
-    return ok;
+    pinnedRetreat(c, in, out);
+    return true;
 }
 
 /// a19CoherentMeleeApproach (on unless A19_COHERENT_MELEE_APPROACH_<SIDE>=0): a move followed by a strike from a cell
