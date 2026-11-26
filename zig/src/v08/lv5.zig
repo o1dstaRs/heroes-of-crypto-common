@@ -368,7 +368,8 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         if (util.livingOf(s, i, team) and i != c.ui) {
             allies[n_allies] = engine.unitCells(a);
             n_allies += 1;
-        } else if (util.livingOf(s, i, opp) and !a.isHidden()) {
+        } else if (util.livingOf(s, i, opp) and !a.isHidden() and !engine.cowardBarred(s, u, a)) {
+            // cowardlyVs: a Cowardice holder never targets a stack with more cumulative HP.
             enemies[n_enemies] = @intCast(i);
             enemy_cells[n_enemies] = engine.unitCells(a);
             n_enemies += 1;
@@ -631,14 +632,21 @@ fn aoeMeleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         var rbuf: [st.MAX_UNITS]u8 = undefined;
         if (spin) {
             const ring = ringAt(c, enemies, cell, &rbuf);
-            if (ring.len == 0) continue; // the primary is the first of the ring (no Cowardice in scope)
+            // The primary is the first of the ring Cowardice lets it aim at; the spin still hits the whole ring.
+            var primary: ?u8 = null;
+            for (ring) |e| if (!engine.cowardBarred(s, u, &s.units[e])) {
+                primary = e;
+                break;
+            };
+            const p = primary orelse continue;
             const inc: f64 = if (ai.sameCell(cell, v4from)) 1 else 0;
             const v = Score.of(s, &c.m, opp, w, ring, cell, cost, inc, dmg_max);
-            if (best == null or v > best.?.score) best = .{ .cell = cell, .route = route, .target = ring[0], .score = v };
+            if (best == null or v > best.?.score) best = .{ .cell = cell, .route = route, .target = p, .score = v };
             continue;
         }
         const ring = ringAt(c, enemies, cell, &rbuf);
         for (ring) |e| {
+            if (engine.cowardBarred(s, u, &s.units[e])) continue; // an aim Cowardice bars
             var lbuf: [2]u8 = undefined;
             const line = skewerLine(s, opp, cell, e, &lbuf);
             const inc: f64 = if (ai.sameCell(cell, v4from) and e == v4target) 1 else 0;
@@ -833,7 +841,8 @@ fn takeAdjacentAttack(c: *ai.Ctx, out: *ai.Decision) void {
         const i: usize = i_slot;
         const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
-        if (e.isHidden() or u.cannotAttack(e.uid)) continue; // Hidden, or the Terrifying Gaze gazer
+        // Hidden, Cowardice-barred (more cumulative HP), or the Terrifying Gaze gazer
+        if (e.isHidden() or engine.cowardBarred(s, u, e) or u.cannotAttack(e.uid)) continue;
         if (u.target >= 0 and u.target != @as(i8, @intCast(i))) continue;
         const ec = engine.unitCells(e);
         if (!util.footprintsNear(ec.slice(), dest_fp.slice())) continue;

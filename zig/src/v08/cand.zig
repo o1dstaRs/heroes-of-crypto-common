@@ -61,6 +61,9 @@ pub const Options = struct {
     /// of an uncapped list gets them in the same order (no other class shares a cast signature, and the incumbent it
     /// passes is not a cast), without the MAX overflow the uncapped moves and melee pairs could hit.
     spells_only: bool = false,
+    /// Port-only: the incumbent and the shots, nothing else (the shots of an uncapped list, in order: a shot's signature
+    /// is shared by no other class, and the decoy filter drops only melee).
+    shots_only: bool = false,
     /// preserveMeteoriteTargetCoverage (battleMageTargetsEnabled, on for a Battle Mage): a Battle Mage's Meteorite keeps
     /// every distinct visible impact after the best one.
     meteor_coverage: bool = false,
@@ -1403,6 +1406,11 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
     g.push(&inc);
     if (opt.spells_only) {
         g.addSpells();
+        if (out.incomplete) util.unsupported = true;
+        return;
+    }
+    if (opt.shots_only) {
+        g.addShots();
         if (out.incomplete) util.unsupported = true;
         return;
     }

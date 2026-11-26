@@ -30,7 +30,9 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
 
 /// routeArachnaQueenAssimilation: an Arachna Queen holding a spell with charges left (Predatory Assimilation took a
 /// castable card) casts the first spell candidate instead of a turn that neither casts nor deals damage (melee, shot,
-/// area throw or obstacle strike). A stolen Endless Quiver is not in scope.
+/// area throw or obstacle strike); a Queen with a stolen Endless Quiver (natively melee, now range-capable with RANGE
+/// among her attack types) fires the shot candidate with the highest expected damage (first on ties) instead of any
+/// turn that does not cast, keeping the turn when no shot is legal.
 fn routeQueenAssimilation(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
@@ -39,15 +41,31 @@ fn routeQueenAssimilation(c: *ai.Ctx, out: *ai.Decision) void {
     for (u.spells[0..u.n_spells]) |b| {
         if (b.amount > 0) remaining = true;
     }
-    if (!remaining) return;
+    const stolen_range = u.attack_type != AT.RANGE and u.has(.endless_quiver) and engine.isRangeCapable(u) and
+        engine.possibleIncludes(u, AT.RANGE);
+    if (!remaining and !stolen_range) return;
+    var casts = false;
+    var damages = false;
     for (out.slice()) |a| switch (a) {
-        .cast_spell, .melee_attack, .range_attack, .area_throw_attack, .obstacle_attack => return,
+        .cast_spell => casts = true,
+        .melee_attack, .range_attack, .area_throw_attack, .obstacle_attack => damages = true,
         else => {},
     };
-    var set: cand.Set = .{};
-    cand.enumerate(c, out, .{ .spells_only = true }, &set);
-    for (set.slice()) |*k| {
-        if (k.kind == .spell) return util.copyDecision(out, &k.d);
+    if (remaining and !casts and !damages) {
+        var set: cand.Set = .{};
+        cand.enumerate(c, out, .{ .spells_only = true }, &set);
+        for (set.slice()) |*k| {
+            if (k.kind == .spell) return util.copyDecision(out, &k.d);
+        }
+    }
+    if (stolen_range and !casts) {
+        var set: cand.Set = .{};
+        cand.enumerate(c, out, .{ .shots_only = true }, &set);
+        var best: ?usize = null;
+        for (set.slice(), 0..) |*k, i| {
+            if (k.kind == .shot and (best == null or k.ed > set.items[best.?].ed)) best = i;
+        }
+        if (best) |b| util.copyDecision(out, &set.items[b].d);
     }
 }
 
