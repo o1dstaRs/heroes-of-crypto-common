@@ -914,6 +914,18 @@ const FORCE_CASTS = (process.env.RECORD_FORCE_CASTS ?? "")
     .map((name) => name.trim())
     .filter(Boolean);
 let forcedCastCount = 0;
+// RECORD_FORCE_PREFER="Water Shield,Water Element": a forced cast prefers a target (an enemy, or an ally for a buff)
+// holding one of these abilities or buffs (before the other preferences). RECORD_FORCE_IMMUNE=k: on every k-th
+// forced-cast opportunity of a unit-targeted enemy spell, the cast goes at an enemy immune to the spell's element
+// (canCastSpell refuses it: an engine-replay check of the gate). Both off by default; a private counter chooses, no
+// battle draw.
+const FORCE_PREFER = (process.env.RECORD_FORCE_PREFER ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+const FORCE_IMMUNE = Number(process.env.RECORD_FORCE_IMMUNE ?? 0);
+let forceImmuneOpportunities = 0;
+let forcedImmuneCount = 0;
 /** The cards Craft grants (craft_ability.ts). */
 const CRAFTED_CARDS = ["Crafted Double Punch", "Crafted Double Shot", "Crafted Frozen Sword", "Crafted Frozen Bow"];
 const forceSpellHelper = FORCE_CASTS.length ? await import("../../src/spells/spell_helper") : undefined;
@@ -1171,6 +1183,35 @@ function main(): void {
                             t.canBeHealed(),
                             reach,
                         );
+                    // RECORD_FORCE_IMMUNE: a unit-targeted enemy cast at an element-immune enemy (refused by the gate).
+                    if (FORCE_IMMUNE > 0 && !spell.isBuff() && targetType === STT.ANY_ENEMY && spell.getElement()) {
+                        const own: Record<number, string> = {
+                            1: "Fire Element",
+                            2: "Water Element",
+                            3: "Wind Element",
+                            4: "Earth Element",
+                        };
+                        const immune = all.find(
+                            (u: any) =>
+                                u.getTeam() !== unit.getTeam() &&
+                                !u.hasBuffActive("Hidden") &&
+                                u.hasAbilityActive(own[spell.getElement()] ?? ""),
+                        );
+                        if (immune) {
+                            forceImmuneOpportunities += 1;
+                            if (forceImmuneOpportunities % FORCE_IMMUNE === 0) {
+                                forcedImmuneCount += 1;
+                                return [
+                                    {
+                                        type: "cast_spell",
+                                        casterId: unit.getId(),
+                                        spellName: name,
+                                        targetId: immune.getId(),
+                                    },
+                                ];
+                            }
+                        }
+                    }
                     let pool: any[];
                     if (spell.isBuff()) {
                         pool = all.filter((u: any) => u.getTeam() === unit.getTeam() && ok(u));
@@ -1178,19 +1219,23 @@ function main(): void {
                         // Wall's share); every other buff goes to the sweepers and shooters first.
                         const casts = (u: any) =>
                             u.getSpells().some((s: any) => s.getAmount() > 0 && s.getName() !== name);
+                        const prefer = (u: any) =>
+                            FORCE_PREFER.some((n) => u.hasAbilityActive(n) || u.hasBuffActive(n)) ? 16 : 0;
                         const score = (u: any) =>
-                            name === "Empower"
+                            prefer(u) +
+                            (name === "Empower"
                                 ? (casts(u) && u.getId() !== unit.getId() ? 8 : 0) +
                                   (u.getId() === unit.getId() ? 4 : 0)
                                 : (SWEEPERS.some((n) => u.hasAbilityActive(n)) ? 4 : 0) +
                                   (u.getAttackType() === 2 ? 2 : 0) +
-                                  (u.getId() === unit.getId() ? 0 : 1);
+                                  (u.getId() === unit.getId() ? 0 : 1));
                         pool.sort((a: any, b: any) => score(b) - score(a));
                     } else {
                         pool = all.filter(
                             (u: any) => u.getTeam() !== unit.getTeam() && !u.hasBuffActive("Hidden") && ok(u),
                         );
                         const score = (u: any) =>
+                            (FORCE_PREFER.some((n) => u.hasAbilityActive(n) || u.hasBuffActive(n)) ? 16 : 0) +
                             (u.hasAbilityActive("Magic Reflection") ? 4 : 0) +
                             (u.getBuff("Absorb Penalties Aura") ? 2 : 0) +
                             (u.hasBuffActive("Luck Blessing") ? 1 : 0);
@@ -1467,6 +1512,8 @@ function main(): void {
         ...(STRIP.size ? { strip: [...STRIP] } : {}),
         ...(SPIT ? { spit: true } : {}),
         ...(FORCE_CASTS.length ? { forcedCasts: FORCE_CASTS, forcedCastCount } : {}),
+        ...(FORCE_PREFER.length ? { forcePrefer: FORCE_PREFER } : {}),
+        ...(FORCE_IMMUNE > 0 ? { forcedImmuneCount } : {}),
         ...(SETUP
             ? {
                   setup: {

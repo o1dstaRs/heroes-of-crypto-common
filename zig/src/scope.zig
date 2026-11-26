@@ -12,22 +12,22 @@ const artifacts = @import("artifacts.zig");
 pub const Field = struct { key: []const u8, what: []const u8 };
 
 /// Unit fields (`units[].fields.<key>`) that must be empty: undefined, false, 0, "", [] or {} (snapshot.requireEmpty).
-/// (Warlord's Edge's warlordsEdgeAttackBase / warlordsEdgeAppliedAttackBonus are loaded since the artifacts port, War
-/// Anger's currentAttackModIncrease since batch 6a.) The Mermaid's waterShieldSpent waits for her slice of batch 6b
-/// (REFUSED_ABILITIES).
-pub const REFUSED_UNIT_FIELDS = [_]Field{
-    .{ .key = "waterShieldSpent", .what = "Water Shield spent" },
-};
+/// None since batch 6b's slice 2 (Warlord's Edge's warlordsEdgeAttackBase / warlordsEdgeAppliedAttackBonus are loaded
+/// since the artifacts port, War Anger's currentAttackModIncrease since batch 6a, the Mermaid's waterShieldSpent since
+/// her slice).
+pub const REFUSED_UNIT_FIELDS = [_]Field{};
 
 /// Batch 6b lands creature by creature. st.AbilityId names every batch-6b card and the engine code behind them is in
-/// place, but only the Harpy's Castling (Shadow Touch is batch 1's) is checked: the loader refuses the other cards by
-/// name, active or stolen (snapshot.loadUnit), and the manifest leaves them out of `abilities`, as for a name the port
-/// does not know. Each later slice takes its creature's cards out of this mask.
-pub const REFUSED_ABILITIES: st.AbilityMask = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit();
+/// place, but only the checked slices are taken: the Harpy's Castling (slice 1; Shadow Touch is batch 1's) and the
+/// Mermaid's Water Element and Water Shield (slice 2). The loader refuses the other cards by name, active or stolen
+/// (snapshot.loadUnit), and the manifest leaves them out of `abilities`, as for a name the port does not know. Each
+/// later slice takes its creature's cards out of this mask.
+pub const CHECKED_6B: st.AbilityMask = st.AbilityId.castling.bit() | st.AbilityId.water_element.bit() | st.AbilityId.water_shield.bit();
+pub const REFUSED_ABILITIES: st.AbilityMask = st.AbilityId.BATCH6B_MASK & ~CHECKED_6B;
 
-/// The applied rows of the refused batch-6b cards (the Mermaid's Water Shield, the Abomination's Flesh Shield aura row):
-/// refused by name in the applied lists and left out of the manifest's `applied` and `auraEffects`.
-pub const REFUSED_ROWS = [_]st.SpellId{ .water_shield, .flesh_shield_aura };
+/// The applied rows of the refused batch-6b cards (the Abomination's Flesh Shield aura row; the Mermaid's Water Shield
+/// row since slice 2): refused by name in the applied lists and left out of the manifest's `applied` and `auraEffects`.
+pub const REFUSED_ROWS = [_]st.SpellId{.flesh_shield_aura};
 
 /// Whether the loader takes card `id` (not in REFUSED_ABILITIES).
 pub inline fn abilityLoaded(id: st.AbilityId) bool {
@@ -509,11 +509,17 @@ test "the manifest names the loader's tables and hashes stably" {
     const loader = parsed.value.object.get("loader").?;
     try std.testing.expectEqual(@as(usize, std.meta.fields(st.AbilityId).len - @popCount(REFUSED_ABILITIES)), loader.object.get("abilities").?.array.items.len);
     try std.testing.expectEqual(@as(usize, std.meta.fields(st.SpellId).len - REFUSED_ROWS.len), loader.object.get("applied").?.array.items.len);
-    for (loader.object.get("abilities").?.array.items) |n| try std.testing.expect(!std.mem.eql(u8, n.string, "Water Shield"));
+    for (loader.object.get("abilities").?.array.items) |n| try std.testing.expect(!std.mem.eql(u8, n.string, "Wind Element"));
     for (loader.object.get("auraEffects").?.array.items) |n| try std.testing.expect(!std.mem.eql(u8, n.string, "Flesh Shield"));
-    var castling = false;
-    for (loader.object.get("abilities").?.array.items) |n| castling = castling or std.mem.eql(u8, n.string, "Castling");
-    try std.testing.expect(castling);
+    var checked: usize = 0;
+    for (loader.object.get("abilities").?.array.items) |n| {
+        for ([_][]const u8{ "Castling", "Water Element", "Water Shield" }) |c| checked += @intFromBool(std.mem.eql(u8, n.string, c));
+    }
+    try std.testing.expectEqual(@as(usize, 3), checked);
+    var shield_row = false;
+    for (loader.object.get("applied").?.array.items) |n| shield_row = shield_row or std.mem.eql(u8, n.string, "Water Shield");
+    try std.testing.expect(shield_row);
+    try std.testing.expectEqual(@as(usize, 0), loader.object.get("refuse").?.object.get("unitFields").?.array.items.len);
     try std.testing.expectEqualStrings("Venom Cloud", loader.object.get("auraEffects").?.array.items[0].string);
     const refused = parsed.value.object.get("policies").?.object.get("v0.8").?.object.get("refusedAbilities").?.array.items;
     try std.testing.expectEqual(@as(usize, @popCount(st.AbilityId.BATCH6A_MASK)), refused.len);

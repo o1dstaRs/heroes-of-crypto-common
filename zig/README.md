@@ -502,11 +502,12 @@ Exact in both modes (coverage under "How parity is checked"):
 
 ### Batch 6b
 
-Batch 6b lands creature by creature. Slice 1, exact in both modes (coverage under "How parity is checked"):
+Batch 6b lands creature by creature. Slices 1 and 2, exact in both modes (coverage under "How parity is checked"):
 
 | Creature | Abilities |
 | --- | --- |
 | Harpy (L2, MELEE_MAGIC flyer) | Shadow Touch (batch 1's), Castling (a castable swap: one `":Castling"` charge) |
+| Mermaid (L1, MELEE walker) | Water Element, Water Shield (the first damage of the battle absorbed) |
 
 - **Castling** (`spells.castlingReach`, `spells.castling`): castSpell's gates as for any unit-targeted cast (a Hidden
   enemy is refused before the hook), then canCastSpell's ENEMY_WITHIN_MOVEMENT_RANGE branch: the target has the
@@ -530,19 +531,40 @@ Batch 6b lands creature by creature. Slice 1, exact in both modes (coverage unde
   `V08_SCOPE.refused_abilities` holds the batch-6b cards, so a v0.8 rollout refuses a board where any unit holds the
   card (a Queen thief too). `RECORD_FORCE_CASTS="Castling"` passes runMatch's hook to canCastSpell, so a forced cast
   reaches it in v0.8s recordings.
-- **The rest of batch 6b is in the tree, refused at load**: Mermaid (Water Element, Water Shield), Efreet (Fire Element,
-  Made of Fire, Fire Shield), Black Dragon (Fire Element, Enchanted Skin, Fire Breath), Abomination (Dense Flesh, Flesh
-  Shield Aura) and Thunderbird (Wind Element, Chain Lightning). Their engine code (the physical element pair and the
-  spell element table, the Ember Covenant's water hit, Water Shield's absorb in `engine.applyDamageFrom` and its seeding
-  pass, the Flesh Shield redirect, Fire Shield, Fire Breath and its stones, Chain Lightning, Dense Flesh's arrow cost,
-  Enchanted Skin's magic_resist_mod, the Made of Fire card's lava walk and buff) plays v0.1 recordings of each creature
-  alone identically (40 battles each, 2026-11-26), but it is not yet checked beside the casters, the artifacts, Queen
-  steals or in v0.8s replays. `scope.REFUSED_ABILITIES` (active or stolen), `scope.REFUSED_ROWS` (the Water Shield and
-  Flesh Shield rows) and `REFUSED_UNIT_FIELDS` (`waterShieldSpent`) refuse those boards at load, and the manifest leaves
-  the names out; `hoc-sim parity` / `native` still play them from recordings, for the next slices.
+- **Water Element** (a Break-aware card, power 50; `combat.physicalElement`, `spells.elementMultiplier`): the physical
+  pair on every damage roll (one floor over `roll x type x ability x deep wounds x pair`: a Fire Element striker on a
+  Mermaid and a Mermaid on a Fire Element deal x1.5, the defender's card power), the spell table (FIRE x1.5 on her,
+  WATER 0, immunity first: a unit-targeted WATER spell, Whirlpool, is refused at her by canCastSpell), the FIRE x1.5 of
+  the Fire Wall and Fireforged burns, and Ember Covenant's water hit: a Water Element striker's creature hit (no
+  element) passes a ring and then dissolves it like any landed damage (`engine.waterHit`). A Broken Mermaid has no
+  element.
+- **Water Shield** (`engine.applyDamageFrom`, `abilities.waterShieldAbsorbs` / `absorbsBy`): the first hit with damage
+  above 0 on an unbroken holder of the System "Water Shield" ROW (not the card) returns 0 after Ember Covenant's block
+  and before the break roll, deletes the row and sets `water_shield_spent`: melee blows, responses, second punches,
+  spin, skewer and AOE sub-hits, shots, spell victim rows (Lightning Strike, the meteors), a Magic Mirror rebound, the
+  poison tick, Armageddon, Last Fuse's explosion and a Fire Wall burn (no element). A Fire Element striker's hit and
+  every FIRE hit (fire spells, Fire Shield, Fire Breath, the Fireforged burn) pass and keep it; so does a hit on a
+  Broken holder (the row stays for when Break ends). Every rider gate (the `*Absorbed` flags) reads covenant OR shield
+  with the striker. The seeding pass (`engine.seedWaterShields`, after the blessings and before the stat loop of every
+  stack-power refresh) appends a row to a living holder of the card (Break-aware) that never spent one and carries
+  none: a Queen that steals the card (the robbed Mermaid keeps her row), or a holder revived after a death that did not
+  spend it. The v0.1 AI reads neither card; v0.8 rollouts refuse both cards and the row (`V08_SCOPE`).
+- **The rest of batch 6b is in the tree, refused at load**: Efreet (Fire Element, Made of Fire, Fire Shield), Black
+  Dragon (Fire Element, Enchanted Skin, Fire Breath), Abomination (Dense Flesh, Flesh Shield Aura) and Thunderbird (Wind
+  Element, Chain Lightning). Their engine code (the other element pairs, the Flesh Shield redirect, Fire Shield, Fire
+  Breath and its stones, Chain Lightning, Dense Flesh's arrow cost, Enchanted Skin's magic_resist_mod, the Made of Fire
+  card's lava walk and buff) plays v0.1 recordings of each creature alone identically (40 battles each, 2026-11-26), but
+  it is not yet checked beside the casters, the artifacts, Queen steals or in v0.8s replays. `scope.REFUSED_ABILITIES`
+  (active or stolen; `scope.CHECKED_6B` names the cards taken) and `scope.REFUSED_ROWS` (the Flesh Shield row) refuse
+  those boards at load, and the manifest leaves the names out; `hoc-sim parity` / `native` still play them from
+  recordings, for the next slices.
 - **Recorder**: keeping a batch-6b creature turns on the batch-3, spellbook and batch-4 columns (a Harpy's charge is a
   spellbook), adds `water_shield_spent` and `magic_resist_mod` after `helping_hand_link` and the fight's `lava` cells,
-  and records the System "Water Shield" and "Made of Fire" configs when a unit holds those cards.
+  and records the System "Water Shield" and "Made of Fire" configs when a unit holds those cards. Two forced-cast aids
+  (engine replay only, off by default): `RECORD_FORCE_PREFER="Water Shield,Water Element"` aims a `RECORD_FORCE_CASTS`
+  cast at a target holding one of those abilities or buffs first (an enemy, or an ally for a buff), and
+  `RECORD_FORCE_IMMUNE=k` sends every k-th unit-targeted enemy cast of an element at an enemy immune to it (refused by
+  canCastSpell); the `.meta.json` gains `forcePrefer` and `forcedImmuneCount`.
 - **State**: `Unit.water_shield_spent`, `flesh_power`; `State.elements`, `water_shield`, `flesh`, `fire_shield`,
   `fire_breath`, `chain`, `dense`, `skin`, `fire_walkers`, `flesh_def`, `water_shield_laps`, `water_shield_power`. A
   state is 87,136 bytes (Unit 2,528; 86,544 and 2,512 before).
@@ -1263,6 +1285,39 @@ ally, another footprint, out of reach), checked by engine replay:
   µs per battle, pairwise -1.1%, and six pairs of the engine-only bench 669 and 671.5 ns per step, pairwise +0.8%, with
   the same run checksums (load 12 to 16).
 
+Batch 6b slice 2 (the Mermaid), checked on 2026-11-26 over common `f442750a` (every battle identical; production-like
+setup on side-oriented production-mix maps, `RECORD_AMOUNTS=expBudget`, `RECORD_RESUME=random:2`; fresh seeds
+71000000-71999999; trigger counts from a counting preload on the recorder):
+
+- native v0.1 and engine replay, every resume point loaded equal to its digest and replayed identical in both modes:
+  the Mermaid alone at keep rate 1 (200: 71000000; 40,716 steps, 400 points with 39,520 remaining steps; 800 shields
+  seeded, 789 absorbed, 107 of them by a striker with a break chance, so its roll was skipped); with the Harpy, batches
+  1 to 6a, the casters (every book whole) and `RECORD_ARTIFACTS=random` at the default rate (240: 71100000; 42,706
+  steps, 480 points) and, Mermaid-heavy at 0.8 with Hydras, Wyverns, the sweepers, Queens and artifacts (200:
+  71110000; 37,061 steps, 400 points; Last Fuse's explosion absorbed); Queen steals at keep rate 1 (160: 71200000;
+  32,768 steps, 320 points; 82 Queens seeded with a fresh shield, 717 absorbs, 7 poison ticks absorbed);
+- native and engine replay beside the Fire Elements (Efreet, Black Dragon and Wyverns at keep rate 1, `RECORD_FACTION
+  ="Chaos|Might"`: 200, 71600000; resume points refused at load for the fire cards): 1,193 physical x1.5 rolls, 194
+  Fire Element strikers' hits and 153 Fire Shield and Fire Breath hits that passed a shield, 38 hits through the row
+  of a Broken holder, 43 poison ticks absorbed;
+- engine replay of v0.8s battles with forced casts (`RECORD_FORCE_CASTS` of the Fire and Lightning Strikes, Fireball,
+  Ring of Fire, Whirlpool, the meteors, the Fireforged Sword and the Magic Mirrors, `RECORD_FORCE_PREFER="Water
+  Shield,Water Element"` to aim them at Mermaids, `RECORD_FORCE_IMMUNE` for casts at an immune Mermaid; 320 battles:
+  71300000, 71320000, 71340000; 77,392 steps and 640 resume replays identical): 616 FIRE hits at x1.5 on Mermaids (221
+  passing a shield), 118 Lightning Strike rows absorbed, 34 Fire Wall burns absorbed, 54 Whirlpools at a Mermaid
+  refused, 629 reflected hits (Magic Mirror and Magic Reflection), 138 hits blocked by a covenant ring before the
+  shield and 22 Mermaid hits through a ring;
+- the rollout oracle (`BRIDGE.md`): v0.1 with Mermaids, Queens, Hydras, Harpies, Wyverns, Pikemen and Crusaders at keep
+  rate 1 and with everything at 0.8, 20 battles, 47 roots, 45,120 values identical (1,865 summons inside rollouts), and
+  v0.8 on batches 1 to 6a, the casters, the Harpy and artifacts at 0.6, 16 battles, 30 roots compared, 28,800 values
+  identical (8 roots holding the Nightmare's Fire Wall or a Harpy refused by v08Scope), seeds 71400000-71450399;
+- negative tests diverge (each a scratch build): no absorb, no FIRE x1.5 on Water, no Water to Fire pair, no covenant
+  water hit, no thief seeding, a Broken holder still shielded, no immunity gate;
+- unchanged: classic `check.sh 100` (71700000), `ffi/smoke.ts 6` (71710000) and 12 with Mermaids, Harpies, Queens,
+  Hydras and Wyverns (71720000), `zig build test`; cost: five alternated pairs of `native-bench --reps 5` 392.0 and
+  393.3 µs per battle, of the engine bench 779 and 785 ns per step (medians, the same checksums: the engine code did not
+  change, only the loader's tables).
+
 Batch 6a, checked on 2026-11-25 (every battle identical; every run on side-oriented production-mix maps with the
 production-like setup and `RECORD_AMOUNTS=expBudget`, most with `RECORD_RESUME=random:2` and traced draws; fresh seeds
 50000000-61999999 plus six stall seeds from earlier recordings, 18080754-18081812). The batteries ran on the same
@@ -1687,7 +1742,7 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 
 ## Not covered yet
 
-- the rest of batch 6b (Mermaid, Efreet, Black Dragon, Abomination, Thunderbird): every creature card and book spell
+- the rest of batch 6b (Efreet, Black Dragon, Abomination, Thunderbird): every creature card and book spell
   is named by the port now, and these are the only ones refused at load (in the tree, unchecked; Batch 6b, above); the
   disabled Broken Aegis (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and mirror
   rolls of debuff spells); the revealed-ranged delivery layer of production's augment plan (it needs the live draft);

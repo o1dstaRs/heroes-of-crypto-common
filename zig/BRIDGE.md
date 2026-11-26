@@ -139,11 +139,17 @@ from `auraEffects` (`Unit.war_anger_power`), a revived unit's leading augment di
 them), and the `Hamstrung` and System `Wind Flow` configs in `spellConfigs` (`state_export.ts` adds them when a unit
 holds Hamstring or carries Wind Flow).
 
+Read for batch 6b: `waterShieldSpent` (`Unit.water_shield_spent`, undefined = false; the seeding pass never re-grants a
+spent shield) and the System `Water Shield` config in `spellConfigs` (`state_export.ts` adds it when a unit holds the
+card: a Queen that steals it is seeded from it). The loader takes only the checked slices' cards: the Harpy's Castling
+and the Mermaid's Water Element and Water Shield with her row; the other batch-6b cards (active or stolen) and the
+Flesh Shield row are refused by name (`scope.REFUSED_ABILITIES`, `REFUSED_ROWS`).
+
 Refused as an unsupported state (the loader names what it found; the names and limits are `src/scope.zig`'s tables,
 which `hoc_scope_manifest` exports): summoned units other than the creatures Infest and Summon Wolves raise, and
 non-creature units; a spell outside `st.CastSpell` (by name, in the raw entries or the Spell objects), more spell
 entries or spells than the book holds (16/6); an artifact-granted ability other than the Wounding Charm's card; Helping
-Hand; ranked `*_authoritative` stats; a spent Water Shield; a pending Last Fuse record; an unported ability, aura,
+Hand; ranked `*_authoritative` stats; a pending Last Fuse record; an unported ability, aura,
 buff, debuff or effect; effect stacks other than Poison's; more buffs, debuffs, effects, active or stolen abilities
 than the lists hold (24/25/12/10/6); WATER_CENTER or a water cell; an artifact the port does not play
 (artifacts.supportedT1/T2, or its buff name); legacy-axis seats; more than 96 smoked cells, 96 vines or 64 burning cells; a
@@ -313,12 +319,13 @@ no burning cell can appear inside a rollout from a root without one): src/v08 co
 revived units, the artifact rows, smoke, and every wave-1 and wave-2 cast but Fire Wall, so a request with a v0.8 seat
 is refused when any holder unit holds a book entry or parsed spell outside the whitelist `rollout.V08_CASTABLE` (every
 `st.CastSpell` but Fire Wall and Castling: a spell added to `st.CastSpell` later is refused until it joins the list),
-holds a batch-6b card or carries its row (`V08_SCOPE.refused_abilities` = `BATCH6B_MASK`, `refused_buffs`: the Harpy's
-Castling, a Queen thief's too, until src/v08 decides it) or holds Time Denial (`V08_SCOPE.late`), or when the board has
-a burning cell. Fire Wall waits for v0.1's
+holds a batch-6b card or carries its row (`V08_SCOPE.refused_abilities` = `BATCH6B_MASK`: the Harpy's Castling and the
+Mermaid's Water Element and Water Shield, a Queen thief's too; `refused_buffs`: a Water Shield row, which outlives a
+robbed or Broken holder's card, until src/v08 decides them) or holds Time Denial (`V08_SCOPE.late`), or when the board
+has a burning cell. Fire Wall waits for v0.1's
 projectPostMoveActorAvailability (v0_1.ts), which `ai.zig` does not port yet: a mindless unit (Berserker, Frenzied
 Boar) plays v0.1 on a board where v0.8 cast walls. The v0.1 policy takes every board the engine port loads, batches 5
-and 6a and the Harpy included. Candidates may be any action the engine replays,
+and 6a, the Harpy and the Mermaid included. Candidates may be any action the engine replays,
 `area_throw_attack` and the free-aim `range_attack` included. The two refusals for
 src/v08 gaps (a removed unit in alreadyMadeTurn, an Angel or Queen with a synergy aura range) are gone: its owner fixed
 them (common `d5fddea9`, `6e6aff54`), and the holder-ordered copy the learned leaves were scored on went with them.
@@ -442,7 +449,7 @@ them, so a porter changes the table and nothing else on the bridge side:
 | The port now plays | Edit |
 | --- | --- |
 | an ability, aura, buff, debuff or effect | its `AbilityId` / `SpellId` (the loader interns by name; the manifest lists the enums) |
-| a batch-6b creature (its slice) | take its cards out of `scope.REFUSED_ABILITIES` and its rows out of `REFUSED_ROWS` (the Mermaid: `waterShieldSpent` out of `REFUSED_UNIT_FIELDS`); v0.8 seats stay refused by `V08_SCOPE.refused_abilities` (`BATCH6B_MASK`) until src/v08 covers them |
+| a batch-6b creature (its slice) | add its cards to `scope.CHECKED_6B` (out of `REFUSED_ABILITIES`) and take its rows out of `REFUSED_ROWS` (done: the Harpy, the Mermaid); v0.8 seats stay refused by `V08_SCOPE.refused_abilities` (`BATCH6B_MASK`) and `refused_buffs` until src/v08 covers them |
 | a spell | its `st.CastSpell` entry; for v0.8 seats also `rollout.V08_CASTABLE` once src/v08 decides it |
 | a unit field or prop that was refused | drop it from `REFUSED_UNIT_FIELDS` / `REFUSED_UNIT_PROPS` and read it in snapshot.zig |
 | more names in a limited list (artifact-granted cards) | `LIMITED_UNIT_PROPS[..].accepted` |
