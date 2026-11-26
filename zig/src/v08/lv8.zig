@@ -1225,10 +1225,29 @@ fn wardProtector(s: *const st.State, ui: u8) ?u8 {
     return null;
 }
 
-/// decisionDestinationCells: the body where the decision leaves the unit (no Castling in scope).
+/// decisionDestinationCells: the body where the decision leaves the unit. The unit's last Castling lands it on the
+/// cells of its target while that target lives; else the last obstacle strike's stand, melee stand or move.
 fn destinationCells(s: *const st.State, ui: u8, actions: []const rec.Action, buf: *engine.Cells) []const rec.Cell {
     const u = &s.units[ui];
     var i = actions.len;
+    const castling: u8 = @intFromEnum(st.CastSpell.castling);
+    while (i > 0) {
+        i -= 1;
+        switch (actions[i]) {
+            .cast_spell => |cs| if (cs.caster == ui and cs.spell == castling) {
+                if (cs.has_target) {
+                    const t = &s.units[cs.target];
+                    if (t.in_holder and !t.isDead()) {
+                        buf.* = engine.unitCells(t);
+                        return buf.slice();
+                    }
+                }
+                break;
+            },
+            else => {},
+        }
+    }
+    i = actions.len;
     while (i > 0) {
         i -= 1;
         switch (actions[i]) {

@@ -1036,7 +1036,15 @@ const Gen = struct {
                     } else if (spell == .meteorite or spell == .meteor_shower) self.addMeteors(spell, b.spell, cfg) else self.out.incomplete = true;
                 },
                 st.SpellTarget.ALLIES_AREA => self.addAlliesArea(b.spell),
-                st.SpellTarget.RANDOM_CLOSE_TO_CASTER, st.SpellTarget.ENEMY_WITHIN_MOVEMENT_RANGE => self.out.incomplete = true,
+                st.SpellTarget.RANDOM_CLOSE_TO_CASTER => self.out.incomplete = true,
+                // Castling: the living enemies that are not Hidden, in holder order, through canCastSpell (the same
+                // footprint and castlingReach: the swap's anchor in the caster's movement range), aimed at the base cell.
+                st.SpellTarget.ENEMY_WITHIN_MOVEMENT_RANGE => {
+                    for (s.holderOrder()) |k| {
+                        if (!util.livingOf(s, k, opp) or s.units[k].isHidden()) continue;
+                        if (spells.canCastSpell(s, self.c.ui, k, spell, cfg)) self.pushSpell(b.spell, k, engine.baseCell(&s.units[k]), 0, 0);
+                    }
+                },
                 st.SpellTarget.ALL_ALLIES, st.SpellTarget.ALL_ENEMIES, st.SpellTarget.ALL_FLYING => {
                     if (spells.canMassCastSpell(s, self.c.ui, spell, cfg)) self.pushSpell(b.spell, null, null, 0, 0);
                 },

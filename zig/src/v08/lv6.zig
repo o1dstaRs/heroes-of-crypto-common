@@ -1,6 +1,6 @@
 //! The v0.6 level of the v0.8 chain (src/ai/versions/v0_6.ts StrategyV0_6.decideTurn) with v0.7's finalizeDecision:
 //! the baked act-vs-wait scorer (wait_scorer.ts applyWaitScorerWeights with v07BakedWaitWeights, the 2026-08-26 2x1
-//! refit). routeCasterDecision is v0.8's (its Summon Wolves rule; the MELEE_MAGIC spells it routes are not in scope).
+//! refit). routeCasterDecision is v0.8's: MAGIC Summon Wolves; MELEE_MAGIC Resurrection, Wind Flow and Castling.
 //! Identity in scope, so not ported: routeAreaThrow (Area Throw), routeMeleeRiderEV (V06_RIDER_EV off) and the kite
 //! (V06_KITE off). The wait scorer's V2 and V3 variants are research-only and absent by default.
 
@@ -68,8 +68,7 @@ fn commitsTurn(out: *const ai.Decision) bool {
 /// The MELEE_MAGIC branch of routeUniversalCasterWithPolicy, over the spell candidates of the unit's list in order: on a
 /// turn that does not commit, the Resurrection with the largest positive surplus (resurrectionRecovery minus the
 /// caster's own revive reserve when the cast burns its shared charge, first on ties), else the first Wind Flow when the
-/// enemy flyers it would slow outweigh the allied ones (shouldCastWindFlow). Castling's boards are not in scope (the
-/// rollout scope refuses its book).
+/// enemy flyers it would slow outweigh the allied ones (shouldCastWindFlow), else bestCastling.
 fn routeMeleeMagicCaster(c: *ai.Ctx, out: *ai.Decision) void {
     if (commitsTurn(out)) return;
     const s = c.s;
@@ -105,9 +104,49 @@ fn routeMeleeMagicCaster(c: *ai.Ctx, out: *ai.Decision) void {
     const wind: u8 = @intFromEnum(st.CastSpell.wind_flow);
     for (set.slice()) |*k| {
         if (k.kind != .spell or k.spell != wind) continue;
-        if (shouldCastWindFlow(s, u.team)) util.copyDecision(out, &k.d);
-        return;
+        // The first Wind Flow only: when it is not worth casting, Castling is next.
+        if (shouldCastWindFlow(s, u.team)) return util.copyDecision(out, &k.d);
+        break;
     }
+    if (bestCastling(c, set.slice())) |i| return util.copyDecision(out, &set.items[i].d);
+}
+
+/// bestCastling: with an ally (not the caster, alive) within Chebyshev 2 of the caster's base cell, the Castling onto a
+/// RANGE or MAGIC enemy at least 2 cells ahead on the advance axis (x on a side-oriented board) worth most (cumulative HP
+/// plus living creatures x max damage; the first on ties). Candidate legality (footprint, reach, Hidden) is cand.zig's.
+fn bestCastling(c: *const ai.Ctx, set: []const cand.Candidate) ?usize {
+    const s = c.s;
+    const u = c.unit();
+    const current = engine.baseCell(u);
+    var support = false;
+    for (s.holderOrder()) |i| {
+        const a = &s.units[i];
+        if (i == c.ui or a.team != u.team or !a.in_holder or a.isDead()) continue;
+        for (engine.unitCells(a).slice()) |cell| {
+            if (@max(@abs(cell.x - current.x), @abs(cell.y - current.y)) <= 2) support = true;
+        }
+        if (support) break;
+    }
+    if (!support) return null;
+    const castling: u8 = @intFromEnum(st.CastSpell.castling);
+    const side = s.fight.side_oriented;
+    var best: ?usize = null;
+    var best_value = -std.math.inf(f64);
+    for (set, 0..) |*k, i| {
+        if (k.kind != .spell or k.spell != castling or k.target < 0) continue;
+        const t = &s.units[@intCast(k.target)];
+        if (t.attack_type != AT.RANGE and t.attack_type != AT.MAGIC) continue;
+        const to = engine.baseCell(t);
+        const delta = if (side) to.x - current.x else to.y - current.y;
+        const forward = if (u.team == st.Team.LEFT) delta else -delta;
+        if (forward < 2) continue;
+        const value = util.cumulativeHp(t) + t.amount_alive * t.attack_damage_max;
+        if (value > best_value) {
+            best = i;
+            best_value = value;
+        }
+    }
+    return best;
 }
 
 /// shouldCastWindFlow: the flying pressure (stacks x max damage x steps, each at least 1) of the enemies Wind Flow would
