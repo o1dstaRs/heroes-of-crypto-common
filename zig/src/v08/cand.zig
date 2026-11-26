@@ -14,6 +14,7 @@ const ai = @import("../ai.zig");
 const util = @import("util.zig");
 const abilities = @import("../abilities.zig");
 const terrain = @import("../terrain.zig");
+const spells = @import("../spells.zig");
 
 const Cell = rec.Cell;
 const AT = st.AttackType;
@@ -43,6 +44,8 @@ pub const Candidate = struct {
     tcell: ?Cell = null,
     ed: f64 = 0,
     ek: u8 = 0,
+    /// spellName: a spell candidate's spell (a CastSpell raw id), or -1.
+    spell: i16 = -1,
 };
 
 pub const Options = struct {
@@ -101,6 +104,13 @@ pub fn sigEqual(a: []const rec.Action, b: []const rec.Action) bool {
                 if (o.target_x != p.target_x or o.target_y != p.target_y or o.has_from != p.has_from) return false;
                 if (o.has_from and !sameCell(o.attack_from, p.attack_from)) return false;
             },
+            // cs:<spell>><targetId or ->@<targetCell or -> (no Fire Wall orientation in scope).
+            .cast_spell => |c| {
+                const o = y.cast_spell;
+                if (c.spell != o.spell or c.has_target != o.has_target or c.has_cell != o.has_cell) return false;
+                if (c.has_target and c.target != o.target) return false;
+                if (c.has_cell and !sameCell(c.cell, o.cell)) return false;
+            },
             else => {},
         }
     }
@@ -137,6 +147,7 @@ const Gen = struct {
         anchor.tcell = cand.tcell;
         anchor.ed = cand.ed;
         anchor.ek = cand.ek;
+        anchor.spell = cand.spell;
     }
 
     fn push(self: *Gen, cand: *const Candidate) void {
@@ -298,6 +309,116 @@ const Gen = struct {
     }
 
     // ---- moves ----
+
+    // ---- spells (addSpells) ----
+
+    /// pushSpell: one cast_spell action with the given targetId / targetCell; a damage spell carries its valuation.
+    fn pushSpell(self: *Gen, raw: u8, target: ?u8, cell: ?Cell, ed: f64, ek: u8) void {
+        var cand = Candidate{ .kind = .spell, .spell = raw, .ed = ed, .ek = ek, .tcell = cell };
+        if (target) |t| cand.target = t;
+        cand.d.push(.{ .cast_spell = .{ .caster = self.c.ui, .spell = raw, .target = target orelse 0, .has_target = target != null, .cell = cell orelse .{ .x = 0, .y = 0 }, .has_cell = cell != null } });
+        self.push(&cand);
+    }
+
+    const Damage = struct { value: f64, kill: u8 };
+
+    /// offensiveSpellDamage: projectSpellDamageAgainstUnit's damage (an Ember Covenant holder blocks it; Water Shield
+    /// is not in scope), capped at the target's cumulative HP, and whether it kills the stack.
+    fn spellDamage(self: *const Gen, spell: spells.CS, cfg: *const st.SpellConfig, ti: u8) Damage {
+        const t = &self.c.s.units[ti];
+        const landed = spells.damageAgainst(spells.rawDamage(self.unit(), spell, cfg), cfg.element, t);
+        const damage: f64 = if (abilities.absorbsHit(t)) 0 else landed;
+        const hp = util.cumulativeHp(t);
+        return .{ .value = @min(damage, hp), .kill = if (damage >= hp) 1 else 0 };
+    }
+
+    /// ringOfFireDamage: every other living stack touching the target's body (the caster and the target spared), enemy
+    /// damage counted for and friendly damage against; null for an empty ring.
+    fn ringDamage(self: *const Gen, spell: spells.CS, cfg: *const st.SpellConfig, ti: u8) ?Damage {
+        const s = self.c.s;
+        const body = engine.unitCells(&s.units[ti]);
+        var ring: spells.Cells = .{};
+        spells.cellsAroundFootprint(body.slice(), &ring);
+        var seen: [st.MAX_UNITS]bool = .{false} ** st.MAX_UNITS;
+        var any = false;
+        var out: Damage = .{ .value = 0, .kill = 0 };
+        // evaluateAffectedUnits: each holder unit once, at its first ring cell.
+        for (ring.slice()) |cell| {
+            if (!engine.cellWithinGrid(cell)) continue;
+            const code = s.grid.board[@intCast(cell.x)][@intCast(cell.y)];
+            if (!st.isUnitCode(code)) continue;
+            const v: u8 = code - 1;
+            if (!s.units[v].in_holder or seen[v]) continue;
+            seen[v] = true;
+            if (s.units[v].isDead() or v == self.c.ui or v == ti) continue;
+            any = true;
+            const d = self.spellDamage(spell, cfg, v);
+            if (s.units[v].team != self.unit().team) {
+                out.value += d.value;
+                if (d.kill != 0) out.kill = 1;
+            } else out.value -= d.value;
+        }
+        return if (any) out else null;
+    }
+
+    /// addSpells: every usable spell in book order. Mass casts (canMassCastSpell), ally spells over the caster then its
+    /// living allies (the Wild Regeneration gift only to an ally it is worth more to: no Wild Regeneration of its own,
+    /// more max HP; Holy Cross is not in scope), and enemy spells over the living enemies that are not Hidden, through
+    /// canCastSpell and the thrown line; a damage spell is valued (Ring of Fire by its ring, empty rings dropped; no
+    /// Last Fuse or Fireball in scope). Summons and cell-targeted spells are not ported yet: the list is incomplete.
+    fn addSpells(self: *Gen) void {
+        const s = self.c.s;
+        const u = self.unit();
+        const team = u.team;
+        const opp = engine.opposite(team);
+        for (u.spells[0..u.n_spells]) |*b| {
+            const spell = std.meta.intToEnum(spells.CS, b.spell) catch {
+                self.out.incomplete = true;
+                continue;
+            };
+            const cfg = &s.spell_cfg[b.spell];
+            if (!cfg.loaded) {
+                self.out.incomplete = true;
+                continue;
+            }
+            if (!spells.usable(u, b, cfg)) continue;
+            switch (cfg.target) {
+                st.SpellTarget.RANDOM_CLOSE_TO_CASTER, st.SpellTarget.FREE_CELL, st.SpellTarget.ALLIES_AREA, st.SpellTarget.ENEMY_WITHIN_MOVEMENT_RANGE => self.out.incomplete = true,
+                st.SpellTarget.ALL_ALLIES, st.SpellTarget.ALL_ENEMIES, st.SpellTarget.ALL_FLYING => {
+                    if (spells.canMassCastSpell(s, self.c.ui, spell, cfg)) self.pushSpell(b.spell, null, null, 0, 0);
+                },
+                st.SpellTarget.ANY_ALLY => {
+                    var order: [st.MAX_UNITS + 1]u8 = undefined;
+                    var n: usize = 0;
+                    order[0] = self.c.ui;
+                    n = 1;
+                    for (s.holderOrder()) |k| {
+                        if (k != self.c.ui and util.livingOf(s, k, team)) {
+                            order[n] = k;
+                            n += 1;
+                        }
+                    }
+                    for (order[0..n]) |k| {
+                        const a = &s.units[k];
+                        if (spell == .wild_regeneration and (a.has(.wild_regeneration) or !(a.max_hp > u.max_hp))) continue;
+                        if (spells.canCastSpell(s, self.c.ui, k, spell, cfg)) self.pushSpell(b.spell, k, null, 0, 0);
+                    }
+                },
+                st.SpellTarget.ANY_ENEMY => {
+                    for (s.holderOrder()) |k| {
+                        if (!util.livingOf(s, k, opp) or s.units[k].isHidden()) continue;
+                        if (!spells.canCastSpell(s, self.c.ui, k, spell, cfg)) continue;
+                        if (!spells.lineOfSightClear(s, self.c.ui, k, spell)) continue;
+                        if (cfg.multiplier == st.SpellMultiplier.UNIT_AMOUNT_DAMAGE) {
+                            const d = if (spell == .ring_of_fire) (self.ringDamage(spell, cfg, k) orelse continue) else self.spellDamage(spell, cfg, k);
+                            self.pushSpell(b.spell, k, null, d.value, d.kill);
+                        } else self.pushSpell(b.spell, k, null, 0, 0);
+                    }
+                },
+                else => {}, // AUTO and other target types are not cast through cast_spell
+            }
+        }
+    }
 
     fn addMoves(self: *Gen) void {
         const mp = self.movePath() orelse return;
@@ -698,6 +819,7 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
     g.addMelee();
     g.addMountainAttack();
     g.addShots();
+    g.addSpells();
     g.addMoves();
     // a19-decoy-aware-v1 (on unless A19_DECOY_AWARE_<SIDE>=0): no challenger strikes a one-model decoy while another
     // candidate strikes a real stack. Candidate 0 always stays.
@@ -718,6 +840,9 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
         }
         out.n = k;
     }
+    // A list this port cannot complete (a class not generated yet, or more than MAX candidates; TypeScript has no cap)
+    // makes the decision unsupported: decideV08 refuses it.
+    if (out.incomplete) util.unsupported = true;
 }
 
 /// The boundary options (enumerateV08BoundaryCandidates without mountain strikes).

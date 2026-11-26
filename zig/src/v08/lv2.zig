@@ -34,7 +34,7 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
         meleeFallback(c, out);
     } else if (ranged) {
         decideRangedTurn(c, out);
-    } else if (!creatureOpener(c, out)) {
+    } else if (!creatureOpener(c, out) and !griffinDive(c, out)) {
         policy.v01(c, out);
         preferNoCounterMeleeTarget(c, out);
         withAura(c, out);
@@ -70,6 +70,8 @@ fn findBestShot(c: *ai.Ctx) ?Shot {
         const i: usize = i_slot;
         const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
+        // Not a Hidden (Disguise) stack, nor the Terrifying Gaze gazer; the first hit is this enemy, so it is neither.
+        if (e.isHidden() or u.cannotAttack(e.uid)) continue;
         const ei: u8 = @intCast(i);
         const to = [2]f64{ e.pos_x, e.pos_y };
         const e_small = engine.isSmall(e);
@@ -254,9 +256,10 @@ fn meleeApproach(c: *ai.Ctx) ?Approach {
     const u = c.unit();
     if (!u.canMove()) return null;
     const opp = engine.opposite(u.team);
+    // The living enemies that are not Hidden (Disguise).
     var any = false;
     for (0..s.n_units) |i| {
-        if (util.livingOf(s, i, opp)) any = true;
+        if (util.livingOf(s, i, opp) and !s.units[i].isHidden()) any = true;
     }
     if (!any) return null;
     const mp = c.actualPath();
@@ -271,7 +274,7 @@ fn meleeApproach(c: *ai.Ctx) ?Approach {
         for (s.holderOrder()) |i_slot| {
             const i: usize = i_slot;
             const e = &s.units[i_slot];
-            if (!util.livingOf(s, i, opp)) continue;
+            if (!util.livingOf(s, i, opp) or e.isHidden()) continue;
             const ec = engine.unitCells(e);
             if (util.footprintsNear(ec.slice(), fp.slice())) {
                 if (best == null or len < best_len) {
@@ -318,6 +321,83 @@ fn creatureOpener(c: *ai.Ctx, out: *ai.Decision) bool {
     out.* = .{};
     out.push(.{ .cast_spell = .{ .caster = c.ui, .spell = raw } });
     return true;
+}
+
+/// decideGriffinDive: a Range Null Field emitter that can move, facing living enemy shooters, with another living flyer
+/// within its steps + aura range + 2 of the nearest shooter, flies where the most shooters fall inside the aura (by
+/// Euclidean distance from the landing anchor to their base cells, the aura's own range) and strikes a shooter next to
+/// that anchor, the cheapest route on ties; with no strike cell it advances to the best-covering cell.
+fn griffinDive(c: *ai.Ctx, out: *ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    if (!u.has(.range_null_field_aura) or !u.canMove()) return false;
+    const opp = engine.opposite(u.team);
+    var ranged: [st.MAX_UNITS]u8 = undefined;
+    var nr: usize = 0;
+    for (s.holderOrder()) |k| {
+        if (!util.livingOf(s, k, opp) or s.units[k].attack_type != AT.RANGE) continue;
+        ranged[nr] = k;
+        nr += 1;
+    }
+    if (nr == 0) return false;
+    // nullFieldRange: the widest debuff aura the unit emits.
+    var aura_r: f64 = 0;
+    for (u.auras[0..u.auraCount()]) |d| {
+        if (!s.aura_defs[d].is_buff) aura_r = @max(aura_r, s.aura_defs[d].range);
+    }
+    // hasFlyingSupport
+    var support = false;
+    for (s.holderOrder()) |k| {
+        const a = &s.units[k];
+        if (k == c.ui or !util.livingOf(s, k, u.team) or !engine.canFly(a)) continue;
+        var nearest = std.math.inf(f64);
+        for (ranged[0..nr]) |r| nearest = @min(nearest, ai.cellDistance(engine.baseCell(a), engine.baseCell(&s.units[r])));
+        if (nearest <= engine.getSteps(a) + aura_r + 2) {
+            support = true;
+            break;
+        }
+    }
+    if (!support) return false;
+    const mp = c.actualPath();
+    const Pick = struct { route: *const pathing.Route, target: u8 = 0, cover: u32, weight: f64 };
+    var strike: ?Pick = null;
+    var advance: ?Pick = null;
+    for (mp.known()) |*r| {
+        var cover: u32 = 0;
+        for (ranged[0..nr]) |k| {
+            if (ai.cellDistance(r.cell, engine.baseCell(&s.units[k])) <= aura_r) cover += 1;
+        }
+        if (cover == 0) continue;
+        if (advance == null or cover > advance.?.cover or (cover == advance.?.cover and r.weight < advance.?.weight)) advance = .{ .route = r, .cover = cover, .weight = r.weight };
+        var adj: ?u8 = null;
+        for (ranged[0..nr]) |k| {
+            const kc = engine.unitCells(&s.units[k]);
+            for (kc.slice()) |rc| if (util.near(rc, r.cell)) {
+                adj = k;
+                break;
+            };
+            if (adj != null) break;
+        }
+        if (adj) |t| {
+            if (strike == null or cover > strike.?.cover or (cover == strike.?.cover and r.weight < strike.?.weight)) strike = .{ .route = r, .target = t, .cover = cover, .weight = r.weight };
+        }
+    }
+    if (strike) |st_| {
+        var d: ai.Decision = .{};
+        if (u.attack_type_selected != AT.MELEE) d.push(.{ .select_attack_type = .{ .unit = c.ui, .attack_type = AT.MELEE } });
+        const len = mp.routeCells(st_.route, &d.path);
+        d.push(.{ .melee_attack = .{ .attacker = c.ui, .target = st_.target, .attack_from = st_.route.cell, .path = d.path[0..len], .has_lava = st_.route.has_lava } });
+        util.copyDecision(out, &d);
+        return true;
+    }
+    const base = engine.baseCell(u);
+    if (advance) |a| {
+        if (!(a.route.cell.x == base.x and a.route.cell.y == base.y) and mp.routeCells(a.route, &out.path) > 0) {
+            util.setMove(out, s, c.ui, mp, a.route);
+            return true;
+        }
+    }
+    return false;
 }
 
 fn withAura(c: *ai.Ctx, out: *ai.Decision) void {
@@ -384,6 +464,7 @@ fn preferNoCounterMeleeTarget(c: *ai.Ctx, out: *ai.Decision) void {
         const e = &s.units[k_slot];
         const ek: u8 = @intCast(k);
         if (!util.livingOf(s, k, opp) or ek == cur) continue;
+        if (e.isHidden() or u.cannotAttack(e.uid)) continue; // never swap onto a Hidden stack or the gazer
         if (!(engine.getStackPower(e) > NEGLIGIBLE_COUNTER_STACK_POWER) or counterMatters(s, ek)) continue;
         const ec = engine.unitCells(e);
         if (!util.footprintsNear(ec.slice(), mine.slice())) continue;

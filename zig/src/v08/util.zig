@@ -202,6 +202,10 @@ pub fn anchorPorted(s: *const State, team: u8) bool {
     return true;
 }
 
+/// Set by a level that met a board term it cannot follow exactly (decideV08 then refuses the decision); lv8.decide
+/// clears it at the start of every decision.
+pub threadlocal var unsupported: bool = false;
+
 /// The battle being decided (set by whoever runs the policy, before the first decision).
 pub threadlocal var battle: Battle = .{};
 

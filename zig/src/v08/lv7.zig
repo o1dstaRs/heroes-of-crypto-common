@@ -10,6 +10,8 @@ const ai = @import("../ai.zig");
 const policy = @import("policy.zig");
 const lv6 = @import("lv6.zig");
 const lv4 = @import("lv4.zig");
+const cand = @import("cand.zig");
+const std = @import("std");
 const util = @import("util.zig");
 
 const AT = st.AttackType;
@@ -23,6 +25,53 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     // have nothing to route in scope.
     if (util.battle.aura_saturated[c.unit().team]) lv4.decide(c, out) else lv6.decide(c, out);
     normalizeMeleeMagicSelection(c, out);
+    repairForbiddenTarget(c, out);
+}
+
+/// attacksForbiddenTarget: a melee or a shot aimed at the Terrifying Gaze gazer (cannotAttackUnitId).
+fn attacksForbidden(s: *const st.State, u: *const st.Unit, acts: []const rec.Action) bool {
+    for (acts) |a| switch (a) {
+        .melee_attack => |m| if (u.cannotAttack(s.units[m.target].uid)) return true,
+        .range_attack => |r| if (u.cannotAttack(s.units[r.target].uid)) return true,
+        else => {},
+    };
+    return false;
+}
+
+/// repairV07ForbiddenTargetDecision: an attack on the gazer (a late v0.4/v0.5 overlay replaced v0.1's checked target)
+/// is re-enumerated from an end-turn incumbent (the boundary options) without the gazer: the best legal attack (a kill,
+/// then damage, then one that does not move; first on ties), else a spell, move, wait or defend, else end the turn.
+fn repairForbiddenTarget(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (u.forbidden == st.NO_UID or !attacksForbidden(s, u, out.slice())) return;
+    var inc: ai.Decision = .{};
+    inc.push(.{ .end_turn = .{ .unit = c.ui, .reason = .manual } });
+    var set: cand.Set = .{};
+    cand.enumerate(c, &inc, cand.BOUNDARY, &set);
+    if (set.incomplete) {
+        util.unsupported = true;
+        return;
+    }
+    var best: ?usize = null;
+    for (set.slice(), 0..) |*k, i| {
+        if (attacksForbidden(s, u, k.d.slice())) continue;
+        if (k.kind != .melee and k.kind != .shot and k.kind != .throw) continue;
+        if (!std.math.isFinite(k.ed) or k.ed <= 0) continue;
+        if (best) |b| {
+            const bb = &set.items[b];
+            const km = util.has(&k.d, .move_unit);
+            const bm = util.has(&bb.d, .move_unit);
+            if (k.ek > bb.ek or (k.ek == bb.ek and (k.ed > bb.ed or (k.ed == bb.ed and bm and !km)))) best = i;
+        } else best = i;
+    }
+    if (best) |b| return util.copyDecision(out, &set.items[b].d);
+    for ([_]cand.Kind{ .spell, .move, .wait, .defend }) |kind| {
+        for (set.slice()) |*k| {
+            if (k.kind == kind and !attacksForbidden(s, u, k.d.slice())) return util.copyDecision(out, &k.d);
+        }
+    }
+    util.setEndTurn(out, c.ui);
 }
 
 /// normalizeMeleeMagicSelection (melee_attack_type.ts): a MELEE_MAGIC-only stack's MELEE select becomes MELEE_MAGIC,

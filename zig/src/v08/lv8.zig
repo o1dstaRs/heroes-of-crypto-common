@@ -14,6 +14,7 @@ const path = @import("../path.zig");
 const js = @import("../jsnum.zig");
 const AT = st.AttackType;
 const abilities = @import("../abilities.zig");
+const spells = @import("../spells.zig");
 
 /// The recorder's pass names, in decideTurn's order (zig/parity/v08/layers.ts).
 pub const Pass = enum {
@@ -158,11 +159,77 @@ fn selectDirectCombat(set: *const cand.Set) ?usize {
     return best;
 }
 
-/// selectV08ProductiveCandidate: direct combat, else the first move (spells are out of scope).
+/// selectV08ProductiveCandidate: direct combat, else the first move, else the first spell.
 fn selectProductive(set: *const cand.Set) ?usize {
     if (selectDirectCombat(set)) |i| return i;
     for (set.slice(), 0..) |*c, i| if (c.kind == .move) return i;
+    for (set.slice(), 0..) |*c, i| if (c.kind == .spell) return i;
     return null;
+}
+
+/// attacksForbiddenTarget: a melee or a shot aimed at the Terrifying Gaze gazer (cannotAttackUnitId).
+pub fn attacksForbidden(s: *const st.State, u: *const st.Unit, acts: []const rec.Action) bool {
+    for (acts) |a| switch (a) {
+        .melee_attack => |m| if (u.cannotAttack(s.units[m.target].uid)) return true,
+        .range_attack => |r| if (u.cannotAttack(s.units[r.target].uid)) return true,
+        else => {},
+    };
+    return false;
+}
+
+/// A copy of `set` without the candidates that attack the gazer (the order kept).
+fn withoutForbidden(s: *const st.State, u: *const st.Unit, set: *const cand.Set, out: *cand.Set) void {
+    out.* = .{ .incomplete = set.incomplete };
+    for (set.slice()) |*cd| {
+        if (attacksForbidden(s, u, cd.d.slice())) continue;
+        out.items[out.n] = cd.*;
+        util.copyDecision(&out.items[out.n].d, &cd.d);
+        out.n += 1;
+    }
+}
+
+/// repairV08ForbiddenTargetDecision: an attack on the gazer is re-enumerated from an end-turn incumbent (the boundary
+/// candidates) without the gazer: the productive pick, else a wait, else a defend, else ending the turn.
+fn forbiddenTarget(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
+    const s = c.s;
+    const u = c.unit();
+    if (u.forbidden == st.NO_UID or !attacksForbidden(s, u, in.slice())) {
+        util.copyDecision(out, in);
+        return true;
+    }
+    var inc: ai.Decision = .{};
+    inc.push(.{ .end_turn = .{ .unit = c.ui, .reason = .manual } });
+    var all: cand.Set = .{};
+    cand.enumerate(c, &inc, cand.BOUNDARY, &all);
+    if (all.incomplete) return false;
+    var set: cand.Set = .{};
+    withoutForbidden(s, u, &all, &set);
+    if (selectProductive(&set)) |i| {
+        take(out, &set, i);
+        return true;
+    }
+    for ([_]cand.Kind{ .wait, .defend }) |k| {
+        for (set.slice(), 0..) |*cd, i| if (cd.kind == k) {
+            take(out, &set, i);
+            return true;
+        };
+    }
+    util.setEndTurn(out, c.ui);
+    return true;
+}
+
+/// bestV08WardSpell: the spell candidate with a kill first, then the most damage, then the spell name (first on ties).
+fn bestWardSpell(set: *const cand.Set) ?usize {
+    var best: ?usize = null;
+    for (set.slice(), 0..) |*c, i| {
+        if (c.kind != .spell) continue;
+        if (best) |b| {
+            const bb = &set.items[b];
+            const name_order = std.mem.order(u8, @as(st.CastSpell, @enumFromInt(@as(u8, @intCast(c.spell)))).name(), @as(st.CastSpell, @enumFromInt(@as(u8, @intCast(bb.spell)))).name());
+            if (c.ek > bb.ek or (c.ek == bb.ek and (c.ed > bb.ed or (c.ed == bb.ed and name_order == .lt)))) best = i;
+        } else best = i;
+    }
+    return best;
 }
 
 fn take(out: *ai.Decision, set: *const cand.Set, i: usize) void {
@@ -181,7 +248,7 @@ fn productiveAction(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void 
             passive = true;
             obstacle = true;
         },
-        .move_unit, .melee_attack, .range_attack => productive = true,
+        .move_unit, .melee_attack, .range_attack, .cast_spell => productive = true,
         else => {},
     };
     if (!passive or (productive and !obstacle)) return util.copyDecision(out, in);
@@ -391,16 +458,30 @@ fn protectorKind(s: *const st.State, ui: u8) ?Protector {
 }
 
 /// isV08BacklineProtectionBeneficiary: living ranged output (spell output is out of scope).
-fn isBeneficiary(u: *const st.Unit) bool {
-    return !u.isDead() and engine.isRangeCapable(u) and engine.getRangeShots(u) > 0;
+/// The spells a unit holds that it may cast now (getSpells() filtered by isSpellUsableByCaster); 0 without a book.
+fn usableSpells(s: *const st.State, u: *const st.Unit) usize {
+    if (!u.canCastSpells()) return 0;
+    var n: usize = 0;
+    for (u.spells[0..u.n_spells]) |*b| {
+        if (spells.usable(u, b, &s.spell_cfg[b.spell])) n += 1;
+    }
+    return n;
 }
 
-/// v08BacklineWardValue: remaining maximum ranged output (no spells in scope).
-fn wardValue(u: *const st.Unit) f64 {
+/// isV08BacklineProtectionBeneficiary: a living stack with shots left, or with a spell it can cast.
+fn isBeneficiary(s: *const st.State, u: *const st.Unit) bool {
+    if (u.isDead()) return false;
+    return (engine.isRangeCapable(u) and engine.getRangeShots(u) > 0) or usableSpells(s, u) > 0;
+}
+
+/// v08BacklineWardValue: remaining maximum ranged output plus remaining usable spells, each scaled by the stack's
+/// direct output.
+fn wardValue(s: *const st.State, u: *const st.Unit) f64 {
     const amount = @max(1, @max(0, u.amount_alive));
     const per = @max(1, @max(0, u.attack_damage_max) * amount);
     const ranged = if (engine.isRangeCapable(u)) @max(0, engine.getRangeShots(u)) * per else 0;
-    return @min(9007199254740991.0, ranged);
+    const spell_output = @as(f64, @floatFromInt(usableSpells(s, u))) * per;
+    return @min(9007199254740991.0, ranged + spell_output);
 }
 
 /// v08BacklineProtectorCoverageRange: Angel's screen 2; Abomination's and Queen's aura range, 1 without the aura in
@@ -458,14 +539,14 @@ fn protectorIntent(s: *const st.State, pi: u8) ?Intent {
     for (s.holderOrder()) |i_slot| {
         const i: usize = i_slot;
         const w = &s.units[i_slot];
-        if (!w.in_holder or i == pi or w.team != p.team or w.summoned or !isBeneficiary(w)) continue;
+        if (!w.in_holder or i == pi or w.team != p.team or w.summoned or !isBeneficiary(s, w)) continue;
         count += 1;
         const wi: u8 = @intCast(i);
         intent.wards[intent.nw] = wi;
         intent.nw += 1;
         if (best) |b| {
-            const vb = wardValue(&s.units[b]);
-            const vw = wardValue(w);
+            const vb = wardValue(s, &s.units[b]);
+            const vw = wardValue(s, w);
             if (vw > vb or (vw == vb and util.idLess(s, wi, b))) best = wi;
         } else best = wi;
     }
@@ -504,7 +585,7 @@ fn coversWard(s: *const st.State, cells: []const rec.Cell, ward: u8, pi: u8) boo
 fn coveredValue(s: *const st.State, intent: *const Intent, cells: []const rec.Cell, pi: u8) f64 {
     var total: f64 = 0;
     for (intent.wardSlice()) |w| {
-        if (coversWard(s, cells, w, pi)) total = @min(9007199254740991.0, total + wardValue(&s.units[w]));
+        if (coversWard(s, cells, w, pi)) total = @min(9007199254740991.0, total + wardValue(s, &s.units[w]));
     }
     return total;
 }
@@ -681,7 +762,7 @@ pub fn backlineProtector(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) 
 /// buildV08BacklineWardIntent: the protector (Abomination first, then by id) whose assigned ward is this unit.
 fn wardProtector(s: *const st.State, ui: u8) ?u8 {
     const u = &s.units[ui];
-    if (u.summoned or !isBeneficiary(u)) return null;
+    if (u.summoned or !isBeneficiary(s, u)) return null;
     var order: [st.MAX_UNITS]u8 = undefined;
     var n: usize = 0;
     for (s.holderOrder()) |i_slot| {
@@ -763,14 +844,19 @@ pub fn backlineWard(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void 
     if (preservesWard(s, c.ui, pi, in.slice())) return util.copyDecision(out, in);
     var all: cand.Set = .{};
     cand.enumerate(c, in, cand.BOUNDARY, &all);
+    if (all.incomplete) {
+        util.unsupported = true;
+        return util.copyDecision(out, in);
+    }
     var kept: cand.Set = .{};
     for (all.slice()) |*cd| {
-        if (!preservesWard(s, c.ui, pi, cd.d.slice())) continue;
+        if (attacksForbidden(s, c.unit(), cd.d.slice()) or !preservesWard(s, c.ui, pi, cd.d.slice())) continue;
         kept.items[kept.n] = cd.*;
         util.copyDecision(&kept.items[kept.n].d, &cd.d);
         kept.n += 1;
     }
     if (selectDirectCombat(&kept)) |i| return take(out, &kept, i);
+    if (bestWardSpell(&kept)) |i| return take(out, &kept, i);
     for ([_]cand.Kind{ .wait, .defend, .move }) |k| {
         for (kept.slice(), 0..) |*cd, i| if (cd.kind == k) return take(out, &kept, i);
     }
@@ -908,9 +994,10 @@ fn pinnedRetreat(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const u = c.unit();
     util.copyDecision(out, in);
     if (u.attack_type != AT.RANGE or engine.getRangeShots(u) <= 0) return;
-    // A web-locked shooter cannot move, and a Handyman shooter melees without penalty. The Range Null Field and
-    // Rangebane suppressions are not in scope.
+    // A web-locked shooter cannot move, a Handyman shooter melees without penalty, and a shooter inside an enemy Range
+    // Null Field is already silenced (Rangebane is not in scope).
     if (!u.canMove() or u.has(.handyman)) return;
+    if (u.debuffs.find(.range_null_field_aura) != null) return;
     if (!pinnedAt(s, u, u.pos_x, u.pos_y)) return;
     var melee: ?rec.Action = null;
     for (in.slice()) |a| switch (a) {
@@ -1110,7 +1197,9 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) bool {
     if (util.battle.aura_saturated[c.unit().team] and !util.anchorPorted(c.s, c.unit().team)) return false;
     var cur: ai.Decision = .{};
     var next: ai.Decision = .{};
+    util.unsupported = false;
     @import("lv7.zig").decide(c, &cur);
+    if (util.unsupported) return false;
     const order = [_]Pass{ .explicit, .prioritize, .defend_to_wait, .finish, .ranged_positioning, .forbidden_target, .splash, .damage_spell, .vine, .smoke, .nightmare, .healer, .blacksmith, .ranked_replay, .backline_protector, .backline_ward, .cemetery, .coherent_melee };
     const names = [_][]const u8{ "explicit", "prioritize", "defend-to-wait", "finish", "ranged-positioning", "forbidden-target", "splash", "damage-spell", "vine", "smoke", "nightmare", "healer", "blacksmith", "ranked-replay", "backline-protector", "backline-ward", "cemetery", "coherent-melee" };
     for (order, names) |pass, name| {
@@ -1148,8 +1237,14 @@ pub fn cemetery(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
     return true;
 }
 
-/// Runs one ported pass on `in`; false when the pass is not ported yet.
+/// Runs one ported pass on `in`; false when the pass is not ported yet, or met a term it cannot follow exactly
+/// (util.unsupported, e.g. an incomplete candidate list).
 pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision) bool {
+    util.unsupported = false;
+    return runPassInner(c, pass, in, out) and !util.unsupported;
+}
+
+fn runPassInner(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision) bool {
     switch (pass) {
         .explicit => explicit(c.ui, in, out),
         .defend_to_wait => defendToWait(c.s, c.ui, in, out),
@@ -1158,10 +1253,11 @@ pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision
         .backline_ward => backlineWard(c, in, out),
         .backline_protector => backlineProtector(c, in, out),
         .coherent_melee => return coherentMelee(c, in, out),
-        // Identity in scope: Terrifying Gaze, splash shooters, damage spells, Vine Throw, Smoke, Nightmare's Fire Wall,
-        // the Healer and the Blacksmith need abilities or spells the engine does not carry yet; ranked-replay tactics
-        // are an off-by-default research scope.
-        .forbidden_target, .splash, .damage_spell, .vine, .smoke, .nightmare, .healer, .blacksmith, .ranked_replay => util.copyDecision(out, in),
+        .forbidden_target => return forbiddenTarget(c, in, out),
+        // Identity in scope: splash shooters, damage spells, Vine Throw, Smoke, Nightmare's Fire Wall, the Healer and
+        // the Blacksmith need abilities or spells the engine does not carry yet; ranked-replay tactics are an
+        // off-by-default research scope.
+        .splash, .damage_spell, .vine, .smoke, .nightmare, .healer, .blacksmith, .ranked_replay => util.copyDecision(out, in),
         .cemetery => return cemetery(c, in, out),
         .ranged_positioning => return rangedPositioning(c, in, out),
     }
