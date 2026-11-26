@@ -24,7 +24,9 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   Fireball (Fire Strike's gate and trajectory, then the blast: the unit it burst on, then the living units on the impact
   cell and its ring, allies too, the caster spared) and Fireforged Sword (the cast buff, and its FIRE burn of the hit's
   damage after every damaging hit its holder lands, at the twelve sites of attack_handler.ts with their own kill and
-  morale rules); a book holding any other spell is refused;
+  morale rules) and Misfortune (the first debuff spell: handleMagicAttack's magic-resist save, the Absorb Penalties
+  redirect and the always-drawn mirror roll; the holder's luck pinned at -10, or 0 when luck-buffed, with no lap roll
+  and Luck Shield held); a book holding any other spell is refused;
 - the army setup `runMatch` applies before the fight: the augments (Armor, Might, Sniper, Movement, Placement; Empower
   is carried but read by nothing in scope), doctrines (their upgrade budget) and synergies (Life, Chaos, Might and
   Nature, both variants, levels 1 to 3), including the Chaos break-on-attack roll and the Break effect;

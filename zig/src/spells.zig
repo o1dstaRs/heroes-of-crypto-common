@@ -639,9 +639,15 @@ fn magicAttack(s: *State, ci: u8, target: ?u8, spell: CS, cfg: *const st.SpellCo
     if (!canCastSpell(s, ci, ti, spell, cfg)) return error.Rejected;
     const caster = &s.units[ci];
     const t = &s.units[ti];
-    if (!cfg.is_buff or cfg.power_type == SP.RESURRECT) {
-        s.overflow = true; // a debuff spell (the resist and mirror rolls) or Resurrection: not in wave 1
+    if (cfg.power_type == SP.RESURRECT) {
+        s.overflow = true; // Resurrection: Angel's, batch 6
         return error.Rejected;
+    }
+    if (!cfg.is_buff) {
+        debuffBranch(s, ci, ti, spell, cfg);
+        useSpell(caster, spell);
+        engine.completeTurn(s, ci, false, false, events);
+        return;
     }
     if (cfg.power_type == SP.HEAL and cfg.is_giftable) {
         // The gift (no Holy Cross in scope): the caster deletes the ability (its card, charge and re-parsed book);
@@ -679,6 +685,33 @@ fn magicAttack(s: *State, ci: u8, target: ?u8, spell: CS, cfg: *const st.SpellCo
     }
     useSpell(caster, spell);
     engine.completeTurn(s, ci, false, false, events);
+}
+
+/// handleMagicAttack's debuff branch (Misfortune): the magic-resist save getRandomInt(0, 100) < floor(magic resist) (a MIND
+/// spell's Madness / Mechanism resistance short-circuits after it); a landed debuff may be redirected to the Absorb
+/// Penalties Aura source (its roll), lands there (laps, +1 on a self-cast) unless that unit resists a MIND spell, then
+/// the mirror roll (always drawn: Magic Reflection's chance) copies it onto the caster (laps + 1) unless the caster
+/// already carries it or resists a MIND spell.
+fn debuffBranch(s: *State, ci: u8, ti: u8, spell: CS, cfg: *const st.SpellConfig) void {
+    const caster = &s.units[ci];
+    const t = &s.units[ti];
+    const id = spell.applied() orelse {
+        s.overflow = true; // a debuff spell without its row in scope
+        return;
+    };
+    const mind = cfg.power_type == SP.MIND;
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) < @floor(engine.getMagicResist(t))) return; // attack_handler.ts:684
+    if (mind and abilities.mindResistant(t)) return;
+    const di = abilities.absorptionTarget(s, ti);
+    const d = &s.units[di];
+    if (!(mind and abilities.mindResistant(d))) {
+        abilities.pushChecked(s, &d.debuffs, .{ .id = id, .laps = cfg.laps + @as(f64, if (ci == ti) 1 else 0), .power = cfg.power });
+    }
+    // SpellHelper.isMirrored(debuffTarget): max(Magic Mirror buff power (none in scope), Magic Reflection's chance).
+    const mirror = @floor(@max(0, mirroredShare(d)));
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) < mirror and notAlreadyApplied(caster, spell, cfg) and !(mind and abilities.mindResistant(caster))) { // spell_helper.ts:1232
+        abilities.pushChecked(s, &caster.debuffs, .{ .id = id, .laps = cfg.laps + 1, .power = cfg.power });
+    }
 }
 
 /// SpellHelper.canMassCastSpell for an ALL_ALLIES non-HEAL spell: some unit of the caster's team (holder order) with

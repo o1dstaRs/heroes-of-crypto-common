@@ -566,25 +566,33 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     }
 
     // LUCK
-    u.luck = u.init.luck;
-    if (f.started and !lap_adjusted) {
-        var luck = @as(f64, @floatFromInt(s.rng.int(-LUCK_MAX_CHANGE_FOR_TURN, LUCK_MAX_CHANGE_FOR_TURN + 1)));
-        if (luck + u.luck > LUCK_MAX) {
-            luck = LUCK_MAX - u.luck;
-        } else if (luck + u.luck < -LUCK_MAX) {
-            luck = -LUCK_MAX - u.luck;
+    if (u.debuffs.len != 0 and u.debuffs.find(.misfortune) != null) {
+        // Misfortune, checked first: luck -10, or 0 when luck-buffed (Luck Blessing, Clover of Fortune), luck_mod 0, no
+        // lap roll; luck_per_turn keeps the last roll (the lap still counts as adjusted).
+        const buffed = u.buffs.find(.luck_blessing) != null or (s.artifacts and u.buffs.find(.clover_of_fortune) != null);
+        u.luck = if (buffed) 0 else -LUCK_MAX;
+        u.luck_mod = 0;
+    } else {
+        u.luck = u.init.luck;
+        if (f.started and !lap_adjusted) {
+            var luck = @as(f64, @floatFromInt(s.rng.int(-LUCK_MAX_CHANGE_FOR_TURN, LUCK_MAX_CHANGE_FOR_TURN + 1)));
+            if (luck + u.luck > LUCK_MAX) {
+                luck = LUCK_MAX - u.luck;
+            } else if (luck + u.luck < -LUCK_MAX) {
+                luck = -LUCK_MAX - u.luck;
+            }
+            u.luck_mod = luck;
+            u.luck_per_turn = luck;
         }
-        u.luck_mod = luck;
-        u.luck_per_turn = luck;
-    }
-    if (!f.started) u.luck_per_turn = 0;
-    // Artifact luck: Cursed Ward's power, then Clover of Fortune's.
-    const artifact_luck: f64 = if (s.artifacts) artifacts.luck(art) else 0;
-    u.luck_mod = u.luck_per_turn + syn.luck + artifact_luck + (u.buffs.power(.luck_blessing) orelse 0);
-    if (u.luck_mod + u.luck > LUCK_MAX) {
-        u.luck_mod = LUCK_MAX - u.luck;
-    } else if (u.luck_mod + u.luck < -LUCK_MAX) {
-        u.luck_mod = -LUCK_MAX - u.luck;
+        if (!f.started) u.luck_per_turn = 0;
+        // Artifact luck: Cursed Ward's power, then Clover of Fortune's.
+        const artifact_luck: f64 = if (s.artifacts) artifacts.luck(art) else 0;
+        u.luck_mod = u.luck_per_turn + syn.luck + artifact_luck + (u.buffs.power(.luck_blessing) orelse 0);
+        if (u.luck_mod + u.luck > LUCK_MAX) {
+            u.luck_mod = LUCK_MAX - u.luck;
+        } else if (u.luck_mod + u.luck < -LUCK_MAX) {
+            u.luck_mod = -LUCK_MAX - u.luck;
+        }
     }
 
     // MORALE (Madness or Mechanism pins it to 0, a leftover Morale or Dismorale entry notwithstanding; Sadness pins it
@@ -1786,10 +1794,16 @@ fn waitTurn(s: *State, ui: u8, events: *Events) Reject!void {
 fn defendTurn(s: *State, ui: u8, events: *Events) Reject!void {
     try validateTurnAction(s, ui);
     const u = &s.units[ui];
-    var luck_mod = LUCK_CHANGE_FOR_SHIELD;
-    if (luck_mod + u.luck > LUCK_MAX) luck_mod = LUCK_MAX - u.luck;
-    u.luck_mod = luck_mod;
-    u.luck_per_turn = luck_mod;
+    if (u.debuffs.len != 0 and u.debuffs.find(.misfortune) != null) {
+        // applyLuckShield under Misfortune (luckIsPinnedByMisfortune): no +3, and the lap's roll is dropped.
+        u.luck_mod = 0;
+        u.luck_per_turn = 0;
+    } else {
+        var luck_mod = LUCK_CHANGE_FOR_SHIELD;
+        if (luck_mod + u.luck > LUCK_MAX) luck_mod = LUCK_MAX - u.luck;
+        u.luck_mod = luck_mod;
+        u.luck_per_turn = luck_mod;
+    }
     changeMorale(u, MORALE_CHANGE_FOR_SHIELD, false);
     completeTurn(s, ui, false, false, events);
 }

@@ -92,6 +92,8 @@ pub const SpellId = enum(u8) {
     sylvan_focus_blessing,
     /// The Wandering Mage's cast buff (wave 2): a FIRE burn of power% after every damaging hit its holder lands.
     fireforged_sword,
+    /// The Wandering Mage's MIND debuff (wave 2): the holder's luck pinned at -10 (0 when luck-buffed), no lap roll.
+    misfortune,
     // batch 4
     /// The stacking Deep Wounds effect (Wolf, Tiger, Griffin, Manticore, Behemoth): a holder's strikes deal power% more.
     deep_wounds,
@@ -195,6 +197,7 @@ pub const SpellId = enum(u8) {
             .vine_throw => "Vine Throw",
             .sylvan_focus_blessing => "Sylvan Focus Blessing",
             .fireforged_sword => "Fireforged Sword",
+            .misfortune => "Misfortune",
             .deep_wounds => "Deep Wounds",
             .boar_saliva => "Boar Saliva",
             .terrifying_gaze => "Terrifying Gaze",
@@ -547,7 +550,7 @@ pub const AbilityId = enum(u8) {
             .forest_spellbook => spell == .summon_wolves,
             .basic_tome_of_battle_magic => spell == .fire_strike or spell == .meteorite,
             .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower,
-            .book_of_chaos => spell == .fireball or spell == .fireforged_sword,
+            .book_of_chaos => spell == .fireball or spell == .fireforged_sword or spell == .misfortune,
             else => false,
         };
     }
@@ -620,6 +623,7 @@ pub const CastSpell = enum(u8) {
     // wave 2b: the Wandering Mage's Book of Chaos
     fireball,
     fireforged_sword,
+    misfortune,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -636,6 +640,7 @@ pub const CastSpell = enum(u8) {
             .wild_regeneration => "Wild Regeneration",
             .fireball => "Fireball",
             .fireforged_sword => "Fireforged Sword",
+            .misfortune => "Misfortune",
         };
     }
 
@@ -654,6 +659,7 @@ pub const CastSpell = enum(u8) {
             .vine_throw => .vine_throw,
             .battle_roar => .battle_roar,
             .fireforged_sword => .fireforged_sword,
+            .misfortune => .misfortune,
             else => null,
         };
     }

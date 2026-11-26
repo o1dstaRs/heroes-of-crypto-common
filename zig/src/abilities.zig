@@ -1081,7 +1081,7 @@ pub inline fn mindResistant(u: *const Unit) bool {
 /// EffectHelper.getAbsorptionTarget: when the target carries an Absorb Penalties Aura row and a unit stands on its source
 /// cell, the roll getRandomInt(0, 100) < floor(power), and a living source takes the penalty. Returns the unit that
 /// receives it.
-fn absorptionTarget(s: *State, tgt_i: u8) u8 {
+pub fn absorptionTarget(s: *State, tgt_i: u8) u8 {
     if (!s.auras) return tgt_i; // the buff exists only through the aura refresh
     const tgt = &s.units[tgt_i];
     const b = tgt.buffs.get(.absorb_penalties_aura) orelse return tgt_i;
