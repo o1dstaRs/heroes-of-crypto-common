@@ -1,5 +1,5 @@
 //! The v0.7 level of the v0.8 chain (src/ai/versions/v0_7.ts StrategyV0_7.decideTurn): v0.6, then the melee-magic
-//! stance fix. Identity in scope, so not ported: the aura-saturated archetype anchor (no auras), the Arachna Queen
+//! stance fix. Not ported: the aura-saturated archetype anchor (decideV08 refuses such a seat), the Arachna Queen
 //! assimilation router (no spells or Endless Quiver) and the Terrifying Gaze repair.
 
 const rec = @import("../recording.zig");

@@ -9,7 +9,7 @@
 //! noMeleeRetreat (only No-Melee shooters can move: an ordinary shooter's score never beats its +Infinity start),
 //! excludeHiddenAttack (no Hidden), meleeAuraSupport (V05_AURASUPPORT off) and repairUnavailableMovePrefixedAttack (no
 //! Fire Wall, no Cowardice). Zero-weight or always-zero score terms (War Anger, target caster, Rapid Charge (weight 0),
-//! bait, Armageddon, hazard, aura) add exactly 0.
+//! bait, Armageddon) add exactly 0.
 
 const std = @import("std");
 const rec = @import("../recording.zig");
@@ -549,8 +549,10 @@ fn repositionByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         const threat = @as(f64, @floatFromInt(ai.countThreats(&c.m, cell, opp))) / 3;
         const aggr_zone: f64 = if (r.first_aggr_met) 1 else 0;
         const shoot_ready: f64 = if (shooter and ed >= 2 and ed <= shot_dist) 1 else 0;
+        // Aura emitters cover more allies (auraCoverageScore, default flat weight).
+        const aura = util.auraCoverageScore(s, c.ui, cell, .flat) / 4;
         const value = W[6] * advance + W[7] * cohesion + W[8] * hazard + W[9] * incumbent + W[10] * threat + W[11] * aggr_zone +
-            W[12] * shoot_ready + W[24] * advance * fm;
+            W[12] * shoot_ready + W[13] * aura + W[24] * advance * fm;
         if (value > best_score) {
             const fp = ai.footprintForAnchor(u, cell);
             if (engine.cellsFreeFor(s, c.ui, fp.slice())) {

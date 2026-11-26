@@ -212,6 +212,9 @@ pub fn prioritize(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
 
 const DELIVERY_EPSILON = 1e-9;
 
+/// A melee by the unit who has Dulling Defense permanently cuts a survivor's base attack: extra remaining work.
+const DULLING_SWING_WORK_BONUS: f64 = 0.2;
+
 const Delivery = struct {
     cand: usize,
     incumbent: bool,
@@ -220,26 +223,57 @@ const Delivery = struct {
     stationary: bool,
     target: u8,
     remaining: f64,
+    unsafe_dulling: bool,
+    dulling_swing: bool,
     work: f64,
 };
 
-/// deliveryPrecedes without Dulling Defense (out of scope): kill, the incumbent, damage, stationary, stable order.
+/// knightAnswersThisMelee: a Dulling Defense target that will answer this blow.
+fn knightAnswers(s: *const st.State, actor: u8, t: u8) bool {
+    return s.units[t].has(.dulling_defense) and util.canRespondToMelee(s, actor, t);
+}
+
+/// actorDullingSwingCuts: the knight's own non-killing melee still cuts the survivor's base attack.
+fn dullingSwingCuts(s: *const st.State, actor: u8, t: u8, melee: bool, ek: u8) bool {
+    const a = &s.units[actor];
+    return ek == 0 and melee and a.has(.dulling_defense) and util.abilityPower(a, .dulling_defense) > 0 and s.units[t].base_attack > 1;
+}
+
+/// targetWork: the hits the target still needs (no creature in scope regenerates, so no Wild Regeneration reserve),
+/// taxed when a knight's answer will cut our attack, and raised for the knight's own dulling swing.
+fn targetWork(s: *const st.State, actor: u8, t: u8, melee: bool, delivery: f64, ek: u8) f64 {
+    const base_work = @max(0, util.cumulativeHp(&s.units[t])) / @max(delivery, DELIVERY_EPSILON);
+    var work = base_work;
+    if (melee and knightAnswers(s, actor, t)) {
+        const power = @max(0, util.abilityPower(&s.units[t], .dulling_defense));
+        const future = @max(0, @ceil(base_work) - 1);
+        const tax = @min(2, (power / @max(1, engine.getAttack(&s.units[actor]))) * (future / 2));
+        work *= 1 + tax;
+    }
+    if (dullingSwingCuts(s, actor, t, melee, ek)) work *= 1 + DULLING_SWING_WORK_BONUS;
+    return work;
+}
+
+/// deliveryPrecedes: kill, the incumbent, a silent target over a knight who will answer, damage, the knight's own
+/// dulling swing, stationary, stable order.
 fn deliveryPrecedes(l: *const Delivery, r: *const Delivery) bool {
     if (l.ek != r.ek) return l.ek > r.ek;
     if (l.incumbent != r.incumbent) return l.incumbent;
+    if (l.unsafe_dulling != r.unsafe_dulling) return !l.unsafe_dulling;
     if (l.ed != r.ed) return l.ed > r.ed;
+    if (l.dulling_swing != r.dulling_swing) return l.dulling_swing;
     if (l.stationary != r.stationary) return l.stationary;
     return l.cand < r.cand;
 }
 
-/// selectV08STargetPressureCandidate: a kill now first; else finish an already wounded stack (the least remaining
-/// first); else the target with the most remaining attack-work. Null when Dulling Defense or Wild Regeneration is on
-/// the board (not ported).
+/// selectV08STargetPressureCandidate: a kill now first; else, preferring a target that is not a fresh answering knight,
+/// finish an already wounded stack (the least remaining first); else the target with the most remaining attack-work.
+/// Ties: damage, the knight's own dulling swing, stationary, stable order. A plain shot's delivery damage is its
+/// expected damage (Area Throw's pressure target is not in scope).
 fn targetPressure(s: *const st.State, actor: u8, set: *const cand.Set, ok: *bool) ?usize {
+    _ = ok;
     const team = s.units[actor].team;
-    if (s.units[actor].ability(.dulling_defense) != null) ok.* = false;
     var by_target: [st.MAX_UNITS]i32 = .{-1} ** st.MAX_UNITS;
-    var order: [st.MAX_UNITS]u8 = undefined;
     var nt: usize = 0;
     var deliveries: [st.MAX_UNITS]Delivery = undefined;
     for (set.slice(), 0..) |*c, i| {
@@ -248,48 +282,62 @@ fn targetPressure(s: *const st.State, actor: u8, set: *const cand.Set, ok: *bool
         const t = &s.units[ti];
         const ed = if (std.math.isFinite(c.ed) and c.ed > 0) c.ed else 0;
         if (t.isDead() or t.team == team or ed <= 0) continue;
-        if (t.ability(.dulling_defense) != null) ok.* = false;
+        const melee = util.has(&c.d, .melee_attack);
         const original = @max(0, t.amount_alive + t.amount_died) * @max(0, t.max_hp);
         const remaining = if (original > 0) @min(1, util.cumulativeHp(t) / original) else 1;
-        // Wild Regeneration's reserve (max HP per remaining pre-Armageddon activation): no creature in scope regenerates.
-        const work = @max(0, util.cumulativeHp(t)) / @max(ed, DELIVERY_EPSILON);
-        const d = Delivery{ .cand = i, .incumbent = c.kind == .incumbent, .ed = ed, .ek = c.ek, .stationary = !moves(c.d.slice()), .target = ti, .remaining = remaining, .work = work };
+        const d = Delivery{
+            .cand = i,
+            .incumbent = c.kind == .incumbent,
+            .ed = ed,
+            .ek = c.ek,
+            .stationary = !moves(c.d.slice()),
+            .target = ti,
+            .remaining = remaining,
+            .unsafe_dulling = c.ek == 0 and melee and knightAnswers(s, actor, ti),
+            .dulling_swing = dullingSwingCuts(s, actor, ti, melee, c.ek),
+            .work = targetWork(s, actor, ti, melee, ed, c.ek),
+        };
         if (by_target[ti] < 0) {
             by_target[ti] = @intCast(nt);
-            order[nt] = ti;
             deliveries[nt] = d;
             nt += 1;
         } else if (deliveryPrecedes(&d, &deliveries[@intCast(by_target[ti])])) deliveries[@intCast(by_target[ti])] = d;
     }
     if (nt == 0) return null;
+    const all = deliveries[0..nt];
     var kills = false;
-    for (deliveries[0..nt]) |*d| if (d.ek == 1) {
+    for (all) |*d| if (d.ek == 1) {
         kills = true;
     };
-    // eligible: the immediate kills, else every delivery (no Dulling Defense in scope).
+    // eligible: the immediate kills; else the deliveries that are not a fresh answering knight; else all of them.
+    var eligible: [st.MAX_UNITS]Delivery = undefined;
+    var ne: usize = 0;
+    if (kills) {
+        for (all) |d| if (d.ek == 1) {
+            eligible[ne] = d;
+            ne += 1;
+        };
+    } else {
+        for (all) |d| if (!d.unsafe_dulling or d.remaining <= 0.5) {
+            eligible[ne] = d;
+            ne += 1;
+        };
+        if (ne == 0) {
+            @memcpy(eligible[0..nt], all);
+            ne = nt;
+        }
+    }
+    // focused: the wounded among them (all of them when there is a kill), else every eligible delivery.
     var focused: [st.MAX_UNITS]Delivery = undefined;
     var nf: usize = 0;
-    for (deliveries[0..nt]) |d| if (!kills or d.ek == 1) {
+    for (eligible[0..ne]) |d| if (kills or d.remaining < 1 - DELIVERY_EPSILON) {
         focused[nf] = d;
         nf += 1;
     };
-    var wounded = kills;
-    if (!kills) {
-        var nw: usize = 0;
-        for (focused[0..nf]) |d| if (d.remaining < 1 - DELIVERY_EPSILON) {
-            focused[nw] = d;
-            nw += 1;
-        };
-        if (nw > 0) {
-            nf = nw;
-            wounded = true;
-        } else {
-            nf = 0;
-            for (deliveries[0..nt]) |d| {
-                focused[nf] = d;
-                nf += 1;
-            }
-        }
+    const wounded = nf > 0;
+    if (!wounded) {
+        @memcpy(focused[0..ne], eligible[0..ne]);
+        nf = ne;
     }
     const Cmp = struct { wounded: bool, kills: bool };
     std.sort.insertion(Delivery, focused[0..nf], Cmp{ .wounded = wounded, .kills = kills }, struct {
@@ -297,6 +345,7 @@ fn targetPressure(s: *const st.State, actor: u8, set: *const cand.Set, ok: *bool
             if (k.wounded and l.remaining != r.remaining) return l.remaining < r.remaining;
             if (!k.kills and l.work != r.work) return l.work > r.work;
             if (l.ed != r.ed) return l.ed > r.ed;
+            if (l.dulling_swing != r.dulling_swing) return l.dulling_swing;
             if (l.stationary != r.stationary) return l.stationary;
             return l.cand < r.cand;
         }
@@ -948,6 +997,8 @@ pub fn coherentMelee(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool
 /// The passes after v0.7, in decideTurn's order; false when a pass this board needs is not ported (cemetery with
 /// standing scattered stones, a coherent-melee repair, or an unported ability term).
 pub fn decide(c: *ai.Ctx, out: *ai.Decision) bool {
+    // v0.7's aura-saturated archetype anchor (a standalone StrategyV0_4 with the universal caster router) is not ported.
+    if (util.battle.aura_saturated[c.unit().team]) return false;
     var cur: ai.Decision = .{};
     var next: ai.Decision = .{};
     @import("lv7.zig").decide(c, &cur);

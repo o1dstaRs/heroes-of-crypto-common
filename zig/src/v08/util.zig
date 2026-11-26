@@ -78,6 +78,10 @@ pub const Battle = struct {
     /// MELEE_MAGIC stacks per team at the start; two or more make v0.7's meleeMagicAnchor army (no Resurrection or
     /// Wind Flow in scope), which keeps v0.6's decisions without the wait scorer.
     melee_magic: [3]u8 = .{ 0, 0, 0 },
+    /// isAuraSaturatedArmy per team at the start: every stack emits an aura of range above 0. v0.7 then plays a
+    /// standalone StrategyV0_4 anchor (not ported), so decideV08 refuses those seats. The rollout bridge must set it
+    /// from the TS profile, as it does `melee_magic`.
+    aura_saturated: [3]bool = .{ false, false, false },
     /// Each unit's place in its ids' localeCompare order (UUIDs: the same as byte order), for the TS id tie-breaks.
     id_rank: [st.MAX_UNITS]u16 = .{0} ** st.MAX_UNITS,
     /// v0.8's ranged positioning runs (V08_RANGED_POSITION_VERSIONS, default "v0.8": production). False for the
@@ -87,10 +91,21 @@ pub const Battle = struct {
     /// The profile from the fight's start state (every holder unit).
     pub fn primeProfile(self: *Battle, s: *const State) void {
         self.melee_magic = .{ 0, 0, 0 };
+        var stacks: [3]u8 = .{ 0, 0, 0 };
+        var emitters: [3]u8 = .{ 0, 0, 0 };
         for (s.holderOrder()) |u_slot| {
             const u = &s.units[u_slot];
-            if (u.in_holder and u.team < 3 and u.attack_type == AT.MELEE_MAGIC) self.melee_magic[u.team] += 1;
+            if (!u.in_holder or u.team >= 3) continue;
+            if (u.attack_type == AT.MELEE_MAGIC) self.melee_magic[u.team] += 1;
+            stacks[u.team] += 1;
+            for (u.auras[0..u.n_auras]) |d| {
+                if (s.aura_defs[d].range > 0) {
+                    emitters[u.team] += 1;
+                    break;
+                }
+            }
         }
+        for (0..3) |t| self.aura_saturated[t] = stacks[t] > 0 and emitters[t] == stacks[t];
     }
 
     /// From a recording's `init` (units in holder order, as engine.initState reads them).
@@ -184,10 +199,14 @@ pub inline fn damageMax(att: *const Unit, tgt: *const Unit, is_range: bool, divi
     return combat.damageBound(att, tgt, att.attack_damage_max, is_range, divisor);
 }
 
-/// Unit.canRespond(MELEE): no Stun / Blindness / Freeze effect and no "No Melee" ability. None exists in scope.
+/// Unit.canRespond(MELEE): no Stun effect (Blindness, Freeze and "No Melee" are not in scope).
 pub inline fn canRespondMelee(u: *const Unit) bool {
-    _ = u;
-    return true;
+    return !u.isStunned();
+}
+
+/// Unit.getAbilityPower(name): the ability's power, 0 without it or while Broken.
+pub inline fn abilityPower(u: *const Unit, id: st.AbilityId) f64 {
+    return if (u.ability(id)) |a| a.power else 0;
 }
 
 /// FightProperties.hasAlreadyMadeTurn
