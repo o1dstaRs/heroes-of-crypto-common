@@ -960,10 +960,9 @@ The framework the army setup added (exact in both modes, coverage below):
     work in `noinline` helpers (`engine.b6Steps`, `abilities.captureBatch6`, `ai.advanceTowardEnemy`); whole battles
     stayed level (the benchmark below).
 - Notes for the v0.8 owner (batch 6a in src/v08):
-  - `rollout.v08Scope` refuses a v0.8 seat while a holder unit holds a batch-6a card (a stolen one too), carries one of
-    its rows (Hamstrung, War Anger's aura row, Blindness, Paralysis, Wind Flow, the four blessings, the Guiding Winds row)
-    or was revived (`Unit.aug_orphans`); Wind Flow and Resurrection stay out of `rollout.V08_CASTABLE`. The batch-5 block
-    is gone (src/v08 covers batch 5: `0809cc1d`, `dbbcb452`, `d2c40d3f`, `6b661284`).
+  - `rollout.v08Scope` takes batch 6a (its cards, a stolen one too, its rows and revived units, `Unit.aug_orphans`;
+    Wind Flow and Resurrection are in `rollout.V08_CASTABLE`), as it takes batch 5 (`0809cc1d`, `dbbcb452`, `d2c40d3f`,
+    `6b661284`).
   - The engine pieces are public: `engine.tryRevive`, `canSelfResurrect`, `warAngerMod`, `enemiesWithin`, `crusade`,
     `forceStalledLap`, `Unit.isSkipping` / `canMove` / `augment`; `abilities.paralysisFactor`, `blindness`,
     `paralysis`, `hamstring`; `combat.wingshieldOwner`; `spells.massCastOnFlyers` (through `castSpell`); `ai.advanceTowardEnemy`
@@ -1626,6 +1625,6 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and
   `compare.NativeCheck`. The bridge's rollouts take each unit's decide function from `rollout.policies` (v0.1 and
-  v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers batches 1 to 5 and the wave-1 casts, so a
-  v0.8 request on a board with another spell, an artifact row, smoke or a batch-6a card or row is refused (the known
+  v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers batches 1 to 5 and 6a, the artifacts and every
+  cast but Fire Wall, so a v0.8 request on a board with Fire Wall, a burning cell or Time Denial is refused (the known
   gaps and what the search still needs are in `BRIDGE.md`).

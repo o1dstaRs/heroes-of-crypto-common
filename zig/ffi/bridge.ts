@@ -158,6 +158,8 @@ export interface IHocArmyProfile {
     meleeMagic: number;
     /** every stack emits an aura (v0.7's v0.4 anchor) */
     auraSaturated?: boolean;
+    /** v0.7's isMeleeMagicAnchorArmy (at least two MELEE_MAGIC stacks, no Resurrection or Wind Flow); false passes 0 */
+    meleeMagicAnchor?: boolean;
 }
 
 /**

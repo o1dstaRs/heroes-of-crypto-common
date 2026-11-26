@@ -60,14 +60,14 @@ pub fn policyFor(version: []const u8) ?DecideFn {
     return null;
 }
 
-/// The boards the v0.8 port covers. Null when `s` is one, else what puts it outside. No batch-6a card or row and no spell
-/// outside the list can appear inside a rollout from such a root (steals, Infest and summons only move or raise cards
-/// already on the board), so checking the root covers every state of the call.
+/// The boards the v0.8 port covers. Null when `s` is one, else what puts it outside. No spell outside the list, no refused
+/// card and no burning cell can appear inside a rollout from such a root (steals, Infest and summons only move or raise
+/// cards already on the board, and only a Fire Wall cast lights a cell), so checking the root covers every state of the
+/// call.
 pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 {
     _ = ident; // the src/v08 gap checks that named creatures are gone (common 6e6aff54, d5fddea9)
-    // src/v08 covers the abilities of batches 1-5 (common 4f5152ba, 2346a159, 0809cc1d, dbbcb452), the wave-1 casts and
-    // the batch-4 castables (bcf722a4, 66e72e9e), vines included. A board where a unit holds any other spell stays out of
-    // scope.
+    // src/v08 covers batches 1-5 and 6a, revived units, the artifacts, smoke and every cast but Fire Wall
+    // (V08_CASTABLE). A board where a unit holds any other spell stays out of scope.
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
         for (u.book[0..u.n_book]) |e| {
@@ -76,26 +76,21 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
         for (u.spells[0..u.n_spells]) |b| {
             if (!v08Castable(b.spell)) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
         }
-        // Batch 6a is not in src/v08 yet: its cards (stolen ones too), its rows (a Hamstrung flyer, Blindness,
-        // Paralysis, Wind Flow and the blessings outlive their source) and a revive's orphan augment rows
-        // (V08_SCOPE's tables).
+        // The cards and rows V08_SCOPE's tables refuse (stolen cards too) and a revive's orphan augment rows.
         if (u.ability_mask & V08_SCOPE.refused_abilities != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-6a ability", .{i}) catch "batch 6a";
         if (V08_SCOPE.refuse_revived and u.aug_orphans != 0) return std.fmt.bufPrint(buf, "slot {d} was revived", .{i}) catch "batch 6a";
         if (refusedRow(u)) |id| return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 6a";
     }
-    // Artifacts: the engine plays the stat artifacts (artifacts.zig), but src/v08 is not checked on them yet (lv8's
-    // explicit-rate damage bound has no Warlord's Edge re-price), so a v0.8 seat stays out of scope with any row.
-    if (V08_SCOPE.refuse_artifact_rows and s.artifacts) return "artifact rows (src/v08 not checked on artifacts)";
-    // Smoke halves shots through it; src/v08 does not read the store yet.
+    if (V08_SCOPE.refuse_artifact_rows and s.artifacts) return "artifact rows";
     if (V08_SCOPE.refuse_smoke and s.fight.n_smoke != 0) return "smoke clouds on the board";
-    // Fire walls toll and burn walkers; src/v08 does not read the store yet.
+    // Fire walls: v0.1's projectPostMoveActorAvailability (a mindless unit plays v0.1 where v0.8 cast walls) is not in
+    // ai.zig yet.
     if (V08_SCOPE.refuse_fire_walls and s.fight.n_fire != 0) return "fire walls on the board";
-    // Wave-2 rows that outlive their casters (src/v08 does not read them yet): the Sword's burns, Misfortune's luck pin,
-    // Whirlpool, the runes, Freeze and the crafted cards (V08_SCOPE.late).
+    // The cards and rows refused after the board-level checks (V08_SCOPE.late: Time Denial).
     const late = V08_SCOPE.late;
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
-        if (u.ability_mask & late.abilities != 0) return "a wave-2 card (a crafted card or Time Denial)";
+        if (u.ability_mask & late.abilities != 0) return "a wave-2 card (Time Denial)";
         if (u.buffs.len != 0 and scope.carries(u.buffs.items[0..u.buffs.len], late.buffs)) return "a wave-2 buff";
         if (u.debuffs.len != 0 and scope.carries(u.debuffs.items[0..u.debuffs.len], late.debuffs)) return "a wave-2 debuff";
         if (u.effects.len != 0 and scope.carries(u.effects.items[0..u.effects.len], late.effects)) return "a Freeze effect";
@@ -103,7 +98,7 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
     return null;
 }
 
-/// A row V08_SCOPE refuses on the unit (a debuff, then an effect, then a buff: the batch-6a rows), if any.
+/// A row V08_SCOPE refuses on the unit (a debuff, then an effect, then a buff), if any.
 fn refusedRow(u: *const st.Unit) ?st.SpellId {
     for (u.debuffs.items[0..u.debuffs.len]) |d| if (scope.listed(V08_SCOPE.refused_debuffs, d.id)) return d.id;
     for (u.effects.items[0..u.effects.len]) |e| if (scope.listed(V08_SCOPE.refused_effects, e.id)) return e.id;
@@ -111,34 +106,25 @@ fn refusedRow(u: *const st.Unit) ?st.SpellId {
     return null;
 }
 
-/// The castables src/v08 decides: the wave-1 spells and the batch-4 castables. A whitelist: every other spell (wave 2,
-/// whatever joins `st.CastSpell` later) keeps a board out of v0.8 rollouts until src/v08 decides it and joins this list.
+/// The castables src/v08 decides: every `st.CastSpell` but Fire Wall (V08_SCOPE). A whitelist: whatever joins
+/// `st.CastSpell` later keeps a board out of v0.8 rollouts until src/v08 decides it and joins this list.
 pub const V08_CASTABLE = [_]st.CastSpell{
-    .heal,          .blessing,   .lightning_strike, .fire_strike, .meteor_shower,     .meteorite,
-    .summon_wolves, .vine_throw, .ring_of_fire,     .battle_roar, .wild_regeneration,
+    .heal,             .blessing,    .lightning_strike,  .fire_strike, .meteor_shower,     .meteorite,
+    .summon_wolves,    .vine_throw,  .ring_of_fire,      .battle_roar, .wild_regeneration, .fireball,
+    .fireforged_sword, .misfortune,  .smoke,             .wind_flow,   .resurrection,      .craft,
+    .armor_rune,       .weapon_rune, .spiritual_armor,   .mass_heal,   .whirlpool,         .riot,
+    .magic_mirror,     .mass_riot,   .mass_magic_mirror, .courage,     .helping_hand,      .empower,
 };
 
-/// v08Scope's tables, which the scope manifest exports (scope.zig): the castables, the batch-6a cards and rows
-/// (Hamstrung and War Anger debuffs, Blindness and Paralysis effects, the batch-6 stat buffs `isBatch6Stat`), a revive's
-/// orphan augment rows, the artifact rows (State.artifacts: scope.artifactRowBuff / artifactRowDebuff), the smoke
-/// clouds, and (`late`, checked after those) the wave-2 cards and rows that outlive their casters.
+/// v08Scope's tables, which the scope manifest exports (scope.zig): the castables, the burning cells and (`late`, checked
+/// after the board) Time Denial. src/v08 covers batches 1-5 and 6a with revived units, the artifact rows, smoke and the
+/// wave-2 cards and rows. Fire Wall (the spell and the walls) waits for v0.1's projectPostMoveActorAvailability, which
+/// ai.zig does not port yet: a mindless unit (Berserker, Frenzied Boar) plays v0.1 on a board where v0.8 cast walls.
 pub const V08_SCOPE = scope.PolicyScope{
     .name = "v0.8",
     .castable = &V08_CASTABLE,
-    .refused_abilities = st.AbilityId.BATCH6A_MASK,
-    .refused_debuffs = &.{ .hamstrung, .war_anger_aura },
-    .refused_effects = &.{ .blindness, .paralysis },
-    .refused_buffs = scope.spellIdsWhere(st.SpellId.isBatch6Stat),
-    .refuse_revived = true,
-    .refuse_artifact_rows = true,
-    .refuse_smoke = true,
     .refuse_fire_walls = true,
-    .late = .{
-        .abilities = st.AbilityId.crafted_double_punch.bit() | st.AbilityId.crafted_double_shot.bit() | st.AbilityId.crafted_frozen_sword.bit() | st.AbilityId.crafted_frozen_bow.bit() | st.AbilityId.time_denial.bit(),
-        .buffs = &.{ .fireforged_sword, .armor_rune, .weapon_rune, .riot, .mass_riot, .magic_mirror, .mass_magic_mirror, .courage, .helping_hand, .empower },
-        .debuffs = &.{ .misfortune, .whirlpool, .helping_hand },
-        .effects = &.{.freeze},
-    },
+    .late = .{ .abilities = st.AbilityId.time_denial.bit() },
 };
 
 /// The v0.1 policy takes every board the loader takes.

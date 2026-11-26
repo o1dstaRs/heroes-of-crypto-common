@@ -25,6 +25,7 @@
 //                  (green) and upper (red) creature lists at expBudget amounts, both teams' Tier-1 / Tier-2 artifacts,
 //                  the doctrines and the map (zig/parity/record.ts's RECORD_ROSTERS lines). KEEP and SPELLS then
 //                  default to ALL and all.
+//   ARTIFACTS=random  without CENSUS, each team draws a Tier-1 and a Tier-2 artifact from the seed (0 = none drawn)
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 
 interface ICensusLine {
@@ -119,6 +120,7 @@ const { getUpgradePoints } = await import("../src/doctrines/doctrine_properties"
 const { ToFactionType } = await import("../src/factions/faction_type");
 const { synergyVariantsForSeed } = await import("../src/synergies/synergy_properties");
 const { NATIVE_ROLLOUTS_ENV, nativeFixtureWritten } = await import("../src/simulation/native_rollouts");
+const { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } = await import("../src/artifacts/artifact_properties");
 
 // The server's bot-search environment (heroes-of-crypto-server src/api/game/v1/bot_search.ts), scoped around every
 // decision as the server scopes it.
@@ -231,6 +233,17 @@ interface ISearchDriverLike {
     nativeRolloutStatistics: Record<string, unknown>;
 }
 
+function artifactsFor(seed: number, teamIndex: number): Record<string, number> {
+    if (process.env.ARTIFACTS !== "random") return {};
+    const rng = makeRng((Math.imul(seed, 0x2c1b3c6d) ^ (teamIndex * 0x297a2d39)) >>> 0);
+    const tier1 = [0, ...TIER1_ARTIFACT_LIST.map((artifact: { id: number }) => artifact.id)];
+    const tier2 = [0, ...TIER2_ARTIFACT_LIST.map((artifact: { id: number }) => artifact.id)];
+    const t1 = tier1[Math.floor(rng() * tier1.length)];
+    const t2 = tier2[Math.floor(rng() * tier2.length)];
+    const side = teamIndex === 0 ? "green" : "red";
+    return { ...(t1 ? { [`${side}ArtifactT1`]: t1 } : {}), ...(t2 ? { [`${side}ArtifactT2`]: t2 } : {}) };
+}
+
 function playBattle(seed: number, mode: string, index: number): IBattleRun {
     process.env[NATIVE_ROLLOUTS_ENV] = mode;
     const census = CENSUS.length ? CENSUS[CENSUS_OFFSET + index] : undefined;
@@ -246,7 +259,7 @@ function playBattle(seed: number, mode: string, index: number): IBattleRun {
               ...(census.artifacts.upper[0] ? { redArtifactT1: census.artifacts.upper[0] } : {}),
               ...(census.artifacts.upper[1] ? { redArtifactT2: census.artifacts.upper[1] } : {}),
           }
-        : {};
+        : { ...artifactsFor(seed, 0), ...artifactsFor(seed, 1) };
     const variants = synergyVariantsForSeed(`rec-${seed}`);
     const decisions: IDecisionRow[] = [];
     const drivers: ISearchDriverLike[] = [];

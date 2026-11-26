@@ -226,14 +226,23 @@ const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 
 /** v0.7's army profile of both teams from the holder at the fight's start (isDenseMeleeMagicArmy's count and
  * isAuraSaturatedArmy), as StrategyV0_7.primeArmyProfile computes it at placement. */
-export function armyProfileAtStart(unitsHolder: any): Record<string, { meleeMagic: number; auraSaturated: boolean }> {
-    const out: Record<string, { meleeMagic: number; auraSaturated: boolean }> = {};
+export function armyProfileAtStart(
+    unitsHolder: any,
+): Record<string, { meleeMagic: number; auraSaturated: boolean; meleeMagicAnchor: boolean }> {
+    const out: Record<string, { meleeMagic: number; auraSaturated: boolean; meleeMagicAnchor: boolean }> = {};
     for (const team of [1, 2]) {
         const units = unitsHolder.getAllAllies(team);
+        const meleeMagic = units.filter((u: any) => u.getAttackType() === MELEE_MAGIC).length;
         out[String(team)] = {
-            meleeMagic: units.filter((u: any) => u.getAttackType() === MELEE_MAGIC).length,
+            meleeMagic,
             auraSaturated:
                 units.length > 0 && units.every((u: any) => u.getAuraRanges().some((range: number) => range > 0)),
+            // v0_7.ts isMeleeMagicAnchorArmy: dense melee magic and no salvage spell (Resurrection, Wind Flow).
+            meleeMagicAnchor:
+                meleeMagic >= 2 &&
+                !units.some((u: any) =>
+                    u.getSpells().some((sp: any) => sp.getName() === "Resurrection" || sp.getName() === "Wind Flow"),
+                ),
         };
     }
     return out;

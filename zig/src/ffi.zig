@@ -216,7 +216,9 @@ fn nameTable(arena: std.mem.Allocator, root: std.json.Value, s: *const st.State)
     return names[0..used];
 }
 
-/// `{"1": {"meleeMagic": n, "auraSaturated": b} | null, "2": ...}` (absent teams keep no profile).
+/// `{"1": {"meleeMagic": n, "auraSaturated": b, "meleeMagicAnchor": b} | null, "2": ...}` (absent teams keep no
+/// profile). The port reads melee_magic >= 2 as v0.7's meleeMagicAnchor (isMeleeMagicAnchorArmy: dense melee magic and
+/// no salvage spell), so a profile whose meleeMagicAnchor is false passes 0.
 fn parseProfiles(v: std.json.Value, out: *[3]ArmyProfile) ?[]const u8 {
     if (v != .object) return if (v == .null) null else "armyProfile must be an object";
     for ([_]u8{ st.Team.RIGHT, st.Team.LEFT }) |team| {
@@ -229,7 +231,10 @@ fn parseProfiles(v: std.json.Value, out: *[3]ArmyProfile) ?[]const u8 {
         if (mm != .integer or mm.integer < 0 or mm.integer > st.MAX_UNITS) return "armyProfile: meleeMagic must be a stack count";
         const sat = rec.get(p, "auraSaturated");
         if (sat != .null and sat != .bool) return "armyProfile: auraSaturated must be a boolean";
-        out[team] = .{ .present = true, .melee_magic = @intCast(mm.integer), .aura_saturated = sat == .bool and sat.bool };
+        const anchor = rec.get(p, "meleeMagicAnchor");
+        if (anchor != .null and anchor != .bool) return "armyProfile: meleeMagicAnchor must be a boolean";
+        const melee_magic: u8 = if (anchor == .bool and !anchor.bool) 0 else @intCast(mm.integer);
+        out[team] = .{ .present = true, .melee_magic = melee_magic, .aura_saturated = sat == .bool and sat.bool };
     }
     return null;
 }
