@@ -127,8 +127,9 @@ pub const V08_SCOPE = scope.PolicyScope{
     .name = "v0.8",
     .castable = &V08_CASTABLE,
     // Batch 6b: the cards (stolen ones too) and rows src/v08 does not cover yet. Covered: Castling (3193517c: candidates,
-    // the caster router, the destination cells) and the Mermaid's Water Element and Water Shield (73ffe9a5).
-    .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit() & ~st.AbilityId.water_element.bit() & ~st.AbilityId.water_shield.bit(),
+    // the caster router, the destination cells), the Mermaid's Water Element and Water Shield (73ffe9a5) and the
+    // Thunderbird's Wind Element and Chain Lightning (7c89022b).
+    .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit() & ~st.AbilityId.water_element.bit() & ~st.AbilityId.water_shield.bit() & ~st.AbilityId.wind_element.bit() & ~st.AbilityId.chain_lightning.bit(),
     .refused_buffs = &.{.flesh_shield_aura},
     .refuse_fire_walls = true,
     .late = .{ .abilities = st.AbilityId.time_denial.bit() },
