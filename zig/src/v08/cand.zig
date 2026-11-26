@@ -930,7 +930,7 @@ const Gen = struct {
                 .raw_max = combat.damageBoundSyn(u, t, u.attack_damage_max, true, divisor, prep.syn),
                 .wounds = abilities.activeDeepWounds(u, t),
                 .prep = prep,
-                .aoe_mult = combat.physicalAoeMultiplier(t),
+                .aoe_mult = combat.physicalAoeMultiplier(s, t),
             };
             const first_min = mods.apply(mods.raw_min, 1, 0);
             const first_max = mods.apply(mods.raw_max, 1, 0);

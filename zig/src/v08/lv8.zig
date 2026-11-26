@@ -14,6 +14,7 @@ const path = @import("../path.zig");
 const js = @import("../jsnum.zig");
 const AT = st.AttackType;
 const abilities = @import("../abilities.zig");
+const artifacts = @import("../artifacts.zig");
 const spells = @import("../spells.zig");
 
 /// The recorder's pass names, in decideTurn's order (zig/parity/v08/layers.ts).
@@ -1108,7 +1109,9 @@ pub fn backlineWard(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void 
 
 /// Unit.calculateAttackDamageMin/Max at an explicit attack rate (combat.damageBound reads the unit's own attack), with
 /// the attacker team's synergy power in getEnemyArmor (an active Piercing Spear scales the armor by 1 - multiplier).
-fn boundAt(att: *const st.Unit, tgt: *const st.Unit, dmg: f64, rate: f64, is_range: bool) f64 {
+fn boundAt(att: *const st.Unit, tgt: *const st.Unit, dmg: f64, rate_in: f64, is_range: bool) f64 {
+    // adjustWarlordsEdgeAttackRate re-prices the explicit rate too.
+    const rate = if (att.we_base != 0) artifacts.warlordsEdgeRate(att, rate_in, is_range) else rate_in;
     var armor = if (is_range) engine.getRangeArmor(tgt) else engine.getArmor(tgt);
     if (att.ability(.piercing_spear)) |ps| armor = armor * (1 - abilities.abilityMultiplierSyn(att, ps, att.syn_power));
     const luck = engine.getLuck(tgt);
