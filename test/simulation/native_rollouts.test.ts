@@ -277,6 +277,24 @@ describe("native rollout scope", () => {
         );
     });
 
+    test("the ranged-positioning modes whose fire-wall checks the library does not port keep every bank in TypeScript", () => {
+        // Band advance, pre-pin egress and protected advance project each route through burning cells
+        // (v0_8_ranged_positioning.ts actorAvailableAfterRoute). The profile turns all three off, and the v0.8 scope takes
+        // Fire Wall boards, so turning one on (or naming a version for it) must refuse the native policy.
+        const environment = profileEnvironment();
+        for (const mode of [
+            "V08_SUPPORTED_BAND_ADVANCE",
+            "V08_SUPPORTED_PREPIN_EGRESS",
+            "V08_PROTECTED_ADVANCE_GUARDRAILS",
+        ]) {
+            expect(environment[mode]).toBe("0");
+            expect(nativeEnvironmentRefusal({ ...environment, [mode]: "1" })).toBe(`env:${mode}`);
+            expect(nativeEnvironmentRefusal({ ...environment, [`${mode}_VERSIONS`]: "v0.8" })).toBe(
+                `env:${mode}_VERSIONS`,
+            );
+        }
+    });
+
     test("only StrategyV0_8 (under the A19 placement layers) and StrategyV0_1 have a library policy", () => {
         const v08 = nativeTeamPolicy(createAIStrategy("v0.8"));
         expect(typeof v08).toBe("object");

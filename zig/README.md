@@ -1805,7 +1805,7 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and
   `compare.NativeCheck`. The bridge's rollouts take each unit's decide function from `rollout.policies` (v0.1 and
-  v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers batches 1 to 5 and 6a, the artifacts and every
-  cast but Fire Wall, so a v0.8 request on a board with Fire Wall, a burning cell, Time Denial or a batch-6b card (the
-  Harpy's Castling included) is refused (the known
+  v0.8; a mindless unit plays v0.1 whatever its seat); the v0.8 port covers batches 1 to 5 and 6a, the artifacts, every
+  cast (the Nightmare's Fire Wall, its burning cells and Time Denial included) and the batch-6b slices src/v08 decides,
+  so a v0.8 request on a board with another batch-6b card is refused (the known
   gaps and what the search still needs are in `BRIDGE.md`).

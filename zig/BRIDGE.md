@@ -316,18 +316,20 @@ calling thread at every call (`rollout.battleTable` over the root's slots, names
 slot). A team without a profile is passed as melee_magic 255 (v0.7's finalizeDecision then keeps v0.6's decision, the
 port's anchor-army path; nothing else reads the count).
 
-Scope of the v0.8 policy (`rollout.v08Scope`, checked on the root; no spell outside the list, no Time Denial card and
-no burning cell can appear inside a rollout from a root without one): src/v08 covers batches 1 to 5 and 6a with
-revived units, the artifact rows, smoke, and every wave-1 and wave-2 cast but Fire Wall, so a request with a v0.8 seat
-is refused when any holder unit holds a book entry or parsed spell outside the whitelist `rollout.V08_CASTABLE` (every
-`st.CastSpell` but Fire Wall and Castling: a spell added to `st.CastSpell` later is refused until it joins the list),
-holds a batch-6b card or carries its row (`V08_SCOPE.refused_abilities` = `BATCH6B_MASK`: the Harpy's Castling and the
-Mermaid's Water Element and Water Shield and the Thunderbird's Wind Element and Chain Lightning, a Queen thief's too; `refused_buffs`: a Water Shield row, which outlives a
-robbed or Broken holder's card, until src/v08 decides them) or holds Time Denial (`V08_SCOPE.late`), or when the board
-has a burning cell. Fire Wall waits for v0.1's
-projectPostMoveActorAvailability (v0_1.ts), which `ai.zig` does not port yet: a mindless unit (Berserker, Frenzied
-Boar) plays v0.1 on a board where v0.8 cast walls. The v0.1 policy takes every board the engine port loads, batches 5
-and 6a, the Harpy, the Mermaid and the Thunderbird included. Candidates may be any action the engine replays,
+Scope of the v0.8 policy (`rollout.v08Scope`, checked on the root; no spell outside the list and no refused card can
+appear inside a rollout from a root without one): src/v08 covers batches 1 to 5 and 6a with revived units, the artifact
+rows, smoke, and every wave-1 and wave-2 cast, the Nightmare's whole book included (Fire Wall and the burning cells it
+leaves, Empower, Time Denial), so a request with a v0.8 seat is refused when any holder unit holds a book entry or
+parsed spell outside the whitelist `rollout.V08_CASTABLE` (every `st.CastSpell`: a spell added to `st.CastSpell` later
+is refused until it joins the list), or holds a batch-6b card src/v08 does not decide yet or carries its row
+(`V08_SCOPE.refused_abilities`: `BATCH6B_MASK` without the Harpy's Castling, the Mermaid's Water Element and Water Shield
+and the Thunderbird's Wind Element and Chain Lightning, a Queen thief's cards too; `refused_buffs`: a Flesh Shield Aura
+row, which outlives its source). A mindless unit (Berserker, Frenzied Boar) plays v0.1 on a board where v0.8 cast walls:
+`ai.zig`'s completeMoveWithMelee projects the walk before it appends the strike, as v0_1.ts does (`ai.projectPostMove`:
+projectPostMoveActorAvailability on the resolved route, Made of Fire's max hp on a lava route, each burning cell
+entered, a Water Shield's absorb, a self-resurrection), and its idle turn waits only where canWaitOnHourglass (Time
+Denial included) allows. The v0.1 policy takes every board the engine port loads, batches 5 and 6a, the Harpy, the
+Mermaid and the Thunderbird included. Candidates may be any action the engine replays,
 `area_throw_attack` and the free-aim `range_attack` included. The two refusals for
 src/v08 gaps (a removed unit in alreadyMadeTurn, an Angel or Queen with a synergy aura range) are gone: its owner fixed
 them (common `d5fddea9`, `6e6aff54`), and the holder-ordered copy the learned leaves were scored on went with them.
@@ -425,9 +427,9 @@ also left out of `auraEffects`); `castable: null` means every spell the loader t
 `storedPropertyBuffs` the buff rows whose stored properties are loaded besides the aura rows (the augments and every
 artifact row but Keen Blade's), each an integer 0..`storedProperty` or undefined; `artifactRows` the rows that make a
 board an artifact board (`State.artifacts`), which a policy with `refusedArtifactRows` refuses (`refusedSmoke` and
-`refusedFireWalls`: a board holding a smoke cloud or a burning cell; v0.8 keeps only the fire walls).
-A policy's `refused*` lists include its late rows (`V08_SCOPE.late`: Time Denial, which v08Scope checks
-after the board-level refusals with its own message). With no policy
+`refusedFireWalls`: a board holding a smoke cloud or a burning cell; v0.8 refuses neither).
+A policy's `refused*` lists include its late rows (`V08_SCOPE.late`, which v08Scope checks after the board-level
+refusals with its own message; v0.8 has none since Time Denial joined its scope). With no policy
 name the manifest carries every policy; `coverage` hashes that full body and is the same in every manifest and in
 `hoc_build_info`.
 
@@ -458,7 +460,7 @@ them, so a porter changes the table and nothing else on the bridge side:
 | a grid or fight store | drop it from `REFUSED_GRID_FIELDS` / `REFUSED_FIGHT_FIELDS` and read it in snapshot.zig |
 | an artifact | `artifacts.supportedT1/T2` (scope.artifactSupported); its row's name in `SpellId` |
 | a wider list | the capacity in `state.zig` (`MAX_*`, the list types); the manifest's `capacities` follow |
-| v0.8 on fire walls or Time Denial (or a card, row or store a future gap refuses) | `rollout.V08_SCOPE` (`refused_abilities`, `refused_debuffs` / `refused_effects` / `refused_buffs`, `refuse_revived`, `refuse_artifact_rows`, `refuse_smoke`, `refuse_fire_walls`, `late`) |
+| v0.8 on a card, row or store a gap still refuses (batch 6b) | `rollout.V08_SCOPE` (`refused_abilities`, `refused_debuffs` / `refused_effects` / `refused_buffs`, `refuse_revived`, `refuse_artifact_rows`, `refuse_smoke`, `refuse_fire_walls`, `late`) |
 
 A new kind of refusal (a check no table holds yet) gets a table and a manifest key in scope.zig and a line in
 `ffi/precheck.ts`. Then rebuild, run `zig build test` (the manifest tests, the artifact-row cross-check against

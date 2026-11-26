@@ -60,14 +60,13 @@ pub fn policyFor(version: []const u8) ?DecideFn {
     return null;
 }
 
-/// The boards the v0.8 port covers. Null when `s` is one, else what puts it outside. No spell outside the list, no refused
-/// card and no burning cell can appear inside a rollout from such a root (steals, Infest and summons only move or raise
-/// cards already on the board, and only a Fire Wall cast lights a cell), so checking the root covers every state of the
-/// call.
+/// The boards the v0.8 port covers. Null when `s` is one, else what puts it outside. No spell outside the list and no
+/// refused card can appear inside a rollout from such a root (steals, Infest and summons only move or raise cards
+/// already on the board), so checking the root covers every state of the call.
 pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 {
     _ = ident; // the src/v08 gap checks that named creatures are gone (common 6e6aff54, d5fddea9)
-    // src/v08 covers batches 1-5 and 6a, revived units, the artifacts, smoke and every cast but Fire Wall and Castling
-    // (V08_CASTABLE). A board where a unit holds any other spell stays out of scope.
+    // src/v08 covers batches 1-5 and 6a, revived units, the artifacts, smoke, the Nightmare (Fire Wall, burning cells,
+    // Time Denial) and every cast (V08_CASTABLE). A board where a unit holds any other spell stays out of scope.
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
         for (u.book[0..u.n_book]) |e| {
@@ -84,17 +83,16 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
     }
     if (V08_SCOPE.refuse_artifact_rows and s.artifacts) return "artifact rows";
     if (V08_SCOPE.refuse_smoke and s.fight.n_smoke != 0) return "smoke clouds on the board";
-    // Fire walls: v0.1's projectPostMoveActorAvailability (a mindless unit plays v0.1 where v0.8 cast walls) is not in
-    // ai.zig yet.
     if (V08_SCOPE.refuse_fire_walls and s.fight.n_fire != 0) return "fire walls on the board";
-    // The cards and rows refused after the board-level checks (V08_SCOPE.late: Time Denial).
+    // The cards and rows refused after the board-level checks (V08_SCOPE.late: none since the Nightmare's Time Denial
+    // joined the scope).
     const late = V08_SCOPE.late;
     for (s.holderOrder()) |i| {
         const u = &s.units[i];
-        if (u.ability_mask & late.abilities != 0) return "a wave-2 card (Time Denial)";
-        if (u.buffs.len != 0 and scope.carries(u.buffs.items[0..u.buffs.len], late.buffs)) return "a wave-2 buff";
-        if (u.debuffs.len != 0 and scope.carries(u.debuffs.items[0..u.debuffs.len], late.debuffs)) return "a wave-2 debuff";
-        if (u.effects.len != 0 and scope.carries(u.effects.items[0..u.effects.len], late.effects)) return "a Freeze effect";
+        if (u.ability_mask & late.abilities != 0) return "a late-refused card";
+        if (u.buffs.len != 0 and scope.carries(u.buffs.items[0..u.buffs.len], late.buffs)) return "a late-refused buff";
+        if (u.debuffs.len != 0 and scope.carries(u.debuffs.items[0..u.debuffs.len], late.debuffs)) return "a late-refused debuff";
+        if (u.effects.len != 0 and scope.carries(u.effects.items[0..u.effects.len], late.effects)) return "a late-refused effect";
     }
     return null;
 }
@@ -107,22 +105,21 @@ fn refusedRow(u: *const st.Unit) ?st.SpellId {
     return null;
 }
 
-/// The castables src/v08 decides: every `st.CastSpell` but Fire Wall and Castling (V08_SCOPE). A whitelist: whatever
-/// joins `st.CastSpell` later keeps a board out of v0.8 rollouts until src/v08 decides it and joins this list.
+/// The castables src/v08 decides: every `st.CastSpell` (V08_SCOPE). A whitelist: whatever joins `st.CastSpell` later keeps
+/// a board out of v0.8 rollouts until src/v08 decides it and joins this list.
 pub const V08_CASTABLE = [_]st.CastSpell{
     .heal,             .blessing,    .lightning_strike,  .fire_strike, .meteor_shower,     .meteorite,
     .summon_wolves,    .vine_throw,  .ring_of_fire,      .battle_roar, .wild_regeneration, .fireball,
     .fireforged_sword, .misfortune,  .smoke,             .wind_flow,   .resurrection,      .craft,
     .armor_rune,       .weapon_rune, .spiritual_armor,   .mass_heal,   .whirlpool,         .riot,
-    .magic_mirror,     .mass_riot,   .mass_magic_mirror, .courage,     .helping_hand,      .empower,
-    .castling,
+    .magic_mirror,     .mass_riot,   .mass_magic_mirror, .courage,     .helping_hand,      .fire_wall,
+    .empower,          .castling,
 };
 
-/// v08Scope's tables, which the scope manifest exports (scope.zig): the castables, the batch-6b cards and rows, the burning
-/// cells and (`late`, checked after the board) Time Denial. src/v08 covers batches 1-5 and 6a with revived units, the
-/// artifact rows, smoke and the wave-2 cards and rows. Fire Wall (the spell and the walls) waits for v0.1's
-/// projectPostMoveActorAvailability, which ai.zig does not port yet: a mindless unit (Berserker, Frenzied Boar) plays
-/// v0.1 on a board where v0.8 cast walls.
+/// v08Scope's tables, which the scope manifest exports (scope.zig): the castables and the batch-6b cards and rows.
+/// src/v08 covers batches 1-5 and 6a with revived units, the artifact rows, smoke and the wave-2 cards and rows, the
+/// Nightmare's included: Fire Wall, the burning cells (a mindless unit, which plays v0.1 whatever its seat, projects its
+/// walk through them before a strike: ai.projectPostMove) and Time Denial (the engine's canWaitOnHourglass).
 pub const V08_SCOPE = scope.PolicyScope{
     .name = "v0.8",
     .castable = &V08_CASTABLE,
@@ -131,8 +128,6 @@ pub const V08_SCOPE = scope.PolicyScope{
     // Thunderbird's Wind Element and Chain Lightning (7c89022b).
     .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit() & ~st.AbilityId.water_element.bit() & ~st.AbilityId.water_shield.bit() & ~st.AbilityId.wind_element.bit() & ~st.AbilityId.chain_lightning.bit(),
     .refused_buffs = &.{.flesh_shield_aura},
-    .refuse_fire_walls = true,
-    .late = .{ .abilities = st.AbilityId.time_denial.bit() },
 };
 
 /// The v0.1 policy takes every board the loader takes.
@@ -1009,6 +1004,72 @@ pub fn playHooked(s: *State, max_laps: i32, decide: PlayDecideFn, hook: ?StepHoo
     result.lap = s.fight.lap;
     result.rng = s.rng.state;
     return result;
+}
+
+test "v08Scope takes the Nightmare's boards (Fire Wall, burning cells, Time Denial) and still refuses the rest of batch 6b" {
+    const snapshot = @import("snapshot.zig");
+    const a = std.testing.allocator;
+    const parsed = try std.json.parseFromSlice(std.json.Value, a, @embedFile("selftest/state.json"), .{});
+    defer parsed.deinit();
+    var arena = std.heap.ArenaAllocator.init(a);
+    defer arena.deinit();
+    var why: snapshot.Why = .{};
+    const ids = try snapshot.unitIds(arena.allocator(), parsed.value, &why);
+    const root = try a.create(State);
+    defer a.destroy(root);
+    root.* = try snapshot.load(parsed.value, ids, .{}, &why);
+    const ident = Identity{ .ids = ids, .names = &.{} };
+    var buf: [96]u8 = undefined;
+    try std.testing.expect(v08Scope(root, &ident, &buf) == null);
+    const s = try a.create(State);
+    defer a.destroy(s);
+    const ui = root.holder[0];
+    const chaos: u8 = 4; // BookEntry.PREFIXES
+    // A Nightmare's board: its book (Fire Wall, Empower), its Time Denial card and a burning cell.
+    s.* = root.*;
+    const u = &s.units[ui];
+    for ([_]st.CastSpell{ .fire_wall, .empower }) |spell| {
+        u.book[u.n_book] = .{ .spell = @intFromEnum(spell), .prefix = chaos };
+        u.n_book += 1;
+        u.spells[u.n_spells] = .{ .spell = @intFromEnum(spell), .prefix = chaos, .amount = 1 };
+        u.n_spells += 1;
+    }
+    u.ability_mask |= st.AbilityId.time_denial.bit();
+    engine.addFire(s, .{ .x = 7, .y = 7 }, 2, 250);
+    try std.testing.expect(s.fight.n_fire == 1);
+    try std.testing.expect(v08Scope(s, &ident, &buf) == null);
+    // A Water Shield row on a wall board is in scope too (fire.zig and ai.zig absorb the first burn); the batch-6b cards
+    // and rows src/v08 does not cover yet stay out, on a wall board as anywhere, and so does a spell outside the list.
+    const nightmare = s.*;
+    s.units[ui].buffs.push(.{ .id = .water_shield, .laps = 3, .power = 1 });
+    try std.testing.expect(v08Scope(s, &ident, &buf) == null);
+    s.* = nightmare;
+    s.units[ui].buffs.push(.{ .id = .flesh_shield_aura, .laps = 3, .power = 1 });
+    try std.testing.expect(std.mem.indexOf(u8, v08Scope(s, &ident, &buf).?, "Flesh Shield") != null);
+    s.* = nightmare;
+    s.units[ui].ability_mask |= st.AbilityId.fire_element.bit();
+    try std.testing.expect(std.mem.indexOf(u8, v08Scope(s, &ident, &buf).?, "batch-6b") != null);
+    s.* = nightmare;
+    s.units[ui].book[s.units[ui].n_book] = .{ .spell = 0xfe, .prefix = chaos };
+    s.units[ui].n_book += 1;
+    try std.testing.expect(std.mem.indexOf(u8, v08Scope(s, &ident, &buf).?, "spells") != null);
+    // The manifest says the same: every castable (Fire Wall included), no burning-cell refusal, no late rows, Time
+    // Denial loaded, only the uncovered batch-6b cards and rows refused.
+    var w: std.Io.Writer.Allocating = .init(a);
+    defer w.deinit();
+    try scope.writePolicy(&w.writer, V08_SCOPE);
+    const m = try std.json.parseFromSlice(std.json.Value, a, w.written(), .{});
+    defer m.deinit();
+    var fire_wall = false;
+    for (m.value.object.get("castable").?.array.items) |n| fire_wall = fire_wall or std.mem.eql(u8, n.string, "Fire Wall");
+    try std.testing.expect(fire_wall);
+    try std.testing.expect(!m.value.object.get("refusedFireWalls").?.bool);
+    try std.testing.expectEqual(@as(st.AbilityMask, 0), V08_SCOPE.late.abilities);
+    const refused = m.value.object.get("refusedAbilities").?.array.items;
+    try std.testing.expectEqual(@as(usize, @popCount(V08_SCOPE.refused_abilities)), refused.len);
+    try std.testing.expect(V08_SCOPE.refused_abilities & ~st.AbilityId.BATCH6B_MASK == 0);
+    for (refused) |n| try std.testing.expect(!std.mem.eql(u8, n.string, "Time Denial"));
+    try std.testing.expectEqual(V08_SCOPE.refused_buffs.len, m.value.object.get("refusedBuffs").?.array.items.len);
 }
 
 test "plain chance seed is (seedBase + r * 0x9e3779b1) >>> 0" {
