@@ -897,6 +897,54 @@ pub fn rangedPositioning(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) 
     return ok;
 }
 
+/// a19CoherentMeleeApproach (on unless A19_COHERENT_MELEE_APPROACH_<SIDE>=0): a move followed by a strike from a cell
+/// the move does not reach is repaired. Ported only where it leaves the decision unchanged (no such move, or the move
+/// ends on the strike's footprint); a repair returns false (not ported).
+pub fn coherentMelee(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
+    util.copyDecision(out, in);
+    const acts = in.slice();
+    var strike: ?usize = null;
+    for (acts, 0..) |a, i| if (a == .melee_attack and a.melee_attack.attacker == c.ui) {
+        strike = i;
+        break;
+    };
+    const si = strike orelse return true;
+    var move: ?usize = null;
+    for (acts[0..si], 0..) |a, i| if (a == .move_unit and a.move_unit.unit == c.ui) {
+        move = i;
+        break;
+    };
+    const mi = move orelse return true;
+    const u = c.unit();
+    const desired = ai.footprintForAnchor(u, acts[si].melee_attack.attack_from);
+    const m = acts[mi].move_unit;
+    var old_buf: engine.Cells = .{};
+    const old: []const rec.Cell = if (m.target_cells.len > 0) m.target_cells else blk: {
+        if (m.path.len == 0) return false;
+        old_buf = ai.footprintForAnchor(u, m.path[m.path.len - 1]);
+        break :blk old_buf.slice();
+    };
+    return sameFootprint(old, desired.slice());
+}
+
+/// The passes after v0.7, in decideTurn's order; false when a pass this board needs is not ported (cemetery with
+/// standing scattered stones, a coherent-melee repair, or an unported ability term).
+pub fn decide(c: *ai.Ctx, out: *ai.Decision) bool {
+    var cur: ai.Decision = .{};
+    var next: ai.Decision = .{};
+    @import("lv7.zig").decide(c, &cur);
+    const order = [_]Pass{ .explicit, .prioritize, .defend_to_wait, .finish, .ranged_positioning, .forbidden_target, .splash, .damage_spell, .vine, .smoke, .nightmare, .healer, .blacksmith, .ranked_replay, .backline_protector, .backline_ward, .cemetery, .coherent_melee };
+    const names = [_][]const u8{ "explicit", "prioritize", "defend-to-wait", "finish", "ranged-positioning", "forbidden-target", "splash", "damage-spell", "vine", "smoke", "nightmare", "healer", "blacksmith", "ranked-replay", "backline-protector", "backline-ward", "cemetery", "coherent-melee" };
+    for (order, names) |pass, name| {
+        const rin = c.s.rng.state;
+        if (!runPass(c, pass, &cur, &next)) return false;
+        util.copyDecision(&cur, &next);
+        @import("policy.zig").note(name, &cur, c.s, rin);
+    }
+    util.copyDecision(out, &cur);
+    return true;
+}
+
 /// Runs one ported pass on `in`; false when the pass is not ported yet.
 pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision) bool {
     switch (pass) {
@@ -906,8 +954,17 @@ pub fn runPass(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decision
         .finish => return finish(c, in, out),
         .backline_ward => backlineWard(c, in, out),
         .backline_protector => backlineProtector(c, in, out),
+        .coherent_melee => return coherentMelee(c, in, out),
+        // Identity in scope: Terrifying Gaze, splash shooters, damage spells, Vine Throw, Smoke, Nightmare's Fire Wall,
+        // the Healer and the Blacksmith need abilities or spells the engine does not carry yet; ranked-replay tactics
+        // are an off-by-default research scope.
+        .forbidden_target, .splash, .damage_spell, .vine, .smoke, .nightmare, .healer, .blacksmith, .ranked_replay => util.copyDecision(out, in),
+        // Cemetery strikes a standing scattered stone: identity without one (mountain candidates not ported yet).
+        .cemetery => {
+            if (c.s.grid.terrain.n_layout > 0 and c.s.grid.terrain.standing != 0) return false;
+            util.copyDecision(out, in);
+        },
         .ranged_positioning => return rangedPositioning(c, in, out),
-        else => return false,
     }
     return true;
 }
