@@ -1044,6 +1044,9 @@ the header of `record.ts`):
   `synergyVariantsForSeed`; `default` never fields Chaos break or Life morale/luck).
 - `RECORD_DISTINCT_RED=1`: red drafts its own roster (asymmetric synergies and plans); `RECORD_FACTION="Chaos|"`
   drafts a team from one faction so its synergy reaches level 2 or 3.
+- `RECORD_ROSTERS=<census.jsonl>`: battle g plays line g of a draft census (`lower` / `upper` creature lists by name
+  and level, `artifacts.lower` / `artifacts.upper`, `lowerDoctrine` / `upperDoctrine`, `gridType`; lower is green):
+  production-drafted rosters, artifacts, doctrines and maps (needs `RECORD_AMOUNTS=expBudget` and `RECORD_SIDE=1`).
 - `RECORD_ARTIFACTS=random|"t1:t2"|...` (for the artifact batch) and `RECORD_TRACE_DRAWS=1` (each step's `ds`, the
   `getRandomInt` caller of every raw draw, the break roll naming its hit, and a `<out>.sites.json` tally).
 

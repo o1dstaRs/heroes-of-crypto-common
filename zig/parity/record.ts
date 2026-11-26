@@ -15,7 +15,7 @@
  * The time spent inside those calls is the TypeScript engine cost the Zig replay is benchmarked against.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 import creaturesJson from "../../src/configuration/creatures.json";
@@ -192,6 +192,36 @@ function rosterFor(seed: number, teamIndex = 0): ReturnType<typeof buildRoster> 
     });
 }
 
+// RECORD_ROSTERS=<census.jsonl> plays a draft census, battle g reading line g: the `lower` and `upper` creature lists
+// (by name and level), `artifacts.lower` / `artifacts.upper` ([Tier 1, Tier 2]), `lowerDoctrine` / `upperDoctrine` and
+// `gridType`; lower is green. It replaces the rosters (red always its own), the artifacts, the doctrines and the map, and
+// needs RECORD_AMOUNTS=expBudget and RECORD_SIDE=1 (production's amounts and boards). A setup option.
+const ROSTERS_PATH = (process.env.RECORD_ROSTERS ?? "").trim();
+const CENSUS: any[] = ROSTERS_PATH
+    ? readFileSync(ROSTERS_PATH, "utf8")
+          .split("\n")
+          .filter((line) => line.trim())
+          .map((line) => JSON.parse(line))
+    : [];
+
+/** A census army as a roster: each creature at its expBudget amount. */
+function censusRoster(list: { name: string; level: number }[]): ReturnType<typeof buildRoster> {
+    return list.map((c) => {
+        const pick = creaturesByLevel(c.level).find((entry) => entry.creatureName === c.name);
+        if (!pick) throw new Error(`RECORD_ROSTERS: unknown creature ${c.name} (level ${c.level})`);
+        return {
+            faction: pick.faction,
+            creatureName: pick.creatureName,
+            level: pick.level,
+            size: pick.size,
+            ...(pick.footprintWidth === undefined || pick.footprintHeight === undefined
+                ? {}
+                : { footprintWidth: pick.footprintWidth, footprintHeight: pick.footprintHeight }),
+            amount: resolveStackAmount(pick.creatureName, pick.level, DEFAULT_AMOUNT_BY_LEVEL, AMOUNT_MODE),
+        };
+    }) as ReturnType<typeof buildRoster>;
+}
+
 // ---- map and board orientation ----
 // RECORD_GRID=1|3|4|mix picks NORMAL, LAVA_CENTER or BLOCK_CENTER for every battle, or a per-seed mix weighted by
 // RECORD_MAP_WEIGHTS (NORMAL,LAVA,BLOCK; default 1,1,1 = production's thirds). The mix hashes the seed into a private
@@ -276,8 +306,12 @@ const dropped = (seed: number, index: number): boolean =>
 if (PLACEMENT_TIMING && PLACEMENT_TIMING !== "setup-before-placement") {
     throw new Error(`RECORD_PLACEMENT_TIMING: expected setup-before-placement, got ${PLACEMENT_TIMING}`);
 }
+if (ROSTERS_PATH && (AMOUNT_MODE !== "expBudget" || !SIDE_ORIENTED)) {
+    throw new Error("RECORD_ROSTERS needs RECORD_AMOUNTS=expBudget and RECORD_SIDE=1");
+}
 /** Any setup option: the setup columns are written. */
 const SETUP = !!(
+    ROSTERS_PATH ||
     AUG_MODE ||
     DOCTRINE_MODE ||
     SYN_ON ||
@@ -1227,16 +1261,22 @@ function main(): void {
     const t0 = performance.now();
     for (let g = 0; g < games; g += 1) {
         const seed = firstSeed + g;
-        const roster = rosterFor(seed);
-        const gridType = gridTypeFor(seed);
+        const census = CENSUS.length ? CENSUS[g] : undefined;
+        if (CENSUS.length && !census) throw new Error(`RECORD_ROSTERS: no census line for battle ${g}`);
+        const roster = census ? censusRoster(census.lower) : rosterFor(seed);
+        const gridType = census ? Number(census.gridType) : gridTypeFor(seed);
         gridCounts[gridType] = (gridCounts[gridType] ?? 0) + 1;
-        const redRoster = DISTINCT_RED ? rosterFor((seed ^ 0x5bd1e995) >>> 0, 1) : roster;
-        const greenDoctrine = doctrineFor(seed, 0);
-        const redDoctrine = doctrineFor(seed, 1);
+        const redRoster = census
+            ? censusRoster(census.upper)
+            : DISTINCT_RED
+              ? rosterFor((seed ^ 0x5bd1e995) >>> 0, 1)
+              : roster;
+        const greenDoctrine = census ? census.lowerDoctrine || undefined : doctrineFor(seed, 0);
+        const redDoctrine = census ? census.upperDoctrine || undefined : doctrineFor(seed, 1);
         const greenAugments = augmentsFor(seed, 0, getUpgradePoints(greenDoctrine ?? 0), roster, redRoster);
         const redAugments = augmentsFor(seed, 1, getUpgradePoints(redDoctrine ?? 0), redRoster, roster);
-        const greenArtifacts = artifactsFor(seed, 0);
-        const redArtifacts = artifactsFor(seed, 1);
+        const greenArtifacts: [number, number] | undefined = census ? census.artifacts.lower : artifactsFor(seed, 0);
+        const redArtifacts: [number, number] | undefined = census ? census.artifacts.upper : artifactsFor(seed, 1);
         const synergyVariants = variantsFor(seed);
         const boardVariants = synergyVariants ?? (DEFAULT_SYNERGY_VARIANTS as Record<string, number>);
         const greenSynergies = synergiesFor(roster, boardVariants);
@@ -1259,7 +1299,7 @@ function main(): void {
             greenVersion: VERSION,
             redVersion: VERSION,
             roster,
-            ...(DISTINCT_RED ? { redRoster } : {}),
+            ...(DISTINCT_RED || census ? { redRoster } : {}),
             seed,
             maxLaps: 60,
             headlessEvents: true,
@@ -1405,6 +1445,7 @@ function main(): void {
                       distinctRed: DISTINCT_RED,
                       placementTiming: PLACEMENT_TIMING || null,
                       artifacts: ARTIFACT_MODE || null,
+                      rosters: ROSTERS_PATH || null,
                       faction: FACTION_MODE || null,
                   },
               }
