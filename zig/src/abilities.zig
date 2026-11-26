@@ -144,8 +144,7 @@ pub fn shatterArmor(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     var laps = a.effect_laps;
     if (to_i == active_i and laps != st.LAPS_AURA and laps != st.NUMBER_OF_LAPS_TOTAL) laps += 1; // Effect.extend
     // Unit.applyEffect
-    to.effects.delete(.shatter_armor);
-    to.effects.push(.{ .id = .shatter_armor, .laps = laps, .power = power });
+    replaceChecked(s, &to.effects, .{ .id = .shatter_armor, .laps = laps, .power = power });
 }
 
 /// processDullingDefenseAblity(from, to): a permanent base-attack cut and its accumulating debuff.
@@ -169,13 +168,17 @@ pub fn dullingDefense(from: *const Unit, to: *Unit) void {
 // Team blessings (UnitsHolder: captureBlessingCensus, reapplyTeamBlessing, src/abilities/stack_blessings.ts)
 // =====================================================================================================================
 
+const ARCANE_WARD_BLESSING_BIT: u32 = 2;
 const SHARPENED_WEAPONS_BLESSING_BIT: u32 = 32;
+const RALLYING_VOLLEY_BLESSING_BIT: u32 = 64;
 const LUCK_BLESSING_BIT: u32 = 128;
 
 inline fn blessingBit(id: st.SpellId) u32 {
     return switch (id) {
         .luck_blessing => LUCK_BLESSING_BIT,
         .sharpened_weapons_blessing => SHARPENED_WEAPONS_BLESSING_BIT,
+        .arcane_ward_blessing => ARCANE_WARD_BLESSING_BIT,
+        .rallying_volley_blessing => RALLYING_VOLLEY_BLESSING_BIT,
         else => 0,
     };
 }
@@ -197,6 +200,8 @@ const TeamPowers = struct {
 const Census = struct {
     luck: TeamPowers = .{},
     sharpened: TeamPowers = .{},
+    arcane: TeamPowers = .{},
+    rally: TeamPowers = .{},
     /// Per unit index: the blessing bits it carries.
     carriers: [st.MAX_UNITS]u32 = undefined,
     carried: u32 = 0,
@@ -217,11 +222,16 @@ inline fn onGrid(u: *const Unit) bool {
     return engine.cellWithinGrid(engine.baseCell(u));
 }
 
-/// UnitsHolder.captureBlessingCensus
+/// Unit.calculateArcaneWardBlessingPower: Number((power + getLuck()).toFixed(2)).
+fn arcaneWardPower(u: *const Unit, a: *const Ability) f64 {
+    return js.toFixed(a.power + engine.getLuck(u), 2);
+}
+
+/// UnitsHolder.captureBlessingCensus (holder order; dead and off-board units are carriers, never sources).
 fn captureCensus(s: *const State) Census {
     var c: Census = .{};
-    for (s.units[0..s.n_units], 0..) |*u, i| {
-        if (!u.in_holder) continue;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
         var carried: u32 = 0;
         for (u.buffs.items[0..u.buffs.len]) |b| carried |= blessingBit(b.id);
         c.carriers[i] = carried;
@@ -240,26 +250,67 @@ fn captureCensus(s: *const State) Census {
             c.sharpened.v[team] = js.max(if (c.sharpened.set[team]) c.sharpened.v[team] else -std.math.inf(f64), power);
             c.sharpened.set[team] = true;
         }
+        if (u.ability(.arcane_ward_blessing)) |a| {
+            c.arcane.v[team] = js.max(if (c.arcane.set[team]) c.arcane.v[team] else 0, arcaneWardPower(u, a));
+            c.arcane.set[team] = true;
+        }
+        if (u.ability(.rallying_volley_blessing)) |a| {
+            c.rally.v[team] = js.max(if (c.rally.set[team]) c.rally.v[team] else 0, a.power);
+            c.rally.set[team] = true;
+        }
     }
     return c;
 }
 
-const Eligible = enum { all, melee_or_magic };
+/// canReceiveSharpenedWeapons (melee or magic attackers) and canReceiveRallyingVolley (isRangeCapable; no Endless
+/// Quiver in scope).
+const Eligible = enum { all, melee_or_magic, ranged };
+
+/// Unit.tryGrantRallyingVolleyShots: applyBuff("Rallying Volley Blessing") adds the arrows once per unit (no ranked
+/// authoritative shots or Endless Quiver in scope).
+fn grantRallyingVolleyShots(u: *Unit, power: f64) void {
+    if (!engine.isRangeCapable(u)) return;
+    const bonus = @max(0, @floor(power));
+    if (bonus > u.rallying_volley_granted) {
+        u.range_shots += bonus - u.rallying_volley_granted;
+        u.rallying_volley_granted = bonus;
+    }
+}
 
 /// UnitsHolder.reapplyTeamBlessing: strip the blessing from its carriers, then grant every living on-board unit its
 /// team's strongest power (laps NUMBER_OF_LAPS_TOTAL, never ticked down).
 fn reapply(s: *State, c: *const Census, powers: *const TeamPowers, bit: u32, id: st.SpellId, eligible: Eligible, allow_non_positive: bool) void {
     const has_power = if (allow_non_positive) powers.any() else powers.anyPositive();
     if (c.carried & bit == 0 and !has_power) return;
-    for (s.units[0..s.n_units], 0..) |*u, i| {
-        if (!u.in_holder) continue;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
         if (c.carriers[i] & bit != 0) u.buffs.delete(id);
         if (!powers.set[u.team]) continue;
         const power = powers.v[u.team];
         if ((!allow_non_positive and power <= 0) or u.isDead() or !onGrid(u)) continue;
-        if (eligible == .melee_or_magic and u.attack_type != AT.MELEE and u.attack_type != AT.MAGIC and u.attack_type != AT.MELEE_MAGIC) continue;
-        u.buffs.push(.{ .id = id, .laps = st.NUMBER_OF_LAPS_TOTAL, .power = power });
+        switch (eligible) {
+            .all => {},
+            .melee_or_magic => if (u.attack_type != AT.MELEE and u.attack_type != AT.MAGIC and u.attack_type != AT.MELEE_MAGIC) continue,
+            .ranged => if (!engine.isRangeCapable(u)) continue,
+        }
+        if (id == .rallying_volley_blessing) grantRallyingVolleyShots(u, power);
+        pushChecked(s, &u.buffs, .{ .id = id, .laps = st.NUMBER_OF_LAPS_TOTAL, .power = power });
     }
+}
+
+/// A push that flags the state when the list is full (TypeScript's lists are unbounded).
+pub inline fn pushChecked(s: *State, list: anytype, a: st.AppliedSpell) void {
+    if (list.len >= @TypeOf(list.*).capacity) {
+        s.overflow = true;
+        return;
+    }
+    list.push(a);
+}
+
+/// replace (delete by name, append) that flags the state when the list is full.
+pub inline fn replaceChecked(s: *State, list: anytype, a: st.AppliedSpell) void {
+    list.delete(a.id);
+    pushChecked(s, list, a);
 }
 
 /// The blessing part of UnitsHolder.refreshStackPowerForAllUnits, after setUnitsCalculatedStacksPower and the aura
@@ -271,15 +322,18 @@ pub fn refreshBlessings(s: *State) void {
     const refresh_luck = c.luck.anyPositive() or c.carried & LUCK_BLESSING_BIT != 0;
     if (refresh_luck) {
         reapply(s, &c, &c.luck, LUCK_BLESSING_BIT, .luck_blessing, .all, false);
-        for (s.units[0..s.n_units]) |*u| {
+        for (s.holderOrder()) |i| {
+            const u = &s.units[i];
             // getAuraEffects() is empty while Broken; the luck-dependent names are read off props.abilities.
-            if (!u.in_holder or u.isDead() or !onGrid(u) or (u.auraCount() == 0 and !u.luck_dependent)) continue;
+            if (u.isDead() or !onGrid(u) or (u.auraCount() == 0 and !u.luck_dependent)) continue;
             engine.adjustBaseStats(s, u);
         }
         if (s.auras) refreshAuras(s);
         c = captureCensus(s);
     }
+    reapply(s, &c, &c.arcane, ARCANE_WARD_BLESSING_BIT, .arcane_ward_blessing, .all, false);
     reapply(s, &c, &c.sharpened, SHARPENED_WEAPONS_BLESSING_BIT, .sharpened_weapons_blessing, .melee_or_magic, true);
+    reapply(s, &c, &c.rally, RALLYING_VOLLEY_BLESSING_BIT, .rallying_volley_blessing, .ranged, false);
 }
 
 // =====================================================================================================================
@@ -289,7 +343,7 @@ pub fn refreshBlessings(s: *State) void {
 /// Unit.calculateAuraPower(auraEffect, the emitter's team ability power), for the power types the loader accepts.
 pub fn auraPower(u: *const Unit, def: *const st.AuraDef) f64 {
     return switch (def.power_type) {
-        PT.ADDITIONAL_BASE_ATTACK_AND_ARMOR, PT.POISON_ON_HIT => def.power,
+        PT.ADDITIONAL_BASE_ATTACK_AND_ARMOR, PT.POISON_ON_HIT, PT.DISABLE_FLY_MOVEMENT => def.power,
         PT.ABSORB_DEBUFF => blk: {
             var coeff: f64 = 1;
             coeff += (def.power / 100 / MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + (engine.getLuck(u) + u.syn_power) / 100 +
@@ -367,8 +421,8 @@ fn covers(body: []const st.Cell, c: st.Cell, range: f64) bool {
 pub fn refreshAuras(s: *State) void {
     var ems: [MAX_EMITTERS]Emission = undefined;
     var n_ems: u8 = 0;
-    for (s.units[0..s.n_units], 0..) |*u, i| {
-        if (!u.in_holder) continue;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
         // isFootprintWithinGrid: NORMAL bodies never leave the board.
         cleanAuraRows(&u.buffs);
         cleanAuraRows(&u.debuffs);
@@ -386,8 +440,8 @@ pub fn refreshAuras(s: *State) void {
     if (n_ems == 0) return;
     var bodies: [st.MAX_UNITS]engine.Cells = undefined;
     for (ems[0..n_ems]) |e| bodies[e.unit] = engine.unitCells(&s.units[e.unit]);
-    for (s.units[0..s.n_units]) |*u| {
-        if (!u.in_holder) continue;
+    for (s.holderOrder()) |ri| {
+        const u = &s.units[ri];
         var rows: AuraRows = .{};
         const cells = engine.unitCells(u);
         for (cells.slice()) |c| {
@@ -400,17 +454,20 @@ pub fn refreshAuras(s: *State) void {
             }
             for (cell_rows.em[0..cell_rows.len]) |ei| rows.offer(ems[0..n_ems], ei);
         }
-        // applyAuraEffectToUnit -> canApplyAuraEffect (true for the power types in scope) -> applyAuraEffect
+        // applyAuraEffectToUnit -> canApplyAuraEffect (the Web lands on flyers only; true for the other power types
+        // in scope) -> applyAuraEffect (a buff row, or a debuff row for an is_buff false aura)
         for (rows.em[0..rows.len]) |ei| {
             const e = ems[ei];
             const def = &s.aura_defs[e.def];
-            u.buffs.replace(.{
+            if (def.power_type == PT.DISABLE_FLY_MOVEMENT and !engine.canFly(u)) continue;
+            const row = st.AppliedSpell{
                 .id = def.buff,
                 .laps = st.LAPS_AURA,
                 .power = js.toFixed(e.power, 1),
                 .src_x = @intCast(e.src.x),
                 .src_y = @intCast(e.src.y),
-            });
+            };
+            if (def.is_buff) replaceChecked(s, &u.buffs, row) else replaceChecked(s, &u.debuffs, row);
         }
     }
 }
@@ -420,12 +477,12 @@ pub fn refreshAuras(s: *State) void {
 // =====================================================================================================================
 
 /// applyPoisonEffect (poison_ability.ts): a new hit stacks onto the active poison.
-fn applyPoison(s: *const State, tgt: *Unit, poison_hp: f64) void {
+fn applyPoison(s: *State, tgt: *Unit, poison_hp: f64) void {
     if (tgt.isDead() or poison_hp <= 0) return; // canBePoisoned: no Mechanism in scope; no Holy Cross
     const active = tgt.effects.power(.poison) orelse 0;
     const stacked = if (active != 0) @max(poison_hp, active + @max(1, js.round(poison_hp * 0.5))) else poison_hp;
     if (stacked <= active) return;
-    tgt.effects.replace(.{ .id = .poison, .laps = s.poison_laps, .power = stacked });
+    replaceChecked(s, &tgt.effects, .{ .id = .poison, .laps = s.poison_laps, .power = stacked });
 }
 
 /// processPoisonAuraAbility(attacker, target, damageDealt): a hit by a unit under Venom Cloud poisons its victim.
@@ -455,9 +512,200 @@ pub fn aggr(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < applyChance(from, a) * 1)) return;
     if (to.effects.find(.aggr) != null) return;
     const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
-    // hasMindAttackResistance (Madness, Mechanism): none in scope.
-    to.effects.replace(.{ .id = .aggr, .laps = laps, .power = a.effect_power });
+    // Aggr is a MIND effect: hasMindAttackResistance (Madness; no Mechanism in scope) resists it after the roll.
+    if (to.has(.madness)) return;
+    replaceChecked(s, &to.effects, .{ .id = .aggr, .laps = laps, .power = a.effect_power });
     to.target = @intCast(from_i);
+}
+
+/// processStunAbility(from, target, currentActiveUnit): calculateStunApplyChance (no Mechanism or status resist in
+/// scope) clamped to [0, 100]; the roll is drawn even when the target is already stunned (then nothing changes). The
+/// stun lasts a lap longer on the active unit. `from` may be dead (its blow still lands).
+pub fn stun(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
+    const to = &s.units[to_i];
+    if (to.isDead()) return;
+    const from = &s.units[from_i];
+    const a = from.ability(.stun) orelse return;
+    const chance = @max(0, @min(100, applyChance(from, a) * 1 * (1 - @as(f64, 0) / 100)));
+    if (!(@as(f64, @floatFromInt(s.rng.int(0, 100))) < chance)) return; // stun_ability.ts:58
+    if (to.isStunned()) return;
+    const laps: f64 = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
+    replaceChecked(s, &to.effects, .{ .id = .stun, .laps = laps, .power = a.effect_power });
+}
+
+/// processMinerAbility(attacker, target): Number(calculateAbilityCount(...).toFixed(2)) base armor moves from the
+/// target's INITIAL base armor (floored at 1) to the attacker's; the live values follow at the next stat refresh. The
+/// target's "Miner" debuff (laps 15) holds the running total. No roll.
+pub fn miner(s: *State, from_i: u8, to_i: u8) void {
+    const from = &s.units[from_i];
+    const a = from.ability(.miner) orelse return;
+    const to = &s.units[to_i];
+    if (from.isDead() or to.isDead()) return;
+    const amount = js.toFixed(abilityCount(from, a), 2);
+    // Unit.decreaseBaseArmor
+    if (amount <= 0) return;
+    const old = to.init.base_armor;
+    to.init.base_armor = @max(1, js.toFixed(old - amount, 2));
+    const mined = js.toFixed(old - to.init.base_armor, 2);
+    if (mined <= 0) return;
+    from.init.base_armor = js.toFixed(from.init.base_armor + mined, 2); // Unit.increaseBaseArmor
+    const total = js.toFixed((to.debuffs.power(.miner) orelse 0) + mined, 2);
+    replaceChecked(s, &to.debuffs, .{ .id = .miner, .laps = st.NUMBER_OF_LAPS_TOTAL, .power = total });
+}
+
+/// processPredatoryAssimilationPoison(attacker, target, damageDealt): Predatory Assimilation's own poison rider, on a
+/// landed blow or response (25% of the rolled damage, plus the attacker's luck). No roll.
+pub fn assimilationPoison(s: *State, att_i: u8, tgt_i: u8, damage: f64) void {
+    if (damage <= 0) return;
+    const tgt = &s.units[tgt_i];
+    if (tgt.isDead()) return;
+    const att = &s.units[att_i];
+    if (!att.has(.predatory_assimilation)) return;
+    const percent = @max(0, 25 + engine.getLuck(att)); // PREDATORY_ASSIMILATION_POISON_PERCENT
+    const poison_hp = @floor((damage * percent) / 100);
+    if (poison_hp <= 0) return;
+    applyPoison(s, tgt, poison_hp);
+}
+
+/// LUCK_DEPENDENT_BLESSINGS (units_holder.ts) among the ported abilities: the early luck pass reads card names.
+pub inline fn isLuckDependentCard(id: st.AbilityId) bool {
+    return id == .sharpened_weapons_blessing or id == .arcane_ward_blessing;
+}
+
+/// Unit.removeAbilityMechanics for an ability leaving the active list: its aura effect goes unless another active
+/// ability still provides it (castable spells are not modelled: Vine Throw is never cast in scope).
+fn removeAbilityMechanics(u: *Unit, gone: *const Ability) void {
+    if (gone.aura == st.NO_AURA) return;
+    for (u.abilities[0..u.n_abilities]) |*a| if (a.aura == gone.aura) return;
+    var k: usize = 0;
+    while (k < u.n_auras) {
+        if (u.auras[k] == gone.aura) {
+            var j = k;
+            while (j + 1 < u.n_auras) : (j += 1) u.auras[j] = u.auras[j + 1];
+            u.n_auras -= 1;
+        } else k += 1;
+    }
+}
+
+/// Unit.disableAbilityAsStolen: the name joins props.stolen_abilities, the ability leaves the active list (the card
+/// stays), then removeAbilityMechanics. Returns the ability as it was.
+fn disableAsStolen(s: *State, u: *Unit, id: st.AbilityId) ?Ability {
+    var idx: ?usize = null;
+    for (u.abilities[0..u.n_abilities], 0..) |a, k| {
+        if (a.id == id) idx = k;
+    }
+    const k = idx orelse return null;
+    const ability = u.abilities[k];
+    var listed = false;
+    for (u.stolen[0..u.n_stolen]) |x| {
+        if (x == id) listed = true;
+    }
+    if (!listed) {
+        if (u.n_stolen < st.MAX_STOLEN) {
+            u.stolen[u.n_stolen] = id;
+            u.n_stolen += 1;
+        } else s.overflow = true;
+    }
+    var j = k;
+    while (j + 1 < u.n_abilities) : (j += 1) u.abilities[j] = u.abilities[j + 1];
+    u.n_abilities -= 1;
+    u.ability_mask &= ~id.bit();
+    removeAbilityMechanics(u, &ability);
+    return ability;
+}
+
+/// Unit.grantStolenAbility -> grantAbility(name, {restoreStolen: true}): a no-op if the thief already has it; the
+/// name leaves the thief's own stolen list; a fresh copy of the configured ability (Ability records hold config values
+/// only) is appended, and its aura effect if the thief does not emit it yet. registerAbility's card data feeds the
+/// early luck pass (`luck_dependent`).
+fn grantStolen(s: *State, u: *Unit, a: Ability) void {
+    if (u.activeAbility(a.id) != null) return;
+    var k: usize = 0;
+    while (k < u.n_stolen) {
+        if (u.stolen[k] == a.id) {
+            var j = k;
+            while (j + 1 < u.n_stolen) : (j += 1) u.stolen[j] = u.stolen[j + 1];
+            u.n_stolen -= 1;
+        } else k += 1;
+    }
+    if (u.n_abilities >= st.MAX_ABILITIES) {
+        s.overflow = true;
+        return;
+    }
+    u.abilities[u.n_abilities] = a;
+    u.n_abilities += 1;
+    u.ability_mask |= a.id.bit();
+    if (isLuckDependentCard(a.id)) u.luck_dependent = true;
+    if (a.aura != st.NO_AURA) {
+        for (u.auras[0..u.n_auras]) |x| if (x == a.aura) return;
+        if (u.n_auras >= st.MAX_UNIT_AURAS) {
+            s.overflow = true;
+            return;
+        }
+        u.auras[u.n_auras] = a.aura;
+        u.n_auras += 1;
+    }
+}
+
+/// processPredatoryAssimilationAbility(thief, target): the candidates are the target's active abilities (none while
+/// it is Broken; a dead target keeps them) other than Predatory Assimilation and the ones the thief already has. The
+/// chance roll is drawn only when a candidate exists, the pick indexes the active list order (no draw for one).
+pub fn assimilate(s: *State, thief_i: u8, target_i: u8) void {
+    const thief = &s.units[thief_i];
+    const pa = thief.ability(.predatory_assimilation) orelse return;
+    const target = &s.units[target_i];
+    var candidates: [st.MAX_ABILITIES]st.AbilityId = undefined;
+    var n: usize = 0;
+    if (!target.isBroken()) {
+        for (target.abilities[0..target.n_abilities]) |a| {
+            if (a.id == .predatory_assimilation or thief.has(a.id)) continue;
+            candidates[n] = a.id;
+            n += 1;
+        }
+    }
+    const chance = applyChance(thief, pa);
+    if (n == 0) return;
+    if (@as(f64, @floatFromInt(s.rng.int(0, 100))) >= chance) return; // predatory_assimilation_ability.ts:51
+    const picked = candidates[@intCast(s.rng.int(0, @intCast(n)))]; // :55
+    const ability = disableAsStolen(s, target, picked) orelse return;
+    grantStolen(s, thief, ability);
+}
+
+/// isEquipmentOrMarkerSpellName for the names in scope: augments, Morale/Dismorale and the army blessings.
+pub fn isMarkerSpell(id: st.SpellId) bool {
+    return id.isAugment() or switch (id) {
+        .morale, .dismorale, .luck_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .ember_covenant_blessing => true,
+        else => false,
+    };
+}
+
+/// processAbsolvingArrowAbility's lifts on one ally: every effect with laps > 0, then every debuff with laps > 0
+/// that is neither an aura row nor a marker (listed before any deletion); the i-th entry is lifted when
+/// getRandomInt(0, 100) < first / 2^i (2 raw per entry, lifted or not), deleting that name from both lists.
+pub fn absolveAlly(s: *State, ally: *Unit, first: f64) void {
+    var names: [st.MAX_EFFECTS + st.MAX_DEBUFFS]st.SpellId = undefined;
+    var n: usize = 0;
+    for (ally.effects.items[0..ally.effects.len]) |e| {
+        if (e.laps > 0) {
+            names[n] = e.id;
+            n += 1;
+        }
+    }
+    for (ally.debuffs.items[0..ally.debuffs.len]) |d| {
+        if (d.laps > 0 and d.laps != st.LAPS_AURA and !isMarkerSpell(d.id)) {
+            names[n] = d.id;
+            n += 1;
+        }
+    }
+    var div: f64 = 1;
+    for (names[0..n]) |id| {
+        const roll: f64 = @floatFromInt(s.rng.int(0, 100)); // absolving_arrow_ability.ts:132
+        const chance = first / div;
+        div *= 2;
+        if (roll >= chance) continue;
+        ally.effects.delete(id);
+        ally.debuffs.delete(id);
+    }
 }
 
 /// processPegasusLightAbility(from, target, currentActiveUnit): power = the effect's 10 + the Pegasus's luck.
@@ -471,7 +719,7 @@ pub fn pegasusLight(s: *State, from_i: u8, to_i: u8, active_i: u8) void {
     var power = a.effect_power + engine.getLuck(from) + from.syn_power;
     if (power < 0) power = 1;
     const laps = if (to_i == active_i) extendLaps(a.effect_laps) else a.effect_laps;
-    to.effects.replace(.{ .id = .pegasus_light, .laps = laps, .power = power });
+    replaceChecked(s, &to.effects, .{ .id = .pegasus_light, .laps = laps, .power = power });
 }
 
 /// The morale an attack on `u` pays while it carries Pegasus Light (`getEffect("Pegasus Light")?.getPower()`).
@@ -540,7 +788,7 @@ pub fn seedEmberCovenant(s: *State) void {
     if (s.ember_teams == 0) return;
     for (s.units[0..s.n_units]) |*u| {
         if (!u.in_holder or s.ember_teams & teamBit(u.team) == 0 or u.isDead() or !onGrid(u)) continue;
-        u.buffs.push(.{ .id = .ember_covenant_blessing, .laps = s.ember_laps, .power = s.ember_power });
+        pushChecked(s, &u.buffs, .{ .id = .ember_covenant_blessing, .laps = s.ember_laps, .power = s.ember_power });
     }
 }
 

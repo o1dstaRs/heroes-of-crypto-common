@@ -100,6 +100,9 @@ pub const Error = error{
     UnsupportedStall,
     /// A seat without a registered policy had to play.
     UnsupportedPolicy,
+    /// A capacity of the port was exceeded (State.overflow: unit slots, ids, list lengths, or a summon without its
+    /// id parts or template).
+    UnsupportedCapacity,
 };
 
 /// CLOCK_MONOTONIC in nanoseconds (the clock of every deadline the bridge takes).
@@ -146,11 +149,7 @@ inline fn productive(a: rec.Action) bool {
 /// SearchDriver.advanceQueue, then simAdvance's forceStalledLap branch (refused: not ported, unless no unit lives,
 /// where forceStalledLap returns false and the rollout ends at the leaf).
 fn simAdvance(s: *State, sim: *Sim) Error!void {
-    var holder: usize = 0;
-    for (s.units[0..s.n_units]) |*u| {
-        if (u.in_holder) holder += 1;
-    }
-    const attempts = holder + 2;
+    const attempts = @as(usize, s.n_holder) + 2;
     var i: usize = 0;
     while (i < attempts and !sim.finished and s.active < 0) : (i += 1) {
         _ = sim.apply(s, .{ .advance = .{ .damage_dealt_this_lap = s.damage_lap == s.fight.lap } });
@@ -159,8 +158,8 @@ fn simAdvance(s: *State, sim: *Sim) Error!void {
         if (sim.events.len == 0 and s.fight.up_next.len == 0) break;
     }
     if (sim.finished or s.active >= 0) return;
-    for (s.units[0..s.n_units]) |*u| {
-        if (u.in_holder and !u.isDead()) return error.UnsupportedStall;
+    for (s.holderOrder()) |slot| {
+        if (!s.units[slot].isDead()) return error.UnsupportedStall;
     }
 }
 
@@ -189,8 +188,9 @@ pub fn leafValue(s: *const State, team: u8, finished: bool, winner: i32, exact_t
     }
     var ours: f64 = 0;
     var enemy: f64 = 0;
-    for (s.units[0..s.n_units]) |*u| {
-        if (!u.in_holder or u.isDead()) continue;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.isDead()) continue;
         const hp = @max(u.hp, 0);
         const cumulative = (u.amount_alive - 1) * u.max_hp + hp; // Unit.getCumulativeHp
         if (u.team == team) ours += cumulative else enemy += cumulative;
@@ -259,6 +259,7 @@ pub fn rollout(s: *State, req: *const Request, cand: *const Candidate, r: u32, c
         if (req.horizon == .reply and s.units[ui].team == enemy_team) break;
     }
     if (ctl.expired()) return null;
+    if (s.overflow) return error.UnsupportedCapacity;
     return leafValue(s, acting, sim.finished, sim.winner, req.exact_terminal);
 }
 
@@ -297,28 +298,72 @@ pub const PlayResult = extern struct {
     rng: u32 = 0,
 };
 
+/// Called after every step of a play-out with the state (e.g. to learn the ids of the units summoned so far).
+pub const StepHook = struct {
+    ctx: *anyopaque,
+    f: *const fn (ctx: *anyopaque, s: *const State) void,
+};
+
 const PlayObserver = struct {
     result: *PlayResult,
+    hook: ?StepHook = null,
 
     fn step(ctx: *anyopaque, kind: ai.StepKind, action: rec.Action, r0: u32, s: *const State, ok: bool, events: []const rec.Event) bool {
         _ = action;
         _ = r0;
-        _ = s;
         _ = ok;
         const self: *PlayObserver = @ptrCast(@alignCast(ctx));
         if (kind == .decide) self.result.decisions += 1 else self.result.steps += 1;
         for (events) |e| {
             if (e.kind == .fight_finished) self.result.winner = e.arg;
         }
+        if (self.hook) |h| h.f(h.ctx, s);
         return true;
+    }
+};
+
+/// The ids of the units summoned in a play-out, by uid from `first` on (a summon joins the holder at the end of the
+/// step that raised it): a StepHook for callers whose id table must name them (digests of the final state).
+pub const SummonIds = struct {
+    first: usize,
+    ids: std.ArrayList([36]u8) = .empty,
+    alloc: std.mem.Allocator,
+
+    pub fn hook(self: *SummonIds) StepHook {
+        return .{ .ctx = self, .f = capture };
+    }
+
+    fn capture(ctx: *anyopaque, s: *const State) void {
+        const self: *SummonIds = @ptrCast(@alignCast(ctx));
+        while (self.first + self.ids.items.len < s.next_uid) {
+            const uid = self.first + self.ids.items.len;
+            var text: [36]u8 = .{'?'} ** 36;
+            for (s.holderOrder()) |i| {
+                if (s.units[i].uid == uid) _ = @import("uuid.zig").format(&s.units[i].uuid, &text);
+            }
+            self.ids.append(self.alloc, text) catch return;
+        }
+    }
+
+    /// `base` followed by the captured ids (slices into `self`), allocated from `arena`.
+    pub fn table(self: *const SummonIds, arena: std.mem.Allocator, base: []const []const u8) ![]const []const u8 {
+        const out = try arena.alloc([]const u8, base.len + self.ids.items.len);
+        @memcpy(out[0..base.len], base);
+        for (self.ids.items, 0..) |*t, i| out[base.len + i] = t;
+        return out;
     }
 };
 
 /// Plays `s` out with `decide` on both seats: from the start (start_fight first) when the fight has not started, else
 /// from where it stands (runMatchInner's loop: a decision boundary or no active unit).
 pub fn play(s: *State, max_laps: i32, decide: DecideFn) PlayResult {
+    return playHooked(s, max_laps, decide, null);
+}
+
+/// play, calling `hook` after every step.
+pub fn playHooked(s: *State, max_laps: i32, decide: DecideFn, hook: ?StepHook) PlayResult {
     var result: PlayResult = .{};
-    var obs = PlayObserver{ .result = &result };
+    var obs = PlayObserver{ .result = &result, .hook = hook };
     const observer: ai.Observer = .{ .ctx = &obs, .step = PlayObserver.step };
     const end = if (s.fight.started) ai.continueMatchWith(s, max_laps, observer, decide) else ai.playMatchWith(s, max_laps, observer, decide);
     result.end = @intFromEnum(end);

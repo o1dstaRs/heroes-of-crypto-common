@@ -2,18 +2,24 @@
 //! bridge's input format (zig/BRIDGE.md) and the start point of `hoc-sim resume`.
 //!
 //! Every field the port models is read from the export: units (stats, base stats, buffs, debuffs and effects with
-//! laps, powers and stored properties, abilities, auras, turn flags, position, grid registration), the grid (board,
-//! aggression boards, terrain and stones), the fight (laps, queues, sets, flags, hit counters), the units holder
-//! (distances, Ember Covenant), the AI target memory and the damage-statistic laps. Anything non-empty the port does
-//! not model (smoke, vines, fire walls, artifact barrels, artifacts, spells, summoned units, unported abilities,
-//! buffs or effects, ranked authoritative stats, ...) is refused as an unsupported state, naming what it found: the
-//! loader is fail-closed, like the export's coverage check on the TypeScript side.
+//! laps, powers and stored properties, the active and stolen abilities, auras, the Web lock, the Rallying Volley
+//! arrows, turn flags, position, grid registration; summoned units too), the grid (board, aggression boards, terrain
+//! and stones), the fight (laps, queues, sets, flags, hit counters), the units holder (distances, Ember Covenant),
+//! the AI target memory, the damage-statistic laps, the summon templates and the summon id parts (the harness's
+//! battle seed and summon counter). Anything non-empty the port does not model (smoke, vines, fire walls, artifact
+//! barrels, artifacts, spells, unported abilities, buffs or effects, ranked authoritative stats, ...) is refused as an
+//! unsupported state, naming what it found: the loader is fail-closed, like the export's coverage check on the
+//! TypeScript side.
+//!
+//! Slots: the holder's units take slots 0.. in holder order; the removed units the turn sets still name (made,
+//! hourglass, replied) are kept by uid (Fight.removed_*). Uids are indices into the caller's `ids`.
 
 const std = @import("std");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
 const engine = @import("engine.zig");
 const terrain = @import("terrain.zig");
+const uuid = @import("uuid.zig");
 const Rng = @import("rng.zig").Rng;
 
 const Value = std.json.Value;
@@ -56,6 +62,8 @@ pub const Harness = struct {
     rng: ?u32 = null,
     /// A unit id, or "" for none.
     active: ?[]const u8 = null,
+    /// The uid the next summon takes (a recording numbers summons after its start units); default `ids.len`.
+    next_uid: ?u8 = null,
 };
 
 // =====================================================================================================================
@@ -219,8 +227,19 @@ pub fn unitIds(arena: std.mem.Allocator, root: Value, why: *Why) Error![]const [
         const id = try string(m, why, "unit id");
         if (rec.unitIndex(out.items, id)) |_| {} else |_| try out.append(arena, id);
     }
-    if (out.items.len > st.MAX_UNITS) return why.unsupported("{d} units (at most {d})", .{ out.items.len, st.MAX_UNITS });
+    if (out.items.len > st.MAX_UIDS) return why.unsupported("{d} unit ids (at most {d})", .{ out.items.len, st.MAX_UIDS });
     return out.items;
+}
+
+/// The slot of unit id `id` (its uid in `ids`), or null when the unit has none (removed, and no longer named by the
+/// turn sets).
+fn slotOfId(s: *const State, ids: []const []const u8, id: []const u8, why: *Why, what: []const u8) Error!?u8 {
+    const uid = try unitIndexOf(ids, id, why, what);
+    return s.slotOf(uid);
+}
+
+fn requireSlot(s: *const State, ids: []const []const u8, id: []const u8, why: *Why, what: []const u8) Error!u8 {
+    return (try slotOfId(s, ids, id, why, what)) orelse why.unsupported("{s}: unit {s} is no longer in the battle", .{ what, id });
 }
 
 /// Loads `root` (an exportBattleState object) into a State whose unit indices follow `ids`: every snapshot unit must
@@ -237,29 +256,49 @@ pub fn load(root: Value, ids: []const []const u8, harness: Harness, why: *Why) E
     const fight = get(root, "fight");
     const holder = get(root, "holder");
     if (grid != .object or fight != .object or holder != .object) return why.malformed("missing grid, fight or holder", .{});
-    if (ids.len > st.MAX_UNITS) return why.unsupported("{d} units (at most {d})", .{ ids.len, st.MAX_UNITS });
+    if (ids.len > st.MAX_UIDS) return why.unsupported("{d} unit ids (at most {d})", .{ ids.len, st.MAX_UIDS });
 
-    s.n_units = @intCast(ids.len);
+    // ---- slots: the holder's units in holder order ----
+    const units = try items(get(root, "units"), why, "units");
+    var slot_uids: [st.MAX_UNITS]u8 = undefined;
+    var n_slots: usize = 0;
+    var previous: i32 = -1;
+    for (units) |uv| {
+        const id = try string(get(uv, "id"), why, "unit id");
+        const uid = try unitIndexOf(ids, id, why, "units");
+        if (@as(i32, uid) <= previous) return why.unsupported("unit {s} out of holder order", .{id});
+        previous = uid;
+        if (n_slots >= st.MAX_UNITS) return why.unsupported("more than {d} units in the holder", .{st.MAX_UNITS});
+        slot_uids[n_slots] = uid;
+        n_slots += 1;
+    }
+    const n_holder = n_slots;
+    s.n_units = @intCast(n_slots);
+    s.n_holder = @intCast(n_holder);
     s.n_aura_defs = 0;
+    s.overflow = false;
+    s.summons = null;
     for (&s.setup, 0..) |*row, t| row.* = engine.loadTeamSetup(root, @intCast(t));
-    for (s.units[0..s.n_units]) |*u| {
-        // A unit removed from the holder before the snapshot: nothing reads it again (every unit loop checks
-        // in_holder first); it keeps only its index.
+    for (s.units[0..s.n_units], 0..) |*u, i| {
+        // A unit removed from the holder before the snapshot: nothing reads it again (every unit loop goes over the
+        // holder); it keeps only its slot and uid for the turn sets.
         u.* = std.mem.zeroes(Unit);
         u.in_holder = false;
         u.target = -1;
+        u.uid = slot_uids[i];
+        if (i < n_holder) s.holder[i] = @intCast(i);
+        if (uuid.parse(ids[slot_uids[i]])) |b| {
+            u.uuid = b;
+            u.uuid_ok = true;
+        }
     }
+    s.next_uid = harness.next_uid orelse @intCast(ids.len);
 
     // ---- units ----
     var names: [st.MAX_UNITS][]const u8 = undefined;
     var n_names: u16 = 0;
-    var previous: i32 = -1;
-    const units = try items(get(root, "units"), why, "units");
-    for (units) |uv| {
-        const id = try string(get(uv, "id"), why, "unit id");
-        const idx = try unitIndexOf(ids, id, why, "units");
-        if (@as(i32, idx) <= previous) return why.unsupported("unit {s} out of holder order", .{id});
-        previous = idx;
+    for (units, 0..) |uv, slot| {
+        const idx: u8 = @intCast(slot);
         const name = try string(get(uv, "name"), why, "unit name");
         var name_id: u16 = n_names;
         for (names[0..n_names], 0..) |known, k| {
@@ -271,6 +310,18 @@ pub fn load(root: Value, ids: []const []const u8, harness: Harness, why: *Why) E
         }
         try loadUnit(&s, root, configs, uv, ids, idx, name_id, why);
     }
+
+    // ---- summon templates and the summon id parts ----
+    s.summons = engine.loadSummons(configs, get(configs, "summonTemplates"), &s) catch |err| return switch (err) {
+        error.UnsupportedAbility => why.unsupported("summon ability {s}", .{engine.unsupported_name}),
+        error.UnsupportedAura => why.unsupported("summon aura {s}", .{engine.unsupported_name}),
+        else => why.malformed("summon templates: {s}", .{@errorName(err)}),
+    };
+    engine.summonNameIds(&s, names[0..n_names]);
+    const hv = get(root, "harness");
+    s.has_seed = get(hv, "seed") == .integer;
+    s.seed = if (s.has_seed) @floatFromInt(get(hv, "seed").integer) else 0;
+    s.summon_seq = if (get(hv, "summonSequence") == .integer) try intAs(u32, get(hv, "summonSequence"), why, "harness.summonSequence") else 0;
 
     // ---- flags and configs read without an ability naming them ----
     engine.loadScopeFlags(&s, configs) catch |err| return why.malformed("configs: {s}", .{@errorName(err)});
@@ -290,19 +341,22 @@ pub fn load(root: Value, ids: []const []const u8, harness: Harness, why: *Why) E
         if (team < 0 or team > Team.LEFT) return why.malformed("emberCovenantTeams: team {d}", .{team});
         s.ember_teams |= @as(u8, 1) << @intCast(team);
     }
+    // The distances of removed units are never read again (only living holder units are measured).
     const distances = get(holder, "distancesToClosestEnemies");
     for (try mapEntries(distances, why, "distancesToClosestEnemies")) |e| {
-        const ui = try unitIndexOf(ids, try string(e.array.items[0], why, "distances"), why, "distances");
+        const ui = (try slotOfId(&s, ids, try string(e.array.items[0], why, "distances"), why, "distances")) orelse continue;
         s.units[ui].dist_known = true;
         s.units[ui].dist_closest_enemy = try number(e.array.items[1], why, "distances");
     }
 
     // ---- AI target memory and the damage-statistic laps ----
+    // A remembered unit that left the battle matches no enemy again (findTarget looks it up among the living), and a
+    // removed attacker never decides: such entries are dropped.
     s.ai_prev_target = .{-1} ** st.MAX_UNITS;
     for (try items(get(root, "aiTargetMemory"), why, "aiTargetMemory")) |e| {
         if (e != .array or e.array.items.len != 2) return why.malformed("aiTargetMemory entry", .{});
-        const a = try unitIndexOf(ids, try string(e.array.items[0], why, "aiTargetMemory"), why, "aiTargetMemory");
-        const t = try unitIndexOf(ids, try string(e.array.items[1], why, "aiTargetMemory"), why, "aiTargetMemory");
+        const a = (try slotOfId(&s, ids, try string(e.array.items[0], why, "aiTargetMemory"), why, "aiTargetMemory")) orelse continue;
+        const t = (try slotOfId(&s, ids, try string(e.array.items[1], why, "aiTargetMemory"), why, "aiTargetMemory")) orelse continue;
         s.ai_prev_target[a] = @intCast(t);
     }
     s.damage_lap = -1;
@@ -312,7 +366,6 @@ pub fn load(root: Value, ids: []const []const u8, harness: Harness, why: *Why) E
     }
 
     // ---- harness ----
-    const hv = get(root, "harness");
     s.rng = Rng.init(0);
     if (harness.rng) |r| {
         s.rng = Rng.init(r);
@@ -322,7 +375,7 @@ pub fn load(root: Value, ids: []const []const u8, harness: Harness, why: *Why) E
     s.active = -1;
     const active_id: []const u8 = harness.active orelse if (get(hv, "activeUnitId") == .string) get(hv, "activeUnitId").string else "";
     if (active_id.len > 0) {
-        const ai = try unitIndexOf(ids, active_id, why, "active unit");
+        const ai = (try slotOfId(&s, ids, active_id, why, "active unit")) orelse return why.malformed("active unit {s} is not in the holder", .{active_id});
         if (!s.units[ai].in_holder) return why.malformed("active unit {s} is not in the holder", .{active_id});
         s.active = @intCast(ai);
     }
@@ -331,17 +384,18 @@ pub fn load(root: Value, ids: []const []const u8, harness: Harness, why: *Why) E
 
 /// Fails unless the unit-level fields the port does not model are empty or at their defaults.
 fn checkUnitScope(uv: Value, fields: Value, props: Value, why: *Why) Error!void {
-    if (get(uv, "summoned") == .bool and get(uv, "summoned").bool) return why.unsupported("summoned unit", .{});
+    // Summoned units: only the creatures Infest raises (spell summons are out of scope).
+    if (get(uv, "summoned") == .bool and get(uv, "summoned").bool) {
+        const name = try string(get(uv, "name"), why, "unit name");
+        if (!std.mem.eql(u8, name, "Arachna Spider") and !std.mem.eql(u8, name, "Arachna Queen")) return why.unsupported("summoned {s}", .{name});
+    }
     const unit_type = get(uv, "unitType");
     if (unit_type != .integer or unit_type.integer != 1) return why.unsupported("unit type is not a creature", .{});
     try checkSpells(fields, props, why);
-    try requireEmpty(get(props, "stolen_abilities"), why, "stolen abilities");
     try requireEmpty(get(props, "artifact_granted_abilities"), why, "artifact-granted abilities");
     try requireEmpty(get(props, "forbidden_target"), why, "forbidden target");
-    try requireEmpty(get(props, "web_movement_locked"), why, "Web movement lock");
     try requireEmpty(get(props, "helping_hand_caster_id"), why, "Helping Hand caster");
     try requireEmpty(get(props, "helping_hand_penalty_id"), why, "Helping Hand penalty");
-    try requireEmpty(get(props, "rallying_volley_granted"), why, "Rallying Volley arrows");
     if (props == .object) {
         var it = props.object.iterator();
         while (it.next()) |e| {
@@ -391,6 +445,13 @@ fn checkSpells(fields: Value, props: Value, why: *Why) Error!void {
         const name = if (std.mem.lastIndexOfScalar(u8, entry, ':')) |i| entry[i + 1 ..] else entry;
         if (!inertAbilitySpell(name, abilities)) return why.unsupported("spell {s}", .{entry});
     }
+}
+
+/// The names of the unit's Ability objects (its ACTIVE list: config order, then what it stole), as JSON strings.
+fn activeNames(arena: []Value, objects: []const Value, why: *Why) Error![]const Value {
+    if (objects.len > arena.len) return why.unsupported("{d} active abilities (at most {d})", .{ objects.len, arena.len });
+    for (objects, 0..) |o, i| arena[i] = .{ .string = try string(get(get(o, "abilityProperties"), "name"), why, "abilityProperties") };
+    return arena[0..objects.len];
 }
 
 /// The names of a list of class instances (`abilities`, `auraEffects`) must be the props' name list, in order.
@@ -451,11 +512,18 @@ fn loadLists(u: *Unit, fields: Value, props: Value, why: *Why) Error!void {
             if (!poison and (x != .integer or x.integer != 1)) return why.unsupported("effect stacks other than 1", .{});
         }
     }
-    // Stored properties: the aura rows' source cells and the augments' (Sniper "27;70"), as engine.loadBuffSources.
+    // Stored properties: the aura rows' source cells (buff and debuff rows) and the augments' (Sniper "27;70"), as
+    // engine.loadBuffSources.
     const objects = try items(get(fields, "buffs"), why, "buffs");
     for (objects, 0..) |o, i| {
         const b = &u.buffs.items[i];
         if (!b.id.isAugment() and b.laps != st.LAPS_AURA) continue;
+        b.src_x = try storedProperty(get(o, "firstSpellProperty"), why);
+        b.src_y = try storedProperty(get(o, "secondSpellProperty"), why);
+    }
+    for (try items(get(fields, "debuffs"), why, "debuffs"), 0..) |o, i| {
+        const b = &u.debuffs.items[i];
+        if (b.laps != st.LAPS_AURA) continue;
         b.src_x = try storedProperty(get(o, "firstSpellProperty"), why);
         b.src_y = try storedProperty(get(o, "secondSpellProperty"), why);
     }
@@ -470,6 +538,9 @@ fn spellError(err: anyerror, why: *Why) Error {
 }
 
 fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []const u8, idx: u8, name_id: u16, why: *Why) Error!void {
+    const uid = s.units[idx].uid;
+    const id_bytes = s.units[idx].uuid;
+    const id_ok = s.units[idx].uuid_ok;
     _ = root;
     const fields = get(uv, "fields");
     const props = get(fields, "unitProperties");
@@ -570,26 +641,38 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
         .auras = undefined,
         .n_auras = 0,
         .syn_power = 0,
+        .uid = uid,
+        .uuid = id_bytes,
+        .uuid_ok = id_ok,
     };
     const u = &s.units[idx];
     u.syn_power = s.setup[u.team].ability_power;
+    const rv = get(props, "rallying_volley_granted");
+    u.rallying_volley_granted = if (isUndefined(rv)) 0 else try number(rv, why, "rallying_volley_granted");
+    const web = get(props, "web_movement_locked");
+    u.web_locked = !isUndefined(web) and try boolean(web, why, "web_movement_locked");
 
     // Abilities and auras from the configs (the same loaders as a recording's start state), checked against the
-    // unit's Ability / AuraEffect objects.
-    engine.loadAbilities(configs, props, u) catch |err| return switch (err) {
+    // unit's Ability / AuraEffect objects: the active list is the Ability objects (stolen ones included), the card list
+    // props.abilities, and props.stolen_abilities what the unit lost.
+    var active_buf: [st.MAX_ABILITIES]Value = undefined;
+    const active = try activeNames(&active_buf, try items(get(fields, "abilities"), why, "abilities"), why);
+    const stolen_v = get(props, "stolen_abilities");
+    engine.loadUnitAbilities(configs, active, try items(get(props, "abilities"), why, "abilities"), if (isUndefined(stolen_v)) &.{} else try items(stolen_v, why, "stolen_abilities"), s, u) catch |err| return switch (err) {
         error.UnsupportedAbility => why.unsupported("ability {s}", .{engine.unsupported_name}),
+        error.UnsupportedAura => why.unsupported("aura {s}", .{engine.unsupported_name}),
+        error.TooManyAbilities => why.unsupported("more abilities than the port holds", .{}),
         else => why.malformed("abilities: {s}", .{@errorName(err)}),
     };
     engine.loadAuras(configs, props, s, u) catch |err| return switch (err) {
         error.UnsupportedAura => why.unsupported("aura {s}", .{engine.unsupported_name}),
         else => why.malformed("auras: {s}", .{@errorName(err)}),
     };
-    try checkNames(try items(get(fields, "abilities"), why, "abilities"), try items(get(props, "abilities"), why, "abilities"), "abilityProperties", why);
     const aura_names = get(props, "aura_effects");
     try checkNames(try items(get(fields, "auraEffects"), why, "auraEffects"), if (aura_names == .array) aura_names.array.items else &.{}, "auraEffectProperties", why);
 
     const target = get(props, "target");
-    if (target == .string and target.string.len > 0) u.target = @intCast(try unitIndexOf(ids, target.string, why, "target"));
+    if (target == .string and target.string.len > 0) u.target = @intCast(try requireSlot(s, ids, target.string, why, "target"));
     try loadLists(u, fields, props, why);
 
     for (try items(get(fields, "adjustedBaseStatsLaps"), why, "adjustedBaseStatsLaps")) |l| {
@@ -678,7 +761,7 @@ fn loadGrid(s: *State, grid: Value, fight: Value, ids: []const []const u8, why: 
             else if (std.mem.eql(u8, code, "W"))
                 return why.unsupported("water cell", .{})
             else blk: {
-                const ui = try unitIndexOf(ids, code, why, "boardCoord");
+                const ui = (try slotOfId(s, ids, code, why, "boardCoord")) orelse return why.malformed("board holds a removed unit", .{});
                 if (!s.units[ui].in_holder) return why.malformed("board holds a removed unit", .{});
                 break :blk ui + 1;
             };
@@ -694,7 +777,7 @@ fn loadGrid(s: *State, grid: Value, fight: Value, ids: []const []const u8, why: 
     const regs = get(grid, "cellsByUnitId");
     for (s.units[0..s.n_units], 0..) |*u, i| {
         if (!u.in_holder) continue;
-        const cells_v = (try lookup(regs, ids[i], why, "cellsByUnitId")) orelse continue;
+        const cells_v = (try lookup(regs, ids[u.uid], why, "cellsByUnitId")) orelse continue;
         const cells = try items(cells_v, why, "cellsByUnitId");
         if (cells.len > u.reg.len) return why.unsupported("{d} registered cells", .{cells.len});
         for (cells, 0..) |c, k| {
@@ -734,17 +817,24 @@ fn loadGrid(s: *State, grid: Value, fight: Value, ids: []const []const u8, why: 
     }
 }
 
-fn queueOf(v: Value, ids: []const []const u8, why: *Why, what: []const u8) Error!st.Queue {
+fn queueOf(s: *const State, v: Value, ids: []const []const u8, why: *Why, what: []const u8) Error!st.Queue {
     var q: st.Queue = .{};
     const list = try items(v, why, what);
     if (list.len > st.MAX_UNITS) return why.malformed("{s}: {d} entries", .{ what, list.len });
-    for (list) |e| q.push(try unitIndexOf(ids, try string(e, why, what), why, what));
+    for (list) |e| q.push(try requireSlot(s, ids, try string(e, why, what), why, what));
     return q;
 }
 
-fn setOf(v: Value, ids: []const []const u8, why: *Why, what: []const u8) Error!st.UnitSet {
+/// A turn set: the holder's units as slot bits, the removed ones (TypeScript keeps their ids until the lap flips) by
+/// uid in `removed`.
+fn turnSet(s: *State, v: Value, ids: []const []const u8, removed: *st.UidSet, why: *Why, what: []const u8) Error!st.UnitSet {
     var set: st.UnitSet = 0;
-    for (try items(v, why, what)) |e| set |= engine.unitBit(try unitIndexOf(ids, try string(e, why, what), why, what));
+    for (try items(v, why, what)) |e| {
+        const id = try string(e, why, what);
+        if (try slotOfId(s, ids, id, why, what)) |slot| {
+            set |= engine.unitBit(slot);
+        } else removed.add(try unitIndexOf(ids, id, why, what));
+    }
     return set;
 }
 
@@ -773,27 +863,35 @@ fn loadFight(s: *State, fight: Value, root: Value, ids: []const []const u8, why:
         for (try mapEntries(get(fight, key), why, key)) |e| try requireEmpty(e.array.items[1], why, "artifacts");
     }
 
-    f.up_next = try queueOf(get(fight, "upNextQueue"), ids, why, "upNextQueue");
-    f.hourglass_q = try queueOf(get(fight, "hourglassQueue"), ids, why, "hourglassQueue");
-    f.morale_plus_q = try queueOf(get(fight, "moralePlusQueue"), ids, why, "moralePlusQueue");
-    f.morale_minus_q = try queueOf(get(fight, "moraleMinusQueue"), ids, why, "moraleMinusQueue");
-    f.made = try setOf(get(fight, "alreadyMadeTurn"), ids, why, "alreadyMadeTurn");
-    f.hourglass_set = try setOf(get(fight, "alreadyHourglass"), ids, why, "alreadyHourglass");
-    f.replied = try setOf(get(fight, "alreadyRepliedAttack"), ids, why, "alreadyRepliedAttack");
-    // alreadyMadeTurnByTeam is not modelled apart: it must be `made` split by team.
-    var by_team: st.UnitSet = 0;
+    f.up_next = try queueOf(s, get(fight, "upNextQueue"), ids, why, "upNextQueue");
+    f.hourglass_q = try queueOf(s, get(fight, "hourglassQueue"), ids, why, "hourglassQueue");
+    f.morale_plus_q = try queueOf(s, get(fight, "moralePlusQueue"), ids, why, "moralePlusQueue");
+    f.morale_minus_q = try queueOf(s, get(fight, "moraleMinusQueue"), ids, why, "moraleMinusQueue");
+    f.made = try turnSet(s, get(fight, "alreadyMadeTurn"), ids, &f.removed_made, why, "alreadyMadeTurn");
+    f.hourglass_set = try turnSet(s, get(fight, "alreadyHourglass"), ids, &f.removed_hourglass, why, "alreadyHourglass");
+    f.replied = try turnSet(s, get(fight, "alreadyRepliedAttack"), ids, &f.removed_replied, why, "alreadyRepliedAttack");
+    // alreadyMadeTurnByTeam is not modelled apart: it must be `made` split by team (compared as uid sets).
+    var made_uids: [st.MAX_UIDS + 1]bool = .{false} ** (st.MAX_UIDS + 1);
+    var made_n: usize = 0;
+    for (try items(get(fight, "alreadyMadeTurn"), why, "alreadyMadeTurn")) |e| {
+        const uid = try unitIndexOf(ids, try string(e, why, "alreadyMadeTurn"), why, "alreadyMadeTurn");
+        if (!made_uids[uid]) made_n += 1;
+        made_uids[uid] = true;
+    }
+    var by_team_n: usize = 0;
     for (try mapEntries(get(fight, "alreadyMadeTurnByTeam"), why, "alreadyMadeTurnByTeam")) |e| {
         const team = try integer(e.array.items[0], why, "alreadyMadeTurnByTeam");
-        const set = try setOf(e.array.items[1], ids, why, "alreadyMadeTurnByTeam");
-        var it = set;
-        while (it != 0) {
-            const ui: u8 = @intCast(@ctz(it));
-            it &= it - 1;
-            if (s.units[ui].in_holder and s.units[ui].team != team) return why.unsupported("alreadyMadeTurnByTeam disagrees with the teams", .{});
+        for (try items(e.array.items[1], why, "alreadyMadeTurnByTeam")) |x| {
+            const id = try string(x, why, "alreadyMadeTurnByTeam");
+            const uid = try unitIndexOf(ids, id, why, "alreadyMadeTurnByTeam");
+            if (!made_uids[uid]) return why.unsupported("alreadyMadeTurnByTeam differs from alreadyMadeTurn", .{});
+            if (try slotOfId(s, ids, id, why, "alreadyMadeTurnByTeam")) |ui| {
+                if (s.units[ui].in_holder and s.units[ui].team != team) return why.unsupported("alreadyMadeTurnByTeam disagrees with the teams", .{});
+            }
+            by_team_n += 1;
         }
-        by_team |= set;
     }
-    if (by_team != f.made) return why.unsupported("alreadyMadeTurnByTeam differs from alreadyMadeTurn", .{});
+    if (by_team_n != made_n) return why.unsupported("alreadyMadeTurnByTeam differs from alreadyMadeTurn", .{});
     f.damage_laps = 0;
     for (try mapEntries(get(fight, "damageDealFactPerLap"), why, "damageDealFactPerLap")) |e| {
         const l = try integer(e.array.items[0], why, "damageDealFactPerLap");

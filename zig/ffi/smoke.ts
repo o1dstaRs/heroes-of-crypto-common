@@ -79,6 +79,8 @@ function recordBattle(seed: number, at: number): IBattle | undefined {
     let exported: Omit<IBattle, "ts"> | undefined;
     let lastDigest: object | undefined;
     let winner = -1;
+    // runMatch's createSummonedUnit counter (a part of every summon id), for the export's harness.
+    let summonSequence = 0;
     const wrap = (proto: any, method: string): (() => void) => {
         const original = proto[method];
         proto[method] = function (this: unknown, arg: unknown) {
@@ -112,6 +114,8 @@ function recordBattle(seed: number, at: number): IBattle | undefined {
                     rng: rng.state,
                     activeUnitId: unit.getId(),
                     uuidSequence: captureDeterministicRandomState().uuidSequence,
+                    seed,
+                    summonSequence,
                 }),
             );
             exportMs = performance.now() - t0;
@@ -144,6 +148,11 @@ function recordBattle(seed: number, at: number): IBattle | undefined {
             sideOrientedPlacement: true,
             beforeFightStart: (context) => {
                 ctx = context;
+                const createSummonedUnit = (context as any).createSummonedUnit;
+                (context as any).createSummonedUnit = (opts: unknown) => {
+                    summonSequence += 1;
+                    return createSummonedUnit(opts);
+                };
                 if (!getDeterministicRandomSource()) throw new Error("expected a seeded match");
                 rng = new Mulberry(Math.imul(seed, 0x9e3779b1) >>> 0);
                 setDeterministicRandomSource(rng.next);

@@ -344,8 +344,9 @@ pub fn analyzeEngagement(c: *const Ctx) Engagement {
     var sum_x: f64 = 0;
     var sum_y: f64 = 0;
     var nearest = INF;
-    for (s.units[0..s.n_units], 0..) |*a, i| {
-        if (!a.in_holder or a.team != u.team or i == c.ui or a.isDead()) continue;
+    for (s.holderOrder()) |i| {
+        const a = &s.units[i];
+        if (a.team != u.team or i == c.ui or a.isDead()) continue;
         const ac = engine.baseCell(a);
         if (a.attack_type == AT.RANGE) {
             e.total_ranged += 1;
@@ -699,7 +700,8 @@ pub fn findTarget(c: *Ctx) ?AIAction {
     const ranged = u.attack_type == AT.RANGE;
     const engaged = countThreats(&c.m, unit_cell, enemy_team) > 0;
 
-    if (action == null and !ranged and !engaged) {
+    // A web-locked flyer (canMove false) takes no movement branch: it strikes in place, shoots, or falls back.
+    if (action == null and !ranged and u.canMove() and !engaged) {
         if (evaluateMountainStrategy(c, &eng)) |mountain| {
             action = mountain; // takes priority over the ranged-heavy hold and the regroup (BLOCK_CENTER only)
             if (c.prefer_attack_over_mining) {
@@ -724,7 +726,7 @@ pub fn findTarget(c: *Ctx) ?AIAction {
         } else {
             action = doFindTarget(c);
         }
-    } else if (action == null) {
+    } else if (action == null and u.canMove()) {
         action = doFindTarget(c);
     }
 
@@ -753,8 +755,9 @@ pub const GROUP_REGROUP_DIST: f64 = 4;
 /// teamRangedFirepower: the sum of remaining shots x max(1, max damage) over the team's living RANGE units.
 pub fn teamRangedFirepower(s: *const State, team: u8) f64 {
     var firepower: f64 = 0;
-    for (s.units[0..s.n_units]) |*u| {
-        if (!u.in_holder or u.team != team or u.isDead() or u.attack_type != AT.RANGE) continue;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.team != team or u.isDead() or u.attack_type != AT.RANGE) continue;
         const shots = engine.getRangeShots(u);
         if (shots <= 0) continue;
         firepower += shots * @max(1, u.attack_damage_max);
@@ -807,8 +810,8 @@ pub fn evaluateMountainStrategy(c: *Ctx, eng: *const Engagement) ?AIAction {
     const s = c.s;
     const u = c.unit();
     if (mountainHitsLeft(s) <= 0) return null;
-    // canMove() is true in scope; a live forced target (Aggr) must be fought first.
-    if (u.attack_type == AT.RANGE or eng.pressing or combat.forcedTarget(s, u) != null) return null;
+    // A live forced target (Aggr) must be fought first.
+    if (u.attack_type == AT.RANGE or !u.canMove() or eng.pressing or combat.forcedTarget(s, u) != null) return null;
     if (eng.total_melee > 0 and eng.nearest_melee > GROUP_REGROUP_DIST and eng.engaged_melee == 0 and !eng.pressing) return null;
     const strike = findMountainMeleeStrike(c) orelse return null;
     const out_range = teamRangedFirepower(s, u.team) > teamRangedFirepower(s, engine.opposite(u.team));
@@ -842,7 +845,7 @@ pub fn routeAtJsKey(mp: *const MovePath, x: i32, y: i32) ?*const Route {
 pub fn preferBackstabAttackCell(c: *Ctx, a: AIAction) AIAction {
     if (a.kind != .melee and a.kind != .move_and_melee) return a;
     const u = c.unit();
-    if (!engine.isSmall(u) or !u.has(.backstab)) return a; // canMove() is true in scope
+    if (!engine.isSmall(u) or !u.has(.backstab) or !u.canMove()) return a;
     const target_cell = a.attack orelse return a;
     const from = a.move orelse return a;
     const t = occupant(c.s, target_cell) orelse return a;
@@ -907,10 +910,11 @@ pub fn hasResponded(s: *const State, t: u8) bool {
 /// preferRespondedMeleeTarget
 pub fn preferRespondedTarget(s: *const State, ui: u8, current_id: u8, from_cells: []const Cell) ?u8 {
     var candidates: engine.UnitList = .{};
-    for (s.units[0..s.n_units], 0..) |*t, i| {
-        if (!t.in_holder or t.team == s.units[ui].team or !isLegalMeleeTarget(s, ui, @intCast(i))) continue;
+    for (s.holderOrder()) |i| {
+        const t = &s.units[i];
+        if (t.team == s.units[ui].team or !isLegalMeleeTarget(s, ui, i)) continue;
         const tc = engine.unitCells(t);
-        if (adjacent(from_cells, tc.slice())) candidates.push(@intCast(i));
+        if (adjacent(from_cells, tc.slice())) candidates.push(i);
     }
     var current: ?u8 = null;
     for (candidates.slice()) |t| if (t == current_id) {
@@ -962,10 +966,11 @@ pub fn completeMoveWithMelee(c: *Ctx, mp: *const MovePath, r: *const Route, pref
     const move = rec.Action{ .move_unit = .{ .unit = c.ui, .path = out.path[0..len], .target_cells = out.targets[0..targets.len], .has_lava = r.has_lava } };
 
     var adjacent_enemies: engine.UnitList = .{};
-    for (s.units[0..s.n_units], 0..) |*e, i| {
-        if (!e.in_holder or e.team == u.team or !isLegalMeleeTarget(s, c.ui, @intCast(i))) continue;
+    for (s.holderOrder()) |i| {
+        const e = &s.units[i];
+        if (e.team == u.team or !isLegalMeleeTarget(s, c.ui, i)) continue;
         const ec = engine.unitCells(e);
-        if (adjacent(targets.slice(), ec.slice())) adjacent_enemies.push(@intCast(i));
+        if (adjacent(targets.slice(), ec.slice())) adjacent_enemies.push(i);
     }
     var target: ?u8 = null;
     if (preferred) |p| {
@@ -998,10 +1003,12 @@ pub fn fallbackTurn(c: *Ctx, out: *Decision) void {
     out.n = 0;
     const s = c.s;
     const u = c.unit();
+    if (!u.canMove()) return idleTurn(c, out);
     const mp = c.actualPath();
     var enemies: engine.UnitList = .{};
-    for (s.units[0..s.n_units], 0..) |*e, i| {
-        if (e.in_holder and e.team != u.team and !e.isDead()) enemies.push(@intCast(i));
+    for (s.holderOrder()) |i| {
+        const e = &s.units[i];
+        if (e.team != u.team and !e.isDead()) enemies.push(i);
     }
     if (enemies.len == 0 or mp.size() == 0) return idleTurn(c, out);
     const base = engine.baseCell(u);
@@ -1048,14 +1055,16 @@ pub fn findLegalRangeAttack(c: *const Ctx, preferred: u8) ?rec.Action {
     const u = c.unit();
     var order: engine.UnitList = .{};
     var has_preferred = false;
-    for (s.units[0..s.n_units], 0..) |*e, i| {
-        if (e.in_holder and e.team != u.team and !e.isDead() and i == preferred) has_preferred = true;
+    for (s.holderOrder()) |i| {
+        const e = &s.units[i];
+        if (e.team != u.team and !e.isDead() and i == preferred) has_preferred = true;
     }
     if (has_preferred) order.push(preferred);
-    for (s.units[0..s.n_units], 0..) |*e, i| {
-        if (!e.in_holder or e.team == u.team or e.isDead()) continue;
+    for (s.holderOrder()) |i| {
+        const e = &s.units[i];
+        if (e.team == u.team or e.isDead()) continue;
         if (has_preferred and i == preferred) continue;
-        order.push(@intCast(i));
+        order.push(i);
     }
     for (order.slice()) |t| {
         if (rangeShotLandable(s, c.ui, t, null, 0)) return .{ .range_attack = .{ .attacker = c.ui, .target = t } };
@@ -1126,6 +1135,7 @@ pub fn decideWith(c: *Ctx, out: *Decision) void {
             const tcells = engine.unitCells(t);
             if (!adjacent(from_cells.slice(), tcells.slice())) return fallbackTurn(c, out);
             const base = engine.baseCell(u);
+            if (!sameCell(from, base) and !u.canMove()) return fallbackTurn(c, out);
             if (!sameCell(from, base)) {
                 const mp = a.paths orelse return fallbackTurn(c, out);
                 const r = mp.get(pathing.key(from.x, from.y)) orelse return fallbackTurn(c, out);
@@ -1139,6 +1149,7 @@ pub fn decideWith(c: *Ctx, out: *Decision) void {
         },
         .move => {
             const tc = a.move orelse return fallbackTurn(c, out);
+            if (!u.canMove()) return fallbackTurn(c, out);
             const mp = a.paths orelse return fallbackTurn(c, out);
             const r = mp.get(pathing.key(tc.x, tc.y)) orelse return fallbackTurn(c, out);
             if (!isLegalMoveRoute(c, tc, mp, r)) return fallbackTurn(c, out);
@@ -1177,12 +1188,15 @@ pub const Observer = struct {
 
 pub const EndReason = enum { elimination, turn_cap, stuck, observer_stop, unsupported };
 
+/// One engine call (`action` names slots); the observer sees the action with its units named by uid (engine.actionToUids,
+/// taken before the call: a slot can change hands during it), as recordings name them.
 pub fn call(s: *State, action: rec.Action, kind: StepKind, obs: ?Observer, events: *engine.Events) struct { ok: bool, stop: bool } {
     const r0 = s.rng.state;
     events.len = 0;
+    const named = if (obs != null) engine.actionToUids(s, action) else action;
     const ok = engine.apply(s, action, events);
     if (obs) |o| {
-        if (!o.step(o.ctx, kind, action, r0, s, ok, events.slice())) return .{ .ok = ok, .stop = true };
+        if (!o.step(o.ctx, kind, named, r0, s, ok, events.slice())) return .{ .ok = ok, .stop = true };
     }
     return .{ .ok = ok, .stop = false };
 }
@@ -1207,11 +1221,7 @@ pub fn continueMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *cons
     while (!s.fight.finished) {
         if (s.fight.lap > max_laps) return .turn_cap;
         if (s.active < 0) {
-            var holder: usize = 0;
-            for (s.units[0..s.n_units]) |*u| {
-                if (u.in_holder) holder += 1;
-            }
-            const attempts = holder + 2;
+            const attempts = @as(usize, s.n_holder) + 2;
             var i: usize = 0;
             while (i < attempts and !s.fight.finished and s.active < 0) : (i += 1) {
                 const r = call(s, .{ .advance = .{ .damage_dealt_this_lap = s.damage_lap == s.fight.lap } }, .advance, obs, &events);
@@ -1231,7 +1241,10 @@ pub fn continueMatchWith(s: *State, max_laps: i32, obs: ?Observer, decide: *cons
         const r0 = s.rng.state;
         decide(s, ui, &decision);
         if (obs) |o| {
-            if (!o.step(o.ctx, .decide, .{ .decide = .{ .unit = ui, .out = decision.slice() } }, r0, s, true, &.{})) return .observer_stop;
+            var named: [3]rec.Action = undefined;
+            for (decision.slice(), 0..) |a, k| named[k] = engine.actionToUids(s, a);
+            const d = rec.Action{ .decide = .{ .unit = s.units[ui].uid, .out = named[0..decision.n] } };
+            if (!o.step(o.ctx, .decide, d, r0, s, true, &.{})) return .observer_stop;
         }
         var did_something = false;
         for (decision.slice()) |a| {

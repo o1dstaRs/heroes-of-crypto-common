@@ -220,7 +220,22 @@ export fn hoc_play_v01(eng: ?*Engine, handle: ?*Handle, max_laps: i32, out: ?*ro
         e.fail("no state", .{});
         return -1;
     };
-    const r = rollout.play(&h.state, max_laps, ai.decideTurn);
+    // Units summoned during the play-out join the handle's id table (uids are dense: a summon takes the next one).
+    const arena = e.tmp();
+    var summoned: rollout.SummonIds = .{ .first = h.ids.len, .alloc = arena };
+    const r = rollout.playHooked(&h.state, max_laps, ai.decideTurn, summoned.hook());
+    if (summoned.ids.items.len > 0) {
+        const table = summoned.table(arena, h.ids) catch {
+            e.fail("out of memory", .{});
+            return -1;
+        };
+        const grown = newHandle(e, &h.state, table, h.uuid_sequence) orelse return -1;
+        alloc.free(h.ids);
+        alloc.free(h.id_bytes);
+        h.ids = grown.ids;
+        h.id_bytes = grown.id_bytes;
+        alloc.destroy(grown);
+    }
     if (out) |o| o.* = r;
     return 0;
 }
@@ -242,8 +257,12 @@ fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []
         e.fail("request: actor must be a unit id", .{});
         return null;
     }
-    const actor = rec.unitIndex(ids, actor_v.string) catch {
+    const actor_uid = rec.unitIndex(ids, actor_v.string) catch {
         e.fail("request: unknown actor {s}", .{actor_v.string});
+        return null;
+    };
+    const actor = h.state.slotOf(actor_uid) orelse {
+        e.fail("request: actor {s} is not a living unit", .{actor_v.string});
         return null;
     };
     if (!h.state.units[actor].in_holder or h.state.units[actor].isDead()) {
@@ -342,10 +361,11 @@ fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []
                 e.fail("unsupported request: candidate {d} action {s}", .{ i, if (t == .string) t.string else "?" });
                 return null;
             }
-            out_actions[j] = rec.parseAction(arena, ids, "apply", a) catch |err| {
+            const named = rec.parseAction(arena, ids, "apply", a) catch |err| {
                 e.fail("unsupported request: candidate {d} action {d}: {s}", .{ i, j, @errorName(err) });
                 return null;
             };
+            out_actions[j] = engine_mod.actionToSlots(&h.state, named);
         }
         out_cands[i] = .{ .incumbent = kind == .string and std.mem.eql(u8, kind.string, "incumbent"), .actions = out_actions };
     }
@@ -401,6 +421,7 @@ export fn hoc_rollouts(eng: ?*Engine, handle: ?*const Handle, req_json: ?[*]cons
             error.UnsupportedRecovery => "a policy turn landed nothing (the recovery net is not ported)",
             error.UnsupportedStall => "the turn queue stalled (forceStalledLap is not ported)",
             error.UnsupportedPolicy => "a seat without a policy had to play",
+            error.UnsupportedCapacity => "a capacity of the port was exceeded (unit slots, ids, lists, or a summon without its id parts)",
         }});
         return -1;
     };

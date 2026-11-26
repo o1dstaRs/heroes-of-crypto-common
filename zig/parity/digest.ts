@@ -10,9 +10,11 @@
 export interface IDigestOptions {
     setup: boolean;
     terrain: boolean;
+    /** The batch-3 columns (active and stolen abilities, the Web lock, debuff stored properties, Rallying Volley). */
+    batch3?: boolean;
 }
 
-export function unitDigest(u: any, setup: boolean): unknown[] {
+export function unitDigest(u: any, setup: boolean, batch3 = false): unknown[] {
     const p = u.getUnitProperties();
     const c = u.getBaseCell();
     return [
@@ -68,11 +70,26 @@ export function unitDigest(u: any, setup: boolean): unknown[] {
             .join(","),
         // Setup columns: Sniper moves shot_distance on every refresh; Bitter Experience moves the two bases.
         ...(setup ? [p.shot_distance, u.initialUnitProperties.base_armor, u.initialUnitProperties.steps] : []),
+        // Batch-3 columns: the active ability list (stolen ones included, Break ignored), the names the unit lost to
+        // Predatory Assimilation, the Web movement lock, each debuff's stored properties (the Web row's source cell)
+        // and the once-only Rallying Volley arrows.
+        ...(batch3
+            ? [
+                  u.abilities.map((a: any) => a.getName()).join(","),
+                  (p.stolen_abilities ?? []).join(","),
+                  p.web_movement_locked ? 1 : 0,
+                  u
+                      .getDebuffs()
+                      .map((b: any) => `${b.getFirstSpellProperty() ?? ""};${b.getSecondSpellProperty() ?? ""}`)
+                      .join(","),
+                  p.rallying_volley_granted ?? 0,
+              ]
+            : []),
     ];
 }
 
 /** The column names of unitDigest, in order. */
-export function digestFields(setup: boolean): string[] {
+export function digestFields(setup: boolean, batch3 = false): string[] {
     return [
         "id",
         "amount_alive",
@@ -122,6 +139,9 @@ export function digestFields(setup: boolean): string[] {
         "magic_resist",
         "buffs_sources",
         ...(setup ? ["shot_distance", "base_armor_init", "steps_init"] : []),
+        ...(batch3
+            ? ["abilities", "stolen_abilities", "web_locked", "debuffs_sources", "rallying_volley_granted"]
+            : []),
     ];
 }
 
@@ -168,7 +188,7 @@ export function battleDigest(
     opts: IDigestOptions,
 ): { units: unknown[][]; fight: Record<string, unknown> } {
     const units: unknown[][] = [];
-    for (const u of ctx.unitsHolder.getAllUnits().values()) units.push(unitDigest(u, opts.setup));
+    for (const u of ctx.unitsHolder.getAllUnits().values()) units.push(unitDigest(u, opts.setup, opts.batch3));
     const emberTeams = [...(ctx.unitsHolder.emberCovenantTeams ?? [])].sort();
     const fight: Record<string, unknown> = { ...fightDigest(ctx.fightProperties), emberTeams };
     if (opts.terrain) fight.terrain = terrainDigest(ctx.grid, ctx.fightProperties);

@@ -17,6 +17,7 @@
 import Denque from "denque";
 
 import { captureAITargetMemory } from "../../src/ai/ai";
+import { createCombatFactories, createUnitFromSpec } from "../../src/simulation/army";
 import { creatureIdForName } from "../../src/ai/setup/creature_score";
 import {
     getAbilityConfig,
@@ -207,17 +208,23 @@ export interface IExportHarness {
     rng?: number;
     activeUnitId?: string;
     uuidSequence?: number;
+    /** The battle seed and runMatch's createSummonedUnit counter: the parts of a summoned unit's id (Infest). */
+    seed?: number;
+    summonSequence?: number;
 }
 
 const plainConfig = (value: unknown): unknown => JSON.parse(JSON.stringify(value ?? null));
 
-/** The configs the engine reads by name, as record.ts writes them into a recording's start state. */
-function engineConfigs(unitsHolder: any): Record<string, Record<string, unknown>> {
+/** The creatures Infest raises (the only summons in the port's scope). */
+const SUMMON_CREATURES = ["Arachna Spider", "Arachna Queen"];
+
+/** The configs the engine reads by name, as record.ts writes them into a recording's start state, and (when a unit
+ * holds Infest) the summon templates: createUnitFromSpec's fresh props for each creature Infest raises. */
+function engineConfigs(unitsHolder: any, grid: any): Record<string, Record<string, unknown>> {
     const abilityConfigs: Record<string, any> = {};
     const effectConfigs: Record<string, unknown> = {};
     const auraEffectConfigs: Record<string, unknown> = {};
-    for (const unit of unitsHolder.getAllUnits().values()) {
-        const props = unit.getUnitProperties();
+    const addProps = (props: any): void => {
         for (const name of props.abilities ?? []) {
             if (name in abilityConfigs) continue;
             abilityConfigs[name] = plainConfig(getAbilityConfig(name));
@@ -227,6 +234,39 @@ function engineConfigs(unitsHolder: any): Record<string, Record<string, unknown>
         for (const name of props.aura_effects ?? []) {
             if (!(name in auraEffectConfigs)) auraEffectConfigs[name] = plainConfig(getAuraEffectConfig(name));
         }
+    };
+    let summons = false;
+    for (const unit of unitsHolder.getAllUnits().values()) {
+        const props = unit.getUnitProperties();
+        addProps(props);
+        if ((props.abilities ?? []).includes("Infest")) summons = true;
+    }
+    let summonTemplates: Record<string, unknown> | undefined;
+    if (summons) {
+        const { abilityFactory, effectFactory } = createCombatFactories();
+        summonTemplates = {};
+        for (const creatureName of SUMMON_CREATURES) {
+            const unit = createUnitFromSpec(
+                { faction: "Nature", creatureName, level: 0, size: 0, amount: 1 },
+                2,
+                grid.getSettings(),
+                abilityFactory,
+                effectFactory,
+                true,
+                "00000000-0000-5000-8000-000000000000",
+            );
+            addProps(unit.getUnitProperties());
+            summonTemplates[creatureName] = {
+                name: unit.getName(),
+                creatureId: creatureIdForName(unit.getName()) ?? 0,
+                level: unit.getLevel(),
+                size: unit.getSize(),
+                footprintW: unit.getFootprintWidth(),
+                footprintH: unit.getFootprintHeight(),
+                props: plainConfig(unit.getUnitProperties()),
+                initialProps: plainConfig(unit.initialUnitProperties),
+            };
+        }
     }
     for (const effect of ["Poison", "Break"]) {
         if (!(effect in effectConfigs)) effectConfigs[effect] = plainConfig(getEffectConfig(effect));
@@ -234,7 +274,13 @@ function engineConfigs(unitsHolder: any): Record<string, Record<string, unknown>
     const spellConfigs = {
         "Ember Covenant Blessing": plainConfig(getSpellConfig("System", "Ember Covenant Blessing")),
     };
-    return { abilityConfigs, effectConfigs, auraEffectConfigs, spellConfigs };
+    return {
+        abilityConfigs,
+        effectConfigs,
+        auraEffectConfigs,
+        spellConfigs,
+        ...(summonTemplates ? { summonTemplates } : {}),
+    };
 }
 
 /** Each team's synergy values (constant once the setup ran) and the laps till narrowing. */
@@ -283,7 +329,7 @@ export function exportBattleState(ctx: IExportContext, harness?: IExportHarness)
         holder: capture(unitsHolder, HOLDER_FIELDS, "holder"),
         aiTargetMemory: [...captureAITargetMemory(unitsHolder).entries()],
         damageStatLaps: [...new Set(damage.map((d: { lap: number }) => d.lap))].sort((a: any, b: any) => a - b),
-        configs: engineConfigs(unitsHolder),
+        configs: engineConfigs(unitsHolder, grid),
         setup: setupValues(fightProperties),
         ...(harness
             ? {
@@ -291,6 +337,8 @@ export function exportBattleState(ctx: IExportContext, harness?: IExportHarness)
                       rng: harness.rng ?? null,
                       activeUnitId: harness.activeUnitId ?? "",
                       uuidSequence: harness.uuidSequence ?? null,
+                      ...(harness.seed === undefined ? {} : { seed: harness.seed }),
+                      ...(harness.summonSequence === undefined ? {} : { summonSequence: harness.summonSequence }),
                   },
               }
             : {}),

@@ -305,8 +305,13 @@ pub inline fn enemyAggr(s: *const State, u: *const Unit) *const [st.GRID][st.GRI
 // Unit getters (src/units/unit.ts)
 // =====================================================================================================================
 
+/// Unit.getMorale: the clamped stored morale, 0 under an active Madness (no Mechanism in scope).
 pub inline fn getMorale(u: *const Unit) f64 {
-    return std.math.clamp(js.round(u.morale), -MORALE_MAX, MORALE_MAX);
+    const m = js.round(u.morale);
+    if (m > MORALE_MAX) return MORALE_MAX;
+    if (m < -MORALE_MAX) return -MORALE_MAX;
+    if (u.ability_mask & st.AbilityId.madness.bit() != 0 and u.has(.madness)) return 0;
+    return m;
 }
 
 pub inline fn getLuck(u: *const Unit) f64 {
@@ -357,9 +362,9 @@ pub inline fn opposite(team: u8) u8 {
     return if (team == Team.NO_TEAM) Team.NO_TEAM else if (team == Team.LEFT) Team.RIGHT else Team.LEFT;
 }
 
-/// increaseMorale / decreaseMorale: change the BASE morale, blocked under Morale/Dismorale.
+/// increaseMorale / decreaseMorale: change the BASE morale, blocked under Madness and under Morale/Dismorale.
 pub fn changeMorale(u: *Unit, amount: f64, increase: bool) void {
-    if (amount <= 0 or hasMoraleBuff(u) or hasDismorale(u)) return;
+    if (amount <= 0 or u.has(.madness) or hasMoraleBuff(u) or hasDismorale(u)) return;
     var m = if (increase) u.init.morale + amount else u.init.morale - amount;
     if (m > MORALE_MAX) m = MORALE_MAX;
     if (m < -MORALE_MAX) m = -MORALE_MAX;
@@ -415,7 +420,7 @@ pub fn applyDamageBreak(s: *State, ui: u8, minus_hp: f64, chance: f64, extend: b
             // effectFactory.makeEffect("Break"), Effect.extend, then Unit.applyEffect (delete by name, append)
             var laps = s.break_laps;
             if (extend and laps != st.LAPS_AURA and laps != st.NUMBER_OF_LAPS_TOTAL) laps += 1;
-            u.effects.replace(.{ .id = .break_, .laps = laps, .power = s.break_power });
+            abilities.replaceChecked(s, &u.effects, .{ .id = .break_, .laps = laps, .power = s.break_power });
         }
     }
     const r = projectStackDamage(u, minus_hp);
@@ -475,10 +480,12 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
         u.luck_mod = -LUCK_MAX - u.luck;
     }
 
-    // MORALE
+    // MORALE (Madness pins it to 0, a leftover Morale or Dismorale entry notwithstanding)
     u.attack_multiplier = 1;
     u.morale = if (syn.morale > 0) u.init.morale + syn.morale else u.init.morale;
-    if (hasMoraleBuff(u)) {
+    if (u.has(.madness)) {
+        u.morale = 0;
+    } else if (hasMoraleBuff(u)) {
         u.attack_multiplier = 1.25;
         u.morale = MORALE_MAX;
     } else if (hasDismorale(u)) {
@@ -514,10 +521,15 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
     if (armor_augment) |aa| u.magic_resist = js.roundUnitStat(u.magic_resist + aa.power, 2); // flat magic armor
     u.magic_resist_mod = 0;
     const p = (if (u.magic_resist_mod != 0) u.magic_resist_mod else u.magic_resist) / 100;
-    // winningAtLeastOneEventProbability([getMagicResist() / 100, Wardguard's multiplier])
+    // winningAtLeastOneEventProbability([getMagicResist() / 100, Magic Shield's and Wardguard's multipliers, the
+    // Arcane Ward Blessing row's power / 100]), folded in that order
     var no_resist = 1 * (1 - p);
+    if (u.ability(.magic_shield)) |ms| no_resist = no_resist * (1 - abilities.abilityMultiplier(u, ms));
     if (s.stat_hooks) {
         if (u.ability(.wardguard)) |wg| no_resist = no_resist * (1 - abilities.abilityMultiplier(u, wg));
+    }
+    if (s.blessings) {
+        if (u.buffs.get(.arcane_ward_blessing)) |aw| no_resist = no_resist * (1 - @max(0, aw.power) / 100);
     }
     u.magic_resist = js.roundUnitStat((1 - no_resist) * 100, 2);
 
@@ -551,6 +563,8 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
         }
     }
     u.attack_mod = u.init.attack_mod;
+    // Blind Fury: the share of the stack already lost, of the INITIAL base attack.
+    if (u.has(.blind_fury)) u.attack_mod += (1 - u.amount_alive / (u.amount_alive + u.amount_died)) * u.init.base_attack;
     u.attack_mod = js.roundUnitStat(u.attack_mod + 0, 2);
     u.base_attack = js.roundUnitStat(u.base_attack * base_attack_multiplier, 2);
     u.shot_distance = js.roundUnitStat(u.shot_distance, 2);
@@ -562,13 +576,15 @@ pub fn adjustBaseStats(s: *State, u: *Unit) void {
 /// FightProperties.setUnitsCalculatedStacksPower
 fn setStackPowers(s: *State) void {
     var max_total: f64 = -MAX_SAFE_INTEGER;
-    for (s.units[0..s.n_units]) |*u| {
-        if (!u.in_holder or !positionWithinGrid(u.pos_x, u.pos_y)) continue;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (!positionWithinGrid(u.pos_x, u.pos_y)) continue;
         const total = u.exp * u.amount_alive;
         max_total = if (max_total < total) total else max_total;
     }
-    for (s.units[0..s.n_units]) |*u| {
-        if (!u.in_holder or !positionWithinGrid(u.pos_x, u.pos_y)) continue;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (!positionWithinGrid(u.pos_x, u.pos_y)) continue;
         const pct = ((u.exp * u.amount_alive) / max_total) * 100;
         u.stack_power = if (pct <= 20) 1 else if (pct <= 40) 2 else if (pct <= 60) 3 else if (pct <= 80) 4 else 5;
     }
@@ -581,8 +597,9 @@ pub fn refreshStackPowerForAllUnits(s: *State) void {
     setStackPowers(s);
     if (s.auras) abilities.refreshAuras(s);
     if (s.blessings) abilities.refreshBlessings(s);
-    for (s.units[0..s.n_units]) |*u| {
-        if (!u.in_holder or !cellWithinGrid(baseCell(u))) continue;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (!cellWithinGrid(baseCell(u))) continue;
         adjustBaseStats(s, u);
     }
 }
@@ -594,8 +611,9 @@ pub fn refreshStackPowerForAllUnits(s: *State) void {
 /// getDistanceToClosestEnemy: every holder unit of the enemy team, dead or not.
 fn distanceToClosestEnemy(s: *const State, enemy_team: u8, x: f64, y: f64) f64 {
     var closest = MAX_SAFE_INTEGER;
-    for (s.units[0..s.n_units]) |*e| {
-        if (!e.in_holder or e.team != enemy_team) continue;
+    for (s.holderOrder()) |i| {
+        const e = &s.units[i];
+        if (e.team != enemy_team) continue;
         closest = @min(closest, distance(x, y, e.pos_x, e.pos_y));
     }
     return closest;
@@ -604,8 +622,9 @@ fn distanceToClosestEnemy(s: *const State, enemy_team: u8, x: f64, y: f64) f64 {
 /// haveDistancesToClosestEnemiesDecreased
 fn haveDistancesDecreased(s: *State) bool {
     var decreased = false;
-    for (s.units[0..s.n_units]) |*u| {
-        if (!u.in_holder or u.isDead()) continue;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.isDead()) continue;
         if (!positionWithinGrid(u.pos_x, u.pos_y)) continue;
         const current = js.toFixed(distanceToClosestEnemy(s, opposite(u.team), u.pos_x, u.pos_y), 2);
         if (u.dist_known) {
@@ -625,8 +644,9 @@ pub fn distanceToEnemyCentroid(s: *const State, enemy_team: u8, x: f64, y: f64) 
     var sx: f64 = 0;
     var sy: f64 = 0;
     var n: f64 = 0;
-    for (s.units[0..s.n_units]) |*e| {
-        if (!e.in_holder or e.team != enemy_team) continue;
+    for (s.holderOrder()) |i| {
+        const e = &s.units[i];
+        if (e.team != enemy_team) continue;
         sx += e.pos_x;
         sy += e.pos_y;
         n += 1;
@@ -641,9 +661,14 @@ pub fn deleteUnit(s: *State, ui: u8) void {
     if (u.in_holder) {
         u.in_holder = false;
         cleanupAll(s, ui);
+        if (std.mem.indexOfScalar(u8, s.holderOrder(), ui)) |k| {
+            std.mem.copyForwards(u8, s.holder[k .. s.n_holder - 1], s.holder[k + 1 .. s.n_holder]);
+            s.n_holder -= 1;
+        }
     }
-    for (s.units[0..s.n_units]) |*x| {
-        if (x.in_holder and x.target == @as(i8, @intCast(ui))) x.target = -1;
+    for (s.holderOrder()) |i| {
+        const x = &s.units[i];
+        if (x.target == @as(i8, @intCast(ui))) x.target = -1;
     }
     _ = s.fight.hourglass_q.removeOnce(ui);
     _ = s.fight.morale_minus_q.removeOnce(ui);
@@ -692,8 +717,9 @@ fn sortByInitiative(s: *const State, list: *UnitList) void {
 
 fn aliveTeam(s: *const State, team: u8) UnitList {
     var out: UnitList = .{};
-    for (s.units[0..s.n_units], 0..) |*u, i| {
-        if (u.in_holder and u.team == team and !u.isDead()) out.push(@intCast(i));
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.team == team and !u.isDead()) out.push(i);
     }
     return out;
 }
@@ -729,6 +755,9 @@ fn flipLap(f: *st.Fight) void {
     f.made = 0;
     f.hourglass_set = 0;
     f.replied = 0;
+    f.removed_made = .{};
+    f.removed_hourglass = .{};
+    f.removed_replied = .{};
     f.lap += 1;
     f.hourglass_q = .{};
     f.morale_minus_q = .{};
@@ -957,7 +986,7 @@ fn moveUnitTowardsCenter(s: *State, cell: Cell, dir: Dir, laps_narrowed: i32, ev
     }
     if (destroyed) {
         deleteUnit(s, ui);
-        events.push(.unit_destroyed, ui);
+        events.push(.unit_destroyed, u.uid);
     }
 }
 
@@ -1027,10 +1056,10 @@ fn applyArmageddon(s: *State, units: []const u8, events: *Events) void {
         const u = &s.units[ui];
         if (u.isDead() or !u.in_holder) continue;
         _ = applyDamage(s, ui, armageddonDamage(u, wave));
-        events.push(.armageddon_applied, ui);
+        events.push(.armageddon_applied, u.uid);
         if (u.isDead()) {
             deleteUnit(s, ui);
-            events.push(.unit_destroyed, ui);
+            events.push(.unit_destroyed, u.uid);
         }
     }
 }
@@ -1043,10 +1072,10 @@ fn applyMoraleRolls(s: *State, units: []const u8) void {
         const chance: f64 = @floatFromInt(s.rng.int(0, 100));
         if (chance >= @abs(m)) continue;
         if (m > 0) {
-            u.buffs.push(.{ .id = .morale, .laps = 1, .power = 0 });
+            abilities.pushChecked(s, &u.buffs, .{ .id = .morale, .laps = 1, .power = 0 });
             s.fight.morale_plus_q.push(ui);
         } else {
-            u.debuffs.push(.{ .id = .dismorale, .laps = 1, .power = 0 });
+            abilities.pushChecked(s, &u.debuffs, .{ .id = .dismorale, .laps = 1, .power = 0 });
             s.fight.morale_minus_q.push(ui);
         }
     }
@@ -1139,9 +1168,12 @@ pub fn possibleIncludes(u: *const Unit, t: u8) bool {
     return false;
 }
 
-/// TurnEngine.activateNextUnit. Returns false when the unit's poison tick killed it (it is deleted, and the caller
-/// emits unit_destroyed after next_unit_selected); the tick runs no stat refresh and grants no morale.
-fn activateNextUnit(s: *State, ui: u8) bool {
+const Activation = enum { ready, poisoned, skipped };
+
+/// TurnEngine.activateNextUnit. `poisoned`: the unit's poison tick killed it (it is deleted, and the caller emits
+/// unit_destroyed after next_unit_selected; the tick runs no stat refresh and grants no morale). `skipped`: the unit
+/// is stunned (isSkippingThisTurn), and the caller completes its turn as a skip after next_unit_selected.
+fn activateNextUnit(s: *State, ui: u8) Activation {
     const u = &s.units[ui];
     u.moved_this_turn = false;
     u.moved_route_cells = 0;
@@ -1149,26 +1181,28 @@ fn activateNextUnit(s: *State, ui: u8) bool {
     // startTurn's timers are not modelled; stacksToAct refreshes the team counts.
     for ([_]u8{ Team.LEFT, Team.RIGHT }) |side| {
         var n: i32 = 0;
-        for (s.units[0..s.n_units]) |*x| {
-            if (x.in_holder and x.team == side and !x.isDead()) n += 1;
+        for (s.holderOrder()) |i| {
+            const x = &s.units[i];
+            if (x.team == side and !x.isDead()) n += 1;
         }
         s.fight.team_units_alive[side] = n;
     }
-    // refreshPreTurnState: no Wild Regeneration or Web in scope.
+    // refreshPreTurnState: the Web lock is snapshotted now (no Wild Regeneration in scope).
+    u.web_locked = canFly(u) and u.debuffs.len != 0 and u.debuffs.find(.web_aura) != null;
     if (u.effects.len != 0) {
         if (u.effects.power(.poison)) |poison| {
             if (poison > 0) {
                 _ = applyDamage(s, ui, poison);
                 if (u.isDead()) {
                     deleteUnit(s, ui);
-                    return false;
+                    return .poisoned;
                 }
             }
         }
     }
     refreshPossibleAttackTypes(u, canLandRangeAttack(s, u));
     s.fight.first_turn_made = true;
-    return true;
+    return if (u.isStunned()) .skipped else .ready;
 }
 
 /// One list's pass of Unit.minusLap: each entry loses a lap (sentinel counts excepted) and is deleted at 0.
@@ -1194,7 +1228,7 @@ pub fn completeTurn(s: *State, ui: u8, hourglass: bool, skip: bool, events: *Eve
     const u = &s.units[ui];
     if (skip) {
         changeMorale(u, MORALE_CHANGE_FOR_SKIP, false);
-        events.push(.unit_skipped, ui);
+        events.push(.unit_skipped, u.uid);
     }
     if (!hourglass) {
         minusLap(u);
@@ -1205,7 +1239,7 @@ pub fn completeTurn(s: *State, ui: u8, hourglass: bool, skip: bool, events: *Eve
     refreshStackPowerForAllUnits(s);
     u.moved_this_turn = false;
     u.moved_route_cells = 0;
-    events.push(.turn_completed, ui);
+    events.push(.turn_completed, u.uid);
 }
 
 fn advance(s: *State, damage_dealt: bool, events: *Events) void {
@@ -1238,9 +1272,14 @@ fn advance(s: *State, damage_dealt: bool, events: *Events) void {
     if (next) |n| {
         const nu = &s.units[n];
         if (!nu.in_holder or nu.isDead()) return;
-        const alive = activateNextUnit(s, n);
-        events.push(.next_unit_selected, n);
-        if (!alive) events.push(.unit_destroyed, n);
+        const activation = activateNextUnit(s, n);
+        events.push(.next_unit_selected, nu.uid);
+        switch (activation) {
+            .ready => {},
+            .poisoned => events.push(.unit_destroyed, nu.uid),
+            // completeTurn(unit, { skipReason: "effect" }): the skip's morale, unit_skipped, the lap and turn_completed
+            .skipped => completeTurn(s, n, false, true, events),
+        }
     }
 }
 
@@ -1253,7 +1292,7 @@ const Reject = error{Rejected};
 /// validateActionUnit
 pub fn validateActionUnit(s: *const State, ui: u8) Reject!void {
     if (!s.fight.started or s.fight.finished) return error.Rejected;
-    if (!s.units[ui].in_holder) return error.Rejected;
+    if (ui >= s.n_units or !s.units[ui].in_holder) return error.Rejected;
     if (s.active >= 0 and s.active != ui) return error.Rejected;
 }
 
@@ -1269,8 +1308,9 @@ fn increaseUnitsSupplyIfNeededPerTeam(s: *State, team: u8) void {
     if (s.fight.started or s.fight.finished) return;
     const pct = s.setup[team].supply;
     if (pct <= 0) return;
-    for (s.units[0..s.n_units]) |*u| {
-        if (!u.in_holder or u.team != team) continue;
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        if (u.team != team) continue;
         u.init.amount_alive = @floor(u.init.amount_alive * (1 + pct / 100));
         u.amount_alive = u.init.amount_alive;
     }
@@ -1307,8 +1347,9 @@ fn waitTurn(s: *State, ui: u8, events: *Events) Reject!void {
     if (u.team != Team.LEFT and u.team != Team.RIGHT) return error.Rejected;
     var unacted = false;
     if (s.fight.team_units_alive[u.team] > 1) {
-        for (s.units[0..s.n_units], 0..) |*x, i| {
-            if (i != ui and x.in_holder and !x.isDead() and x.team == u.team and s.fight.made & unitBit(@intCast(i)) == 0) unacted = true;
+        for (s.holderOrder()) |i| {
+            const x = &s.units[i];
+            if (i != ui and !x.isDead() and x.team == u.team and s.fight.made & unitBit(i) == 0) unacted = true;
         }
     }
     if (!unacted or u.on_hourglass or s.fight.hourglass_q.includes(ui) or s.fight.made & unitBit(ui) != 0 or s.fight.hourglass_set & unitBit(ui) != 0) return error.Rejected;
@@ -1401,6 +1442,7 @@ pub fn applyDistanceMorale(s: *State, ui: u8, from: [2]f64, to: [2]f64) void {
 fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell) Reject!void {
     try validateTurnAction(s, ui);
     const u = &s.units[ui];
+    if (!u.canMove()) return error.Rejected; // move_not_available (the Web lock)
     if (path.len == 0) return error.Rejected;
     if (target_cells.len == 0) return error.Rejected; // the fallback is unreachable: v0.1 always supplies them
     if (!formsFootprint(target_cells, u.fw, u.fh)) return error.Rejected;
@@ -1481,6 +1523,20 @@ fn loadBuffSources(unit: std.json.Value, list: *st.SpellList) !void {
     }
 }
 
+/// The aura debuff rows' source cells from `init.units[].debuffsSources` (batch-3 recordings with setup: the Web Aura).
+fn loadDebuffSources(unit: std.json.Value, list: anytype) !void {
+    const srcs = rec.get(unit, "debuffsSources");
+    if (srcs != .array) return;
+    if (srcs.array.items.len != list.len) return error.BuffSourcesMismatch;
+    for (srcs.array.items, 0..) |e, i| {
+        const b = &list.items[i];
+        if (b.laps != st.LAPS_AURA) continue;
+        var parts = std.mem.splitScalar(u8, e.string, ';');
+        b.src_x = try storedProperty(parts.next() orelse "");
+        b.src_y = try storedProperty(parts.next() orelse "");
+    }
+}
+
 /// `init.setup.perTeam[team]` (record.ts setupState): the team's synergy values; zero without setup.
 pub fn loadTeamSetup(init: std.json.Value, team: u8) st.TeamSetup {
     var key: [4]u8 = undefined;
@@ -1508,41 +1564,113 @@ const LUCK_DEPENDENT_BLESSINGS = [_][]const u8{
     "Arrows Wingshield Blessing",
 };
 
-/// The unit's abilities from `props.abilities` and the recorded `getAbilityConfig` / `getEffectConfig` entries.
+/// The unit's abilities from `props.abilities` and the recorded `getAbilityConfig` / `getEffectConfig` entries (no aura
+/// links: loadUnitAbilities is the full loader).
 pub fn loadAbilities(init: std.json.Value, props: std.json.Value, u: *Unit) !void {
+    const names = rec.get(props, "abilities").array.items;
+    try loadAbilityRecords(init, names, names, null, u);
+}
+
+/// One configured ability (getAbilityConfig), with the default of the effect it applies.
+fn abilityRecord(init: std.json.Value, name: []const u8) !st.Ability {
+    const id = st.AbilityId.fromName(name) orelse {
+        unsupported_name = name;
+        return error.UnsupportedAbility;
+    };
+    const cfg = rec.get(rec.get(init, "abilityConfigs"), name);
+    if (cfg == .null) return error.MissingAbilityConfig;
+    var a = st.Ability{
+        .id = id,
+        .power = rec.num(rec.get(cfg, "power")),
+        .power_type = @intCast(rec.int(rec.get(cfg, "power_type"))),
+        .ty = @intCast(rec.int(rec.get(cfg, "type"))),
+        .stack_powered = rec.get(cfg, "stack_powered") == .bool and rec.get(cfg, "stack_powered").bool,
+        .skip_response = rec.get(cfg, "skip_response") == .bool and rec.get(cfg, "skip_response").bool,
+    };
+    const effect = rec.get(cfg, "effect");
+    if (effect == .string) {
+        const ecfg = rec.get(rec.get(init, "effectConfigs"), effect.string);
+        if (ecfg == .null) return error.MissingEffectConfig;
+        const laps = rec.num(rec.get(ecfg, "laps"));
+        const power = rec.num(rec.get(ecfg, "power"));
+        a.effect_laps = @floatCast(laps);
+        a.effect_power = @floatCast(power);
+        if (a.effect_laps != laps or a.effect_power != power) return error.UnsupportedEffectConfig;
+    }
+    return a;
+}
+
+/// The active ability list (`active`, the unit's Ability objects in order: config order, then what it stole) and the
+/// card names (`cards`, props.abilities: the early luck pass reads them), each ability linked to the aura effect it
+/// emits when `s` is given (loadAuras interns the defs).
+fn loadAbilityRecords(init: std.json.Value, active: []const std.json.Value, cards: []const std.json.Value, s: ?*State, u: *Unit) !void {
     u.n_abilities = 0;
     u.ability_mask = 0;
     u.luck_dependent = false;
-    for (rec.get(props, "abilities").array.items) |n| {
+    for (cards) |n| {
         for (LUCK_DEPENDENT_BLESSINGS) |name| {
             if (std.mem.eql(u8, n.string, name)) u.luck_dependent = true;
         }
-        const id = st.AbilityId.fromName(n.string) orelse {
-            unsupported_name = n.string;
-            return error.UnsupportedAbility;
-        };
-        const cfg = rec.get(rec.get(init, "abilityConfigs"), n.string);
-        if (cfg == .null) return error.MissingAbilityConfig;
-        var a = st.Ability{
-            .id = id,
-            .power = rec.num(rec.get(cfg, "power")),
-            .power_type = @intCast(rec.int(rec.get(cfg, "power_type"))),
-            .ty = @intCast(rec.int(rec.get(cfg, "type"))),
-            .stack_powered = rec.get(cfg, "stack_powered") == .bool and rec.get(cfg, "stack_powered").bool,
-            .skip_response = rec.get(cfg, "skip_response") == .bool and rec.get(cfg, "skip_response").bool,
-        };
-        const effect = rec.get(cfg, "effect");
-        if (effect == .string) {
-            const ecfg = rec.get(rec.get(init, "effectConfigs"), effect.string);
-            if (ecfg == .null) return error.MissingEffectConfig;
-            a.effect_laps = rec.num(rec.get(ecfg, "laps"));
-            a.effect_power = rec.num(rec.get(ecfg, "power"));
+    }
+    for (active) |n| {
+        var a = try abilityRecord(init, n.string);
+        if (s) |state| {
+            const aura = rec.get(rec.get(rec.get(init, "abilityConfigs"), n.string), "aura_effect");
+            if (aura == .string) a.aura = try internAura(init, state, aura.string);
         }
         if (u.n_abilities >= st.MAX_ABILITIES) return error.TooManyAbilities;
         u.abilities[u.n_abilities] = a;
         u.n_abilities += 1;
-        u.ability_mask |= id.bit();
+        u.ability_mask |= a.id.bit();
     }
+}
+
+/// loadAbilityRecords for a unit of `s`: the active list, the card names and the abilities it lost (`stolen`, names).
+pub fn loadUnitAbilities(init: std.json.Value, active: []const std.json.Value, cards: []const std.json.Value, stolen: []const std.json.Value, s: *State, u: *Unit) !void {
+    try loadAbilityRecords(init, active, cards, s, u);
+    u.n_stolen = 0;
+    for (stolen) |n| {
+        const id = st.AbilityId.fromName(n.string) orelse {
+            unsupported_name = n.string;
+            return error.UnsupportedAbility;
+        };
+        if (u.n_stolen >= st.MAX_STOLEN) return error.TooManyAbilities;
+        u.stolen[u.n_stolen] = id;
+        u.n_stolen += 1;
+    }
+}
+
+/// The State.aura_defs index of aura effect `name` (recorded `init.auraEffectConfigs`), interned on first use.
+fn internAura(init: std.json.Value, s: *State, name: []const u8) !u8 {
+    var buf: [64]u8 = undefined;
+    const buff_name = std.fmt.bufPrint(&buf, "{s} Aura", .{name}) catch return error.UnsupportedAura;
+    const buff = st.SpellId.fromName(buff_name) orelse {
+        unsupported_name = name;
+        return error.UnsupportedAura;
+    };
+    for (s.aura_defs[0..s.n_aura_defs], 0..) |d, k| {
+        if (d.buff == buff) return @intCast(k);
+    }
+    const cfg = rec.get(rec.get(init, "auraEffectConfigs"), name);
+    if (cfg == .null) return error.MissingAuraConfig;
+    const def = st.AuraDef{
+        .buff = buff,
+        .range = rec.num(rec.get(cfg, "range")),
+        .power = rec.num(rec.get(cfg, "power")),
+        .is_buff = rec.get(cfg, "is_buff") == .bool and rec.get(cfg, "is_buff").bool,
+        .power_type = @intCast(rec.int(rec.get(cfg, "power_type"))),
+    };
+    switch (def.power_type) {
+        st.PowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR, st.PowerType.POISON_ON_HIT, st.PowerType.ABSORB_DEBUFF, st.PowerType.DISABLE_FLY_MOVEMENT => {},
+        else => {
+            unsupported_name = name;
+            return error.UnsupportedAura;
+        },
+    }
+    if (s.n_aura_defs >= st.MAX_AURA_DEFS) return error.TooManyAuras;
+    s.aura_defs[s.n_aura_defs] = def;
+    s.n_aura_defs += 1;
+    return s.n_aura_defs - 1;
 }
 
 /// The unit's emitted auras from `props.aura_effects` and the recorded `init.auraEffectConfigs`, interned in
@@ -1552,48 +1680,17 @@ pub fn loadAuras(init: std.json.Value, props: std.json.Value, s: *State, u: *Uni
     const names = rec.get(props, "aura_effects");
     if (names != .array) return;
     for (names.array.items) |n| {
-        var buf: [64]u8 = undefined;
-        const buff_name = std.fmt.bufPrint(&buf, "{s} Aura", .{n.string}) catch return error.UnsupportedAura;
-        const buff = st.SpellId.fromName(buff_name) orelse {
-            unsupported_name = n.string;
-            return error.UnsupportedAura;
-        };
-        var idx: ?u8 = null;
-        for (s.aura_defs[0..s.n_aura_defs], 0..) |d, k| {
-            if (d.buff == buff) idx = @intCast(k);
-        }
-        if (idx == null) {
-            const cfg = rec.get(rec.get(init, "auraEffectConfigs"), n.string);
-            if (cfg == .null) return error.MissingAuraConfig;
-            const def = st.AuraDef{
-                .buff = buff,
-                .range = rec.num(rec.get(cfg, "range")),
-                .power = rec.num(rec.get(cfg, "power")),
-                .is_buff = rec.get(cfg, "is_buff") == .bool and rec.get(cfg, "is_buff").bool,
-                .power_type = @intCast(rec.int(rec.get(cfg, "power_type"))),
-            };
-            switch (def.power_type) {
-                st.PowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR, st.PowerType.POISON_ON_HIT, st.PowerType.ABSORB_DEBUFF => {},
-                else => {
-                    unsupported_name = n.string;
-                    return error.UnsupportedAura;
-                },
-            }
-            if (s.n_aura_defs >= st.MAX_AURA_DEFS) return error.TooManyAuras;
-            s.aura_defs[s.n_aura_defs] = def;
-            idx = s.n_aura_defs;
-            s.n_aura_defs += 1;
-        }
+        const idx = try internAura(init, s, n.string);
         if (u.n_auras >= st.MAX_UNIT_AURAS) return error.TooManyAuras;
-        u.auras[u.n_auras] = idx.?;
+        u.auras[u.n_auras] = idx;
         u.n_auras += 1;
     }
 }
 
 /// The flags that keep the ability-free path cheap (`State.blessings`, `auras`, `stat_hooks`, `augments`) and the configs
 /// read without an ability naming them (the Poison laps, the Break effect, the Ember Covenant spell), from the units
-/// already loaded into `s` and `init`'s effectConfigs / spellConfigs. Clears the Ember Covenant state. Shared by
-/// initState and the mid-battle loader (snapshot.zig).
+/// already loaded into `s` (and the summon templates) and `init`'s effectConfigs / spellConfigs. Clears the Ember
+/// Covenant state. Shared by initState and the mid-battle loader (snapshot.zig).
 pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     s.blessings = false;
     s.auras = false;
@@ -1606,22 +1703,55 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
         if (row.break_chance > 0) breaks = true;
     }
     const AB = st.AbilityId;
+    const blessing_mask = AB.luck_blessing.bit() | AB.sharpened_weapons_blessing.bit() | AB.arcane_ward_blessing.bit() | AB.rallying_volley_blessing.bit();
+    var templates: [2]?*const Unit = .{ null, null };
+    if (s.summons) |sm| {
+        for (0..2) |k| {
+            if (sm.present[k]) templates[k] = &sm.units[k];
+        }
+    }
+    var all: [st.MAX_UNITS + 2]*const Unit = undefined;
+    var n_all: usize = 0;
     for (s.units[0..s.n_units]) |*u| {
-        // The flags say what can ever happen, so they read the configured abilities, Break or not.
+        all[n_all] = u;
+        n_all += 1;
+    }
+    for (templates) |t| if (t) |u| {
+        all[n_all] = u;
+        n_all += 1;
+    };
+    for (all[0..n_all], 0..) |u, k| {
+        // The flags say what can ever happen, so they read the configured abilities, Break or not. Abilities only
+        // move between units (Predatory Assimilation), so the board's abilities cover every later holder.
         const mask = u.ability_mask;
-        if (mask & (AB.luck_blessing.bit() | AB.sharpened_weapons_blessing.bit()) != 0) s.blessings = true;
+        if (mask & blessing_mask != 0) s.blessings = true;
         if (u.n_auras != 0) s.auras = true;
         if (mask & (AB.aggr.bit() | AB.wardguard.bit()) != 0 or u.target >= 0) s.stat_hooks = true;
         if (mask & AB.ember_covenant_blessing.bit() != 0) covenant = true;
+        if (mask & AB.predatory_assimilation.bit() != 0) poisons = true;
         if (u.effects.find(.break_) != null) breaks = true;
+        // A template's aura links hold SpellId values (loadSummons): only the battle's units index aura_defs.
+        const aura_def = struct {
+            fn poison(state: *const State, template: bool, d: u8) bool {
+                if (template) return d == @intFromEnum(st.SpellId.venom_cloud_aura);
+                return state.aura_defs[d].power_type == st.PowerType.POISON_ON_HIT;
+            }
+        };
+        const template = k >= s.n_units;
+        for (u.abilities[0..u.n_abilities]) |a| {
+            if (a.aura != st.NO_AURA and aura_def.poison(s, template, a.aura)) poisons = true;
+        }
         for (u.auras[0..u.n_auras]) |d| {
-            if (s.aura_defs[d].power_type == st.PowerType.POISON_ON_HIT) poisons = true;
+            if (aura_def.poison(s, template, d)) poisons = true;
         }
         for (u.buffs.items[0..u.buffs.len]) |b| {
-            if (b.id == .luck_blessing or b.id == .sharpened_weapons_blessing) s.blessings = true;
+            if (blessingRow(b.id)) s.blessings = true;
             if (b.laps == st.LAPS_AURA) s.auras = true;
             if (b.id == .ember_covenant_blessing) covenant = true;
             if (b.id.isAugment()) s.augments = true;
+        }
+        for (u.debuffs.items[0..u.debuffs.len]) |b| {
+            if (b.laps == st.LAPS_AURA) s.auras = true;
         }
         if (u.effects.find(.poison) != null) poisons = true;
     }
@@ -1654,19 +1784,191 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
     }
 }
 
+inline fn blessingRow(id: st.SpellId) bool {
+    return switch (id) {
+        .luck_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing => true,
+        else => false,
+    };
+}
+
+/// A recorded unit (a start-state unit or a summon template: `name`, `creatureId`, `level`, `size`, `footprintW/H`,
+/// `props` and, after a setup refresh, `initialProps`) as a Unit, without its abilities, lists, position or grid
+/// registration.
+fn unitFromRecord(u: std.json.Value, name_id: u16) Unit {
+    const props = rec.get(u, "props");
+    // initialUnitProperties: recorded apart once a setup refresh has folded augments and synergies into props.
+    const base = if (rec.get(u, "initialProps") == .object) rec.get(u, "initialProps") else props;
+    const pn = struct {
+        fn f(v: std.json.Value, key: []const u8) f64 {
+            return rec.num(rec.get(v, key));
+        }
+    }.f;
+    const cid = rec.get(u, "creatureId");
+    const rv = rec.get(props, "rallying_volley_granted");
+    return .{
+        .in_holder = true,
+        .creature_id = if (cid == .integer) @intCast(cid.integer) else 0,
+        .team = @intCast(rec.int(rec.get(u, "team"))),
+        .faction = @intCast(rec.int(rec.get(props, "faction"))),
+        .level = @intCast(rec.int(rec.get(u, "level"))),
+        .size = @intCast(rec.int(rec.get(u, "size"))),
+        .fw = @intCast(rec.int(rec.get(u, "footprintW"))),
+        .fh = @intCast(rec.int(rec.get(u, "footprintH"))),
+        .attack_type = @intCast(rec.int(rec.get(props, "attack_type"))),
+        .attack_type_selected = @intCast(rec.int(rec.get(props, "attack_type_selected"))),
+        .movement_type = @intCast(rec.int(rec.get(props, "movement_type"))),
+        .base = .{ .x = 0, .y = 0 },
+        .pos_x = 0,
+        .pos_y = 0,
+        .cells = undefined,
+        .n_cells = 0,
+        .max_hp = pn(props, "max_hp"),
+        .hp = pn(props, "hp"),
+        .steps = pn(props, "steps"),
+        .steps_mod = pn(props, "steps_mod"),
+        .morale = pn(props, "morale"),
+        .luck = pn(props, "luck"),
+        .initiative = pn(props, "initiative"),
+        .armor_mod = pn(props, "armor_mod"),
+        .base_armor = pn(props, "base_armor"),
+        .range_armor = pn(props, "range_armor"),
+        .base_attack = pn(props, "base_attack"),
+        .attack_mod = pn(props, "attack_mod"),
+        .attack_damage_min = pn(props, "attack_damage_min"),
+        .attack_damage_max = pn(props, "attack_damage_max"),
+        .attack_range = pn(props, "attack_range"),
+        .range_shots = pn(props, "range_shots"),
+        .range_shots_mod = pn(props, "range_shots_mod"),
+        .shot_distance = pn(props, "shot_distance"),
+        .magic_resist = pn(props, "magic_resist"),
+        .magic_resist_mod = pn(props, "magic_resist_mod"),
+        .exp = pn(props, "exp"),
+        .amount_alive = pn(props, "amount_alive"),
+        .amount_died = pn(props, "amount_died"),
+        .luck_mod = pn(props, "luck_mod"),
+        .attack_multiplier = pn(props, "attack_multiplier"),
+        .stack_power = pn(props, "stack_power"),
+        .responded = false,
+        .on_hourglass = false,
+        .moved_this_turn = false,
+        .buffs = .{},
+        .debuffs = .{},
+        .effects = .{},
+        .init = .{
+            .max_hp = pn(base, "max_hp"),
+            .luck = pn(base, "luck"),
+            .morale = pn(base, "morale"),
+            .base_armor = pn(base, "base_armor"),
+            .armor_mod = pn(base, "armor_mod"),
+            .base_attack = pn(base, "base_attack"),
+            .attack_mod = pn(base, "attack_mod"),
+            .attack_damage_min = pn(base, "attack_damage_min"),
+            .attack_damage_max = pn(base, "attack_damage_max"),
+            .steps = pn(base, "steps"),
+            .initiative = pn(base, "initiative"),
+            .magic_resist = pn(base, "magic_resist"),
+            .shot_distance = pn(base, "shot_distance"),
+            .amount_alive = pn(base, "amount_alive"),
+        },
+        .luck_per_turn = 0,
+        .adjusted_laps = 0,
+        .dist_known = false,
+        .dist_closest_enemy = 0,
+        .name_id = name_id,
+        .possible = .{ 0, 0, 0, 0 },
+        .n_possible = 0,
+        .reg = undefined,
+        .n_reg = 0,
+        .abilities = undefined,
+        .n_abilities = 0,
+        .ability_mask = 0,
+        .luck_dependent = false,
+        .moved_route_cells = 0,
+        .target = -1,
+        .auras = undefined,
+        .n_auras = 0,
+        .syn_power = 0,
+        .rallying_volley_granted = if (rv == .null) 0 else rec.num(rv),
+    };
+}
+
+/// Interned summon templates (zig/parity/record.ts `init.summonTemplates`, state_export.ts `configs.summonTemplates`):
+/// one immutable copy per distinct template text, shared by every State that points at it (process lifetime). Their
+/// auras and abilities' aura links hold SpellId values (the defs are interned per battle: spawnInfested maps them).
+var summons_lock: std.Thread.Mutex = .{};
+var summons_registry: std.ArrayList(struct { text: []u8, summons: *st.Summons }) = .empty;
+
+/// The summon templates of `cfg` (an object with "Arachna Spider" / "Arachna Queen" entries, configs alongside in
+/// `init`), interned, with their aura defs interned in `s` too. Null when `cfg` is not an object.
+pub fn loadSummons(init: std.json.Value, cfg: std.json.Value, s: *State) !?*const st.Summons {
+    if (cfg != .object) return null;
+    var sm: st.Summons = std.mem.zeroes(st.Summons);
+    const names = [2][]const u8{ "Arachna Spider", "Arachna Queen" };
+    for (names, 0..) |name, k| {
+        const t = rec.get(cfg, name);
+        if (t != .object) continue;
+        const props = rec.get(t, "props");
+        var u = unitFromRecord(t, 0);
+        u.in_holder = false;
+        const abil = rec.get(props, "abilities").array.items;
+        try loadUnitAbilities(init, abil, abil, &.{}, s, &u);
+        try loadAuras(init, props, s, &u);
+        // Template form: aura links as SpellId values.
+        for (u.abilities[0..u.n_abilities]) |*a| {
+            if (a.aura != st.NO_AURA) a.aura = @intFromEnum(s.aura_defs[a.aura].buff);
+        }
+        for (u.auras[0..u.n_auras]) |*d| d.* = @intFromEnum(s.aura_defs[d.*].buff);
+        sm.units[k] = u;
+        sm.present[k] = true;
+    }
+    var text: std.Io.Writer.Allocating = .init(std.heap.page_allocator);
+    defer text.deinit();
+    std.json.Stringify.value(cfg, .{}, &text.writer) catch return error.OutOfMemory;
+    summons_lock.lock();
+    defer summons_lock.unlock();
+    for (summons_registry.items) |e| {
+        if (std.mem.eql(u8, e.text, text.written())) return e.summons;
+    }
+    const owned = try std.heap.page_allocator.dupe(u8, text.written());
+    const copy = try std.heap.page_allocator.create(st.Summons);
+    copy.* = sm;
+    try summons_registry.append(std.heap.page_allocator, .{ .text = owned, .summons = copy });
+    return copy;
+}
+
+/// The name id a summon's creature takes: the board's own when a start unit has that name, else a fresh one.
+pub fn summonNameIds(s: *State, names: []const []const u8) void {
+    const summon_names = [2][]const u8{ "Arachna Spider", "Arachna Queen" };
+    var next: u16 = @intCast(names.len);
+    for (summon_names, 0..) |n, k| {
+        s.summon_name_id[k] = next;
+        for (names, 0..) |known, i| {
+            if (std.mem.eql(u8, known, n)) s.summon_name_id[k] = @intCast(i);
+        }
+        if (s.summon_name_id[k] == next) next += 1;
+    }
+}
+
 pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
     var s: st.State = undefined;
     s.n_aura_defs = 0;
+    s.overflow = false;
+    s.summons = null;
+    s.summon_seq = 0;
+    s.n_holder = 0;
     const units = rec.get(init, "units").array.items;
     if (units.len > st.MAX_UNITS) return error.TooManyUnits;
     s.n_units = @intCast(units.len);
+    s.next_uid = @intCast(units.len);
+    // The battle seed (a summon id's second part): record.ts writes it as the start state's rosterSeed.
+    const seed = rec.get(init, "rosterSeed");
+    s.has_seed = seed == .integer;
+    s.seed = if (s.has_seed) @floatFromInt(seed.integer) else 0;
     var names: [st.MAX_UNITS][]const u8 = undefined;
     var n_names: u16 = 0;
     for (&s.setup, 0..) |*row, t| row.* = loadTeamSetup(init, @intCast(t));
     for (units, 0..) |u, i| {
         const props = rec.get(u, "props");
-        // initialUnitProperties: recorded apart once a setup refresh has folded augments and synergies into props.
-        const base = if (rec.get(u, "initialProps") == .object) rec.get(u, "initialProps") else props;
         const pos = rec.get(u, "position");
         const name = rec.get(u, "name").string;
         var name_id: u16 = n_names;
@@ -1677,100 +1979,24 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
             names[n_names] = name;
             n_names += 1;
         }
-        const pn = struct {
-            fn f(v: std.json.Value, key: []const u8) f64 {
-                return rec.num(rec.get(v, key));
-            }
-        }.f;
-        const cid = rec.get(u, "creatureId");
-        s.units[i] = .{
-            .in_holder = true,
-            .creature_id = if (cid == .integer) @intCast(cid.integer) else 0,
-            .team = @intCast(rec.int(rec.get(u, "team"))),
-            .faction = @intCast(rec.int(rec.get(props, "faction"))),
-            .level = @intCast(rec.int(rec.get(u, "level"))),
-            .size = @intCast(rec.int(rec.get(u, "size"))),
-            .fw = @intCast(rec.int(rec.get(u, "footprintW"))),
-            .fh = @intCast(rec.int(rec.get(u, "footprintH"))),
-            .attack_type = @intCast(rec.int(rec.get(props, "attack_type"))),
-            .attack_type_selected = @intCast(rec.int(rec.get(props, "attack_type_selected"))),
-            .movement_type = @intCast(rec.int(rec.get(props, "movement_type"))),
-            .base = .{ .x = 0, .y = 0 },
-            .pos_x = rec.num(rec.get(pos, "x")),
-            .pos_y = rec.num(rec.get(pos, "y")),
-            .cells = undefined,
-            .n_cells = 0,
-            .max_hp = pn(props, "max_hp"),
-            .hp = pn(props, "hp"),
-            .steps = pn(props, "steps"),
-            .steps_mod = pn(props, "steps_mod"),
-            .morale = pn(props, "morale"),
-            .luck = pn(props, "luck"),
-            .initiative = pn(props, "initiative"),
-            .armor_mod = pn(props, "armor_mod"),
-            .base_armor = pn(props, "base_armor"),
-            .range_armor = pn(props, "range_armor"),
-            .base_attack = pn(props, "base_attack"),
-            .attack_mod = pn(props, "attack_mod"),
-            .attack_damage_min = pn(props, "attack_damage_min"),
-            .attack_damage_max = pn(props, "attack_damage_max"),
-            .attack_range = pn(props, "attack_range"),
-            .range_shots = pn(props, "range_shots"),
-            .range_shots_mod = pn(props, "range_shots_mod"),
-            .shot_distance = pn(props, "shot_distance"),
-            .magic_resist = pn(props, "magic_resist"),
-            .magic_resist_mod = pn(props, "magic_resist_mod"),
-            .exp = pn(props, "exp"),
-            .amount_alive = pn(props, "amount_alive"),
-            .amount_died = pn(props, "amount_died"),
-            .luck_mod = pn(props, "luck_mod"),
-            .attack_multiplier = pn(props, "attack_multiplier"),
-            .stack_power = pn(props, "stack_power"),
-            .responded = false,
-            .on_hourglass = false,
-            .moved_this_turn = false,
-            .buffs = .{},
-            .debuffs = .{},
-            .effects = .{},
-            .init = .{
-                .max_hp = pn(base, "max_hp"),
-                .luck = pn(base, "luck"),
-                .morale = pn(base, "morale"),
-                .base_armor = pn(base, "base_armor"),
-                .armor_mod = pn(base, "armor_mod"),
-                .base_attack = pn(base, "base_attack"),
-                .attack_mod = pn(base, "attack_mod"),
-                .attack_damage_min = pn(base, "attack_damage_min"),
-                .attack_damage_max = pn(base, "attack_damage_max"),
-                .steps = pn(base, "steps"),
-                .initiative = pn(base, "initiative"),
-                .magic_resist = pn(base, "magic_resist"),
-                .shot_distance = pn(base, "shot_distance"),
-                .amount_alive = pn(base, "amount_alive"),
-            },
-            .luck_per_turn = 0,
-            .adjusted_laps = 0,
-            .dist_known = false,
-            .dist_closest_enemy = 0,
-            .name_id = name_id,
-            .possible = .{ 0, 0, 0, 0 },
-            .n_possible = 0,
-            .reg = undefined,
-            .n_reg = 0,
-            .abilities = undefined,
-            .n_abilities = 0,
-            .ability_mask = 0,
-            .luck_dependent = false,
-            .moved_route_cells = 0,
-            .target = -1,
-            .auras = undefined,
-            .n_auras = 0,
-            .syn_power = 0,
-        };
+        s.units[i] = unitFromRecord(u, name_id);
         const unit = &s.units[i];
+        unit.pos_x = rec.num(rec.get(pos, "x"));
+        unit.pos_y = rec.num(rec.get(pos, "y"));
+        unit.uid = @intCast(i);
+        if (i < ids.len) {
+            if (@import("uuid.zig").parse(ids[i])) |b| {
+                unit.uuid = b;
+                unit.uuid_ok = true;
+            }
+        }
+        s.holder[i] = @intCast(i);
+        s.n_holder += 1;
         if (unit.team > Team.LEFT) return error.UnsupportedTeam;
         unit.syn_power = s.setup[unit.team].ability_power;
-        try loadAbilities(init, props, unit);
+        const abil = rec.get(props, "abilities").array.items;
+        const stolen = rec.get(props, "stolen_abilities");
+        try loadUnitAbilities(init, abil, abil, if (stolen == .array) stolen.array.items else &.{}, &s, unit);
         try loadAuras(init, props, &s, unit);
         const target = rec.get(props, "target");
         if (target == .string and target.string.len > 0) unit.target = @intCast(try rec.unitIndex(ids, target.string));
@@ -1778,7 +2004,10 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
         unit.debuffs = try loadSpells(@TypeOf(unit.debuffs), props, "debuffs");
         unit.effects = try loadSpells(@TypeOf(unit.effects), props, "effects");
         try loadBuffSources(u, &unit.buffs);
+        try loadDebuffSources(u, &unit.debuffs);
     }
+    s.summons = try loadSummons(init, rec.get(init, "summonTemplates"), &s);
+    summonNameIds(&s, names[0..n_names]);
     try loadScopeFlags(&s, init);
     // Grid: stamp the terrain, register each unit's placement cells, then build the threat boards from them.
     for (0..st.GRID) |x| {
@@ -1820,8 +2049,196 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
     return s;
 }
 
-/// Applies one top-level engine call, then updates the harness's active unit from the events (runMatch.applyEvents).
-/// Returns whether the TypeScript engine accepts the call.
+// =====================================================================================================================
+// Summons (GameActionEngine.spawnInfestedUnit, runMatch's createSummonedUnit, UnitsHolder.addUnit)
+// =====================================================================================================================
+
+/// A slot a new unit can take, the lowest first: a removed unit's slot that the turn sets no longer name, else a
+/// removed unit's slot whose set memberships move to Fight.removed_* (they keep removed ids until the lap flips), else
+/// the next unused slot. The active unit's slot is never taken (its completeTurn is still to come).
+pub fn allocSlot(s: *State) ?u8 {
+    const f = &s.fight;
+    const named = f.made | f.hourglass_set | f.replied;
+    for (s.units[0..s.n_units], 0..) |*u, i| {
+        if (u.in_holder or named & unitBit(@intCast(i)) != 0 or s.active == @as(i8, @intCast(i))) continue;
+        return @intCast(i);
+    }
+    for (s.units[0..s.n_units], 0..) |*u, i| {
+        if (u.in_holder or s.active == @as(i8, @intCast(i))) continue;
+        const bit = unitBit(@intCast(i));
+        if (f.made & bit != 0) f.removed_made.add(u.uid);
+        if (f.hourglass_set & bit != 0) f.removed_hourglass.add(u.uid);
+        if (f.replied & bit != 0) f.removed_replied.add(u.uid);
+        f.made &= ~bit;
+        f.hourglass_set &= ~bit;
+        f.replied &= ~bit;
+        return @intCast(i);
+    }
+    if (s.n_units >= st.MAX_UNITS) return null;
+    s.n_units += 1;
+    return s.n_units - 1;
+}
+
+/// What spawnInfested reads of the killer: its Infest (hasAbilityActive, read at cleanup), team and id.
+pub const Killer = struct { infest: bool, team: u8, uuid: [16]u8, uuid_ok: bool };
+
+pub fn killerOf(u: *const Unit) Killer {
+    return .{ .infest = u.ability_mask & st.AbilityId.infest.bit() != 0 and u.has(.infest), .team = u.team, .uuid = u.uuid, .uuid_ok = u.uuid_ok };
+}
+
+/// GameActionEngine.spawnInfestedUnit: the corpse of a direct kill by an Infest holder raises an "Arachna Spider"
+/// (level 1-3) or an "Arachna Queen" (level 4) of one creature on the killer's team, on the corpse's cells when they
+/// fit its footprint, else on the corpse's anchor; it joins the holder last (Map.set) with a fresh uid and the id
+/// createSummonedUnit hashes (the sequence counts every call, a failed placement too). No augments, Life supply or
+/// events; its first stat refresh (the step's completeTurn) rolls its lap luck after everyone else's.
+pub fn spawnInfested(s: *State, killer: *const Killer, corpse_level: u8, corpse: []const Cell) void {
+    if (corpse.len == 0) return;
+    const which: usize = if (corpse_level == 4) st.Summons.QUEEN else if (corpse_level >= 1 and corpse_level <= 3) st.Summons.SPIDER else return;
+    const sm = s.summons orelse {
+        s.overflow = true; // the recording carries no template: the battle cannot be followed
+        return;
+    };
+    if (!sm.present[which]) {
+        s.overflow = true;
+        return;
+    }
+    const sequence = s.summon_seq;
+    s.summon_seq += 1;
+    var nu = sm.units[which];
+    // resolveSummonCells unless the corpse cells already form the footprint (getFootprintAnchorForCells otherwise).
+    var cells: Cells = .{};
+    if (formsFootprint(corpse, nu.fw, nu.fh)) {
+        for (corpse) |c| cells.push(c);
+    } else {
+        const a = anchorForCells(corpse);
+        if (isSmall(&nu)) {
+            cells.push(a);
+        } else if (nu.fw == 2 and nu.fh == 2) {
+            cells.push(.{ .x = a.x - 1, .y = a.y });
+            cells.push(a);
+            cells.push(.{ .x = a.x - 1, .y = a.y - 1 });
+            cells.push(.{ .x = a.x, .y = a.y - 1 });
+        } else cells = cellsForAnchor(a, nu.fw, nu.fh);
+    }
+    const pos = positionForCells(cells.slice()) orelse return;
+    // Grid.occupyCells: every cell on the board and empty (the summon owns none yet).
+    for (cells.slice()) |c| {
+        if (!cellWithinGrid(c) or occ(s, c) != st.EMPTY) return;
+    }
+    if (!killer.uuid_ok or !s.has_seed or s.next_uid >= st.MAX_UIDS) {
+        s.overflow = true; // no canonical summoner id or battle seed to hash, or out of uids
+        return;
+    }
+    const slot = allocSlot(s) orelse {
+        s.overflow = true;
+        return;
+    };
+    nu.uid = s.next_uid;
+    s.next_uid += 1;
+    nu.uuid = @import("uuid.zig").summonId(@intFromFloat(s.seed), killer.team, 3, if (which == st.Summons.QUEEN) "Arachna Queen" else "Arachna Spider", &killer.uuid, "Infest", sequence);
+    nu.uuid_ok = true;
+    nu.in_holder = true;
+    nu.team = killer.team;
+    nu.syn_power = s.setup[nu.team].ability_power;
+    nu.name_id = s.summon_name_id[which];
+    nu.pos_x = pos[0];
+    nu.pos_y = pos[1];
+    nu.n_reg = 0;
+    // Template form to this battle's aura defs.
+    for (nu.abilities[0..nu.n_abilities]) |*a| {
+        if (a.aura != st.NO_AURA) a.aura = auraDefFor(s, a.aura);
+    }
+    for (nu.auras[0..nu.n_auras]) |*d| d.* = auraDefFor(s, d.*);
+    s.units[slot] = nu;
+    _ = occupyCells(s, slot, cells.slice());
+    s.holder[s.n_holder] = slot;
+    s.n_holder += 1;
+    // A slot carries no AI target memory from a previous occupant (TypeScript's memory names the dead id).
+    s.ai_prev_target[slot] = -1;
+    for (&s.ai_prev_target) |*t| {
+        if (t.* == @as(i8, @intCast(slot))) t.* = -1;
+    }
+    // UnitsHolder.addUnit: a covenant team's newcomer joins the ring (a Queen's team never holds one in scope).
+    const u = &s.units[slot];
+    if (s.ember_teams & (@as(u8, 1) << @intCast(u.team)) != 0 and !u.isDead() and cellWithinGrid(baseCell(u))) {
+        abilities.pushChecked(s, &u.buffs, .{ .id = .ember_covenant_blessing, .laps = s.ember_laps, .power = s.ember_power });
+    }
+}
+
+/// The aura def of a template aura (a SpellId value) in this battle.
+fn auraDefFor(s: *const State, buff: u8) u8 {
+    for (s.aura_defs[0..s.n_aura_defs], 0..) |d, k| {
+        if (@intFromEnum(d.buff) == buff) return @intCast(k);
+    }
+    return 0;
+}
+
+// =====================================================================================================================
+// Unit identities: recorded actions name uids, the engine works on slots
+// =====================================================================================================================
+
+/// A slot no unit holds: an action naming a unit outside the battle is refused (as an unknown id is).
+pub const NO_SLOT: u8 = 0xff;
+
+fn slotOrNone(s: *const State, uid: u8) u8 {
+    return s.slotOf(uid) orelse NO_SLOT;
+}
+
+/// A recorded action (units named by uid, the recording's index) with its units as slots. Identity without summons.
+pub fn actionToSlots(s: *const State, a: rec.Action) rec.Action {
+    var out = a;
+    switch (out) {
+        .start_fight, .advance => {},
+        .end_turn => |*x| x.unit = slotOrNone(s, x.unit),
+        .wait_turn => |*x| x.unit = slotOrNone(s, x.unit),
+        .defend_turn => |*x| x.unit = slotOrNone(s, x.unit),
+        .select_attack_type => |*x| x.unit = slotOrNone(s, x.unit),
+        .move_unit => |*x| x.unit = slotOrNone(s, x.unit),
+        .melee_attack => |*x| {
+            x.attacker = slotOrNone(s, x.attacker);
+            x.target = slotOrNone(s, x.target);
+        },
+        .range_attack => |*x| {
+            x.attacker = slotOrNone(s, x.attacker);
+            x.target = slotOrNone(s, x.target);
+        },
+        .obstacle_attack => |*x| x.attacker = slotOrNone(s, x.attacker),
+        .decide => |*x| x.unit = slotOrNone(s, x.unit),
+    }
+    return out;
+}
+
+inline fn uidOf(s: *const State, slot: u8) u8 {
+    return if (slot < s.n_units) s.units[slot].uid else slot;
+}
+
+/// An engine action (units as slots) with its units named by uid, as recordings name them (`decide`'s actions are
+/// left as they are: use it per action).
+pub fn actionToUids(s: *const State, a: rec.Action) rec.Action {
+    var out = a;
+    switch (out) {
+        .start_fight, .advance => {},
+        .end_turn => |*x| x.unit = uidOf(s, x.unit),
+        .wait_turn => |*x| x.unit = uidOf(s, x.unit),
+        .defend_turn => |*x| x.unit = uidOf(s, x.unit),
+        .select_attack_type => |*x| x.unit = uidOf(s, x.unit),
+        .move_unit => |*x| x.unit = uidOf(s, x.unit),
+        .melee_attack => |*x| {
+            x.attacker = uidOf(s, x.attacker);
+            x.target = uidOf(s, x.target);
+        },
+        .range_attack => |*x| {
+            x.attacker = uidOf(s, x.attacker);
+            x.target = uidOf(s, x.target);
+        },
+        .obstacle_attack => |*x| x.attacker = uidOf(s, x.attacker),
+        .decide => |*x| x.unit = uidOf(s, x.unit),
+    }
+    return out;
+}
+
+/// Applies one top-level engine call (units as slots), then updates the harness's active unit from the events
+/// (runMatch.applyEvents; events name uids). Returns whether the TypeScript engine accepts the call.
 pub fn apply(s: *State, action: rec.Action, events: *Events) bool {
     const ok: bool = switch (action) {
         .start_fight => startFight(s),
@@ -1840,13 +2257,14 @@ pub fn apply(s: *State, action: rec.Action, events: *Events) bool {
         .decide => true, // AI decisions are not engine calls
     };
     for (events.slice()) |e| {
+        const active_uid: i32 = if (s.active >= 0) s.units[@intCast(s.active)].uid else -1;
         switch (e.kind) {
-            .next_unit_selected => s.active = @intCast(e.arg),
-            .turn_completed => if (s.active == e.arg) {
+            .next_unit_selected => s.active = if (s.slotOf(@intCast(e.arg))) |slot| @intCast(slot) else -1,
+            .turn_completed => if (active_uid == e.arg) {
                 s.active = -1;
             },
             .fight_finished => s.active = -1,
-            .unit_destroyed => if (s.active == e.arg) {
+            .unit_destroyed => if (active_uid == e.arg) {
                 s.active = -1;
             },
             else => {},

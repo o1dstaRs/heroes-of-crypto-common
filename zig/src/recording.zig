@@ -51,7 +51,10 @@ pub const Step = struct {
 
 pub const Game = struct {
     seed: i64,
+    /// Unit ids by uid: the start state's units, then the summoned units in creation order (`summonIds`).
     ids: [][]const u8,
+    /// The start state's unit count (the first summon's uid).
+    n_start: usize = 0,
     init: std.json.Value,
     steps: []Step,
 };
@@ -227,8 +230,12 @@ pub fn parseGameValue(arena: std.mem.Allocator, root: std.json.Value, keep_diges
     parse_seed = int(get(root, "seed"));
     const init = get(root, "init");
     const units = get(init, "units").array.items;
-    const ids = try arena.alloc([]const u8, units.len);
+    const summon_ids = get(root, "summonIds");
+    const n_summons = if (summon_ids == .array) summon_ids.array.items.len else 0;
+    if (units.len + n_summons > 255) return error.TooManyUnits;
+    const ids = try arena.alloc([]const u8, units.len + n_summons);
     for (units, 0..) |u, i| ids[i] = get(u, "id").string;
+    for (0..n_summons) |i| ids[units.len + i] = summon_ids.array.items[i].string;
 
     const raw_steps = get(root, "steps").array.items;
     const steps = try arena.alloc(Step, raw_steps.len);
@@ -254,7 +261,7 @@ pub fn parseGameValue(arena: std.mem.Allocator, root: std.json.Value, keep_diges
             .digest = if (keep_digests and get(s, "s") != .null) get(s, "s") else null,
         };
     }
-    return .{ .seed = int(get(root, "seed")), .ids = ids, .init = init, .steps = steps };
+    return .{ .seed = int(get(root, "seed")), .ids = ids, .n_start = units.len, .init = init, .steps = steps };
 }
 
 /// Iterates the non-empty lines of a JSONL buffer.

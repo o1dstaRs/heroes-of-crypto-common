@@ -6,14 +6,20 @@
 const std = @import("std");
 const Rng = @import("rng.zig").Rng;
 
+/// Unit slots: the units in the holder plus the removed ones the turn sets still name this lap. A summon takes a free
+/// slot (`engine.allocSlot`), so a battle can create more units than this over its course.
 pub const MAX_UNITS = 32;
+/// Distinct unit ids one battle can name (start units and summons): `Unit.uid` and recorded unit indices are u8.
+pub const MAX_UIDS = 255;
 pub const GRID = 16;
-/// Buffs a unit can carry in scope: Morale, Luck Blessing, Sharpened Weapons, Ember Covenant, three aura rows and
-/// the five augments.
-pub const MAX_SPELLS = 12;
-/// Debuffs (Dismorale, Dulling Defense) and effects (Shatter Armor, Poison, Aggr, Pegasus Light, Break), with room.
-pub const MAX_DEBUFFS = 4;
-pub const MAX_EFFECTS = 6;
+/// Buffs a unit can carry in scope: Morale, Luck Blessing, Arcane Ward, Sharpened Weapons (melee or magic units) or
+/// Rallying Volley (shooters), Ember Covenant, three aura rows and the five augments (13), with one to spare. A push
+/// past a capacity sets State.overflow (the checks report it).
+pub const MAX_SPELLS = 14;
+/// Debuffs (Dismorale, Dulling Defense, Miner, the Web Aura row) and effects (Stun, Break, Poison, Aggr, Shatter
+/// Armor, Pegasus Light), one to spare each.
+pub const MAX_DEBUFFS = 5;
+pub const MAX_EFFECTS = 7;
 
 pub const Team = struct {
     pub const NO_TEAM: u8 = 0;
@@ -56,6 +62,15 @@ pub const SpellId = enum(u8) {
     pegasus_light,
     /// The Chaos break-on-attack effect (effects.json "Break"): every ability is off while it lasts.
     break_,
+    // batch 3
+    /// Squire's Stun effect: the unit skips its next activation and cannot respond.
+    stun,
+    arcane_ward_blessing,
+    rallying_volley_blessing,
+    /// Troglodyte's display debuff on a mined unit (laps 15, power = the armor taken from it).
+    miner,
+    /// The Arachna Queen's aura row on enemy flyers (a debuff, MAX_SAFE_INTEGER laps).
+    web_aura,
     armor_augment,
     might_augment,
     sniper_augment,
@@ -79,6 +94,11 @@ pub const SpellId = enum(u8) {
             .aggr => "Aggr",
             .pegasus_light => "Pegasus Light",
             .break_ => "Break",
+            .stun => "Stun",
+            .arcane_ward_blessing => "Arcane Ward Blessing",
+            .rallying_volley_blessing => "Rallying Volley Blessing",
+            .miner => "Miner",
+            .web_aura => "Web Aura",
             .armor_augment => "Armor Augment",
             .might_augment => "Might Augment",
             .sniper_augment => "Sniper Augment",
@@ -111,8 +131,9 @@ pub const NUMBER_OF_LAPS_TOTAL: f64 = 15;
 /// first), so both always agree and one record holds them.
 pub const AppliedSpell = struct {
     id: SpellId,
-    /// firstSpellProperty / secondSpellProperty: an aura row's source cell (the emitter's base cell), the Sniper
-    /// Augment's base-attack and shot-distance percentages (27 and 70 at level 3), else -1 (undefined).
+    /// firstSpellProperty / secondSpellProperty: an aura row's source cell (the emitter's base cell, buff or debuff
+    /// rows), the Sniper Augment's base-attack and shot-distance percentages (27 and 70 at level 3), else -1
+    /// (undefined). Rows that store their power there (the census blessings, Miner) keep it as the row's power.
     src_x: i8 = -1,
     src_y: i8 = -1,
     laps: f64,
@@ -176,7 +197,10 @@ pub fn SpellListN(comptime cap: u8) type {
 // Abilities (src/abilities/ability_properties.ts, the creature configs in src/configuration)
 // =====================================================================================================================
 
-pub const MAX_ABILITIES = 4;
+/// Active abilities per unit: three native ones plus what Predatory Assimilation steals (8 seen on one Queen).
+pub const MAX_ABILITIES = 10;
+/// Abilities a unit can lose to Predatory Assimilation (props.stolen_abilities).
+pub const MAX_STOLEN = 6;
 pub const AbilityMask = u64;
 
 /// The abilities the port implements. A recorded unit carrying any other ability is refused at load.
@@ -209,6 +233,21 @@ pub const AbilityId = enum(u8) {
     earth_element,
     vine_throw,
     in_its_own_world,
+    // batch 3
+    handyman,
+    chakram,
+    rallying_volley_blessing,
+    web_aura,
+    infest,
+    predatory_assimilation,
+    stun,
+    arcane_ward_blessing,
+    madness,
+    blind_fury,
+    miner,
+    magic_shield,
+    borrowed_grace,
+    absolving_arrow,
 
     pub fn name(self: AbilityId) []const u8 {
         return switch (self) {
@@ -239,6 +278,20 @@ pub const AbilityId = enum(u8) {
             .earth_element => "Earth Element",
             .vine_throw => "Vine Throw",
             .in_its_own_world => "In Its Own World",
+            .handyman => "Handyman",
+            .chakram => "Chakram",
+            .rallying_volley_blessing => "Rallying Volley Blessing",
+            .web_aura => "Web Aura",
+            .infest => "Infest",
+            .predatory_assimilation => "Predatory Assimilation",
+            .stun => "Stun",
+            .arcane_ward_blessing => "Arcane Ward Blessing",
+            .madness => "Madness",
+            .blind_fury => "Blind Fury",
+            .miner => "Miner",
+            .magic_shield => "Magic Shield",
+            .borrowed_grace => "Borrowed Grace",
+            .absolving_arrow => "Absolving Arrow",
         };
     }
 
@@ -255,8 +308,9 @@ pub const AbilityId = enum(u8) {
     }
 };
 
-pub const MAX_AURA_DEFS = 4;
-pub const MAX_UNIT_AURAS = 2;
+pub const MAX_AURA_DEFS = 6;
+/// Aura effects one unit emits: its own, plus the ones it stole (a Queen: Web and two stolen ones seen).
+pub const MAX_UNIT_AURAS = 4;
 
 /// One aura effect (aura_effects.json, recorded in `init.auraEffectConfigs`): the buff row it grants on its
 /// recipients ("<effect> Aura") and its configured range, default power, recipient side and power type.
@@ -287,21 +341,28 @@ pub const PowerType = struct {
     pub const MAGIC_DAMAGE: u8 = 41;
     pub const ADDITIONAL_BASE_ATTACK_AND_ARMOR: u8 = 32;
     pub const POISON_ON_HIT: u8 = 56;
+    /// The Web aura (Arachna Queen): it lands only on flyers and carries no power.
+    pub const DISABLE_FLY_MOVEMENT: u8 = 51;
     pub const GAIN_ATTACK_AND_ARMOR_EACH_STEP: u8 = 44;
     pub const REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK: u8 = 47;
 };
 
-/// One configured ability (getAbilityConfig(name)), plus the default of the effect it applies, if any.
+/// One configured ability (getAbilityConfig(name)), plus the default of the effect it applies, if any (effects.json
+/// laps and powers are small integers, so f32 holds them exactly).
 pub const Ability = struct {
-    id: AbilityId,
     power: f64,
+    effect_laps: f32 = 0,
+    effect_power: f32 = 0,
+    id: AbilityId,
     power_type: u8,
     ty: u8,
     stack_powered: bool,
     skip_response: bool,
-    effect_laps: f64 = 0,
-    effect_power: f64 = 0,
+    /// The aura effect it emits (an index into State.aura_defs), or NO_AURA.
+    aura: u8 = NO_AURA,
 };
+
+pub const NO_AURA: u8 = 0xff;
 
 /// `initialUnitProperties`: the base values every stat refresh recomputes from (recorded `initialProps`; older
 /// recordings, made without setup, take them from `props`). In scope `morale` changes (morale moves), `base_attack`
@@ -345,6 +406,13 @@ pub const TeamSetup = struct {
 
 pub const Unit = struct {
     in_holder: bool,
+    /// The unit's per-battle identity (never reused): start units take their start-state index, each summon the next
+    /// one (State.next_uid). Recordings and handles name units by uid; slots (indices into State.units) are reused.
+    uid: u8 = 0,
+    /// The unit id as 16 bytes when it is a canonical lowercase UUID (`uuid_ok`): summon ids hash their summoner's id,
+    /// and Chakram breaks bearing ties by id order.
+    uuid: [16]u8 = .{0} ** 16,
+    uuid_ok: bool = false,
     /// PBTypes.CreatureVals of the unit's creature (recorded `creatureId`; 0 in recordings that predate it).
     creature_id: u16,
     team: u8,
@@ -429,6 +497,13 @@ pub const Unit = struct {
     /// getAdditionalAbilityPowerPerTeam(team): the synergy power every ability formula of this unit adds (the
     /// owner's team at every call site in scope; State.setup[team].ability_power).
     syn_power: f64,
+    /// props.rallying_volley_granted: the Rallying Volley arrows already added to range_shots (0 or 2, once per unit).
+    rallying_volley_granted: f64 = 0,
+    /// props.web_movement_locked: refreshPreTurnState's snapshot at activation (a flyer under a Web Aura row).
+    web_locked: bool = false,
+    /// props.stolen_abilities: the abilities Predatory Assimilation took from this unit, in order.
+    stolen: [MAX_STOLEN]AbilityId = undefined,
+    n_stolen: u8 = 0,
 
     pub fn isDead(self: *const Unit) bool {
         return self.amount_alive <= 0;
@@ -456,6 +531,23 @@ pub const Unit = struct {
     pub inline fn auraCount(self: *const Unit) u8 {
         if (self.n_auras == 0 or self.isBroken()) return 0;
         return self.n_auras;
+    }
+
+    /// hasEffectActive("Stun"): isSkippingThisTurn (no Blindness, Freeze or Whirlpool in scope), and canRespond's veto.
+    pub inline fn isStunned(self: *const Unit) bool {
+        return self.effects.len != 0 and self.effects.find(.stun) != null;
+    }
+
+    /// canMove(): no Paralysis or Whirlpool in scope, so only the Web lock taken at activation.
+    pub inline fn canMove(self: *const Unit) bool {
+        return !self.web_locked;
+    }
+
+    /// The active ability of that id, Break ignored (the `abilities` array as TypeScript holds it).
+    pub fn activeAbility(self: *const Unit, id: AbilityId) ?*const Ability {
+        if (self.ability_mask & id.bit() == 0) return null;
+        for (self.abilities[0..self.n_abilities]) |*a| if (a.id == id) return a;
+        return null;
     }
 };
 
@@ -498,6 +590,28 @@ pub const Queue = struct {
 
 pub const UnitSet = u32;
 
+/// A set of uids (0..255): the removed units a lap's turn set still names. TypeScript keeps a removed unit's id in
+/// alreadyMadeTurn / alreadyHourglass / alreadyRepliedAttack until the lap flips; nothing but the digest and the set
+/// sizes reads them, so a removed unit's slot can go to a summon once its memberships move here.
+pub const UidSet = struct {
+    words: [4]u64 = .{ 0, 0, 0, 0 },
+
+    pub inline fn add(self: *UidSet, uid: u8) void {
+        self.words[uid >> 6] |= @as(u64, 1) << @intCast(uid & 63);
+    }
+    pub inline fn has(self: *const UidSet, uid: u8) bool {
+        return self.words[uid >> 6] & (@as(u64, 1) << @intCast(uid & 63)) != 0;
+    }
+    pub fn count(self: *const UidSet) u32 {
+        var n: u32 = 0;
+        for (self.words) |w| n += @popCount(w);
+        return n;
+    }
+    pub inline fn isEmpty(self: *const UidSet) bool {
+        return (self.words[0] | self.words[1] | self.words[2] | self.words[3]) == 0;
+    }
+};
+
 pub const Fight = struct {
     lap: i32 = 1,
     started: bool = false,
@@ -528,6 +642,16 @@ pub const Fight = struct {
     /// Bit L set = damage was dealt in lap L.
     damage_laps: u128 = 0,
     team_units_alive: [3]i32 = .{ 0, 0, 0 },
+    /// The removed units the turn sets still name whose slots went to summons (by uid; see UidSet), cleared with the
+    /// sets at the lap flip. `made` / `hourglass_set` / `replied` hold the units in slots.
+    removed_made: UidSet = .{},
+    removed_hourglass: UidSet = .{},
+    removed_replied: UidSet = .{},
+
+    /// getAlreadyMadeTurnSize: the units in `made` plus the removed ones it still names.
+    pub fn madeCount(self: *const Fight) u32 {
+        return @as(u32, @popCount(self.made)) + self.removed_made.count();
+    }
 };
 
 pub const EMPTY: u8 = 0;
@@ -576,9 +700,37 @@ pub const Grid = struct {
     terrain: Terrain = .{},
 };
 
+/// The creatures Infest raises, as createUnitFromSpec builds them (recorded `init.summonTemplates`, or the export's
+/// `configs.summonTemplates`): the props and base stats of a fresh stack of one, its abilities and auras. Shared and
+/// immutable (engine.internSummons), so a State only points at it.
+pub const Summons = struct {
+    /// Index SPIDER: "Arachna Spider" (a level 1-3 corpse), QUEEN: "Arachna Queen" (a level-4 corpse).
+    units: [2]Unit,
+    present: [2]bool = .{ false, false },
+
+    pub const SPIDER = 0;
+    pub const QUEEN = 1;
+};
+
 pub const State = struct {
     units: [MAX_UNITS]Unit,
+    /// The slots in use: every slot below it holds a unit, in the holder or removed (`in_holder` false).
     n_units: u8,
+    /// The UnitsHolder's insertion order: the slots of the units in the holder (dead ones not cleaned up included).
+    holder: [MAX_UNITS]u8 = undefined,
+    n_holder: u8 = 0,
+    /// The uid the next summon takes.
+    next_uid: u8 = 0,
+    /// runMatch's createSummonedUnit counter (a part of every summon id) and the battle seed (another part; `has_seed`
+    /// false prints it as "undefined").
+    summon_seq: u32 = 0,
+    seed: f64 = 0,
+    has_seed: bool = false,
+    /// The summon templates, when a unit can summon (null otherwise).
+    summons: ?*const Summons = null,
+    /// A capacity of the port was exceeded (unit slots, uids, ability or spell lists): the state no longer follows
+    /// TypeScript, and the checks report it.
+    overflow: bool = false,
     grid: Grid,
     fight: Fight,
     rng: Rng,
@@ -610,4 +762,22 @@ pub const State = struct {
     /// The "Break" effect's configured laps and power (effects.json, recorded in `init.effectConfigs.Break`).
     break_laps: f64,
     break_power: f64,
+    /// The name ids of "Arachna Spider" and "Arachna Queen" (Unit.name_id of a summon).
+    summon_name_id: [2]u16 = .{ 0xffff, 0xffff },
+
+    /// The holder's units in TypeScript's insertion order (`unitsHolder.getAllUnits()`): slot indices into `units`.
+    /// Dead units stay until cleanupDeadUnits removes them. Without summons slots are never reused, so this is every
+    /// slot with `in_holder` set, in slot order.
+    pub inline fn holderOrder(self: *const State) []const u8 {
+        return self.holder[0..self.n_holder];
+    }
+
+    /// The slot holding unit `uid` (in the holder, or removed but still in a slot), or null.
+    pub fn slotOf(self: *const State, uid: u8) ?u8 {
+        if (uid < self.n_units and self.units[uid].uid == uid) return uid; // the common case: no slot reused yet
+        for (self.units[0..self.n_units], 0..) |*u, i| {
+            if (u.uid == uid) return @intCast(i);
+        }
+        return null;
+    }
 };

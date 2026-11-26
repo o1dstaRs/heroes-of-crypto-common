@@ -34,15 +34,15 @@ throws at export). Tags: `{$map: [[k, v]...]}`, `{$set: [...]}`, `{$denque: [...
 | Key | Content |
 | --- | --- |
 | `version` | 2 (the loader refuses anything else) |
-| `units[]` | `{id, name, creatureId, team, unitType, summoned, fields}` in the holder's insertion order; `fields` = the unit's own fields (`unitProperties`, `initialUnitProperties`, `buffs`, `debuffs`, `effects`, `abilities`, `auraEffects`, `position`, `possibleAttackTypes`, turn flags, `adjustedBaseStatsLaps`, `luckPerTurn`, ...) |
+| `units[]` | `{id, name, creatureId, team, unitType, summoned, fields}` in the holder's insertion order (summoned units included); `fields` = the unit's own fields (`unitProperties`, `initialUnitProperties`, `buffs`, `debuffs`, `effects`, `abilities` (the ACTIVE list), `auraEffects`, `position`, `possibleAttackTypes`, turn flags, `adjustedBaseStatsLaps`, `luckPerTurn`, ...) |
 | `grid` | `boardCoord`, `cellsByUnitId`, `boardAggrPerTeam`, `gridType`, the terrain fields, artifact barrels |
 | `fight` | FightProperties' fields: lap, flags, queues, sets, setup maps, hit counters, smoke, vines, fire walls |
 | `holder` | UnitsHolder's: distances, Ember Covenant, the aura refresh caches |
 | `aiTargetMemory` | `[[attackerId, targetId]...]` (ai.ts previousTargetsByBattle) |
 | `damageStatLaps` | the laps of the damage-statistic entries (runMatch's `damageDealtThisLap` reads them) |
-| `configs` | `{abilityConfigs, effectConfigs, auraEffectConfigs, spellConfigs}`: the configs of every ability and aura on the board, Poison, Break and the Ember Covenant spell, in the shape of a recording's start state |
+| `configs` | `{abilityConfigs, effectConfigs, auraEffectConfigs, spellConfigs, summonTemplates?}`: the configs of every ability and aura on the board, Poison, Break and the Ember Covenant spell, in the shape of a recording's start state; with an Infest unit on the board, the summon templates (createUnitFromSpec's props of "Arachna Spider" and "Arachna Queen") and their abilities' and auras' configs |
 | `setup` | `{lapsTillNarrowing, perTeam: {"2": {...}, "1": {...}}}`: getAdditionalAbilityPower / MovementSteps / FlyArmor / Morale / Luck / Supply / AuraRange PerTeam and getBreakChancePerTeam |
-| `harness` | optional `{rng, activeUnitId, uuidSequence}`: the mulberry32 state, runMatch's currentActiveUnitId ("" = none), lib.ts deterministicUuidSequence |
+| `harness` | optional `{rng, activeUnitId, uuidSequence, seed?, summonSequence?}`: the mulberry32 state, runMatch's currentActiveUnitId ("" = none), lib.ts deterministicUuidSequence, and the parts of a summon's id: the battle seed and runMatch's createSummonedUnit counter (without them a summon cannot be named, and the play-out reports the overflow) |
 
 `configs`, `setup`, `name` and `creatureId` are there so the loader never recomputes TypeScript logic it does not port.
 A typical export is 54 to 62 KB (up to about 140 KB with several aura emitters: `holder.teamsAuraEffects` is a third of
@@ -58,38 +58,46 @@ Read into the Zig `State` (`snapshot.zig`):
 | `attack_type_selected`, `possible` | `selectedAttackType` (must equal `attack_type_selected`), `possibleAttackTypes` |
 | `pos_x/pos_y`, `responded`, `on_hourglass`, `moved_this_turn`, `moved_route_cells`, `luck_per_turn`, `adjusted_laps` | `position`, the flags, `movedRouteCellsThisTurn`, `luckPerTurn`, `adjustedBaseStatsLaps` |
 | `buffs`, `debuffs`, `effects` (name, laps, power, order) | the props' `applied_*` arrays, cross-checked against the AppliedSpell / Effect objects |
-| buff `src_x/src_y` | `firstSpellProperty` / `secondSpellProperty` of aura rows and augments |
-| `abilities`, `ability_mask`, `luck_dependent`, `auras`, `State.aura_defs` | `props.abilities` / `aura_effects` with `configs` (engine.loadAbilities / loadAuras), checked against the Ability / AuraEffect objects |
+| buff and debuff `src_x/src_y` | `firstSpellProperty` / `secondSpellProperty` of aura rows (the Web Aura debuff row too) and augments |
+| `abilities` (the active list, in order), `ability_mask`, `Ability.aura`, `auras`, `State.aura_defs` | the Ability objects' names and `aura_effects` with `configs` (engine.loadUnitAbilities / loadAuras), checked against the AuraEffect objects |
+| `luck_dependent`, `stolen` | `props.abilities` (the card list: the early luck pass reads card names), `props.stolen_abilities` |
+| `web_locked`, `rallying_volley_granted` | `props.web_movement_locked`, `props.rallying_volley_granted` |
+| `uid`, `uuid` | the unit's index in the id list, its id parsed as a canonical UUID |
+| `State.summons`, `summon_seq`, `seed`, `next_uid` | `configs.summonTemplates` (interned), `harness.summonSequence`, `harness.seed`; the caller's next uid (default: the id list's length) |
 | `target` | `props.target` |
 | `name_id`, `creature_id` | `name`, `creatureId` |
 | `reg`, `grid.board`, `grid.aggr` | `cellsByUnitId`, `boardCoord` ("" / id / "H" / "B" / "L"), `boardAggrPerTeam` |
 | `grid.terrain`, `fight.hits_*` | `scatteredMountainLayout`, `scatteredMountainsStanding` (packed `(x << 8) \| y`), the cleared sides, `cleanedUpCenter`, `obstacleHitsLeft*`; every "B" and "L" must be where the terrain says |
-| `fight` laps, flags, queues, `made` / `hourglass_set` / `replied`, `damage_laps`, `team_units_alive` | the FightProperties fields (`alreadyMadeTurnByTeam` must agree with `alreadyMadeTurn`) |
+| `fight` laps, flags, queues, `made` / `hourglass_set` / `replied` (and `removed_*` for the removed ids they name), `damage_laps`, `team_units_alive` | the FightProperties fields (`alreadyMadeTurnByTeam` must agree with `alreadyMadeTurn`) |
 | `fight.laps_till_narrowing`, `State.setup`, `Unit.syn_power` | `setup` |
 | `dist_known/dist_closest_enemy`, `ember_seeded`, `ember_teams` | `holder` |
 | `ai_prev_target`, `damage_lap` | `aiTargetMemory`, max of `damageStatLaps` |
 | `rng`, `active` | `harness` (or the caller: `hoc-sim resume` passes the recorded values) |
 | `blessings`, `auras`, `stat_hooks`, `augments`, Poison / Break / Ember Covenant config | derived as at a battle start (engine.loadScopeFlags) |
 
-Unit indices: with a recording, the recording's ids (a unit missing from the export was removed from the holder and
-stays `in_holder` false); without one (the C ABI), the holder's units in order, then the ids of removed units that the
-turn sets, the AI target memory or the distances still name. The handle keeps the id strings: requests and digests
-speak ids.
+Unit ids and slots: a unit's uid is its index in the id list: with a recording, the recording's ids (start units, then
+`summonIds`; `hoc-sim resume` passes the next uid from the point's `summonsCreated`); without one (the C ABI), the
+holder's units in order, then the ids of removed units that the turn sets, the AI target memory or the distances still
+name (at most 255). The holder's units take slots 0.. in holder order; removed units named by the turn sets are kept by
+uid (`Fight.removed_*`); AI memory and distance entries of removed units are dropped (a removed id matches no living
+unit again). The handle keeps the id strings: requests and digests speak ids, and `hoc_play_v01` appends the ids of
+the units it summons (`rollout.SummonIds`).
 
 Ignored (read by nothing in scope, or a cache the port recomputes): `renderPosition`, `maxRangeShots` (Limited Supply),
 `unitIdToTeam`, `availableCenterStart/End`, `placementType`, the turn timers, the per-team augment, doctrine and synergy
 maps (their effect arrives through the buffs and `setup`), `teamsAuraEffects`, `auraRefreshFingerprint`,
 `auraRefreshKnownEmpty` (the port runs the full aura refresh every time), descriptions and textures,
 `bitter_experience_stacks` (a counter nothing reads), Poison's stack count (it only feeds the description), `fight.id`,
-`harness.uuidSequence` (carried by the handle; the port creates no units).
+`harness.uuidSequence` (carried by the handle; summons take the createSummonedUnit ids, not lib.ts UUIDs).
 
-Refused as an unsupported state (the loader names what it found): summoned or non-creature units; spells other than
-the spell entries of inert castable abilities (Trent's Vine Throw); stolen or artifact-granted abilities; a forbidden
-target; a Web movement lock; Helping Hand; Rallying Volley arrows; ranked `*_authoritative` stats; a spent Water Shield;
-Last Fuse; Warlord's Edge or a War Anger attack increase; an unported ability, aura, buff, debuff or effect; effect stacks
-other than Poison's; more buffs, debuffs or effects than the lists hold (12/4/6); WATER_CENTER or a water cell; artifact
-barrels; artifacts; legacy-axis seats; smoke clouds, vines or fire walls; a unit on lava or terrain the board lost; more
-than 32 units; units out of holder order. Malformed input (a missing field, a wrong type, an id no list knows) is
+Refused as an unsupported state (the loader names what it found): summoned units other than the creatures Infest raises
+and non-creature units; spells other than the spell entries of inert castable abilities (Vine Throw, on a Trent or a
+thief); artifact-granted abilities; a forbidden target; Helping Hand; ranked `*_authoritative` stats; a spent Water
+Shield; Last Fuse; Warlord's Edge or a War Anger attack increase; an unported ability, aura, buff, debuff or effect;
+effect stacks other than Poison's; more buffs, debuffs, effects, active or stolen abilities than the lists hold
+(14/5/7/10/6); WATER_CENTER or a water cell; artifact barrels; artifacts; legacy-axis seats; smoke clouds, vines or fire
+walls; a unit on lava or terrain the board lost; more than 32 units in the holder or 255 ids; units out of holder
+order. Malformed input (a missing field, a wrong type, an id no list knows) is
 reported as a malformed state.
 
 ## The C ABI (`src/ffi.zig`, ABI version 1)
@@ -125,8 +133,8 @@ struct RolloutStats { uint64_t turns; uint32_t written; int32_t stop; };        
   ability" message comes from a diagnostic global of engine.zig, so two engines refusing states at the same moment can
   swap names. A refused state reads "unsupported state: ...", a refused request "unsupported request: ...", a rollout that
   reached unported code "unsupported rollout: ..."; the caller falls back to TypeScript for that decision.
-- `hoc_state_digest_json` writes `{units, fight, active, rng}` with the record.ts digest columns (setup and terrain
-  columns always on; `buffs_sources` names aura and augment rows only). `hoc_state_check_digest` takes a
+- `hoc_state_digest_json` writes `{units, fight, active, rng}` with the record.ts digest columns (setup, terrain and
+  batch-3 columns always on; `buffs_sources` and `debuffs_sources` name aura and augment rows only). `hoc_state_check_digest` takes a
   `parity/digest.ts` `battleDigest` and runs `compare.state`.
 
 ### `hoc_rollouts`: SearchDriver.rollout and leafValue
@@ -183,6 +191,21 @@ research logit adjustments (late-ranged finish, pure-ranged terminal), the mater
 - Rollouts against TypeScript (a scratch harness, `SearchDriver` built over the match's own objects with
   `snapshotBattle` / `restoreBattle` around each private `rollout` call): every value bit for bit and the same rollout
   turn counts.
+
+Results with batch 3 on 2026-11-25 (common `ec55af8b`):
+
+- `hoc-sim resume`, every point identical in both modes and every loaded state equal to its recorded digest: 8,000
+  points from production-like recordings (2,500 battles with batch 3 kept, 5,000 points, 459,998 remaining steps; 1,500
+  battles with batches 1 to 3 kept, 3,000 points, 266,545 steps; seeds in README.md), with summoned units, stolen
+  abilities, Web locks, Stuns, Rallying Volley arrows and removed ids in the turn sets at the points; production-like
+  batches 1 and 2 kept, 300 battles, 600 points (8500000); 0 refused.
+- `ffi/smoke.ts`: 12 battles with batches 1 and 2 kept (seeds 9100-9111), and 30 each with batch 3 (9300-9329) and with
+  batches 1 to 3 kept (9400-9429) through `SMOKE_KEEP`, every check passing (play-outs that summon included).
+- Rollouts: 6,240 and 4,640 values identical to `SearchDriver.rollout` (seeds 7800-7839 batches 1+2, 7900-7929
+  ability-free), and 6,240 and 6,400 with batches 1 to 3 (7800-7839) and batch 3 (8800-8839) kept, the same rollout turn
+  counts.
+- A rollout whose state exceeds a capacity of the port (`State.overflow`: unit slots, ids, lists, a summon without its
+  id parts) fails with "unsupported rollout"; the caller falls back to TypeScript.
 
 Results on 2026-11-25 (common `50ae51c2` plus this change):
 
@@ -243,7 +266,9 @@ What the A19 port will need from the bridge:
   and the per-draw complement `1 - v - 2^-32`; it needs the random source to switch generators by key at every draw;
 - the V2 leaf (60 features, `src/simulation/value_features.ts`) and the v1 leaf, with the sigmoid's `Math.exp` taken
   from the C library (`exp`), not `std.math.exp`, since exact ties decide choices; check on Linux as well as macOS;
-- the UUID counter for units created inside rollouts (summons, splits), carried by the handle today;
+- the summon counter is in the State (`summon_seq`), so a rollout's summons take the ids the TypeScript rollout gives
+  them as long as the root export carries `harness.seed` and `summonSequence`; splits and spell summons will need the
+  same;
 - the recovery net and `forceStalledLap`, when a policy can land nothing;
 - the server's engine wiring as a later parity target: production rollouts run with the server's engine context, which
   re-checks move reachability with known paths after a stat refresh (the server's `play_session.ts`, around line 3729)

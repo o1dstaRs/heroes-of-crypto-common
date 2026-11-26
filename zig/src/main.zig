@@ -87,7 +87,7 @@ fn parity(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
             }
             s.rng.state = step.r0;
             events.len = 0;
-            const ok = engine.apply(&s, step.action, &events);
+            const ok = engine.apply(&s, engine.actionToSlots(&s, step.action), &events);
             var m: compare.Mismatch = .{};
             var why: ?[]const u8 = null;
             if (ok != step.ok) {
@@ -109,7 +109,7 @@ fn parity(gpa: std.mem.Allocator, path: []const u8, max_fail: usize) !bool {
                 if (failures <= max_fail) {
                     std.debug.print("seed {d} step {d}/{d} {s}: {s}\n", .{ game.seed, i, game.steps.len, describe(step.action), reason });
                     std.debug.print("    action {any}\n", .{step.action});
-                    std.debug.print("    draws: ts {d}; zig rng state {d} vs ts {d}\n", .{ step.draws, s.rng.state, step.r1 });
+                    std.debug.print("    draws: ts {d}; zig rng state {d} vs ts {d}; slots {d}, holder {d}{s}\n", .{ step.draws, s.rng.state, step.r1, s.n_units, s.n_holder, if (s.overflow) ", capacity exceeded" else "" });
                     printEvents("ts events ", step.events);
                     printEvents("zig events", events.slice());
                 }
@@ -144,7 +144,7 @@ fn benchWorker(games: []const BenchGame, reps: usize, out_steps: *u64, out_check
                 if (step.action == .decide) continue;
                 s.rng.state = step.r0;
                 events.len = 0;
-                _ = engine.apply(&s, step.action, &events);
+                _ = engine.apply(&s, engine.actionToSlots(&s, step.action), &events);
                 steps += 1;
             }
             check +%= s.rng.state +% @as(u64, @intFromFloat(@max(0, s.units[0].amount_alive)));
@@ -379,7 +379,7 @@ fn resumeOne(game: *const rec.Game, start: *const st.State, k: usize, native_mod
         }
         s.rng.state = step.r0;
         events.len = 0;
-        const ok = engine.apply(&s, step.action, &events);
+        const ok = engine.apply(&s, engine.actionToSlots(&s, step.action), &events);
         var m: compare.Mismatch = .{};
         var why: ?[]const u8 = null;
         if (ok != step.ok) {
@@ -478,9 +478,12 @@ fn resumeCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool 
             }
             var why: snapshot.Why = .{};
             var timer = try std.time.Timer.start();
+            const created = rec.get(p, "summonsCreated");
             const s = snapshot.load(rec.get(p, "state"), game.ids, .{
                 .rng = @intCast(rec.int(rec.get(p, "rng"))),
                 .active = rec.get(p, "unitId").string,
+                // The recording numbers summons in creation order after the start units.
+                .next_uid = if (created == .integer) @intCast(game.n_start + @as(usize, @intCast(created.integer))) else null,
             }, &why) catch |err| {
                 if (err == error.UnsupportedState) {
                     unsupported += 1;
@@ -500,7 +503,7 @@ fn resumeCheck(gpa: std.mem.Allocator, file: []const u8, max_fail: usize) !bool 
             load_ns += timer.read();
             // The snapshot is the state after the step before the decision.
             var m: compare.Mismatch = .{};
-            const r0_ok = s.rng.state == game.steps[k].r0 and s.active == game.steps[k].action.decide.unit;
+            const r0_ok = s.rng.state == game.steps[k].r0 and s.active >= 0 and s.units[@intCast(s.active)].uid == game.steps[k].action.decide.unit;
             if (!r0_ok or (game.steps[k - 1].digest != null and !compare.state(&s, game.ids, game.steps[k - 1].digest.?, &m))) {
                 load_fail += 1;
                 if (load_fail <= max_fail) std.debug.print("seed {d} resume@{d}: loaded state differs from the recorded digest: {s}\n", .{ game.seed, k, if (r0_ok) m.text() else "random state or active unit" });
@@ -540,11 +543,12 @@ fn playState(gpa: std.mem.Allocator, file: []const u8, max_laps: i32) !bool {
         std.debug.print("state not loaded: {s} ({s})\n", .{ @errorName(err), why.text() });
         return false;
     };
-    const r = rollout.play(&s, max_laps, ai.decideTurn);
+    var summoned: rollout.SummonIds = .{ .first = s.next_uid, .alloc = arena };
+    const r = rollout.playHooked(&s, max_laps, ai.decideTurn, summoned.hook());
     var out: std.Io.Writer.Allocating = .init(gpa);
     defer out.deinit();
     try out.writer.print("{{\"result\":{{\"end\":{d},\"winner\":{d},\"lap\":{d},\"steps\":{d},\"decisions\":{d},\"rng\":{d}}},\"digest\":", .{ r.end, r.winner, r.lap, r.steps, r.decisions, r.rng });
-    try digest.write(&out.writer, &s, ids);
+    try digest.write(&out.writer, &s, try summoned.table(arena, ids));
     try out.writer.writeAll("}\n");
     try std.fs.File.stdout().writeAll(out.written());
     return true;

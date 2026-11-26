@@ -36,7 +36,13 @@ import { resolveSetupPolicy } from "../../src/ai/setup/setup_ship";
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../../src/artifacts/artifact_properties";
 import { getUpgradePoints } from "../../src/doctrines/doctrine_properties";
 import { ToFactionType } from "../../src/factions/faction_type";
-import { buildRoster, creaturesByLevel, makeRng } from "../../src/simulation/army";
+import {
+    buildRoster,
+    createCombatFactories,
+    createUnitFromSpec,
+    creaturesByLevel,
+    makeRng,
+} from "../../src/simulation/army";
 import {
     DEFAULT_SYNERGY_VARIANTS,
     FACTION_SYNERGY_PAIRS,
@@ -397,10 +403,76 @@ class Mulberry {
 
 const num = (v: unknown): number => (typeof v === "number" ? v : Number(v ?? 0));
 
-const DIGEST_FIELDS = digestFields(SETUP);
+// ---- batch 3 (summons, stolen abilities, the Web lock) ----
+// Keeping any batch-3 creature turns on the batch-3 digest columns (digest.ts). A battle whose start state holds an
+// Infest unit records `init.summonTemplates` (the fresh createUnitFromSpec props of the creatures Infest raises,
+// stripped like every other creature here) and, once a unit is summoned, `summonIds` (the summoned unit ids in
+// creation order); its resume points gain `summonSequence` (runMatch's createSummonedUnit counter) and
+// `summonsCreated`. Keep "Arachna Spider" beside "Arachna Queen": the summon-only Spider is stripped otherwise.
+const BATCH3_CREATURES = ["Zena", "Arachna Queen", "Arachna Spider", "Squire", "Troglodyte", "Monk"];
+const BATCH3 = BATCH3_CREATURES.some((name) => KEEP.has(name));
+const SUMMON_CREATURES = ["Arachna Spider", "Arachna Queen"];
+
+const DIGEST_FIELDS = digestFields(SETUP, BATCH3);
 
 function digest(ctx: Ctx): { units: unknown[][]; fight: Record<string, unknown> } {
-    return battleDigest(ctx, { setup: SETUP, terrain: TERRAIN });
+    return battleDigest(ctx, { setup: SETUP, terrain: TERRAIN, batch3: BATCH3 });
+}
+
+/** Whether a unit of the holder can ever summon (Infest; spells are stripped). */
+function canSummon(ctx: Ctx): boolean {
+    for (const u of ctx.unitsHolder.getAllUnits().values()) {
+        if (u.getUnitProperties().abilities.includes("Infest")) return true;
+    }
+    return false;
+}
+
+/** The props a summon starts from: createUnitFromSpec as runMatch's createSummonedUnit calls it (team 2; the loader
+ * sets the summoner's team), and the configs of its abilities and aura effects. */
+function summonTemplates(
+    ctx: Ctx,
+    abilityConfigs: Record<string, any>,
+    effectConfigs: Record<string, unknown>,
+    auraEffectConfigs: Record<string, unknown>,
+): Record<string, unknown> {
+    const { abilityFactory, effectFactory } = createCombatFactories();
+    const out: Record<string, unknown> = {};
+    for (const creatureName of SUMMON_CREATURES) {
+        const unit = createUnitFromSpec(
+            { faction: "Nature", creatureName, level: 0, size: 0, amount: 1 },
+            2,
+            ctx.grid.getSettings(),
+            abilityFactory,
+            effectFactory,
+            true,
+            "00000000-0000-5000-8000-000000000000",
+        );
+        const p = unit.getUnitProperties();
+        for (const name of p.abilities) {
+            if (name in abilityConfigs) continue;
+            abilityConfigs[name] = JSON.parse(JSON.stringify(getAbilityConfig(name)));
+            const effect = abilityConfigs[name].effect;
+            if (effect && !(effect in effectConfigs)) {
+                effectConfigs[effect] = JSON.parse(JSON.stringify(getEffectConfig(effect) ?? null));
+            }
+        }
+        for (const name of p.aura_effects ?? []) {
+            if (!(name in auraEffectConfigs)) {
+                auraEffectConfigs[name] = JSON.parse(JSON.stringify(getAuraEffectConfig(name) ?? null));
+            }
+        }
+        out[creatureName] = {
+            name: unit.getName(),
+            creatureId: creatureIdForName(unit.getName()) ?? 0,
+            level: unit.getLevel(),
+            size: unit.getSize(),
+            footprintW: unit.getFootprintWidth(),
+            footprintH: unit.getFootprintHeight(),
+            props: JSON.parse(JSON.stringify(p)),
+            initialProps: JSON.parse(JSON.stringify(unit.initialUnitProperties)),
+        };
+    }
+    return out;
 }
 
 function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
@@ -429,6 +501,16 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
                       buffsSources: u
                           .getBuffs()
                           .map((b: any) => `${b.getFirstSpellProperty() ?? ""};${b.getSecondSpellProperty() ?? ""}`),
+                      ...(BATCH3
+                          ? {
+                                debuffsSources: u
+                                    .getDebuffs()
+                                    .map(
+                                        (b: any) =>
+                                            `${b.getFirstSpellProperty() ?? ""};${b.getSecondSpellProperty() ?? ""}`,
+                                    ),
+                            }
+                          : {}),
                   }
                 : {}),
         });
@@ -463,6 +545,9 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
     const spellConfigs: Record<string, unknown> = {
         "Ember Covenant Blessing": JSON.parse(JSON.stringify(getSpellConfig("System", "Ember Covenant Blessing"))),
     };
+    const templates = canSummon(ctx)
+        ? summonTemplates(ctx, abilityConfigs, effectConfigs, auraEffectConfigs)
+        : undefined;
     const fp = ctx.fightProperties;
     return {
         rosterSeed,
@@ -499,6 +584,7 @@ function initialState(ctx: Ctx, rosterSeed: number): Record<string, unknown> {
             teamUnitsAlive: [...fp.teamUnitsAlive.entries()],
         },
         ...(SETUP ? { setup: setupState(fp) } : {}),
+        ...(templates ? { summonTemplates: templates } : {}),
         units,
     };
 }
@@ -560,6 +646,21 @@ function main(): void {
     let warmNanos = 0n;
     let warmSteps = 0;
 
+    // Summons (batch 3): runMatch's createSummonedUnit counter and the summoned ids in creation order.
+    let summonTracking = false;
+    let summonSeed = 0;
+    let summonSequence = 0;
+    let summonIds: string[] = [];
+    const seenIds = new Set<string>();
+    const noteSummons = (): void => {
+        if (!summonTracking || !ctx) return;
+        for (const id of ctx.unitsHolder.getAllUnits().keys()) {
+            if (seenIds.has(id)) continue;
+            seenIds.add(id);
+            summonIds.push(id);
+        }
+    };
+
     // getRandomInt call sites (one entry per raw draw) while recording, for RECORD_TRACE_DRAWS.
     const siteLog: string[] = [];
     const siteTally = new Map<string, number>();
@@ -580,6 +681,7 @@ function main(): void {
                 engineNanos += process.hrtime.bigint() - t0;
                 depth -= 1;
             }
+            noteSummons();
             steps.push({
                 k: kind,
                 a: arg ?? {},
@@ -642,7 +744,15 @@ function main(): void {
 
     // RECORD_RESUME: the decision points kept for this battle (reset per battle) and the private stream that picks
     // them.
-    type ResumePoint = { step: number; decision: number; unitId: string; rng: number; state: unknown };
+    type ResumePoint = {
+        step: number;
+        decision: number;
+        unitId: string;
+        rng: number;
+        summonSequence?: number;
+        summonsCreated?: number;
+        state: unknown;
+    };
     let resumePoints: ResumePoint[] = [];
     let resumeRng: () => number = () => 0;
     let decisionIndex = 0;
@@ -655,7 +765,8 @@ function main(): void {
             decision: index,
             unitId: unit.getId(),
             rng: rng!.state,
-            state: exportBattleState(ctx as any),
+            ...(summonTracking ? { summonSequence, summonsCreated: summonIds.length } : {}),
+            state: exportBattleState(ctx as any, summonTracking ? { seed: summonSeed, summonSequence } : undefined),
         });
         if (RESUME.kind === "list") {
             if (RESUME.decisions.has(index)) resumePoints.push(point());
@@ -685,10 +796,14 @@ function main(): void {
         const memory = layersModule ? [...captureAITargetMemory(context.unitsHolder)] : undefined;
         if (layersModule) layersModule.beginDecision();
         let layers: unknown[] | undefined;
+        let candidates: unknown[] | undefined;
         try {
             actions = decideTurn.call(this, unit, context);
         } finally {
-            if (layersModule) layers = layersModule.endDecision();
+            if (layersModule) {
+                layers = layersModule.endDecision();
+                candidates = layersModule.endCandidates();
+            }
             decideNanos += process.hrtime.bigint() - t0;
             decisions += 1;
             depth -= 1;
@@ -701,7 +816,7 @@ function main(): void {
             draws: rng.draws - d0,
             out: JSON.parse(JSON.stringify(actions)),
             ...(TRACE ? { ds: siteLog.slice(site0) } : {}),
-            ...(layers ? { layers, memory } : {}),
+            ...(layers ? { layers, memory, ...(candidates?.length ? { candidates } : {}) } : {}),
         });
         return actions;
     };
@@ -729,6 +844,11 @@ function main(): void {
         siteLog.length = 0;
         steps = [];
         resumePoints = [];
+        summonTracking = false;
+        summonSeed = seed;
+        summonSequence = 0;
+        summonIds = [];
+        seenIds.clear();
         decisionIndex = 0;
         if (RESUME) resumeRng = makeRng(Math.imul(seed ^ 0x2545f491, 0x9e3779b1) >>> 0);
         let init: Record<string, unknown> | undefined;
@@ -773,6 +893,16 @@ function main(): void {
                         : next,
                 );
                 init = initialState(ctx, seed);
+                if (canSummon(ctx)) {
+                    summonTracking = true;
+                    for (const id of ctx.unitsHolder.getAllUnits().keys()) seenIds.add(id);
+                    const engineContext = context as any;
+                    const createSummonedUnit = engineContext.createSummonedUnit;
+                    engineContext.createSummonedUnit = (opts: unknown) => {
+                        summonSequence += 1;
+                        return createSummonedUnit(opts);
+                    };
+                }
                 recording = true;
             },
         });
@@ -808,6 +938,7 @@ function main(): void {
                       }
                     : {}),
                 steps,
+                ...(summonIds.length ? { summonIds } : {}),
                 ...(RESUME ? { resume: [...resumePoints].sort((a, b) => a.step - b.step) } : {}),
             }),
         );

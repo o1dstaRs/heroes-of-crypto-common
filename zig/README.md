@@ -12,8 +12,9 @@ plays it out or runs search rollouts on it.
 Zig plays whole battles that match the TypeScript `runMatch` step for step, for battles with:
 
 - every creature's stats, sizes (1x1, 2x1, 2x2), walking and flying, melee and ranged;
-- the abilities of the creatures ported so far (batches 1 and 2, below); every other creature's abilities, and all
-  spells, stripped; no artifacts;
+- the abilities of the creatures ported so far (batches 1, 2 and 3, below), including the units Infest summons and the
+  abilities Predatory Assimilation moves between units; every other creature's abilities, and all spells, stripped; no
+  artifacts;
 - the army setup `runMatch` applies before the fight: the augments (Armor, Might, Sniper, Movement, Placement; Empower
   is carried but read by nothing in scope), doctrines (their upgrade budget) and synergies (Life, Chaos, Might and
   Nature, both variants, levels 1 to 3), including the Chaos break-on-attack roll and the Break effect;
@@ -46,7 +47,7 @@ Ported:
 
 ### Abilities
 
-Batches 1 and 2, exact in both modes:
+Batches 1, 2 and 3, exact in both modes:
 
 | Creature | Abilities |
 | --- | --- |
@@ -63,6 +64,12 @@ Batches 1 and 2, exact in both modes:
 | Trent (L2) | Earth Element, Vine Throw, In Its Own World (inert under v0.1: it never casts, so no vines exist, and no Wind Element creature is ported; loaded as ability ids only) |
 | Pegasus (L3) | Pegasus Might Aura, Pegasus Light |
 | Hydra (L4) | Lightning Spin, Devour Essence, Ember Covenant Blessing |
+| Zena (L3) | Handyman, Chakram, Rallying Volley Blessing |
+| Arachna Queen (L4) | Web Aura, Infest, Predatory Assimilation |
+| Arachna Spider (summoned) | Infest |
+| Squire (L1) | Stun, Arcane Ward Blessing |
+| Troglodyte (L1) | Madness, Blind Fury, Miner |
+| Monk (L3) | Magic Shield, Borrowed Grace (inert: no buff in scope can be copied), Absolving Arrow |
 
 The framework later batches build on:
 
@@ -128,6 +135,82 @@ Added by batch 2:
   (magic resist; no reader in scope), the Absorb Penalties roll (`abilities.spitBall`: `processSpitBallAbility` draws
   `getAbsorptionTarget`'s roll on every landed shot and landed counter-shot whose victim carries the aura and whose
   source cell holds a unit; the result is unused).
+
+Added by batch 3:
+
+- **Unit slots and identities** (`state.zig`): `State.units` are slots. A unit's identity is `Unit.uid` (u8, never
+  reused: start units take their start-state index, each summon the next one, `State.next_uid`); recordings and bridge
+  handles name units by uid (`Game.ids` = the start ids, then the recording's `summonIds` in creation order), the
+  engine works on slots (`engine.actionToSlots` / `actionToUids`, `State.slotOf(uid)`). The UnitsHolder's insertion
+  order is explicit: `State.holder` / `n_holder`, read through `State.holderOrder()`; every order-sensitive loop
+  (refresh, auras, census, turn-order inputs, AI target lists, morale decreases, the digest) walks it, and a summon
+  is appended last. Without summons slot i is start unit i, so `s.units[0..s.n_units]` filtered by `in_holder` is
+  still the holder in order. Engine events carry uids; `engine.apply` maps them to `State.active`.
+- **Slot reuse** (`engine.allocSlot`): TypeScript keeps a removed unit's id in alreadyMadeTurn / alreadyHourglass /
+  alreadyRepliedAttack until the lap flips (the digest lists them, getAlreadyMadeTurnSize counts them). A removed
+  unit keeps its slot and its set bits until a summon needs a slot; then (a free slot first, else the lowest removed
+  slot) its memberships move to `Fight.removed_made` / `removed_hourglass` / `removed_replied` (`st.UidSet`, by uid;
+  cleared at the lap flip; `Fight.madeCount()` is the set size) and the slot is reset. The active unit's slot is
+  never taken (its completeTurn still marks it). On reuse the AI target memory keyed by or pointing at the slot is
+  cleared (TypeScript's memory names the dead id, which matches no living enemy again). Battles reached 181 summons
+  and 72 removed ids in one lap's sets (production-like, default keep rate); the live holder never exceeded the start
+  count. A capacity overflow (slots, uids, list lengths) sets `State.overflow`, which `compare.state` reports.
+- **Unit ids** (`uuid.zig`): `Unit.uuid` holds a canonical lowercase UUID id as 16 bytes (`uuid_ok`); a summon's id is
+  `deterministicSimulationId("summon", seed, team, 3, name, summonerId, "Infest", sequence)` (`hashSimulationParts`'
+  FNV-1a over `len:part|`, the murmur finalizer, version 5 and variant nibbles), with the battle seed
+  (`init.rosterSeed`, or the export's `harness.seed`) and runMatch's createSummonedUnit counter (`State.summon_seq`,
+  counting failed placements too). Chakram breaks bearing ties by id order, which is byte order of the UUIDs.
+- **Summons** (`engine.spawnInfested`, from `combat.cleanupDeadUnits`): the target of a melee strike killed by the
+  attacker, or the attacker killed by the target (createDirectKillAttributions; obstacle strikes, narrowing,
+  Armageddon and poison never infest; no shooter can hold Infest), raises a Spider (level 1-3 corpse) or a Queen
+  (level 4) of one creature when the killer has Infest at cleanup (a dead killer too, a Broken one not): on the corpse
+  cells when they form its footprint, else on the corpse's anchor; corpses in `died` order. The newcomer comes from the
+  recorded template (`init.summonTemplates`, `State.summons`, interned per template text by `engine.loadSummons`), gets
+  no augments, Life supply or events, takes synergies, blessings and aura rows at its first refresh (the step's
+  completeTurn, where its lap luck roll is the last draw), acts in the lap it appears and joins a covenant team's ring.
+- **Ability lists that change at runtime** (`abilities.assimilate`): `Unit.abilities` is the ACTIVE list in order
+  (config order, then steals), `Unit.stolen` props.stolen_abilities, `ability_mask` and `auras` follow every grant
+  and loss, `Ability.aura` names the aura an ability emits (removeAbilityMechanics keeps it while another ability
+  provides it), and `luck_dependent` follows the card list (a thief of Sharpened Weapons or Arcane Ward joins the early
+  luck pass, the robbed unit stays in it). The steal: candidates are the target's active abilities (none while it is
+  Broken) minus Predatory Assimilation and what the thief has; the chance roll only with a candidate, the index roll
+  only with two or more; response steal before attack steal, after the morale settlement and before the second
+  refresh. A stolen ability is a copy of the configured record, read with the holder's own stats and team, and every
+  existing hook is holder-generic: Lightning Spin, Double Punch, Skewer Strike from a 2x2 (pierceSweepCells' closest
+  body cell, `combat.closestBodyCell`), Backstab from a 2x2, the batch-2 riders and the stat hooks.
+- **Riders**: Miner (initial base armor moves, toFixed(2), floored at 1, with a "Miner" debuff of the running total)
+  and Stun (`clamp(luck + syn + 7 * stack power)`, laps 2 on the active unit, drawn on an already stunned target)
+  lead the blow, response, second punch, spin and skewer riders; Predatory Assimilation's poison follows Venom
+  Cloud's on the blow and the response (not the second punch). Aggr is rolled, then resisted by Madness.
+- **Stun at activation and on replies** (`engine.activateNextUnit`): a stunned unit's activation is
+  `next_unit_selected, unit_skipped, turn_completed` (completeTurn as a skip: morale -1, the lap ticks the Stun away);
+  a stunned unit gives no melee response or counter-shot (nothing spent) and no second punch.
+- **Web lock** (`Unit.web_locked`, `canMove`): refreshPreTurnState snapshots `canFly && "Web Aura" debuff` at
+  activation; move_unit and a moving melee_attack are refused (an obstacle strike's walk-in is not gated, as in
+  TypeScript); the v0.1 AI skips every movement branch (findTarget's two, the mountain strategy, fallbackTurn ->
+  idleTurn, decideTurn's moving strike and move). The Web row is the port's first debuff aura (enemy flyers only, power
+  0, the emitter's cell as stored property).
+- **Morale lock** (Madness): getMorale returns 0 after the clamp (no lap roll is drawn, the first-turn averages count
+  0, steps_mod loses its morale term), morale changes are refused, adjustBaseStats pins morale 0 before the
+  Morale/Dismorale branch.
+- **Stat hooks**: Blind Fury's attack_mod share of the INITIAL base attack; magic resist folds base, Magic Shield,
+  Wardguard and the Arcane Ward row in that order (`1 - prod(1 - p)`, toFixed(2); no roll reads it in scope);
+  Handyman lifts a RANGE creature's half-strength melee.
+- **Census blessings**: Arcane Ward (`toFixed(10 + luck, 2)` of the strongest unbroken source, luck-dependent) after
+  Luck Blessing, then Sharpened Weapons, then Rallying Volley last (any unbroken Zena; shooters only), whose applyBuff
+  side effect adds 2 arrows once per unit (`Unit.rallying_volley_granted`).
+- **Chakram** (`combat.planChakram`, `aoeTail`): the flight is planned from the primary (stack power caps the victims;
+  one or two empty bridge cells inside both bodies' box; clockwise sweep, then separation, then id; a two-cell bounce
+  halves and ends the flight), its bounce miss rolls stop at the first dodge, and the ranged AOE tail replaces the
+  single damage roll before the counter-shot: per victim the damage roll with the primary's divisor, the break roll
+  (never extended), Venom Cloud poison and Pegasus Light morale, then kills and riders, the thrower's morale at once and
+  one arrow (a missed throw too); the primary is poisoned a second time from the throw's largest damage. A responding
+  Zena counter-throws the same way. The sweep is compared exactly on the integer vectors (quadrant class and cross
+  product), which reproduces Math.atan2's order and its parallel ties.
+- **Absolving Arrow** (`combat.absolvingArrow`): before the shot's miss roll, and before the counter-shot's damage
+  roll for a responding Monk, every live ally on the whole traced ray (past enemies, stones and lava) is rolled per
+  liftable entry (effects, then non-aura, non-marker debuffs; `first / 2^i`), deleting a lifted name from both lists.
+- **Lists**: buffs 14, debuffs 5, effects 7, abilities 10, stolen 6, auras 4 per unit, aura defs 6 per battle.
 
 ### Maps and board orientation
 
@@ -278,11 +361,6 @@ The framework the army setup added (exact in both modes, coverage below):
     miss chance, Quiver of Echoes adds a roll to every landed shot and to the ranged obstacle shot (the branch skips it
     now), Barrel Barricade places barrels inside `start_fight` (after the supply, before `fightProperties.startFight`),
     and Cursed Ward / Crown of Command move luck and morale in `adjustBaseStats`.
-  - Next creatures: Squire's Arcane Ward Blessing is a luck-dependent census blessing (the early luck pass) and a
-    magic-resist roll; Monk's Magic Shield is another resist roll; Troglodyte's Madness pins morale to 0 (a
-    `hasAbilityActive` gate on morale changes too) and Blind Fury adds attack_mod; Zena's Chakram rolls its bounces in
-    flight order and Rallying Volley is a census blessing; Arachna Queen's Web Aura locks flyers at activation
-    (`refreshPreTurnState`). All of them are Break-aware in TypeScript.
 - Batch 2 lessons:
   - Inert is not absent: Trent's abilities change nothing in scope, but the loader must still know their names.
   - A refresh-time value is stale until the next refresh: aura rows after `move_unit` (no refresh), Absorb power at a
@@ -296,6 +374,29 @@ The framework the army setup added (exact in both modes, coverage below):
     Pegasus lit).
   - A decision context (`ai.Ctx`) is about 18 KB: build it in place (`initCtxInto`), a by-value return cost about 7% of
     battle time.
+- Batch 3 lessons (for the spellcasters and artifacts next):
+  - Slots are not identities. Name units by `uid` across steps (recordings, events, observers, memory, handles),
+    iterate the holder through `holderOrder()`, and never keep a slot index past a cleanup: a corpse's slot can hold a
+    summon before the step ends (cleanupDeadUnits captures the killers first). Spell summons (`createSummonedUnit` from
+    castSpell) and a resurrection will reuse `engine.spawnInfested`'s pieces: the id hash with its own source ability
+    ("spell" by default), a template per summoned creature, `allocSlot`, the holder append. Resurrection
+    (`deleteUnitById(id, true)`) is not ported: the corpse leaves today.
+  - TypeScript's lists are unbounded: size every list for the worst case in scope and let the overflow flag report the
+    rest. Steals pile abilities on Queens (8 active seen); a lap of summons named 72 removed ids.
+  - Card names are not active abilities: the export's `props.abilities` is the card list (stolen cards stay), the
+    Ability objects are the active list; the early luck pass, descriptions and inert spell checks read cards, every
+    mechanic reads the active list. Spells will add castable abilities whose charges move with a steal
+    (`takeAbilitySpellEntries`): Vine Throw's charge moves today, unread, because nothing casts.
+  - Magic resist is exact but unread: the resist rolls arrive with spells (`handleMagicAttack`, the mass debuffs, the
+    Vine Throw snare) and artifacts (Aegis of the Arcane adds a term after Arcane Ward). Stun's chance already has the
+    status-resist factor (Amulet of Resolve) and Aggr the mind-resist factor, both 1 today.
+  - Borrowed Grace and Absolving Arrow skip "marker" names (`abilities.isMarkerSpell`): every artifact buffName joins
+    that list, and Borrowed Grace becomes reachable once a cast buff or an artifact buff can be copied (its chance
+    roll, pick roll and `takeBuffFrom`'s extra lap are in `ref/batch3/monk.md`).
+  - The ranged AOE tail (`aoeTail`) is the place for Area Throw and Large Caliber, and Giant's Maul / Broken Aegis /
+    Flesh Shield order victims and scale damage there; a missed AOE shot spends its arrow.
+  - Summon templates and harness fields are recorded data, not recomputed: a new summoned creature needs its template
+    in `init.summonTemplates` / `configs.summonTemplates` and the id parts in the harness.
 
 ## How parity is checked
 
@@ -375,6 +476,27 @@ RECORD_GRID=mix RECORD_SIDE=1 RECORD_AUGMENTS=production RECORD_DOCTRINE=random 
   zig/parity/check.sh 500
 ```
 
+Batch-3 options (off unless a batch-3 creature is kept; then the default output above is unchanged otherwise):
+
+- Keeping any of Zena, Arachna Queen, Arachna Spider, Squire, Troglodyte or Monk adds five unit digest columns after
+  the setup columns: `abilities` (the active list, steals included, Break ignored), `stolen_abilities`, `web_locked`,
+  `debuffs_sources` (each debuff's stored properties: the Web row's source cell) and `rallying_volley_granted`; with
+  setup the start state's units gain `debuffsSources`. `compare.state` tells the layouts apart by row length (47, 50
+  setup, 52 batch 3, 55 both).
+- A start state holding an Infest unit gains `init.summonTemplates` (createUnitFromSpec's props of "Arachna Spider" and
+  "Arachna Queen", stripped as every creature is); the game line gains `summonIds` (the summoned ids in creation order)
+  and each resume point `summonSequence` and `summonsCreated`, with the export's harness carrying `seed` and
+  `summonSequence`. Keep "Arachna Spider" beside "Arachna Queen": the summon-only Spider is stripped otherwise.
+- `RECORD_CANDIDATES=1` (with `RECORD_LAYERS=1`) adds v0.8's candidate lists to a decide step when there are any, as
+  `parity/v08/record.ts` does.
+
+```bash
+# batch 3 kept, production-like setup, with resume points
+RECORD_GRID=mix RECORD_SIDE=1 RECORD_AUGMENTS=production RECORD_DOCTRINE=random RECORD_SYNERGIES=1 \
+  RECORD_SYNERGY_VARIANTS=seed RECORD_DISTINCT_RED=1 RECORD_PLACEMENT_TIMING=setup-before-placement RECORD_RESUME=random:2 \
+  RECORD_KEEP_ABILITIES="Zena,Arachna Queen,Arachna Spider,Squire,Troglodyte,Monk" zig/parity/check.sh 300
+```
+
 `hoc-sim parity` and `native` report a game they cannot parse (an action or event outside the port) as "recording not
 supported" with its seed and step and go on, as they do for an unsupported start state.
 
@@ -397,6 +519,35 @@ cd zig && zig build test         # unit tests (random stream, JS number rounding
 ```
 
 Run `check.sh` after changing any rules or v0.1 AI code the port covers, both with and without the batch kept.
+
+Batch 3, checked on 2026-11-25 against common `ec55af8b` (both modes, every battle identical; every run on
+side-oriented production-mix maps with the production-like setup above and `RECORD_RESUME=random:2`):
+
+- batch 3 kept (`Zena,Arachna Queen,Arachna Spider,Squire,Troglodyte,Monk`): 2,500 battles, 468,970 steps: at the
+  default keep rate seeds 9700000–9700399 and 9701000–9701599, at keep rate 1 the whole batch (9710000–9710399),
+  Queen + Spider (9720000–9720299), Zena (9730000–9730299), Squire + Monk (9740000–9740299) and Troglodyte
+  (9750000–9750199); plus 200 traced battles at keep rate 1 (9760000–9760199, `RECORD_TRACE_DRAWS=1`);
+- batches 1, 2 and 3 kept together: 1,500 battles, 271,461 steps (9800000–9800999, and 9810000–9810499 at keep rate 1);
+- replay of v0.8s battles with batches 1 to 3 kept (production-like, seeds 9900000–9900059): 56 of 60 identical, the
+  other 4 refused as recordings outside the port (v0.8 casts Vine Throw: `cast_spell`);
+- every check above also passes with a Debug build (Zig's safety checks on);
+- resume: 8,000 points from these recordings, every loaded state equal to its recorded digest and every remaining
+  step identical in both modes (5,000 points and 459,998 remaining steps with batch 3 kept, 3,000 points and 266,545
+  steps with all three batches);
+- reached (digest and event tallies of the batch-3 runs): 16,812 summons (181 in one battle; 72 removed ids in one
+  lap's turn sets), 912 skips (Stun skips and web-locked end turns), 13,953 web-locked flyer rows, 5,337 Stun rows,
+  48,126 Miner rows, Rallying Volley arrows on 279,989 rows; steals of every batch-3 ability but Web Aura, Infest and
+  Predatory Assimilation, and with all three batches kept 34 abilities (Lightning Spin 85, Double Punch 18, Skewer
+  Strike from a Queen 15, Backstab 4, the auras and blessings; up to 8 active abilities on one Queen); the traced draw
+  sites: Chakram bounce rolls 1,088 (counter-throws 52), AOE-tail break rolls 584, Absolving Arrow rolls 122, Stun
+  rolls 1,108, Predatory Assimilation chance rolls 1,044 and pick rolls 168;
+- unchanged: the default recorder output byte-identical to HEAD's (classic seeds 1001–1020, batches 1+2 kept on the
+  side mix 2001–2020, production-like kept with resume points 3001–3020), and `RECORD_CANDIDATES=1` byte-identical to
+  `parity/v08/record.ts` (v0.8s, rollout origin, layers, side mix, seeds 4001–4012: 70 candidate lists); classic
+  `check.sh 300 8400000` (50,956 steps); production-like batches 1+2 kept, 300 battles with 600 resume points
+  (8500000); `hoc-sim parity` 100/100 on v0.8s and v0.8sr side-mix layers; `ffi/smoke.ts 12 9100`, and 30 battles each
+  with batch 3 and with all three batches kept (`SMOKE_KEEP`); the rollout comparison 6,240 + 4,640 values identical,
+  and 6,240 + 6,400 with batch 3 and all batches kept; `zig build test`.
 
 Bridge (mid-battle export and load, resume, the C ABI and rollouts), checked on 2026-11-25 against common `50ae51c2`
 (details and overheads in `BRIDGE.md`):
@@ -577,23 +728,34 @@ pairwise 0%), and four pairs of the engine-only bench 609 and 601 ns per step, w
 ability-free path pays a mask test per ability probe (as before), one `State.augments` test per refresh and a zero
 break-chance test per hit.
 
-A battle state is a flat value of about 40 KB (40,432 bytes; 36 KB before abilities, 41 KB with three 8-entry spell
-lists per unit before the setup batch sized them 12/4/6), so a search rollout's snapshot and restore is one copy.
+A battle state is a flat value of about 47 KB (48,320 bytes; 40,432 before batch 3; 36 KB before abilities), so a
+search rollout's snapshot and restore is one copy. Batch 3 grew each unit from 1,184 to 1,424 bytes (spell lists
+12/4/6 -> 14/5/7, ten abilities instead of four, the uid and UUID, the stolen list, the Web lock and the Rallying
+Volley arrows) and added the holder order and the removed-unit sets; the summon templates live outside the State
+(one interned copy per template, `State.summons` points at it).
+
+Batch 3 kept the classic path within noise on a busy host: six alternated pairs of `native-bench --reps 3` (load 55 to
+60) gave medians of 304.4 µs (old) and 299.2 µs (new) per battle, pairwise -1.7%, and six pairs of the engine-only
+bench 576.0 and 561.5 ns per step, pairwise -2.9%, with the same run checksums (an earlier eight pairs at load 38 to 81:
++1.2% and -2.1%); retired instructions per pass (`/usr/bin/time -l`, the difference of two repetition counts) went
+from 4.23 to 4.11 billion per 1,000 battles and from 938 to 944 million per engine pass.
 
 Where Zig spends battle time (sampled, before the layer bitmap): `getMovePath` 31%, `doFindTarget` 14%, the melee
 target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the layers.
 
 ## Not covered yet
 
-- the abilities of every creature outside batches 1 and 2, spells and artifacts (and so Broken Aegis's +20 break
-  chance and self-miss); the revealed-ranged delivery layer of production's augment plan (it needs the live draft);
+- the abilities of every creature outside batches 1, 2 and 3, spells and artifacts (and so Broken Aegis's +20 break
+  chance and self-miss, spell summons, resurrection, magic-resist rolls and Borrowed Grace's copy, which needs a
+  copyable buff); the revealed-ranged delivery layer of production's augment plan (it needs the live draft);
   WATER_CENTER (never played); on the maps, Area Throw / Large Caliber on stones (`areaStrikeAtCell`), Quiver of
   Echoes' extra obstacle shot, Fire Breath through stones, artifact barrels, and `forceStalledLap` / the recovery net
   (never reached: 0 rejected engine calls in every map recording). The ported code leaves out what no battle in scope
   can reach: Made of Fire, Mechanism, Paralysis, the
   forbidden target (Terrifying Gaze), Water Shield and Water Element, Flesh Shield, the Dual Strike Charm, the aura
-  power types outside the three in scope, Skewer Strike from a large attacker, the Vine Throw cast, vines and the
-  Earth/Wind element pair (Thunderbird is not ported);
+  power types outside the four in scope, the Vine Throw cast (a stolen charge moves, unread), vines and the
+  Earth/Wind element pair (Thunderbird is not ported), Infest from a ranged kill (no shooter can hold it), and runs of
+  more stunned activations than the advance attempts allow (`forceStalledLap`, never seen);
 - the AI versions the research uses (v0.8 with the a19 search). The production rollout policy is the v0.8 chain, about
   67k lines of TypeScript; its port lives in `src/v08/` and builds on `ai.zig` (every declaration public,
   `playMatchWith` / `continueMatchWith` take the decide function, `initCtxInto` builds a decision context) and

@@ -6,6 +6,7 @@ const st = @import("state.zig");
 const engine = @import("engine.zig");
 const ai = @import("ai.zig");
 const terrain = @import("terrain.zig");
+const uuid = @import("uuid.zig");
 
 pub const Mismatch = struct {
     buf: [512]u8 = undefined,
@@ -91,40 +92,99 @@ fn sourcesMatch(list: *const st.SpellList, srcs: []const u8) bool {
     return i == list.len;
 }
 
+/// The "x;y,..." debuff column: the aura rows' source cells (the Web Aura's emitter); other rows store their power
+/// (Miner) or nothing and are compared as their power.
+fn debuffSourcesMatch(list: []const st.AppliedSpell, srcs: []const u8) bool {
+    if (srcs.len == 0) return list.len == 0;
+    var it = std.mem.splitScalar(u8, srcs, ',');
+    var i: usize = 0;
+    while (it.next()) |entry| : (i += 1) {
+        if (i >= list.len) return false;
+        const b = list[i];
+        if (b.laps != st.LAPS_AURA) continue;
+        var parts = std.mem.splitScalar(u8, entry, ';');
+        const xs = parts.next() orelse return false;
+        const ys = parts.next() orelse return false;
+        const x: i32 = if (xs.len == 0) -1 else (std.fmt.parseInt(i32, xs, 10) catch return false);
+        const y: i32 = if (ys.len == 0) -1 else (std.fmt.parseInt(i32, ys, 10) catch return false);
+        if (x != b.src_x or y != b.src_y) return false;
+    }
+    return i == list.len;
+}
+
+/// A comma-joined name list against ability ids, in order.
+fn abilityNamesMatch(ids_: []const st.AbilityId, names: []const u8) bool {
+    var it = std.mem.tokenizeScalar(u8, names, ',');
+    var i: usize = 0;
+    while (it.next()) |n| : (i += 1) {
+        if (i >= ids_.len or !std.mem.eql(u8, n, ids_[i].name())) return false;
+    }
+    return i == ids_.len;
+}
+
 fn column(row: []const std.json.Value, i: usize) ?[]const u8 {
     return if (i < row.len and row[i] == .string) row[i].string else null;
 }
 
-fn idSet(ids: []const []const u8, set: st.UnitSet, expected: std.json.Value, m: *Mismatch, what: []const u8) bool {
+/// The uid of unit id `id`: its index in `ids`, else (a unit summoned after the table was built, e.g. on a bridge
+/// handle) the uid of the slot holding that UUID.
+fn uidOf(s: *const st.State, ids: []const []const u8, id: []const u8) ?u8 {
+    if (rec.unitIndex(ids, id)) |i| return i else |_| {}
+    const want = uuid.parse(id) orelse return null;
+    for (s.units[0..s.n_units]) |*u| {
+        if (u.uid >= ids.len and u.uuid_ok and std.mem.eql(u8, &u.uuid, &want)) return u.uid;
+    }
+    return null;
+}
+
+pub const SetKind = enum { made, hourglass, replied };
+
+/// The removed units of that turn set (by uid).
+pub inline fn removedSet(f: *const st.Fight, kind: SetKind) *const st.UidSet {
+    return switch (kind) {
+        .made => &f.removed_made,
+        .hourglass => &f.removed_hourglass,
+        .replied => &f.removed_replied,
+    };
+}
+
+/// A turn set (slot bits, plus the removed units it still names by uid) against TypeScript's sorted id list.
+fn idSet(s: *const st.State, ids: []const []const u8, set: st.UnitSet, kind: SetKind, expected: std.json.Value, m: *Mismatch, what: []const u8) bool {
+    const removed = removedSet(&s.fight, kind);
     var count: usize = 0;
     for (expected.array.items) |e| {
-        const idx = rec.unitIndex(ids, e.string) catch {
+        const uid = uidOf(s, ids, e.string) orelse {
             m.set("{s}: unknown id", .{what});
             return false;
         };
-        if (set & (@as(st.UnitSet, 1) << @intCast(idx)) == 0) {
-            m.set("{s}: expected unit {d} in set", .{ what, idx });
+        var found = removed.has(uid);
+        if (!found) {
+            if (s.slotOf(uid)) |slot| found = set & (@as(st.UnitSet, 1) << @intCast(slot)) != 0;
+        }
+        if (!found) {
+            m.set("{s}: expected unit {d} in set", .{ what, uid });
             return false;
         }
         count += 1;
     }
-    if (@popCount(set) != count) {
-        m.set("{s}: zig has {d} units, ts {d}", .{ what, @popCount(set), count });
+    const zig_count = @popCount(set) + removed.count();
+    if (zig_count != count) {
+        m.set("{s}: zig has {d} units, ts {d}", .{ what, zig_count, count });
         return false;
     }
     return true;
 }
 
-fn queue(ids: []const []const u8, q: *const st.Queue, expected: std.json.Value, m: *Mismatch, what: []const u8) bool {
+fn queue(s: *const st.State, ids: []const []const u8, q: *const st.Queue, expected: std.json.Value, m: *Mismatch, what: []const u8) bool {
     const items = expected.array.items;
     if (items.len != q.len) {
         m.set("{s}: zig len {d}, ts len {d}", .{ what, q.len, items.len });
         return false;
     }
     for (items, 0..) |e, i| {
-        const idx = rec.unitIndex(ids, e.string) catch return false;
-        if (q.items[i] != idx) {
-            m.set("{s}[{d}]: zig unit {d}, ts unit {d}", .{ what, i, q.items[i], idx });
+        const uid = uidOf(s, ids, e.string) orelse return false;
+        if (s.units[q.items[i]].uid != uid) {
+            m.set("{s}[{d}]: zig unit {d}, ts unit {d}", .{ what, i, s.units[q.items[i]].uid, uid });
             return false;
         }
     }
@@ -132,20 +192,35 @@ fn queue(ids: []const []const u8, q: *const st.Queue, expected: std.json.Value, 
 }
 
 pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value, m: *Mismatch) bool {
+    if (s.overflow) {
+        m.set("a capacity of the port was exceeded (unit slots, ids, abilities or spell lists)", .{});
+        return false;
+    }
     // Units: TypeScript lists the units still in the holder, in insertion order.
     const units = rec.get(digest, "units").array.items;
     var k: usize = 0;
-    for (s.units[0..s.n_units], 0..) |*u, idx| {
-        if (!u.in_holder) continue;
+    for (s.holderOrder()) |slot| {
+        const u = &s.units[slot];
+        const idx = u.uid;
         if (k >= units.len) {
             m.set("unit {d} still in zig holder, ts removed it", .{idx});
             return false;
         }
         const row = units[k].array.items;
-        const ts_idx = rec.unitIndex(ids, row[0].string) catch return false;
+        const ts_idx = uidOf(s, ids, row[0].string) orelse {
+            m.set("holder slot {d}: unknown ts id {s}", .{ k, row[0].string });
+            return false;
+        };
         if (ts_idx != idx) {
             m.set("holder slot {d}: zig unit {d}, ts unit {d}", .{ k, idx, ts_idx });
             return false;
+        }
+        if (u.uuid_ok) {
+            var buf: [36]u8 = undefined;
+            if (!std.mem.eql(u8, uuid.format(&u.uuid, &buf), row[0].string)) {
+                m.set("unit {d} id: zig {s}, ts {s}", .{ idx, uuid.format(&u.uuid, &buf), row[0].string });
+                return false;
+            }
         }
         const nums = unitNumbers(u);
         for (1..unit_fields.len) |f| {
@@ -188,9 +263,10 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
         }
         // Batch-2 columns: the Aggr forced target, magic resist (Wardguard) and each buff's source cell.
         if (column(row, 44)) |t| {
-            const want: i32 = if (t.len == 0) -1 else (rec.unitIndex(ids, t) catch return false);
-            if (want != u.target) {
-                m.set("unit {d} target: zig {d}, ts {d}", .{ idx, u.target, want });
+            const want: i32 = if (t.len == 0) -1 else (uidOf(s, ids, t) orelse return false);
+            const got: i32 = if (u.target >= 0) s.units[@intCast(u.target)].uid else -1;
+            if (want != got) {
+                m.set("unit {d} target: zig {d}, ts {d}", .{ idx, got, want });
                 return false;
             }
         }
@@ -205,17 +281,45 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
             }
         }
         // Setup columns (recordings with augments or synergies): the Sniper shot distance and the two bases Bitter
-        // Experience moves.
+        // Experience moves. Then the batch-3 columns (digest.ts): rows of 47 columns have neither, 50 setup, 52 batch 3,
+        // 55 both.
+        const has_setup = row.len == 50 or row.len == 55;
         const setup_cols = [_]struct { []const u8, f64, usize }{
             .{ "shot_distance", u.shot_distance, 47 },
             .{ "base_armor_init", u.init.base_armor, 48 },
             .{ "steps_init", u.init.steps, 49 },
         };
-        for (setup_cols) |h| {
-            if (h[2] >= row.len) break;
+        if (has_setup) for (setup_cols) |h| {
             const e = rec.num(row[h[2]]);
             if (!eqNum(h[1], e)) {
                 m.set("unit {d} {s}: zig {d}, ts {d}", .{ idx, h[0], h[1], e });
+                return false;
+            }
+        };
+        if (row.len == 52 or row.len == 55) {
+            const b = row.len - 5;
+            if (!abilityNamesMatch(blk: {
+                var list: [st.MAX_ABILITIES]st.AbilityId = undefined;
+                for (u.abilities[0..u.n_abilities], 0..) |a, i| list[i] = a.id;
+                break :blk list[0..u.n_abilities];
+            }, column(row, b) orelse "")) {
+                m.set("unit {d} abilities: ts '{s}' (zig has {d})", .{ idx, column(row, b) orelse "", u.n_abilities });
+                return false;
+            }
+            if (!abilityNamesMatch(u.stolen[0..u.n_stolen], column(row, b + 1) orelse "")) {
+                m.set("unit {d} stolen_abilities: ts '{s}' (zig has {d})", .{ idx, column(row, b + 1) orelse "", u.n_stolen });
+                return false;
+            }
+            if (!eqNum(flag(u.web_locked), rec.num(row[b + 2]))) {
+                m.set("unit {d} web_locked: zig {}, ts {d}", .{ idx, u.web_locked, rec.num(row[b + 2]) });
+                return false;
+            }
+            if (!debuffSourcesMatch(u.debuffs.items[0..u.debuffs.len], column(row, b + 3) orelse "")) {
+                m.set("unit {d} debuffs_sources: ts '{s}'", .{ idx, column(row, b + 3) orelse "" });
+                return false;
+            }
+            if (!eqNum(u.rallying_volley_granted, rec.num(row[b + 4]))) {
+                m.set("unit {d} rallying_volley_granted: zig {d}, ts {d}", .{ idx, u.rallying_volley_granted, rec.num(row[b + 4]) });
                 return false;
             }
         }
@@ -245,13 +349,13 @@ pub fn state(s: *const st.State, ids: []const []const u8, digest: std.json.Value
             return false;
         }
     }
-    if (!queue(ids, &fs.up_next, rec.get(f, "upNext"), m, "upNext")) return false;
-    if (!queue(ids, &fs.hourglass_q, rec.get(f, "hourglassQ"), m, "hourglassQ")) return false;
-    if (!queue(ids, &fs.morale_plus_q, rec.get(f, "moralePlusQ"), m, "moralePlusQ")) return false;
-    if (!queue(ids, &fs.morale_minus_q, rec.get(f, "moraleMinusQ"), m, "moraleMinusQ")) return false;
-    if (!idSet(ids, fs.made, rec.get(f, "made"), m, "made")) return false;
-    if (!idSet(ids, fs.hourglass_set, rec.get(f, "hourglassSet"), m, "hourglassSet")) return false;
-    if (!idSet(ids, fs.replied, rec.get(f, "replied"), m, "replied")) return false;
+    if (!queue(s, ids, &fs.up_next, rec.get(f, "upNext"), m, "upNext")) return false;
+    if (!queue(s, ids, &fs.hourglass_q, rec.get(f, "hourglassQ"), m, "hourglassQ")) return false;
+    if (!queue(s, ids, &fs.morale_plus_q, rec.get(f, "moralePlusQ"), m, "moralePlusQ")) return false;
+    if (!queue(s, ids, &fs.morale_minus_q, rec.get(f, "moraleMinusQ"), m, "moraleMinusQ")) return false;
+    if (!idSet(s, ids, fs.made, .made, rec.get(f, "made"), m, "made")) return false;
+    if (!idSet(s, ids, fs.hourglass_set, .hourglass, rec.get(f, "hourglassSet"), m, "hourglassSet")) return false;
+    if (!idSet(s, ids, fs.replied, .replied, rec.get(f, "replied"), m, "replied")) return false;
     const ember = rec.get(f, "emberTeams");
     if (ember == .array) {
         var teams: u8 = 0;
