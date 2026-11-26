@@ -20,7 +20,9 @@ Zig plays whole battles that match the TypeScript `runMatch` step for step, for 
   setup); a team holding the disabled Broken Aegis or Holy Cross is refused;
 - the wave-1 spells (below): Heal, Blessing, Lightning Strike, Fire Strike, Meteor Shower, Meteorite, Ring of Fire, Summon
   Wolves and Vine Throw, with the casters' spellbooks (Healer, Battle Mage, Satyr, Magic Dragon, Trent, and a Queen that
-  stole one), the MAGIC attack type, the vines and the Wolves they summon; a book holding any other spell is refused;
+  stole one), the MAGIC attack type, the vines and the Wolves they summon; of wave 2 so far, the Wandering Mage's
+  Fireball (Fire Strike's gate and trajectory, then the blast: the unit it burst on, then the living units on the impact
+  cell and its ring, allies too, the caster spared); a book holding any other spell is refused;
 - the army setup `runMatch` applies before the fight: the augments (Armor, Might, Sniper, Movement, Placement; Empower
   is carried but read by nothing in scope), doctrines (their upgrade budget) and synergies (Life, Chaos, Might and
   Nature, both variants, levels 1 to 3), including the Chaos break-on-attack roll and the Break effect;
@@ -1360,7 +1362,7 @@ target layers 22%, the engine 20%. None of it is tuned beyond one bitmap for the
 ## Not covered yet
 
 - the abilities of every creature outside batches 1 to 5 and the wave-1 casters, the spells outside wave 1 (Spiritual
-  Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Fireball, Smoke, Craft, Wind Flow, Resurrection, Castling, the
+  Armor, Mass Heal, Courage, Helping Hand, Whirlpool, Smoke, Craft, Wind Flow, Resurrection, Castling, the
   runes and the rest: a book holding one is refused by name), the disabled Broken Aegis
   (its +20 break chance and self-miss) and Holy Cross (resurrection, the magic-resist and mirror rolls of debuff
   spells), Crafted Double Shot; the revealed-ranged delivery layer of production's augment plan (it needs the live

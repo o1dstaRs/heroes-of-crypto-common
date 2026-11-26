@@ -236,7 +236,9 @@ fn endpointCells(s: *const State, base: Cell) Body {
 }
 
 /// The best candidate of interceptedThrowTrajectory: 0 unobstructed, 1 a body intercepts (`blocker`, a slot), 2 terrain.
-pub const Trajectory = struct { obstruction: u2, blocker: u8 = 0 };
+/// `impact`: the target-body cell the ray entered (else the aimed endpoint cell), or the blocker's cell
+/// (resolveThrownSpellImpact's `cell`: Fireball's blast centre).
+pub const Trajectory = struct { obstruction: u2, blocker: u8 = 0, impact: Cell = .{ .x = 0, .y = 0 } };
 
 /// interceptedThrowTrajectory (Fire Strike): every observable edge of the target's body, the pixel ray from the
 /// caster's body centre to its centre (traceGridRayCells), the first cell that is neither empty, lava, the caster nor
@@ -258,20 +260,23 @@ pub fn trajectory(s: *const State, ci: u8, ti: u8) ?Trajectory {
         for (0..4) |side| {
             if (!thrownSideObservable(s, cell, side, caster.team)) continue;
             const p = combat.sideCenter(cell, @intCast(side), fp[0], fp[1]);
-            var t: Trajectory = .{ .obstruction = 0 };
+            var t: Trajectory = .{ .obstruction = 0, .impact = cell };
             var ray: combat.Ray = undefined;
             combat.traceRayInto(&ray, fp[0], fp[1], p[0], p[1]);
             for (ray.items[0..ray.len]) |h| {
                 if (!engine.cellWithinGrid(h.cell)) continue;
                 const o = boardAt(s, h.cell);
-                if (o != st.EMPTY and o == target_code) break;
+                if (o != st.EMPTY and o == target_code) {
+                    t.impact = h.cell;
+                    break;
+                }
                 if (o == st.EMPTY or o == caster_code or o == st.LAVA) continue;
                 if (o == st.BLOCK or o == st.HOLE) {
                     t.obstruction = 2;
                     break;
                 }
                 if (allyOfCaster(s, caster.team, o)) continue;
-                t = .{ .obstruction = 1, .blocker = o - 1 };
+                t = .{ .obstruction = 1, .blocker = o - 1, .impact = h.cell };
                 break;
             }
             const dx = p[0] - fp[0];
@@ -295,7 +300,7 @@ pub fn lineOfSightClear(s: *const State, ci: u8, ti: u8, spell: CS) bool {
     switch (spell) {
         .vine_throw => return !sightBlocked(s, from, to, .creatures),
         .ring_of_fire => return !sightBlocked(s, from, to, .creatures_and_terrain),
-        .fire_strike => {
+        .fire_strike, .fireball => {
             // hasObservableThrownSpellEdge over target.getCells()
             const team = s.units[ci].team;
             const cells = engine.unitCells(&s.units[ti]);
@@ -320,7 +325,7 @@ pub fn lineOfSightClear(s: *const State, ci: u8, ti: u8, spell: CS) bool {
 /// MORALE_SCALED_SPELLS (spell_damage.ts) among the ported ones: isOffensiveSpellMultiplier's set.
 pub inline fn moraleScaled(spell: CS) bool {
     return switch (spell) {
-        .lightning_strike, .ring_of_fire, .meteor_shower, .meteorite, .fire_strike, .heal => true,
+        .lightning_strike, .ring_of_fire, .meteor_shower, .meteorite, .fire_strike, .heal, .fireball => true,
         else => false,
     };
 }
@@ -613,6 +618,7 @@ pub fn castSpell(s: *State, ci: u8, spell_raw: u8, target: ?u8, cell: ?Cell, eve
     if (ti) |t| switch (spell) {
         .vine_throw => return vineThrow(s, ci, t, spell, cfg, events),
         .fire_strike => return fireStrike(s, ci, t, spell, cfg, events),
+        .fireball => return fireball(s, ci, t, spell, cfg, events),
         .lightning_strike => return lightningStrike(s, ci, t, spell, cfg, events),
         .ring_of_fire => return ringOfFire(s, ci, t, spell, cfg, events),
         else => {},
@@ -760,6 +766,35 @@ fn fireStrike(s: *State, ci: u8, ti: u8, spell: CS, cfg: *const st.SpellConfig, 
         victim = t.blocker;
     }
     damageTail(s, ci, spell, cfg, &.{victim}, events);
+}
+
+/// fireballCast: Fire Strike's gate and intercepted trajectory, then the blast: the unit the throw burst on (the aimed
+/// target, or the enemy screening it) first, then every other living unit with a cell in [impact, ring(impact)], in that
+/// cell order, each once, allies included and the caster spared (stones and barrels stay); the shared damage tail.
+fn fireball(s: *State, ci: u8, ti: u8, spell: CS, cfg: *const st.SpellConfig, events: *Events) Reject!void {
+    if (!canCastSpell(s, ci, ti, spell, cfg)) return error.Rejected;
+    const t = trajectory(s, ci, ti) orelse return error.Rejected; // blockedByTerrain
+    if (t.obstruction == 2) return error.Rejected;
+    var epicentre = ti;
+    if (t.obstruction == 1 and t.blocker != ti) {
+        const v = &s.units[t.blocker];
+        if (!v.in_holder or v.isDead()) return error.Rejected;
+        epicentre = t.blocker;
+    }
+    var cells: Cells = .{};
+    cells.push(t.impact);
+    var ring: Cells = .{};
+    cellsAroundCell(t.impact, &ring);
+    for (ring.slice()) |c| cells.push(c);
+    var affected: Slots = .{};
+    affectedUnits(s, cells.slice(), &affected);
+    var caught: Slots = .{};
+    caught.push(epicentre);
+    for (affected.slice()) |x| {
+        if (s.units[x].isDead() or x == ci or x == epicentre) continue;
+        caught.push(x);
+    }
+    damageTail(s, ci, spell, cfg, caught.slice(), events);
 }
 
 /// lightningStrikeCast: any enemy on the board (canCastSpell again), no line of sight.

@@ -406,6 +406,8 @@ pub const AbilityId = enum(u8) {
     tome_of_elements,
     magic_reflection,
     sylvan_focus_blessing,
+    // spells (wave 2): the casters' spellbook cards
+    book_of_chaos,
     // batch 4
     /// The mindless pin: the unit plays v0.1 whatever its seat (no engine reader).
     ai_driven,
@@ -501,6 +503,7 @@ pub const AbilityId = enum(u8) {
             .basic_tome_of_battle_magic => "Basic Tome of Battle Magic",
             .forest_spellbook => "Forest Spellbook",
             .tome_of_elements => "Tome of Elements",
+            .book_of_chaos => "Book of Chaos",
             .magic_reflection => "Magic Reflection",
             .sylvan_focus_blessing => "Sylvan Focus Blessing",
             .ai_driven => "AI Driven",
@@ -541,13 +544,14 @@ pub const AbilityId = enum(u8) {
             .forest_spellbook => spell == .summon_wolves,
             .basic_tome_of_battle_magic => spell == .fire_strike or spell == .meteorite,
             .tome_of_elements => spell == .lightning_strike or spell == .ring_of_fire or spell == .meteor_shower,
+            .book_of_chaos => spell == .fireball,
             else => false,
         };
     }
 
     pub inline fn isSpellbook(self: AbilityId) bool {
         return switch (self) {
-            .book_of_healing, .basic_tome_of_battle_magic, .forest_spellbook, .tome_of_elements => true,
+            .book_of_healing, .basic_tome_of_battle_magic, .forest_spellbook, .tome_of_elements, .book_of_chaos => true,
             else => false,
         };
     }
@@ -610,6 +614,8 @@ pub const CastSpell = enum(u8) {
     // batch 4: castable abilities
     battle_roar,
     wild_regeneration,
+    // wave 2b: the Wandering Mage's Book of Chaos
+    fireball,
 
     pub fn name(self: CastSpell) []const u8 {
         return switch (self) {
@@ -624,6 +630,7 @@ pub const CastSpell = enum(u8) {
             .ring_of_fire => "Ring of Fire",
             .battle_roar => "Battle Roar",
             .wild_regeneration => "Wild Regeneration",
+            .fireball => "Fireball",
         };
     }
 
