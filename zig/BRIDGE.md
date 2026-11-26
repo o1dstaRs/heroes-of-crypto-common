@@ -293,10 +293,11 @@ exact doubles.
   the walk's legality, length, travelled count, lava flag or, with burning cells, any cell; a path-bearing strike's
   route that changes the approach; a strike the refreshed map cannot reach refused for want of that route; a path-less
   approach the full map accepts), "... a lap ..." (a lap left unmarked by a 0-damage statistic that adds a narrowing
-  lap) and "... an obstacle strike ..." (its provider's approach differs, or its stat refresh changed a unit the strike
-  can read before its own refresh: a walk in, a shot, Lightning Spin, Skewer Strike, burning cells, a strike that burns
-  or does not land). The refresh at moves and melee approaches and a stationary strike's one-cell charge decide values
-  in the cohorts and match there, so they are served. A cohort that shows a flagged path deciding a value (with Zig
+  lap) and "... an obstacle strike ..." (its provider's approach differs from the action's path, or the refreshed map
+  cannot reach it). The refresh at moves and melee approaches and a stationary strike's one-cell charge decide values
+  in the cohorts and match there; at obstacle strikes the provider's calls match the server's call for call
+  (`rollout-trace` prints them as `kp` per step from `server.kp_log`, the oracle logs its provider the same way), the
+  refresh changing stats there included. These are served. A cohort that shows a flagged path deciding a value (with Zig
   agreeing) lifts its flag.
 
 The v0.8 policy reads a per-battle table besides the State (`v08/util.zig` `battle`: each slot's creature, its id rank

@@ -11,6 +11,7 @@ const std = @import("std");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
 const engine = @import("engine.zig");
+const server = @import("server.zig");
 const compare = @import("compare.zig");
 const pathing = @import("path.zig");
 const ai = @import("ai.zig");
@@ -715,6 +716,18 @@ const TraceOut = struct {
             try w.print("{d}/{d}/{d}/{d}/{d}/{d}/{d}/{}/{} ", .{ u.morale, u.luck, u.luck_mod, u.steps, u.steps_mod, u.base_attack, u.attack_mod, u.on_hourglass, u.responded });
         }
         try w.writeAll("\"");
+        // The provider calls since the previous line (server mode): [map size, stats changed, steps changed].
+        if (server.kp_log) |l| {
+            if (l.n != 0) {
+                try w.writeAll(",\"kp\":[");
+                for (l.items[0..@min(l.n, l.items.len)], 0..) |e, k| {
+                    if (k != 0) try w.writeAll(",");
+                    try w.print("[{d},{d},{d}]", .{ e.size, @intFromBool(e.stats), @intFromBool(e.steps) });
+                }
+                try w.writeAll("]");
+                l.n = 0;
+            }
+        }
         if (kind == .decide and self.digests) {
             try w.writeAll(",\"d\":");
             try digest.write(w, s, self.ident.ids);
@@ -749,6 +762,9 @@ fn rolloutTrace(gpa: std.mem.Allocator, state_file: []const u8, request_file: []
     var t: TraceOut = .{ .out = &out.writer, .ident = req.identity.?, .state = &e.scratch, .digests = digests };
     rollout.trace = .{ .ctx = &t, .f = TraceOut.step };
     defer rollout.trace = null;
+    var kp: server.KpLog = .{};
+    server.kp_log = &kp;
+    defer server.kp_log = null;
     const policy = @import("v08/policy.zig");
     policy.hook = .{ .ctx = &t, .f = TraceOut.layer };
     defer policy.hook = null;

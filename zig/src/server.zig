@@ -25,22 +25,15 @@ const Cell = st.Cell;
 ///   refreshed map cannot reach refused for want of that route, and a path-less approach the full map accepts;
 /// - UNVERIFIED_ZERO_LAP: a lap left unmarked by a 0-damage statistic (runMatch's holder marks it) that adds a
 ///   narrowing lap;
-/// - UNVERIFIED_OBSTACLE: an obstacle strike whose provider approach differs from runMatch's, or whose stat refresh
-///   changed a unit the strike can read before its own refresh (a walk in, a shot, Lightning Spin, Skewer Strike,
-///   burning cells, a strike that burns or does not land).
+/// - UNVERIFIED_OBSTACLE: an obstacle strike whose provider approach differs from runMatch's, or that the refreshed map
+///   cannot reach, refused for want of that route.
 /// The provider's refresh at moves and melee approaches and a stationary strike's one-cell charge decide values in the
-/// cohorts, and Zig matches them there, so they are not flagged.
+/// cohorts, and Zig matches them there; at obstacle strikes the provider's calls and their refresh match the server's
+/// call for call (kp_log against the oracle's provider log, the refresh changing stats there included). None of them is
+/// flagged.
 pub const UNVERIFIED_ROUTE: u8 = 1;
 pub const UNVERIFIED_ZERO_LAP: u8 = 2;
 pub const UNVERIFIED_OBSTACLE: u8 = 4;
-
-/// What the provider's refresh can change: the units and the aggression boards (a hash of their bytes).
-pub fn fingerprint(s: *const State) u64 {
-    var h = std.hash.Wyhash.init(0);
-    h.update(std.mem.sliceAsBytes(s.units[0..s.n_units]));
-    h.update(std.mem.asBytes(&s.grid.aggr));
-    return h.final();
-}
 
 /// The travelled part of a route (travelledMovePath: without its leading base cell).
 pub fn travelledOf(r: []const Cell, base: Cell) []const Cell {
@@ -63,6 +56,32 @@ fn cellsInOrder(a: []const Cell, b: []const Cell) bool {
     return true;
 }
 
+/// `hoc-sim rollout-trace`'s provider log (debugging, this thread; null everywhere else): each knownPaths call's map
+/// size (-1 without a map), and whether its stat refresh changed the trace's per-unit stats line ("h": morale, luck,
+/// steps, base attack and their modifiers, the hourglass and reply flags) or the active unit's steps, as the server
+/// oracle records its provider's calls, so the two call sequences can be compared step by step.
+pub const KpEntry = struct { size: i32, stats: bool, steps: bool };
+pub const KpLog = struct {
+    n: usize = 0,
+    items: [64]KpEntry = undefined,
+
+    fn push(self: *KpLog, e: KpEntry) void {
+        if (self.n < self.items.len) self.items[self.n] = e;
+        self.n += 1;
+    }
+};
+pub threadlocal var kp_log: ?*KpLog = null;
+
+fn statsLine(s: *const State) u64 {
+    var h = std.hash.Wyhash.init(0);
+    for (s.holderOrder()) |i| {
+        const u = &s.units[i];
+        h.update(std.mem.asBytes(&[_]f64{ u.morale, u.luck, u.luck_mod, u.steps, u.steps_mod, u.base_attack, u.attack_mod }));
+        h.update(&[_]u8{ @intFromBool(u.on_hourglass), @intFromBool(u.responded) });
+    }
+    return h.final();
+}
+
 /// What the provider answered: no live active unit in the holder (undefined: the caller trusts the action, as
 /// runMatch does), an empty map (the active unit cannot move), or the active unit's known paths.
 pub const Known = enum { none, empty, paths };
@@ -73,13 +92,22 @@ pub const Known = enum { none, empty, paths };
 /// from the active unit's base cell with its refreshed getSteps, the enemy team's rebuilt board, flight, footprint, the
 /// fight's vines and fire walls, In Its Own World and canTraverseLava, written into `out`.
 pub fn knownPaths(s: *State, out: *pathing.MovePath) Known {
-    if (s.active < 0) return .none;
+    const log = kp_log;
+    if (s.active < 0 or !s.units[@intCast(s.active)].in_holder) {
+        if (log) |l| l.push(.{ .size = -1, .stats = false, .steps = false });
+        return .none;
+    }
     const ui: u8 = @intCast(s.active);
     const u = &s.units[ui];
-    if (!u.in_holder) return .none;
-    if (!u.canMove()) return .empty;
+    if (!u.canMove()) {
+        if (log) |l| l.push(.{ .size = 0, .stats = false, .steps = false });
+        return .empty;
+    }
+    const stats0 = if (log != null) statsLine(s) else 0;
+    const steps0 = if (log != null) engine.getSteps(u) else 0;
     engine.refreshStackPowerForAllUnits(s);
     rebuildAggrBoards(s);
+    defer if (log) |l| l.push(.{ .size = @intCast(out.size()), .stats = statsLine(s) != stats0, .steps = engine.getSteps(u) != steps0 });
     const m = pathing.buildMatrix(s);
     pathing.getMovePath(&m, .{
         .start = engine.baseCell(u),

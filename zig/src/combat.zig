@@ -2666,20 +2666,12 @@ pub fn obstacleAttackAt(s: *State, ai: u8, tx: f64, ty: f64, from: ?Cell, path: 
     // resolveKnownPaths when the action has an attack-from cell (the server's provider is asked then, a shot too).
     var route_buf: server.RouteBuf = .{};
     var am = server.Approach.fromPath(path, s.action_lava);
-    // The provider at an obstacle strike is unverified (server.UNVERIFIED_OBSTACLE): flagged where its approach differs
-    // from runMatch's, or where its refresh changed a unit that the strike can read before its own refresh below.
-    var refreshed = false;
-    var reads_refresh = true;
     if (from) |f| {
         if (s.engine_mode == .server) {
-            const before = server.fingerprint(s);
+            // The provider's call and refresh here match the server call for call (server.kp_log); an approach that
+            // differs from runMatch's is still unverified (server.UNVERIFIED_OBSTACLE).
             am = server.approach(s, f, path, s.action_lava, &route_buf);
-            refreshed = server.fingerprint(s) != before;
             if (approachDiffers(s, ai, am, path)) s.server_unverified |= server.UNVERIFIED_OBSTACLE;
-            // A stationary melee strike without Lightning Spin or Skewer Strike on a board without burning cells reads
-            // no refreshed field before that refresh (spendObstacleHit, Double Punch).
-            const b = engine.baseCell(att);
-            reads_refresh = can_land_range or !(b.x == f.x and b.y == f.y) or att.has(.lightning_spin) or att.has(.skewer_strike) or s.fight.n_fire != 0;
         }
         const base = engine.baseCell(att);
         const approaching = !can_land_range and !(base.x == f.x and base.y == f.y);
@@ -2694,8 +2686,6 @@ pub fn obstacleAttackAt(s: *State, ai: u8, tx: f64, ty: f64, from: ?Cell, path: 
     var burned = false;
     const completed = handleObstacleAttack(s, ai, tx, ty, from, am, &died, &burned);
     const landed = if (scattered) terrain.standingCount(s) < standing_before else terrain.hitsLeft(s) < hits_before;
-    // A burned or refused strike keeps the provider's refresh past this action.
-    if (refreshed and (reads_refresh or burned or !completed or !landed)) s.server_unverified |= server.UNVERIFIED_OBSTACLE;
     if (burned) {
         cleanupDeadUnits(s, &died, events, null);
         engine.completeTurn(s, ai, false, false, events);
