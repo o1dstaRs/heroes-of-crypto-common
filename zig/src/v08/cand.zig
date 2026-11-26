@@ -12,6 +12,7 @@ const combat = @import("../combat.zig");
 const path = @import("../path.zig");
 const ai = @import("../ai.zig");
 const util = @import("util.zig");
+const fuse = @import("fuse.zig");
 const abilities = @import("../abilities.zig");
 const artifacts = @import("../artifacts.zig");
 const terrain = @import("../terrain.zig");
@@ -409,6 +410,15 @@ const Gen = struct {
         return .{ .value = @min(damage, hp), .kill = if (damage >= hp) 1 else 0 };
     }
 
+    /// A direct offensive cast: estimateLastFuseSpellDamage where it prices the cast, else offensiveSpellDamage.
+    fn directSpellDamage(self: *const Gen, spell: spells.CS, cfg: *const st.SpellConfig, ti: u8) Damage {
+        const t = &self.c.s.units[ti];
+        const absorbed = abilities.absorbsHit(t);
+        const landed = if (absorbed) 0 else spells.damageAgainst(spells.rawDamage(self.unit(), spell, cfg), cfg.element, t);
+        if (fuse.lastFuseSpell(self.c.s, self.unit(), ti, landed, absorbed)) |est| return .{ .value = est.net, .kill = if (est.secure) 1 else 0 };
+        return self.spellDamage(spell, cfg, ti);
+    }
+
     /// ringOfFireDamage: every other living stack touching the target's body (the caster and the target spared), enemy
     /// damage counted for and friendly damage against; null for an empty ring.
     fn ringDamage(self: *const Gen, spell: spells.CS, cfg: *const st.SpellConfig, ti: u8) ?Damage {
@@ -647,7 +657,7 @@ const Gen = struct {
                         if (!spells.canCastSpell(s, self.c.ui, k, spell, cfg)) continue;
                         if (!reachesAimedTarget(s, self.c.ui, k, spell)) continue;
                         if (cfg.multiplier == st.SpellMultiplier.UNIT_AMOUNT_DAMAGE) {
-                            const d = if (spell == .ring_of_fire) (self.ringDamage(spell, cfg, k) orelse continue) else self.spellDamage(spell, cfg, k);
+                            const d = if (spell == .ring_of_fire) (self.ringDamage(spell, cfg, k) orelse continue) else self.directSpellDamage(spell, cfg, k);
                             self.pushSpell(b.spell, k, null, d.value, d.kill);
                         } else self.pushSpell(b.spell, k, null, 0, 0);
                     }
@@ -855,16 +865,6 @@ const Gen = struct {
         return js.toFixed(@max(0, stacked + engine.getLuck(u) + syn), 1);
     }
 
-    /// projectRangeShotsAfterVolleys: the arrows left after `volleys` volleys (an active Endless Quiver costs none; a
-    /// range_shots_mod override never runs dry; Dense Flesh is not in scope).
-    fn shotsAfter(u: *const st.Unit, volleys: f64) f64 {
-        const per: f64 = if (u.ability_mask & st.AbilityId.endless_quiver.bit() != 0 and u.has(.endless_quiver)) 0 else 1;
-        const cost = per * @max(0, volleys);
-        if (cost <= 0) return engine.getRangeShots(u);
-        if (u.range_shots_mod != 0) return u.range_shots_mod;
-        return @max(0, @floor(u.range_shots) - cost);
-    }
-
     const Mods = struct {
         raw_min: f64,
         raw_max: f64,
@@ -903,7 +903,7 @@ const Gen = struct {
                 var next: [32]State = undefined;
                 var k: usize = 0;
                 for (st_[0..n_.*]) |state| {
-                    if (state.damage >= hp_ or shotsAfter(uu, state.spent) <= 0) {
+                    if (state.damage >= hp_ or fuse.shotsAfter(uu, state.spent) <= 0) {
                         next[k] = state;
                         k += 1;
                         continue;
@@ -951,9 +951,18 @@ const Gen = struct {
         const opp = engine.opposite(u.team);
         const ammo_any = true; // shotsAfter does not read the ammunition target (Dense Flesh is not in scope)
         _ = ammo_any;
-        const second_mul: f64 = if (shotsAfter(u, 1) > 0) prep.second else 0;
+        // A stationary ordinary shot whose ray holds one enemy stack: estimateLastFuseRangedDamage, when it prices it.
+        if (!prep.physical_aoe and g.n == 1 and g.group(0).len == 1) {
+            const only = g.group(0)[0];
+            if (s.units[only].team == opp) {
+                if (fuse.lastFuseRanged(s, u, only, g.divisors[0])) |f| {
+                    return .{ .ed = f.net, .ek = if (only == primary and f.secure) 1 else 0 };
+                }
+            }
+        }
+        const second_mul: f64 = if (fuse.shotsAfter(u, 1) > 0) prep.second else 0;
         const spent_volleys: f64 = if (prep.through or second_mul == 0) 1 else 2;
-        const bonus_available = shotsAfter(u, spent_volleys) > 0;
+        const bonus_available = fuse.shotsAfter(u, spent_volleys) > 0;
         const groups: usize = if (prep.through) g.n else @min(1, g.n);
         var value: f64 = 0;
         var kill: u8 = 0;
@@ -988,12 +997,12 @@ const Gen = struct {
                 effective = 0;
                 for ([_][3]f64{ .{ 0, miss, 0 }, .{ first_c, hit, 1 } }) |o1| {
                     if (o1[1] == 0) continue;
-                    const follow = prep.second > 0 and shotsAfter(u, o1[2]) > 0;
+                    const follow = prep.second > 0 and fuse.shotsAfter(u, o1[2]) > 0;
                     const seconds: []const [3]f64 = if (follow) &[_][3]f64{ .{ 0, miss, o1[2] }, .{ second_c, hit, o1[2] + 1 } } else &[_][3]f64{.{ 0, 1, o1[2] }};
                     for (seconds) |o2| {
                         if (o2[1] == 0) continue;
                         const native = @min(o1[0] + o2[0], hp);
-                        const echo_damage = if (prep.echo > 0 and shotsAfter(u, o2[2]) > 0)
+                        const echo_damage = if (prep.echo > 0 and fuse.shotsAfter(u, o2[2]) > 0)
                             prep.echo * hit * (@min(o1[0] + o2[0] + first_c, hp) - native)
                         else
                             0;
@@ -1322,7 +1331,24 @@ const Gen = struct {
                     return;
                 }
                 if (dmg[ti] == null) dmg[ti] = g.meleeDamage(ti);
-                const v = dmg[ti].?;
+                var v = dmg[ti].?;
+                // A Last Fuse army: estimateLastFuseMeleeDamage replaces the plain estimate where it prices the strike.
+                if (g.unit().buffs.find(.last_fuse) != null) {
+                    const own = engine.baseCell(g.unit());
+                    var shape: fuse.MeleeShape = .{};
+                    if (route) |ri| {
+                        if (cell.x != own.x or cell.y != own.y) {
+                            const mp = g.movePath().?;
+                            const r = &mp.known()[ri];
+                            // the move's path: the route's cells from the start (MovePath.routeCells)
+                            var len: usize = 0;
+                            var cur: ?*const path.Route = r;
+                            while (cur) |x| : (len += 1) cur = if (x.parent < 0) null else &mp.routes[@intCast(x.parent)];
+                            shape = .{ .moved = true, .charge = @floatFromInt(len), .lava = r.has_lava };
+                        }
+                    }
+                    if (fuse.lastFuseMelee(g.c.s, g.c.ui, ti, shape, cell)) |est| v = .{ .ed = est.net, .ek = if (est.secure) 1 else 0 };
+                }
                 ps[n.*] = .{ .target = ti, .cell = cell, .route = route, .ed = v.ed, .ek = v.ek, .index = @intCast(n.*) };
                 n.* += 1;
             }

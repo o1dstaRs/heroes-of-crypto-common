@@ -9,6 +9,7 @@ const st = @import("../state.zig");
 const ai = @import("../ai.zig");
 const util = @import("util.zig");
 const cand = @import("cand.zig");
+const fuse = @import("fuse.zig");
 const engine = @import("../engine.zig");
 const path = @import("../path.zig");
 const js = @import("../jsnum.zig");
@@ -226,7 +227,8 @@ fn forbiddenTarget(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
 fn splashRanged(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const u = c.unit();
     const through = u.has(.through_shot);
-    if (!(u.has(.area_throw) or u.has(.large_caliber) or through)) return util.copyDecision(out, in);
+    // Area Throw, Large Caliber, a Through Shot line, or an army holding Last Fuse (its blast prices single impacts).
+    if (!(u.has(.area_throw) or u.has(.large_caliber) or through or u.buffs.find(.last_fuse) != null)) return util.copyDecision(out, in);
     if (!util.has(in, .range_attack) and !util.has(in, .area_throw_attack)) return util.copyDecision(out, in);
     var set: cand.Set = .{};
     // enumerateCandidates({maxMoveDestinations: 1, maxMeleePairs: 1, enrichIncumbentMetadata, throughShotFreeAim}): only
@@ -1110,70 +1112,11 @@ pub fn backlineWard(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void 
 
 // ---- ranged positioning (v0_8_ranged_positioning.ts), production path: the pinned retreat ----
 
-/// Unit.calculateAttackDamageMin/Max at an explicit attack rate (combat.damageBound reads the unit's own attack), with
-/// the attacker team's synergy power in getEnemyArmor (an active Piercing Spear scales the armor by 1 - multiplier).
-fn boundAt(att: *const st.Unit, tgt: *const st.Unit, dmg: f64, rate_in: f64, is_range: bool) f64 {
-    // adjustWarlordsEdgeAttackRate re-prices the explicit rate too.
-    const rate = if (att.we_base != 0) artifacts.warlordsEdgeRate(att, rate_in, is_range) else rate_in;
-    var armor = if (is_range) engine.getRangeArmor(tgt) else engine.getArmor(tgt);
-    if (att.ability(.piercing_spear)) |ps| armor = armor * (1 - abilities.abilityMultiplierSyn(att, ps, att.syn_power));
-    const luck = engine.getLuck(tgt);
-    return @max(1, @ceil(((((dmg * rate * att.amount_alive) / armor) * (1 - luck / 100)) / 1) * att.attack_multiplier * 1));
-}
-
-/// chargeDistance: the move's path length, else the strike's, else 1.
-fn chargeDistance(actions: []const rec.Action) f64 {
-    for (actions) |a| if (a == .move_unit and a.move_unit.path.len > 0) return @floatFromInt(a.move_unit.path.len);
-    for (actions) |a| if (a == .melee_attack and a.melee_attack.path.len > 0) return @floatFromInt(a.melee_attack.path.len);
-    return 1;
-}
-
-/// estimatePrimaryMeleeDamage(...).secureKill for a strike from `from` (src/ai/melee_damage_estimate.ts): null for an
-/// unsupported sequence (a lava move, Lightning Spin, Double Punch, Skewer Strike), else whether the hit cannot miss
-/// and every landed outcome of the damage chain kills: Rapid Charge over the charge distance and Backstab from `from`
-/// after the roll, the ranged unit's half-strength swing unless Handyman, Lucky Strike's chance and multiplier, and
-/// Penetrating Bite's bonus, under one floor with the target's Deep Wounds (calculateActiveDeepWoundsEffect). War
-/// Anger (the aura attack terms), Paralysis, Fire Breath and Chain Lightning are not in scope; the elemental factor is
-/// 1 (no Fire, Water or Wind Element holder in scope).
+/// estimatePrimaryMeleeDamage(...).secureKill for a strike from `from` (fuse.primaryMelee): null for an unsupported
+/// sequence, else whether the hit cannot miss and every landed outcome kills.
 fn meleeSecureKill(s: *const st.State, ai_: u8, ti: u8, actions: []const rec.Action, from: rec.Cell) ?bool {
-    const u = &s.units[ai_];
-    const t = &s.units[ti];
-    if (t.isDead()) return null;
-    for (actions) |a| if (a == .move_unit and a.move_unit.has_lava) return null;
-    if (u.has(.lightning_spin) or u.has(.double_punch) or u.has(.skewer_strike)) return null;
-    const rate = @max(u.base_attack, engine.getAttack(u));
-    var handler: f64 = 1;
-    if (u.ability(.rapid_charge)) |rc| {
-        const base = abilities.abilityMultiplier(u, rc);
-        if (base >= 1) handler *= 1 + (base - 1) * chargeDistance(actions);
-    }
-    handler *= abilities.positionMultiplierOn(u, from, engine.baseCell(t), t.fw, t.fh, s.fight.side_oriented);
-    const lo = boundAt(u, t, u.attack_damage_min, rate, false);
-    const hi = boundAt(u, t, u.attack_damage_max, rate, false);
-    if (hi < lo or @max(1, hi - lo) > 10_000) return null;
-    const type_mult: f64 = if (u.attack_type == AT.RANGE and !u.has(.handyman)) 0.5 else 1;
-    var lucky_chance: f64 = 0;
-    var lucky_mult: f64 = 1;
-    if (u.ability(.lucky_strike)) |ls| {
-        lucky_chance = @min(100, @max(0, @ceil(abilities.applyChance(u, ls)))) / 100;
-        lucky_mult = abilities.abilityMultiplier(u, ls);
-    }
-    const bite = abilities.penetratingBite(u, t);
-    const wounds = 1 + abilities.activeDeepWounds(u, t) / 100;
-    const hp = util.cumulativeHp(t);
-    const hit = 1 - @min(100, @max(0, abilities.missChance(u, t))) / 100;
-    if (hit != 1) return false;
-    const raw_end = if (hi == lo) lo + 1 else hi;
-    var raw = lo;
-    while (raw < raw_end) : (raw += 1) {
-        const ordinary = @floor(raw * type_mult * handler * wounds * 1);
-        if (lucky_chance > 0) {
-            // addOutcome drops a zero-probability outcome: a certain Lucky Strike leaves only the lucky one.
-            if (1 - lucky_chance > 0 and ordinary + bite < hp) return false;
-            if (@floor(ordinary * lucky_mult) + bite < hp) return false;
-        } else if (ordinary + bite < hp) return false;
-    }
-    return true;
+    const estimate = fuse.primaryMelee(s, ai_, ti, fuse.meleeShape(actions), from) orelse return null;
+    return estimate.secure;
 }
 
 fn cellsDistance(a: []const rec.Cell, b: []const rec.Cell) i32 {
