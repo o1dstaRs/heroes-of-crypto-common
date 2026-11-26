@@ -322,9 +322,9 @@ rows, smoke, and every wave-1 and wave-2 cast, the Nightmare's whole book includ
 leaves, Empower, Time Denial), so a request with a v0.8 seat is refused when any holder unit holds a book entry or
 parsed spell outside the whitelist `rollout.V08_CASTABLE` (every `st.CastSpell`: a spell added to `st.CastSpell` later
 is refused until it joins the list), or holds a batch-6b card src/v08 does not decide yet or carries its row
-(`V08_SCOPE.refused_abilities`: `BATCH6B_MASK` without the Harpy's Castling, the Mermaid's Water Element and Water Shield
-and the Thunderbird's Wind Element and Chain Lightning, a Queen thief's cards too; `refused_buffs`: a Flesh Shield Aura
-row, which outlives its source). A mindless unit (Berserker, Frenzied Boar) plays v0.1 on a board where v0.8 cast walls:
+(`V08_SCOPE.refused_abilities`: `BATCH6B_MASK` without the Harpy's Castling, the Mermaid's Water Element and Water Shield,
+the Thunderbird's Wind Element and Chain Lightning and the Black Dragon's Fire Element, Enchanted Skin and Fire Breath, a
+Queen thief's cards too; `refused_buffs`: a Flesh Shield Aura row, which outlives its source). A mindless unit (Berserker, Frenzied Boar) plays v0.1 on a board where v0.8 cast walls:
 `ai.zig`'s completeMoveWithMelee projects the walk before it appends the strike, as v0_1.ts does (`ai.projectPostMove`:
 projectPostMoveActorAvailability on the resolved route, Made of Fire's max hp on a lava route, each burning cell
 entered, a Water Shield's absorb, a self-resurrection), and its idle turn waits only where canWaitOnHourglass (Time

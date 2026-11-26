@@ -75,8 +75,8 @@ pub fn v08Scope(s: *const State, ident: *const Identity, buf: []u8) ?[]const u8 
         for (u.spells[0..u.n_spells]) |b| {
             if (!v08Castable(b.spell)) return std.fmt.bufPrint(buf, "slot {d} holds spells", .{i}) catch "spells";
         }
-        // The cards and rows V08_SCOPE's tables refuse (stolen cards too: batch 6b is not in src/v08 yet, and a Water
-        // Shield or Flesh Shield row outlives its source) and a revive's orphan augment rows.
+        // The cards and rows V08_SCOPE's tables refuse (stolen cards too: src/v08 does not decide every batch-6b card
+        // yet, and a Flesh Shield Aura row outlives its source) and a revive's orphan augment rows.
         if (u.ability_mask & V08_SCOPE.refused_abilities != 0) return std.fmt.bufPrint(buf, "slot {d} holds a batch-6b ability", .{i}) catch "batch 6b";
         if (V08_SCOPE.refuse_revived and u.aug_orphans != 0) return std.fmt.bufPrint(buf, "slot {d} was revived", .{i}) catch "batch 6a";
         if (refusedRow(u)) |id| return std.fmt.bufPrint(buf, "slot {d} carries {s}", .{ i, id.name() }) catch "batch 6a";
@@ -124,9 +124,10 @@ pub const V08_SCOPE = scope.PolicyScope{
     .name = "v0.8",
     .castable = &V08_CASTABLE,
     // Batch 6b: the cards (stolen ones too) and rows src/v08 does not cover yet. Covered: Castling (3193517c: candidates,
-    // the caster router, the destination cells), the Mermaid's Water Element and Water Shield (73ffe9a5) and the
-    // Thunderbird's Wind Element and Chain Lightning (7c89022b).
-    .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit() & ~st.AbilityId.water_element.bit() & ~st.AbilityId.water_shield.bit() & ~st.AbilityId.wind_element.bit() & ~st.AbilityId.chain_lightning.bit(),
+    // the caster router, the destination cells), the Mermaid's Water Element and Water Shield (73ffe9a5), the
+    // Thunderbird's Wind Element and Chain Lightning (7c89022b) and the Black Dragon's Fire Element, Enchanted Skin and
+    // Fire Breath (the breath's line in v0.4's and v0.5's AoE positioning).
+    .refused_abilities = st.AbilityId.BATCH6B_MASK & ~st.AbilityId.castling.bit() & ~st.AbilityId.water_element.bit() & ~st.AbilityId.water_shield.bit() & ~st.AbilityId.wind_element.bit() & ~st.AbilityId.chain_lightning.bit() & ~st.AbilityId.fire_element.bit() & ~st.AbilityId.enchanted_skin.bit() & ~st.AbilityId.fire_breath.bit(),
     .refused_buffs = &.{.flesh_shield_aura},
 };
 
@@ -1038,8 +1039,9 @@ test "v08Scope takes the Nightmare's boards (Fire Wall, burning cells, Time Deni
     engine.addFire(s, .{ .x = 7, .y = 7 }, 2, 250);
     try std.testing.expect(s.fight.n_fire == 1);
     try std.testing.expect(v08Scope(s, &ident, &buf) == null);
-    // A Water Shield row on a wall board is in scope too (fire.zig and ai.zig absorb the first burn); the batch-6b cards
-    // and rows src/v08 does not cover yet stay out, on a wall board as anywhere, and so does a spell outside the list.
+    // A Water Shield row on a wall board is in scope too (fire.zig and ai.zig absorb the first burn), and so are the Black
+    // Dragon's cards; the batch-6b cards and rows src/v08 does not cover yet (the Abomination's and the Efreet's) stay out,
+    // on a wall board as anywhere, and so does a spell outside the list.
     const nightmare = s.*;
     s.units[ui].buffs.push(.{ .id = .water_shield, .laps = 3, .power = 1 });
     try std.testing.expect(v08Scope(s, &ident, &buf) == null);
@@ -1047,7 +1049,9 @@ test "v08Scope takes the Nightmare's boards (Fire Wall, burning cells, Time Deni
     s.units[ui].buffs.push(.{ .id = .flesh_shield_aura, .laps = 3, .power = 1 });
     try std.testing.expect(std.mem.indexOf(u8, v08Scope(s, &ident, &buf).?, "Flesh Shield") != null);
     s.* = nightmare;
-    s.units[ui].ability_mask |= st.AbilityId.fire_element.bit();
+    s.units[ui].ability_mask |= st.AbilityId.fire_element.bit() | st.AbilityId.enchanted_skin.bit() | st.AbilityId.fire_breath.bit();
+    try std.testing.expect(v08Scope(s, &ident, &buf) == null);
+    s.units[ui].ability_mask |= st.AbilityId.made_of_fire.bit();
     try std.testing.expect(std.mem.indexOf(u8, v08Scope(s, &ident, &buf).?, "batch-6b") != null);
     s.* = nightmare;
     s.units[ui].book[s.units[ui].n_book] = .{ .spell = 0xfe, .prefix = chaos };

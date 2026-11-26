@@ -3,7 +3,7 @@
 //!
 //! In scope (no spells; the abilities of batches 1-3) the pipeline is: v0.4, the learned mountain mining
 //! (mineByPolicy, BLOCK_CENTER), the learned melee re-rank (meleeByPolicy), the learned AoE stand (aoeMeleeByPolicy:
-//! Lightning Spin, Skewer Strike), the learned move re-rank (repositionByPolicy), the aura flyer's support
+//! Lightning Spin, Fire Breath, Skewer Strike, Chain Lightning), the learned move re-rank (repositionByPolicy), the aura flyer's support
 //! (auraFlyerSupport), the charge hourglass (hourglassByPolicy), the blocked-move guard (dropBlockedMove) and the free
 //! adjacent attack (takeAdjacentAttack), with the healer policy, the No Melee retreat, the Hidden-target guard and the
 //! Cowardice move-prefix repair. Identity in scope, so not ported: meleeAuraSupport (V05_AURASUPPORT off) and the Fire
@@ -509,8 +509,8 @@ fn meleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
 }
 
 // =====================================================================================================================
-// AoE melee: aoeMeleeByPolicy and the hourglass's meleeAoeHitCount (Lightning Spin, Skewer Strike and Chain Lightning;
-// Fire Breath is not in scope)
+// AoE melee: aoeMeleeByPolicy and the hourglass's meleeAoeHitCount (Lightning Spin, Fire Breath, Skewer Strike and
+// Chain Lightning)
 // =====================================================================================================================
 
 /// A landed melee by a Dulling Defense unit permanently cuts a survivor's base attack (DULLING_OWN_SWING_SCORE).
@@ -541,25 +541,9 @@ fn ringAt(c: *ai.Ctx, enemies: []const u8, cell: Cell, buf: *[st.MAX_UNITS]u8) [
     return buf[0..n];
 }
 
-/// A Skewer Strike line from `from` through `t`: the target, then the living enemy stack on the cell beyond its base cell.
-fn skewerLine(s: *const State, opp: u8, from: Cell, t: u8, buf: *[2]u8) []const u8 {
-    const tc = engine.baseCell(&s.units[t]);
-    buf[0] = t;
-    var n: usize = 1;
-    const beyond = Cell{ .x = tc.x + std.math.sign(tc.x - from.x), .y = tc.y + std.math.sign(tc.y - from.y) };
-    if (beyond.x >= 0 and beyond.y >= 0) {
-        if (ai.occupant(s, beyond)) |o| {
-            if (o != t and !s.units[o].isDead() and s.units[o].team == opp) {
-                buf[1] = o;
-                n = 2;
-            }
-        }
-    }
-    return buf[0..n];
-}
-
 /// meleeAoeHitCount: the enemy stacks the decision's strike catches (the Lightning Spin ring at its stand cell, the
-/// Skewer line through its target, or the Chain Lightning arc from it); 1 for any other strike, 0 without one.
+/// Fire Breath or Skewer line through its target (util.aoeLine), or the Chain Lightning arc from it); 1 for any other
+/// strike, 0 without one.
 fn meleeAoeHitCount(c: *ai.Ctx, out: *const ai.Decision) usize {
     const s = c.s;
     const u = c.unit();
@@ -574,9 +558,9 @@ fn meleeAoeHitCount(c: *ai.Ctx, out: *const ai.Decision) usize {
     const opp = engine.opposite(u.team);
     const t = &s.units[strike.target];
     if (!t.in_holder or t.isDead() or t.team != opp) return 0;
-    if (u.has(.skewer_strike)) {
-        var lbuf: [2]u8 = undefined;
-        return skewerLine(s, opp, strike.attack_from, strike.target, &lbuf).len;
+    if (u.has(.fire_breath) or u.has(.skewer_strike)) {
+        var lbuf: [st.MAX_UNITS]u8 = undefined;
+        return util.aoeLine(s, u, opp, strike.attack_from, strike.target, &lbuf).len;
     }
     if (u.has(.chain_lightning)) {
         var hbuf: [st.MAX_UNITS]u8 = undefined;
@@ -596,15 +580,16 @@ fn routeLen(mp: *const pathing.MovePath, r: *const pathing.Route) usize {
 }
 
 /// aoeMeleeByPolicy: the learned AoE stand. Every stand (in place, then each landable known route) with, for the spin
-/// [33..40], its first adjacent enemy and the whole ring, or, for the skewer and Chain Lightning [41..48], each adjacent
-/// enemy and its line or arc (util.chainHits), scored over the hit set (coverage, value, kills, threat, exposure, move cost, wounds, incumbency); the best
-/// (first on ties) replaces v0.4's strike unless it is v0.4's own pick. The trained blocks are never dormant.
+/// [33..40], its first adjacent enemy and the whole ring, or, for the directional Fire Breath, Skewer Strike and Chain
+/// Lightning [41..48], each adjacent enemy and its line (util.aoeLine) or arc (util.chainHits), scored over the hit set
+/// (coverage, value, kills, threat, exposure, move cost, wounds, incumbency); the best (first on ties) replaces v0.4's
+/// strike unless it is v0.4's own pick. The trained blocks are never dormant.
 fn aoeMeleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
     const spin = u.has(.lightning_spin);
     const chain = u.has(.chain_lightning);
-    if (!spin and !u.has(.skewer_strike) and !chain) return;
+    if (!spin and !u.has(.fire_breath) and !u.has(.skewer_strike) and !chain) return;
     const off: usize = if (spin) 33 else 41;
     const si = firstIndex(out, .melee_attack) orelse return;
     if (u.target >= 0 or !u.canMove()) return;
@@ -671,9 +656,8 @@ fn aoeMeleeByPolicy(c: *ai.Ctx, out: *ai.Decision) void {
         const ring = ringAt(c, enemies, cell, &rbuf);
         for (ring) |e| {
             if (engine.cowardBarred(s, u, &s.units[e])) continue; // an aim Cowardice bars
-            var lbuf: [2]u8 = undefined;
-            var hbuf: [st.MAX_UNITS]u8 = undefined;
-            const line = if (chain) util.chainHits(s, enemies, e, &hbuf) else skewerLine(s, opp, cell, e, &lbuf);
+            var lbuf: [st.MAX_UNITS]u8 = undefined;
+            const line = if (chain) util.chainHits(s, enemies, e, &lbuf) else util.aoeLine(s, u, opp, cell, e, &lbuf);
             const inc: f64 = if (ai.sameCell(cell, v4from) and e == v4target) 1 else 0;
             const v = Score.of(s, &c.m, opp, w, line, cell, cost, inc, dmg_max);
             if (best == null or v > best.?.score) best = .{ .cell = cell, .route = route, .target = e, .score = v };

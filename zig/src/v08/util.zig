@@ -551,17 +551,49 @@ pub fn canHourglass(s: *const State, ui: u8) bool {
     return engine.canWaitOnHourglass(s, ui);
 }
 
-/// isAoEUnit (v0_4.ts): by name (AOE_NAMES), or by an active AoE ability (Skewer Strike, Area Throw, Through Shot,
-/// Large Caliber; a Queen that stole one counts too). Fire Breath is batch 6b.
+/// isAoEUnit (v0_4.ts): by name (AOE_NAMES), or by an active AoE ability (Area Throw, Fire Breath, Through Shot,
+/// Skewer Strike, Large Caliber; a Queen that stole one counts too).
 pub fn isAoEUnit(s: *const State, ui: u8) bool {
     return switch (creature(s, ui)) {
         .black_dragon, .pikeman, .gargantuan, .cyclops, .tsar_cannon => true,
-        // AOE_ABILITIES (Fire Breath is batch 6): a Queen that stole one counts too.
+        // AOE_ABILITIES: a Queen that stole one counts too.
         else => blk: {
             const u = &s.units[ui];
-            break :blk u.has(.skewer_strike) or u.has(.area_throw) or u.has(.through_shot) or u.has(.large_caliber);
+            break :blk u.has(.area_throw) or u.has(.fire_breath) or u.has(.through_shot) or u.has(.skewer_strike) or u.has(.large_caliber);
         },
     };
+}
+
+/// fireBreathDepthAlong (v0_4.ts): how far past its target a strike along (dx, dy) carries, the depth of the breather's
+/// own body along the wave (its larger side on a diagonal, its width sideways, its height up or down); 1 for a unit
+/// without an active Fire Breath (Skewer Strike's single cell).
+pub fn fireBreathDepthAlong(u: *const st.Unit, dx: i32, dy: i32) i32 {
+    if (!u.has(.fire_breath)) return 1;
+    if (dx != 0 and dy != 0) return @max(u.fw, u.fh);
+    return if (dy == 0) u.fw else u.fh;
+}
+
+/// The line hit set v0.4's aoeMeleeReposition, v0.5's meleeAoeHitCount and aoeMeleeByPolicy read for a Fire Breath or
+/// Skewer Strike from `from` through `t`: the target, then each living enemy (team `opp`) stack on the
+/// fireBreathDepthAlong cells beyond the target's base cell, once and in line order.
+pub fn aoeLine(s: *const State, u: *const st.Unit, opp: u8, from: Cell, t: u8, buf: *[st.MAX_UNITS]u8) []const u8 {
+    const tc = engine.baseCell(&s.units[t]);
+    const dx = std.math.sign(tc.x - from.x);
+    const dy = std.math.sign(tc.y - from.y);
+    buf[0] = t;
+    var n: usize = 1;
+    const depth = fireBreathDepthAlong(u, dx, dy);
+    var k: i32 = 1;
+    while (k <= depth) : (k += 1) {
+        const cell = Cell{ .x = tc.x + dx * k, .y = tc.y + dy * k };
+        if (cell.x < 0 or cell.y < 0) continue;
+        const o = ai.occupant(s, cell) orelse continue;
+        const e = &s.units[o];
+        if (e.isDead() or e.team != opp or std.mem.indexOfScalar(u8, buf[0..n], o) != null) continue;
+        buf[n] = o;
+        n += 1;
+    }
+    return buf[0..n];
 }
 
 // =====================================================================================================================

@@ -4,7 +4,7 @@
 //! In scope (no spells or abilities) the pipeline is: hold when out-gunning at range, v0.3, the Goblin Knight's
 //! low-level victim, the flyer's patient hunt, the landing guard, the melee legality guard, the lap-1 mass-buff
 //! wait, the front move, the range legality guard, plus the ability repositions of batches 1-3: auraRepositionMelee,
-//! rapidChargeReposition, aoeMeleeReposition (Skewer Strike; Fire Breath is not in scope), hydraSpinReposition and
+//! rapidChargeReposition, aoeMeleeReposition (Fire Breath, Skewer Strike), hydraSpinReposition and
 //! chainLightningTarget (batch 6b), and the casts of the later waves (retargetHeal, the Ogre Mage Riot, the Healer's
 //! spell policy, the Troll's Wild Regeneration). Off by default: the siege mute (MUTE_SIEGE_ENABLED),
 //! the boxed-shooter hold (V04_BOXHOLD), the caster self-delays (V04_OGRESELF / V04_BEHESELF).
@@ -437,21 +437,11 @@ fn livingEnemies(s: *const State, team: u8, buf: *[st.MAX_UNITS]u8) []const u8 {
     return buf[0..n];
 }
 
-/// aoeMeleeReposition's lineHits for Skewer Strike (line depth 1; Fire Breath is not in scope): the target plus the
-/// living enemy stack on the cell beyond its base cell, seen from `from`.
-fn lineHits(s: *const State, opp: u8, from: Cell, t: u8) u32 {
-    const tc = engine.baseCell(&s.units[t]);
-    const dx = std.math.sign(tc.x - from.x);
-    const dy = std.math.sign(tc.y - from.y);
-    var hits: u32 = 1;
-    const beyond = Cell{ .x = tc.x + dx, .y = tc.y + dy };
-    if (beyond.x >= 0 and beyond.y >= 0) {
-        if (ai.occupant(s, beyond)) |o| {
-            const e = &s.units[o];
-            if (o != t and !e.isDead() and e.team == opp) hits += 1;
-        }
-    }
-    return hits;
+/// aoeMeleeReposition's lineHits: the stacks util.aoeLine catches from `from` through `t` (the target plus the living
+/// enemies on the fireBreathDepthAlong cells beyond its base cell; one cell for Skewer Strike).
+fn lineHits(s: *const State, u: *const st.Unit, opp: u8, from: Cell, t: u8) u32 {
+    var buf: [st.MAX_UNITS]u8 = undefined;
+    return @intCast(util.aoeLine(s, u, opp, from, t, &buf).len);
 }
 
 const Cand = struct { cell: Cell, route: ?*const pathing.Route };
@@ -474,20 +464,20 @@ fn candLen(c: *ai.Ctx, k: Cand) usize {
     return if (k.route) |r| routeLen(c.actualPath(), r) else 0;
 }
 
-/// (8) aoeMeleeReposition (Skewer Strike): the stand cell and target whose line catches the most enemy stacks (ties:
-/// the shorter route), when that beats the current strike's line and catches two or more; the decision becomes that
-/// strike alone.
+/// (8) aoeMeleeReposition (Fire Breath, Skewer Strike): the stand cell and target whose line catches the most enemy
+/// stacks (ties: the shorter route), when that beats the current strike's line and catches two or more; the decision
+/// becomes that strike alone.
 fn aoeMeleeReposition(c: *ai.Ctx, out: *ai.Decision) void {
     const s = c.s;
     const u = c.unit();
-    if (!u.has(.skewer_strike) or u.target >= 0 or !u.canMove()) return;
+    if ((!u.has(.fire_breath) and !u.has(.skewer_strike)) or u.target >= 0 or !u.canMove()) return;
     const i = firstMelee(out) orelse return;
     const strike = out.actions[i].melee_attack;
     var ebuf: [st.MAX_UNITS]u8 = undefined;
     const enemies = livingEnemies(s, u.team, &ebuf);
     if (enemies.len < 2) return;
     const opp = engine.opposite(u.team);
-    const base_hits: u32 = if (s.units[strike.target].in_holder) lineHits(s, opp, strike.attack_from, strike.target) else 1;
+    const base_hits: u32 = if (s.units[strike.target].in_holder) lineHits(s, u, opp, strike.attack_from, strike.target) else 1;
     var cbuf: [pathing.MAX_ROUTES]Cand = undefined;
     const cands = standCandidates(c, &cbuf);
     var best: ?struct { k: Cand, target: u8, hits: u32 } = null;
@@ -496,7 +486,7 @@ fn aoeMeleeReposition(c: *ai.Ctx, out: *ai.Decision) void {
         for (enemies) |e| {
             const ec = engine.unitCells(&s.units[e]);
             if (!util.footprintsNear(ec.slice(), fp.slice())) continue;
-            const hits = lineHits(s, opp, k.cell, e);
+            const hits = lineHits(s, u, opp, k.cell, e);
             if (best == null or hits > best.?.hits or (hits == best.?.hits and candLen(c, k) < candLen(c, best.?.k))) {
                 best = .{ .k = k, .target = e, .hits = hits };
             }
