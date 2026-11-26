@@ -99,14 +99,37 @@ export function nativeRolloutModeFromEnv(
  * only while the tree has no local changes under src/ or zig/: a research arm that edits the TypeScript search or
  * policy keeps TypeScript rollouts unless it forces native ones (1). `git` runs a git command in the common root and
  * returns its trimmed output, or null when it fails.
+ *
+ * A tree that is not a git checkout but an installed package (bun's GitHub install, whose `.bun-tag` ends in the
+ * commit's short sha; `bunTag` reads it, null when absent) gives that commit as a prefix (`shaPrefix`): the library's
+ * own commit must start with it. Any other tree (a copied or archived research tree) keeps TypeScript rollouts.
  */
-export function nativeDefaultTree(git: (args: string[]) => string | null): { sha: string } | { reason: string } {
+export function nativeDefaultTree(
+    git: (args: string[]) => string | null,
+    bunTag: () => string | null = () => null,
+): { sha: string } | { shaPrefix: string } | { reason: string } {
     const sha = git(["rev-parse", "HEAD"]);
-    if (sha === null || !/^[0-9a-f]{40}$/.test(sha)) return { reason: "the TypeScript tree is not a git checkout" };
+    if (sha === null || !/^[0-9a-f]{40}$/.test(sha)) {
+        const tag = /-([0-9a-f]{7,40})$/.exec(bunTag()?.trim() ?? "");
+        if (tag) return { shaPrefix: tag[1] };
+        return { reason: "the TypeScript tree is not a git checkout" };
+    }
     const changes = git(["status", "--porcelain", "--untracked-files=no", "--", "src", "zig"]);
     if (changes === null) return { reason: "git status failed" };
     if (changes !== "") return { reason: "the TypeScript tree has local changes under src/ or zig/" };
     return { sha };
+}
+
+/** The common root's `.bun-tag` (an installed package), or null. */
+function commonRootBunTag(): string | null {
+    const load = (import.meta as unknown as { require?: (specifier: string) => unknown }).require;
+    if (typeof load !== "function") return null;
+    try {
+        const fs = load("node:fs") as { readFileSync(path: string, encoding: "utf8"): string };
+        return fs.readFileSync(decodeURIComponent(new URL("../../.bun-tag", import.meta.url).pathname), "utf8");
+    } catch {
+        return null;
+    }
 }
 
 /** git in the common root through Bun.spawnSync (no module import, so browser bundles never see it). */
@@ -160,6 +183,8 @@ export interface INativeEngine {
     rollouts(state: INativeStateHandle, request: object, deadlineNs?: bigint): INativeRolloutCallResult;
     rolloutPairs(): INativePairRecord[];
     scopeManifest(policy?: string): unknown;
+    /** the commit the library was built from ("-dirty" with local zig/ changes) */
+    readonly buildInfo: { readonly commonSha: string };
 }
 
 export interface INativePairFlags {
@@ -247,8 +272,9 @@ export function getNativeRolloutBackend(): INativeRolloutBackend | null {
 
 function loadNativeRolloutBackend(load: (specifier: string) => unknown): INativeRolloutBackend | null {
     let commonSha = process.env[NATIVE_COMMON_SHA_ENV] || undefined;
+    let shaPrefix: string | undefined;
     if (commonSha === undefined && (process.env[NATIVE_ROLLOUTS_ENV] ?? "").trim() === "") {
-        const tree = nativeDefaultTree(commonRootGit);
+        const tree = nativeDefaultTree(commonRootGit, commonRootBunTag);
         if ("reason" in tree) {
             nativeRolloutLog(
                 "default",
@@ -257,7 +283,8 @@ function loadNativeRolloutBackend(load: (specifier: string) => unknown): INative
             );
             return null;
         }
-        commonSha = tree.sha;
+        if ("sha" in tree) commonSha = tree.sha;
+        else shaPrefix = tree.shaPrefix;
     }
     const bridge = load("../../zig/ffi/bridge.ts") as IBridgeModule;
     const engine = bridge.loadHocEngine({
@@ -265,6 +292,14 @@ function loadNativeRolloutBackend(load: (specifier: string) => unknown): INative
         log: (message) => nativeRolloutLog("load", message, loadNoticeLevel()),
     });
     if (!engine) return null;
+    if (shaPrefix !== undefined && !engine.buildInfo.commonSha.startsWith(shaPrefix)) {
+        nativeRolloutLog(
+            "default",
+            `native rollouts off by default: libhocsim was built from common ${engine.buildInfo.commonSha}, this package is ${shaPrefix}`,
+            "info",
+        );
+        return null;
+    }
     const { compileHocPrecheck } = load("../../zig/ffi/precheck.ts") as {
         compileHocPrecheck(manifest: unknown): INativePrecheck;
     };
@@ -403,17 +438,110 @@ export function nativeLeafKind(learnedV2: ILeafWeights | null, learned: ILeafWei
 /** The AI policy's environment namespaces (and its one AI_ switch: a broad AI_ prefix catches unrelated tooling). */
 const AI_POLICY_ENV = /^(A19|B2|Q2|V0\d)_|^AI_AURA_ZONE_EXACT$/;
 /**
- * Policy-namespace variables no rollout reads: the root-only flyer backline priority, the override carrier (its
- * effect shows in the variables it overrides), and the search routing that picks the driver (V08_A19_SEARCH,
- * V08_A13_SEARCH).
+ * Policy-namespace knobs no rollout reads (audited 2026-11-26 from each knob's readers), each also as its per-seat
+ * _LEFT / _RIGHT form:
+ * - draft and setup (src/ai/setup): the counter draft and its model, the striker rush's shooter floor, the learned
+ *   draft, setup, synergy and augment weights, the conditional setup;
+ * - placement (placeArmy only): the split and shield screens, v0.5's placement modes, v0.6's dispersal, v0.7's
+ *   reveal, the ranked setup spec;
+ * - the search root: the carrier cohesion veto (search_driver's carrierCohesionIncumbent), v0.6s / runMatch's search
+ *   switch, the aggressive root and the Q2 dataset, oracle and wait ablation;
+ * - the leaf weights, which nativeLeafKind checks on every bank;
+ * - the v0.5 lookahead, which no A19 driver runs;
+ * - runner infrastructure: the aligned-v2 runner, measurement switches, the audit skip.
+ * Kept checked: B2_ORACLE. Its side channel is also fed by the wait scorer inside TypeScript rollouts, so a native
+ * bank would change what the oracle collects.
+ */
+const AI_POLICY_ROOT_ONLY: readonly string[] = [
+    "A19_COUNTER_DRAFT",
+    "A19_COUNTER_MODEL",
+    "A19_STRIKER_RUSH_MIXED_MIN_SHOOTERS",
+    "V05_AUGCA_WEIGHTS",
+    "V05_DRAFT_FROZEN_WEIGHTS",
+    "V05_DRAFT_WEIGHTS",
+    "V05_SETUPCA_WEIGHTS",
+    "V05_SETUP_WEIGHTS",
+    "V05_SYNERGY_WEIGHTS",
+    "V07_SETUP_CONDITIONAL",
+    "A19_SHIELD_SCREEN",
+    "A19_SPLIT_SCREEN",
+    "V05_FLYERMIN",
+    "V05_PLACEMENT",
+    "V05_PLACE_WEIGHTS",
+    "V06_DISPERSE_TEAM",
+    "V07_PLACEMENT_REVEAL",
+    "V07_PLACEMENT_REVEAL_VERSIONS",
+    "V08_RANKED_SETUP_POLICY_SPEC",
+    "A19_CARRIER_COHESION",
+    "Q2_DATASET",
+    "Q2_DATASET_V2",
+    "Q2_ORACLE",
+    "Q2_WAIT_ABLATION",
+    "V07_SEARCH",
+    "V08_AGGRESSIVE",
+    "V07_VALUE_WEIGHTS",
+    "V07_VALUE_WEIGHTS_V2",
+    "V05_LOOKAHEAD",
+    "V05_LOOKAHEAD_POSW",
+    "V05_RERANK_GATE",
+    "V05_VALUE_WEIGHTS",
+    "A19_CONTINUATION_DISABLED",
+    "A19_DIAGNOSTIC_DISABLED",
+    "V05_SKIP_AUDIT",
+    "V07_ALIGNED_V2_DEFINITION",
+    "V07_ALIGNED_V2_HEARTBEAT_MS",
+    "V07_ALIGNED_V2_HOST_PROBE_MS",
+    "V07_ALIGNED_V2_HOST_PROBE_TIMEOUT_MS",
+    "V07_ALIGNED_V2_MAX_RESTARTS",
+    "V07_ALIGNED_V2_NICE",
+    "V07_ALIGNED_V2_OUT",
+    "V07_ALIGNED_V2_RESTART_BASE_MS",
+    "V07_ALIGNED_V2_RESTART_MAX_MS",
+    "V07_ALIGNED_V2_RUNNER_PROGRESS_WATCHDOG_MS",
+    "V07_ALIGNED_V2_RUNNER_STARTUP_WATCHDOG_MS",
+    "V07_ALIGNED_V2_STOP_GRACE_MS",
+    "V07_ALIGNED_V2_WATCHDOG_MS",
+    "V07_COMPOSED_HOST_IDLE_ATTESTATION",
+];
+/**
+ * Policy-namespace variables no rollout reads: AI_POLICY_ROOT_ONLY (with the per-seat forms), the root-only flyer
+ * backline priority, the override carrier (its effect shows in the variables it overrides), and the search routing that
+ * picks the driver (V08_A19_SEARCH, V08_A13_SEARCH).
  */
 const AI_POLICY_ENV_IGNORED: ReadonlySet<string> = new Set([
+    ...AI_POLICY_ROOT_ONLY.flatMap((key) => [key, `${key}_LEFT`, `${key}_RIGHT`]),
+    "V08_FLYER_BACKLINE_PRIORITY",
     "V08_FLYER_BACKLINE_PRIORITY_LEFT",
     "V08_FLYER_BACKLINE_PRIORITY_RIGHT",
     "V08_A19_SEARCH_ENV_OVERRIDES",
     "V08_A19_SEARCH",
     "V08_A13_SEARCH",
 ]);
+/**
+ * Rollout-read switches whose every reader tests for one value only (=== / !== that value), so unset, "0", "" and any
+ * other value all mean off: compared by meaning (on or off), not by string. Audited 2026-11-26: v0_8_support_roles.ts
+ * (the mage kill priority, per seat), v0_7.ts (the dense melee-magic isolation; the aura caster router at "on"),
+ * v0_8_ranged_positioning.ts (the protected-advance guardrails, the supported band advance, the pre-pin egress, and
+ * their live-only switches).
+ */
+const AI_POLICY_ENV_ON_AT: Readonly<Record<string, string>> = {
+    V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT: "1",
+    V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT: "1",
+    V07_DENSE_MM_SALVAGE_ISOLATION: "1",
+    V07_AURA_CASTER_ROUTER: "on",
+    V08_PROTECTED_ADVANCE_GUARDRAILS: "1",
+    V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY: "1",
+    V08_SUPPORTED_BAND_ADVANCE: "1",
+    V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "1",
+    V08_SUPPORTED_PREPIN_EGRESS: "1",
+    V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY: "1",
+};
+/** Whether two values of a policy variable mean the same to its readers (undefined: unset). */
+function samePolicyMeaning(key: string, a: string | undefined, b: string | undefined): boolean {
+    if (a === b) return true;
+    const on = AI_POLICY_ENV_ON_AT[key];
+    return on !== undefined && (a === on) === (b === on);
+}
 let profilePolicyEnvironment: Readonly<Record<string, string | undefined>> | undefined;
 
 function a19PolicyEnvironment(): Readonly<Record<string, string | undefined>> {
@@ -434,19 +562,20 @@ function a19PolicyEnvironment(): Readonly<Record<string, string | undefined>> {
 }
 
 /**
- * The library implements the production AI only: every policy-namespace variable must hold the A19 profile's value
- * (unset where the profile unsets it), as the bot seat scopes it around each decision, and no other may be set.
+ * The library implements the production AI only: every policy-namespace variable a rollout reads must mean what the
+ * A19 profile's value means (unset where the profile unsets it; samePolicyMeaning), as the bot seat scopes it around
+ * each decision, and no other may be set. Root-only knobs (AI_POLICY_ENV_IGNORED) are not checked.
  */
 export function nativeEnvironmentRefusal(
     env: Readonly<Record<string, string | undefined>> = process.env,
 ): string | null {
     const expected = a19PolicyEnvironment();
     for (const [key, value] of Object.entries(expected)) {
-        if (env[key] !== value) return `env:${key}`;
+        if (!samePolicyMeaning(key, env[key], value)) return `env:${key}`;
     }
     for (const key of Object.keys(env)) {
         if (env[key] === undefined || !AI_POLICY_ENV.test(key) || AI_POLICY_ENV_IGNORED.has(key)) continue;
-        if (!(key in expected)) return `env:${key}`;
+        if (!(key in expected) && !samePolicyMeaning(key, env[key], undefined)) return `env:${key}`;
     }
     return null;
 }

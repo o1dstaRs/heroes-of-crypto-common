@@ -179,6 +179,25 @@ describe("native rollout switch", () => {
         });
         expect(nativeDefaultTree(tree(sha, null))).toEqual({ reason: "git status failed" });
     });
+
+    test("an installed package (bun's .bun-tag) gives its commit as a prefix; any other non-git tree stays off", () => {
+        const notGit = () => null;
+        expect(nativeDefaultTree(notGit, () => "o1dstaRs-heroes-of-crypto-common-19f3c39\n")).toEqual({
+            shaPrefix: "19f3c39",
+        });
+        expect(nativeDefaultTree(notGit, () => "o1dstaRs-heroes-of-crypto-common")).toEqual({
+            reason: "the TypeScript tree is not a git checkout",
+        });
+        expect(nativeDefaultTree(notGit, () => null)).toEqual({ reason: "the TypeScript tree is not a git checkout" });
+        // a git checkout never reads the tag
+        const sha = "0123456789abcdef0123456789abcdef01234567";
+        expect(
+            nativeDefaultTree(
+                (args) => (args[0] === "rev-parse" ? sha : ""),
+                () => "x-1234567",
+            ),
+        ).toEqual({ sha });
+    });
 });
 
 describe("native rollout scope", () => {
@@ -206,9 +225,56 @@ describe("native rollout scope", () => {
         expect(nativeEnvironmentRefusal({ ...environment, A19_DECOY_AWARE_LEFT: "0" })).toBe(
             "env:A19_DECOY_AWARE_LEFT",
         );
+        // B2's side channel is fed inside TypeScript rollouts, so it stays checked
+        expect(nativeEnvironmentRefusal({ ...environment, B2_ORACLE: "1" })).toBe("env:B2_ORACLE");
+    });
+
+    test("root-only knobs (draft, setup, placement, the search root, the leaf, runner infrastructure) are not checked", () => {
+        const environment = profileEnvironment();
         const unset = { ...environment };
-        delete unset.V08_AGGRESSIVE;
-        expect(nativeEnvironmentRefusal(unset)).toBe("env:V08_AGGRESSIVE");
+        for (const key of ["V08_AGGRESSIVE", "V07_SEARCH", "Q2_ORACLE", "V07_PLACEMENT_REVEAL"]) delete unset[key];
+        expect(nativeEnvironmentRefusal(unset)).toBeNull();
+        expect(
+            nativeEnvironmentRefusal({
+                ...environment,
+                A19_CARRIER_COHESION_LEFT: "0",
+                A19_SPLIT_SCREEN_RIGHT: "0",
+                A19_SHIELD_SCREEN_LEFT: "0",
+                A19_COUNTER_DRAFT: "0",
+                V05_DRAFT_WEIGHTS: "[1,2,3]",
+                V05_PLACEMENT: "learned",
+                V07_SETUP_CONDITIONAL: "1",
+                Q2_DATASET: "/tmp/q2.jsonl",
+                V07_ALIGNED_V2_NICE: "10",
+                V08_AGGRESSIVE: "0",
+            }),
+        ).toBeNull();
+    });
+
+    test("switches read at one value only compare by meaning: unset and 0 are both off", () => {
+        const environment = profileEnvironment();
+        expect(environment.V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT).toBe("0");
+        const unset = { ...environment };
+        for (const key of [
+            "V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT",
+            "V08_MAGE_DAMAGE_KILL_PRIORITY_RIGHT",
+            "V07_AURA_CASTER_ROUTER",
+        ])
+            delete unset[key];
+        expect(nativeEnvironmentRefusal(unset)).toBeNull();
+        expect(nativeEnvironmentRefusal({ ...environment, V08_SUPPORTED_BAND_ADVANCE: "off" })).toBeNull();
+        expect(nativeEnvironmentRefusal({ ...environment, V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT: "1" })).toBe(
+            "env:V08_MAGE_DAMAGE_KILL_PRIORITY_LEFT",
+        );
+        expect(nativeEnvironmentRefusal({ ...environment, V07_AURA_CASTER_ROUTER: "on" })).toBe(
+            "env:V07_AURA_CASTER_ROUTER",
+        );
+        // a VERSIONS scope is not a switch: unset (every version) and "" (none) differ
+        const scope = { ...environment };
+        delete scope.V08_SUPPORT_ROLE_VERSIONS;
+        expect(nativeEnvironmentRefusal({ ...scope, V08_SUPPORT_ROLE_VERSIONS: "" })).toBe(
+            "env:V08_SUPPORT_ROLE_VERSIONS",
+        );
     });
 
     test("only StrategyV0_8 (under the A19 placement layers) and StrategyV0_1 have a library policy", () => {
