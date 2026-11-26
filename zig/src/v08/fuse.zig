@@ -250,9 +250,9 @@ fn secondaryRider(u: *const st.Unit) bool {
 /// estimateLastFuseRangedDamage: a stationary ordinary shot of a Last Fuse army on its only possible impact, priced per
 /// roll (Lucky Strike included) with the corpse's blast at the fatal chance; null (search decides) for a shooter or
 /// target whose sequence it does not model: a secondary rider or a physical AOE / Chakram / Absolving Arrow card, a
-/// Fireforged Sword, a target that can answer the shot, a Double Shot or Echo that may follow an uncertain kill, or a
-/// blast that would destroy a self-resurrecting stack. Flesh Shield is not in the engine's scope, and Broken Aegis'
-/// break chance is 0 in every loadable army.
+/// Fireforged Sword, a target that can answer the shot, a Double Shot or Echo that may follow an uncertain kill, a
+/// self-resurrecting target while the shooter's team can Break (Broken Aegis, Chaos Break on Attack), or a blast that
+/// would destroy a self-resurrecting stack. Flesh Shield is not in the engine's scope.
 pub fn lastFuseRanged(s: *const st.State, u: *const st.Unit, ti: u8, divisor: f64) ?FuseEstimate {
     const t = &s.units[ti];
     if (t.isDead() or u.buffs.find(.last_fuse) == null or t.team == u.team or engine.getRangeShots(u) <= 0) return null;
@@ -262,6 +262,7 @@ pub fn lastFuseRanged(s: *const st.State, u: *const st.Unit, ti: u8, divisor: f6
     if (engine.isRangeCapable(t) and engine.getRangeShots(t) > 0 and !abilities.skipsResponse(u) and !util.repliedAttack(s, ti) and
         !t.isSkipping() and !t.has(.through_shot)) return null;
     const resurrects = engine.canSelfResurrect(t);
+    if (resurrects and s.setup[u.team].break_chance > 0) return null;
     const lo = combat.damageBound(u, t, u.attack_damage_min, true, divisor);
     const hi = combat.damageBound(u, t, u.attack_damage_max, true, divisor);
     if (hi < lo) return null;
@@ -304,13 +305,14 @@ pub fn lastFuseRanged(s: *const st.State, u: *const st.Unit, ti: u8, divisor: f6
 /// canProjectMeleeResponse: whether the target's answer to the strike cannot change it. True when the target cannot
 /// answer, or its answer (its own primary melee estimate from its base cell) misses for sure, is absorbed, or never
 /// kills the striker; false for an answer the estimate does not model (a Backstab answer to a moved strike, Rapid Charge,
-/// the target's Fireforged Sword, a secondary rider; Fire Shield, Flesh Shield and Broken Aegis are not in the engine's
-/// scope).
+/// the target's Fireforged Sword, a secondary rider, a target team that can Break; Fire Shield and Flesh Shield are not
+/// in the engine's scope).
 fn canProjectMeleeResponse(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape) bool {
     const u = &s.units[ai_];
     const t = &s.units[ti];
     if (!util.canRespondToMelee(s, ai_, ti)) return true;
-    if ((shape.moved and t.has(.backstab)) or t.has(.rapid_charge) or t.buffs.find(.fireforged_sword) != null or secondaryRider(t)) return false;
+    if ((shape.moved and t.has(.backstab)) or t.has(.rapid_charge) or t.buffs.find(.fireforged_sword) != null or secondaryRider(t) or
+        s.setup[t.team].break_chance > 0) return false;
     const response = primaryMelee(s, ti, ai_, .{}, engine.baseCell(t)) orelse return false;
     if (response.hit <= 0 or abilities.absorbsHit(u)) return true;
     return response.max_damage < util.cumulativeHp(u);
@@ -330,6 +332,7 @@ pub fn lastFuseMelee(s: *const st.State, ai_: u8, ti: u8, shape: MeleeShape, fro
         for (s.holderOrder()) |i| if (s.units[i].n_auras != 0) return null;
     }
     const resurrects = engine.canSelfResurrect(t);
+    if (resurrects and s.setup[u.team].break_chance > 0) return null;
     const damage = primaryMelee(s, ai_, ti, shape, from) orelse return null;
     if (abilities.absorbsHit(t)) return .{ .net = 0, .fatal = 0, .secure = false };
     const fatal = if (resurrects) 0 else damage.hit * damage.fatal;

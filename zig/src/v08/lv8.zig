@@ -952,10 +952,11 @@ fn pureMoveMeaningful(s: *const st.State, intent: *const Intent, pi: u8, actions
 }
 
 /// followWard: the closest catch-up route toward the uncovered primary ward that loses no covered ward (else the best
-/// value swap); by distance, route weight, then cell y and x.
+/// value swap); by distance, route weight, then cell y and x. None for a protector that cannot move (Paralysis, a web).
 fn followWard(c: *ai.Ctx, intent: *const Intent, out: *ai.Decision) bool {
     const s = c.s;
     const u = c.unit();
+    if (!u.canMove()) return false;
     const ward = cellsOf(s, intent.ward);
     const now = footprintDistance(engine.unitCells(u).slice(), ward.slice());
     const mp = c.actualPath();
