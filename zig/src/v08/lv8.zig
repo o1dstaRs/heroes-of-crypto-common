@@ -132,7 +132,7 @@ pub fn defendToWait(s: *const st.State, ui: u8, in: *const ai.Decision, out: *ai
 /// isV08DirectCombatDecision: a melee or ranged attack (area throws are out of scope).
 fn isDirectCombat(actions: []const rec.Action) bool {
     for (actions) |a| switch (a) {
-        .melee_attack, .range_attack => return true,
+        .melee_attack, .range_attack, .area_throw_attack => return true,
         else => {},
     };
     return false;
@@ -218,6 +218,31 @@ fn forbiddenTarget(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) bool {
     return true;
 }
 
+/// prioritizeV08SplashRangedDecision: a splash shooter (Area Throw, Large Caliber) or a Through Shot unit
+/// (V08_THROUGH_SHOT_LINE unset: on) whose decision shoots or throws takes the shot or area throw with the most priced
+/// damage over its whole uncapped catalog (free Through Shot lines included), when that beats the priced incumbent.
+/// Last Fuse is an artifact buff, not in scope.
+fn splashRanged(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
+    const u = c.unit();
+    const through = u.has(.through_shot);
+    if (!(u.has(.area_throw) or u.has(.large_caliber) or through)) return util.copyDecision(out, in);
+    if (!util.has(in, .range_attack) and !util.has(in, .area_throw_attack)) return util.copyDecision(out, in);
+    var set: cand.Set = .{};
+    cand.enumerate(c, in, .{ .max_moves = 1, .max_melee = 1, .enrich = true, .through_free_aim = through }, &set);
+    const inc = &set.items[0];
+    if (inc.target < 0 or !std.math.isFinite(inc.ed)) return util.copyDecision(out, in);
+    var best: ?usize = null;
+    for (set.slice(), 0..) |*cd, i| {
+        if (cd.kind != .shot and cd.kind != .throw) continue;
+        if (!isDirectCombat(cd.d.slice()) or !std.math.isFinite(cd.ed)) continue;
+        if (best == null or cd.ed > set.items[best.?].ed) best = i;
+    }
+    if (best) |b| {
+        if (set.items[b].ed > inc.ed) return take(out, &set, b);
+    }
+    util.copyDecision(out, in);
+}
+
 /// The unit's book spell `raw`, when it may cast it now (isSpellUsableByCaster), with its config.
 fn usableBookSpell(s: *const st.State, u: *const st.Unit, raw: u8) ?*const st.SpellConfig {
     for (u.spells[0..u.n_spells]) |*b| {
@@ -291,7 +316,7 @@ fn vineThrow(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     const vine: u8 = @intFromEnum(st.CastSpell.vine_throw);
     if (usableBookSpell(s, u, vine) == null) return util.copyDecision(out, in);
     for (in.slice()) |a| switch (a) {
-        .wait_turn, .melee_attack, .range_attack, .cast_spell => return util.copyDecision(out, in),
+        .wait_turn, .melee_attack, .range_attack, .area_throw_attack, .cast_spell => return util.copyDecision(out, in),
         else => {},
     };
     if (util.dominantFinishState(s, u.team).active) return util.copyDecision(out, in);
@@ -464,7 +489,7 @@ fn productiveAction(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void 
             passive = true;
             obstacle = true;
         },
-        .move_unit, .melee_attack, .range_attack, .cast_spell => productive = true,
+        .move_unit, .melee_attack, .range_attack, .area_throw_attack, .cast_spell => productive = true,
         else => {},
     };
     if (!passive or (productive and !obstacle)) return util.copyDecision(out, in);
@@ -1081,9 +1106,11 @@ pub fn backlineWard(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void 
 
 // ---- ranged positioning (v0_8_ranged_positioning.ts), production path: the pinned retreat ----
 
-/// Unit.calculateAttackDamageMin/Max at an explicit attack rate (combat.damageBound reads the unit's own attack).
+/// Unit.calculateAttackDamageMin/Max at an explicit attack rate (combat.damageBound reads the unit's own attack), with
+/// the attacker team's synergy power in getEnemyArmor (an active Piercing Spear scales the armor by 1 - multiplier).
 fn boundAt(att: *const st.Unit, tgt: *const st.Unit, dmg: f64, rate: f64, is_range: bool) f64 {
-    const armor = if (is_range) engine.getRangeArmor(tgt) else engine.getArmor(tgt);
+    var armor = if (is_range) engine.getRangeArmor(tgt) else engine.getArmor(tgt);
+    if (att.ability(.piercing_spear)) |ps| armor = armor * (1 - abilities.abilityMultiplierSyn(att, ps, att.syn_power));
     const luck = engine.getLuck(tgt);
     return @max(1, @ceil(((((dmg * rate * att.amount_alive) / armor) * (1 - luck / 100)) / 1) * att.attack_multiplier * 1));
 }
@@ -1099,8 +1126,9 @@ fn chargeDistance(actions: []const rec.Action) f64 {
 /// unsupported sequence (a lava move, Lightning Spin, Double Punch, Skewer Strike), else whether the hit cannot miss
 /// and every landed outcome of the damage chain kills: Rapid Charge over the charge distance and Backstab from `from`
 /// after the roll, the ranged unit's half-strength swing unless Handyman, Lucky Strike's chance and multiplier, and
-/// Penetrating Bite's bonus. War Anger (the aura attack terms), Paralysis, Deep Wounds, elemental affinity, Fire
-/// Breath and Chain Lightning are not in scope.
+/// Penetrating Bite's bonus, under one floor with the target's Deep Wounds (calculateActiveDeepWoundsEffect). War
+/// Anger (the aura attack terms), Paralysis, Fire Breath and Chain Lightning are not in scope; the elemental factor is
+/// 1 (no Fire, Water or Wind Element holder in scope).
 fn meleeSecureKill(s: *const st.State, ai_: u8, ti: u8, actions: []const rec.Action, from: rec.Cell) ?bool {
     const u = &s.units[ai_];
     const t = &s.units[ti];
@@ -1125,13 +1153,14 @@ fn meleeSecureKill(s: *const st.State, ai_: u8, ti: u8, actions: []const rec.Act
         lucky_mult = abilities.abilityMultiplier(u, ls);
     }
     const bite = abilities.penetratingBite(u, t);
+    const wounds = 1 + abilities.activeDeepWounds(u, t) / 100;
     const hp = util.cumulativeHp(t);
     const hit = 1 - @min(100, @max(0, abilities.missChance(u, t))) / 100;
     if (hit != 1) return false;
     const raw_end = if (hi == lo) lo + 1 else hi;
     var raw = lo;
     while (raw < raw_end) : (raw += 1) {
-        const ordinary = @floor(raw * type_mult * handler * 1 * 1);
+        const ordinary = @floor(raw * type_mult * handler * wounds * 1);
         if (lucky_chance > 0) {
             // addOutcome drops a zero-probability outcome: a certain Lucky Strike leaves only the lucky one.
             if (1 - lucky_chance > 0 and ordinary + bite < hp) return false;
@@ -1154,24 +1183,6 @@ fn pinnedAt(s: *const st.State, u: *const st.Unit, px: f64, py: f64) bool {
         if (aggr[@intCast(c.x)][@intCast(c.y)] > 1) return true;
     }
     return false;
-}
-
-/// AttackHandler.getRangeAttackDivisor (combat.zig rangeDivisor / shotCellDistance, copied: they are file-private).
-fn rangeDivisorAt(att: *const st.Unit, hx: f64, hy: f64, ax: f64, ay: f64) f64 {
-    var divisor: f64 = 1;
-    const band = if (att.shot_distance > 0 and std.math.isFinite(att.shot_distance)) @floor(att.shot_distance) else 0;
-    if (band > 0) {
-        const tc = engine.cellForPosition(hx, hy);
-        const t = engine.positionForCell(@floatFromInt(tc.x), @floatFromInt(tc.y));
-        const hfx = ((@as(f64, @floatFromInt(att.fw)) - 1) / 2) * engine.CELL;
-        const hfy = ((@as(f64, @floatFromInt(att.fh)) - 1) / 2) * engine.CELL;
-        var away = @max(0, js.round(@max(@abs(t[0] - ax) - hfx, @abs(t[1] - ay) - hfy) / engine.CELL));
-        while (away > band) {
-            away -= band;
-            divisor *= 2;
-        }
-    }
-    return @max(1, divisor);
 }
 
 /// allyScreensThreat: the ally sits between the shooter's cells and that enemy, within reach of the shooter.
@@ -1211,13 +1222,14 @@ fn pinnedRetreat(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
     util.copyDecision(out, in);
     if (u.attack_type != AT.RANGE or engine.getRangeShots(u) <= 0) return;
     // A web-locked shooter cannot move, a Handyman shooter melees without penalty, and a shooter inside an enemy Range
-    // Null Field is already silenced (Rangebane is not in scope).
+    // Null Field or under Rangebane is already silenced.
     if (!u.canMove() or u.has(.handyman)) return;
-    if (u.debuffs.find(.range_null_field_aura) != null) return;
+    if (u.debuffs.find(.range_null_field_aura) != null or engine.rangebaned(s, u)) return;
     if (!pinnedAt(s, u, u.pos_x, u.pos_y)) return;
     var melee: ?rec.Action = null;
     for (in.slice()) |a| switch (a) {
-        .range_attack, .obstacle_attack => return,
+        // TURN_CONSUMING_NON_MELEE
+        .range_attack, .area_throw_attack, .obstacle_attack, .cast_spell => return,
         .melee_attack => melee = a,
         else => {},
     };
@@ -1263,8 +1275,9 @@ fn pinnedRetreat(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
             const ecells = engine.unitCells(e);
             const d = cellsDistance(foot, ecells.slice());
             min_enemy = @min(min_enemy, d);
-            divisor = @min(divisor, rangeDivisorAt(u, e.pos_x, e.pos_y, pos[0], pos[1]));
-            if (@as(f64, @floatFromInt(d)) > @ceil(@max(0, engine.getSteps(e))) + 1) continue; // withinMeleeHorizon
+            divisor = @min(divisor, util.rangeDivisorAt(u, e.pos_x, e.pos_y, pos[0], pos[1]));
+            // withinMeleeHorizon: a No Melee enemy never threatens.
+            if (e.has(.no_melee) or @as(f64, @floatFromInt(d)) > @ceil(@max(0, engine.getSteps(e))) + 1) continue;
             reachable += 1;
             for (front[0..nfr]) |fi| {
                 if (allyScreens(foot, engine.unitCells(&s.units[fi]).slice(), ecells.slice())) {
@@ -1276,7 +1289,8 @@ fn pinnedRetreat(c: *ai.Ctx, in: *const ai.Decision, out: *ai.Decision) void {
         var nearest: i32 = std.math.maxInt(i32);
         for (front[0..nfr]) |fi| nearest = @min(nearest, cellsDistance(foot, engine.unitCells(&s.units[fi]).slice()));
         const view = RouteView{ .route = @intCast(ri), .unscreened = reachable - screened, .reachable = reachable, .eligible = reachable == screened, .min_enemy = min_enemy, .nearest_front = nearest, .divisor = divisor, .cost = r.weight };
-        if (!view.eligible) continue;
+        // legacyEligible: a No Melee shooter takes any route, another only a fully screened one.
+        if (!(u.has(.no_melee) or view.eligible)) continue;
         if (best == null or preferRetreat(&view, &best.?)) best = view;
     }
     const b = best orelse return;
@@ -1470,12 +1484,13 @@ fn runPassInner(c: *ai.Ctx, pass: Pass, in: *const ai.Decision, out: *ai.Decisio
         .backline_protector => backlineProtector(c, in, out),
         .coherent_melee => return coherentMelee(c, in, out),
         .forbidden_target => return forbiddenTarget(c, in, out),
+        .splash => splashRanged(c, in, out),
         .damage_spell => damageSpell(c, in, out),
         .vine => vineThrow(c, in, out),
         .healer => healerSustain(c, in, out),
         // Identity in scope: splash shooters, Smoke, Nightmare's Fire Wall and the Blacksmith need abilities or spells
         // the engine does not carry yet; ranked-replay tactics are an off-by-default research scope.
-        .splash, .smoke, .nightmare, .blacksmith, .ranked_replay => util.copyDecision(out, in),
+        .smoke, .nightmare, .blacksmith, .ranked_replay => util.copyDecision(out, in),
         .cemetery => return cemetery(c, in, out),
         .ranged_positioning => return rangedPositioning(c, in, out),
     }

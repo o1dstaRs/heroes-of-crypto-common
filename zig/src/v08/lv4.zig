@@ -83,8 +83,8 @@ fn healerSpell(c: *ai.Ctx, out: *ai.Decision) bool {
     for (s.holderOrder()) |k| {
         const a = &s.units[k];
         if (!util.livingOf(s, k, u.team)) continue;
-        // healEligible (canBeHealed: every unit in scope can be healed)
-        if (engine.getMagicResist(a) == 100 or !(a.hp < a.max_hp)) continue;
+        // healEligible: canBeHealed (a Mechanism cannot be), magic resist below 100, the top creature hurt
+        if (a.has(.mechanism) or engine.getMagicResist(a) == 100 or !(a.hp < a.max_hp)) continue;
         if (a.level < 3) continue;
         const lost = woundFraction(a);
         if (!(lost > 0.3)) continue;
@@ -766,19 +766,20 @@ fn frontMove(c: *ai.Ctx, out: *ai.Decision) void {
 
 const Edge = struct { cell: Cell, side: u8 };
 
-/// resolveRangeAttackAimEdge: the requested edge if observable, else the observable edge nearest the attacker.
-fn resolveAimEdge(s: *const State, att: *const st.Unit, tgt: *const st.Unit, aim_cell: ?Cell, aim_side: u8) ?Edge {
+/// resolveRangeAttackAimEdge: the requested edge if observable, else the observable edge nearest the attacker (the
+/// shot's Through Shot / ignores-structures flags in the side test).
+fn resolveAimEdge(s: *const State, att: *const st.Unit, tgt: *const st.Unit, aim_cell: ?Cell, aim_side: u8, through: bool, ignores: bool) ?Edge {
     const cells = engine.unitCells(tgt);
     if (aim_cell) |ac| {
         for (cells.slice()) |cl| {
-            if (cl.x == ac.x and cl.y == ac.y and aim_side < 4 and combat.sideObservable(s, cl, aim_side, att.team)) return .{ .cell = cl, .side = aim_side };
+            if (cl.x == ac.x and cl.y == ac.y and aim_side < 4 and combat.sideObservableEx(s, cl, aim_side, att.team, through, ignores)) return .{ .cell = cl, .side = aim_side };
         }
     }
     var best: ?Edge = null;
     var best_d: f64 = 0;
     for (cells.slice()) |cl| {
         for ([_]u8{ 0, 1, 2, 3 }) |side| {
-            if (!combat.sideObservable(s, cl, side, att.team)) continue;
+            if (!combat.sideObservableEx(s, cl, side, att.team, through, ignores)) continue;
             const p = combat.sideCenter(cl, side, att.pos_x, att.pos_y);
             const d = engine.distance(att.pos_x, att.pos_y, p[0], p[1]);
             if (best == null or d < best_d) {
@@ -790,16 +791,23 @@ fn resolveAimEdge(s: *const State, att: *const st.Unit, tgt: *const st.Unit, aim
     return best;
 }
 
-/// rangeShotLands (requireResolvedPrimaryRangeTarget: true; no Through Shot, AOE, Hidden, Cowardice or Gaze).
+/// rangeShotLands (requireResolvedPrimaryRangeTarget: true): the target alive and not Hidden, the shot landable
+/// (canLandRangeAttack), a selectable aim edge (not for a Through Shot), and the engine's evaluation of the resolved
+/// aim (Through Shot's line, a splash shooter's rings) leading with a living enemy the unit may hit: not a lone Hidden
+/// group, not Cowardice-barred, the forced target if one lives, not the gazer.
 fn rangeShotLands(c: *const ai.Ctx, shot: anytype) bool {
     const s = c.s;
     const u = c.unit();
     const target = &s.units[shot.target];
-    if (!target.in_holder or target.isDead()) return false;
+    if (!target.in_holder or target.isDead() or target.isHidden()) return false;
     if (!engine.canLandRangeAttack(s, u)) return false;
     const from = [2]f64{ u.pos_x, u.pos_y };
-    const edge = resolveAimEdge(s, u, target, shot.aim_cell, shot.aim_side) orelse return false;
-    if (!util.sideSelectable(s, edge.cell, edge.side, from, .{ target.pos_x, target.pos_y }, engine.isSmall(u), engine.isSmall(target), u.team)) return false;
+    const through = u.has(.through_shot);
+    const aoe = combat.isSplashShooter(u);
+    if (!through) {
+        const edge = resolveAimEdge(s, u, target, shot.aim_cell, shot.aim_side, through, aoe) orelse return false;
+        if (!util.sideSelectableEx(s, edge.cell, edge.side, from, .{ target.pos_x, target.pos_y }, engine.isSmall(u), engine.isSmall(target), u.team, through, aoe)) return false;
+    }
     // resolveRangeTargetPosition, replicated: the aim cell (else the target cell nearest the attacker), then the aim
     // side if observable (else the observable side nearest the attacker).
     const cells = engine.unitCells(target);
@@ -825,7 +833,7 @@ fn rangeShotLands(c: *const ai.Ctx, shot: anytype) bool {
     var sides: [4]u8 = undefined;
     var n_sides: usize = 0;
     for ([_]u8{ 0, 1, 2, 3 }) |side| {
-        if (combat.sideObservable(s, cl, side, u.team)) {
+        if (combat.sideObservableEx(s, cl, side, u.team, through, aoe)) {
             sides[n_sides] = side;
             n_sides += 1;
         }
@@ -854,14 +862,19 @@ fn rangeShotLands(c: *const ai.Ctx, shot: anytype) bool {
         }
         to = combat.sideCenter(cl, side, from[0], from[1]);
     }
-    const hits = combat.evaluateRange(s, c.ui, from[0], from[1], to[0], to[1]);
-    if (hits.len == 0) return false;
-    const first = &s.units[hits.units[0]];
+    var g: combat.Groups = undefined;
+    combat.evaluateGroups(&g, s, c.ui, from[0], from[1], to[0], to[1], through, aoe);
+    if (g.n == 0) return false;
+    const fi = g.first(0);
+    const first = &s.units[fi];
     if (first.isDead() or first.team == u.team) return false;
-    if (u.target >= 0 and u.target != @as(i8, @intCast(hits.units[0]))) {
+    if (g.n == 1 and first.isHidden()) return false;
+    if (engine.cowardBarred(s, u, first)) return false;
+    if (u.target >= 0 and u.target != @as(i8, @intCast(fi))) {
         const f = &s.units[@intCast(u.target)];
         if (f.in_holder and !f.isDead()) return false;
     }
+    if (u.cannotAttack(first.uid)) return false;
     return true;
 }
 

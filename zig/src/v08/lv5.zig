@@ -5,10 +5,9 @@
 //! (mineByPolicy, BLOCK_CENTER), the learned melee re-rank (meleeByPolicy), the learned AoE stand (aoeMeleeByPolicy:
 //! Lightning Spin, Skewer Strike), the learned move re-rank (repositionByPolicy), the aura flyer's support
 //! (auraFlyerSupport), the charge hourglass (hourglassByPolicy), the blocked-move guard (dropBlockedMove) and the free
-//! adjacent attack (takeAdjacentAttack). Identity in scope, so not ported: healerPolicy (no Healer spells),
-//! noMeleeRetreat (only No-Melee shooters can move: an ordinary shooter's score never beats its +Infinity start),
-//! excludeHiddenAttack (no Hidden), meleeAuraSupport (V05_AURASUPPORT off) and repairUnavailableMovePrefixedAttack (no
-//! Fire Wall, no Cowardice). Zero-weight or always-zero score terms (War Anger, target caster, Rapid Charge (weight 0),
+//! adjacent attack (takeAdjacentAttack), with the healer policy, the No Melee retreat, the Hidden-target guard and the
+//! Cowardice move-prefix repair. Identity in scope, so not ported: meleeAuraSupport (V05_AURASUPPORT off) and the Fire
+//! Wall half of repairUnavailableMovePrefixedAttack (wave 2). Zero-weight or always-zero score terms (War Anger, target caster, Rapid Charge (weight 0),
 //! bait, Armageddon) add exactly 0.
 
 const std = @import("std");
@@ -35,14 +34,152 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     defer policy.note("v0.5", out, s, rin);
     lv4.decide(c, out);
     healerPolicy(c, out);
+    noMeleeRetreat(c, out);
     mineByPolicy(c, out);
     meleeByPolicy(c, out);
     aoeMeleeByPolicy(c, out);
     repositionByPolicy(c, out);
+    excludeHiddenAttack(c, out);
     auraFlyerSupport(c, out);
     hourglassByPolicy(c, out);
     dropBlockedMove(c, out);
     takeAdjacentAttack(c, out);
+    repairMovePrefixedAttack(c, out);
+}
+
+/// noMeleeRetreat: a No Melee shooter that can move but cannot land a shot, on a turn with no combat action but a melee
+/// (a melee whose Double-Punch-scaled top hit kills the target stays), retreats to the reachable cell (a non-empty
+/// route, not its own cell) where its footprint touches no enemy, farthest (Manhattan to the nearest enemy base) from
+/// the enemies; first wins ties. An ordinary shooter's disengage never moves (its score starts at +Infinity).
+fn noMeleeRetreat(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    if (u.attack_type != AT.RANGE or !u.canMove()) return;
+    if (engine.canLandRangeAttack(s, u)) return;
+    if (!u.has(.no_melee)) return;
+    var melee: ?u8 = null;
+    for (out.slice()) |a| switch (a) {
+        .range_attack, .cast_spell, .obstacle_attack, .area_throw_attack => return,
+        .melee_attack => |m| {
+            if (melee == null) melee = m.target;
+        },
+        else => {},
+    };
+    if (melee) |t| {
+        const tgt = &s.units[t];
+        if (tgt.in_holder and util.meleeAttacks(u) * util.damageMax(u, tgt, false, 1) >= util.cumulativeHp(tgt)) return;
+    }
+    const opp = engine.opposite(u.team);
+    var any = false;
+    for (s.holderOrder()) |k| {
+        if (util.livingOf(s, k, opp)) any = true;
+    }
+    if (!any) return;
+    const mp = c.actualPath();
+    if (mp.size() == 0) return;
+    const base = engine.baseCell(u);
+    var best: ?*const pathing.Route = null;
+    var best_score = -std.math.inf(f64);
+    var buf: [64]Cell = undefined;
+    for (mp.known()) |*r| {
+        if (mp.routeCells(r, &buf) == 0 or (r.cell.x == base.x and r.cell.y == base.y)) continue;
+        const fp = ai.footprintForAnchor(u, r.cell);
+        var pinned = false;
+        var dist = std.math.inf(f64);
+        for (s.holderOrder()) |k| {
+            if (!util.livingOf(s, k, opp)) continue;
+            const e = &s.units[k];
+            if (util.footprintsNear(engine.unitCells(e).slice(), fp.slice())) pinned = true;
+            const eb = engine.baseCell(e);
+            dist = @min(dist, @as(f64, @floatFromInt(@abs(r.cell.x - eb.x) + @abs(r.cell.y - eb.y))));
+        }
+        if (pinned) continue;
+        if (dist > best_score) {
+            best_score = dist;
+            best = r;
+        }
+    }
+    const b = best orelse return;
+    util.setMove(out, s, c.ui, mp, b);
+}
+
+/// excludeHiddenAttack: a strike or shot on a Hidden stack becomes, for a melee, an in-place strike on the first
+/// enemy (getAllAllies order) that is alive, not Hidden, not Cowardice-barred and adjacent now; otherwise the strike
+/// is dropped, keeping the rest of the turn when it moves, else ending the turn.
+fn excludeHiddenAttack(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    var idx: ?usize = null;
+    for (out.slice(), 0..) |a, i| {
+        if (a == .melee_attack or a == .range_attack) {
+            idx = i;
+            break;
+        }
+    }
+    const i = idx orelse return;
+    const a = out.actions[i];
+    const target: u8 = if (a == .melee_attack) a.melee_attack.target else a.range_attack.target;
+    if (a == .range_attack and a.range_attack.free) return; // a free line names no stack
+    const t = &s.units[target];
+    if (!t.in_holder or !t.isHidden()) return;
+    if (a == .melee_attack) {
+        const mine = engine.unitCells(u);
+        const opp = engine.opposite(u.team);
+        for (s.holderOrder()) |k| {
+            const e = &s.units[k];
+            if (!e.in_holder or e.team != opp or e.isDead() or e.isHidden() or engine.cowardBarred(s, u, e)) continue;
+            if (!util.footprintsNear(engine.unitCells(e).slice(), mine.slice())) continue;
+            out.* = .{};
+            if (u.attack_type_selected != AT.MELEE) out.push(.{ .select_attack_type = .{ .unit = c.ui, .attack_type = AT.MELEE } });
+            out.push(.{ .melee_attack = .{ .attacker = c.ui, .target = k, .attack_from = engine.baseCell(u), .path = &.{} } });
+            return;
+        }
+    }
+    var rest: ai.Decision = .{};
+    var moves = false;
+    for (out.slice(), 0..) |x, j| {
+        if (j == i or x == .select_attack_type) continue;
+        if (x == .move_unit) moves = true;
+        rest.push(x);
+    }
+    if (moves) return util.copyDecision(out, &rest);
+    util.setEndTurn(out, c.ui);
+}
+
+/// repairUnavailableMovePrefixedAttack (no Fire Wall in scope): a move followed by the unit's melee on a stack with
+/// more cumulative HP while the unit carries Cowardice keeps only the actions up to the move.
+fn repairMovePrefixedAttack(c: *ai.Ctx, out: *ai.Decision) void {
+    const s = c.s;
+    const u = c.unit();
+    var move_idx: ?usize = null;
+    for (out.slice(), 0..) |a, i| {
+        if (a == .move_unit and a.move_unit.unit == c.ui) {
+            move_idx = i;
+            break;
+        }
+    }
+    const mi = move_idx orelse return;
+    var dependent = false;
+    for (out.slice()[mi + 1 ..]) |a| switch (a) {
+        .melee_attack => |m| if (m.attacker == c.ui) {
+            dependent = true;
+        },
+        .range_attack => |r| if (r.attacker == c.ui) {
+            dependent = true;
+        },
+        else => {},
+    };
+    if (!dependent or !engine.cowardly(s, u)) return;
+    const hp = util.cumulativeHp(u);
+    var blocked = false;
+    for (out.slice()[mi + 1 ..]) |a| switch (a) {
+        .melee_attack => |m| if (m.attacker == c.ui) {
+            const t = &s.units[m.target];
+            if (t.in_holder and !t.isDead() and hp < util.cumulativeHp(t)) blocked = true;
+        },
+        else => {},
+    };
+    if (blocked) out.n = @intCast(mi + 1);
 }
 
 /// Slots with a sort key, ordered by the key descending, stably (JavaScript's sort with `(p, q) => key(q) - key(p)`).

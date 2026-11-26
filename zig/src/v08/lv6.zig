@@ -42,7 +42,7 @@ fn routeCaster(c: *ai.Ctx, out: *ai.Decision) void {
     if (cast) |sp| {
         if (sp == summon) return;
     } else for (out.slice()) |a| switch (a) {
-        .wait_turn, .defend_turn, .melee_attack, .range_attack, .obstacle_attack => return,
+        .wait_turn, .defend_turn, .melee_attack, .range_attack, .area_throw_attack, .obstacle_attack => return,
         else => {},
     };
     var set: cand.Set = .{};

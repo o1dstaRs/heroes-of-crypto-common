@@ -5,6 +5,7 @@ const std = @import("std");
 const rec = @import("../recording.zig");
 const st = @import("../state.zig");
 const engine = @import("../engine.zig");
+const js = @import("../jsnum.zig");
 const combat = @import("../combat.zig");
 const abilities = @import("../abilities.zig");
 const pathing = @import("../path.zig");
@@ -237,12 +238,13 @@ pub fn cumulativeHp(u: *const Unit) f64 {
 }
 
 /// canUnitRespondToMelee (src/handlers/melee_response.ts), as the engine's combat.zig canRespondToMelee: nobody answers
-/// a Shadow Touch or Lightning Spin attacker, a Stun blocks the reply, an Aggr'd target answers only its forced
-/// attacker, a unit frightened by Terrifying Gaze never answers its gazer, and the reply is spent once (No Melee and
-/// Cowardice are not in scope).
+/// a Shadow Touch or Lightning Spin attacker, a No Melee target never answers, nor a Cowardice-barred one (less
+/// cumulative HP than its attacker), a Stun blocks the reply, an Aggr'd target answers only its forced attacker, a unit
+/// frightened by Terrifying Gaze never answers its gazer, and the reply is spent once.
 pub fn canRespondToMelee(s: *const State, att: u8, ti: u8) bool {
     const tgt = &s.units[ti];
     if (abilities.skipsResponse(&s.units[att])) return false;
+    if (tgt.has(.no_melee) or engine.cowardBarred(s, tgt, &s.units[att])) return false;
     if (tgt.isStunned()) return false;
     if (tgt.target >= 0 and tgt.target != @as(i8, @intCast(att))) return false;
     if (s.forbids(tgt, s.units[att].uid)) return false;
@@ -256,17 +258,17 @@ pub inline fn meleeAttacks(u: *const Unit) f64 {
 
 /// calculateAttackDamageMin(getAttack(), target, isRange, 0, divisor) (no Warlord's Edge, no synergy power).
 pub inline fn damageMin(att: *const Unit, tgt: *const Unit, is_range: bool, divisor: f64) f64 {
-    return combat.damageBound(att, tgt, att.attack_damage_min, is_range, divisor);
+    return combat.damageBoundSyn(att, tgt, att.attack_damage_min, is_range, divisor, 0);
 }
 
 /// calculateAttackDamageMax(getAttack(), target, isRange, 0, divisor).
 pub inline fn damageMax(att: *const Unit, tgt: *const Unit, is_range: bool, divisor: f64) f64 {
-    return combat.damageBound(att, tgt, att.attack_damage_max, is_range, divisor);
+    return combat.damageBoundSyn(att, tgt, att.attack_damage_max, is_range, divisor, 0);
 }
 
-/// Unit.canRespond(MELEE): no Stun effect (Blindness, Freeze and "No Melee" are not in scope).
 pub inline fn canRespondMelee(u: *const Unit) bool {
-    return !u.isStunned();
+    // Unit.canRespond(MELEE): a Stun blocks it, and an unbroken No Melee (Blindness and Freeze are not in scope).
+    return !u.isStunned() and !u.has(.no_melee);
 }
 
 /// Unit.getAbilityPower(name): the ability's power, 0 without it or while Broken.
@@ -305,14 +307,20 @@ pub fn footprintsNear(a: []const Cell, b: []const Cell) bool {
 }
 
 // =====================================================================================================================
-// isRangeAttackSideSelectable (src/grid/grid_math.ts), plain shots (no Through Shot, structures not ignored)
+// isRangeAttackSideSelectable (src/grid/grid_math.ts), with its throughShot and ignoresStructures flags
 // =====================================================================================================================
 
 const Point = struct { x: f64, y: f64, side: u8, d: f64 };
 
-/// Whether the player's ranged cursor can select this exact edge: a probe just inside the edge resolves, through
-/// getClosestSideCenterDetailed, to this cell and side.
+/// isRangeAttackSideSelectable for a plain shot (no Through Shot, structures not ignored).
 pub fn sideSelectable(s: *const State, cell: Cell, side: u8, from: [2]f64, to: [2]f64, from_small: bool, to_small: bool, team: u8) bool {
+    return sideSelectableEx(s, cell, side, from, to, from_small, to_small, team, false, false);
+}
+
+/// Whether the player's ranged cursor can select this exact edge: a probe just inside the edge resolves, through
+/// getClosestSideCenterDetailed (its side tests take the shot's Through Shot / ignores-structures flags), to this cell
+/// and side.
+pub fn sideSelectableEx(s: *const State, cell: Cell, side: u8, from: [2]f64, to: [2]f64, from_small: bool, to_small: bool, team: u8, through: bool, ignores: bool) bool {
     if (side > 3) return false;
     const center = engine.positionForCell(@floatFromInt(cell.x), @floatFromInt(cell.y));
     const reach: f64 = @max(0, engine.HALF - 1);
@@ -339,25 +347,25 @@ pub fn sideSelectable(s: *const State, cell: Cell, side: u8, from: [2]f64, to: [
 
     var pts: [4]Point = undefined;
     var n: usize = 0;
-    if (combat.sideObservable(s, pc, 0, team) and !(big_to_small and ax == tx - half) and
+    if (combat.sideObservableEx(s, pc, 0, team, through, ignores) and !(big_to_small and ax == tx - half) and
         ((same_or_big and ax < tx) or (small_to_big and ax - half < tx - step)))
     {
         pts[n] = .{ .x = cp[0] - half, .y = cp[1], .side = 0, .d = 0 };
         n += 1;
     }
-    if (combat.sideObservable(s, pc, 1, team) and !(big_to_small and ax == tx + half) and
+    if (combat.sideObservableEx(s, pc, 1, team, through, ignores) and !(big_to_small and ax == tx + half) and
         ((same_or_big and ax > tx) or (small_to_big and ax + half > tx + step)))
     {
         pts[n] = .{ .x = cp[0] + half, .y = cp[1], .side = 1, .d = 0 };
         n += 1;
     }
-    if (combat.sideObservable(s, pc, 2, team) and !(big_to_small and ay == ty - half) and
+    if (combat.sideObservableEx(s, pc, 2, team, through, ignores) and !(big_to_small and ay == ty - half) and
         ((same_or_big and ay < ty) or (small_to_big and ay - half < ty - step)))
     {
         pts[n] = .{ .x = cp[0], .y = cp[1] - half, .side = 2, .d = 0 };
         n += 1;
     }
-    if (combat.sideObservable(s, pc, 3, team) and !(big_to_small and ay == ty + half) and
+    if (combat.sideObservableEx(s, pc, 3, team, through, ignores) and !(big_to_small and ay == ty + half) and
         ((same_or_big and ay > ty) or (small_to_big and ay + half > ty + step)))
     {
         pts[n] = .{ .x = cp[0], .y = cp[1] + half, .side = 3, .d = 0 };
@@ -415,7 +423,11 @@ pub fn canHourglass(s: *const State, ui: u8) bool {
 pub fn isAoEUnit(s: *const State, ui: u8) bool {
     return switch (creature(s, ui)) {
         .black_dragon, .pikeman, .gargantuan, .cyclops, .tsar_cannon => true,
-        else => s.units[ui].has(.skewer_strike),
+        // AOE_ABILITIES (Fire Breath is batch 6): a Queen that stole one counts too.
+        else => blk: {
+            const u = &s.units[ui];
+            break :blk u.has(.skewer_strike) or u.has(.area_throw) or u.has(.through_shot) or u.has(.large_caliber);
+        },
     };
 }
 
@@ -503,7 +515,7 @@ pub fn strikes(d: *const ai.Decision) bool {
 /// v0.5's COMBAT_ACTIONS and v0.8's posture-protected types: a strike, a cast or an obstacle attack (Area Throw is not
 /// in scope).
 pub fn combatAction(d: *const ai.Decision) bool {
-    return strikes(d) or has(d, .obstacle_attack);
+    return strikes(d) or has(d, .obstacle_attack) or has(d, .area_throw_attack);
 }
 
 pub fn setWait(d: *ai.Decision, ui: u8) void {
@@ -966,4 +978,22 @@ pub fn waitFeatures(s: *const State, ui: u8, incumbent: []const rec.Action, out:
     f[18] = fm * lap_capped;
     f[19] = enemy_yet_frac * is_melee;
     f[20] = enemy_yet_frac * is_ranged;
+}
+
+/// AttackHandler.getRangeAttackDivisor (combat.zig rangeDivisor / shotCellDistance, copied: they are file-private).
+pub fn rangeDivisorAt(att: *const st.Unit, hx: f64, hy: f64, ax: f64, ay: f64) f64 {
+    var divisor: f64 = 1;
+    const band = if (att.shot_distance > 0 and std.math.isFinite(att.shot_distance)) @floor(att.shot_distance) else 0;
+    if (band > 0) {
+        const tc = engine.cellForPosition(hx, hy);
+        const t = engine.positionForCell(@floatFromInt(tc.x), @floatFromInt(tc.y));
+        const hfx = ((@as(f64, @floatFromInt(att.fw)) - 1) / 2) * engine.CELL;
+        const hfy = ((@as(f64, @floatFromInt(att.fh)) - 1) / 2) * engine.CELL;
+        var away = @max(0, js.round(@max(@abs(t[0] - ax) - hfx, @abs(t[1] - ay) - hfy) / engine.CELL));
+        while (away > band) {
+            away -= band;
+            divisor *= 2;
+        }
+    }
+    return @max(1, divisor);
 }

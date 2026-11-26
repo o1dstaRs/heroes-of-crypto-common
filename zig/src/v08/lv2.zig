@@ -31,7 +31,8 @@ pub fn decide(c: *ai.Ctx, out: *ai.Decision) void {
     const rin = s.rng.state;
     const ranged = u.attack_type == AT.RANGE;
     if (ranged and !engine.canLandRangeAttack(s, u)) {
-        meleeFallback(c, out);
+        // No Melee (Tsar Cannon): no melee strike exists, so advance (or hold if pinned).
+        if (u.has(.no_melee)) ai.fallbackTurn(c, out) else meleeFallback(c, out);
     } else if (ranged) {
         decideRangedTurn(c, out);
     } else if (u.attack_type == AT.MAGIC and spellTurn(c, out)) {
@@ -58,8 +59,12 @@ fn decideRangedTurn(c: *ai.Ctx, out: *ai.Decision) void {
     out.push(.{ .range_attack = .{ .attacker = c.ui, .target = best.target, .aim_cell = best.cell, .aim_side = best.side } });
 }
 
-/// Every selectable edge of every enemy whose authoritative first hit is that enemy; the best scored shot wins
-/// (first wins ties: enemies in holder order, their cells, sides LEFT, RIGHT, DOWN, UP).
+/// Every observable edge of every enemy that is not Hidden or the gazer, through the shot's real evaluation
+/// (evaluateRangeAttack with Through Shot's line and a splash shooter's rings); the best scored shot wins (first wins
+/// ties: enemies in holder order, their cells, sides LEFT, RIGHT, DOWN, UP). v0.8's resolved-primary seam: an edge
+/// the cursor cannot select is skipped (not for a Through Shot), and a plain shot whose first hit is not the aimed
+/// enemy is skipped (a Through Shot's line and a splash impact are intentional collateral). A shot whose only group
+/// leads with a Hidden stack is skipped.
 fn findBestShot(c: *ai.Ctx) ?Shot {
     const s = c.s;
     const u = c.unit();
@@ -67,12 +72,14 @@ fn findBestShot(c: *ai.Ctx) ?Shot {
     const opp = engine.opposite(team);
     const from = [2]f64{ u.pos_x, u.pos_y };
     const small = engine.isSmall(u);
+    const aoe = combat.isSplashShooter(u);
+    const through = u.has(.through_shot);
+    var g: combat.Groups = undefined;
     var best: ?Shot = null;
     for (s.holderOrder()) |i_slot| {
         const i: usize = i_slot;
         const e = &s.units[i_slot];
         if (!util.livingOf(s, i, opp)) continue;
-        // Not a Hidden (Disguise) stack, nor the Terrifying Gaze gazer; the first hit is this enemy, so it is neither.
         if (e.isHidden() or u.cannotAttack(e.uid)) continue;
         const ei: u8 = @intCast(i);
         const to = [2]f64{ e.pos_x, e.pos_y };
@@ -80,12 +87,13 @@ fn findBestShot(c: *ai.Ctx) ?Shot {
         const cells = engine.unitCells(e);
         for (cells.slice()) |cell| {
             for ([_]u8{ 0, 1, 2, 3 }) |side| {
-                if (!combat.sideObservable(s, cell, side, team)) continue;
-                if (!util.sideSelectable(s, cell, side, from, to, small, e_small, team)) continue;
+                if (!combat.sideObservableEx(s, cell, side, team, through, aoe)) continue;
+                if (!through and !util.sideSelectableEx(s, cell, side, from, to, small, e_small, team, through, aoe)) continue;
                 const aim = combat.sideCenter(cell, side, from[0], from[1]);
-                const hits = combat.evaluateRange(s, c.ui, from[0], from[1], aim[0], aim[1]);
-                if (hits.len == 0 or hits.units[0] != ei) continue;
-                const value0 = scoreShot(c, &hits);
+                combat.evaluateGroups(&g, s, c.ui, from[0], from[1], aim[0], aim[1], through, aoe);
+                if (g.n == 1 and s.units[g.first(0)].isHidden()) continue;
+                if (!through and !aoe and (g.n == 0 or g.first(0) != ei)) continue;
+                const value0 = scoreShot(c, &g);
                 if (value0 <= 0) continue;
                 const value = value0 + shotTargetBonus(c, ei, value0);
                 if (best == null or value > best.?.score) best = .{ .cell = cell, .side = side, .target = ei, .score = value };
@@ -100,8 +108,9 @@ inline fn firepowerOf(u: *const Unit) f64 {
     return @max(1, engine.getRangeShots(u)) * @max(1, u.attack_damage_max);
 }
 
-/// StrategyV0_5.scoreShot: the learned shot scorer over every unit the shot's evaluation lists.
-fn scoreShot(c: *const ai.Ctx, hits: *const combat.Hits) f64 {
+/// StrategyV0_5.scoreShot: the learned shot scorer over every unit the shot's evaluation lists (each once, at its
+/// group's divisor), a Double Shot / Double Throw shooter landing two shots.
+fn scoreShot(c: *const ai.Ctx, g: *const combat.Groups) f64 {
     const s = c.s;
     const u = c.unit();
     const team = u.team;
@@ -127,9 +136,13 @@ fn scoreShot(c: *const ai.Ctx, hits: *const combat.Hits) f64 {
             n_allies += 1;
         }
     }
-    const shots: f64 = 1; // Double Shot: out of scope
+    const shots: f64 = if (combat.doubleShotAbility(u) != null) 2 else 1;
     var value: f64 = 0;
-    for (hits.units[0..hits.len], hits.divisors[0..hits.len]) |ti, divisor| {
+    var counted: st.UnitSet = 0;
+    for (0..g.n) |k| for (g.group(k)) |ti| {
+        if (counted & engine.unitBit(ti) != 0) continue;
+        counted |= engine.unitBit(ti);
+        const divisor = g.divisors[k];
         const t = &s.units[ti];
         const lo = util.damageMin(u, t, true, divisor);
         const hi = util.damageMax(u, t, true, divisor);
@@ -160,24 +173,29 @@ fn scoreShot(c: *const ai.Ctx, hits: *const combat.Hits) f64 {
         } else if (t.team == team) {
             value -= w_friendly * effective;
         }
-    }
+    };
     return value;
 }
 
 const BEHOLDER_FRESH_WEIGHT: f64 = 0.35;
 const BEHOLDER_YET_TO_ACT_MULT: f64 = 1.8;
 const BEHOLDER_THREAT_MULT: f64 = 1.3;
-/// SPIT_BALL_DEBUFFS (Sadness, Quagmire, Weakening Beam, Weakness, Cowardice) and Rangebane: none exists in scope.
-const SPIT_BALL_DEBUFFS: f64 = 5;
+/// SPIT_BALL_DEBUFFS (a ranged hit stacks every one the target lacks) and the range-only Rangebane.
+const SPIT_BALL_DEBUFFS = [_]st.SpellId{ .sadness, .quagmire, .weakening_beam, .weakness, .cowardice };
 
 /// StrategyV0_3.shotTargetBonus: the Beholder's debuff-spreading bias.
 fn shotTargetBonus(c: *const ai.Ctx, ei: u8, base: f64) f64 {
-    if (util.creature(c.s, c.ui) != .beholder) return 0; // or "Spit Ball": abilities out of scope
+    if (util.creature(c.s, c.ui) != .beholder and !c.unit().has(.spit_ball)) return 0;
     const s = c.s;
     const e = &s.units[ei];
     const targets_range = e.attack_type == AT.RANGE;
-    const possible = SPIT_BALL_DEBUFFS + @as(f64, if (targets_range) 1 else 0);
-    const fresh = possible; // no target carries any of them in scope
+    const possible = @as(f64, SPIT_BALL_DEBUFFS.len) + @as(f64, if (targets_range) 1 else 0);
+    var fresh: f64 = 0;
+    for (SPIT_BALL_DEBUFFS) |d| {
+        if (!engine.hasDebuff(e, d)) fresh += 1;
+    }
+    if (targets_range and !engine.hasDebuff(e, .rangebane)) fresh += 1;
+    if (fresh == 0) return 0;
     var bonus = base * BEHOLDER_FRESH_WEIGHT * (fresh / possible);
     if (!util.madeTurn(s, ei)) bonus *= BEHOLDER_YET_TO_ACT_MULT;
     if (canThreatenThisTurn(c, ei)) bonus *= BEHOLDER_THREAT_MULT;

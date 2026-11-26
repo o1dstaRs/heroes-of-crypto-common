@@ -41,7 +41,7 @@ fn routeQueenAssimilation(c: *ai.Ctx, out: *ai.Decision) void {
     }
     if (!remaining) return;
     for (out.slice()) |a| switch (a) {
-        .cast_spell, .melee_attack, .range_attack, .obstacle_attack => return,
+        .cast_spell, .melee_attack, .range_attack, .area_throw_attack, .obstacle_attack => return,
         else => {},
     };
     var set: cand.Set = .{};

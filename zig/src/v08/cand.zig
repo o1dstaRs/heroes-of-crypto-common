@@ -15,6 +15,7 @@ const util = @import("util.zig");
 const abilities = @import("../abilities.zig");
 const terrain = @import("../terrain.zig");
 const spells = @import("../spells.zig");
+const js = @import("../jsnum.zig");
 
 const Cell = rec.Cell;
 const AT = st.AttackType;
@@ -30,7 +31,7 @@ pub fn kindName(k: Kind) []const u8 {
         .shot => "shot",
         .move => "move",
         .mine => "mine",
-        .throw => "throw",
+        .throw => "area_throw",
         .spell => "spell",
     };
 }
@@ -63,6 +64,10 @@ pub const Options = struct {
     /// preserveMeteoriteTargetCoverage (battleMageTargetsEnabled, on for a Battle Mage): a Battle Mage's Meteorite keeps
     /// every distinct visible impact after the best one.
     meteor_coverage: bool = false,
+    /// maxAreaThrowCells (0: no cap).
+    max_throws: usize = 0,
+    /// throughShotFreeAim: a Through Shot also proposes free lines aimed at world points (v0.8's splash pass).
+    through_free_aim: bool = false,
 };
 
 pub const MAX = 64;
@@ -104,8 +109,13 @@ pub fn sigEqual(a: []const rec.Action, b: []const rec.Action) bool {
             .melee_attack => |m| if (m.target != y.melee_attack.target or !sameCell(m.attack_from, y.melee_attack.attack_from)) return false,
             .range_attack => |r| {
                 const o = y.range_attack;
-                if (r.target != o.target or !optCellEq(r.aim_cell, o.aim_cell) or r.aim_side != o.aim_side) return false;
+                // rg:<targetId>@<aimCell>/<aimSide>, plus ~x,y for a free line (targetId "").
+                if (r.free != o.free) return false;
+                if (r.free) {
+                    if (r.tx != o.tx or r.ty != o.ty) return false;
+                } else if (r.target != o.target or !optCellEq(r.aim_cell, o.aim_cell) or r.aim_side != o.aim_side) return false;
             },
+            .area_throw_attack => |t| if (!sameCell(t.target_cell, y.area_throw_attack.target_cell)) return false,
             .obstacle_attack => |o| {
                 const p = y.obstacle_attack;
                 if (o.target_x != p.target_x or o.target_y != p.target_y or o.has_from != p.has_from) return false;
@@ -714,8 +724,9 @@ const Gen = struct {
         const atk_mul: f64 = if (u.ability(.double_punch) != null) 2 else 1;
         // Native shooters deal half melee damage unless Handyman removes the penalty.
         const ranged_mul: f64 = if (u.attack_type == AT.RANGE and !u.has(.handyman)) 0.5 else 1;
-        const lo = atk_mul * @floor(combat.damageBound(u, t, u.attack_damage_min, false, 1) * ranged_mul);
-        const hi = atk_mul * @floor(combat.damageBound(u, t, u.attack_damage_max, false, 1) * ranged_mul);
+        // calculateAttackDamageMin/Max(getAttack(), target, false, 0, 1): no synergy power (Piercing Spear).
+        const lo = atk_mul * @floor(combat.damageBoundSyn(u, t, u.attack_damage_min, false, 1, 0) * ranged_mul);
+        const hi = atk_mul * @floor(combat.damageBoundSyn(u, t, u.attack_damage_max, false, 1, 0) * ranged_mul);
         const hp = util.cumulativeHp(t);
         const effective = @min((lo + hi) / 2, hp);
         return .{ .ed = effective, .ek = if (effective >= hp) 1 else 0 };
@@ -736,20 +747,24 @@ const Gen = struct {
         }
     };
 
-    /// One distinct visible-edge aim (addShots): the resolved first hit, the aimed enemy, the edge and its value.
+    /// One distinct shot (addShots): the resolved first hit, the aim anchor (the aimed enemy, or the first hit of a free
+    /// Through Shot line), the edge or free point, its value and its line signature.
     const Shot = struct {
         target: u8,
         aim: u8,
-        cell: Cell,
-        side: u8,
+        cell: Cell = .{ .x = 0, .y = 0 },
+        side: u8 = 0,
+        free: bool = false,
+        tx: f64 = 0,
+        ty: f64 = 0,
         ed: f64,
         ek: u8,
         index: u16,
-        hits: combat.Hits,
+        line: u64,
         fn stationary(_: Shot) bool {
             return true;
         }
-        /// Coverage preserves every declared visible-edge anchor (the aimed enemy).
+        /// Coverage preserves every declared aim anchor (special lines may aim through a rear stack).
         fn coverTarget(self: Shot) u8 {
             return self.aim;
         }
@@ -758,28 +773,221 @@ const Gen = struct {
     fn shotCandidate(self: *Gen, sh: *const Shot, cand: *Candidate) void {
         cand.* = .{ .kind = .shot, .target = sh.target, .ed = sh.ed, .ek = sh.ek };
         if (self.unit().attack_type_selected != AT.RANGE) cand.d.push(.{ .select_attack_type = .{ .unit = self.c.ui, .attack_type = AT.RANGE } });
-        cand.d.push(.{ .range_attack = .{ .attacker = self.c.ui, .target = sh.aim, .aim_cell = sh.cell, .aim_side = sh.side } });
+        if (sh.free) {
+            // A free line names no stack: the engine resolves its victims from the ray.
+            cand.d.push(.{ .range_attack = .{ .attacker = self.c.ui, .target = 0, .free = true, .tx = sh.tx, .ty = sh.ty } });
+        } else cand.d.push(.{ .range_attack = .{ .attacker = self.c.ui, .target = sh.aim, .aim_cell = sh.cell, .aim_side = sh.side } });
     }
 
-    /// shotDamage for a plain shot (no Through Shot, splash, Double Shot, Echo, Deep Wounds, shields or Last Fuse in
-    /// scope): the hit chance times the mean volley on the first impact, capped at its health.
-    fn shotDamage(self: *const Gen, ti: u8, divisor: f64) Dmg {
+    /// prepareRangeCandidateDamage: the attacker-only terms of every aim of one decision (the team's synergy power;
+    /// Through Shot's, else a splash's ability multiplier; the second volley's multiplier; whether ordinary arrows
+    /// spend only on a hit; Deep Wounds per landed hit). Paralysis, Giant's Maul, Broken Aegis, the Dual Strike Charm
+    /// and Quiver of Echoes are not in scope.
+    const Prepared = struct {
+        syn: f64,
+        physical_aoe: bool,
+        through: bool,
+        shared: f64,
+        second: f64,
+        on_hit_only: bool,
+        wounds_per_hit: f64,
+    };
+
+    fn prepareShot(self: *const Gen, shots: u8, aoe: bool) Prepared {
         const u = self.unit();
-        const t = &self.c.s.units[ti];
-        const lo = @floor(combat.damageBound(u, t, u.attack_damage_min, true, divisor));
-        const hi = @floor(combat.damageBound(u, t, u.attack_damage_max, true, divisor));
-        const hp = util.cumulativeHp(t);
-        const hit = 1 - @min(100, @max(0, abilities.missChance(u, t))) / 100;
-        const effective = hit * @min((lo + hi) / 2, hp);
-        return .{ .ed = effective, .ek = if (effective >= hp) 1 else 0 };
+        const syn = u.syn_power;
+        const through_ab = u.ability(.through_shot);
+        const aoe_ab: ?*const st.Ability = if (through_ab == null and aoe) (u.ability(.area_throw) orelse u.ability(.large_caliber)) else null;
+        const special = through_ab orelse aoe_ab;
+        var second: f64 = 0;
+        if (shots > 1) {
+            if (combat.doubleShotAbility(u)) |ds| second = if (aoe_ab != null) 1 else abilities.abilityMultiplierSyn(u, ds, syn);
+        }
+        return .{
+            .syn = syn,
+            .physical_aoe = special != null,
+            .through = through_ab != null,
+            .shared = if (special) |a| abilities.abilityMultiplierSyn(u, a, syn) else 1,
+            .second = second,
+            .on_hit_only = special == null and !u.has(.chakram),
+            .wounds_per_hit = woundsPerHit(u, syn),
+        };
     }
 
-    fn sameLine(a: *const combat.Hits, b: *const combat.Hits) bool {
-        if (a.len != b.len) return false;
-        for (0..a.len) |i| if (a.units[i] != b.units[i] or a.divisors[i] != b.divisors[i]) return false;
-        return true;
+    /// deepWoundsPowerPerHit: calculateDeepWoundsCount over the held Deep Wounds cards (Made of Fire is not in scope).
+    fn woundsPerHit(u: *const st.Unit, syn: f64) f64 {
+        if (u.ability_mask & st.AbilityId.DEEP_WOUNDS_MASK == 0) return 0;
+        var stacked: f64 = 0;
+        var held = false;
+        inline for (st.AbilityId.DEEP_WOUNDS) |id| {
+            if (u.ability(id)) |a| {
+                stacked += (a.power / abilities.MAX_UNIT_STACK_POWER) * engine.getStackPower(u) + 0;
+                held = true;
+            }
+        }
+        if (!held) return 0;
+        return js.toFixed(@max(0, stacked + engine.getLuck(u) + syn), 1);
     }
 
+    /// projectRangeShotsAfterVolleys: the arrows left after `volleys` volleys (an active Endless Quiver costs none; a
+    /// range_shots_mod override never runs dry; Dense Flesh is not in scope).
+    fn shotsAfter(u: *const st.Unit, volleys: f64) f64 {
+        const per: f64 = if (u.ability_mask & st.AbilityId.endless_quiver.bit() != 0 and u.has(.endless_quiver)) 0 else 1;
+        const cost = per * @max(0, volleys);
+        if (cost <= 0) return engine.getRangeShots(u);
+        if (u.range_shots_mod != 0) return u.range_shots_mod;
+        return @max(0, @floor(u.range_shots) - cost);
+    }
+
+    const Mods = struct {
+        raw_min: f64,
+        raw_max: f64,
+        wounds: f64,
+        prep: *const Prepared,
+        aoe_mult: f64,
+
+        /// applyEngineVolleyModifiers: the shared and volley multipliers with the target's Deep Wounds after
+        /// `landed` prior hits, under one floor, then a physical AOE's victim multiplier (Mechanism).
+        fn apply(self: *const Mods, raw: f64, volley: f64, landed: f64) f64 {
+            const wounds = js.toFixed(self.wounds + self.prep.wounds_per_hit * landed, 1);
+            var adjusted = @floor(raw * self.prep.shared * volley * (1 + wounds / 100));
+            if (self.prep.physical_aoe) adjusted = @floor(adjusted * self.aoe_mult);
+            return adjusted;
+        }
+        fn mean(self: *const Mods, second_volley: bool, landed: f64) f64 {
+            const m: f64 = if (second_volley) self.prep.second else 1;
+            return (self.apply(self.raw_min, m, landed) + self.apply(self.raw_max, m, landed)) / 2;
+        }
+    };
+
+    /// estimateShieldedRangedDamage: the volley outcomes in order (a miss, then a hit), an absorbing shield taking the
+    /// first positive hit, a hit spending an arrow (an ordinary miss only when arrows spend on any shot), and Deep Wounds
+    /// repricing later hits; no Echo in scope.
+    fn shieldedDamage(u: *const st.Unit, hp: f64, hit: f64, first: f64, second: f64, prep: *const Prepared, shield: bool, mods: ?*const Mods) f64 {
+        const State = struct { damage: f64, shield: bool, spent: f64, p: f64, landed: f64 };
+        var states: [32]State = undefined;
+        var n: usize = 1;
+        states[0] = .{ .damage = 0, .shield = shield, .spent = 0, .p = 1, .landed = 0 };
+        const Volley = struct {
+            fn run(st_: *[32]State, n_: *usize, uu: *const st.Unit, hp_: f64, hit_: f64, base: f64, second_volley: bool, spends: bool, on_hit_only: bool, m: ?*const Mods) void {
+                var next: [32]State = undefined;
+                var k: usize = 0;
+                for (st_[0..n_.*]) |state| {
+                    if (state.damage >= hp_ or shotsAfter(uu, state.spent) <= 0) {
+                        next[k] = state;
+                        k += 1;
+                        continue;
+                    }
+                    const damage = if (m) |mm| mm.mean(second_volley, state.landed) else base;
+                    for ([_]bool{ false, true }) |h| {
+                        const w = state.p * 1 * (if (h) hit_ else 1 - hit_);
+                        if (w <= 0) continue;
+                        const positive = h and damage > 0;
+                        next[k] = .{
+                            .damage = @min(hp_, state.damage + (if (positive and !state.shield) damage else 0)),
+                            .shield = state.shield and !positive,
+                            .spent = state.spent + @as(f64, if (spends and (h or !on_hit_only)) 1 else 0),
+                            .p = w,
+                            .landed = state.landed + @as(f64, if (h and !(positive and state.shield)) 1 else 0),
+                        };
+                        k += 1;
+                    }
+                }
+                st_.* = next;
+                n_.* = k;
+            }
+        };
+        Volley.run(&states, &n, u, hp, hit, first, false, true, prep.on_hit_only, mods);
+        if (prep.second > 0) Volley.run(&states, &n, u, hp, hit, second, true, !prep.through, prep.on_hit_only, mods);
+        var sum: f64 = 0;
+        for (states[0..n]) |state| sum += state.p * state.damage;
+        return sum;
+    }
+
+    /// evaluatePreparedRangeCandidateDamage (stationary, no Last Fuse in scope): over the shot's groups (every group
+    /// of a Through Shot, else the first, whose splash ring it holds), each unit once at its group's divisor: the
+    /// hit chance's expected damage of the first and (when the arrows allow) second volley capped at the stack's
+    /// health, the arrow-on-hit outcome tree for an ordinary Double Shot, the shielded estimate when the target absorbs
+    /// a hit or Deep Wounds grow per hit; enemies add, every other unit subtracts; a kill only on the primary.
+    fn shotValue(self: *const Gen, prep: *const Prepared, g: *const combat.Groups, primary: u8) Dmg {
+        const s = self.c.s;
+        const u = self.unit();
+        const opp = engine.opposite(u.team);
+        const ammo_any = true; // shotsAfter does not read the ammunition target (Dense Flesh is not in scope)
+        _ = ammo_any;
+        const second_mul: f64 = if (shotsAfter(u, 1) > 0) prep.second else 0;
+        const groups: usize = if (prep.through) g.n else @min(1, g.n);
+        var value: f64 = 0;
+        var kill: u8 = 0;
+        var counted: st.UnitSet = 0;
+        for (0..groups) |k| for (g.group(k)) |ti| {
+            if (counted & engine.unitBit(ti) != 0) continue;
+            counted |= engine.unitBit(ti);
+            const t = &s.units[ti];
+            const divisor = g.divisors[k];
+            const mods = Mods{
+                .raw_min = combat.damageBoundSyn(u, t, u.attack_damage_min, true, divisor, prep.syn),
+                .raw_max = combat.damageBoundSyn(u, t, u.attack_damage_max, true, divisor, prep.syn),
+                .wounds = abilities.activeDeepWounds(u, t),
+                .prep = prep,
+                .aoe_mult = combat.physicalAoeMultiplier(t),
+            };
+            const first_min = mods.apply(mods.raw_min, 1, 0);
+            const first_max = mods.apply(mods.raw_max, 1, 0);
+            const second_min = if (prep.second != 0) mods.apply(mods.raw_min, prep.second, 0) else 0;
+            const second_max = if (prep.second != 0) mods.apply(mods.raw_max, prep.second, 0) else 0;
+            const hp = util.cumulativeHp(t);
+            const first_c = (first_min + first_max) / 2;
+            const second_c = (second_min + second_max) / 2;
+            const hit = 1 - @min(100, @max(0, abilities.missChance(u, t))) / 100;
+            const miss = 1 - hit;
+            var effective = if (second_mul > 0)
+                hit * miss * @min(first_c, hp) + miss * hit * @min(second_c, hp) + hit * hit * @min(first_c + second_c, hp)
+            else
+                hit * @min(first_c, hp);
+            if (prep.on_hit_only and prep.second > 0) {
+                effective = 0;
+                for ([_][3]f64{ .{ 0, miss, 0 }, .{ first_c, hit, 1 } }) |o1| {
+                    if (o1[1] == 0) continue;
+                    const follow = prep.second > 0 and shotsAfter(u, o1[2]) > 0;
+                    const seconds: []const [3]f64 = if (follow) &[_][3]f64{ .{ 0, miss, o1[2] }, .{ second_c, hit, o1[2] + 1 } } else &[_][3]f64{.{ 0, 1, o1[2] }};
+                    for (seconds) |o2| {
+                        if (o2[1] == 0) continue;
+                        const native = @min(o1[0] + o2[0], hp);
+                        effective += o1[1] * o2[1] * (native + 0);
+                    }
+                }
+            }
+            const shield = abilities.absorbsHit(t);
+            if (shield or prep.wounds_per_hit > 0) {
+                effective = shieldedDamage(u, hp, hit, first_c, second_c, prep, shield, if (prep.wounds_per_hit > 0) &mods else null);
+            }
+            if (t.team == opp) {
+                value += effective;
+                if (ti == primary and effective >= hp) kill = 1;
+            } else value -= effective;
+        };
+        return .{ .ed = value, .ek = kill };
+    }
+
+    /// lineSignatureOf: (divisor, stack ids) per group in ray order, hashed.
+    fn lineHash(s: *const st.State, g: *const combat.Groups) u64 {
+        var h = std.hash.Wyhash.init(0);
+        for (0..g.n) |k| {
+            h.update(std.mem.asBytes(&g.divisors[k]));
+            const members = g.group(k);
+            h.update(&[_]u8{@intCast(members.len)});
+            for (members) |m| h.update(&[_]u8{s.units[m].uid});
+        }
+        return h.final();
+    }
+
+    /// addShots: every enemy (not Hidden, not the gazer) x observable edge (selectable, unless Through Shot), through the
+    /// engine's evaluation (Through Shot's line to the field edge, a splash shooter's rings); the first hit must be a
+    /// living enemy that is not Hidden or the gazer, the forced target when one lives, and not Cowardice-barred (unless
+    /// Through Shot); a plain shot's first hit must be the aimed enemy. Aims are deduped per aimed enemy by their line.
+    /// With throughShotFreeAim, a Through Shot also samples a 3x3 grid inside every enemy cell and keeps the free lines
+    /// no earlier line reached. Then the cap, enrichment and the challengers.
     fn addShots(self: *Gen) void {
         const s = self.c.s;
         const u = self.unit();
@@ -789,32 +997,39 @@ const Gen = struct {
         const opp = engine.opposite(team);
         const from = [2]f64{ u.pos_x, u.pos_y };
         const small = engine.isSmall(u);
+        const aoe = combat.isSplashShooter(u);
+        const through = u.has(.through_shot);
+        const shots: u8 = if (combat.doubleShotAbility(u) != null) 2 else 1;
+        const prep = self.prepareShot(shots, aoe);
         const forced: i32 = if (u.target >= 0 and u.target < s.n_units and !s.units[@intCast(u.target)].isDead()) @as(i32, u.target) else -1;
-        var found: [128]Shot = undefined;
+        var found: [160]Shot = undefined;
         var nf: usize = 0;
+        var g: combat.Groups = undefined;
         for (s.holderOrder()) |i_slot| {
             const i: usize = i_slot;
             const e = &s.units[i_slot];
             if (!util.livingOf(s, i, opp)) continue;
-            if (e.isHidden() or u.cannotAttack(e.uid)) continue; // a Hidden unit or the gazer is no legal shot
+            if (e.isHidden() or u.cannotAttack(e.uid)) continue;
             const ei: u8 = @intCast(i);
             const to = [2]f64{ e.pos_x, e.pos_y };
             const e_small = engine.isSmall(e);
             const cells = engine.unitCells(e);
             for (cells.slice()) |cell| {
                 for ([_]u8{ 0, 1, 2, 3 }) |side| {
-                    if (!combat.sideObservable(s, cell, side, team)) continue;
-                    if (!util.sideSelectable(s, cell, side, from, to, small, e_small, team)) continue;
+                    if (!combat.sideObservableEx(s, cell, side, team, through, aoe)) continue;
+                    if (!through and !util.sideSelectableEx(s, cell, side, from, to, small, e_small, team, through, aoe)) continue;
                     const aim = combat.sideCenter(cell, side, from[0], from[1]);
-                    const hits = combat.evaluateRange(s, self.c.ui, from[0], from[1], aim[0], aim[1]);
-                    if (hits.len == 0) continue;
-                    const primary = hits.units[0];
-                    if (s.units[primary].isDead() or s.units[primary].team != opp) continue;
-                    if (s.units[primary].isHidden() or u.cannotAttack(s.units[primary].uid)) continue;
+                    combat.evaluateGroups(&g, s, self.c.ui, from[0], from[1], aim[0], aim[1], through, aoe);
+                    if (g.n == 0) continue;
+                    const primary = g.first(0);
+                    const pu = &s.units[primary];
+                    if (pu.isDead() or pu.team != opp or pu.isHidden() or u.cannotAttack(pu.uid)) continue;
                     if (forced >= 0 and forced != @as(i32, primary)) continue;
-                    if (primary != ei) continue; // a plain shot never advertises a rear stack behind the first hit
+                    if (!through and engine.cowardBarred(s, u, pu)) continue;
+                    if (!through and !aoe and primary != ei) continue;
+                    const line = lineHash(s, &g);
                     var dup = false;
-                    for (found[0..nf]) |*f| if (f.aim == ei and sameLine(&f.hits, &hits)) {
+                    for (found[0..nf]) |*f| if (!f.free and f.aim == ei and f.line == line) {
                         dup = true;
                     };
                     if (dup) continue;
@@ -822,9 +1037,46 @@ const Gen = struct {
                         self.out.incomplete = true;
                         continue;
                     }
-                    const dmg = self.shotDamage(primary, hits.divisors[0]);
-                    found[nf] = .{ .target = primary, .aim = ei, .cell = cell, .side = side, .ed = dmg.ed, .ek = dmg.ek, .index = @intCast(nf), .hits = hits };
+                    const dmg = self.shotValue(&prep, &g, primary);
+                    found[nf] = .{ .target = primary, .aim = ei, .cell = cell, .side = side, .ed = dmg.ed, .ek = dmg.ek, .index = @intCast(nf), .line = line };
                     nf += 1;
+                }
+            }
+        }
+        if (through and self.opt.through_free_aim) {
+            const inset = engine.HALF - 1;
+            for (s.holderOrder()) |i_slot| {
+                const i: usize = i_slot;
+                const e = &s.units[i_slot];
+                if (!util.livingOf(s, i, opp)) continue;
+                if (e.isHidden() or u.cannotAttack(e.uid)) continue;
+                const cells = engine.unitCells(e);
+                for (cells.slice()) |cell| {
+                    const centre = engine.positionForCell(@floatFromInt(cell.x), @floatFromInt(cell.y));
+                    for ([_]f64{ -inset, 0, inset }) |dx| for ([_]f64{ -inset, 0, inset }) |dy| {
+                        const tx = js.round(centre[0] + dx);
+                        const ty = js.round(centre[1] + dy);
+                        if (!engine.positionWithinGrid(tx, ty)) continue;
+                        combat.evaluateGroups(&g, s, self.c.ui, from[0], from[1], tx, ty, true, aoe);
+                        if (g.n == 0) continue;
+                        const primary = g.first(0);
+                        const pu = &s.units[primary];
+                        if (pu.isDead() or pu.team != opp or pu.isHidden() or u.cannotAttack(pu.uid)) continue;
+                        if (forced >= 0 and forced != @as(i32, primary)) continue;
+                        const line = lineHash(s, &g);
+                        var seen = false;
+                        for (found[0..nf]) |*f| if (f.line == line) {
+                            seen = true;
+                        };
+                        if (seen) continue;
+                        if (nf >= found.len) {
+                            self.out.incomplete = true;
+                            continue;
+                        }
+                        const dmg = self.shotValue(&prep, &g, primary);
+                        found[nf] = .{ .target = primary, .aim = primary, .free = true, .tx = tx, .ty = ty, .ed = dmg.ed, .ek = dmg.ek, .index = @intCast(nf), .line = line };
+                        nf += 1;
+                    };
                 }
             }
         }
@@ -842,6 +1094,132 @@ const Gen = struct {
             self.shotCandidate(&found[i], &cand);
             self.push(&cand);
         }
+    }
+
+    /// One area-throw aim (addAreaThrows): the aimed cell, the engine's first affected unit, the first affected enemy
+    /// (the pressure target), the value and kill, and the kill the cap reads.
+    const Throw = struct {
+        cell: Cell,
+        primary: u8,
+        pressure: u8,
+        ed: f64,
+        ek: u8,
+        kill: u8,
+        index: u16,
+        fn stationary(_: Throw) bool {
+            return true;
+        }
+        fn coverTarget(self: Throw) u8 {
+            return self.pressure;
+        }
+    };
+
+    /// addAreaThrows (an active Area Throw with arrows and RANGE selectable): every free (or lava) cell on the ring of
+    /// a living enemy's cells, deduped in enemy/cell order; the throw lands where the splash ray to it first enters an
+    /// enemy (projectAreaThrowTargetCell), else on it; its 3x3 (ring order, the centre last) lists every unit once, as
+    /// two identical groups at the divisor to the impact; the first listed unit must not be the gazer and must be the
+    /// forced target when one lives, and some listed unit must be an enemy. Valued as a splash shot.
+    fn addAreaThrows(self: *Gen) void {
+        const s = self.c.s;
+        const u = self.unit();
+        if (!u.has(.area_throw) or engine.getRangeShots(u) <= 0) return;
+        if (u.attack_type_selected != AT.RANGE and !engine.possibleIncludes(u, AT.RANGE)) return;
+        const opp = engine.opposite(u.team);
+        const shots: u8 = if (combat.doubleShotAbility(u) != null) 2 else 1;
+        const prep = self.prepareShot(shots, true);
+        const forced: i32 = if (u.target >= 0 and u.target < s.n_units and !s.units[@intCast(u.target)].isDead()) @as(i32, u.target) else -1;
+        var seen: [st.GRID + 2][st.GRID + 2]bool = .{.{false} ** (st.GRID + 2)} ** (st.GRID + 2);
+        var pool: [256]Cell = undefined;
+        var np: usize = 0;
+        for (s.holderOrder()) |k| {
+            if (!util.livingOf(s, k, opp)) continue;
+            const ec = engine.unitCells(&s.units[k]);
+            for (ec.slice()) |cell| {
+                var ring: spells.Cells = .{};
+                spells.cellsAroundCell(cell, &ring);
+                for (ring.slice()) |c| {
+                    if (c.x < -1 or c.y < -1 or c.x > st.GRID or c.y > st.GRID) continue;
+                    const sx: usize = @intCast(c.x + 1);
+                    const sy: usize = @intCast(c.y + 1);
+                    if (seen[sx][sy]) continue;
+                    seen[sx][sy] = true;
+                    if (!engine.cellWithinGrid(c)) continue;
+                    const o = s.grid.board[@intCast(c.x)][@intCast(c.y)];
+                    if (o != st.EMPTY and o != st.LAVA) continue; // a unit, a stone or a hole refuses the aim
+                    if (np < pool.len) {
+                        pool[np] = c;
+                        np += 1;
+                    }
+                }
+            }
+        }
+        var found: [256]Throw = undefined;
+        var nf: usize = 0;
+        var g: combat.Groups = undefined;
+        for (pool[0..np]) |aim| {
+            const aim_pos = engine.positionForCell(@floatFromInt(aim.x), @floatFromInt(aim.y));
+            combat.evaluateGroups(&g, s, self.c.ui, u.pos_x, u.pos_y, aim_pos[0], aim_pos[1], false, true);
+            const target = if (g.n > 0) g.entry[0] else aim;
+            const pos = engine.positionForCell(@floatFromInt(target.x), @floatFromInt(target.y));
+            var ring: spells.Cells = .{};
+            spells.cellsAroundCell(target, &ring);
+            ring.push(target);
+            var list: Slots = .{};
+            affectedUnits(s, ring.slice(), &list);
+            if (list.len == 0) continue;
+            const primary = list.items[0];
+            if (u.cannotAttack(s.units[primary].uid) or (forced >= 0 and forced != @as(i32, primary))) continue;
+            var pressure: ?u8 = null;
+            for (list.slice()) |v| {
+                if (s.units[v].team == opp) {
+                    pressure = v;
+                    break;
+                }
+            }
+            const pt = pressure orelse continue;
+            const divisor = util.rangeDivisorAt(u, pos[0], pos[1], u.pos_x, u.pos_y);
+            var tg: combat.Groups = undefined;
+            tg.reset();
+            for (0..2) |_| {
+                for (list.slice()) |v| {
+                    tg.members[tg.n_members] = v;
+                    tg.n_members += 1;
+                }
+                tg.divisors[tg.n] = divisor;
+                tg.entry[tg.n] = target;
+                tg.n += 1;
+                tg.start[tg.n] = tg.n_members;
+            }
+            const dmg = self.shotValue(&prep, &tg, primary);
+            const pressure_kill = if (self.opt.coverage and pt != primary) self.shotValue(&prep, &tg, pt).ek else dmg.ek;
+            if (nf >= found.len) {
+                self.out.incomplete = true;
+                continue;
+            }
+            found[nf] = .{ .cell = aim, .primary = primary, .pressure = pt, .ed = dmg.ed, .ek = if (self.opt.coverage) pressure_kill else dmg.ek, .kill = dmg.ek, .index = @intCast(nf) };
+            nf += 1;
+        }
+        var kept: [1024]u16 = undefined;
+        var kn: usize = nf;
+        for (0..nf) |i| kept[i] = @intCast(i);
+        if (self.opt.max_throws > 0 and nf > self.opt.max_throws) kn = capAttack(found[0..nf], self.opt.max_throws, self.opt.coverage, &kept);
+        var cand: Candidate = undefined;
+        if (self.opt.enrich) {
+            for (found[0..nf]) |*t| {
+                self.throwCandidate(t, &cand);
+                self.enrich(&cand);
+            }
+        }
+        for (kept[0..kn]) |i| {
+            self.throwCandidate(&found[i], &cand);
+            self.push(&cand);
+        }
+    }
+
+    fn throwCandidate(self: *Gen, t: *const Throw, cand: *Candidate) void {
+        cand.* = .{ .kind = .throw, .target = t.primary, .tcell = t.cell, .ed = t.ed, .ek = t.kill };
+        if (self.unit().attack_type_selected != AT.RANGE) cand.d.push(.{ .select_attack_type = .{ .unit = self.c.ui, .attack_type = AT.RANGE } });
+        cand.d.push(.{ .area_throw_attack = .{ .attacker = self.c.ui, .target_cell = t.cell } });
     }
 
     fn meleeCandidate(self: *Gen, mp: ?*const path.MovePath, p: *const Pair, cand: *Candidate) void {
@@ -874,9 +1252,9 @@ const Gen = struct {
             const i: usize = i_slot;
             const e = &s.units[i_slot];
             if (!e.in_holder or e.isDead() or e.team == team) continue;
-            // meleeTargets: not Hidden (Disguise), the forced target only, not the Terrifying Gaze gazer (Cowardice is
-            // not in scope).
-            if (e.isHidden() or u.cannotAttack(e.uid)) continue;
+            // meleeTargets: not Hidden (Disguise), not a stack Cowardice bars, the forced target only, not the Terrifying
+            // Gaze gazer.
+            if (e.isHidden() or engine.cowardBarred(s, u, e) or u.cannotAttack(e.uid)) continue;
             if (forced >= 0 and forced != @as(i32, @intCast(i))) continue;
             targets[nt] = @intCast(i);
             nt += 1;
@@ -1033,6 +1411,7 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
     g.addMelee();
     g.addMountainAttack();
     g.addShots();
+    g.addAreaThrows();
     g.addSpells();
     g.addMoves();
     // a19-decoy-aware-v1 (on unless A19_DECOY_AWARE_<SIDE>=0): no challenger strikes a one-model decoy while another
@@ -1060,12 +1439,12 @@ pub fn enumerate(c: *ai.Ctx, incumbent: *const ai.Decision, opt: Options, out: *
 }
 
 /// The boundary options (enumerateV08BoundaryCandidates without mountain strikes).
-pub const BOUNDARY = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true, .meteor_coverage = true };
+pub const BOUNDARY = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .max_throws = 4, .enrich = true, .meteor_coverage = true };
 /// The boundary census without the Battle Mage's Meteorite coverage: repairV07ForbiddenTargetDecision's options and
 /// v0.8's support roles' (enumerateSupportCandidates).
-pub const REPAIR_V07 = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true };
+pub const REPAIR_V07 = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .max_throws = 4, .enrich = true };
 pub const SUPPORT = REPAIR_V07;
 /// enumerateV08BoundaryCandidates with mountain strikes (the cemetery pass).
-pub const BOUNDARY_MOUNTAINS = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true, .mountains = true, .meteor_coverage = true };
+pub const BOUNDARY_MOUNTAINS = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .max_throws = 4, .enrich = true, .mountains = true, .meteor_coverage = true };
 /// prioritizeV08A13FinishDecision's options.
-pub const FINISH = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .enrich = true, .coverage = true };
+pub const FINISH = Options{ .max_moves = 1, .max_melee = 8, .max_shots = 6, .max_throws = 4, .enrich = true, .coverage = true };
