@@ -420,7 +420,12 @@ export function exportBattleState(ctx: IExportContext, harness?: IExportHarness)
             fields: capture(unit, UNIT_FIELDS, `unit ${id}`),
         });
     }
-    const damage = ctx.attackHandler?.damageStatisticHolder?.get?.() ?? [];
+    const holder = ctx.attackHandler?.damageStatisticHolder;
+    const damage = holder?.get?.() ?? [];
+    // The server's DamageStatisticHolder (server src/simulation/statistic_holder.ts) merges entries per unit and keeps
+    // each one's FIRST lap, so its get() laps are not the laps damage was dealt in: its snapshot() names them (damage > 0
+    // only, as its has(lap) reads them). runMatch's holder has no snapshot(): every entry's lap.
+    const serverLaps: readonly number[] | undefined = holder?.snapshot?.()?.damageDealtLaps;
     return {
         version: 2,
         units,
@@ -428,7 +433,9 @@ export function exportBattleState(ctx: IExportContext, harness?: IExportHarness)
         fight: capture(fightProperties, FIGHT_FIELDS, "fight"),
         holder: capture(unitsHolder, HOLDER_FIELDS, "holder"),
         aiTargetMemory: [...captureAITargetMemory(unitsHolder).entries()],
-        damageStatLaps: [...new Set(damage.map((d: { lap: number }) => d.lap))].sort((a: any, b: any) => a - b),
+        damageStatLaps: serverLaps
+            ? [...new Set(serverLaps)].sort((a, b) => a - b)
+            : [...new Set(damage.map((d: { lap: number }) => d.lap))].sort((a: any, b: any) => a - b),
         configs: engineConfigs(unitsHolder, grid, fightProperties),
         setup: setupValues(fightProperties),
         ...(harness

@@ -22,6 +22,7 @@ const std = @import("std");
 const rec = @import("recording.zig");
 const st = @import("state.zig");
 const engine = @import("engine.zig");
+const server = @import("server.zig");
 const ai = @import("ai.zig");
 const rng_mod = @import("rng.zig");
 const uuid = @import("uuid.zig");
@@ -371,6 +372,8 @@ pub const Error = error{
     /// A capacity of the port was exceeded (State.overflow: unit slots, ids, list lengths, a summon without its id
     /// parts or template, the antithetic stream's key table).
     UnsupportedCapacity,
+    /// Server mode reached a server-only path the oracle has not verified (State.server_unverified).
+    UnsupportedEngine,
 };
 
 /// CLOCK_MONOTONIC in nanoseconds (the clock of every deadline the bridge takes).
@@ -583,6 +586,8 @@ fn advanceQueue(s: *State, sim: *Sim) void {
     const attempts = @as(usize, s.n_holder) + 2;
     var i: usize = 0;
     while (i < attempts and !sim.finished and s.active < 0) : (i += 1) {
+        // A lap whose only statistic had 0 damage: the server's holder and runMatch's disagree from here.
+        if (s.engine_mode == .server and s.zero_lap == s.fight.lap and s.damage_lap != s.fight.lap) s.server_unverified |= server.UNVERIFIED_ZERO_LAP;
         _ = sim.apply(s, .{ .advance = .{ .damage_dealt_this_lap = s.damage_lap == s.fight.lap } });
         if (sim.finished) return;
         if (s.active >= 0) return;
@@ -813,6 +818,7 @@ fn rolloutBody(s: *State, req: *const Request, cand: *const Candidate, r: u32, c
     }
     if (ctl.expired()) return null;
     if (s.overflow) return error.UnsupportedCapacity;
+    if (s.server_unverified != 0) return error.UnsupportedEngine;
     return leafValueOf(req.leaf, s, acting, sim.finished, sim.winner, req.exact_terminal);
 }
 

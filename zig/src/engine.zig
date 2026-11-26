@@ -9,6 +9,7 @@ const rec = @import("recording.zig");
 const st = @import("state.zig");
 const js = @import("jsnum.zig");
 const combat = @import("combat.zig");
+const server = @import("server.zig");
 const abilities = @import("abilities.zig");
 const terrain = @import("terrain.zig");
 const pathing = @import("path.zig");
@@ -199,7 +200,7 @@ inline fn setOcc(s: *State, c: Cell, v: u8) void {
 }
 
 /// stampAggrRing: the on-board 8-neighbourhood ring around the footprint, each ring cell once.
-fn stampAggrRing(s: *State, team: u8, footprint: []const Cell, d: i16) void {
+pub fn stampAggrRing(s: *State, team: u8, footprint: []const Cell, d: i16) void {
     if (footprint.len == 0 or team == 0) return;
     var in_fp: [st.GRID]u16 = .{0} ** st.GRID;
     for (footprint) |c| {
@@ -2324,6 +2325,16 @@ pub fn validateTurnAction(s: *const State, ui: u8) Reject!void {
     if (s.fight.made & unitBit(ui) != 0) return error.Rejected;
 }
 
+/// damageStatisticHolder.add's lap mark after a hit that `dealt` damage (applyDamage's return): runMatch's holder marks
+/// the lap for every statistic, the server's DamageStatisticHolder only for damage > 0 (engine_mode `server`).
+pub inline fn markDamageLap(s: *State, dealt: f64) void {
+    if (s.engine_mode == .server and !(dealt > 0)) {
+        if (s.damage_lap != s.fight.lap) s.zero_lap = s.fight.lap;
+        return;
+    }
+    s.damage_lap = s.fight.lap;
+}
+
 /// UnitsHolder.increaseUnitsSupplyIfNeededPerTeam -> Unit.increaseSupply: the Life supply synergy grows every holder
 /// unit of the team (dead or unplaced ones too) before the fight starts; hp and amount_died stay.
 fn increaseUnitsSupplyIfNeededPerTeam(s: *State, team: u8) void {
@@ -2506,7 +2517,23 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell, e
     const anchor = baseCell(u);
     if (footprint_only and (u.fw == 1 or u.fh == 1) and path.len > 1 and path[0].x == anchor.x and path[0].y == anchor.y) footprint_only = false;
     if (footprint_only) return error.Rejected; // never produced by v0.1; not ported
-    const travelled = if (path[0].x == anchor.x and path[0].y == anchor.y) path[1..] else path;
+    // resolveKnownMoveRoute: on the server the provider refreshes the board and the move takes the server's route to the
+    // path's destination (an empty map or an unreachable destination: invalid_move); runMatch trusts the action's path.
+    var route_buf: server.RouteBuf = .{};
+    var route: []const Cell = path;
+    var route_lava = s.action_lava;
+    if (s.engine_mode == .server) {
+        switch (server.moveRoute(s, path, &route_buf)) {
+            .runmatch => {},
+            .rejected => return error.Rejected,
+            .route => |r| {
+                if (!server.sameRoute(r.cells, path, anchor)) s.server_unverified |= server.UNVERIFIED_ROUTE;
+                route = r.cells;
+                route_lava = r.has_lava;
+            },
+        }
+    }
+    const travelled = if (route[0].x == anchor.x and route[0].y == anchor.y) route[1..] else route;
     const max_cells = maxCellsForStepBudget(s, u);
     if (travelled.len == 0 or @as(f64, @floatFromInt(travelled.len)) > max_cells) return error.Rejected;
     var prev = anchor;
@@ -2517,7 +2544,7 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell, e
         if ((dx == 0 and dy == 0) or dx > 1 or dy > 1) return error.Rejected;
         prev = c;
     }
-    if (groundRouteCrossesObstacle(s, u, path)) return error.Rejected; // move_blocked
+    if (groundRouteCrossesObstacle(s, u, route)) return error.Rejected; // move_blocked
     if (!cellsFreeFor(s, ui, target_cells)) return error.Rejected;
     const from = [2]f64{ u.pos_x, u.pos_y };
     const to = positionForCells(target_cells) orelse return error.Rejected;
@@ -2528,10 +2555,10 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell, e
     // over the travelled route (the path minus its origin), then applyLavaWaterModifier (Made of Fire on a lava route).
     applyDistanceMorale(s, ui, from, to);
     if (s.crusade) crusade(u, travelled.len);
-    if (s.artifacts) artifacts.lavaRoute(s, ui, s.action_lava);
+    if (s.artifacts) artifacts.lavaRoute(s, ui, route_lava);
     snareOnVineArrival(s, ui, target_cells);
     u.moved_this_turn = true;
-    u.moved_route_cells = @floatFromInt(path.len); // setMovedRouteCellsThisTurn(action.path.length)
+    u.moved_route_cells = @floatFromInt(route.len); // setMovedRouteCellsThisTurn(knownMoveRoute?.route.length ?? action.path.length)
     // applyFireWallBurn: the walk's burning cells, after the arrival; a stack the flames kill is cleaned up at once.
     if (s.fight.n_fire != 0) {
         var burning: Swept = .{};
@@ -3307,6 +3334,8 @@ pub fn initState(init: std.json.Value, ids: []const []const u8) !st.State {
     s.uuid_seq = 0;
     s.id_scheme = .match;
     s.engine_mode = .match;
+    s.server_unverified = 0;
+    s.zero_lap = -1;
     s.n_holder = 0;
     s.spell_cfg = .{st.SpellConfig{}} ** st.N_CAST_SPELLS;
     loadSpellConfigs(&s, rec.get(init, "spellConfigs"));

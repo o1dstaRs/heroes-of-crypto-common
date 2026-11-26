@@ -269,7 +269,22 @@ exact doubles.
   (play_session.ts createBotSearchDeps: the known-paths provider, a full stat refresh and an aggression rebuild before
   every move and approach, the server's routes, damage laps marked by damage > 0 only). `server` needs
   `summonIds: "uuidSequence"` and a library whose `supportedEngines` (scope manifest and build info) lists it; another
-  build refuses it as an unsupported request, so the caller keeps those rollouts in TypeScript.
+  build refuses it as an unsupported request, so the caller keeps those rollouts in TypeScript. In server mode
+  (`src/server.zig`, State.engine_mode) the provider (currentActiveKnownPaths) runs where TypeScript asks it: in
+  `move_unit` after the footprint checks, in `melee_attack` before every check of the strike (stationary strikes too),
+  and in `obstacle_attack` when it names an attack-from cell. For a unit that can move it is the full stat refresh
+  (refreshStackPowerForAllUnits: a second one is not idempotent), the aggression boards rebuilt from the
+  registrations, and getMovePath from the active unit with its refreshed getSteps. A move then takes the server's route
+  to its destination (an unreachable one is refused) for its obstacle test, travelled path, Crusade, lava flag, route
+  length and Fire Wall burn; an approach takes the route to its attack-from cell (a path-less one is accepted when the
+  cell is reachable), and a strike with a map but no route charges Rapid Charge one cell. The server's damage holder
+  marks a lap only for a statistic with damage > 0 (engine.markDamageLap). The export of a server root names those laps:
+  `state_export.ts` reads the holder's `snapshot().damageDealtLaps` when it has one (runMatch's has none). Three
+  server-only paths the server oracle has run without any case where they change a value are refused when a rollout
+  reaches them (State.server_unverified, "unsupported rollout: server mode reached a path the server oracle has not
+  verified", so that bank stays in TypeScript): a route other than the action's (a substitution, or a path-less
+  approach the full map accepts), a lap whose only damage statistic had 0 damage reaching an advance, and an obstacle
+  approach under the provider. A cohort that shows one of them changing a value (and Zig agreeing) lifts its flag.
 
 The v0.8 policy reads a per-battle table besides the State (`v08/util.zig` `battle`: each slot's creature, its id rank
 for the TypeScript id tie-breaks, and the army profile). It is a thread-local, so `hoc_rollouts` builds it on the

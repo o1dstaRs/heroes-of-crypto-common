@@ -368,7 +368,7 @@ export fn hoc_play_v01(eng: ?*Engine, handle: ?*Handle, max_laps: i32, out: ?*ro
 
 /// Whether this build plays the server's engine path (`engine: "server"`). Off until server mode is complete: a
 /// request for it is then refused as unsupported, so the caller keeps those rollouts in TypeScript.
-pub const SERVER_ENGINE = false;
+pub const SERVER_ENGINE = true;
 /// The engine paths a request may select (`supportedEngines` in the manifest and the build info).
 pub const SUPPORTED_ENGINES: []const []const u8 = if (SERVER_ENGINE) &.{ "match", "server" } else &.{"match"};
 
@@ -745,6 +745,7 @@ export fn hoc_rollouts(eng: ?*Engine, handle: ?*const Handle, req_json: ?[*]cons
         e.fail("unsupported rollout: {s}", .{switch (err) {
             error.UnsupportedPolicy => "a unit without a policy had to play, or its policy needs a pass the port lacks",
             error.UnsupportedCapacity => "a capacity of the port was exceeded (unit slots, ids, lists, chance keys, or a summon without its id parts)",
+            error.UnsupportedEngine => "server mode reached a path the server oracle has not verified (a route substitution, a 0-damage lap, an obstacle approach)",
         }});
         return -1;
     };

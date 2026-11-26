@@ -1614,6 +1614,11 @@ pub const State = struct {
     id_scheme: IdScheme = .match,
     /// The engine path of this call's rollouts (rollout.Request.engine); `match` everywhere else.
     engine_mode: EngineMode = .match,
+    /// Server mode: the server-only paths this rollout reached that the server oracle has not verified yet (server.zig
+    /// UNVERIFIED_*); a rollout that reaches one is refused (rollout.Error.UnsupportedEngine).
+    server_unverified: u8 = 0,
+    /// Server mode: the lap a 0-damage statistic found unmarked (the lap runMatch's holder would mark), -1 for none.
+    zero_lap: i32 = -1,
     /// The summon templates, when a unit can summon (null otherwise).
     summons: ?*const Summons = null,
     /// A capacity of the port was exceeded (unit slots, uids, ability or spell lists): the state no longer follows

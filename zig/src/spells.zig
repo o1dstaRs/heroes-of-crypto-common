@@ -462,7 +462,7 @@ fn applyVictims(s: *State, ci: u8, element: u8, victims: *const Victims, died: *
         const applied = engine.applyDamageElement(s, v.slot, v.damage, 0, false, element);
         // A spell kill records the caster's Last Fuse source (the rebound onto the caster is same-team: none).
         if (s.artifacts and u.isDead()) artifacts.recordFatal(s, v.slot, applied, ci);
-        if (!v.rebounded) s.damage_lap = s.fight.lap;
+        if (!v.rebounded) engine.markDamageLap(s, applied);
         if (u.isDead()) {
             died.push(v.slot);
             if (u.team != team) {

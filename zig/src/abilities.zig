@@ -1387,7 +1387,7 @@ noinline fn gazeRolls(s: *State, from_i: u8, to_i: u8, damage: f64, divisor: f64
         // applyDamage(damage, 0, ..., lastFuseSourceFor(gazer)): a killing petrify records the gazer's Last Fuse.
         const dealt = engine.applyDamageBreak(s, to_i, dmg, 0, false);
         if (s.artifacts and to.isDead()) artifacts.recordFatal(s, to_i, dealt, from_i);
-        s.damage_lap = s.fight.lap;
+        engine.markDamageLap(s, dealt);
     }
 }
 

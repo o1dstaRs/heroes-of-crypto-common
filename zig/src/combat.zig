@@ -8,6 +8,7 @@ const rec = @import("recording.zig");
 const st = @import("state.zig");
 const js = @import("jsnum.zig");
 const engine = @import("engine.zig");
+const server = @import("server.zig");
 const abilities = @import("abilities.zig");
 const terrain = @import("terrain.zig");
 const spells = @import("spells.zig");
@@ -222,7 +223,7 @@ fn swordBurn(s: *State, from_i: u8, to_i: u8, base: f64) Burn {
     const burn = swordDamage(to, base, power);
     if (burn <= 0) return .{};
     const dealt = engine.applyDamageElement(s, to_i, burn, 0, false, st.Element.FIRE);
-    s.damage_lap = s.fight.lap;
+    engine.markDamageLap(s, dealt);
     if (s.artifacts and to.isDead()) artifacts.recordFatal(s, to_i, dealt, from_i);
     var out: Burn = .{ .killed = to.isDead() };
     const from = &s.units[from_i];
@@ -388,7 +389,7 @@ fn adjacent(a: []const Cell, b: []const Cell) bool {
 /// MoveHandler.applyMoveModifiers for a path-bearing strike: the client's route (resolveKnownPaths trusts it verbatim)
 /// minus its origin; distance morale from the current position to the CENTRE OF THE LAST ROUTE CELL (not the
 /// footprint centre). Returns false when nothing is left to travel.
-fn applyStrikeMoveModifiers(s: *State, ui: u8, path: []const Cell) bool {
+fn applyStrikeMoveModifiers(s: *State, ui: u8, path: []const Cell, has_lava: bool) bool {
     const u = &s.units[ui];
     const base = engine.baseCell(u);
     const travelled = if (path.len > 0 and path[0].x == base.x and path[0].y == base.y) path[1..] else path; // travelledMovePath
@@ -399,24 +400,25 @@ fn applyStrikeMoveModifiers(s: *State, ui: u8, path: []const Cell) bool {
     // applyTravelledDistanceModifier (Crusade over the travelled route), then applyLavaWaterModifier (Made of Fire on a
     // lava route).
     if (s.crusade) engine.crusade(u, travelled.len);
-    if (s.artifacts) artifacts.lavaRoute(s, ui, s.action_lava);
+    if (s.artifacts) artifacts.lavaRoute(s, ui, has_lava);
     return true;
 }
 
 /// handleMeleeAttack's movement prefix: a stationary strike, or (with a client `path`) the walk to `from`. A refusal
 /// after the move modifiers keeps their morale change, as in TypeScript.
-fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, path: []const Cell, stationary: bool) Reject!void {
+fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, am: server.Approach, stationary: bool) Reject!void {
     const att = &s.units[ai];
     // A stationary strike passes the occupancy checks on the unit's own cells and setPosition writes the same value.
     if (stationary) return;
     // canMove(): the Web lock or Paralysis (attack_not_available).
     if (!att.canMove()) return error.Rejected;
-    const has_route = path.len != 0; // currentActiveKnownPaths.get(attackFrom key)?.length
+    const route = am.route orelse &.{}; // currentActiveKnownPaths.get(attackFrom key)?.[0]
+    const has_route = am.route != null;
     if (engine.isSmall(att)) {
         if (!engine.cellsFreeFor(s, ai, &.{from})) return error.Rejected;
         if (!has_route) return error.Rejected;
         const pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
-        if (!applyStrikeMoveModifiers(s, ai, path)) return error.Rejected;
+        if (!applyStrikeMoveModifiers(s, ai, route, am.has_lava)) return error.Rejected;
         if (!engine.occupyCell(s, ai, from)) return error.Rejected;
         att.pos_x = pos[0];
         att.pos_y = pos[1];
@@ -432,7 +434,7 @@ fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, pat
     const cells = engine.cellsForPosition(pos[0], pos[1], att.fw, att.fh);
     if (!engine.cellsFreeFor(s, ai, cells.slice()) and !engine.cellsFreeFor(s, ai, from_cells)) return error.Rejected;
     if (!has_route) return error.Rejected;
-    if (!applyStrikeMoveModifiers(s, ai, path)) return error.Rejected;
+    if (!applyStrikeMoveModifiers(s, ai, route, am.has_lava)) return error.Rejected;
     if (!engine.occupyCells(s, ai, cells.slice())) return error.Rejected;
     att.pos_x = pos[0];
     att.pos_y = pos[1];
@@ -442,9 +444,17 @@ fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, pat
 pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, events: *Events) Reject!void {
     try engine.validateTurnAction(s, ai);
     if (ti >= s.n_units or !s.units[ti].in_holder) return error.Rejected;
-    // A path-bearing approach (resolveKnownPaths trusts the client route) must not walk a ground body over "B".
+    // resolveKnownPaths: runMatch trusts a path-bearing approach's route; the server asks its provider first (every
+    // strike, stationary ones too) and takes the server's route.
+    var route_buf: server.RouteBuf = .{};
+    const am = if (s.engine_mode == .server) server.approach(s, from, path, s.action_lava, &route_buf) else server.Approach.fromPath(path, s.action_lava);
+    // An approach with a route must not walk a ground body over "B".
     const approaching = !(engine.baseCell(&s.units[ai]).x == from.x and engine.baseCell(&s.units[ai]).y == from.y);
-    if (approaching and path.len != 0 and engine.groundRouteCrossesObstacle(s, &s.units[ai], path)) return error.Rejected;
+    if (approaching) {
+        if (am.route) |r| {
+            if (engine.groundRouteCrossesObstacle(s, &s.units[ai], r)) return error.Rejected;
+        }
+    }
 
     const att = &s.units[ai];
     const tgt = &s.units[ti];
@@ -464,11 +474,13 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     if (!adjacent(from_cells.slice(), tgt_cells.slice())) return error.Rejected;
     const stationary = current.x == from.x and current.y == from.y;
     const cells_before = engine.unitCells(att); // the snare on arrival compares the body before and after
-    try strikeMovePrefix(s, ai, from, from_cells.slice(), path, stationary);
-    // burnAttackerOnFireWalls: the walk in burns before the blow (after the smoke dispel); a stack the flames kill never
-    // strikes: the action completes with its cleanup (the melee kill attributions) and completeTurn.
+    try strikeMovePrefix(s, ai, from, from_cells.slice(), am, stationary);
+    // burnAttackerOnFireWalls: the walk in burns before the blow (after the smoke dispel), along the map's route (or the
+    // attack-from cell); a stack the flames kill never strikes: the action completes with its cleanup (the melee kill
+    // attributions) and completeTurn.
     if (!stationary and s.fight.n_fire != 0) {
-        const travelled = if (path.len > 0 and path[0].x == current.x and path[0].y == current.y) path[1..] else path;
+        const r = am.route orelse &.{from};
+        const travelled = if (r.len > 0 and r[0].x == current.x and r[0].y == current.y) r[1..] else r;
         const landing = engine.unitCells(att);
         var burning: engine.Swept = .{};
         engine.burningCellsEntered(s, ai, cells_before.slice(), travelled, landing.slice(), false, &burning);
@@ -493,8 +505,9 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     if (stationary and att.moved_this_turn and att.moved_route_cells > 0) {
         rapid_cells = att.moved_route_cells;
         ability_multiplier = abilities.rapidCharge(att, rapid_cells);
-    } else if (path.len != 0) {
-        rapid_cells = @floatFromInt(path.len);
+    } else if (am.defined) {
+        // map.get(attackFrom)?.[0]?.route.length ?? 1: the server charges a stationary strike one cell.
+        rapid_cells = if (am.route) |r| @floatFromInt(r.len) else 1;
         ability_multiplier = abilities.rapidCharge(att, rapid_cells);
     }
     // Paralysis (the attacker's) cuts after Rapid Charge, before Backstab.
@@ -547,8 +560,8 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     var response_landed = response.landed;
     if (!spin_attack and !missed and !tgt.isDead()) {
         const absorbed = damage_from_attack > 0 and abilities.absorbs(s, tgt);
-        _ = hit(s, ai, ti, damage_from_attack, false); // attack_handler.ts:3214
-        s.damage_lap = s.fight.lap;
+        const blow_dealt = hit(s, ai, ti, damage_from_attack, false); // attack_handler.ts:3214
+        engine.markDamageLap(s, blow_dealt);
         // Fireforged Sword (attack_handler.ts:3252): the swing a shield ate still burns; the kill grants no morale.
         _ = swordHit(s, ai, ti, damage_from_attack, &died, &decrease);
         if (!absorbed) {
@@ -575,8 +588,8 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
         if (response.landed) response_landed = true;
         const absorbed = punch.damage > 0 and abilities.absorbs(s, tgt);
         if (punch.damage > 0) {
-            _ = hit(s, ai, ti, punch.damage, false); // attack_handler.ts:3400
-            s.damage_lap = s.fight.lap;
+            const punch_dealt = hit(s, ai, ti, punch.damage, false); // attack_handler.ts:3400
+            engine.markDamageLap(s, punch_dealt);
         }
         // Fireforged Sword on the second punch (attack_handler.ts:3458; no kill morale).
         if (!punch.missed) _ = swordHit(s, ai, ti, punch.damage, &died, &decrease);
@@ -709,8 +722,8 @@ fn meleeResponse(s: *State, ai: u8, ti: u8, from: Cell, died: *Died, decrease: *
         const damage_from_response = luckyStrike(s, tgt, calculateAttackDamage(s, tgt, att, AT.MELEE, 1, ability_multiplier)) +
             abilities.penetratingBite(tgt, att); // M4
         const absorbed = damage_from_response > 0 and abilities.absorbs(s, att);
-        _ = hit(s, ti, ai, damage_from_response, true); // attack_handler.ts:3072: the active attacker's Break extends
-        s.damage_lap = s.fight.lap;
+        const response_dealt = hit(s, ti, ai, damage_from_response, true); // attack_handler.ts:3072: the active attacker's Break extends
+        engine.markDamageLap(s, response_dealt);
         // The responder's Fireforged Sword (attack_handler.ts:3085): +4 for a kill.
         target_plus.* += swordHit(s, ti, ai, damage_from_response, died, decrease);
         if (!absorbed) {
@@ -837,7 +850,7 @@ fn lightningSpin(s: *State, from_i: u8, first: Cell, is_attack: bool, active_i: 
         const dealt = hit(s, from_i, ei, damage, false); // lightning_spin_ability.ts:239
         if (sweep) |w| w.push(ei, dealt, damage, absorbed);
         abilities.poisonAura(s, from_i, ei, dealt);
-        s.damage_lap = s.fight.lap;
+        engine.markDamageLap(s, dealt);
         if (!absorbed) morale += abilities.pegasusLightMorale(enemy);
         // Gravechain rolls off every unabsorbed sub-hit, a killing one included, before the death check.
         if (!absorbed) artifacts.gravechain(s, from_i, ei, active_i, gc);
@@ -906,7 +919,7 @@ fn strikeSkewerTarget(s: *State, from_i: u8, vi: u8, is_attack: bool, died: *Die
     const absorbed = damage > 0 and abilities.absorbs(s, next);
     const dealt = hit(s, from_i, vi, damage, false); // skewer_strike_ability.ts:210
     if (sweep) |w| w.push(vi, dealt, damage, absorbed);
-    s.damage_lap = s.fight.lap;
+    engine.markDamageLap(s, dealt);
     // Gravechain rolls off an unabsorbed skewer hit (the active unit's set), a killing one included.
     if (!absorbed) artifacts.gravechain(s, from_i, vi, active_i, gc);
     if (!next.isDead() and !absorbed) {
@@ -1697,8 +1710,8 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
             gaze_resp = dmg;
             response_absorbed = dmg > 0 and abilities.absorbs(s, victim);
             // attack_handler.ts:1763: extended only when the counter-shot hits the shooter whose turn it is.
-            _ = hit(s, target_ui, r, dmg, r == ai);
-            s.damage_lap = s.fight.lap;
+            const counter_dealt = hit(s, target_ui, r, dmg, r == ai);
+            engine.markDamageLap(s, counter_dealt);
             // The responder's Fireforged Sword on its counter-shot (attack_handler.ts:1778): +4 for a kill.
             target_plus += swordHit(s, target_ui, r, dmg, died, &decrease);
             if (!response_absorbed) {
@@ -1718,8 +1731,8 @@ fn resolveShot(s: *State, ai: u8, g: *const Groups, resp_units: ?[]const u8, res
         var absorbed = false;
         if (!attack_damage_applied) {
             absorbed = damage_from_attack > 0 and abilities.absorbs(s, tgt);
-            _ = hit(s, ai, target_ui, damage_from_attack, false); // attack_handler.ts:1886
-            s.damage_lap = s.fight.lap;
+            const shot_dealt = hit(s, ai, target_ui, damage_from_attack, false); // attack_handler.ts:1886
+            engine.markDamageLap(s, shot_dealt);
             if (!absorbed) attacker_plus += abilities.pegasusLightMorale(tgt);
             // Gravechain off the landed shot (attack_handler.ts:1923; a fresh set; the target may have died).
             if (!absorbed) {
@@ -1946,8 +1959,8 @@ fn doubleShot(s: *State, ai: u8, target_ui: u8, grp: []const u8, divisor: f64, i
     if (abilities.paralysisFactor(att)) |pf| m *= pf; // Paralysis after the Dual Strike Charm
     const dmg = luckyStrike(s, att, calculateAttackDamage(s, att, to, AT.RANGE, divisor, m));
     const absorbed = dmg > 0 and abilities.absorbs(s, to);
-    _ = hit(s, ai, to_ui, dmg, false);
-    s.damage_lap = s.fight.lap;
+    const second_dealt = hit(s, ai, to_ui, dmg, false);
+    engine.markDamageLap(s, second_dealt);
     return .{ .applied = true, .absorbed = absorbed, .damage = dmg, .morale = if (absorbed) 0 else abilities.pegasusLightMorale(to) };
 }
 
@@ -1991,7 +2004,7 @@ fn throughShot(s: *State, ai: u8, g: *const Groups, decrease_shots: bool, factor
             const dealt = hit(s, ai, c, dmg, false); // through_shot_ability.ts:210
             if (hits) |w| w.push(c, dealt, dmg, was_absorbed);
             abilities.poisonAura(s, ai, c, dealt);
-            s.damage_lap = s.fight.lap;
+            engine.markDamageLap(s, dealt);
             if (!was_absorbed) engine.changeMorale(att, abilities.pegasusLightMorale(cu), true);
             damaged[n_damaged] = c;
             n_damaged += 1;
@@ -2279,7 +2292,7 @@ fn aoeTail(s: *State, thrower_i: u8, flight: *const Flight, divisor: f64, active
         const dealt = hit(s, thrower_i, v, damage, false); // aoe_range_ability.ts:230
         if (hits) |w| w.push(v, dealt, damage, absorbed);
         abilities.poisonAura(s, thrower_i, v, dealt);
-        s.damage_lap = s.fight.lap;
+        engine.markDamageLap(s, dealt);
         if (!absorbed) morale += abilities.pegasusLightMorale(u);
         max_damage = @max(max_damage, damage);
         if (!u.isDead() and !absorbed) abilities.petrifyingGaze(s, thrower_i, v, damage, divisor);
@@ -2485,7 +2498,7 @@ fn obstacleEcho(s: *State, ai: u8, tx: f64, ty: f64) void {
 /// melee branch: the walk in (or a strike in place), the hit, Skewer Strike's pierce, Double Punch's second hit,
 /// then Hydra's Lightning Spin around the strike anchor. No miss or damage roll on the stone itself. Returns
 /// `completed`; kills from the pierce and the spin go to `died`. `from` is null for a shot without attackFrom.
-fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, path: []const Cell, died: *Died, burned: *bool) bool {
+fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, am: server.Approach, died: *Died, burned: *bool) bool {
     const att = &s.units[ai];
     const target = engine.cellForPosition(tx, ty);
     const is_right = target.x >= st.GRID >> 1;
@@ -2520,14 +2533,15 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, pa
     if (!adjacent_to_center) return false;
     const base = engine.baseCell(att);
     const stationary = base.x == from.x and base.y == from.y;
-    const has_route = path.len != 0; // currentActiveKnownPaths.get(attackFrom)?.length
+    const route = am.route orelse &.{}; // currentActiveKnownPaths.get(attackFrom)?.[0]
+    const has_route = am.route != null;
     // Captured before either branch relocates the attacker (burnAttackerOnFireWalls).
     const start_cells = engine.unitCells(att);
     if (engine.isSmall(att)) {
         if (!(engine.cellsFreeFor(s, ai, from_cells.slice()) and (stationary or has_route))) return false;
         const pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
         if (!stationary) {
-            if (!applyStrikeMoveModifiers(s, ai, path)) return false;
+            if (!applyStrikeMoveModifiers(s, ai, route, am.has_lava)) return false;
             if (!engine.occupyCell(s, ai, from)) return false;
         }
         att.pos_x = pos[0];
@@ -2542,7 +2556,7 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, pa
         const cells = engine.cellsForPosition(pos[0], pos[1], att.fw, att.fh);
         if (!(engine.cellsFreeFor(s, ai, cells.slice()) and (stationary or has_route))) return false;
         if (!stationary) {
-            if (!applyStrikeMoveModifiers(s, ai, path)) return false;
+            if (!applyStrikeMoveModifiers(s, ai, route, am.has_lava)) return false;
             if (!engine.occupyCells(s, ai, cells.slice())) return false;
         }
         att.pos_x = pos[0];
@@ -2552,7 +2566,8 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, pa
     // The walk in burns before the obstacle is struck (both branches, after the smoke dispel); burned to death, the
     // strike is skipped and the action completes with the cleanup alone.
     if (!stationary and s.fight.n_fire != 0) {
-        const travelled = if (path.len > 0 and path[0].x == base.x and path[0].y == base.y) path[1..] else path;
+        const r = am.route orelse &.{from};
+        const travelled = if (r.len > 0 and r[0].x == base.x and r[0].y == base.y) r[1..] else r;
         const landing = engine.unitCells(att);
         var burning: engine.Swept = .{};
         engine.burningCellsEntered(s, ai, start_cells.slice(), travelled, landing.slice(), false, &burning);
@@ -2572,8 +2587,8 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, pa
         var rapid_cells: f64 = 1;
         if (stationary and att.moved_this_turn and att.moved_route_cells > 0) {
             rapid_cells = att.moved_route_cells;
-        } else if (has_route) {
-            rapid_cells = @floatFromInt(path.len);
+        } else if (am.defined) {
+            rapid_cells = if (am.route) |r| @floatFromInt(r.len) else 1;
         }
         var gc_spin: st.UidSet = .{}; // an obstacle strike's spin rolls Gravechain with a fresh set
         _ = lightningSpin(s, ai, from, true, ai, rapid_cells, died, &gc_spin, null);
@@ -2614,15 +2629,26 @@ pub fn obstacleAttackAt(s: *State, ai: u8, tx: f64, ty: f64, from: ?Cell, path: 
         return areaStrikeAtCell(s, ai, target, events);
     }
     const hits_before = terrain.hitsLeft(s);
+    // resolveKnownPaths when the action has an attack-from cell (the server's provider is asked then, a shot too).
+    var route_buf: server.RouteBuf = .{};
+    var am = server.Approach.fromPath(path, s.action_lava);
     if (from) |f| {
+        if (s.engine_mode == .server) {
+            am = server.approach(s, f, path, s.action_lava, &route_buf);
+            s.server_unverified |= server.UNVERIFIED_OBSTACLE;
+        }
         const base = engine.baseCell(att);
         const approaching = !can_land_range and !(base.x == f.x and base.y == f.y);
-        if (approaching and path.len != 0 and engine.groundRouteCrossesObstacle(s, att, path)) return error.Rejected;
+        if (approaching) {
+            if (am.route) |r| {
+                if (engine.groundRouteCrossesObstacle(s, att, r)) return error.Rejected;
+            }
+        }
     }
 
     var died: Died = .{};
     var burned = false;
-    const completed = handleObstacleAttack(s, ai, tx, ty, from, path, &died, &burned);
+    const completed = handleObstacleAttack(s, ai, tx, ty, from, am, &died, &burned);
     if (burned) {
         cleanupDeadUnits(s, &died, events, null);
         engine.completeTurn(s, ai, false, false, events);
