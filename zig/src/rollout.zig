@@ -372,8 +372,11 @@ pub const Error = error{
     /// A capacity of the port was exceeded (State.overflow: unit slots, ids, list lengths, a summon without its id
     /// parts or template, the antithetic stream's key table).
     UnsupportedCapacity,
-    /// Server mode reached a server-only path the oracle has not verified (State.server_unverified).
-    UnsupportedEngine,
+    /// Server mode reached a server-only path no oracle cohort has verified (State.server_unverified, server.zig): a
+    /// route (UNVERIFIED_ROUTE), a 0-damage lap (UNVERIFIED_ZERO_LAP), an obstacle strike (UNVERIFIED_OBSTACLE).
+    UnsupportedServerRoute,
+    UnsupportedServerZeroLap,
+    UnsupportedServerObstacle,
 };
 
 /// CLOCK_MONOTONIC in nanoseconds (the clock of every deadline the bridge takes).
@@ -586,8 +589,6 @@ fn advanceQueue(s: *State, sim: *Sim) void {
     const attempts = @as(usize, s.n_holder) + 2;
     var i: usize = 0;
     while (i < attempts and !sim.finished and s.active < 0) : (i += 1) {
-        // A lap whose only statistic had 0 damage: the server's holder and runMatch's disagree from here.
-        if (s.engine_mode == .server and s.zero_lap == s.fight.lap and s.damage_lap != s.fight.lap) s.server_unverified |= server.UNVERIFIED_ZERO_LAP;
         _ = sim.apply(s, .{ .advance = .{ .damage_dealt_this_lap = s.damage_lap == s.fight.lap } });
         if (sim.finished) return;
         if (s.active >= 0) return;
@@ -819,7 +820,11 @@ fn rolloutBody(s: *State, req: *const Request, cand: *const Candidate, r: u32, c
     }
     if (ctl.expired()) return null;
     if (s.overflow) return error.UnsupportedCapacity;
-    if (s.server_unverified != 0) return error.UnsupportedEngine;
+    if (s.server_unverified != 0) {
+        if (s.server_unverified & server.UNVERIFIED_ROUTE != 0) return error.UnsupportedServerRoute;
+        if (s.server_unverified & server.UNVERIFIED_ZERO_LAP != 0) return error.UnsupportedServerZeroLap;
+        return error.UnsupportedServerObstacle;
+    }
     return leafValueOf(req.leaf, s, acting, sim.finished, sim.winner, req.exact_terminal);
 }
 

@@ -286,12 +286,18 @@ exact doubles.
   length and Fire Wall burn; an approach takes the route to its attack-from cell (a path-less one is accepted when the
   cell is reachable), and a strike with a map but no route charges Rapid Charge one cell. The server's damage holder
   marks a lap only for a statistic with damage > 0 (engine.markDamageLap). The export of a server root names those laps:
-  `state_export.ts` reads the holder's `snapshot().damageDealtLaps` when it has one (runMatch's has none). Three
-  server-only paths the server oracle has run without any case where they change a value are refused when a rollout
-  reaches them (State.server_unverified, "unsupported rollout: server mode reached a path the server oracle has not
-  verified", so that bank stays in TypeScript): a route other than the action's (a substitution, or a path-less
-  approach the full map accepts), a lap whose only damage statistic had 0 damage reaching an advance, and an obstacle
-  approach under the provider. A cohort that shows one of them changing a value (and Zig agreeing) lifts its flag.
+  `state_export.ts` reads the holder's `snapshot().damageDealtLaps` when it has one (runMatch's has none). The
+  server-only paths no oracle cohort has shown deciding a value (a broken build matched every traced step and bank) are
+  refused only where they decide something runMatch's path would not (State.server_unverified, `server.zig`), so that
+  bank stays in TypeScript: "unsupported rollout: server mode reached a route ..." (a move's server route that changes
+  the walk's legality, length, travelled count, lava flag or, with burning cells, any cell; a path-bearing strike's
+  route that changes the approach; a strike the refreshed map cannot reach refused for want of that route; a path-less
+  approach the full map accepts), "... a lap ..." (a lap left unmarked by a 0-damage statistic that adds a narrowing
+  lap) and "... an obstacle strike ..." (its provider's approach differs, or its stat refresh changed a unit the strike
+  can read before its own refresh: a walk in, a shot, Lightning Spin, Skewer Strike, burning cells, a strike that burns
+  or does not land). The refresh at moves and melee approaches and a stationary strike's one-cell charge decide values
+  in the cohorts and match there, so they are served. A cohort that shows a flagged path deciding a value (with Zig
+  agreeing) lifts its flag.
 
 The v0.8 policy reads a per-battle table besides the State (`v08/util.zig` `battle`: each slot's creature, its id rank
 for the TypeScript id tie-breaks, and the army profile). It is a thread-local, so `hoc_rollouts` builds it on the

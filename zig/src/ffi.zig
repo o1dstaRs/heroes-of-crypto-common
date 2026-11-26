@@ -745,7 +745,9 @@ export fn hoc_rollouts(eng: ?*Engine, handle: ?*const Handle, req_json: ?[*]cons
         e.fail("unsupported rollout: {s}", .{switch (err) {
             error.UnsupportedPolicy => "a unit without a policy had to play, or its policy needs a pass the port lacks",
             error.UnsupportedCapacity => "a capacity of the port was exceeded (unit slots, ids, lists, chance keys, or a summon without its id parts)",
-            error.UnsupportedEngine => "server mode reached a path the server oracle has not verified (a route substitution, a 0-damage lap, an obstacle approach)",
+            error.UnsupportedServerRoute => "server mode reached a route the server oracle has not verified (a server route that changes the walk or the approach, a strike refused for want of a route, or a path-less approach the full map accepts)",
+            error.UnsupportedServerZeroLap => "server mode reached a lap the server oracle has not verified (a lap left unmarked by a 0-damage statistic adds a narrowing lap)",
+            error.UnsupportedServerObstacle => "server mode reached an obstacle strike the server oracle has not verified (its provider refresh changed a unit the strike reads, or its approach differs)",
         }});
         return -1;
     };

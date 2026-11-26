@@ -406,6 +406,31 @@ fn applyStrikeMoveModifiers(s: *State, ui: u8, path: []const Cell, has_lava: boo
 
 /// handleMeleeAttack's movement prefix: a stationary strike, or (with a client `path`) the walk to `from`. A refusal
 /// after the move modifiers keeps their morale change, as in TypeScript.
+/// Server mode: whether a path-bearing strike's approach under the provider decides anything differently from runMatch's
+/// (the action's own path): the route's presence, its length (the charge), the travelled count (Crusade), the last
+/// travelled cell (distance morale), a ground crossing of "B", the lava flag, or with burning cells any cell.
+fn approachDiffers(s: *const State, ai: u8, am: server.Approach, path: []const Cell) bool {
+    if (path.len == 0) return false; // path-less: server.approach flags the approach the full map accepts
+    const r = am.route orelse return false; // unreached: flagged where the missing route refuses the strike (noRoute)
+    const u = &s.units[ai];
+    const base = engine.baseCell(u);
+    if (s.artifacts and am.has_lava != s.action_lava) return true;
+    if (server.sameRoute(r, path, base)) return false;
+    if (s.fight.n_fire != 0) return true;
+    const tr = server.travelledOf(r, base);
+    const tp = server.travelledOf(path, base);
+    if (r.len != path.len or tr.len != tp.len) return true;
+    if (tr.len != 0 and (tr[tr.len - 1].x != tp[tp.len - 1].x or tr[tr.len - 1].y != tp[tp.len - 1].y)) return true;
+    return engine.groundRouteCrossesObstacle(s, u, r) != engine.groundRouteCrossesObstacle(s, u, path);
+}
+
+/// A moving strike without a route is refused (attack_not_available); one the server's refreshed map cannot reach, where
+/// runMatch would walk the action's path, is an unverified server path (server.UNVERIFIED_ROUTE).
+fn noRoute(s: *State, am: server.Approach) Reject {
+    if (am.unreached) s.server_unverified |= server.UNVERIFIED_ROUTE;
+    return error.Rejected;
+}
+
 fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, am: server.Approach, stationary: bool) Reject!void {
     const att = &s.units[ai];
     // A stationary strike passes the occupancy checks on the unit's own cells and setPosition writes the same value.
@@ -416,7 +441,7 @@ fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, am:
     const has_route = am.route != null;
     if (engine.isSmall(att)) {
         if (!engine.cellsFreeFor(s, ai, &.{from})) return error.Rejected;
-        if (!has_route) return error.Rejected;
+        if (!has_route) return noRoute(s, am);
         const pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
         if (!applyStrikeMoveModifiers(s, ai, route, am.has_lava)) return error.Rejected;
         if (!engine.occupyCell(s, ai, from)) return error.Rejected;
@@ -433,7 +458,7 @@ fn strikeMovePrefix(s: *State, ai: u8, from: Cell, from_cells: []const Cell, am:
     };
     const cells = engine.cellsForPosition(pos[0], pos[1], att.fw, att.fh);
     if (!engine.cellsFreeFor(s, ai, cells.slice()) and !engine.cellsFreeFor(s, ai, from_cells)) return error.Rejected;
-    if (!has_route) return error.Rejected;
+    if (!has_route) return noRoute(s, am);
     if (!applyStrikeMoveModifiers(s, ai, route, am.has_lava)) return error.Rejected;
     if (!engine.occupyCells(s, ai, cells.slice())) return error.Rejected;
     att.pos_x = pos[0];
@@ -448,6 +473,7 @@ pub fn meleeAttack(s: *State, ai: u8, ti: u8, from: Cell, path: []const Cell, ev
     // strike, stationary ones too) and takes the server's route.
     var route_buf: server.RouteBuf = .{};
     const am = if (s.engine_mode == .server) server.approach(s, from, path, s.action_lava, &route_buf) else server.Approach.fromPath(path, s.action_lava);
+    if (s.engine_mode == .server and approachDiffers(s, ai, am, path)) s.server_unverified |= server.UNVERIFIED_ROUTE;
     // An approach with a route must not walk a ground body over "B".
     const approaching = !(engine.baseCell(&s.units[ai]).x == from.x and engine.baseCell(&s.units[ai]).y == from.y);
     if (approaching) {
@@ -2498,6 +2524,12 @@ fn obstacleEcho(s: *State, ai: u8, tx: f64, ty: f64) void {
 /// melee branch: the walk in (or a strike in place), the hit, Skewer Strike's pierce, Double Punch's second hit,
 /// then Hydra's Lightning Spin around the strike anchor. No miss or damage roll on the stone itself. Returns
 /// `completed`; kills from the pierce and the spin go to `died`. `from` is null for a shot without attackFrom.
+/// noRoute's obstacle twin (server.UNVERIFIED_OBSTACLE): the strike is refused (false).
+fn unreachedObstacle(s: *State, am: server.Approach) bool {
+    if (am.unreached) s.server_unverified |= server.UNVERIFIED_OBSTACLE;
+    return false;
+}
+
 fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, am: server.Approach, died: *Died, burned: *bool) bool {
     const att = &s.units[ai];
     const target = engine.cellForPosition(tx, ty);
@@ -2538,7 +2570,8 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, am
     // Captured before either branch relocates the attacker (burnAttackerOnFireWalls).
     const start_cells = engine.unitCells(att);
     if (engine.isSmall(att)) {
-        if (!(engine.cellsFreeFor(s, ai, from_cells.slice()) and (stationary or has_route))) return false;
+        if (!engine.cellsFreeFor(s, ai, from_cells.slice())) return false;
+        if (!(stationary or has_route)) return unreachedObstacle(s, am);
         const pos = engine.positionForCell(@floatFromInt(from.x), @floatFromInt(from.y));
         if (!stationary) {
             if (!applyStrikeMoveModifiers(s, ai, route, am.has_lava)) return false;
@@ -2554,7 +2587,8 @@ fn handleObstacleAttack(s: *State, ai: u8, tx: f64, ty: f64, from_opt: ?Cell, am
             anchor_pos[1] - (@as(f64, @floatFromInt(@max(1, att.fh))) - 1) * engine.HALF,
         };
         const cells = engine.cellsForPosition(pos[0], pos[1], att.fw, att.fh);
-        if (!(engine.cellsFreeFor(s, ai, cells.slice()) and (stationary or has_route))) return false;
+        if (!engine.cellsFreeFor(s, ai, cells.slice())) return false;
+        if (!(stationary or has_route)) return unreachedObstacle(s, am);
         if (!stationary) {
             if (!applyStrikeMoveModifiers(s, ai, route, am.has_lava)) return false;
             if (!engine.occupyCells(s, ai, cells.slice())) return false;
@@ -2632,10 +2666,20 @@ pub fn obstacleAttackAt(s: *State, ai: u8, tx: f64, ty: f64, from: ?Cell, path: 
     // resolveKnownPaths when the action has an attack-from cell (the server's provider is asked then, a shot too).
     var route_buf: server.RouteBuf = .{};
     var am = server.Approach.fromPath(path, s.action_lava);
+    // The provider at an obstacle strike is unverified (server.UNVERIFIED_OBSTACLE): flagged where its approach differs
+    // from runMatch's, or where its refresh changed a unit that the strike can read before its own refresh below.
+    var refreshed = false;
+    var reads_refresh = true;
     if (from) |f| {
         if (s.engine_mode == .server) {
+            const before = server.fingerprint(s);
             am = server.approach(s, f, path, s.action_lava, &route_buf);
-            s.server_unverified |= server.UNVERIFIED_OBSTACLE;
+            refreshed = server.fingerprint(s) != before;
+            if (approachDiffers(s, ai, am, path)) s.server_unverified |= server.UNVERIFIED_OBSTACLE;
+            // A stationary melee strike without Lightning Spin or Skewer Strike on a board without burning cells reads
+            // no refreshed field before that refresh (spendObstacleHit, Double Punch).
+            const b = engine.baseCell(att);
+            reads_refresh = can_land_range or !(b.x == f.x and b.y == f.y) or att.has(.lightning_spin) or att.has(.skewer_strike) or s.fight.n_fire != 0;
         }
         const base = engine.baseCell(att);
         const approaching = !can_land_range and !(base.x == f.x and base.y == f.y);
@@ -2649,12 +2693,14 @@ pub fn obstacleAttackAt(s: *State, ai: u8, tx: f64, ty: f64, from: ?Cell, path: 
     var died: Died = .{};
     var burned = false;
     const completed = handleObstacleAttack(s, ai, tx, ty, from, am, &died, &burned);
+    const landed = if (scattered) terrain.standingCount(s) < standing_before else terrain.hitsLeft(s) < hits_before;
+    // A burned or refused strike keeps the provider's refresh past this action.
+    if (refreshed and (reads_refresh or burned or !completed or !landed)) s.server_unverified |= server.UNVERIFIED_OBSTACLE;
     if (burned) {
         cleanupDeadUnits(s, &died, events, null);
         engine.completeTurn(s, ai, false, false, events);
         return;
     }
-    const landed = if (scattered) terrain.standingCount(s) < standing_before else terrain.hitsLeft(s) < hits_before;
     if (!completed or !landed) return error.Rejected;
 
     engine.refreshStackPowerForAllUnits(s);

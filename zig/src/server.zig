@@ -15,14 +15,37 @@ const artifacts = @import("artifacts.zig");
 const State = st.State;
 const Cell = st.Cell;
 
-/// Server-only paths the oracle has not exercised yet (State.server_unverified): a rollout that reaches one is refused
-/// as unsupported, so its bank stays in TypeScript rather than serving an unverified value. A route other than the
-/// action's (a substitution, or a path-less approach the full map accepts), a lap whose only damage statistic had 0
-/// damage reaching an advance (the server's holder leaves it unmarked, runMatch's marks it), and an obstacle approach
-/// under the provider.
+/// Server-only paths no oracle cohort has shown deciding a value (step-level negative tests: a broken build that still
+/// matches every traced step and bank), flagged in State.server_unverified only where they decide something runMatch's
+/// path would not. A rollout that reaches one is refused (rollout.Error.UnsupportedServer*), so its bank stays in
+/// TypeScript instead of serving an unverified value:
+/// - UNVERIFIED_ROUTE: a move's server route that changes what the walk reads off it (its legality, length, travelled
+///   count, the lava flag, or any cell on a board with burning cells), a path-bearing strike's route that changes what
+///   the approach reads (its length, travelled count, last cell, a ground crossing of "B", the lava flag), a strike the
+///   refreshed map cannot reach refused for want of that route, and a path-less approach the full map accepts;
+/// - UNVERIFIED_ZERO_LAP: a lap left unmarked by a 0-damage statistic (runMatch's holder marks it) that adds a
+///   narrowing lap;
+/// - UNVERIFIED_OBSTACLE: an obstacle strike whose provider approach differs from runMatch's, or whose stat refresh
+///   changed a unit the strike can read before its own refresh (a walk in, a shot, Lightning Spin, Skewer Strike,
+///   burning cells, a strike that burns or does not land).
+/// The provider's refresh at moves and melee approaches and a stationary strike's one-cell charge decide values in the
+/// cohorts, and Zig matches them there, so they are not flagged.
 pub const UNVERIFIED_ROUTE: u8 = 1;
 pub const UNVERIFIED_ZERO_LAP: u8 = 2;
 pub const UNVERIFIED_OBSTACLE: u8 = 4;
+
+/// What the provider's refresh can change: the units and the aggression boards (a hash of their bytes).
+pub fn fingerprint(s: *const State) u64 {
+    var h = std.hash.Wyhash.init(0);
+    h.update(std.mem.sliceAsBytes(s.units[0..s.n_units]));
+    h.update(std.mem.asBytes(&s.grid.aggr));
+    return h.final();
+}
+
+/// The travelled part of a route (travelledMovePath: without its leading base cell).
+pub fn travelledOf(r: []const Cell, base: Cell) []const Cell {
+    return travelled(r, base);
+}
 
 /// routeMatchesActionPath: the same cells in order, or the same travelled cells (each without its leading base cell).
 pub fn sameRoute(route: []const Cell, p: []const Cell, base: Cell) bool {
@@ -150,6 +173,9 @@ pub const Approach = struct {
     defined: bool = false,
     route: ?[]const Cell = null,
     has_lava: bool = false,
+    /// The server's refreshed map cannot reach a path-bearing strike's attack-from cell (runMatch walks the action's
+    /// path): flagged (UNVERIFIED_ROUTE / UNVERIFIED_OBSTACLE) only where the missing route refuses the strike.
+    unreached: bool = false,
 
     /// runMatch (no provider): a path-bearing action carries its own path as the route; a path-less one has no map.
     pub fn fromPath(p: []const Cell, has_lava: bool) Approach {
@@ -173,8 +199,7 @@ pub fn approach(s: *State, from: Cell, p: []const Cell, has_lava: bool, buf: *Ro
                 if (r != null and !(from.x == base.x and from.y == base.y)) s.server_unverified |= UNVERIFIED_ROUTE;
                 return .{ .defined = true, .route = if (r != null) buf.slice() else null, .has_lava = if (r) |x| x.has_lava else false };
             }
-            const found = r orelse return .{};
-            if (!sameRoute(buf.slice(), p, base)) s.server_unverified |= UNVERIFIED_ROUTE;
+            const found = r orelse return .{ .unreached = true };
             return .{ .defined = true, .route = buf.slice(), .has_lava = found.has_lava };
         },
     }

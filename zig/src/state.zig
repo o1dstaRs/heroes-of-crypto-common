@@ -1452,6 +1452,9 @@ pub const Fight = struct {
     replied: UnitSet = 0,
     /// Bit L set = damage was dealt in lap L.
     damage_laps: u128 = 0,
+    /// Server mode: laps that reached their transition with only a 0-damage statistic, which the server's holder leaves
+    /// unmarked and runMatch's marks (engine.markDamageLap; read by the narrowing to see when that decides anything).
+    zero_laps: u128 = 0,
     team_units_alive: [3]i32 = .{ 0, 0, 0 },
     /// The removed units the turn sets still name whose slots went to summons (by uid; see UidSet), cleared with the
     /// sets at the lap flip. `made` / `hourglass_set` / `replied` hold the units in slots.
@@ -1615,7 +1618,7 @@ pub const State = struct {
     /// The engine path of this call's rollouts (rollout.Request.engine); `match` everywhere else.
     engine_mode: EngineMode = .match,
     /// Server mode: the server-only paths this rollout reached that the server oracle has not verified yet (server.zig
-    /// UNVERIFIED_*); a rollout that reaches one is refused (rollout.Error.UnsupportedEngine).
+    /// UNVERIFIED_*); a rollout that reaches one is refused (rollout.Error.UnsupportedServer*).
     server_unverified: u8 = 0,
     /// Server mode: the lap a 0-damage statistic found unmarked (the lap runMatch's holder would mark), -1 for none.
     zero_lap: i32 = -1,

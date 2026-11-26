@@ -1598,6 +1598,7 @@ fn handleLapTransition(s: *State, o: *const Ordered, all_made: bool, damage_deal
     }
     const f = &s.fight;
     if (damage_dealt and f.lap >= 0 and f.lap < 128) f.damage_laps |= @as(u128, 1) << @intCast(f.lap);
+    if (s.engine_mode == .server and !damage_dealt and s.zero_lap == f.lap and f.lap >= 0 and f.lap < 128) f.zero_laps |= @as(u128, 1) << @intCast(f.lap);
     if (f.first_turn_made) {
         flipLap(f);
         // SmokeClouds.minusAllLaps, then Vines.minusAllLaps: each entry loses a lap and goes at 0.
@@ -1623,6 +1624,8 @@ fn handleLapTransition(s: *State, o: *const Ordered, all_made: bool, damage_deal
         const prev_lap = f.lap - 1;
         const prev_damage = prev_lap >= 0 and prev_lap < 128 and (f.damage_laps & (@as(u128, 1) << @intCast(prev_lap))) != 0;
         if (!decreased and !prev_damage and !isNarrowingLap(f)) {
+            // A lap left unmarked by a 0-damage statistic: runMatch's holder marks it and adds no lap here.
+            if (prev_lap >= 0 and prev_lap < 128 and f.zero_laps & (@as(u128, 1) << @intCast(prev_lap)) != 0) s.server_unverified |= server.UNVERIFIED_ZERO_LAP;
             f.additional_narrowing_laps += 1;
             encounter_current = true;
         }
@@ -2504,6 +2507,39 @@ pub fn applyDistanceMorale(s: *State, ui: u8, from: [2]f64, to: [2]f64) void {
     }
 }
 
+/// What moveUnit reads off a walk's route: whether it is legal (the travelled cells within the step budget, each one step
+/// from the last inside the grid, no ground crossing of "B"), its length (setMovedRouteCellsThisTurn), the travelled
+/// count (Crusade) and the lava flag.
+const WalkFacts = struct { legal: bool, len: usize, travelled: usize, lava: bool };
+
+fn walkFacts(s: *const State, u: *const Unit, route: []const Cell, lava: bool, anchor: Cell) WalkFacts {
+    const travelled = server.travelledOf(route, anchor);
+    var legal = travelled.len != 0 and @as(f64, @floatFromInt(travelled.len)) <= maxCellsForStepBudget(s, u);
+    var prev = anchor;
+    if (legal) for (travelled) |c| {
+        const dx = @abs(c.x - prev.x);
+        const dy = @abs(c.y - prev.y);
+        if (!cellWithinGrid(c) or (dx == 0 and dy == 0) or dx > 1 or dy > 1) {
+            legal = false;
+            break;
+        }
+        prev = c;
+    };
+    if (legal and groundRouteCrossesObstacle(s, u, route)) legal = false;
+    return .{ .legal = legal, .len = route.len, .travelled = travelled.len, .lava = lava };
+}
+
+/// Server mode: whether the server's route decides the move differently from the action's path (both refused decide
+/// nothing; with burning cells any other cell can change the burn).
+fn walkDiffers(s: *const State, u: *const Unit, route: []const Cell, route_lava: bool, path: []const Cell, anchor: Cell) bool {
+    const a = walkFacts(s, u, route, route_lava, anchor);
+    const b = walkFacts(s, u, path, s.action_lava, anchor);
+    if (!a.legal and !b.legal) return false;
+    if (a.legal != b.legal or a.len != b.len or a.travelled != b.travelled) return true;
+    if (s.artifacts and a.lava != b.lava) return true;
+    return s.fight.n_fire != 0;
+}
+
 fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell, events: *Events) Reject!void {
     try validateTurnAction(s, ui);
     const u = &s.units[ui];
@@ -2527,7 +2563,7 @@ fn moveUnit(s: *State, ui: u8, path: []const Cell, target_cells: []const Cell, e
             .runmatch => {},
             .rejected => return error.Rejected,
             .route => |r| {
-                if (!server.sameRoute(r.cells, path, anchor)) s.server_unverified |= server.UNVERIFIED_ROUTE;
+                if (!server.sameRoute(r.cells, path, anchor) and walkDiffers(s, u, r.cells, r.has_lava, path, anchor)) s.server_unverified |= server.UNVERIFIED_ROUTE;
                 route = r.cells;
                 route_lava = r.has_lava;
             },
