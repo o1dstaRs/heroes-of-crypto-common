@@ -1490,6 +1490,7 @@ export class SearchDriver {
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
     private readonly a19MeleeBarrelDeliberation: boolean;
     private readonly a19NeutralBarrelDeliberation: boolean;
+    private readonly a19BarrelEngagementAdvance: boolean;
     private readonly a19NightmareWallMovement: boolean;
     private readonly a19GravechainCoverage: boolean;
     private readonly a19WanderingMageSupport: boolean;
@@ -1819,6 +1820,7 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_NEUTRAL_BARREL_DELIBERATION must be 0 or 1");
         }
         this.a19NeutralBarrelDeliberation = this.mode === "search" && neutralBarrelDeliberation === "1";
+        this.a19BarrelEngagementAdvance = searchEnv("SEARCH_A19_BARREL_ENGAGEMENT_ADVANCE") === "1";
         const nightmareWallMovement = searchEnv("SEARCH_A19_NIGHTMARE_WALL_MOVEMENT");
         if (
             nightmareWallMovement !== undefined &&
@@ -2957,6 +2959,15 @@ export class SearchDriver {
                         v08sHasStrongerRangedOutput &&
                         !prioritizeDominantFinish &&
                         !prioritizeV08SUrgency),
+                preferEngagedMeleeAdvance:
+                    version === "v0.8" &&
+                    deliberateBarrel &&
+                    !strikesArtifactBarrel &&
+                    (unit.getAttackType() === PBTypes.AttackVals.MELEE ||
+                        unit.getAttackType() === PBTypes.AttackVals.MELEE_MAGIC) &&
+                    !unit.canFly() &&
+                    (process.env[seatEnvName("A19_BARREL_ENGAGEMENT_ADVANCE", unit.getTeam())] ??
+                        (this.a19BarrelEngagementAdvance ? "1" : "0")) === "1",
                 preserveAttackTargetCoverage:
                     this.scoredDecisionObserver !== undefined || preserveBaselineAttackTargetCoverage,
                 researchReserveRapidChargeDifferentTarget:

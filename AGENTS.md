@@ -1,5 +1,14 @@
 # Agent guidance
 
+## Neutral barrel movement — profile v40, November 27, 2026
+
+The owner adopted `a19-barrel-engagement-advance-v1` after staging match 48e40715. When A19 compares a walking
+melee unit's neutral barrel strike, its capped move can head toward enemies near its allies or past a one-model
+split toward the main enemy army. The search still scores the barrel and eligible attacks. Set
+`A19_BARREL_ENGAGEMENT_ADVANCE_<LEFT|RIGHT>=0` to use the earlier move ordering on that seat. The 108-fight
+development screen estimated +0.69 match-score points (95% −6.25 to +7.64). The owner chose to adopt the
+behavior after the replay investigation.
+
 ## v0.9 and the A19 neural correction removed — owner, November 26, 2026
 
 Owner decision: "yeah lets do it so it is all clean", and "Remove it" for the neural correction's one live use (the

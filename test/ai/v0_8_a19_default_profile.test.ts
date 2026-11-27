@@ -54,6 +54,7 @@ const ENV_KEYS = [
     "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
     "SEARCH_A19_MELEE_BARREL_DELIBERATION",
     "SEARCH_A19_NEUTRAL_BARREL_DELIBERATION",
+    "SEARCH_A19_BARREL_ENGAGEMENT_ADVANCE",
     "SEARCH_A19_NIGHTMARE_WALL_MOVEMENT",
     "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
     "SEARCH_A19_ROLLOUT_ALLOCATION",
@@ -92,7 +93,12 @@ describe("v0.8+A19 production profile", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
-            schema: "hoc.v0_8_a19_production_profile.v39",
+            schema: "hoc.v0_8_a19_production_profile.v40",
+            barrelEngagementAdvance: {
+                policyId: "a19-barrel-engagement-advance-v1",
+                adoption: "explicit-user-instruction",
+                qualification: "replay-confirmed-development-inconclusive",
+            },
             battleMageTargets: "battle-mage-impact-coverage-v1",
             candidateId: "a19",
             productionVersion: "v0.8",

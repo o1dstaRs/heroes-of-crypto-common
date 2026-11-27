@@ -290,6 +290,7 @@ describe("native rollout scope", () => {
             nativeEnvironmentRefusal({
                 ...environment,
                 A19_CARRIER_COHESION_LEFT: "0",
+                A19_BARREL_ENGAGEMENT_ADVANCE_RIGHT: "1",
                 A19_SPLIT_SCREEN_RIGHT: "0",
                 A19_SHIELD_SCREEN_LEFT: "0",
                 A19_CLOSE_SCREEN_RIGHT: "0",

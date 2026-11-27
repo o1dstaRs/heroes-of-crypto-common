@@ -199,7 +199,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     Spymaster draft and +10.12 per changed Scout draft; registered confirmation MV3 on the fixed tree
  *     (docs/counter_model_v2_adoption.md).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v39" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v40" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -235,6 +235,7 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     // Explicit user adoption: neutral barrel strikes, melee or ranged, get the same comparison. The held-out
     // gain is confirmed; the failed quality and cost gates stay recorded separately.
     SEARCH_A19_NEUTRAL_BARREL_DELIBERATION: "1",
+    SEARCH_A19_BARREL_ENGAGEMENT_ADVANCE: "1",
     // Explicit user adoption; preserve the positive estimate and failed qualification separately.
     SEARCH_A19_NIGHTMARE_WALL_MOVEMENT: "1",
     // Keep one broader single-target Gravechain attack for the horizon to price its movement denial.
@@ -280,7 +281,7 @@ export const V08_A19_GENOME_SHA256 = "1ff72691020e57cda1432d08c240a4a32ce8726ad8
 // The sealed environment's fingerprint. 2026-11-26: SEARCH_A19_NEURAL_TIES left the environment with the A19 neural
 // correction (owner decision); before that the fingerprint was 429c490e0b611975db37f33c7111c7553b2f8d72c108e03f56f70df01636fb2e.
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "8154731e8a7cc1ba4d156eee0affd83dd49624215018ddee3c03a41a13f60aa4" as const;
+    "9c9ff683e10eb1bedb57676b205072ffa45ba5da3b1db9c9b43140e81c7862bf" as const;
 
 /**
  * User-adopted neutral cemetery barrel deliberation. The switch lives in `SearchDriver`; this record keeps the
@@ -292,6 +293,14 @@ export const V08_A19_NEUTRAL_BARREL_DELIBERATION_POLICY = Object.freeze({
     adoption: "explicit-user-instruction",
     registrationSha256: "8d4a618a9f3533b6a9a91e1784cfe197725996aa97c0a0284529a969badefc81",
     qualification: "strength-confirmed-quality-and-cost-gates-failed",
+} as const);
+
+/** Owner adoption after staging match 48e40715. The 108-game development comparison was inconclusive. */
+export const V08_A19_BARREL_ENGAGEMENT_ADVANCE_POLICY = Object.freeze({
+    policyId: "a19-barrel-engagement-advance-v1",
+    adoptedAt: "2026-11-27",
+    adoption: "explicit-user-instruction",
+    qualification: "replay-confirmed-development-inconclusive",
 } as const);
 
 /**
@@ -646,7 +655,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "melee-barrel-rollback-environment" as const,
         source: "src/ai/versions/v0_8_a13_profile.ts" as const,
-        sha256: "0de782b3da74931726cb8da41c0577546919a2e1f338cb97af99e0a00f26c9eb" as const,
+        sha256: "fff690b3ae132e13ea1c9f5b22a7f9aeacdbf417a5891be531c6bad965323111" as const,
     }),
     Object.freeze({
         role: "nightmare-wall-movement" as const,
@@ -677,7 +686,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         // is all clean"; "Remove it" for the sandbox correction). Bot seats and Premium decisions are unchanged.
         // Re-pinned: a driver without a native harness (a live bot seat) never asks for the library; only the order of
         // the bank's fallback checks changes.
-        sha256: "3ebd4c0b400bf7fcfe4ad355b30af919f5b6a983814744a1d41eafe41eb5e029" as const,
+        // Profile v40 adds the advance toward the main fight to neutral-barrel deliberation.
+        sha256: "d739cd5343a99c8031af3cb1b9db9f8b929fa3acf76fe7f49d4fb5782d2c5731" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,
@@ -718,7 +728,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
         // Candidate rays share the player cursor's selectable-edge gate; Through Shot retains free aim.
-        sha256: "241126f336686a85afdd4dc15e4d7f0af8d705d4a88956bf4e675351f007081c" as const,
+        // Neutral-barrel deliberation can use the capped move slot for an advance toward the main fight.
+        sha256: "32f0da36cf109da6167820cbb90b12f10b6d42698386ffbbd60b98f50cfa4e8f" as const,
     }),
     Object.freeze({
         role: "ranged-target-selection" as const,
@@ -999,6 +1010,7 @@ export const V08_A19_PROFILE = Object.freeze({
     battleMageTargets: BATTLE_MAGE_TARGET_POLICY,
     nightmareWallMovement: A19_NIGHTMARE_WALL_MOVEMENT_POLICY,
     neutralBarrelDeliberation: V08_A19_NEUTRAL_BARREL_DELIBERATION_POLICY,
+    barrelEngagementAdvance: V08_A19_BARREL_ENGAGEMENT_ADVANCE_POLICY,
     strikerRush: V08_A19_STRIKER_RUSH_POLICY,
     artifactBeneficiary: V08_A19_ARTIFACT_BENEFICIARY_POLICY,
     shooterlessMovement: V08_A19_SHOOTERLESS_MOVEMENT_POLICY,

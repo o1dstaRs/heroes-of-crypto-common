@@ -313,6 +313,44 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         }
     });
 
+    it("uses the capped move to join the fight instead of pursuing a split", () => {
+        const c = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        const barrel = { x: 9, y: 9 };
+        c.grid.setScatteredMountains([barrel]);
+        const hydra = makeReal(LEFT, "Chaos", "Hydra");
+        const ally = createTestUnit({ team: LEFT });
+        const main = createTestUnit({ team: RIGHT, name: "Troll", amountAlive: 20 });
+        const split = createTestUnit({ team: RIGHT, name: "Troll", amountAlive: 1 });
+        placeUnit(c.grid, c.unitsHolder, hydra, { x: 8, y: 9 });
+        placeUnit(c.grid, c.unitsHolder, ally, { x: 13, y: 2 });
+        placeUnit(c.grid, c.unitsHolder, main, { x: 13, y: 1 });
+        placeUnit(c.grid, c.unitsHolder, split, { x: 5, y: 12 });
+        const context = ctxFor(c);
+        const incumbent: GameAction[] = [
+            {
+                type: "obstacle_attack",
+                attackerId: hydra.getId(),
+                targetPosition: getPositionForCells(testGridSettings, [barrel])!,
+            },
+        ];
+        const ordinary = enumerateCandidates(hydra, context, incumbent, { maxMoveDestinations: 1 });
+        const focused = enumerateCandidates(hydra, context, incumbent, {
+            maxMoveDestinations: 1,
+            preferEngagedMeleeAdvance: true,
+        });
+        const ordinaryMoves = ofKind(ordinary.candidates, "move");
+        const focusedMoves = ofKind(focused.candidates, "move");
+        expect(ordinaryMoves).toHaveLength(1);
+        expect(focusedMoves).toHaveLength(1);
+        expect(ordinaryMoves[0].targetCell!.y).toBeGreaterThan(9);
+        expect(focusedMoves[0].targetCell!.y).toBeLessThan(9);
+        expect(focused.candidates[0].actions).toBe(incumbent);
+        const full = enumerateCandidates(hydra, context, incumbent);
+        expect(ofKind(full.candidates, "move").map((candidate) => candidate.actions)).toContainEqual(
+            focusedMoves[0].actions,
+        );
+    });
+
     it("opt-in capped moves retain one closing and one non-closing posture without changing the default", () => {
         const c = createCombatTestContext();
         const unit = createTestUnit({ team: LEFT, name: "Screen", attackType: MELEE, initiative: 4 });

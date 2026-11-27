@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { a19DecoyAwareEnabled, strikesOneModelDecoy, strikesRealStack } from "./decoy_aware";
+import { a19DecoyAwareEnabled, isOneModelDecoy, strikesOneModelDecoy, strikesRealStack } from "./decoy_aware";
 import { a19WildRegenGiftEnabled, isWorthwhileWildRegenerationGift } from "./wild_regeneration_gift";
 import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
@@ -91,6 +91,15 @@ const RIGHT = PBTypes.TeamVals.RIGHT;
 
 const otherTeam = (team: number): number => (team === LEFT ? RIGHT : LEFT);
 const isAdjacentCell = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
+const footprintDistance = (from: readonly XY[], to: readonly XY[]): number => {
+    let nearest = Infinity;
+    for (const a of from) {
+        for (const b of to) {
+            nearest = Math.min(nearest, Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)));
+        }
+    }
+    return nearest;
+};
 const haveAdjacentCells = (left: readonly XY[], right: readonly XY[]): boolean => {
     for (const leftCell of left) {
         for (const rightCell of right) {
@@ -965,6 +974,8 @@ export interface IEnumerateOptions {
     researchFireBreathValue?: boolean;
     /** Cap on move destinations, kept nearest-to-enemy first (0/undefined = all reachable). */
     maxMoveDestinations?: number;
+    /** When deliberating a neutral barrel strike, use a capped move slot for a route toward the main fight. */
+    preferEngagedMeleeAdvance?: boolean;
     /**
      * Optional consumer-specific move gate applied before maxMoveDestinations. This lets a role-aware caller
      * retain the nearest move satisfying a hard geometry contract instead of capping first and accidentally
@@ -1547,6 +1558,10 @@ class CandidateGenerator {
             } else {
                 kept = ranked.slice(0, cap).map(({ route }) => route);
             }
+            const advance = this.engagedMeleeAdvance(routes, kept[0]);
+            if (advance && advance !== kept[0]) {
+                kept = [advance, ...kept.filter((route) => route !== advance)].slice(0, kept.length);
+            }
             if (kept.length < routes.length) this.truncated.push("move");
         }
         if (this.options.enrichIncumbentMetadata) {
@@ -1555,6 +1570,51 @@ class CandidateGenerator {
         for (const route of kept) {
             this.push(candidateOf(route));
         }
+    }
+    /**
+     * Keep the normal move when there is no fight to join. While comparing a neutral barrel strike, the one
+     * ordinary movement slot should point toward enemies an ally is fighting, or past an isolated split
+     * toward the other enemies. The routes here already satisfy the actor's movement budget and footprint.
+     */
+    private engagedMeleeAdvance(
+        routes: readonly IReadonlyWeightedRoute[],
+        ordinary: IReadonlyWeightedRoute,
+    ): IReadonlyWeightedRoute | undefined {
+        if (
+            !this.options.preferEngagedMeleeAdvance ||
+            !this.allies.length ||
+            this.candidates.some((candidate) => strikesRealStack(this.context, candidate.actions))
+        ) {
+            return undefined;
+        }
+        const targets = this.meleeTargets();
+        const realTargets = targets
+            .filter((enemy) => !isOneModelDecoy(this.context, enemy.getId()))
+            .map((enemy) => enemy.getCells());
+        const allyCells = this.allies.map((ally) => ally.getCells());
+        const engaged = realTargets.filter((enemy) => allyCells.some((ally) => footprintDistance(ally, enemy) <= 2));
+        if (!engaged.length && realTargets.length === targets.length) {
+            return undefined;
+        }
+        const focus = engaged.length ? engaged : realTargets;
+        const distanceTo = (cells: readonly XY[], groups: readonly XY[][]): number =>
+            Math.min(...groups.map((group) => footprintDistance(cells, group)));
+        const startDistance = distanceTo(this.unit.getCells(), focus);
+        let best: IReadonlyWeightedRoute | undefined;
+        let bestDistance = startDistance;
+        let bestSupportDistance = Infinity;
+        // Prefer the ordinary move on a tie. A route adjacent to a real target belongs in the melee catalog.
+        for (const route of [ordinary, ...routes]) {
+            const cells = this.footprintForCell(route.cell);
+            const distance = distanceTo(cells, focus);
+            if (distance <= 1 || distance >= startDistance || distance > bestDistance) continue;
+            const supportDistance = distanceTo(cells, allyCells);
+            if (distance === bestDistance && supportDistance >= bestSupportDistance) continue;
+            best = route;
+            bestDistance = distance;
+            bestSupportDistance = supportDistance;
+        }
+        return best;
     }
     // ---- melee -------------------------------------------------------------------------------------
     private canMelee(): boolean {

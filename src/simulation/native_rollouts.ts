@@ -555,7 +555,7 @@ const AI_POLICY_ENV = /^(A19|B2|Q2|V0\d)_|^AI_AURA_ZONE_EXACT$/;
  *   draft, setup, synergy and augment weights, the conditional setup;
  * - placement (placeArmy only): the split and shield screens, v0.5's placement modes, v0.6's dispersal, v0.7's
  *   reveal, the ranked setup spec;
- * - the search root: the carrier cohesion veto (search_driver's carrierCohesionIncumbent), v0.6s / runMatch's search
+ * - the search root: the carrier cohesion veto, neutral-barrel engagement movement, v0.6s / runMatch's search
  *   switch, the aggressive root and the Q2 dataset, oracle and wait ablation;
  * - the leaf weights, which nativeLeafKind checks on every bank;
  * - the v0.5 lookahead, which no A19 driver runs;
@@ -585,6 +585,7 @@ const AI_POLICY_ROOT_ONLY: readonly string[] = [
     "V07_PLACEMENT_REVEAL_VERSIONS",
     "V08_RANKED_SETUP_POLICY_SPEC",
     "A19_CARRIER_COHESION",
+    "A19_BARREL_ENGAGEMENT_ADVANCE",
     "Q2_DATASET",
     "Q2_DATASET_V2",
     "Q2_ORACLE",
