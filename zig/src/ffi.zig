@@ -638,7 +638,66 @@ fn parseRequest(e: *Engine, arena: std.mem.Allocator, h: *const Handle, json: []
     const budget = rec.get(v, "turnBudget");
     if (budget == .integer and budget.integer >= 0) req.turn_budget = @intCast(budget.integer);
     if (!parseBank(e, rec.get(v, "bank"), &req)) return null;
+    if (!parseReuseRows(e, arena, rec.get(v, "reuseRows"), &req)) return null;
     return req;
+}
+
+fn finiteJsonNumber(v: std.json.Value) bool {
+    return switch (v) {
+        .integer => true,
+        .float => std.math.isFinite(v.float),
+        else => false,
+    };
+}
+
+fn unsignedJsonInteger(v: std.json.Value, max: u64) bool {
+    return v == .integer and v.integer >= 0 and @as(u64, @intCast(v.integer)) <= max;
+}
+
+/// Optional ABI 3 hint for trusted, unpruned, server-mode banks. Older libraries ignore the
+/// top-level field and execute all pairs normally.
+fn parseReuseRows(e: *Engine, arena: std.mem.Allocator, v: std.json.Value, req: *rollout.Request) bool {
+    if (v == .null) return true;
+    if (v != .array or v.array.items.len > req.pairs.len or req.engine != .server or
+        req.chance != .plain or req.horizon != .turns or req.bank.tail != null or
+        req.bank.summon_per_rollout or req.drop_decisions != 0)
+    {
+        e.fail("request: invalid reuseRows for this bank", .{});
+        return false;
+    }
+    const rows = arena.alloc(rollout.ReuseRow, v.array.items.len) catch {
+        e.fail("out of memory", .{});
+        return false;
+    };
+    for (v.array.items, 0..) |item, i| {
+        if (item != .array or item.array.items.len != 7) {
+            e.fail("request: reuseRows[{d}] must have seven fields", .{i});
+            return false;
+        }
+        const x = item.array.items;
+        if (!unsignedJsonInteger(x[0], std.math.maxInt(u32)) or x[0].integer >= req.pairs.len or
+            (i > 0 and x[0].integer <= rows[i - 1].index) or
+            !unsignedJsonInteger(x[1], 9_007_199_254_740_991) or
+            !unsignedJsonInteger(x[2], std.math.maxInt(u32)) or
+            !unsignedJsonInteger(x[3], req.turns) or !finiteJsonNumber(x[4]) or
+            (if (req.bank.material) !finiteJsonNumber(x[5]) else x[5] != .null) or
+            x[6] != .integer or x[6].integer < -1 or x[6].integer > 2)
+        {
+            e.fail("request: invalid reuseRows[{d}]", .{i});
+            return false;
+        }
+        rows[i] = .{
+            .index = @intCast(x[0].integer),
+            .uuid_seq = @intCast(x[1].integer),
+            .summon_seq = @intCast(x[2].integer),
+            .turns = @intCast(x[3].integer),
+            .value = rec.num(x[4]),
+            .material = if (req.bank.material) rec.num(x[5]) else std.math.nan(f64),
+            .winner = @intCast(x[6].integer),
+        };
+    }
+    req.reuse_rows = rows;
+    return true;
 }
 
 /// The request's `bank` (ABI 3): scoreCandidates' bank semantics, see rollout.Bank. Unknown keys are refused, never

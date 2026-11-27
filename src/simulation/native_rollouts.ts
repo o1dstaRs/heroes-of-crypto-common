@@ -29,6 +29,7 @@
  */
 
 import type { IAIStrategy } from "../ai/ai_strategy";
+import type { NativeRolloutReuse } from "./native_rollout_reuse";
 import { A19_COHERENT_MELEE_APPROACH_ENV, a19CoherentMeleeApproachEnabled } from "../ai/coherent_melee_approach";
 import { A19_DECOY_AWARE_ENV, a19DecoyAwareEnabled } from "../ai/decoy_aware";
 import { seatEnvName } from "../ai/seat_env";
@@ -181,6 +182,7 @@ export interface INativePairRecord {
     material: number;
     turns: number;
     flags: number;
+    reused?: true;
     summonSequence: number;
     uuidSequence: number;
     winner: number;
@@ -727,6 +729,8 @@ export interface INativeRolloutStatistics {
     roots: number;
     nativeRoots: number;
     nativeTurns: number;
+    reusedPairs: number;
+    reusedTurns: number;
     tsTurns: number;
     nativeBankMs: number;
     tsBankMs: number;
@@ -758,6 +762,8 @@ export function emptyNativeRolloutStatistics(mode: NativeRolloutMode): INativeRo
         roots: 0,
         nativeRoots: 0,
         nativeTurns: 0,
+        reusedPairs: 0,
+        reusedTurns: 0,
         tsTurns: 0,
         nativeBankMs: 0,
         tsBankMs: 0,
@@ -808,6 +814,7 @@ export interface INativeBankInput {
     turnLimit: number | null;
     turnsBefore: number;
     deadlineAt: number | null;
+    reuse?: { readonly cache: NativeRolloutReuse; readonly root: string };
 }
 
 export interface INativeBankResult {
@@ -901,16 +908,34 @@ export function runNativeBank(
         if (input.turnLimit !== null && input.turnsBefore + turns > input.turnLimit) return done("turn_budget");
         const pairs: [number, number][] = [];
         for (let k = 0; k < group.length; k += 1) for (let r = 0; r < R; r += 1) pairs.push([k, r]);
+        const candidates = group.map((index) => ({
+            kind: input.candidates[index].kind,
+            actions: input.candidates[index].actions,
+        }));
+        const reuse =
+            input.reuse &&
+            !tails &&
+            input.harness.engine === "server" &&
+            input.harness.summonScope === "call" &&
+            input.chance === "plain" &&
+            input.horizonMode === "turns" &&
+            R > 2
+                ? input.reuse.cache.prepare(
+                      input.reuse.root,
+                      JSON.stringify([base, input.captureMaterial]),
+                      candidates,
+                      R,
+                      input.captureMaterial,
+                  )
+                : undefined;
         const request = {
             ...base,
-            candidates: group.map((index) => ({
-                kind: input.candidates[index].kind,
-                actions: input.candidates[index].actions,
-            })),
+            candidates,
             pairs,
             ...(input.turnLimit === null ? {} : { turnBudget: input.turnLimit - (input.turnsBefore + turns) }),
             summonSequence: summon,
             uuidSequence: uuid,
+            ...(reuse?.hints.length ? { reuseRows: reuse.hints } : {}),
             bank: {
                 skipAfterIllegal: true,
                 summonScope: input.harness.summonScope,
@@ -922,6 +947,7 @@ export function runNativeBank(
         const result = native.engine.rollouts(handle, request, deadlineNs());
         calls += 1;
         const pairRecords = native.engine.rolloutPairs();
+        reuse?.remember(pairRecords, flags.played, uuid, summon);
         records.push(...pairRecords);
         turns += result.turns;
         uuid = result.uuidSequence;

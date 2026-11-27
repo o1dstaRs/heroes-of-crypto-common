@@ -280,6 +280,20 @@ pub const Request = struct {
     engine: st.EngineMode = .match,
     /// scoreCandidates' bank semantics (the request's `bank`, ABI 3); the defaults are ABI 2's plain pair loop.
     bank: Bank = .{},
+    /// Certified completed samples from an earlier pass over this exact root and request policy.
+    reuse_rows: []const ReuseRow = &.{},
+};
+
+/// A finite played pair that left both allocation counters unchanged. The caller establishes
+/// the exact root, policy, candidate, and random-stream identity before offering it.
+pub const ReuseRow = struct {
+    index: u32,
+    uuid_seq: u64,
+    summon_seq: u32,
+    turns: u32,
+    value: f64,
+    material: f64,
+    winner: i32,
 };
 
 /// How one call reproduces a SearchDriver.scoreCandidates bank (search_driver.ts): the pairs must then be
@@ -320,6 +334,8 @@ pub const PairFlag = struct {
     pub const NOT_REACHED: u32 = 3;
     /// Not played: the tail bound said its candidate cannot win (Bank.tail).
     pub const SKIPPED_TAIL: u32 = 4;
+    /// Telemetry bit on a played pair. Its value and logical work match the original sample.
+    pub const REUSED: u32 = 1 << 8;
 };
 
 /// One pair's outcome, in request order (C layout, 40 bytes: hoc_rollout_pairs copies these).
@@ -896,7 +912,13 @@ pub fn runRecords(root: *const State, scratch: *State, req: *const Request, out:
     var cand_done: u32 = 0;
     var outside_unit = false;
     var written: usize = 0;
+    var reuse_index: usize = 0;
     for (req.pairs, 0..) |p, i| {
+        const reuse = if (reuse_index < req.reuse_rows.len and req.reuse_rows[reuse_index].index == i)
+            req.reuse_rows[reuse_index]
+        else
+            null;
+        if (reuse != null) reuse_index += 1;
         if (written >= out.len) {
             ctl.stop = .out_full;
             break;
@@ -912,6 +934,29 @@ pub fn runRecords(root: *const State, scratch: *State, req: *const Request, out:
             if (i < records.len) records[i] = .{ .flags = skip, .summon_seq = summon_seq, .uuid_seq = uuid_seq };
             written += 1;
             continue;
+        }
+        if (reuse) |row| {
+            // Let the real simulator produce the exact partial result whenever the cap falls
+            // inside this sample. A cache hit still spends the original logical work budget.
+            const fits = if (ctl.turn_budget) |limit|
+                ctl.turns <= limit and row.turns <= limit - ctl.turns
+            else
+                true;
+            if (fits and row.uuid_seq == uuid_seq and row.summon_seq == summon_seq and !ctl.expired()) {
+                ctl.turns += row.turns;
+                out[written] = row.value;
+                if (i < records.len) records[i] = .{
+                    .value = row.value,
+                    .material = row.material,
+                    .turns = row.turns,
+                    .flags = PairFlag.PLAYED | PairFlag.REUSED,
+                    .summon_seq = summon_seq,
+                    .uuid_seq = uuid_seq,
+                    .winner = row.winner,
+                };
+                written += 1;
+                continue;
+            }
         }
         const turns_before = ctl.turns;
         scratch.* = root.*;

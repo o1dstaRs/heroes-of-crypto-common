@@ -687,7 +687,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         // Re-pinned: a driver without a native harness (a live bot seat) never asks for the library; only the order of
         // the bank's fallback checks changes.
         // Profile v40 adds the advance toward the main fight to neutral-barrel deliberation.
-        sha256: "d739cd5343a99c8031af3cb1b9db9f8b929fa3acf76fe7f49d4fb5782d2c5731" as const,
+        sha256: "11127d8f031dff926365ea4ca353d4dfc2317726704da6a39d2cb8bfdecd4585" as const,
     }),
     Object.freeze({
         role: "unit-support-setup" as const,

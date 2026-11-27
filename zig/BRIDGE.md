@@ -281,6 +281,13 @@ exact doubles.
   allocated in both cases). A pair record's `summonSequence` is the library's own count; it is comparable with
   TypeScript only under `match` naming, since the server's harness keeps no summon counter (the adapter's shadow
   comparison skips it under `uuidSequence`).
+- `reuseRows` is an optional ABI 3 hint for exact, decision-scoped reuse by the server's native
+  search ladder. Rows are ordered by output index and hold `[pairIndex, uuidSequence, summonSequence,
+  turns, value, materialOrNull, winner]`. The caller supplies a completed sample from the same
+  serialized root, resolved policy, candidate, horizon and random stream. The sample must have
+  left both ID counters unchanged. Zig checks the live counters and budget at the pair, then credits
+  its original logical turns. A hit sets bit 8 in the played pair's flags. The Bun bridge exposes the
+  bit as `reused` alongside the ordinary played flag. Older ABI 3 libraries ignore the top-level hint.
 - `engine`: `match` (default) reproduces runMatch's engine path; `server` the server's bot-seat deps
   (play_session.ts createBotSearchDeps: the known-paths provider, a full stat refresh and an aggression rebuild before
   every move and approach, the server's routes, damage laps marked by damage > 0 only). `server` needs

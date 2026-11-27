@@ -140,6 +140,7 @@ import {
     reportNativeShadowMismatch,
     runNativeBank,
 } from "./native_rollouts";
+import type { NativeRolloutReuse } from "./native_rollout_reuse";
 import { makeSearchChanceStream } from "./search_chance_sampling";
 import { BattleRollbackJournal, restoreBattle, snapshotBattle } from "./battle_snapshot";
 import {
@@ -497,6 +498,8 @@ export interface ISearchDecisionBudget {
     readonly rolloutTurns?: number;
     /** Wall-clock deadline from the start of this decision's search; ignored under offline deterministic work. */
     readonly deadlineMs?: number;
+    /** Shared only by the consecutive native search passes for one live action. */
+    readonly nativeRolloutReuse?: NativeRolloutReuse;
 }
 
 export interface ISearchBudgetedDecision {
@@ -1613,6 +1616,7 @@ export class SearchDriver {
     private readonly nativeStats: INativeRolloutStatistics = emptyNativeRolloutStatistics(this.nativeMode);
     /** The current chooseSearchDecision's native root (export and loaded board, or why it stays in TypeScript). */
     private nativeRoot: NativeRootScope | undefined;
+    private nativeRolloutReuse: NativeRolloutReuse | undefined;
     /** Shadow mode: TypeScript's rollouts of the bank being compared. */
     private nativeShadowRollouts: INativeShadowRollout[] | undefined;
     /** Native rollout banks of this driver (HOC_NATIVE_ROLLOUTS): native and TypeScript banks, fallbacks, shadow checks. */
@@ -2451,6 +2455,7 @@ export class SearchDriver {
         const startFallbacks = this.counters.deadlineFallbacks;
         this.rolloutTurnLimit = budget.rolloutTurns === undefined ? null : startTurns + budget.rolloutTurns;
         this.decisionDeadlineOverrideMs = budget.deadlineMs ?? null;
+        this.nativeRolloutReuse = budget.nativeRolloutReuse;
         this.decisionBudgetExceeded = false;
         try {
             let actions: GameAction[];
@@ -2470,6 +2475,7 @@ export class SearchDriver {
         } finally {
             this.rolloutTurnLimit = null;
             this.decisionDeadlineOverrideMs = null;
+            this.nativeRolloutReuse = undefined;
             this.decisionBudgetExceeded = false;
         }
     }
@@ -6019,7 +6025,11 @@ export class SearchDriver {
         const startedAt = performance.now();
         let result: INativeBankResult;
         try {
-            result = runNativeBank(native, root.handle!, input);
+            const reuse =
+                this.nativeRolloutReuse && root.json !== undefined
+                    ? { cache: this.nativeRolloutReuse, root: root.json }
+                    : undefined;
+            result = runNativeBank(native, root.handle!, reuse ? { ...input, reuse } : input);
         } catch (error) {
             if (!native.isRefusal(error)) {
                 disableNativeRollouts(error);
@@ -6042,6 +6052,13 @@ export class SearchDriver {
         stats.nativeCalls += result.calls;
         stats.nativeBankMs += performance.now() - startedAt;
         stats.nativeTurns += result.turns;
+        if (this.nativeRolloutReuse) {
+            for (const record of result.records) {
+                if (!record.reused) continue;
+                stats.reusedPairs += 1;
+                stats.reusedTurns += record.turns;
+            }
+        }
         // The state a TypeScript bank leaves behind.
         this.counters.rolloutTurnsTotal += result.turns;
         if (result.played) this.rolloutEnemyTeam = otherTeam(unit.getTeam());

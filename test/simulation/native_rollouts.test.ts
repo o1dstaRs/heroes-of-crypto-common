@@ -19,6 +19,7 @@ import { V08_A13_VALUE_LEAF } from "../../src/ai/versions/v0_8_a13_profile";
 import { buildV08A19SearchEnvironment } from "../../src/ai/versions/v0_8_a19_profile";
 import { creaturesByLevel, type IArmyUnitSpec, makeRng } from "../../src/simulation/army";
 import { runMatch } from "../../src/simulation/battle_engine";
+import { NativeRolloutReuse } from "../../src/simulation/native_rollout_reuse";
 import {
     compareNativeShadowBank,
     exportWithoutSideEffects,
@@ -876,5 +877,44 @@ describe("native root export", () => {
             else process.env.HOC_NATIVE_SENTINELS = sentinels;
             restoreDeterministicRandomState(saved);
         }
+    });
+});
+
+describe("native sample reuse", () => {
+    test("keeps complete no-allocation samples under the exact board, policy, and candidate", () => {
+        const cache = new NativeRolloutReuse();
+        const wait = { kind: "wait", actions: [{ type: "wait_turn", unitId: "actor" }] };
+        const defend = { kind: "defend", actions: [{ type: "defend_turn", unitId: "actor" }] };
+        const remember = cache.prepare("root", "policy", [wait, defend], 2, true);
+        expect(remember.hints).toEqual([]);
+
+        const record: INativePairRecord = {
+            flags: 0,
+            turns: 41,
+            value: 0.75,
+            material: 0.65,
+            uuidSequence: 7,
+            summonSequence: 9,
+            winner: -1,
+        };
+        remember.remember(
+            [
+                record,
+                { ...record, uuidSequence: 8, summonSequence: 10 },
+                { ...record, uuidSequence: 8, summonSequence: 10 },
+                { ...record, flags: 2 },
+            ],
+            0,
+            7,
+            9,
+        );
+
+        expect(cache.prepare("root", "policy", [defend, wait], 3, true).hints).toEqual([
+            [0, 8, 10, 41, 0.75, 0.65, -1],
+            [3, 7, 9, 41, 0.75, 0.65, -1],
+        ]);
+        expect(cache.prepare("root", "policy", [{ ...wait, kind: "incumbent" }], 3, true).hints).toEqual([]);
+        expect(cache.prepare("changed", "policy", [defend, wait], 3, true).hints).toEqual([]);
+        expect(cache.prepare("root", "changed", [defend, wait], 3, true).hints).toEqual([]);
     });
 });

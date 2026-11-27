@@ -232,6 +232,7 @@ export const HOC_PAIR_SKIPPED_ILLEGAL = 1;
 export const HOC_PAIR_ABORTED = 2;
 export const HOC_PAIR_NOT_REACHED = 3;
 export const HOC_PAIR_SKIPPED_TAIL = 4;
+const HOC_PAIR_REUSED = 1 << 8;
 
 /** rollout.PairRecord: one pair of the last hoc_rollouts call. */
 export interface IHocPairRecord {
@@ -243,6 +244,8 @@ export interface IHocPairRecord {
     turns: number;
     /** HOC_PAIR_* */
     flags: number;
+    /** A completed sample credited from an earlier pass. */
+    reused?: true;
     /** the counters after the pair */
     summonSequence: number;
     uuidSequence: number;
@@ -326,11 +329,13 @@ export class HocEngine {
         const out: IHocPairRecord[] = new Array(n);
         for (let i = 0; i < n; i++) {
             const w = i * 10;
+            const flags = u[w + 5];
             out[i] = {
                 value: f[i * 5],
                 material: f[i * 5 + 1],
                 turns: u[w + 4],
-                flags: u[w + 5],
+                flags: flags & ~HOC_PAIR_REUSED,
+                ...(flags & HOC_PAIR_REUSED ? { reused: true } : {}),
                 summonSequence: u[w + 6],
                 winner: s[w + 7],
                 // uuid_seq is a u64; the TypeScript counter is a safe integer
