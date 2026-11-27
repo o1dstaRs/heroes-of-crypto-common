@@ -1,0 +1,252 @@
+{
+    "registration": {
+        "id": "CS1",
+        "registeredUtc": "2026-11-27T05:51:18Z",
+        "policy": "a19-close-screen-v1",
+        "kind": "Registered non-inferiority follow-up to the owner’s adopt-now decision.",
+        "ownerDecisionSha256": "e170fb92d6dae94b86de5df152dc35a58085a2ccf40ed4806286d856ace875a6",
+        "source": {
+            "server": "02c1c74ff91da792eda222e258b1cd30b834611c",
+            "common": "de73f4ebae739ce4ada6ad58690cd58b59d3633a",
+            "nativeAbi": 3,
+            "bun": "1.4.5",
+            "combat": "A19 on both seats, production deep fit fixed-work on Zig."
+        },
+        "arms": {
+            "close": "v39 with A19_CLOSE_SCREEN enabled on both seats",
+            "control": "Previous screen body via A19_CLOSE_SCREEN_<entrant seat>=0, other seat stays v39."
+        },
+        "populations": {
+            "mirror": "Both teams use the production draft, with no shooter for the entrant and at least one shooter for its opponent.",
+            "fort": "Production entrant. Synthetic ranged-fort draft using published Gargantuan and Medusa preference when offered, at least two shooters. No private match history used."
+        },
+        "familiesPerPopulation": 1080,
+        "perPopulationMapDoctrine": 120,
+        "families": 2160,
+        "eligibleSeats": 4320,
+        "changedSeats": 1160,
+        "unchangedControls": 24,
+        "crossHostParityPairs": 20,
+        "scoredFights": 2320,
+        "endpoint": "Win=1, draw=.5, loss=0, close minus control percentage points over all eligible seats. Identical authoritative openings score zero difference after the exact null check.",
+        "bootstrap": {
+            "resample": "whole draft family, within population/map/entrant doctrine",
+            "confidence": 0.95,
+            "samples": 20000,
+            "seed": 261127617
+        },
+        "gates": {
+            "pooledLowerBoundAtLeastPp": -2,
+            "eachPopulationEstimateAtLeastPp": -2,
+            "noQualityErrors": true,
+            "unchangedControlsExact": true,
+            "crossHostParityExact": true,
+            "moreAirborneSinglesAndSteps": true,
+            "matchedOpponentArmyGeometryBarrelsAndFunding": true
+        },
+        "decision": "On a valid pass record the non-inferiority confirmation in the installed profile. A valid gate failure triggers the owner-approved rollback on both AI and Premium. Report a strength gain only if the pooled interval lower bound exceeds zero.",
+        "sha256": {
+            "server-source.txt": "47c29c62ee6fae3ad82a4efe73beb985a1e96362944090a3baf7b9c1fd45a26a",
+            "pilot.json": "dc3a1d561e1d0643f93b097248ae55f794f36a80da7620748347c1529ba777df",
+            "confirm.json": "8def7009aeb1e77ffb5fc98340f6068245718d00326986f41ee690199340341d",
+            "seed-audit.json": "73944f7632d34745f203abca5a7855acc0a1b2a200d02a57ad484c5d24a0d4da",
+            "census-index.json": "414c87d43c6fb8e48f7b0f8c5b193860b53e19f234051e548fd8b1e670c9e2de",
+            "run-check.sh": "af3212997032a2497b8c7fc05943ab14b7bc8369ba7781876282de7aca6c8d39",
+            "run-census.sh": "f0579bfcff41e8f0d91033228d1817d789f1b2368ff8635760d6c19fa5deaba8",
+            "repo/bun.lock": "76ccdcb437ab891441ae0a1688b67fef47ee380567c7c487b80be3f8eb8bde5a",
+            "libraries/libhocsim.so": "5d19bd6731734a1134e6265571a771d6f3f2bbe052e03d88d8df8d78eb82342c",
+            "libraries/libhocsim.dylib": "4fd4b4b6dcacf9f53e044ef4305bdb44ceca90b58d7162dde9f5fecbcb777d7c",
+            "basenode-plan.json": "e45ab3b18a0d081815e1506984d1c69802afcf8e9531f66d5d1296b2286e6720",
+            "hft-plan.json": "1ecb893eefd243d9d76c0a0474a74dd10d85cf8d3d699a92dded8bcf574c5147",
+            "m4-plan.json": "1e023efd695c47f7e1e82794f671458ac7c5d2b6c397ca6b0c950c056f30b43c",
+            "parity-plan.json": "0dd7d51e31eb79686a8f71b3c9b3f03468b1e76eb80ed06956c9b7ee9091aaeb",
+            "pilot-plan.json": "291b49d9e5177137f22607b5d92cb4f0f3df53f1c25469bae768d7c76df1852f",
+            "repo/close-study/adapter.ts": "799010eccf543a8071620a0e05b5edc9e5814be1ec7f7bf2ed752712751e0ba5",
+            "repo/close-study/bank.ts": "3ad4479c2df222ef71a429e64c58ed51c9d87c11aeeaac8582a657790d1f6a53",
+            "repo/close-study/census.ts": "e30df19dad1491827b278d5ea4e09fe6cb814e9e96c3781126f7cf3ecd359e67",
+            "repo/close-study/plans.ts": "554231a97600e95fc71e2fc87120e875a29ff06f554ad093c8da743dff3f75d3",
+            "repo/close-study/worker-env.ts": "10a52183002c2c6841c2b83379aa60fa1251f6aec9340c7f153e3a9234a93240",
+            "repo/placement-upgrades/bank.ts": "498e7bf318e08ddb9e5b4672dbfee36191403ddae2178d0f93110a73be381543",
+            "repo/placement-upgrades/make-parity-plan.ts": "da4c8ef94ecc085ca3d42fb7c548859d7ec35ed6386f5298959830a5f78b7e78",
+            "repo/placement-upgrades/run.ts": "18bc5118fc13289bd0ad6e8ca3eb789e27a924d68c9494ec0b415ed2c739cbbb",
+            "repo/placement-upgrades/variants.ts": "2b6e67b04592bdddee8a910b6e4fcfceace3e67bb30a5aa116d918ce28726e66"
+        }
+    },
+    "result": {
+        "id": "CS1",
+        "registrationSha256": "3c6238df3cb16cebcc240ab550b19adad640ee43596fa485871034392291a9ae",
+        "scoredFights": 2320,
+        "families": 2160,
+        "eligibleSeats": 4320,
+        "changedOpenings": 1160,
+        "nullControlsExactPairs": 24,
+        "crossHostExactFights": 40,
+        "pooledEffectPp": 0.3703703703703704,
+        "intervalPp": [-0.2777777777777778, 1.0300925925925926],
+        "populations": {
+            "fort": {
+                "eligibleSeats": 2160,
+                "controlFlyingSingles": 976,
+                "controlPrintedSteps": 24495.599999999875,
+                "closeFlyingSingles": 2388,
+                "closePrintedSteps": 30721.399999999976,
+                "changedOpenings": 694,
+                "same": 627,
+                "worse": 29,
+                "better": 38,
+                "effectPp": 0.4398148148148148,
+                "intervalPp": [-0.30092592592592593, 1.2037037037037037],
+                "changedOpponentEarlyShots": {
+                    "control": 2058,
+                    "close": 1801
+                }
+            },
+            "mirror": {
+                "eligibleSeats": 2160,
+                "controlFlyingSingles": 1013,
+                "controlPrintedSteps": 21801.599999999904,
+                "closeFlyingSingles": 1949,
+                "closePrintedSteps": 26045.599999999948,
+                "changedOpenings": 466,
+                "better": 75,
+                "same": 321,
+                "worse": 70,
+                "effectPp": 0.30092592592592593,
+                "intervalPp": [-0.7638888888888888, 1.3888888888888888],
+                "changedOpponentEarlyShots": {
+                    "control": 618,
+                    "close": 586
+                }
+            }
+        },
+        "mapDeltasPp": {
+            "Normal": -0.45138888888888884,
+            "Lava": 0.7291666666666666,
+            "Block": 0.8333333333333334
+        },
+        "doctrineDeltasPp": {
+            "Scout": 1.0069444444444444,
+            "Spymaster": 0.1388888888888889,
+            "Battle Trance": -0.034722222222222224
+        },
+        "acceptedOpponentEarlyShotsMeanOnChangedOpenings": {
+            "control": 2.306896551724138,
+            "close": 2.057758620689655
+        },
+        "gates": {
+            "pooledLowerBound": true,
+            "populationMeans": true,
+            "zeroQualityErrors": true,
+            "moreAirborneSinglesAndSteps": true,
+            "unchangedControlsExact": true,
+            "crossHostParityExact": true,
+            "openingPairing": true
+        },
+        "passed": true,
+        "strengthGain": false,
+        "reportSha256": {
+            "hft": "c5077ffd4261392607d37f2bdb0782b3f02d38fc5dd1b21d16448078bf3e97fd",
+            "basenode": "bff597ecdba8bd10a1905b7f4b4f2af3713231096d7a9116b40891999f74510e",
+            "m4": "ab5e0c183bd7437d12c5682a7f561df55a865e382f79535fc055962dab16f457",
+            "parity": "6dcc66fa16bff797d6eba9bd505d31b564f8fbd02d4f916fd739b6a3c2a15cf7"
+        },
+        "nativeBatches": 319846,
+        "tsBatches": 129
+    },
+    "seedAdmission": {
+        "banks": {
+            "pilot": {
+                "sha256": "dc3a1d561e1d0643f93b097248ae55f794f36a80da7620748347c1529ba777df",
+                "families": 36,
+                "familiesPerCell": 2
+            },
+            "confirm": {
+                "sha256": "8def7009aeb1e77ffb5fc98340f6068245718d00326986f41ee690199340341d",
+                "families": 2160,
+                "familiesPerCell": 120
+            }
+        },
+        "exclusions": {
+            "native-public-placement-value-data-20261118-v1": {
+                "channels": 2293199,
+                "intersectionsWithOversample": 4
+            },
+            "native-public-placement-audited-data-20261119-v1": {
+                "channels": 2293215,
+                "intersectionsWithOversample": 2
+            },
+            "native-public-placement-audited-json-data-20261119-v1": {
+                "channels": 2293218,
+                "intersectionsWithOversample": 4
+            },
+            "native-low-budget-formation-ridge-20261119-v1": {
+                "channels": 2293130,
+                "intersectionsWithOversample": 4
+            },
+            "native-public-placement-paired-data-20261119-v1": {
+                "channels": 2293095,
+                "intersectionsWithOversample": 11
+            },
+            "native-public-placement-weighted-move-pairs-20261119-v1": {
+                "channels": 2293206,
+                "intersectionsWithOversample": 2
+            },
+            "barrel-strike-necessity-20261119-v1": {
+                "channels": 1631768,
+                "intersectionsWithOversample": 0
+            },
+            "revealed-ranged-delivery-20261117-fresh-v1": {
+                "channels": 1310511,
+                "intersectionsWithOversample": 3
+            },
+            "counterfactual delivery": {
+                "channels": 2424201,
+                "intersectionsWithOversample": 4
+            },
+            "counterfactual earlier roots": {
+                "channels": 30,
+                "intersectionsWithOversample": 0
+            },
+            "melee_barrel_deliberation_20261116.json": {
+                "channels": 939914,
+                "intersectionsWithOversample": 8
+            },
+            "melee_barrel_choice_diversity_registration_20261117.json": {
+                "channels": 230911,
+                "intersectionsWithOversample": 0
+            },
+            "barrel_forecast_model_mixture_qualification_allocation_20261117.json": {
+                "channels": 1623777,
+                "intersectionsWithOversample": 5
+            },
+            "barrel_forecast_intent_registration_20261117.json": {
+                "channels": 463432,
+                "intersectionsWithOversample": 0
+            },
+            "v39 placement studies": {
+                "channels": 23814,
+                "intersectionsWithOversample": 0
+            },
+            "barrel shot cover": {
+                "channels": 3744,
+                "intersectionsWithOversample": 0
+            },
+            "rear barrel clear avoidance": {
+                "channels": 3204,
+                "intersectionsWithOversample": 0
+            },
+            "SH1 plus smoke reservations": {
+                "channels": 120897,
+                "intersectionsWithOversample": 3
+            }
+        },
+        "rejectedBeforeAnyGames": {
+            "confirm": 48
+        }
+    },
+    "receipts": {
+        "path": "game/core/tmp/close-screen-cs1-20261127/research-receipts.tar.gz",
+        "sha256": "29f1fa2d26d5cb2fde4e04c9bba3471ea20f19cab53da2abc68082e9a22fe105"
+    },
+    "decision": "CS1 passed all seven registered gates. Record the active v39 rule as non-inferiority-confirmed for the default and Premium."
+}

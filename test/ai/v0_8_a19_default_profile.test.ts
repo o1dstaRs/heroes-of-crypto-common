@@ -288,13 +288,13 @@ describe("v0.8+A19 production profile", () => {
                 qualification: "strength-confirmed",
             },
             // Profile v39: an army with no shooter facing a public shooter screens with its fastest cheap body (the
-            // owner's decision "Adopt now, check after"; the registration is the decision record).
+            // owner's decision "Adopt now, check after" and non-inferiority check CS1).
             closeScreen: {
                 policyId: "a19-close-screen-v1",
                 adoptedAt: "2026-11-26",
                 adoption: "owner-explicit-decision",
                 registrationSha256: "e170fb92d6dae94b86de5df152dc35a58085a2ccf40ed4806286d856ace875a6",
-                qualification: "owner-decision-check-pending",
+                qualification: "non-inferiority-confirmed",
             },
         });
         expect(V08_A19_SEARCH).toMatchObject({

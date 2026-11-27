@@ -41,10 +41,37 @@ seats and Premium "Arrange army") passes it to the planner, and the client's Pre
 
 The owner was offered three ways to ship it: check first and adopt only if it passes, adopt now and check after, or
 Premium's advice only. The owner chose "Adopt now, check after"
-(`docs/evidence/close_screen_decision_20261126.json`, the policy's `registrationSha256`). So the profile records
-`qualification: "owner-decision-check-pending"`.
+(`docs/evidence/close_screen_decision_20261126.json`, the policy's `registrationSha256`). The initial adoption
+recorded `qualification: "owner-decision-check-pending"`.
 
-A registered non-inferiority check follows: AI seats whose army is closing, against the v36 screen body, with OA's bar
-(the 95% lower bound may not fall below −2 points per game) over an AI-vs-AI and an owner-shaped population. If it fails,
-the rule is rolled back through its switch as the next profile, for AI seats and Premium together, and the owner is told.
-It is not a measured strength gain.
+The adoption called for a registered non-inferiority check against the v36 screen body. Its
+95% lower bound had to clear −2 points per game across AI-vs-AI and owner-shaped drafts. The
+owner approved rolling the rule back for AI seats and Premium together on a failed check.
+
+## Check CS1 passed on November 27, 2026
+
+CS1 compared the active close screen with the previous screen-body preference. Both seats
+played A19 on the ranked engine with deterministic Zig deep fit. The 2,160 fresh draft families
+were balanced across the three maps and doctrines. Half faced the default draft and half faced
+a synthetic ranged-fort draft modeled on the shooters in the owner's recorded corner-fort game.
+The census evaluated both physical seat assignments of every family.
+
+The authoritative census found 1,160 changed openings in 4,320 eligible seats. Both arms played
+each changed opening, for 2,320 scored fights. A further 24 unchanged pairs reproduced their
+full fight traces, and all 40 cross-host replay fights matched. The comparison holds paid
+upgrades, artifacts, armies, and the actual opponent opening fixed within each pair.
+
+| Population     | Eligible seats | Score difference | 95% family interval |
+| -------------- | -------------: | ---------------: | ------------------: |
+| Pooled         |          4,320 |     +0.37 points |      −0.28 to +1.03 |
+| Default mirror |          2,160 |     +0.30 points |      −0.76 to +1.39 |
+| Ranged fort    |          2,160 |     +0.44 points |      −0.30 to +1.20 |
+
+All seven gates passed, including the registered −2-point non-inferiority margin and both
+population guards. The opening used 4,337 flying one-model stacks versus 1,989 before. Across
+changed openings, the opponent's accepted ranged and area-shot actions in the first two laps
+fell from 2.31 to 2.06 per fight. All played fights had zero engine quality errors.
+
+The qualification is now `non-inferiority-confirmed` for the current default and Premium
+"Arrange army". The fight-score interval includes zero.
+[Registration and paired results](evidence/close_screen_check_20261127.json)

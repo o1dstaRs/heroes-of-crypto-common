@@ -539,14 +539,15 @@ export const V08_A19_SHIELD_SCREEN_POLICY = Object.freeze({
  * Close screen (profile v39): ai/split_screen.ts switches the close-range screen body of ai/tactical_split_placement.ts
  * (an army with no shooter facing a public shooter screens with its fastest cheap body) for the server's split plan (AI
  * seats and Premium "Arrange army") and the client's Premium projection. Adopted by the owner's decision ("Adopt now,
- * check after") before its check; the registration is the frozen decision record. See docs/close_screen_adoption.md.
+ * check after"). The decision record is frozen. The registered check CS1 confirmed non-inferiority on November 27.
+ * See docs/close_screen_adoption.md.
  */
 export const V08_A19_CLOSE_SCREEN_POLICY = Object.freeze({
     policyId: "a19-close-screen-v1" as const,
     adoptedAt: "2026-11-26",
     adoption: "owner-explicit-decision",
     registrationSha256: "e170fb92d6dae94b86de5df152dc35a58085a2ccf40ed4806286d856ace875a6",
-    qualification: "owner-decision-check-pending",
+    qualification: "non-inferiority-confirmed",
 } as const);
 
 /**
