@@ -9,17 +9,17 @@ import { PremiumEvidenceSnapshot } from "./premium_evidence_snapshot";
 
 /** CLI defaults only. Programmatic, registered experiments keep their explicit run options. */
 export function aiMetaOutputContract(profile: string, environment: NodeJS.ProcessEnv) {
+    const currentRanked = profile === "ranked-current-a19-work" || profile === "ranked-current-zig-work";
     const mode = environment.AI_META_OUTPUT_MODE ?? "premium";
     if (mode !== "premium" && mode !== "legacy-oracle")
         throw new Error("AI_META_OUTPUT_MODE must be premium or explicitly legacy-oracle");
     if (mode === "legacy-oracle") {
-        if (profile === "ranked-current-a19-work")
-            throw new Error("Native current collection requires Premium evidence");
+        if (currentRanked) throw new Error("Native current collection requires Premium evidence");
         if (environment.AI_META_STUDY_PROFILE)
             throw new Error("legacy-oracle conflicts with AI_META_STUDY_PROFILE; do not silently change a study");
         return { mode, studyProfile: undefined, collectEvidence: environment.AI_META_COLLECT_EVIDENCE === "1" };
     }
-    if (!["a19-bot-seat", "a19-work", "ranked-current-a19-work"].includes(profile))
+    if (!currentRanked && !["a19-bot-seat", "a19-work"].includes(profile))
         throw new Error(
             "Automatic Premium snapshots require a19-bot-seat or a19-work; " +
                 "use AI_META_OUTPUT_MODE=legacy-oracle explicitly for outcome-only research",
@@ -30,9 +30,9 @@ export function aiMetaOutputContract(profile: string, environment: NodeJS.Proces
         throw new Error("Premium study fixes exploration; unset AI_META_ARTIFACT_UNIFORM");
     const studyProfile =
         environment.AI_META_STUDY_PROFILE ??
-        (profile === "ranked-current-a19-work" ? PREMIUM_META_CURRENT_STUDY : PREMIUM_META_POLICY_LEARNING_STUDY);
+        (currentRanked ? PREMIUM_META_CURRENT_STUDY : PREMIUM_META_POLICY_LEARNING_STUDY);
     if (!isPremiumMetaStudy(studyProfile)) throw new Error(`Unknown AI_META_STUDY_PROFILE: ${studyProfile}`);
-    if ((profile === "ranked-current-a19-work") !== (studyProfile === PREMIUM_META_CURRENT_STUDY))
+    if (currentRanked !== (studyProfile === PREMIUM_META_CURRENT_STUDY))
         throw new Error("Current default and exploratory populations require separate profiles and outputs");
     return { mode, studyProfile, collectEvidence: true };
 }

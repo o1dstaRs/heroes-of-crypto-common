@@ -158,6 +158,7 @@ export interface IAiMetaFormationEvidence {
 }
 
 export interface IAiMetaFightEvidence {
+    nativeSearch?: { decisions: number; nativeBanks: number; tsBanks: number; reusedPairs: number };
     formationChoices?: Record<"a" | "b", IMetaFormationDecision>;
     aIsGreen: boolean;
     formations: { a: IAiMetaFormationEvidence; b: IAiMetaFormationEvidence };

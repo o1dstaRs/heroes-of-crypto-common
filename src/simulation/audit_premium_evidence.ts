@@ -157,6 +157,7 @@ export class PremiumEvidenceAudit {
     public summonCreatures = 0;
     public healthFights = 0;
     public readonly healthTotals = summarizePremiumHealth([]);
+    public readonly nativeSearch = { fights: 0, decisions: 0, nativeBanks: 0, tsBanks: 0, reusedPairs: 0 };
     public readonly combatMetrics = {
         schema: PREMIUM_COMBAT_METRICS_SCHEMA,
         fights: 0,
@@ -377,6 +378,22 @@ export class PremiumEvidenceAudit {
             this.rejectedActions += game.rejectedA + game.rejectedB;
         }
         for (const fight of evidence.fights!) {
+            if (fight.nativeSearch) {
+                const { decisions, nativeBanks, tsBanks, reusedPairs } = fight.nativeSearch;
+                if (
+                    ![decisions, nativeBanks, tsBanks, reusedPairs].every(
+                        (count) => Number.isSafeInteger(count) && count >= 0,
+                    ) ||
+                    !decisions ||
+                    !nativeBanks
+                )
+                    throw new Error(`Invalid Zig search evidence: ${evidence.scenarioId}`);
+                this.nativeSearch.fights++;
+                this.nativeSearch.decisions += decisions;
+                this.nativeSearch.nativeBanks += nativeBanks;
+                this.nativeSearch.tsBanks += tsBanks;
+                this.nativeSearch.reusedPairs += reusedPairs;
+            }
             if (fight.healthLedger) {
                 this.healthFights++;
                 const totals = summarizePremiumHealth(fight.healthLedger);
@@ -543,6 +560,7 @@ export class PremiumEvidenceAudit {
                     scope: "committed-event-participation-and-spell-support-only",
                 },
                 combatMetrics: this.combatMetrics,
+                ...(this.nativeSearch.fights && { nativeSearch: this.nativeSearch }),
                 committedHealth: { fights: this.healthFights, ...this.healthTotals },
                 committedEventTypes: this.committedEvents,
                 namedMechanics: {
@@ -645,6 +663,11 @@ export async function auditPremiumEvidence(summaryPath: string, snapshotPath?: s
     }
     if (audit.families !== summary.provenance.totalPairs || audit.fights !== summary.provenance.totalGames)
         throw new Error("Audit counts disagree with summary");
+    if (
+        summary.provenance.fightProfile?.searchBackend === "verified-zig-deepening" &&
+        audit.nativeSearch.fights !== audit.fights
+    )
+        throw new Error("Every fight in the ranked Zig snapshot must include verified native search evidence");
     const retrieval: Record<
         string,
         { supports: number[]; milliseconds: number[]; zero: number; limited: number; supported: number }

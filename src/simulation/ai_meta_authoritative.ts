@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createAIStrategy } from "../ai/index";
+import { artifactFitVersionForSetupSpec } from "../ai/setup/artifact_fit";
 import type { ISetupAugmentChoice } from "../ai/setup/setup_ship";
 import {
     premiumAugmentPlanId,
@@ -42,12 +43,15 @@ import {
     aiMetaDraftArtifacts,
     cloneAiMetaDraftObservation,
     type IAiMetaDraftEvidence,
+    type IAiMetaFightEvidence,
 } from "./ai_meta_evidence";
 import { aiMetaServerRoot } from "./ai_meta_authoritative_source";
 import { assertAuthoritativeMetaCommon } from "./ai_meta_authoritative_resolution";
 import { premiumStudyDoctrine, PREMIUM_META_CURRENT_STUDY } from "./ai_meta_study";
+import { createV08A19Strategy } from "../ai/versions/v0_8_a19_profile";
 import type { IAiMetaRuntimeAdapter } from "./ai_meta_runtime_adapter";
 import type { IMatchConfig } from "./battle_engine";
+import { getNativeRolloutBackend, type INativeRolloutStatistics } from "./native_rollouts";
 
 type Budget = { v3: boolean; contextual: boolean; delivery: boolean };
 type Decision = {
@@ -87,6 +91,13 @@ interface Server {
     bundle(pick: PickDocument, team: TeamType, offers: readonly (readonly number[])[]): Decision;
     creature(pick: PickDocument, team: TeamType, level: number, available: readonly number[]): Decision;
     tier2(pick: PickDocument, team: TeamType, offers: readonly number[], own: readonly number[]): number;
+    lavaCounter?(
+        pick: PickDocument,
+        team: TeamType,
+        doctrine: number,
+        offers: readonly number[],
+        incumbent: number,
+    ): boolean;
 }
 const teams = [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT] as const;
 const nameForTeam = (team: number) => (team === PBTypes.TeamVals.LEFT ? "a" : "b");
@@ -110,8 +121,8 @@ function documentFor(
         pickPhaseLevels: LIVE_PICK_PHASES.map((p) => p.creatureLevel),
     };
     for (const [own, enemy, suffix, side] of [
-        [state.left, state.right, "Lower", "a"],
-        [state.right, state.left, "Upper", "b"],
+        [state.left, state.right, "Left", "a"],
+        [state.right, state.left, "Right", "b"],
     ] as const) {
         Object.assign(doc, {
             [`creaturesPicked${suffix}`]: [...own.creatures],
@@ -175,6 +186,13 @@ function draft(
                 ids = getVisibleCreatureChoices(observed, team);
                 chosen = server.creature(doc, team, phase.creatureLevel, ids);
                 selected = chosen.choice!;
+                if (
+                    phase.creatureLevel === 4 &&
+                    selected !== undefined &&
+                    ids.includes(PBTypes.CreatureVals.THUNDERBIRD) &&
+                    server.lavaCounter?.(doc, team, own.doctrine ?? 0, ids, selected)
+                )
+                    selected = PBTypes.CreatureVals.THUNDERBIRD;
                 action = { type: "pick_creature", team, creatureId: selected };
             }
             assert(ids.includes(selected), "Native draft returned a nonvisible choice");
@@ -393,6 +411,23 @@ function nativeOpening(server: Server, prepared: Prepared, aIsGreen: boolean) {
 export async function loadAuthoritativeMetaAdapter(): Promise<IAiMetaRuntimeAdapter> {
     await assertAuthoritativeMetaCommon();
     const load = (path: string) => import(pathToFileURL(resolve(aiMetaServerRoot(), path)).href);
+    const zigRequested = process.env.AI_META_RANKED_ZIG === "1";
+    const zig = zigRequested
+        ? await Promise.all([
+              load("src/api/tournament/v1/brain_search.ts"),
+              load("src/api/game/v1/bot_search.ts"),
+              load("src/api/game/v1/bot_seat_think.ts"),
+              load("src/api/game/v1/bot_lava_route_search.ts"),
+          ])
+        : undefined;
+    if (zig) assert(getNativeRolloutBackend(), "Current ranked Zig collection requires a verified native library");
+    const lava = zig
+        ? await Promise.all([
+              load("src/api/game/v1/lava_thunderbird_draft.ts"),
+              load("src/simulation/lava_thunderbird_forecast.ts"),
+              load("src/api/game/v1/ranked_ai_profile.ts"),
+          ])
+        : undefined;
     const [session, decider, placement] = await Promise.all([
         load("src/api/game/v1/play_session.ts"),
         load("src/api/game/v1/pick_decider.ts"),
@@ -405,8 +440,31 @@ export async function loadAuthoritativeMetaAdapter(): Promise<IAiMetaRuntimeAdap
         bundle: decider.decideRankedBundleForTeam,
         creature: decider.decideRankedDraftCreatureForTeam,
         tier2: decider.pickRankedTier2ArtifactForTeam,
+        ...(lava && {
+            lavaCounter(
+                pick: PickDocument,
+                team: TeamType,
+                doctrine: number,
+                offers: readonly number[],
+                incumbent: number,
+            ) {
+                const [input, forecast, profile] = lava;
+                const fit = artifactFitVersionForSetupSpec(profile.DEFAULT_RANKED_AI_PROFILE.setupPolicy.spec);
+                const context = decider.rankedDraftContextForTeam(pick, team, fit);
+                const view = input.lavaThunderbirdForecastInput(
+                    pick.gameId,
+                    team,
+                    doctrine,
+                    context,
+                    offers,
+                    incumbent,
+                );
+                return view !== undefined && forecast.prefersLavaThunderbird(view);
+            },
+        }),
     };
     const openings = new WeakMap<Prepared, [ReturnType<typeof nativeOpening>, ReturnType<typeof nativeOpening>]>();
+    const nativeEvidence = new WeakMap<IMatchConfig, NonNullable<IAiMetaFightEvidence["nativeSearch"]>>();
     return {
         preparePair(options: IAiMetaRunOptions, pair: number) {
             assert.equal(options.studyProfile, PREMIUM_META_CURRENT_STUDY);
@@ -423,26 +481,18 @@ export async function loadAuthoritativeMetaAdapter(): Promise<IAiMetaRuntimeAdap
         configureFight(prepared, aIsGreen, config) {
             const opening = openings.get(prepared)![aIsGreen ? 0 : 1];
             const strategy = (index: number) => {
-                const data = opening.teams[index],
-                    base = createAIStrategy("v0.8")!;
-                return {
-                    version: base.version,
-                    decideTurn: base.decideTurn.bind(base),
-                    placeArmy(units: Parameters<typeof base.placeArmy>[0]) {
-                        assert.deepEqual(
-                            units.map((u) => [
-                                u.getName(),
-                                u.getAmountAlive(),
-                                u.getFootprintWidth(),
-                                u.getFootprintHeight(),
-                            ]),
-                            data.bodies,
-                        );
-                        return new Map(units.map((u, i) => [u.getId(), data.positions[i]]));
-                    },
+                const data = opening.teams[index];
+                const base = zig ? createV08A19Strategy() : createAIStrategy("v0.8");
+                const place = base.placeArmy.bind(base);
+                base.placeArmy = (units, context) => {
+                    assert.deepEqual(bodies(units), data.bodies);
+                    // Placement also initializes the strategy's combat profile for this army.
+                    if (zig) place(units, context);
+                    return new Map(units.map((u, i) => [u.getId(), data.positions[i]]));
                 };
+                return base;
             };
-            return {
+            const result: IMatchConfig = {
                 ...config,
                 roster: opening.teams[0].roster,
                 redRoster: opening.teams[1].roster,
@@ -471,7 +521,86 @@ export async function loadAuthoritativeMetaAdapter(): Promise<IAiMetaRuntimeAdap
                     assert.deepEqual(terrain(context.grid.getScatteredMountainsStanding()), opening.terrain);
                     setDeterministicRandomSource(makeRng(prepared.combatSeed));
                 },
-            } as IMatchConfig;
+            };
+            if (zig) {
+                result.searchDriverFactory = (deps, match) => {
+                    assert(match.offlineDeterministicWork, "Ranked evidence must use deterministic search work");
+                    const [brain, bot, seat, route] = zig;
+                    type Driver = ReturnType<NonNullable<IMatchConfig["searchDriverFactory"]>> & {
+                        report: { decisions: number };
+                        nativeRolloutSources: readonly INativeRolloutStatistics[];
+                    };
+                    const createDriver = (levels = brain.BRAIN_SEARCH_LEVELS): Driver =>
+                        brain.createTurnBudgetDeepeningDriver(
+                            deps,
+                            match,
+                            bot.BOT_SEARCH_AI_VERSION,
+                            bot.BOT_SEARCH_PRODUCTION_PROFILE,
+                            { nativeRolloutReuse: true },
+                            seat.ZIG_BOT_SEARCH_ROLLOUT_TURNS,
+                            levels,
+                        );
+                    const driver = createDriver();
+                    const lavaSeat =
+                        prepared.map === PBTypes.GridVals.LAVA_CENTER
+                            ? route.lavaRouteSeat(
+                                  (aIsGreen ? prepared.armyA : prepared.armyB).creatureIds,
+                                  (aIsGreen ? prepared.armyB : prepared.armyA).creatureIds,
+                              )
+                            : undefined;
+                    const lavaDriver =
+                        lavaSeat === undefined
+                            ? undefined
+                            : createDriver(
+                                  brain.BRAIN_SEARCH_LEVELS.map((level: { budget: Record<string, string> }) => ({
+                                      ...level,
+                                      budget: { ...level.budget, SEARCH_MAX_MOVES: "3" },
+                                  })),
+                              );
+                    const center = lavaDriver ? deps.grid.getCenterCells() : [];
+                    const drivers = lavaDriver ? [driver, lavaDriver] : [driver];
+                    return {
+                        chooseDecision(unit, version, incumbent, context) {
+                            const search =
+                                lavaDriver &&
+                                unit.getTeam() === lavaSeat &&
+                                route.canWidenLavaRoute(unit, deps.fightProperties.getCurrentLap(), deps.grid, center)
+                                    ? lavaDriver
+                                    : driver;
+                            return search.chooseDecision(unit, version, incumbent, context);
+                        },
+                        onFightReady() {
+                            for (const search of drivers) search.onFightReady();
+                        },
+                        onMatchEnd(winner, reason) {
+                            for (const search of drivers) search.onMatchEnd(winner, reason);
+                            const sources = drivers.flatMap((search) => search.nativeRolloutSources);
+                            const total = (name: "nativeBanks" | "tsBanks" | "reusedPairs") =>
+                                sources.reduce((sum, row) => sum + row[name], 0);
+                            const stats = {
+                                decisions: drivers.reduce((sum, search) => sum + search.report.decisions, 0),
+                                nativeBanks: total("nativeBanks"),
+                                tsBanks: total("tsBanks"),
+                                reusedPairs: total("reusedPairs"),
+                            };
+                            if (!stats.decisions || !stats.nativeBanks)
+                                throw new Error(
+                                    `Fight completed without Zig search: ${JSON.stringify({
+                                        ...stats,
+                                        sources: sources.map(({ mode, fallback, rootFallback }) => ({
+                                            mode,
+                                            fallback,
+                                            rootFallback,
+                                        })),
+                                    })}`,
+                                );
+                            nativeEvidence.set(result, stats);
+                        },
+                    };
+                };
+            }
+            return result;
         },
+        nativeSearchEvidence: (config) => nativeEvidence.get(config),
     };
 }

@@ -796,7 +796,8 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
-export type AiMetaFightProfileId = "a13" | "a19" | "a19-work" | "a19-bot-seat" | "ranked-current-a19-work";
+export type AiMetaFightProfileId =
+    "a13" | "a19" | "a19-work" | "a19-bot-seat" | "ranked-current-a19-work" | "ranked-current-zig-work";
 
 /**
  * The profile an invocation that names none plays (owner, 2026-11-26: newly sealed research plans default to the
@@ -828,6 +829,29 @@ const definedEnvironment = (
     );
 
 const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFightProfile>> = Object.freeze({
+    "ranked-current-zig-work": Object.freeze({
+        id: "ranked-current-zig-work",
+        title: "Heroes of Crypto — Current Ranked Draft and Native Setup / Zig Deepening",
+        fightVersion: "v0.8",
+        authoritativeRanked: true,
+        provenance: Object.freeze({
+            ...V08_A19_PROFILE,
+            name: "ranked-current+v0.8-zig-work",
+            searchBudget: "offline-deterministic-work",
+            searchBackend: "verified-zig-deepening",
+            collectionPopulation:
+                "current-ranked-draft-and-native-setup; prescribed cohorts use synthetic artifact assignments",
+        }),
+        workerEnvironment: definedEnvironment({
+            ...buildV08A19SearchEnvironment(),
+            V08_A19_SEARCH: "1",
+            HOC_A19_CONTEXT_POLICY: "on",
+            HOC_NATIVE_ROLLOUTS: "1",
+            AI_META_RANKED_ZIG: "1",
+        }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+        offlineDeterministicWork: true,
+    }),
     "ranked-current-a19-work": Object.freeze({
         id: "ranked-current-a19-work",
         title: "Heroes of Crypto — Current Ranked Draft and Native Setup / A19 Combat",
@@ -978,6 +1002,7 @@ export function sanitizedAiMetaEnvironment(
 ): NodeJS.ProcessEnv {
     const environment = { ...source };
     const exact = new Set([
+        "AI_META_RANKED_ZIG",
         "COHORT",
         "FORCE_CREATURES",
         "GRID_MATRIX_CACHE_VERIFY",
@@ -1554,7 +1579,7 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "[fight-profile=a19-bot-seat|a13|a19|a19-work|ranked-current-a19-work] [pair-start=0] [pair-count=all]. " +
+    "[fight-profile=a19-bot-seat|a13|a19|a19-work|ranked-current-a19-work|ranked-current-zig-work] [pair-start=0] [pair-count=all]. " +
     "An empty or omitted fight profile plays a19-bot-seat (the production bot seat's deep-fit search, neural off, " +
     "offline deterministic work); a named profile keeps its own driver. " +
     "Defaults to premium-ranked-v4 learning capture and an audited premium.sqlite (a19-bot-seat or a19-work). " +

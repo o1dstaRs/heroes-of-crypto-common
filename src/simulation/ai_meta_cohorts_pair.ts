@@ -336,6 +336,8 @@ function playMetaPairInner(
     if (adapter) bConfig = adapter.configureFight(prepared, false, bConfig);
     const bCapture = capturePremiumFight(bConfig, Boolean(options.studyProfile));
     const bGreen = bCapture.result;
+    const aNative = adapter?.nativeSearchEvidence?.(aConfig);
+    const bNative = adapter?.nativeSearchEvidence?.(bConfig);
     const record: IAiMetaPairRecord = {
         ...prepared,
         games: [gameOutcome(aGreen, true), gameOutcome(bGreen, false)],
@@ -346,6 +348,7 @@ function playMetaPairInner(
                       fights: [
                           {
                               ...fightEvidence(aGreen, aConfig, prepared.armyA, prepared.armyB, true),
+                              ...(aNative ? { nativeSearch: aNative } : {}),
                               ...(learning ? { formationChoices: aFormation.decisions } : {}),
                               firstDecisionState: aCapture.firstDecisionState,
                               committedEventBatches: aCapture.committedEventBatches,
@@ -355,6 +358,7 @@ function playMetaPairInner(
                           },
                           {
                               ...fightEvidence(bGreen, bConfig, prepared.armyB, prepared.armyA, false),
+                              ...(bNative ? { nativeSearch: bNative } : {}),
                               ...(learning ? { formationChoices: bFormation.decisions } : {}),
                               firstDecisionState: bCapture.firstDecisionState,
                               committedEventBatches: bCapture.committedEventBatches,
