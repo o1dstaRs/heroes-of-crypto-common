@@ -1139,13 +1139,40 @@ fn ringOfFire(s: *State, ci: u8, ti: u8, spell: CS, cfg: *const st.SpellConfig, 
     damageTail(s, ci, spell, cfg, caught.slice(), events);
 }
 
-/// craftCast: the 2x2 from `targetCell` (anchor, +x, +y, +x+y; not range- or grid-checked: an off-board cell holds
-/// nobody), the caster's team among the units standing on it (each once, at its first cell; the caster included), then
-/// processCraftAbility: the stun band clamp(10 - caster luck, 0, 20) read once, and per living ally one
-/// getRandomInt(0, 100): under the band Stun (effects.json's, a lap longer on the caster; the row replaced), the next
-/// 40 nothing, the next 40 the crafted second attack (Double Shot for a unit with arrows left, else Double Punch; nothing
-/// when it already strikes twice), else the crafted frozen weapon (Bow / Sword). Then the charge (spent with no ally too)
-/// and completeTurn.
+const CraftRollBands = struct {
+    end: i64,
+    stun_end: i64,
+    nothing_end: i64,
+    double_end: i64,
+};
+
+/// Matches getCraftChances and processCraftAbility. Ordinary Craft keeps its original RNG bounds;
+/// the Tome uses hundredths of a percentage point so fractional chances are sampled accurately.
+fn craftRollBands(luck: f64, tome: f64) CraftRollBands {
+    const stun = @max(0, @min(20, 10 - luck));
+    const base_frozen = 20 - stun;
+    const increase = if (std.math.isFinite(tome)) @max(0, tome) / 100 else 0;
+    const multiplier = @min(1 + increase, (100 - stun) / (40 + base_frozen));
+    const double = js.toFixed(40 * multiplier, 2);
+    const frozen = js.toFixed(base_frozen * multiplier, 2);
+    const nothing = @max(0, js.toFixed(100 - stun - double - frozen, 2));
+    const resolution: f64 = if (double > 40) 100 else 1;
+    return .{
+        .end = @intFromFloat(100 * resolution),
+        .stun_end = @intFromFloat(@round(stun * resolution)),
+        .nothing_end = @intFromFloat(@round((stun + nothing) * resolution)),
+        .double_end = @intFromFloat(@round((100 - frozen) * resolution)),
+    };
+}
+
+test "Tome widens Craft's double and frozen bands at the expense of nothing" {
+    try std.testing.expectEqual(CraftRollBands{ .end = 100, .stun_end = 10, .nothing_end = 50, .double_end = 90 }, craftRollBands(0, 0));
+    try std.testing.expectEqual(CraftRollBands{ .end = 10000, .stun_end = 1000, .nothing_end = 3250, .double_end = 8650 }, craftRollBands(0, 35));
+    try std.testing.expectEqual(CraftRollBands{ .end = 10000, .stun_end = 0, .nothing_end = 1900, .double_end = 7300 }, craftRollBands(10, 35));
+    try std.testing.expectEqual(CraftRollBands{ .end = 10000, .stun_end = 2000, .nothing_end = 4600, .double_end = 10000 }, craftRollBands(-10, 35));
+}
+
+/// One Craft roll per living ally in the 2x2, then spend the charge and complete the caster's turn.
 fn craftCast(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, target_cell: ?Cell, events: *Events) Reject!void {
     _ = cfg;
     const c = target_cell orelse return error.Rejected;
@@ -1153,18 +1180,19 @@ fn craftCast(s: *State, ci: u8, spell: CS, cfg: *const st.SpellConfig, target_ce
     var affected: Slots = .{};
     affectedUnits(s, &cells, &affected);
     const caster = &s.units[ci];
-    const stun = @max(0, @min(20, 10 - engine.getLuck(caster)));
+    const tome = if (caster.buffs.get(.tome_of_amplification)) |buff| buff.power else 0;
+    const bands = craftRollBands(engine.getLuck(caster), tome);
     for (affected.slice()) |ai| {
         const ally = &s.units[ai];
         if (ally.team != caster.team or ally.isDead()) continue;
-        const roll: f64 = @floatFromInt(s.rng.int(0, 100)); // craft_ability.ts:51
+        const roll = s.rng.int(0, bands.end);
         const ranged = engine.getRangeShots(ally) > 0;
-        if (roll < stun) {
+        if (roll < bands.stun_end) {
             const laps = s.craft_stun_laps + @as(f64, if (ai == ci) 1 else 0);
             abilities.replaceChecked(s, &ally.effects, .{ .id = .stun, .laps = laps, .power = s.craft_stun_power });
-        } else if (roll < stun + 40) {
+        } else if (roll < bands.nothing_end) {
             // nothing
-        } else if (roll < stun + 80) {
+        } else if (roll < bands.double_end) {
             const twice = if (ranged)
                 ally.has(.double_shot) or ally.has(.crafted_double_shot) or ally.has(.double_throw)
             else

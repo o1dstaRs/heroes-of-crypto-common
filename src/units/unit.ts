@@ -972,7 +972,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         if (ability.getName() === "Blacksmith Tools") {
             // Craft's per-ally outcome chances shift with the caster's luck (see getCraftChances).
-            const { stun, nothing, double, frozen } = getCraftChances(this.getLuck());
+            const tome = this.getBuffPower("Tome of Amplification") ?? 0;
+            const { stun, nothing, double, frozen } = getCraftChances(this.getLuck(), tome);
             return ability
                 .getDesc()
                 .join("\n")

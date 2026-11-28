@@ -27,11 +27,16 @@ export interface ICraftChances {
 }
 
 /**
- * The luck-weighted Craft outcome percentages for a caster's luck. Luck shifts probability 1:1 from the bad
- * Stun outcome to the good Frozen outcome (each clamped to 0-20); Nothing and Double stay at 40. Sums to 100.
+ * Luck shifts probability from Stun to Frozen. The Tome multiplies the two successful outcomes,
+ * spending the additional chance from the Nothing outcome.
  * Single source of truth for both the rolls (processCraftAbility) and the ability/spell descriptions.
  */
-export function getCraftChances(luck: number): ICraftChances {
+export function getCraftChances(luck: number, tomePercent = 0): ICraftChances {
     const stun = Math.max(0, Math.min(20, 10 - luck));
-    return { stun, nothing: 40, double: 40, frozen: 20 - stun };
+    const baseFrozen = 20 - stun;
+    const increase = Number.isFinite(tomePercent) ? Math.max(0, tomePercent) / 100 : 0;
+    const multiplier = Math.min(1 + increase, (100 - stun) / (40 + baseFrozen));
+    const double = Number((40 * multiplier).toFixed(2));
+    const frozen = Number((baseFrozen * multiplier).toFixed(2));
+    return { stun, nothing: Math.max(0, Number((100 - stun - double - frozen).toFixed(2))), double, frozen };
 }

@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { processCraftAbility } from "../../src/abilities/craft_ability";
+import { getCraftChances, processCraftAbility } from "../../src/abilities/craft_ability";
+import { ARTIFACT_POWER } from "../../src/artifacts/artifact_properties";
+import { getSpellConfig } from "../../src/configuration/config_provider";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { Spell } from "../../src/spells/spell";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import { createTestUnit } from "../helpers/combat";
 
@@ -13,6 +16,38 @@ const alwaysRoll = (value: number): void => {
 afterEach(() => setDeterministicRandomSource(undefined));
 
 describe("Blacksmith Craft", () => {
+    it("multiplies double and frozen outcomes by the Tome's 35% and lets luck preserve the stun risk", () => {
+        const tome = ARTIFACT_POWER.TOME_BUFF_POWER_PERCENT;
+        expect(getCraftChances(0, tome)).toEqual({ stun: 10, nothing: 22.5, double: 54, frozen: 13.5 });
+        expect(getCraftChances(10, tome)).toEqual({ stun: 0, nothing: 19, double: 54, frozen: 27 });
+        expect(getCraftChances(-10, tome)).toEqual({ stun: 20, nothing: 26, double: 54, frozen: 0 });
+    });
+
+    it("samples the Tome's fractional boundary for melee and ranged weapons", () => {
+        const caster = createTestUnit({ name: "Blacksmith", luck: 0 });
+        const tome = new Spell({ spellProperties: getSpellConfig("System", "Tome of Amplification"), amount: 1 });
+        tome.setPower(ARTIFACT_POWER.TOME_BUFF_POWER_PERCENT);
+        caster.applyBuff(tome);
+        const melee = createTestUnit({ name: "Squire" });
+        const ranged = createTestUnit({ name: "Arbalester", rangeShots: 5 });
+
+        alwaysRoll(3249);
+        expect(processCraftAbility(caster, [melee], new SceneLogMock())[0]?.outcome).toBe("nothing");
+        alwaysRoll(3250);
+        expect(processCraftAbility(caster, [melee, ranged], new SceneLogMock()).map((r) => r.grantedAbility)).toEqual([
+            "Crafted Double Punch",
+            "Crafted Double Shot",
+        ]);
+        const freshAlly = createTestUnit({ name: "Fresh ally" });
+        alwaysRoll(8649);
+        expect(processCraftAbility(caster, [freshAlly], new SceneLogMock())[0]?.outcome).toBe("double");
+        alwaysRoll(8650);
+        expect(processCraftAbility(caster, [melee, ranged], new SceneLogMock()).map((r) => r.grantedAbility)).toEqual([
+            "Crafted Frozen Sword",
+            "Crafted Frozen Bow",
+        ]);
+    });
+
     it("stuns each living ally when the backfire band is rolled", () => {
         alwaysRoll(0);
         const caster = createTestUnit({ name: "Blacksmith", luck: 0 });

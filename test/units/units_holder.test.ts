@@ -362,9 +362,9 @@ describe("UnitsHolder", () => {
         expect(ranged.getSteps()).toBe(4);
     });
 
-    it("describes Tome as affecting only allied unit-cast buffs", () => {
+    it("describes the Tome's allied buff power and successful Craft odds", () => {
         const description =
-            "Increases the power of non-healing castable buffs allied units apply to allies by 35%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.";
+            "Increases the power of non-healing castable buffs allied units apply to allies by 35%. Increases Blacksmith's Craft chances for a double attack or a frozen weapon by the same percentage. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.";
         expect(formatArtifactDescription(getTier1ArtifactProperties(Tier1Artifact.TOME_OF_AMPLIFICATION))).toBe(
             description,
         );

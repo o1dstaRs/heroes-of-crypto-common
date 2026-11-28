@@ -42,7 +42,7 @@ export enum Tier1Artifact {
     BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 20% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
     MAGES_RING = 13, // +10% magic damage (army-wide); Tier-1 half of the arcane pair
     // Was Tier 2 id 10. That id stays addressable for saved games; new drafts pick this one.
-    TOME_OF_AMPLIFICATION = 14, // +35% power to non-healing castable buffs allied units apply to allies
+    TOME_OF_AMPLIFICATION = 14, // +35% to allied castable buff power and successful Craft odds
     // Was Tier 2 id 11. That id stays addressable for saved games; new drafts pick this one.
     RIME_CHARM = 15, // 30% plus the attacking unit's current luck to slow a target for 3 laps
 }
@@ -185,6 +185,9 @@ export const ARTIFACT_POWER = {
     LAST_FUSE_PERCENT: 25,
     LAST_FUSE_MIN_DAMAGE_PER_POWER: 25,
 } as const;
+
+const TOME_DESCRIPTION =
+    "Increases the power of non-healing castable buffs allied units apply to allies by {}%. Increases Blacksmith's Craft chances for a double attack or a frozen weapon by the same percentage. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.";
 
 export interface ArtifactProperties {
     readonly tier: ArtifactTier;
@@ -332,7 +335,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
             "tome_of_amplification",
             "Tome of Amplification",
             "Tome of Amplification",
-            "Increases the power of non-healing castable buffs allied units apply to allies by {}%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.",
+            TOME_DESCRIPTION,
         ),
         imageKey: "artifact_t2_tome_of_amplification_256",
     },
@@ -419,7 +422,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "tome_of_amplification",
         "Tome of Amplification",
         "Tome of Amplification",
-        "Increases the power of non-healing castable buffs allied units apply to allies by {}%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.",
+        TOME_DESCRIPTION,
     ),
     [Tier2Artifact.RIME_CHARM]: t2(
         Tier2Artifact.RIME_CHARM,
