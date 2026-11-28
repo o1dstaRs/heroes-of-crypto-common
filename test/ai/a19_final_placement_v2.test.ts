@@ -86,7 +86,7 @@ test("the serving adapter applies the confirmed choice without modifying inputs 
         };
         const incumbent = new Map(sample.input.bodies.map((b, i) => [b.id, { ...sample.baseline[i] }]));
         const before = JSON.stringify([...incumbent]);
-        // Confirmation fixtures keep their recorded HP, damage and pre-discount Satyr cost. Later live
+        // Confirmation fixtures keep their recorded HP, damage and creature costs. Later live
         // balance changes must not turn the historical stack quantity into an unfunded input or move
         // the recorded feature vector (Battle Mage max damage 5 -> 4 on 2026-11-19).
         const recordedHp = new Map(sample.input.bodies.map((b) => [b.creature, b.hp]));
@@ -101,6 +101,7 @@ test("the serving adapter applies the confirmed choice without modifying inputs 
                       ...(hp !== undefined ? { hp } : {}),
                       ...(recordedDamage.has(id) ? { maxDamage: recordedDamage.get(id)! } : {}),
                       ...(info.name === "Satyr" ? { exp: 28.2 } : {}),
+                      ...(info.name === "Cyclops" ? { exp: 140, abilities: "Large Caliber" } : {}),
                   }
                 : info;
         });

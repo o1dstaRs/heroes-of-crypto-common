@@ -1397,6 +1397,20 @@
         "aura_effect": "Web",
         "can_be_cast": false
     },
+    "Triumphant Roar": {
+        "name": "Triumphant Roar",
+        "type": "ATTACK",
+        "desc": [
+            "Each enemy stack this unit destroys grants +1 Attack to every surviving allied stack for the rest of the fight."
+        ],
+        "power": 1,
+        "power_type": "GAIN_ALLIED_ATTACK_ON_KILL",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Infest": {
         "name": "Infest",
         "type": "ATTACK",

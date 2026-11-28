@@ -107,6 +107,7 @@ export enum AbilityPowerType {
     // Appended to keep every existing serialized numeric value stable.
     MAGIC_VULNERABILITY_WIND = 70,
     ARMY_FIRE_COVENANT = 71,
+    GAIN_ALLIED_ATTACK_ON_KILL = 72,
 }
 
 export const AllAbilityPowerTypes = [
@@ -182,6 +183,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.DISABLE_HOURGLASS,
     AbilityPowerType.MAGIC_VULNERABILITY_WIND,
     AbilityPowerType.ARMY_FIRE_COVENANT,
+    AbilityPowerType.GAIN_ALLIED_ATTACK_ON_KILL,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -260,6 +262,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     DISABLE_HOURGLASS: AbilityPowerType.DISABLE_HOURGLASS,
     MAGIC_VULNERABILITY_WIND: AbilityPowerType.MAGIC_VULNERABILITY_WIND,
     ARMY_FIRE_COVENANT: AbilityPowerType.ARMY_FIRE_COVENANT,
+    GAIN_ALLIED_ATTACK_ON_KILL: AbilityPowerType.GAIN_ALLIED_ATTACK_ON_KILL,
 };
 
 export enum AbilityType {

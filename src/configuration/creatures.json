@@ -1227,7 +1227,7 @@
             "initiative": 4,
             "armor": 20,
             "attack_type": "RANGE",
-            "attack": 22,
+            "attack": 20,
             "attack_damage_min": 19,
             "attack_damage_max": 23,
             "attack_range": 1,
@@ -1235,11 +1235,11 @@
             "shot_distance": 6.5,
             "magic_resist": 10,
             "movement_type": "WALK",
-            "exp": 140,
+            "exp": 124,
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Large Caliber"]
+            "abilities": ["Large Caliber", "Triumphant Roar"]
         },
         "Zena": {
             "name": "Zena",

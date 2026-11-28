@@ -10,6 +10,7 @@
  */
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
+import { TRIUMPHANT_ROAR } from "../constants";
 import { Grid } from "../grid/grid";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
@@ -153,6 +154,7 @@ const ABILITY_TEXTURE_OVERRIDES: ReadonlyMap<string, string> = new Map([
     ["Arrows Wingshield Blessing", "arrows_wingshield_aura_256"],
     ["Angelic Host Blessing", "angelic_host_256"],
     ["Sharpened Weapons Blessing", "sharpened_weapons_aura_256"],
+    [TRIUMPHANT_ROAR, "riot_256"],
 ]);
 
 export const abilityToTextureName = (abilityName: string): string =>
@@ -198,6 +200,7 @@ const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
     "Rallying Volley Blessing",
     "Sharpened Weapons Blessing",
     "Water Shield",
+    TRIUMPHANT_ROAR,
     "Ember Covenant Blessing",
 ]);
 

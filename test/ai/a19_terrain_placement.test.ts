@@ -7,6 +7,7 @@ import {
 } from "../../src/ai/placement/terrain_reflection";
 import { creatureInfo } from "../../src/ai/setup/creature_score";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Grid } from "../../src/grid/grid";
 import { getFootprintCellsForAnchor } from "../../src/grid/grid_math";
 import { GridSettings } from "../../src/grid/grid_settings";
@@ -46,7 +47,10 @@ function parts(sample = fixture.cases[0]) {
 test("the adopted serving choice exactly reproduces all 72 registered openings, including 34 reflections", () => {
     FightStateManager.getInstance().reset();
     // Native draft/placement has already initialized the catalog before the measured policy call.
-    creatureInfo(1);
+    const cyclops = creatureInfo(PBTypes.CreatureVals.CYCLOPS)!;
+    const liveCost = cyclops.exp;
+    // The registered openings use the original Cyclops stack cost.
+    cyclops.exp = 140;
     setDeterministicRandomSource(makeRng(17112026));
     const rng = captureDeterministicRandomState();
     let changed = 0;
@@ -80,6 +84,7 @@ test("the adopted serving choice exactly reproduces all 72 registered openings, 
         expect(A19_TERRAIN_PLACEMENT_POLICY.adoptedByUser).toBe(true);
         expect(A19_TERRAIN_PLACEMENT_POLICY.registeredStrengthGatePassed).toBe(false);
     } finally {
+        cyclops.exp = liveCost;
         setDeterministicRandomSource(undefined);
     }
 });

@@ -901,6 +901,7 @@ export class UnitsHolder {
         }
 
         if (!considerResurrection) {
+            const rallyTeam = unitToDelete?.wasKilledByTriumphantRoar() ? unitToDelete.getOppositeTeam() : undefined;
             if (unitToDelete) {
                 this.allUnits.delete(unitId);
                 this.grid.cleanupAll(unitId, unitToDelete.getAttackRange(), unitToDelete.isSmallSize());
@@ -915,6 +916,9 @@ export class UnitsHolder {
                     // Do not use resetTarget(): a ranked/battle-snapshot hydrate may have captured this
                     // mid-fight id in initialUnitProperties, which would merely restore the same dangling id.
                     unit.setTarget("");
+                }
+                if (rallyTeam === unit.getTeam() && !unit.isDead()) {
+                    unit.grantTriumphantRoar();
                 }
             }
 

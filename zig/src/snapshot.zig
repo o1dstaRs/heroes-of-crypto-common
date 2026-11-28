@@ -796,6 +796,8 @@ fn loadUnit(s: *State, root: Value, configs: Value, uv: Value, ids: []const []co
         const ws = get(fields, "waterShieldSpent");
         u.water_shield_spent = !isUndefined(ws) and try boolean(ws, why, "waterShieldSpent");
     }
+    const rally = get(fields, "killedByTriumphantRoar");
+    u.killed_by_triumphant_roar = !isUndefined(rally) and try boolean(rally, why, "killedByTriumphantRoar");
 
     const target = get(props, "target");
     if (target == .string and target.string.len > 0) u.target = @intCast(try requireSlot(s, ids, target.string, why, "target"));

@@ -1110,7 +1110,7 @@ pub fn addAbility(s: *State, u: *Unit, a: Ability) bool {
 /// blessings included).
 pub fn isMarkerSpell(id: st.SpellId) bool {
     return id.isAugment() or id.isArtifact() or switch (id) {
-        .morale, .dismorale, .luck_blessing, .sylvan_focus_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .ember_covenant_blessing, .hidden, .visible, .warding_mane_blessing => true,
+        .morale, .dismorale, .luck_blessing, .sylvan_focus_blessing, .sharpened_weapons_blessing, .arcane_ward_blessing, .rallying_volley_blessing, .ember_covenant_blessing, .hidden, .visible, .warding_mane_blessing, .triumphant_roar => true,
         // batch 6a: the stack blessings and the Angel's two (ENGINE_MARKER_SPELL_NAMES); Wind Flow is takeable
         .tie_up_the_horses_blessing, .wolf_trail_blessing, .angelic_host_blessing, .arrows_wingshield_blessing => true,
         // batch 6b: the seeded Water Shield row

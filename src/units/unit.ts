@@ -42,6 +42,7 @@ import {
     NUMBER_OF_LAPS_TOTAL,
     MIN_ARMAGEDDON_DAMAGE_FIRST_WAVE,
     GUIDING_WINDS_MAX_PERCENT,
+    TRIUMPHANT_ROAR,
 } from "../constants";
 import { applyAttackDamageChain, projectShotCost, resolveAttackDamageChain } from "../damage/damage_projection";
 import { AuraEffect } from "../effects/aura_effect";
@@ -342,6 +343,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // refresh (UnitsHolder.refreshWaterShieldForAllUnits) never re-grants it after it breaks.
     protected waterShieldSpent = false;
     protected lastFuseFatalHit: { damage: number; source?: ILastFuseSource } | undefined = undefined;
+    private killedByTriumphantRoar = false;
     protected onHourglass = false;
     // True once this unit has moved during its current turn. Reset when its turn completes. Lets the
     // engine tell a real "manual" end-of-turn (it moved, then finished) from a do-nothing turn (e.g. an
@@ -1231,7 +1233,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     public deleteAllBuffs(): void {
         const hadHelpingHand = this.unitProperties.applied_buffs.includes("Helping Hand");
-        this.buffs = [];
+        this.buffs = this.buffs.filter((buff) => buff.getName() === TRIUMPHANT_ROAR);
 
         if (
             this.unitProperties.applied_buffs.length === this.unitProperties.applied_buffs_laps.length &&
@@ -1240,7 +1242,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         ) {
             for (let i = this.unitProperties.applied_buffs.length - 1; i >= 0; i--) {
                 const buffName = this.unitProperties.applied_buffs[i];
-                if (!buffName.endsWith(" Augment")) {
+                if (!buffName.endsWith(" Augment") && buffName !== TRIUMPHANT_ROAR) {
                     this.unitProperties.applied_buffs.splice(i, 1);
                     this.unitProperties.applied_buffs_laps.splice(i, 1);
                     this.unitProperties.applied_buffs_descriptions.splice(i, 1);
@@ -1932,6 +1934,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.amount_alive += revived;
         this.unitProperties.amount_died -= revived;
         this.lastFuseFatalHit = undefined;
+        this.killedByTriumphantRoar = false;
         this.refreshLastFuseDescription();
         return revived;
     }
@@ -2173,6 +2176,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.amount_died = damage.state.amountDied;
             if (damage.appliedDamage > 0) notifyEmberCovenantDamage(this, sceneLog);
             if (damage.dead && damage.unitsDied > 0) {
+                this.killedByTriumphantRoar =
+                    attacker?.getTeam() === this.getOppositeTeam() && attacker.hasAbilityActive(TRIUMPHANT_ROAR);
                 const source = lastFuseSource ?? lastFuseSourceFor(attacker);
                 this.lastFuseFatalHit = {
                     damage: damage.appliedDamage,
@@ -2200,6 +2205,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     public isDead(): boolean {
         return this.unitProperties.amount_alive <= 0;
+    }
+    public wasKilledByTriumphantRoar(): boolean {
+        return this.isDead() && this.killedByTriumphantRoar;
+    }
+    public grantTriumphantRoar(): void {
+        const power = (this.getBuffPower(TRIUMPHANT_ROAR) ?? 0) + 1;
+        this.deleteBuff(TRIUMPHANT_ROAR);
+        this.applyBuff(
+            new Spell({ spellProperties: { ...getSpellConfig("System", TRIUMPHANT_ROAR), power }, amount: 1 }),
+        );
+        this.unitProperties.attack_mod = roundUnitStat(this.unitProperties.attack_mod + 1, 2);
     }
     public setAmountAlive(amountAlive: number): void {
         if (amountAlive <= 0) {
@@ -4390,11 +4406,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
-        // Weapon Rune (Blacksmith): a stacking flat +N attack buff; accumulated bonus in the buff's first
-        // spell property (set in enchantCast). getAttack() = base_attack + attack_mod, so this lands as flat +N.
-        const enchantWeaponStacks = this.getBuffStacks("Weapon Rune");
-        if (enchantWeaponStacks) {
-            this.unitProperties.attack_mod = roundUnitStat(this.unitProperties.attack_mod + enchantWeaponStacks, 2);
+        // Weapon Rune and Triumphant Roar add their accumulated points after the percentage modifiers.
+        const flatAttackBonus = this.getBuffStacks("Weapon Rune") + (this.getBuffPower(TRIUMPHANT_ROAR) ?? 0);
+        if (flatAttackBonus) {
+            this.unitProperties.attack_mod = roundUnitStat(this.unitProperties.attack_mod + flatAttackBonus, 2);
         }
 
         // The attack twin of the armor_mod restore above — Riot / Mass Riot / Weakness / Warlord's Edge /

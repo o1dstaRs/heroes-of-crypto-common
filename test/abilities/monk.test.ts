@@ -92,7 +92,7 @@ describe("Monk configuration", () => {
         expect(softer(monk.magic_resist, cyclops.magic_resist)).toBeLessThanOrEqual(0.9);
 
         // Monk damage 20-25 stays strictly above Cyclops damage 19-23 on both ends.
-        expect(cyclops.base_attack).toBe(22);
+        expect(cyclops.base_attack).toBe(20);
         expect(cyclops.attack_damage_min).toBe(19);
         expect(cyclops.attack_damage_max).toBe(23);
         expect(monk.base_attack).toBe(27);

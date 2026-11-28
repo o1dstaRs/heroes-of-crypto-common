@@ -32,6 +32,7 @@ export const NUMBER_OF_LAPS_TILL_STOP_NARROWING = 12;
 export const NUMBER_OF_LAPS_FIRST_ARMAGEDDON = NUMBER_OF_LAPS_TILL_STOP_NARROWING;
 export const NUMBER_OF_ARMAGEDDON_WAVES = 4;
 export const NUMBER_OF_LAPS_TOTAL = NUMBER_OF_LAPS_FIRST_ARMAGEDDON + NUMBER_OF_ARMAGEDDON_WAVES - 1;
+export const TRIUMPHANT_ROAR = "Triumphant Roar";
 export const MAX_HOLE_LAYERS = 5;
 export const MAX_HITS_MOUNTAIN = 5;
 // BLOCK_CENTER is two separate 2x2 mountains; each is destroyed independently after this many hits.

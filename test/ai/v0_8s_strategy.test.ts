@@ -218,7 +218,8 @@ describe("v0.8 search measurement alias", () => {
         // Re-pinned 2026-11-19 for the requested six-unit HP/armor balance pass. The old-stat control
         // restores 855a02781d7fda61e46203e9dde56b97535b8588bcbceb423c14a322182defeb;
         // two new-stat runs agree with zero rejected actions.
-        expect(digest("v0.7")).toBe("d4a8968f557e31206a64a70629e5b9df45442d579f1b7397561703e533dcd8fa");
+        // Re-pinned for Cyclops XP 124, Attack 20 and Triumphant Roar. Two isolated runs agree.
+        expect(digest("v0.7")).toBe("3f080f822adfebb9d6968cd0e8207b6732ac31f102a1a0d098eaaf751d96883c");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -262,7 +263,8 @@ describe("v0.8 search measurement alias", () => {
         // The same 2026-11-19 balance pass moves this trace. The old-stat control restores
         // 917c16b76a800c614b0a6d82b5e53684d477aecedafd821962b30848fc4cf17c;
         // two new-stat runs agree with zero rejected actions.
-        expect(digest("v0.8")).toBe("6b3b3bd63c98e361c9b588367108cf3552d7ab985f9c66afc9de7a95c3e96c84");
+        // The same Cyclops update moves this trace. Two isolated runs agree.
+        expect(digest("v0.8")).toBe("2d36376feb8acc96d825d1396ad6bfa5aaaccb05a699a58941c7d93096010c95");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

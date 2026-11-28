@@ -527,7 +527,13 @@ pub fn applyDamageFrom(s: *State, ui: u8, minus_hp: f64, chance: f64, extend: bo
     const r = projectStackDamage(u, minus_hp);
     if (r.applied > 0 and s.ember_teams != 0) abilities.breakEmberCovenant(s, u.team);
     // damage.dead && unitsDied > 0: the stack's Helping Hand links end now, before the rest of the attack.
-    if (s.helping_hand and alive_before > 0 and u.amount_alive == 0) helpingHandChanged(s, st.NO_UID);
+    if (alive_before > 0 and u.amount_alive == 0) {
+        if (s.helping_hand) helpingHandChanged(s, st.NO_UID);
+        if (striker) |from| {
+            const attacker = &s.units[from];
+            u.killed_by_triumphant_roar = attacker.team == opposite(u.team) and attacker.has(.triumphant_roar);
+        }
+    }
     if (r.lost_and_survived and u.has(.bitter_experience)) {
         u.base_armor += 1;
         u.init.base_armor += 1;
@@ -837,6 +843,9 @@ fn adjustBaseStatsWith(s: *State, u: *Unit, comptime batch5: bool) void {
     if (s.runes) {
         if (runeStacks(u, .weapon_rune)) |n| u.attack_mod = js.roundUnitStat(u.attack_mod + n, 2);
     }
+    if (s.triumphant_roar_buffs) {
+        if (u.buffs.power(.triumphant_roar)) |bonus| u.attack_mod = js.roundUnitStat(u.attack_mod + bonus, 2);
+    }
     u.base_attack = js.roundUnitStat(u.base_attack * base_attack_multiplier, 2);
     u.shot_distance = js.roundUnitStat(u.shot_distance, 2);
     // Arrows Wingshield: the range-armor multiplier 1 x (1 + max(0, power) / 100).
@@ -1059,10 +1068,12 @@ pub fn tryRevive(s: *State, ui: u8) bool {
     u.amount_alive += revived;
     u.amount_died -= revived;
     u.fuse = .{}; // lastFuseFatalHit = undefined
+    u.killed_by_triumphant_roar = false;
     // deleteAllEffects, deleteAllBuffs (the " Augment" display rows stay, objects none), deleteAllDebuffs; each list
     // that held a Helping Hand row notifies once it is cleared.
     u.effects.len = 0;
     const hh_buff = s.helping_hand and u.buffs.find(.helping_hand) != null;
+    const rally = if (u.buffs.get(.triumphant_roar)) |buff| buff.* else null;
     var w: u8 = 0;
     for (u.buffs.items[0..u.buffs.len]) |b| {
         if (!b.id.isAugment()) continue;
@@ -1071,6 +1082,7 @@ pub fn tryRevive(s: *State, ui: u8) bool {
     }
     u.buffs.len = w;
     u.aug_orphans = w;
+    if (rally) |buff| abilities.pushChecked(s, &u.buffs, buff);
     if (hh_buff) helpingHandChanged(s, st.NO_UID);
     const hh_debuff = s.helping_hand and u.debuffs.find(.helping_hand) != null;
     u.debuffs.len = 0;
@@ -1183,6 +1195,7 @@ pub fn distanceToEnemyCentroid(s: *const State, enemy_team: u8, x: f64, y: f64) 
 pub fn deleteUnit(s: *State, ui: u8) void {
     if (s.helping_hand) helpingHandChanged(s, s.units[ui].uid);
     const u = &s.units[ui];
+    const rally_team: ?u8 = if (u.in_holder and u.isDead() and u.killed_by_triumphant_roar) opposite(u.team) else null;
     if (u.in_holder) {
         u.in_holder = false;
         cleanupAll(s, ui);
@@ -1194,6 +1207,12 @@ pub fn deleteUnit(s: *State, ui: u8) void {
     for (s.holderOrder()) |i| {
         const x = &s.units[i];
         if (x.target == @as(i8, @intCast(ui))) x.target = -1;
+        if (rally_team == x.team and !x.isDead()) {
+            const power = (x.buffs.power(.triumphant_roar) orelse 0) + 1;
+            abilities.replaceChecked(s, &x.buffs, .{ .id = .triumphant_roar, .laps = st.NUMBER_OF_LAPS_TOTAL, .power = power });
+            x.attack_mod = js.roundUnitStat(x.attack_mod + 1, 2);
+            s.triumphant_roar_buffs = true;
+        }
     }
     _ = s.fight.hourglass_q.removeOnce(ui);
     _ = s.fight.morale_minus_q.removeOnce(ui);
@@ -3067,6 +3086,7 @@ pub fn loadScopeFlags(s: *State, init: std.json.Value) !void {
             if (b.id == .rime_charm or b.id == .gravechain) riders = true;
             if (b.id == .fireforged_sword) s.swords = true;
             if (b.id == .armor_rune or b.id == .weapon_rune) s.runes = true;
+            if (b.id == .triumphant_roar) s.triumphant_roar_buffs = true;
             // Rime Charm inflicts Spit Ball's Quagmire: its holder turns the Spit Ball hooks on.
             if (b.id == .rime_charm) s.spit = true;
             if (b.id == .blessing or b.id == .battle_roar) s.spell_hooks = true;

@@ -939,6 +939,24 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Triumphant Roar": {
+            "name": "Triumphant Roar",
+            "level": 0,
+            "desc": ["+{} Attack from enemy stacks destroyed.", "Lasts for the rest of the fight."],
+            "target": "ANY_ALLY",
+            "power": 0,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 0,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Made of Fire": {
             "name": "Made of Fire",
             "level": 0,

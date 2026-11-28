@@ -24,19 +24,27 @@ import fixture from "./fixtures/doctrine_draft_v3_replay.json";
 if (!isRankedDraftStrengthPolicy(fixture.draft)) throw new Error("Unknown historical draft policy");
 const genome = rankedDraftStrengthCandidate(fixture.draft);
 
-// This immutable 2026-11-04 fixture predates Satyr's 5% XP discount. Keep the real draft and
-// stack-size calculations on that recorded cost, then restore every live catalog view.
-const withHistoricalSatyrCost = (replay: () => void) => () => {
-    const info = creatureInfo(PBTypes.CreatureVals.SATYR)!;
-    const catalog = creaturesByLevel(2).find((entry) => entry.creatureName === "Satyr")!;
-    const before = { source: creatures.Nature.Satyr.exp, info: info.exp, catalog: catalog.exp };
-    creatures.Nature.Satyr.exp = info.exp = catalog.exp = 28.2;
+// Run the draft and stack-size calculations with the creature balance recorded in the fixture.
+const withHistoricalCreatureBalance = (replay: () => void) => () => {
+    const satyrInfo = creatureInfo(PBTypes.CreatureVals.SATYR)!;
+    const satyrCatalog = creaturesByLevel(2).find((entry) => entry.creatureName === "Satyr")!;
+    const cyclops = creatures.Might.Cyclops;
+    const cyclopsInfo = creatureInfo(PBTypes.CreatureVals.CYCLOPS)!;
+    const cyclopsCatalog = creaturesByLevel(3).find((entry) => entry.creatureName === "Cyclops")!;
+    const satyrCosts = [creatures.Nature.Satyr.exp, satyrInfo.exp, satyrCatalog.exp] as const;
+    const cyclopsCosts = [cyclops.exp, cyclopsInfo.exp, cyclopsCatalog.exp] as const;
+    const cyclopsAbilities = [cyclops.abilities, cyclopsInfo.abilities] as const;
+
+    creatures.Nature.Satyr.exp = satyrInfo.exp = satyrCatalog.exp = 28.2;
+    cyclops.exp = cyclopsInfo.exp = cyclopsCatalog.exp = 140;
+    cyclops.abilities = ["Large Caliber"];
+    cyclopsInfo.abilities = "Large Caliber";
     try {
         replay();
     } finally {
-        creatures.Nature.Satyr.exp = before.source;
-        info.exp = before.info;
-        catalog.exp = before.catalog;
+        [creatures.Nature.Satyr.exp, satyrInfo.exp, satyrCatalog.exp] = satyrCosts;
+        [cyclops.exp, cyclopsInfo.exp, cyclopsCatalog.exp] = cyclopsCosts;
+        [cyclops.abilities, cyclopsInfo.abilities] = cyclopsAbilities;
     }
 };
 
@@ -100,7 +108,7 @@ describe("reusable locked doctrine draft policy", () => {
 
     test(
         "reproduces historical setups, decisions and collision counts across doctrines and seats",
-        withHistoricalSatyrCost(() => {
+        withHistoricalCreatureBalance(() => {
             expect(fixture.rows).toHaveLength(49);
             for (const row of fixture.rows) {
                 const decisions: IDoctrineDraftResearchDecision[] = [];

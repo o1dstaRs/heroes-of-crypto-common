@@ -173,7 +173,7 @@ describe("config_provider", () => {
     it("loads Cyclops's attack profile", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Cyclops", "cyclops_512", 1);
 
-        expect(creature.base_attack).toBe(22);
+        expect(creature.base_attack).toBe(20);
         expect(creature.attack_damage_min).toBe(19);
         expect(creature.attack_damage_max).toBe(23);
     });

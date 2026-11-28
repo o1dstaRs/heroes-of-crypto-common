@@ -45,6 +45,7 @@ const UNIT_FIELDS = [
     "responded",
     "waterShieldSpent",
     "lastFuseFatalHit",
+    "killedByTriumphantRoar",
     "onHourglass",
     "movedThisTurn",
     "movedRouteCellsThisTurn",

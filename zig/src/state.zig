@@ -217,6 +217,7 @@ pub const SpellId = enum(u8) {
     water_shield,
     /// The Abomination's buff aura row on its own team (read by nothing in the engine: the redirect recomputes coverage).
     flesh_shield_aura,
+    triumphant_roar,
 
     /// An artifact buff row or marker debuff (UnitsHolder.applyArtifacts).
     pub inline fn isArtifact(self: SpellId) bool {
@@ -323,6 +324,7 @@ pub const SpellId = enum(u8) {
             .empower => "Empower",
             .water_shield => "Water Shield",
             .flesh_shield_aura => "Flesh Shield Aura",
+            .triumphant_roar => "Triumphant Roar",
         };
     }
 
@@ -617,6 +619,7 @@ pub const AbilityId = enum(u8) {
     chain_lightning,
     /// Harpy: castable, one ":Castling" charge (swap with an enemy of the same footprint within movement range).
     castling,
+    triumphant_roar,
 
     pub fn name(self: AbilityId) []const u8 {
         return switch (self) {
@@ -730,6 +733,7 @@ pub const AbilityId = enum(u8) {
             .wind_element => "Wind Element",
             .chain_lightning => "Chain Lightning",
             .castling => "Castling",
+            .triumphant_roar => "Triumphant Roar",
         };
     }
 
@@ -1328,6 +1332,7 @@ pub const Unit = struct {
     /// Artifacts: Unit.lastFuseFatalHit, written by the killing hit when the striker's army holds Last Fuse, read by
     /// the same step's death cleanup (never set at a step boundary).
     fuse: FuseHit = .{},
+    killed_by_triumphant_roar: bool = false,
     /// The power its War Anger AuraEffect holds (the last aura refresh that iterated it), hidden: getUnitAuraAttackMod
     /// reads it at every refresh and at the strike.
     war_anger_power: f64 = 0,
@@ -1788,6 +1793,7 @@ pub const State = struct {
     craft_stun_power: f64 = 0,
     /// The runes: some unit carries a rune row or holds a rune charge, so the stat refresh adds their bonus.
     runes: bool = false,
+    triumphant_roar_buffs: bool = false,
     /// The Death "Quagmire" and "Gravebound" spells' powers (recorded `spellConfigs`; the riders set the laps).
     quagmire_power: f64 = 25,
     gravebound_power: f64 = 25,
